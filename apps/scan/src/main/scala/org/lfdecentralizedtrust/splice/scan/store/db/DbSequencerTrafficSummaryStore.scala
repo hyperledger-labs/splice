@@ -159,14 +159,13 @@ class DbSequencerTrafficSummaryStore(
         $trafficCosts,
         $viewHashesJson
       )
-      on conflict (history_id, sequencing_time) do nothing
     """.asUpdate
   }
 
   /** Insert multiple traffic summaries in a single transaction.
     *
-    * We use INSERT ... ON CONFLICT DO NOTHING to handle duplicates.
-    * Duplicates are identified by (history_id, sequencing_time).
+    * We check for existing sequencing_times first, then insert only non-existing items.
+    * The unique index on (history_id, sequencing_time) serves as a safety net.
     */
   def insertTrafficSummaries(
       items: Seq[TrafficSummaryT]
@@ -176,14 +175,30 @@ class DbSequencerTrafficSummaryStore(
 
     if (items.isEmpty) Future.unit
     else {
-      val action: DBIO[Unit] = DBIO
-        .sequence(items.map(sqlInsertTrafficSummary))
-        .map { counts =>
-          val inserted = counts.sum
-          logger.info(
-            s"Inserted $inserted traffic summaries out of ${items.size} (duplicates skipped)."
-          )
+      val checkExist = (sql"""
+        select sequencing_time
+        from #${Tables.trafficSummaries}
+        where history_id = $historyId
+          and """ ++ inClause("sequencing_time", items.map(_.sequencingTime.toMicros)))
+        .as[Long]
+
+      val action: DBIO[Unit] = for {
+        alreadyExisting <- checkExist.map(_.toSet)
+        nonExisting = items.filter(item => !alreadyExisting.contains(item.sequencingTime.toMicros))
+        _ = logger.info(
+          s"Already ingested traffic summaries: ${alreadyExisting.size}. Non-existing: ${nonExisting.size}."
+        )
+        _ <- if (nonExisting.nonEmpty) {
+          DBIO
+            .sequence(nonExisting.map(sqlInsertTrafficSummary))
+            .map { counts =>
+              val inserted = counts.sum
+              logger.info(s"Inserted $inserted traffic summaries.")
+            }
+        } else {
+          DBIO.successful(())
         }
+      } yield ()
 
       futureUnlessShutdownToFuture(
         storage

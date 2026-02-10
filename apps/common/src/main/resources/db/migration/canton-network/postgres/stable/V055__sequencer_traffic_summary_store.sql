@@ -21,10 +21,11 @@ create table sequencer_traffic_summary_store
     -- View hashes per envelope, stored as JSONB array of arrays (parallel array with envelope_traffic_costs)
     -- Each element contains view hashes for one envelope, e.g., [["hash1","hash2"],["hash3"]]
     envelope_view_hashes        jsonb not null,
-    constraint sequencer_traffic_summary_store_pkey primary key (row_id),
-    -- Unique constraint for deduplication during ingestion (sequencing_time is unique per history)
-    constraint sequencer_traffic_summary_unique unique (history_id, sequencing_time)
+    constraint sequencer_traffic_summary_store_pkey primary key (row_id)
 );
 
 -- Index for efficient querying by history, migration and sequencing time
 create index sequencer_traffic_hi_mi_st on sequencer_traffic_summary_store (history_id, migration_id, sequencing_time);
+
+-- Unique index for deduplication (safety net) and efficient existence checks
+create unique index sequencer_traffic_hi_st on sequencer_traffic_summary_store (history_id, sequencing_time);
