@@ -12,8 +12,6 @@ import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  ActiveContract,
-  IncompleteReassignmentEvent,
   Reassignment,
   ReassignmentEvent,
   ReassignmentUpdate,
@@ -65,6 +63,10 @@ import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.util.MonadUtil
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -305,26 +307,20 @@ class UpdateHistory(
       private def description() =
         s"UpdateHistory(party=$updateStreamParty, participantId=$participantId, migrationId=$domainMigrationId, historyId=$historyId)"
 
-      override def ingestAcs(
+      override def ingestAcsStreamInBatches(
+          source: Source[Seq[BaseLedgerConnection.ActiveContractsItem], NotUsed],
           offset: Long,
-          acs: Seq[ActiveContract],
-          incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-          incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-      )(implicit traceContext: TraceContext): Future[Unit] = {
-        if (acs.nonEmpty || incompleteIn.nonEmpty || incompleteOut.nonEmpty) {
-          logger.info(
-            s"${description()} started from the ACS at offset $offset, " +
-              s"but the ACS already contains (acs=${acs.size}, incompleteOut=${incompleteOut.size} incompleteIn=${incompleteIn.size}) elements at that point. " +
-              "This is only fine in the following cases:\n" +
-              "- This is an SV node that joined late, and has thus missed past updates for the multi-hosted SV party. " +
-              "In this case, the node needs to download the missing updates from other SV nodes.\n" +
-              "- This is a participant starting after a hard domain migration. " +
-              "In this case, all items in the ACS must come from the previous domain migration."
-          )
-        }
+      )(implicit tc: TraceContext, mat: Materializer): Future[Unit] = {
+        logger.info(
+          s"${description()} started from the ACS at offset $offset, " +
+            s"but the ACS was already initialized. " +
+            "This is only fine in the following cases:\n" +
+            "- This is an SV node that joined late, and has thus missed past updates for the multi-hosted SV party. " +
+            "In this case, the node needs to download the missing updates from other SV nodes.\n" +
+            "- This is a participant starting after a hard domain migration. " +
+            "In this case, all items in the ACS must come from the previous domain migration."
+        )
 
-        // The update history only stores actual updates,
-        // it doesn't try to reconstruct past updates from the initial state.
         Future.unit
       }
 

@@ -42,8 +42,11 @@ import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.circe.Json
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 
 import java.time.Instant
@@ -744,12 +747,36 @@ object MultiDomainAcsStore extends StoreErrors {
     /** Must be the first method called. Returns information about where and how to start ingestion. */
     def initialize()(implicit traceContext: TraceContext): Future[IngestionStart]
 
+    @VisibleForTesting
     def ingestAcs(
         offset: Long,
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit traceContext: TraceContext): Future[Unit]
+    )(implicit mat: Materializer, traceContext: TraceContext): Future[Unit] = {
+      ingestAcsStreamInBatches(
+        Source.single[Seq[BaseLedgerConnection.ActiveContractsItem]](
+          acs.map[BaseLedgerConnection.ActiveContractsItem](
+            BaseLedgerConnection.ActiveContractsItem.ActiveContract(_)
+          ) ++
+            incompleteOut.iterator.map(
+              BaseLedgerConnection.ActiveContractsItem.IncompleteUnassign(_)
+            ) ++
+            incompleteIn.iterator.map(
+              BaseLedgerConnection.ActiveContractsItem.IncompleteAssign(_)
+            )
+        ),
+        offset,
+      )
+    }
+
+    def ingestAcsStreamInBatches(
+        source: Source[Seq[BaseLedgerConnection.ActiveContractsItem], NotUsed],
+        offset: Long,
+    )(implicit
+        tc: TraceContext,
+        mat: Materializer,
+    ): Future[Unit]
 
     def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
