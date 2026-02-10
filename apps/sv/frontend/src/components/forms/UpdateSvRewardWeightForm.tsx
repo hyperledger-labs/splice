@@ -37,6 +37,8 @@ interface ExtraFormField {
 
 export type UpdateSvRewardWeightFormData = CommonProposalFormData & ExtraFormField;
 
+const LEADING_ZEROS = /^0+(?=\d)/;
+
 export const UpdateSvRewardWeightForm: React.FC = _ => {
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
@@ -82,7 +84,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
             tag: 'SRARC_UpdateSvRewardWeight',
             value: {
               svParty: value.sv,
-              newRewardWeight: value.weight.replace('_', ''),
+              newRewardWeight: value.weight.replace('_', '').replace(LEADING_ZEROS, ''),
             },
           },
         },

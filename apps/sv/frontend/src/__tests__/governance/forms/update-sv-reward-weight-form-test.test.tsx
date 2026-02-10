@@ -458,4 +458,55 @@ describe('Update SV Reward Weight Form', () => {
 
     await screen.findByText('Successfully submitted the proposal');
   });
+
+  test('should send reward weight to backend without underscore', async () => {
+    let requestBody = '';
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, async (req, res, ctx) => {
+        requestBody = await req.text();
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    await user.type(weightInput, '0_1000');
+
+    await user.click(actionInput); // triggers onBlur validation
+    await waitFor(async () => {
+      expect(submitButton).not.toBeDisabled();
+    });
+
+    await user.click(submitButton); // review proposal
+    await user.click(submitButton); // submit proposal
+
+    await waitFor(() => {
+      expect(requestBody).toContain('1000');
+    });
+    expect(requestBody).not.toContain('_');
+  });
 });
