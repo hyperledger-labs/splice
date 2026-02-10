@@ -172,5 +172,6 @@ Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*GrpcServic
 
 # LSU test when sync nodes are stopped
 The operation 'request current time' was not successful.*RequestFailed\(No connection available\)
+Now retrying operation 'request current time'
 
 # Make sure to have a trailing newline
