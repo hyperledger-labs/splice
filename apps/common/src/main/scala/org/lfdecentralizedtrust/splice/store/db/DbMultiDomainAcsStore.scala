@@ -1117,7 +1117,7 @@ final class DbMultiDomainAcsStore[TXE](
           // But if the offset changes between calls (which can happen in InitializeAcsAtLatestOffset), then we might miss some archival events,
           // and thus we need to ingest the entire ACS from the beginning.
           // Since we are not using any long-running transaction spanning the entire ACS ingestion
-          // process, ACS queries could return incomplete data shorty after application start.
+          // process, ACS queries could return incomplete data shortly after application start.
           // This is fine because all clients are expected to use [[waitUntilAcsIngested()]] to avoid
           // reading ACS data before it has finished ingesting.
           _ <- clearDataForCurrentMigrationId()
