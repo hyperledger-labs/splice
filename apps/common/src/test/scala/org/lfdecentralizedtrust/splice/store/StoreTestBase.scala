@@ -15,7 +15,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
+import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressionRule}
 import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
@@ -34,7 +34,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   schedule as scheduleCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -52,11 +52,14 @@ import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
   Trees,
 }
-import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Numeric
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
@@ -88,7 +91,12 @@ import scala.concurrent.{Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
+abstract class StoreTestBase
+    extends AsyncWordSpec
+    with BaseTest
+    with HasActorSystem
+    with HasExecutionContext
+    with NamedLogging {
 
   protected val upgradedAppRewardCouponPackageId = "upgradedpackageid"
   protected val dummyHoldingPackageId = DummyHolding.TEMPLATE_ID.getPackageId
@@ -953,6 +961,15 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
     updateId = updateId,
   )
 
+  protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {
+    case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
+      ActiveContract(
+        domain,
+        toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
+        counter,
+      )
+  }
+
   protected def acs(
       acs: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
       incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
@@ -961,14 +978,7 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map {
-        case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
-          ActiveContract(
-            domain,
-            toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
-            counter,
-          )
-      },
+      acs.map(acsImportEntryToActiveContract),
       incompleteOut.map {
         case StoreTestBase.AcsImportIncompleteEntry(
               c,
@@ -1058,20 +1068,12 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
       underlying.ingestionFilter
     override def initialize()(implicit traceContext: TraceContext) =
       underlying.initialize()
-    override def ingestAcs(
+
+    override def ingestAcsStreamInBatches(
+        source: Source[Seq[BaseLedgerConnection.ActiveContractsItem], NotUsed],
         offset: Long,
-        acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit traceContext: TraceContext) =
-      withoutRepeatedIngestionWarning(
-        underlying.ingestAcs(
-          offset,
-          acs,
-          incompleteOut,
-          incompleteIn,
-        )(traceContext)
-      )
+    )(implicit tc: TraceContext, mat: Materializer): Future[Unit] =
+      withoutRepeatedIngestionWarning(underlying.ingestAcsStreamInBatches(source, offset)(tc, mat))
 
     override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext

@@ -61,7 +61,6 @@ class SvSvAutomationService(
       svStore,
       ledgerClient,
       retryProvider,
-      config.ingestFromParticipantBegin,
       config.parameters,
     ) {
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
