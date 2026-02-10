@@ -144,11 +144,16 @@ Accepting the proposal will automatically replace the existing delegation with t
 This allows beneficiaries to update their delegation parameters (such as extending the
 expiration date) without the delegate having to manually withdraw the old delegation first.
 
+.. tip::
+   To change a delegation's expiration or amulet merge limit, the beneficiary should
+   create a new proposal with the updated values. When the delegate accepts it, the
+   existing delegation will be replaced.
+
 
 Creating Proposals via Ledger API
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-External parties (beneficiaries) who wish to delegate minting to a validator operator
+External parties (beneficiaries) who wish to delegate minting to a delegate party
 must create a ``MintingDelegationProposal`` contract. Since beneficiaries typically do not
 have access to the wallet UI, they can create proposals programmatically using the
 Canton Ledger API.
@@ -171,8 +176,8 @@ Before creating a proposal, the beneficiary must have:
 3. **The delegate's party ID**: The delegate is typically the validator operator party,
    but could be another internal party on the validator node.
 
-4. **The DSO party ID**: The DSO party ID for the network. This can be obtained from
-   the Scan API.
+4. **The DSO party ID**: The DSO party ID for the network.
+
 
 Example: Creating a Proposal
 """"""""""""""""""""""""""""
