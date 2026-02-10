@@ -39,6 +39,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
+import scala.util.Using
 
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
@@ -280,65 +281,69 @@ class LogicalSynchronizerUpgradeIntegrationTest
               oldBackend.sequencerClient.topology.transactions.logical_upgrade_state()
             val dump = DomainMigrationInitializer
               .loadDomainMigrationDump((expectedDirectory / "domain_migration_dump.json").path)
-            val sequencerInitializer =
-              new NodeInitializer(
-                sequencerAdminConnection(newBackend),
-                retryProvider,
-                loggerFactory,
-              )
-            val newMediatorAdminConnection = mediatorAdminConnection(newBackend)
-            val mediatorInitializer =
-              new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
-
-            clue(s"init ${oldBackend.name} sequencer and mediator from dump") {
-              newBackend.sequencerClient.health.wait_for_ready_for_id()
-              sequencerInitializer
-                .initializeFromDump(dump.nodeIdentities.sequencer)
-                .futureValue
-
-              newBackend.mediatorClient.health.wait_for_ready_for_id()
-              mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
-            }
-            val staticSynchronizerParameters =
-              oldBackend.sequencerClient.synchronizer_parameters.static.get()
-            val newStaticSyncParams = staticSynchronizerParameters.copy(
-              serial = staticSynchronizerParameters.serial + NonNegativeInt.one
-            )
-
-            clue(s"init ${oldBackend.name} sequencer from synchronizer predecessor") {
-              newBackend.sequencerClient.health.wait_for_ready_for_initialization()
-              newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
-                lsuSynchronizerState,
-                newStaticSyncParams,
-              )
-              eventually(2.minutes) {
-                newBackend.sequencerClient.topology.transactions
-                  .list(decentralizedSynchronizerId)
-                  .result
-                  .size shouldBe topologyTransactionsOnTheSync
-              }
-            }
-
-            clue(s"init ${oldBackend.name} mediator") {
-              newMediatorAdminConnection
-                .initialize(
-                  PhysicalSynchronizerId(
-                    decentralizedSynchronizerId,
-                    newStaticSyncParams.toInternal,
-                  ),
-                  GrpcSequencerConnection
-                    .create(
-                      newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
-                    )
-                    .value,
-                  newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification.toInternal,
+            Using.resources(
+              sequencerAdminConnection(newBackend),
+              mediatorAdminConnection(newBackend),
+            ) { (newSequencerAdminConnection, newMediatorAdminConnection) =>
+              val sequencerInitializer =
+                new NodeInitializer(
+                  newSequencerAdminConnection,
+                  retryProvider,
+                  loggerFactory,
                 )
-                .futureValue
-              eventually(2.minutes) {
-                newBackend.mediatorClient.topology.transactions
-                  .list(decentralizedSynchronizerId)
-                  .result
-                  .size shouldBe topologyTransactionsOnTheSync
+              val mediatorInitializer =
+                new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
+
+              clue(s"init ${oldBackend.name} sequencer and mediator from dump") {
+                newBackend.sequencerClient.health.wait_for_ready_for_id()
+                sequencerInitializer
+                  .initializeFromDump(dump.nodeIdentities.sequencer)
+                  .futureValue
+
+                newBackend.mediatorClient.health.wait_for_ready_for_id()
+                mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
+              }
+              val staticSynchronizerParameters =
+                oldBackend.sequencerClient.synchronizer_parameters.static.get()
+              val newStaticSyncParams = staticSynchronizerParameters.copy(
+                serial = staticSynchronizerParameters.serial + NonNegativeInt.one
+              )
+
+              clue(s"init ${oldBackend.name} sequencer from synchronizer predecessor") {
+                newBackend.sequencerClient.health.wait_for_ready_for_initialization()
+                newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
+                  lsuSynchronizerState,
+                  newStaticSyncParams,
+                )
+                eventually(2.minutes) {
+                  newBackend.sequencerClient.topology.transactions
+                    .list(decentralizedSynchronizerId)
+                    .result
+                    .size shouldBe topologyTransactionsOnTheSync
+                }
+              }
+
+              clue(s"init ${oldBackend.name} mediator") {
+                newMediatorAdminConnection
+                  .initialize(
+                    PhysicalSynchronizerId(
+                      decentralizedSynchronizerId,
+                      newStaticSyncParams.toInternal,
+                    ),
+                    GrpcSequencerConnection
+                      .create(
+                        newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+                      )
+                      .value,
+                    newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification.toInternal,
+                  )
+                  .futureValue
+                eventually(2.minutes) {
+                  newBackend.mediatorClient.topology.transactions
+                    .list(decentralizedSynchronizerId)
+                    .result
+                    .size shouldBe topologyTransactionsOnTheSync
+                }
               }
             }
 
