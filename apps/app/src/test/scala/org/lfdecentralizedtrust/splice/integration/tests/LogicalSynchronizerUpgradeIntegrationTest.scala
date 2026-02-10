@@ -46,12 +46,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
     with ProcessTestUtil
     with SvTestUtil
     with WalletTestUtil
-    with DomainMigrationUtil
     with StandaloneCanton
-    with SplitwellTestUtil
     with HasExecutionContext {
 
   override protected def runEventHistorySanityCheck: Boolean = false
+  override protected lazy val resetRequiredTopologyState: Boolean = false
 
   override def dbsSuffix = "lsu"
 
@@ -164,7 +163,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       startAllSync(validatorBackend)
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
       walletClient.tap(tapAmount)
-      withClueAndLog(s"${validatorBackend.name} has tapped a amulet") {
+      clue(s"${validatorBackend.name} has tapped a amulet") {
         checkWallet(
           walletUserParty,
           walletClient,
