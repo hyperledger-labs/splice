@@ -170,4 +170,7 @@ java.lang.IllegalStateException: cannot enqueue after timer shutdown
 Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*Causes: First received frame was not SETTINGS. Hex dump for first 5 bytes
 Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*GrpcServiceUnavailable: UNAVAILABLE/io exception
 
+#TODO(DACH-NY/cn-test-failures#6834) Remove once Canton fixes the log level of this.
+Received a mediator confirmation request with id.*with some informees not being hosted by an active participant: alice-validatorLocalForValidatorReonboardingIT-1
+
 # Make sure to have a trailing newline
