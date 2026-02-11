@@ -5,14 +5,14 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import cats.data.{NonEmptyList, NonEmptyVector, OptionT}
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Transaction}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -33,7 +33,7 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
   Trees,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M, String3}
+import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -49,10 +49,6 @@ import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
-  ContractStateEvent,
-  ReassignmentId,
-}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   AcsStoreId,
   SelectFromAcsTableWithStateResult,
@@ -61,18 +57,18 @@ import org.lfdecentralizedtrust.splice.store.db.AcsTables.ContractStateRowData
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
-import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.circe.Json
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.ActiveContractsItem
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
-import scala.collection.mutable
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
@@ -241,7 +237,6 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Boolean] = waitUntilAcsIngested {
     if (ids.isEmpty) Future.successful(false)
     else {
-      val contractIds = inClause(ids)
       val expectedCount = ids.size
       storage
         .query(
@@ -250,7 +245,7 @@ final class DbMultiDomainAcsStore[TXE](
          from #$acsTableName acs
          where acs.store_id = $acsStoreId
          and acs.migration_id = $domainMigrationId
-         and acs.contract_id in """ ++ contractIds ++ sql"""
+         and """ ++ inClause("acs.contract_id", ids) ++ sql"""
          """).toActionBuilder
             .as[Int]
             .head,
@@ -582,50 +577,61 @@ final class DbMultiDomainAcsStore[TXE](
       )(implicit
           tc: TraceContext
       ): Future[DestinationHistory.InsertResult] = {
-        val trees = items.collect { case UpdateHistoryResponse(TransactionTreeUpdate(tree), _) =>
-          assert(
-            tree.getRecordTime.isAfter(CantonTimestamp.MinValue.toInstant),
-            "insert() must not be called with import updates",
-          )
-          tree
-        }
-        val nonEmpty = NonEmptyList
-          .fromFoldable(trees)
-          .getOrElse(
-            throw new RuntimeException("insert() must not be called with an empty sequence")
-          )
-        val firstTree = nonEmpty.foldLeft(nonEmpty.head) { case (acc, tree) =>
-          if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
-        }
-        val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
-        val treesWithEntries = trees.flatMap { tree =>
-          val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
-          entries.map(e => (tree, e))
+        val trees = items.collect {
+          case UpdateHistoryResponse(TransactionTreeUpdate(tree), _)
+              if !tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX) =>
+            assert(
+              tree.getRecordTime.isAfter(CantonTimestamp.MinValue.toInstant),
+              "insert() must not be called with import updates",
+            )
+            tree
         }
 
-        for {
-          _ <- storage.queryAndUpdate(
-            DBIOAction
-              .seq(
-                doInsertEntries(migrationId, synchronizerId, treesWithEntries),
-                doUpdateFirstIngestedUpdate(
-                  synchronizerId,
-                  migrationId,
-                  firstRecordTime,
-                ),
+        NonEmptyList.fromFoldable(trees) match {
+          case None =>
+            Future.successful(
+              DestinationHistory.InsertResult(
+                backfilledUpdates = 0L,
+                backfilledCreatedEvents = 0L,
+                backfilledExercisedEvents = 0L,
+                lastBackfilledRecordTime =
+                  items.headOption.map(_.update.recordTime).getOrElse(CantonTimestamp.MinValue),
               )
-              .transactionally,
-            "destinationHistory.insert",
-          )
-        } yield {
-          val ingestedEvents = IngestedEvents.eventCount(trees)
-          DestinationHistory.InsertResult(
-            backfilledUpdates = trees.size.toLong,
-            backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
-            backfilledCreatedEvents = ingestedEvents.numCreatedEvents,
-            lastBackfilledRecordTime =
-              CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
-          )
+            )
+          case Some(nonEmpty) =>
+            val firstTree = nonEmpty.foldLeft(nonEmpty.head) { case (acc, tree) =>
+              if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
+            }
+            val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
+            val treesWithEntries = trees.flatMap { tree =>
+              val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
+              entries.map(e => (tree, e))
+            }
+
+            for {
+              _ <- storage.queryAndUpdate(
+                DBIOAction
+                  .seq(
+                    doInsertEntries(migrationId, synchronizerId, treesWithEntries),
+                    doUpdateFirstIngestedUpdate(
+                      synchronizerId,
+                      migrationId,
+                      firstRecordTime,
+                    ),
+                  )
+                  .transactionally,
+                "destinationHistory.insert",
+              )
+            } yield {
+              val ingestedEvents = IngestedEvents.eventCount(trees)
+              DestinationHistory.InsertResult(
+                backfilledUpdates = trees.size.toLong,
+                backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
+                backfilledCreatedEvents = ingestedEvents.numCreatedEvents,
+                lastBackfilledRecordTime =
+                  CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
+              )
+            }
         }
       }
 
@@ -1089,13 +1095,98 @@ final class DbMultiDomainAcsStore[TXE](
         })
         .transactionally
     }
-    override def ingestAcs(
+
+    def ingestAcsStreamInBatches(
+        source: Source[Seq[BaseLedgerConnection.ActiveContractsItem], NotUsed],
+        offset: Long,
+    )(implicit
+        tc: TraceContext,
+        mat: Materializer,
+    ): Future[Unit] = {
+      if (hasFinishedAcsIngestion) {
+        Future.failed(
+          new RuntimeException(
+            s"ACS was already ingested for store $acsStoreId, cannot ingest again"
+          )
+        )
+      } else {
+        for {
+          // If we crash halfway through we want to start over with the whole ACS ingestion.
+          // If the offset is the same between calls, this isn't strictly necessary, as `on conflict do nothing` prevents any issues.
+          // But if the offset changes between calls (which can happen in InitializeAcsAtLatestOffset), then we might miss some archival events,
+          // and thus we need to ingest the entire ACS from the beginning.
+          // Since we are not using any long-running transaction spanning the entire ACS ingestion
+          // process, ACS queries could return incomplete data shortly after application start.
+          // This is fine because all clients are expected to use [[waitUntilAcsIngested()]] to avoid
+          // reading ACS data before it has finished ingesting.
+          _ <- clearDataForCurrentMigrationId()
+          acsSize <- source.runWith(
+            Sink.foldAsync[Int, Seq[BaseLedgerConnection.ActiveContractsItem]](0) {
+              case (acsSizeSoFar, batch) =>
+                val summaryState = MutableIngestionSummary.empty
+                ingestAcsBatch(
+                  offset,
+                  batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
+                  batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) =>
+                    unassign
+                  },
+                  batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
+                  summaryState,
+                ).map { _ =>
+                  val newAcsSize = summaryState.acsSizeDiff + acsSizeSoFar
+                  val summary = summaryState
+                    .toIngestionSummary(
+                      synchronizerIdToRecordTime = Map.empty,
+                      offset = offset,
+                      newAcsSize = newAcsSize,
+                      metrics = metrics,
+                    )
+                  handleIngestionSummary(summary)
+                  logger.debug(show"Ingested ACS batch $summary")
+                  newAcsSize
+                }
+            }
+          )
+          // A store is considered initialized if the last ingested offset is set
+          // Therefore, we must do that after the ACS is ingested,
+          // so that in case of failure the whole ACS ingestion will be retried.
+          _ <- markAcsIngestedAsOf(offset, acsSize)
+        } yield ()
+      }
+    }
+
+    private def clearDataForCurrentMigrationId()(implicit
+        traceContext: TraceContext
+    ): Future[Unit] = {
+      for {
+        nAcs <- storage
+          .update(
+            sqlu"delete from #$acsTableName where store_id = $acsStoreId and migration_id = $domainMigrationId",
+            "clearDataForCurrentMigrationId.deleteAcs",
+          )
+        nReassignments <- storage.update(
+          sqlu"delete from incomplete_reassignments where store_id = $acsStoreId and migration_id = $domainMigrationId",
+          "clearDataForCurrentMigrationId.deleteReassignments",
+        )
+      } yield {
+        if (nAcs > 0 || nReassignments > 0) {
+          logger.warn(
+            s"Deleted $nAcs rows from ACS table and $nReassignments incomplete reassignments for store $acsStoreId and migration $domainMigrationId. " +
+              "This should only happen if the store already had some data, but was not marked as having ingested the ACS " +
+              "(because of a previous failed ACS ingestion attempt)."
+          )
+        }
+      }
+    }
+
+    private def ingestAcsBatch(
         offset: Long,
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
+        summaryState: MutableIngestionSummary,
     )(implicit traceContext: TraceContext): Future[Unit] = {
-      if (finishedAcsIngestion.isCompleted) {
+      if (hasFinishedAcsIngestion) {
         Future.failed(
           new RuntimeException(
             s"ACS was already ingested for store $acsStoreId, cannot ingest again"
@@ -1119,104 +1210,106 @@ final class DbMultiDomainAcsStore[TXE](
           contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
         }
 
-        val summaryState = MutableIngestionSummary.empty
+        val acsInserts = NonEmptyList
+          .fromFoldable(todoAcs)
+          .map(acs =>
+            doIngestAcsInserts(
+              acs.map { ac =>
+                AcsInsertEntry(
+                  offset,
+                  ac.createdEvent,
+                  stateRowDataFromActiveContract(
+                    ac.synchronizerId,
+                    ac.reassignmentCounter,
+                  ),
+                )
+              },
+              summaryState,
+              onConflictDoNothing = true,
+            )
+          )
+
+        val incompleteOutInserts = NonEmptyList
+          .fromFoldable(todoIncompleteOut)
+          .map { evts =>
+            doIngestAcsInserts(
+              evts.map { evt =>
+                AcsInsertEntry(
+                  offset,
+                  evt.createdEvent,
+                  stateRowDataFromUnassign(evt.reassignmentEvent),
+                )
+              },
+              summaryState,
+              onConflictDoNothing = true,
+            )
+          }
+          .toList ++ todoIncompleteOut.map { evt =>
+          // TODO (#3884): batch inserts
+          doRegisterIncompleteReassignment(
+            evt.createdEvent.getContractId,
+            evt.reassignmentEvent.source,
+            evt.reassignmentEvent.unassignId,
+            isAssignment = false,
+            summaryState,
+          )
+        }
+
+        val incompleteInInserts = NonEmptyList
+          .fromFoldable(todoIncompleteIn)
+          .map { evts =>
+            doIngestAcsInserts(
+              evts.map { evt =>
+                AcsInsertEntry(
+                  offset,
+                  evt.reassignmentEvent.createdEvent,
+                  stateRowDataFromAssign(evt.reassignmentEvent),
+                )
+              },
+              summaryState,
+              onConflictDoNothing = true,
+            )
+          }
+          .toList ++ todoIncompleteIn.map { evt =>
+          // TODO (#3884): batch inserts
+          doRegisterIncompleteReassignment(
+            evt.reassignmentEvent.createdEvent.getContractId,
+            evt.reassignmentEvent.source,
+            evt.reassignmentEvent.unassignId,
+            isAssignment = true,
+            summaryState,
+          )
+        }
+
         for {
           _ <- storage
             .queryAndUpdate(
-              ingestUpdateAtOffset(
-                offset,
-                DBIO
-                  .sequence(
-                    // TODO (#989): batch inserts
-                    todoAcs.map { ac =>
-                      for {
-                        _ <- doIngestAcsInserts(
-                          NonEmptyList
-                            .of(
-                              AcsInsertEntry(
-                                offset,
-                                ac.createdEvent,
-                                stateRowDataFromActiveContract(
-                                  ac.synchronizerId,
-                                  ac.reassignmentCounter,
-                                ),
-                              )
-                            ),
-                          summaryState,
-                        )
-                      } yield ()
-                    }
-                      ++ todoIncompleteOut.map { evt =>
-                        for {
-                          _ <- doIngestAcsInserts(
-                            NonEmptyList
-                              .of(
-                                AcsInsertEntry(
-                                  offset,
-                                  evt.createdEvent,
-                                  stateRowDataFromUnassign(evt.reassignmentEvent),
-                                )
-                              ),
-                            summaryState,
-                          )
-                          _ <- doRegisterIncompleteReassignment(
-                            evt.createdEvent.getContractId,
-                            evt.reassignmentEvent.source,
-                            evt.reassignmentEvent.unassignId,
-                            isAssignment = false,
-                            summaryState,
-                          )
-                        } yield ()
-                      }
-                      ++ todoIncompleteIn.map { evt =>
-                        for {
-                          _ <- doIngestAcsInserts(
-                            NonEmptyList
-                              .of(
-                                AcsInsertEntry(
-                                  offset,
-                                  evt.reassignmentEvent.createdEvent,
-                                  stateRowDataFromAssign(evt.reassignmentEvent),
-                                )
-                              ),
-                            summaryState,
-                          )
-                          _ <- doRegisterIncompleteReassignment(
-                            evt.reassignmentEvent.createdEvent.getContractId,
-                            evt.reassignmentEvent.source,
-                            evt.reassignmentEvent.unassignId,
-                            isAssignment = true,
-                            summaryState,
-                          )
-                        } yield ()
-                      }
-                  ),
-              ),
-              "ingestAcs",
+              DBIO
+                .sequence(
+                  acsInserts.toList ++ incompleteOutInserts ++ incompleteInInserts
+                ),
+              "ingestAcsBatch",
             )
-        } yield {
-          val newAcsSize = summaryState.acsSizeDiff
-          val summary = summaryState.toIngestionSummary(
-            updateId = None,
-            offset = offset,
-            synchronizerIdToRecordTime = Map.empty,
-            newAcsSize = newAcsSize,
-            metrics = metrics,
-          )
-          state
-            .getAndUpdate(
-              _.withUpdate(newAcsSize, offset)
-            )
-            .signalOffsetChanged(offset)
+        } yield ()
+      }
+    }
 
-          logger.debug(show"Ingested complete ACS at offset $offset: $summary")
-          handleIngestionSummary(summary)
-
-          finishedAcsIngestion.success(())
-          logger.info(
-            s"Store $acsStoreId ingested the ACS and switched to ingesting updates at $offset"
+    private def markAcsIngestedAsOf(offset: Long, acsSize: Int)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] = {
+      storage.update(updateOffset(offset), "markAcsIngestedAsOf").map { _ =>
+        state
+          .getAndUpdate(
+            _.withUpdate(acsSize, offset)
           )
-        }
+          .signalOffsetChanged(offset)
+
+        logger.debug(show"Ingested complete ACS at offset $offset")
+
+        finishedAcsIngestion.success(())
+        logger.info(
+          s"Store $acsStoreId ingested the ACS and switched to ingesting updates at $offset"
+        )
       }
     }
 
@@ -1249,7 +1342,6 @@ final class DbMultiDomainAcsStore[TXE](
                   .signalOffsetChanged(lastTree.getOffset)
                 val summary =
                   summaryState.toIngestionSummary(
-                    updateId = None,
                     offset = lastTree.getOffset,
                     synchronizerIdToRecordTime = synchronizerIdToRecordTime.toMap,
                     newAcsSize = state.get().acsSize,
@@ -1277,7 +1369,6 @@ final class DbMultiDomainAcsStore[TXE](
                   .signalOffsetChanged(reassignment.offset)
                 val summary =
                   summaryState.toIngestionSummary(
-                    updateId = None,
                     synchronizerIdToRecordTime = Map(synchronizerId -> reassignment.recordTime),
                     offset = reassignment.offset,
                     newAcsSize = state.get().acsSize,
@@ -1299,7 +1390,6 @@ final class DbMultiDomainAcsStore[TXE](
                   .signalOffsetChanged(offset)
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
-                    updateId = None,
                     synchronizerIdToRecordTime = Map.empty,
                     offset = offset,
                     newAcsSize = state.get().acsSize,
@@ -1561,8 +1651,9 @@ final class DbMultiDomainAcsStore[TXE](
           .sequence(contractIds.grouped(ingestionConfig.maxLookupsPerStatement).map { contractIds =>
             (sql"""
            select distinct contract_id from incomplete_reassignments
-           where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id in """ ++ inClause(
-              contractIds
+           where store_id = $acsStoreId and migration_id = $domainMigrationId and """ ++ inClause(
+              "contract_id",
+              contractIds.map(lengthLimited),
             )).toActionBuilder.as[String].map(_.toSet)
           })
           .map(_.foldLeft(Set.empty[String])(_ ++ _))
@@ -1612,7 +1703,10 @@ final class DbMultiDomainAcsStore[TXE](
     private def doIngestAcsInserts(
         entries: NonEmptyList[AcsInsertEntry],
         summary: MutableIngestionSummary,
+        onConflictDoNothing: Boolean = false,
     )(implicit tc: TraceContext) = {
+      val onConflictDoNothingClause =
+        if (onConflictDoNothing) sql" on conflict do nothing " else sql""
       DBIO.sequence(entries.grouped(ingestionConfig.maxEntriesPerInsert).map { entries =>
         val insertValues = entries
           .map(entry => entry.createdEvent.getContractId -> getInsertValues(entry))
@@ -1630,12 +1724,19 @@ final class DbMultiDomainAcsStore[TXE](
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$acsIndexColumnNames)
-                values """ ++ joinedAcsTableValues ++ sql" returning contract_id, event_number").toActionBuilder
+                values """ ++ joinedAcsTableValues ++ onConflictDoNothingClause ++ sql" returning contract_id, event_number").toActionBuilder
             .asUpdateReturning[(String, Long)]
           rawContractIdToEventNumberMap = rawContractIdToEventNumber.toMap
           interfaceViewsValues = insertValues.toList.flatMap { case (contractId, insertValue) =>
-            val eventNumber = rawContractIdToEventNumberMap(contractId)
-            insertValue.interfaceViews(eventNumber)
+            // If there's no conflict, this will include all views.
+            // If there's a conflict (which then does NOT include the row in the result):
+            // The contract was inserted in a previous call and therefore so were its interface views, so we can skip their inserts.
+            // To introduce a new view the store_descriptor must change, and therefore either:
+            // - Both the contract and view are already inserted
+            // - Neither are inserted
+            rawContractIdToEventNumberMap.get(contractId).toList.flatMap { eventNumber =>
+              insertValue.interfaceViews(eventNumber)
+            }
           }
           joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
           _ <- joinedInterfaceViewsValues match {
@@ -1644,7 +1745,7 @@ final class DbMultiDomainAcsStore[TXE](
             case Some(interfaceViewValues) =>
               (sql"""
                 insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$interfaceViewsIndexColumnNames)
-                values """ ++ interfaceViewValues).toActionBuilder.asUpdate
+                values """ ++ interfaceViewValues ++ onConflictDoNothingClause).toActionBuilder.asUpdate
           }
         } yield {
           summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
@@ -1755,8 +1856,9 @@ final class DbMultiDomainAcsStore[TXE](
             delete from #$acsTableName
             where store_id = $acsStoreId
               and migration_id = $domainMigrationId
-              and contract_id in """ ++ inClause(
-            events.map(_.getContractId)
+              and """ ++ inClause(
+            "contract_id",
+            events.map(e => lengthLimited(e.getContractId)),
           ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
             val deletedCidSet = deletedCids.toSet
             val ingestedArchivedEvents =
@@ -2181,94 +2283,6 @@ object DbMultiDomainAcsStore {
       acsSize = 0,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
-    )
-  }
-
-  case class TxLogEvent(
-      eventId: String,
-      synchronizerId: SynchronizerId,
-      acsContractId: Option[ContractId[?]],
-  )
-
-  /** Like [[IngestionSummary]], but with all fields mutable to simplify collecting the content from helper methods */
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  case class MutableIngestionSummary(
-      ingestedCreatedEvents: mutable.ArrayBuffer[CreatedEvent],
-      var numFilteredCreatedEvents: Int,
-      ingestedArchivedEvents: mutable.ArrayBuffer[ExercisedEvent],
-      var numFilteredArchivedEvents: Int,
-      updatedContractStates: mutable.ArrayBuffer[ContractStateEvent],
-      addedAssignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
-      var numFilteredAssignEvents: Int,
-      removedAssignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
-      addedUnassignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
-      var numFilteredUnassignEvents: Int,
-      removedUnassignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
-      prunedContracts: mutable.ArrayBuffer[ContractId[?]],
-      ingestedTxLogEntries: mutable.ArrayBuffer[(String3, String)],
-  ) {
-    def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
-
-    def toIngestionSummary(
-        updateId: Option[String],
-        synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
-        offset: Long,
-        newAcsSize: Int,
-        metrics: StoreMetrics,
-    ): IngestionSummary = {
-      // We update the metrics in here as it's the easiest way
-      // to not miss any place that might need updating.
-      metrics.acsSize.updateValue(newAcsSize.toLong)
-      metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
-      metrics.eventCount.inc(this.ingestedCreatedEvents.length.toLong)(
-        MetricsContext("event_type" -> "created")
-      )
-      metrics.eventCount.inc(this.ingestedArchivedEvents.length.toLong)(
-        MetricsContext("event_type" -> "archived")
-      )
-      metrics.completedIngestions.mark()
-      synchronizerIdToRecordTime.foreach { case (synchronizer, recordTime) =>
-        metrics
-          .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
-          .updateValue(recordTime.toEpochMilli)
-      }
-      IngestionSummary(
-        updateId = updateId,
-        offset = Some(offset),
-        synchronizerIdToRecordTime = synchronizerIdToRecordTime,
-        newAcsSize = newAcsSize,
-        ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
-        numFilteredCreatedEvents = this.numFilteredCreatedEvents,
-        ingestedArchivedEvents = this.ingestedArchivedEvents.toVector,
-        numFilteredArchivedEvents = this.numFilteredArchivedEvents,
-        updatedContractStates = this.updatedContractStates.toVector,
-        addedAssignEvents = this.addedAssignEvents.toVector,
-        numFilteredAssignEvents = this.numFilteredAssignEvents,
-        removedAssignEvents = this.removedAssignEvents.toVector,
-        addedUnassignEvents = this.addedUnassignEvents.toVector,
-        numFilteredUnassignEvents = this.numFilteredUnassignEvents,
-        removedUnassignEvents = this.removedUnassignEvents.toVector,
-        prunedContracts = Vector.empty,
-        ingestedTxLogEntries = this.ingestedTxLogEntries.toSeq,
-      )
-    }
-  }
-
-  object MutableIngestionSummary {
-    def empty: MutableIngestionSummary = MutableIngestionSummary(
-      mutable.ArrayBuffer.empty,
-      0,
-      mutable.ArrayBuffer.empty,
-      0,
-      mutable.ArrayBuffer.empty,
-      mutable.ArrayBuffer.empty,
-      0,
-      mutable.ArrayBuffer.empty,
-      mutable.ArrayBuffer.empty,
-      0,
-      mutable.ArrayBuffer.empty,
-      mutable.ArrayBuffer.empty,
-      mutable.ArrayBuffer.empty,
     )
   }
 

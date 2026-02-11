@@ -3,7 +3,6 @@ description: |
   This action checks if the current PR is only for static tests (via a commit flag ot a PR label).
 inputs:
   gh_token:
-    type: string
     required: true
 outputs:
   skip:

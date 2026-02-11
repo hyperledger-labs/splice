@@ -13,11 +13,11 @@ inputs:
     default: ${{ format('{0}/nix', github.repository == 'hyperledger-labs/splice' && '.' || 'splice') }}
   target:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
-    type: choice
-    options:
-      - oss
-      - default
-      - static_tests
+#    type: choice
+#    options:
+#      - oss
+#      - default
+#      - static_tests
     required: true
   cache_version:
     description: "The cache version"

@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 555,
+  "id": 951,
   "links": [],
   "panels": [
     {
@@ -1004,7 +1004,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{chain_id}}",
+          "legendFormat": "{{namespace}}-{{chain_id}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1371,5 +1371,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 2
+  "version": 1
 }

@@ -51,12 +51,15 @@ check_grafana_dashboards() {
 
   if [[ $changed == true ]]; then
     if [[ ${CI-} == true ]]; then
-      echo "ERROR: Some dashboards needed changes." >&2
+      echo "ERROR: Some Grafana dashboards require changes." >&2
       git diff --color=always "$dashboard_dir" >&2
-      echo "INFO: Please run '$0' locally and commit the changes." >&2
+      echo "ERROR: Please run '$0' locally and commit the changes." >&2
     fi
 
     return 1
+  else
+    echo "INFO: All Grafana dashboards are up to date." >&2
+    return 0
   fi
 }
 

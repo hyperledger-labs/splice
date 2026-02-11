@@ -66,7 +66,7 @@ let
                                      }))
     python3Packages.dockerfile-parse
     python3Packages.flask
-    python3Packages.GitPython
+    python3Packages.gitpython
     python3Packages.gql
     python3Packages.humanize
     python3Packages.json-logging
@@ -81,9 +81,9 @@ let
     python3Packages.regex
     python3Packages.requests
     python3Packages.google-cloud-storage
-    python3Packages.requests_toolbelt
+    python3Packages.requests-toolbelt
     python3Packages.semver
-    python3Packages.sphinx_rtd_theme
+    python3Packages.sphinx-rtd-theme
     python3Packages.sphinx-copybutton
     python3Packages.sphinxcontrib-openapi
     python3Packages.sphinx-autobuild

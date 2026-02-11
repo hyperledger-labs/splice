@@ -11,6 +11,9 @@ set -eou pipefail
 
 # curl uses --retry-all-errors because some 4xx returned by canton are transient errors that must be retried
 
+# shellcheck disable=SC1091
+source "${SPLICE_ROOT}/cluster/scripts/utils.source"
+
 function usage() {
   echo "Usage: ./vote-for-migration.sh <migration_id>"
 }
@@ -80,10 +83,6 @@ vote_data='{
   "reason_description":"Accepted via trigger-migration script"
 }'
 echo "Casting votes on $vote_request_cid with: $vote_data"
-
-function get_resolved_config() {
-  "${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh"
-}
 
 other_svs=()
 

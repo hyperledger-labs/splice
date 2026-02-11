@@ -41,8 +41,6 @@ class ExternalPartyWalletManager(
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
     scanConnection: BftScanConnection,
 )(implicit
@@ -172,8 +170,6 @@ class ExternalPartyWalletManager(
       partyLoggerFactory,
       domainMigrationInfo,
       participantId,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
       scanConnection,
     )

@@ -58,6 +58,9 @@ case class ScanStorageConfig(
     CantonTimestamp.assertFromInstant(until)
   }
 
+  def computeBulkSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
+    computeSnapshotTimeAfter(afterRecordTime, bulkAcsSnapshotPeriodHours)
+
   def computeDbSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, dbAcsSnapshotPeriodHours)
 

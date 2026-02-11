@@ -25,11 +25,11 @@ inputs:
   target:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
     default: 'default'
-    type: choice
-    options:
-      - oss
-      - default
-      - static_tests
+#    type: choice
+#    options:
+#      - oss
+#      - default
+#      - static_tests
     required: false
   upload_workload_identity_provider:
     description: "The workload identity provider to use for uploading the cache"

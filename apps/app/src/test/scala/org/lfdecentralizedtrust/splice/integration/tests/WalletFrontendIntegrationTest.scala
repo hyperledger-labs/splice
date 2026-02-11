@@ -333,11 +333,11 @@ class WalletFrontendIntegrationTest
             },
           )
 
-          // 7. Withdraw one delegation via UI
+          // 7. Cancel one delegation via UI
           actAndCheck(
-            "Alice clicks Withdraw on the first delegation and confirms", {
-              clickByCssSelector(".delegation-row .delegation-withdraw")
-              eventuallyClickOn(id("withdraw-delegation-confirmation-dialog-accept-button"))
+            "Alice clicks Cancel on the first delegation and confirms", {
+              clickByCssSelector(".delegation-row .delegation-cancel")
+              eventuallyClickOn(id("cancel-delegation-confirmation-dialog-accept-button"))
             },
           )(
             "1 proposal remains, 1 delegation remains",

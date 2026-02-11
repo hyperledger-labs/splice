@@ -4,6 +4,9 @@ inputs:
   cache_version:
     description: "Version of the cache"
     required: true
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
 outputs:
   cache_hits:
     description: "Cache hits"
@@ -23,24 +26,28 @@ runs:
       uses: ./.github/actions/cache/precompiled_classes/restore
       with:
         cache_version: ${{ inputs.cache_version }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Restore SBT cache
       id: sbt
       uses: ./.github/actions/cache/sbt/restore
       with:
         cache_version: ${{ inputs.cache_version }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Restore frontend node_modules
       id: frontend_node_modules
       uses: ./.github/actions/cache/frontend_node_modules/restore
       with:
         cache_version: ${{ inputs.cache_version }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Restore Daml artifacts
       id: daml
       uses: ./.github/actions/cache/daml_artifacts/restore
       with:
         cache_version: ${{ inputs.cache_version }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Collect cache hits
       id: cache_hits

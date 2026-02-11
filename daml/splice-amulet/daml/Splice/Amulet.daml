@@ -288,7 +288,6 @@ template FeaturedAppActivityMarker
     interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppActivityMarker for FeaturedAppActivityMarker where
       view = Splice.Api.FeaturedAppRightV1.FeaturedAppActivityMarkerView with dso, provider, beneficiary, weight
 
-
 -- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
 -- Amulet transfer coordinated by the app of a provider.
 template AppRewardCoupon

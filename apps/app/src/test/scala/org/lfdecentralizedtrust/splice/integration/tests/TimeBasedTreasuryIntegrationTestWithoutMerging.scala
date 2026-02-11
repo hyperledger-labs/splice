@@ -13,12 +13,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigUtil,
-  SpliceUtil,
-  TimeTestUtil,
-  WalletTestUtil,
-}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.AmuletMetricsTrigger
 import org.slf4j.event.Level
 
@@ -325,47 +320,6 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       },
     )
 
-  }
-
-  "ignore expired-amulets in the treasury service input" in { implicit env =>
-    val (_, bob) = onboardAliceAndBob()
-
-    aliceWalletClient.tap(100)
-
-    // creating 5 soon-to-be-expired amulets because the 'expire amulet' automation expires
-    // 4 amulets at once by default & so even in the case it starts expiring amulets, we have one unexpired amulet for the test.
-    // If this test flakes because the automation already expired all expired amulets, increase the number of
-    // soon-to-be-expired amulets we create here
-    (1 to 5).map(_ => aliceWalletClient.tap(SpliceUtil.defaultHoldingFee.rate))
-
-    eventually() {
-      aliceWalletClient.list().amulets should have length 6
-    }
-
-    // after one more tick, the amulets have no value and should be ignored.
-    advanceRoundsToNextRoundOpening
-
-    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-      {
-        p2pTransfer(aliceWalletClient, bobWalletClient, bob, 1)
-        eventually() {
-          bobWalletClient.balance().unlockedQty should be > BigDecimal(0)
-          // there is still >1 amulet
-          aliceWalletClient.list().amulets.size should be > 1
-        }
-      },
-      entries => {
-        forAtLeast(
-          1,
-          entries,
-        )(
-          // but only the non-expired amulet is selected as input.
-          _.message should include regex (
-            "with inputs Vector\\(InputAmulet\\(.*\\)\\)"
-          )
-        )
-      },
-    )
   }
 
   "scan-connection caching avoids unnecessary network calls and re-sending contracts if they are already known by the client" in {

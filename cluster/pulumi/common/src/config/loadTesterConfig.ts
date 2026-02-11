@@ -4,6 +4,8 @@ import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/sr
 import util from 'node:util';
 import { z } from 'zod';
 
+import { K8sResourceSchema } from './configSchema';
+
 export const LoadTesterAdaptiveScenarioConfigSchema = z.object({
   maxVUs: z.number().default(50),
   minVUs: z.number().default(0),
@@ -21,6 +23,7 @@ export const LoadTesterConfigSchema = z.object({
       iterationsPerMinute: z.number().default(60),
       maxVUs: z.number().optional(),
       adaptiveScenario: LoadTesterAdaptiveScenarioConfigSchema.default({}),
+      resources: K8sResourceSchema.optional(),
     })
     .optional(),
 });

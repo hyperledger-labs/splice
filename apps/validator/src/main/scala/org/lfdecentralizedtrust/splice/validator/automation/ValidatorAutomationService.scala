@@ -70,8 +70,6 @@ class ValidatorAutomationService(
     domainMigrationDumpPath: Option[Path],
     domainMigrationId: Long,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
@@ -93,17 +91,13 @@ class ValidatorAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
       params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
 
-  registerUpdateHistoryIngestion(
-    updateHistory,
-    ingestUpdateHistoryFromParticipantBegin,
-  )
+  registerUpdateHistoryIngestion(updateHistory)
 
   automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
     registerTrigger(

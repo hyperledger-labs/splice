@@ -14,10 +14,6 @@ import definitions.UpdateHistoryItemV2.members.{
   UpdateHistoryReassignment,
   UpdateHistoryTransactionV2,
 }
-import definitions.UpdateHistoryReassignment.Event.members.{
-  UpdateHistoryAssignment,
-  UpdateHistoryUnassignment,
-}
 
 import scala.concurrent.duration.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -26,6 +22,7 @@ import com.digitalasset.canton.metrics.MetricValue
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTest
+    with ScanTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil
     with TimeTestUtil {
@@ -58,7 +55,7 @@ class ScanEventHistoryIntegrationTest
 
     val (aliceParty, _) = onboardAliceAndBob()
 
-    val cursorBeforeTap = eventuallySucceeds() { lastCursor() }
+    val cursorBeforeTap = eventuallySucceeds() { latestEventHistoryCursor(sv1ScanBackend) }
 
     val countBefore = scanVerdictCountMetric()
     val lastRtBefore = scanVerdictLastRecordTimeUsMetric()
@@ -156,7 +153,7 @@ class ScanEventHistoryIntegrationTest
     // There may be some data already in scan's DB even with disabled proxy
     val cursorBefore = clue("Get the last available event in DB") {
       eventuallySucceeds() {
-        lastCursor()
+        latestEventHistoryCursor(sv1ScanBackend)
       }
     }
 
@@ -295,7 +292,7 @@ class ScanEventHistoryIntegrationTest
 
     val _ = onboardAliceAndBob()
 
-    val cursorBeforeTaps = eventuallySucceeds() { lastCursor() }
+    val cursorBeforeTaps = eventuallySucceeds() { latestEventHistoryCursor(sv1ScanBackend) }
 
     // Also record wallet top eventId to derive updateIds for taps deterministically
     val topBeforeAll = withoutDevNetTopups(
@@ -419,46 +416,6 @@ class ScanEventHistoryIntegrationTest
       case UpdateHistoryTransactionV2(tx) => tx.updateId
       case UpdateHistoryReassignment(r) => r.updateId
     }
-  }
-
-  // Obtain last (migrationId, recordTime) provided by the event stream
-  private def lastCursor(startAfter: Option[(Long, String)] = None)(implicit
-      env: SpliceTestConsoleEnvironment
-  ): (Long, String) = {
-    @annotation.tailrec
-    def go(after: Option[(Long, String)], acc: Option[(Long, String)]): Option[(Long, String)] = {
-      val page = sv1ScanBackend.getEventHistory(
-        count = pageLimit,
-        after = after,
-        encoding = CompactJson,
-      )
-      if (page.isEmpty) acc
-      else {
-        val next = page.lastOption.flatMap(cursorOf)
-        val newAcc = next.orElse(acc)
-        next match {
-          case Some(c) => go(Some(c), newAcc)
-          case None => newAcc
-        }
-      }
-    }
-    go(startAfter, None).getOrElse((0L, ""))
-  }
-
-  // (migrationId, recordTime) for an event item
-  private def cursorOf(item: EventHistoryItem): Option[(Long, String)] = {
-    val updateCursor: Option[(Long, String)] = item.update.flatMap {
-      case UpdateHistoryTransactionV2(tx) =>
-        Some((tx.migrationId, tx.recordTime))
-      case UpdateHistoryReassignment(r) =>
-        r.event match {
-          case UpdateHistoryAssignment(ev) =>
-            Some((ev.migrationId, r.recordTime))
-          case UpdateHistoryUnassignment(ev) =>
-            Some((ev.migrationId, r.recordTime))
-        }
-    }
-    updateCursor.orElse(item.verdict.map(v => (v.migrationId, v.recordTime)))
   }
 
   private def getLongMetricOr0(name: String)(implicit env: SpliceTestConsoleEnvironment): Long =

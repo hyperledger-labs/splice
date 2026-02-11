@@ -2,6 +2,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 /** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSDK_CORE_PROJECT` * */
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLivenessActivityRecord
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -43,6 +45,15 @@ class ScanTotalSupplyBigQueryIntegrationTest
       // prevent ReceiveFaucetCouponTrigger from seeing stale caches
       .withScanDisabledMiningRoundsCache()
       .withAmuletPrice(walletAmuletPrice)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Validator)(
+          _.copy(
+            // Doesn't work well in simtime where time does not advance on its own
+            // and the test breaks if a round is missed.
+            enableNewRewardTriggerScheduling = false
+          )
+        )(config)
+      )
 
   def coinPrice = BigDecimal(0.00001)
   override def walletAmuletPrice = SpliceUtil.damlDecimal(coinPrice)
@@ -305,6 +316,15 @@ class ScanTotalSupplyBigQueryIntegrationTest
         (6, aliceValidatorMintedAmount),
       )
     ) { (expectRound, expectedBalance) =>
+      clue(s"Alice receives liveness activity record for round ${expectRound - 2}") {
+        eventually() {
+          aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+            .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+              aliceValidatorBackend.getValidatorPartyId(),
+              _.data.round.number == (expectRound - 2),
+            ) should have size (1)
+        }
+      }
       actAndCheck(timeUntilSuccess = 30.seconds)(
         s"Advance round ${expectRound - 1}", {
           advanceRoundsToNextRoundOpening

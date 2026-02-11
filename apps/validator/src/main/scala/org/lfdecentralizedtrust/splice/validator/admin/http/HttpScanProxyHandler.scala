@@ -291,4 +291,23 @@ class HttpScanProxyHandler(
       }
     }
   }
+
+  override def listUnclaimedDevelopmentFundCoupons(
+      respond: ScanproxyResource.ListUnclaimedDevelopmentFundCouponsResponse.type
+  )()(
+      tUser: AuthenticatedRequest
+  ): Future[ScanproxyResource.ListUnclaimedDevelopmentFundCouponsResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
+    withSpan(s"$workflowId.listUnclaimedDevelopmentFundCoupons") { implicit traceContext => _ =>
+      for {
+        coupons <- scanConnection.listUnclaimedDevelopmentFundCoupons()
+      } yield {
+        respond.OK(
+          definitions.ListUnclaimedDevelopmentFundCouponsResponse(
+            coupons.map(_.toHttp).toVector
+          )
+        )
+      }
+    }
+  }
 }

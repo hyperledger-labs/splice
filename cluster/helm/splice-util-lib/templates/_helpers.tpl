@@ -109,7 +109,7 @@ spec:
                 path: postgresPassword
       containers:
       - name: postgres-exporter
-        image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.19.0
         env:
           - name: DATA_SOURCE_PASS_FILE
             value: /tmp/pwd
@@ -117,9 +117,6 @@ spec:
             value: cnadmin
           - name: DATA_SOURCE_URI
             value: {{ $persistence.host  }}:{{ $persistence.port | default 5432 }}/{{ $.persistence.databaseName }}?sslmode=disable
-          # TODO(#3752): remove this once this works in postgres-exporter again
-          - name: PG_EXPORTER_DISABLE_SETTINGS_METRICS
-            value: "true"
         command:
           - '/bin/postgres_exporter'
           - '--log.format=json'

@@ -3,6 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _package-batched-markers:
+
 splice-util-batched-markers docs
 ================================
 

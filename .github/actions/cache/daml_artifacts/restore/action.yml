@@ -4,6 +4,9 @@ inputs:
   cache_version:
     description: "Version of the cache"
     required: true
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
 outputs:
   cache_hit:
     description: "Cache hit"
@@ -18,11 +21,11 @@ runs:
       with:
         path: |
           /tmp/daml
-          apps/common/frontend/daml.js
-        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }} rev:${{ github.sha }}
+          ${{ format('{0}/apps/common/frontend/daml.js', inputs.splice_root) }}
+        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/nix/canton-sources.json', inputs.splice_root)) }} rev:${{ github.sha }}
         restore-keys: |
-          daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }}
-          daml-artifacts-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }}
+          daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/nix/canton-sources.json', inputs.splice_root)) }}
+          daml-artifacts-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/nix/canton-sources.json', inputs.splice_root)) }}
     - name: Extract Daml artifacts
       shell: bash
       run: |

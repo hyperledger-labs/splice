@@ -43,7 +43,6 @@ import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.{Done, NotUsed}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  ActiveContract,
   DedupConfig,
   DedupOffset,
   IncompleteReassignmentEvent,
@@ -77,7 +76,7 @@ class BaseLedgerConnection(
     userId: String,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
-)(implicit as: ActorSystem, ec: ExecutionContextExecutor)
+)(implicit ec: ExecutionContextExecutor)
     extends NamedLogging {
 
   logger.debug(s"Created connection with userId=$userId")(
@@ -105,50 +104,47 @@ class BaseLedgerConnection(
   def activeContracts(
       eventFormat: com.daml.ledger.api.v2.transaction_filter.EventFormat,
       offset: Long,
-  )(implicit tc: TraceContext): Future[
-    (
-        Seq[ActiveContract],
-        Seq[IncompleteReassignmentEvent.Unassign],
-        Seq[IncompleteReassignmentEvent.Assign],
-    )
-  ] = {
+  )(implicit tc: TraceContext): Source[BaseLedgerConnection.ActiveContractsItem, NotUsed] = {
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset,
         eventFormat = Some(eventFormat),
       )
     )
-    for {
-      responseSequence <- activeContractsRequest runWith Sink.seq
-      contractStateComponents = responseSequence
-        .map(_.contractEntry)
-      active = contractStateComponents.collect {
+    activeContractsRequest
+      .map(_.contractEntry)
+      .map[Option[BaseLedgerConnection.ActiveContractsItem]] {
+        case lapi.state_service.GetActiveContractsResponse.ContractEntry.Empty =>
+          None
         case lapi.state_service.GetActiveContractsResponse.ContractEntry.ActiveContract(contract) =>
-          ActiveContract.fromProto(contract)
+          Some(
+            BaseLedgerConnection.ActiveContractsItem
+              .ActiveContract(
+                org.lfdecentralizedtrust.splice.environment.ledger.api.ActiveContract
+                  .fromProto(contract)
+              )
+          )
+        case lapi.state_service.GetActiveContractsResponse.ContractEntry.IncompleteUnassigned(ev) =>
+          Some(
+            BaseLedgerConnection.ActiveContractsItem
+              .IncompleteUnassign(IncompleteReassignmentEvent.fromProto(ev))
+          )
+        case lapi.state_service.GetActiveContractsResponse.ContractEntry.IncompleteAssigned(ev) =>
+          Some(
+            BaseLedgerConnection.ActiveContractsItem
+              .IncompleteAssign(IncompleteReassignmentEvent.fromProto(ev))
+          )
       }
-      incompleteOut = contractStateComponents.collect {
-        case lapi.state_service.GetActiveContractsResponse.ContractEntry
-              .IncompleteUnassigned(ev) =>
-          IncompleteReassignmentEvent.fromProto(ev)
+      .collect { case Some(item) =>
+        item
       }
-      incompleteIn = contractStateComponents.collect {
-        case lapi.state_service.GetActiveContractsResponse.ContractEntry
-              .IncompleteAssigned(ev) =>
-          IncompleteReassignmentEvent.fromProto(ev)
-      }
-    } yield (active, incompleteOut, incompleteIn)
   }
 
   def activeContracts(
       filter: IngestionFilter,
       offset: Long,
-  )(implicit tc: TraceContext): Future[
-    (
-        Seq[ActiveContract],
-        Seq[IncompleteReassignmentEvent.Unassign],
-        Seq[IncompleteReassignmentEvent.Assign],
-    )
-  ] = activeContracts(filter.toEventFormat, offset)
+  )(implicit tc: TraceContext): Source[BaseLedgerConnection.ActiveContractsItem, NotUsed] =
+    activeContracts(filter.toEventFormat, offset)
 
   def getContract(
       contractId: ContractId[?],
@@ -1330,6 +1326,19 @@ object BaseLedgerConnection {
       case c =>
         '_' +: "%04x".format(c.toInt)
     }.mkString
+  }
+
+  sealed trait ActiveContractsItem
+  object ActiveContractsItem {
+    case class ActiveContract(
+        contract: org.lfdecentralizedtrust.splice.environment.ledger.api.ActiveContract
+    ) extends ActiveContractsItem
+
+    case class IncompleteUnassign(unassign: IncompleteReassignmentEvent.Unassign)
+        extends ActiveContractsItem
+
+    case class IncompleteAssign(assign: IncompleteReassignmentEvent.Assign)
+        extends ActiveContractsItem
   }
 }
 

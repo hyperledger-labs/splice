@@ -44,8 +44,6 @@ object PackageIdResolver {
         DarResources.TokenStandard.tokenAllocationInstruction.latest.metadata.version.toString()
       case TokenStandard.SpliceTokenTestTradingApp =>
         DarResources.TokenStandard.tokenTestTradingApp.latest.metadata.version.toString()
-      case FeaturedApp =>
-        DarResources.featuredApp.latest.metadata.version.toString()
     }
     PackageVersion.assertFromString(version)
   }
@@ -78,7 +76,5 @@ object PackageIdResolver {
     final case object SpliceValidatorLifecycle extends Package
     final case object SpliceWallet extends Package
     final case object SpliceWalletPayments extends Package
-
-    final case object FeaturedApp extends Package
   }
 }
