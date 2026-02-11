@@ -17,6 +17,7 @@ import { expect } from 'vitest';
 import { SvAdminClientProvider } from '../contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from '../contexts/SvAppVotesHooksContext';
 import { SvConfigProvider, useSvConfig } from '../utils';
+import { UserEvent } from '@testing-library/user-event';
 
 const testQueryClient = new QueryClient({
   defaultOptions: {
@@ -97,7 +98,12 @@ export async function changeAction(actionName: ActionName = 'SRARC_SetConfig'): 
   }
 }
 
-export async function navigateToLegacyGovernance(): Promise<void> {
+export async function navigateToGovernancePage(user: UserEvent): Promise<void> {
+  expect(await screen.findByTestId('navlink-governance')).toBeInTheDocument();
+  await user.click(screen.getByTestId('navlink-governance'));
+}
+
+export async function navigateToLegacyGovernancePage(): Promise<void> {
   window.history.pushState({}, '', '/governance-old');
   window.dispatchEvent(new PopStateEvent('popstate'));
   expect(await screen.findByText('Vote Requests')).toBeDefined();

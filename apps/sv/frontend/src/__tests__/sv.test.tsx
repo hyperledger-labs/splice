@@ -15,7 +15,7 @@ import { SvConfigProvider } from '../utils';
 import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
-import { changeAction, navigateToLegacyGovernance } from './helpers';
+import { changeAction, navigateToLegacyGovernancePage } from './helpers';
 import {
   dateTimeFormatISO,
   getUTCWithOffset,
@@ -115,7 +115,7 @@ Expiration
   test('browse to the governance tab', async () => {
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
   });
 
   test(
@@ -124,7 +124,7 @@ Expiration
       const user = userEvent.setup();
       render(<AppWithConfig />);
 
-      await navigateToLegacyGovernance();
+      await navigateToLegacyGovernancePage();
 
       const inOneWeek = dayjs().add(1, 'week').format(dateTimeFormatISO);
       const expirationDate = dayjs().add(23, 'minutes').format(dateTimeFormatISO);
@@ -168,7 +168,7 @@ describe('An SetConfig request', () => {
   test('defaults to the current amulet configuration', async () => {
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction('CRARC_SetConfig');
 
@@ -188,7 +188,7 @@ describe('An SetConfig request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction('SRARC_SetConfig');
     await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
@@ -222,7 +222,7 @@ describe('An SetConfig request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction('CRARC_SetConfig');
     await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
@@ -259,7 +259,7 @@ describe('An SetConfig request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction('CRARC_SetConfig');
     await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
@@ -296,7 +296,7 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     expect(await screen.findByText('Executed')).toBeDefined();
     await user.click(screen.getByText('Executed'));
@@ -344,7 +344,7 @@ describe('SetAmuletRules', () => {
       const user = userEvent.setup();
       render(<AppWithConfig />);
 
-      await navigateToLegacyGovernance();
+      await navigateToLegacyGovernancePage();
 
       await changeAction('CRARC_SetConfig');
 
