@@ -9,7 +9,10 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.console.{ScanAppBackendReference, WalletAppClientReference}
+import org.lfdecentralizedtrust.splice.console.{
+  ValidatorAppBackendReference,
+  WalletAppClientReference,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
@@ -143,7 +146,7 @@ class DevelopmentFundCouponIntegrationTest
         )
       }
       eventually()(
-        sv1ScanBackend
+        sv1ValidatorBackend.scanProxy
           .listUnclaimedDevelopmentFundCoupons()
           .map(coupon => BigDecimal(coupon.contract.payload.amount))
           .sum shouldBe unclaimedDevelopmentFundCouponTotal
@@ -333,7 +336,7 @@ class DevelopmentFundCouponIntegrationTest
             .listActiveDevelopmentFundCoupons()
             .map(_.payload.expiresAt) should not be empty
           val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
-            sv1ScanBackend
+            sv1ValidatorBackend
           )
           unclaimedDevelopmentFundCouponTotal shouldBe
             (initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount)
@@ -358,7 +361,7 @@ class DevelopmentFundCouponIntegrationTest
     ) {
       eventually() {
         getUnclaimedDevelopmentFundCouponTotal(
-          sv1ScanBackend
+          sv1ValidatorBackend
         ) shouldBe unclaimedDevelopmentFundCouponTotalBeforeClaiming
       }
     }
@@ -426,7 +429,7 @@ class DevelopmentFundCouponIntegrationTest
             aliceValidatorWalletClient
               .listActiveDevelopmentFundCoupons() should have size 1
             val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
-              sv1ScanBackend
+              sv1ValidatorBackend
             )
             unclaimedDevelopmentFundCouponTotal shouldBe
               (initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount)
@@ -449,7 +452,7 @@ class DevelopmentFundCouponIntegrationTest
       ) {
         eventually() {
           getUnclaimedDevelopmentFundCouponTotal(
-            sv1ScanBackend
+            sv1ValidatorBackend
           ) shouldBe (unclaimedDevelopmentFundCouponTotalBeforeExpiration + developmentFundCouponAmount)
         }
       }
@@ -514,7 +517,7 @@ class DevelopmentFundCouponIntegrationTest
               .listActiveDevelopmentFundCoupons()
             developmentFundCoupons should have size 1
             val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
-              sv1ScanBackend
+              sv1ValidatorBackend
             )
             unclaimedDevelopmentFundCouponTotal shouldBe
               (initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount)
@@ -538,7 +541,7 @@ class DevelopmentFundCouponIntegrationTest
         _ => {
           aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
           getUnclaimedDevelopmentFundCouponTotal(
-            sv1ScanBackend
+            sv1ValidatorBackend
           ) shouldBe (unclaimedDevelopmentFundCouponTotalBeforeRejection + developmentFundCouponAmount)
         },
       )
@@ -708,13 +711,13 @@ class DevelopmentFundCouponIntegrationTest
   private def assertUnclaimedDevelopmentCouponAmounts(
       expectedAmounts: Seq[BigDecimal]
   )(implicit env: FixtureParam) =
-    sv1ScanBackend
+    sv1ValidatorBackend.scanProxy
       .listUnclaimedDevelopmentFundCoupons()
       .map(co => BigDecimal(co.payload.amount))
       .sorted shouldBe expectedAmounts
 
-  private def getUnclaimedDevelopmentFundCouponTotal(scanAppRef: ScanAppBackendReference) =
-    scanAppRef
+  private def getUnclaimedDevelopmentFundCouponTotal(ref: ValidatorAppBackendReference) =
+    ref.scanProxy
       .listUnclaimedDevelopmentFundCoupons()
       .map(co => BigDecimal(co.contract.payload.amount))
       .sum
