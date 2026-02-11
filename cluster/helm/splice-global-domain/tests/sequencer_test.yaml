@@ -110,7 +110,6 @@ tests:
       # Set log levels for testing
       logLevel: DEBUG
       logLevelStdout: ERROR
-      logLevelApiRequest: DEBUG
     documentSelector:
       path: kind
       value: Deployment
