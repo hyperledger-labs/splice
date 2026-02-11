@@ -25,6 +25,7 @@ plugins=(
   # old versions so that old pulumi state can be interpreted
   # each can be removed once MainNet uses a newer version
   "pulumi/kubernetes=4.23.0"
+  "pulumi/kubernetes=4.22.0"
   "pulumi/random=4.18.2"
   "pulumi/auth0=3.21.0"
   "pulumi/command=1.1.0"
