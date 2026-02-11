@@ -15,7 +15,7 @@ import { SvConfigProvider } from '../utils';
 import { onboardingInfo } from '../components/ValidatorOnboardingSecrets';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
-import { changeAction } from './helpers';
+import { changeAction, navigateToLegacyGovernance } from './helpers';
 import {
   dateTimeFormatISO,
   getUTCWithOffset,
@@ -29,12 +29,6 @@ const AppWithConfig = () => {
       <App />
     </SvConfigProvider>
   );
-};
-
-const navigateToLegacyGovernance = async () => {
-  window.history.pushState({}, '', '/governance-old');
-  window.dispatchEvent(new PopStateEvent('popstate'));
-  expect(await screen.findByText('Vote Requests')).toBeDefined();
 };
 
 describe('SV user can', () => {
