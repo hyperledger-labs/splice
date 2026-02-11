@@ -15,6 +15,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppFoundDsoConfigs_
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
@@ -111,9 +112,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .withAmuletPrice(walletAmuletPrice)
+      .addConfigTransform((_, config) => {
+        updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = true))(config)
+      })
       .withManualStart
 
-  override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
+  override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes without downtime" in { implicit env =>
     startAllSync(
@@ -467,12 +471,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
         )(
           "validator automation completes transfer",
           _ => {
-            // 40-10-some fees
             BigDecimal(
               aliceValidatorBackend
                 .getExternalPartyBalance(externalPartyOnboarding.party)
                 .totalUnlockedCoin
-            ) should beWithin(BigDecimal(28), BigDecimal(30))
+            ) should be(BigDecimal(30))
           },
         )
       }
