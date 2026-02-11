@@ -29,7 +29,7 @@ async function login(user: UserEvent) {
 }
 
 async function navigateToGovernancePage(user: UserEvent) {
-  expect(await screen.findByTestId('navlink-governance-beta')).toBeInTheDocument();
+  expect(await screen.findByTestId('navlink-governance')).toBeInTheDocument();
   await user.click(screen.getByText('Governance'));
 }
 

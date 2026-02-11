@@ -31,6 +31,12 @@ const AppWithConfig = () => {
   );
 };
 
+const navigateToLegacyGovernance = async () => {
+  window.history.pushState({}, '', '/governance-old');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+  expect(await screen.findByText('Vote Requests')).toBeDefined();
+};
+
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
     const user = userEvent.setup();
@@ -113,13 +119,9 @@ Expiration
   });
 
   test('browse to the governance tab', async () => {
-    const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    await navigateToLegacyGovernance();
   });
 
   test(
@@ -128,8 +130,7 @@ Expiration
       const user = userEvent.setup();
       render(<AppWithConfig />);
 
-      expect(await screen.findByText('Governance')).toBeDefined();
-      await user.click(screen.getByText('Governance'));
+      await navigateToLegacyGovernance();
 
       const inOneWeek = dayjs().add(1, 'week').format(dateTimeFormatISO);
       const expirationDate = dayjs().add(23, 'minutes').format(dateTimeFormatISO);
@@ -171,14 +172,9 @@ Expiration
 
 describe('An SetConfig request', () => {
   test('defaults to the current amulet configuration', async () => {
-    const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
+    await navigateToLegacyGovernance();
 
     await changeAction('CRARC_SetConfig');
 
@@ -198,11 +194,7 @@ describe('An SetConfig request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
+    await navigateToLegacyGovernance();
 
     await changeAction('SRARC_SetConfig');
     await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
@@ -236,10 +228,7 @@ describe('An SetConfig request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    await navigateToLegacyGovernance();
 
     await changeAction('CRARC_SetConfig');
     await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
@@ -276,11 +265,7 @@ describe('An SetConfig request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
+    await navigateToLegacyGovernance();
 
     await changeAction('CRARC_SetConfig');
     await waitFor(() => expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined());
@@ -317,11 +302,7 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
+    await navigateToLegacyGovernance();
 
     expect(await screen.findByText('Executed')).toBeDefined();
     await user.click(screen.getByText('Executed'));
@@ -369,11 +350,7 @@ describe('SetAmuletRules', () => {
       const user = userEvent.setup();
       render(<AppWithConfig />);
 
-      expect(await screen.findByText('Governance')).toBeDefined();
-      await user.click(screen.getByText('Governance'));
-
-      expect(await screen.findByText('Vote Requests')).toBeDefined();
-      expect(await screen.findByText('Governance')).toBeDefined();
+      await navigateToLegacyGovernance();
 
       await changeAction('CRARC_SetConfig');
 

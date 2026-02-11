@@ -316,7 +316,7 @@ class SvFrontendIntegrationTest
     ): Unit =
       actAndCheck(
         "operator can login and browse to the beta governance tab", {
-          go to s"http://localhost:$uiPort/governance-beta"
+          go to s"http://localhost:$uiPort/governance"
           loginOnCurrentPage(uiPort, ledgerApiUser)
         },
       )(
@@ -420,8 +420,8 @@ class SvFrontendIntegrationTest
 
           eventually() {
             val currentUrl = webDriver.getCurrentUrl
-            currentUrl should include("/governance-beta/proposals/")
-            currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
+            currentUrl should include("/governance/proposals/")
+            currentUrl.split("/governance/proposals/")(1).split("\\?")(0)
           }
         },
       )
@@ -434,7 +434,7 @@ class SvFrontendIntegrationTest
     ): Unit = {
       actAndCheck(
         "sv2 operator can login and browse to the governance page", {
-          go to s"http://localhost:$sv2UIPort/governance-beta"
+          go to s"http://localhost:$sv2UIPort/governance"
           loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
         },
       )(
@@ -485,7 +485,7 @@ class SvFrontendIntegrationTest
     ): Unit =
       actAndCheck(
         "sv1 navigates back to the proposal details page", {
-          go to s"http://localhost:$sv1UIPort/governance-beta/proposals/$proposalContractId"
+          go to s"http://localhost:$sv1UIPort/governance/proposals/$proposalContractId"
         },
       )(
         "sv1 can see the new vote from sv2",
@@ -558,7 +558,7 @@ class SvFrontendIntegrationTest
         implicit webDriver =>
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/votes"
+              go to s"http://localhost:$sv1UIPort/governance-old"
               loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
@@ -624,7 +624,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv2") { implicit webDriver =>
         val (_, reviewButton) = actAndCheck(
           "sv2 operator can login and browse to the governance tab", {
-            go to s"http://localhost:$sv2UIPort/votes"
+            go to s"http://localhost:$sv2UIPort/governance-old"
             loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
           },
         )(
@@ -859,7 +859,7 @@ class SvFrontendIntegrationTest
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/votes"
+              go to s"http://localhost:$sv1UIPort/governance-old"
               loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
@@ -928,7 +928,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can create a new vote request to revoke the featured app right", {
-              go to s"http://localhost:$sv1UIPort/votes"
+              go to s"http://localhost:$sv1UIPort/governance-old"
 
               changeAction("SRARC_RevokeFeaturedAppRight")
 
@@ -1052,7 +1052,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/votes"
+              go to s"http://localhost:$sv1UIPort/governance-old"
               loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
@@ -1193,7 +1193,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/votes"
+              go to s"http://localhost:$sv1UIPort/governance-old"
               loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
@@ -1286,7 +1286,7 @@ class SvFrontendIntegrationTest
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/votes"
+              go to s"http://localhost:$sv1UIPort/governance-old"
               loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
