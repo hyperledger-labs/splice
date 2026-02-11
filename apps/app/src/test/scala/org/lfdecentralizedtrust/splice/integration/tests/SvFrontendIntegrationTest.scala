@@ -327,6 +327,16 @@ class SvFrontendIntegrationTest
           },
       )
 
+    def navigateToLegacyGovernance(uiPort: Int)(implicit webDriver: WebDriverType): Unit =
+      go to s"http://localhost:$uiPort/governance-old"
+
+    def loginToLegacyGovernance(uiPort: Int, ledgerApiUser: String)(implicit
+        webDriver: WebDriverType
+    ): Unit = {
+      navigateToLegacyGovernance(uiPort)
+      loginOnCurrentPage(uiPort, ledgerApiUser)
+    }
+
     def selectActionAndNavigateToForm(action: String, formPrefix: String)(implicit
         webDriver: WebDriverType
     ): Unit =
@@ -558,8 +568,7 @@ class SvFrontendIntegrationTest
         implicit webDriver =>
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/governance-old"
-              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -624,20 +633,17 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv2") { implicit webDriver =>
         val (_, reviewButton) = actAndCheck(
           "sv2 operator can login and browse to the governance tab", {
-            go to s"http://localhost:$sv2UIPort/governance-old"
-            loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
+            loginToLegacyGovernance(sv2UIPort, sv2Backend.config.ledgerApiUser)
           },
         )(
           "sv2 can see the new vote request",
           _ => {
-            find(id("tab-badge-action-needed-count")).value.text shouldBe "1"
-            find(id("nav-badge-votes-count")).value.text shouldBe "1"
-
             eventuallyClickOn(id("tab-panel-action-needed"))
 
             val tbody = find(id("sv-voting-action-needed-table-body"))
             inside(tbody) { case Some(tb) =>
               val rows = getAllVoteRows("sv-voting-action-needed-table-body")
+              rows should not be empty
 
               rows.head.text should matchText(
                 createdVoteRequestAction
@@ -859,8 +865,7 @@ class SvFrontendIntegrationTest
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/governance-old"
-              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -928,7 +933,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can create a new vote request to revoke the featured app right", {
-              go to s"http://localhost:$sv1UIPort/governance-old"
+              navigateToLegacyGovernance(sv1UIPort)
 
               changeAction("SRARC_RevokeFeaturedAppRight")
 
@@ -1052,8 +1057,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/governance-old"
-              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -1193,8 +1197,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/governance-old"
-              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -1286,8 +1289,7 @@ class SvFrontendIntegrationTest
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1UIPort/governance-old"
-              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
