@@ -2081,8 +2081,8 @@ updateTestConfigForParallelRuns := {
     name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
-  def isRecordTimeToleranceTest(name: String): Boolean =
-    name contains "RecordTimeToleranceTimeBasedIntegrationTest"
+  def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
+    name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
 
   val allTestNames =
     definedTests
@@ -2209,9 +2209,9 @@ updateTestConfigForParallelRuns := {
       (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t),
     ),
     (
-      "tests to check record time tolerance",
-      "test-full-class-names-record-time-tolerance.log",
-      (t: String) => isRecordTimeToleranceTest(t),
+      "tests to check dynamic synchronizer parameter reconciliation",
+      "test-full-class-names-dynamic-synchronizer-params-reconciliation.log",
+      (t: String) => isDynamicSynchronizerParamsReconciliationTest(t),
     ),
     (
       "tests with simulated time",
