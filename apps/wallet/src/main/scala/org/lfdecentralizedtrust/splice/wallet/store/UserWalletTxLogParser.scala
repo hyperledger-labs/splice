@@ -664,7 +664,6 @@ class UserWalletTxLogParser(
               stateFromTransfer <- now(
                 State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer)
               )
-
               stateFromDevelopmentFundCouponArchives <- defer {
                 val start = exercised.getNodeId.intValue()
                 val end = exercised.getLastDescendantNodeId.intValue()
@@ -674,6 +673,8 @@ class UserWalletTxLogParser(
                         if nodeId.intValue() >= start &&
                           nodeId.intValue() <= end &&
                           ex.getChoice == amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive.name &&
+                          ex.getPackageName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getPackageId
+                            .stripPrefix("#") &&
                           ex.getTemplateId.getModuleName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getModuleName &&
                           ex.getTemplateId.getEntityName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getEntityName =>
                       nodeId
