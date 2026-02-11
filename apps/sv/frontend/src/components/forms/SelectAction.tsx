@@ -23,13 +23,13 @@ export const SelectAction: React.FC = () => {
       action: '',
     },
     onSubmit: async ({ value }) => {
-      navigate(`/governance-beta/proposals/create?action=${value.action}`);
+      navigate(`/governance/proposals/create?action=${value.action}`);
     },
   });
 
   const handleCancel = () => {
     form.reset();
-    navigate('/governance-beta/proposals');
+    navigate('/governance/proposals');
   };
 
   return (

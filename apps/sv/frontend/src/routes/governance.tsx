@@ -170,7 +170,7 @@ export const Governance: React.FC = () => {
             id="initiate-proposal-button"
             variant="pill"
             component={RouterLink}
-            to={`/governance-beta/proposals/create`}
+            to={`/governance/proposals/create`}
           >
             Initiate Proposal
           </Button>

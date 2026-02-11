@@ -21,6 +21,7 @@ import {
   createRoutesFromElements,
   useLocation,
   useNavigate,
+  useParams,
 } from 'react-router';
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
@@ -77,15 +78,26 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
 const ConditionalThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const location = useLocation();
-  const isBeta = location.pathname.startsWith('/governance-beta');
+  const isNewGovernancePath =
+    location.pathname === '/governance' || location.pathname.startsWith('/governance/');
 
-  const currentTheme = isBeta ? betaTheme : theme;
+  const currentTheme = isNewGovernancePath ? betaTheme : theme;
 
   return (
     <ThemeProvider theme={currentTheme}>
       <CssBaseline />
       {children}
     </ThemeProvider>
+  );
+};
+
+const GovernanceBetaProposalRedirect: React.FC = () => {
+  const { contractId } = useParams();
+  return (
+    <Navigate
+      to={contractId ? `/governance/proposals/${contractId}` : '/governance/proposals'}
+      replace
+    />
   );
 };
 
@@ -108,14 +120,27 @@ const App: React.FC = () => {
           <Route path="dso" element={<Dso />} />
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="amulet-price" element={<AmuletPrice />} />
-          <Route path="votes" element={<Voting />} />
+          <Route path="governance-old" element={<Voting />} />
+          <Route path="votes" element={<Navigate to="/governance-old" replace />} />
+
+          <Route path="governance" element={<Navigate to="/governance/proposals" replace />} />
+          <Route path="governance/proposals" element={<Governance />} />
+          <Route path="governance/proposals/create" element={<CreateProposal />} />
+          <Route path="governance/proposals/:contractId" element={<VoteRequestDetails />} />
+
+          <Route path="governance-beta" element={<Navigate to="/governance/proposals" replace />} />
           <Route
-            path="governance-beta"
-            element={<Navigate to="/governance-beta/proposals" replace />}
+            path="governance-beta/proposals"
+            element={<Navigate to="/governance/proposals" replace />}
           />
-          <Route path="governance-beta/proposals" element={<Governance />} />
-          <Route path="governance-beta/proposals/create" element={<CreateProposal />} />
-          <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
+          <Route
+            path="governance-beta/proposals/create"
+            element={<Navigate to="/governance/proposals/create" replace />}
+          />
+          <Route
+            path="governance-beta/proposals/:contractId"
+            element={<GovernanceBetaProposalRedirect />}
+          />
         </Route>
       </Route>
     )
