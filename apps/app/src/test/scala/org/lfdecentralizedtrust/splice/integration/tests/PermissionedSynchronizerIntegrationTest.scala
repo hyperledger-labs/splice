@@ -7,7 +7,6 @@ import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.{
   RestrictedOpen,
   UnrestrictedOpen,
 }
-import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
