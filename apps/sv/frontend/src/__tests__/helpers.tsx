@@ -96,3 +96,9 @@ export async function changeAction(actionName: ActionName = 'SRARC_SetConfig'): 
       break;
   }
 }
+
+export async function navigateToLegacyGovernance(): Promise<void> {
+  window.history.pushState({}, '', '/governance-old');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+  expect(await screen.findByText('Vote Requests')).toBeDefined();
+}
