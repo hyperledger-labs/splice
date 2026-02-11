@@ -40,6 +40,6 @@ set_value oss_sha256 "$oss_nix256"
 
 for img in base participant mediator sequencer; do
   _info "Fetching image sha256 for canton-$img..."
-  sha=$(skopeo inspect "docker://europe-docker.pkg.dev/da-images/public-all/docker/canton-$img:${NEW_VERSION}" --format '{{.Digest}}')
+  sha=$(skopeo inspect --override-os linux --override-arch amd64 "docker://europe-docker.pkg.dev/da-images/public-all/docker/canton-$img:${NEW_VERSION}" --format '{{.Digest}}')
   set_value "canton_${img}_image_sha256" "$sha"
 done
