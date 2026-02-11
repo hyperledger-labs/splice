@@ -152,6 +152,8 @@ class PermissionedSynchronizerIntegrationTest
 
         aliceParticipantClient.health.wait_for_ready_for_id()
 
+        // we need to generate signing key for alice, which in turn is used for the namespace.
+
         val aliceRootKey = aliceParticipantClient.keys.secret
           .generate_signing_key(
             "aliceRootKey",
@@ -159,10 +161,14 @@ class PermissionedSynchronizerIntegrationTest
           )
         val aliceNamespace = com.digitalasset.canton.topology.Namespace(aliceRootKey.fingerprint)
 
+        // initialize ids
+
         aliceParticipantClient.topology.init_id_from_uid(
           com.digitalasset.canton.topology.ParticipantId("aliceValidator", aliceNamespace).uid,
           waitForReady = true,
         )
+
+        // authorize the alice-participant to sign anything for her namespace
 
         aliceParticipantClient.topology.namespace_delegations.propose_delegation(
           aliceNamespace,
@@ -172,7 +178,35 @@ class PermissionedSynchronizerIntegrationTest
           signedBy = Seq(aliceNamespace.fingerprint),
         )
 
+        // key for signing ledger transactions.
+
+        val signingKey = aliceParticipantClient.keys.secret.generate_signing_key(
+          "alice-signing",
+          usage = Set(
+            com.digitalasset.canton.crypto.SigningKeyUsage.Protocol,
+            com.digitalasset.canton.crypto.SigningKeyUsage.SequencerAuthentication,
+          ),
+        )
+
+        // encryption key for alice used in actions
+
+        val encryptionKey =
+          aliceParticipantClient.keys.secret.generate_encryption_key("alice-encryption")
+
+        // bind protocol signing and encryption keys to the participant in the topology
+
+        aliceParticipantClient.topology.owner_to_key_mappings.propose(
+          aliceParticipantClient.id.member,
+          com.daml.nonempty.NonEmpty(Seq, signingKey, encryptionKey),
+          Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
+          signedBy = Seq(aliceRootKey.fingerprint, signingKey.fingerprint),
+        )
+
+        // get the participant ID
+
         val aliceParticipantId = aliceParticipantClient.id
+
+        // submit the ParticipantSynchronizerPermission for alice
 
         sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
           decentralizedSynchronizerId,
