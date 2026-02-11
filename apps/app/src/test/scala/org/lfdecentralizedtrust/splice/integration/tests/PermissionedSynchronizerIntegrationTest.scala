@@ -35,19 +35,23 @@ class PermissionedSynchronizerIntegrationTest
     with PostgresAroundEach
     with WalletTestUtil {
 
+  // need because we use a new participant outside canton.
   override protected def runTokenStandardCliSanityCheck: Boolean = false
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def usesDbs: Seq[String] = Seq(
-    "alice_participant_new"
+    "alice_participant_new" // used for the additional participant
   )
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
-      .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq("aliceValidator"))
+      .withAllocatedUsers(extraIgnoredValidatorPrefixes =
+        Seq("aliceValidator")
+      ) // don't allocate users for extra participant.
       .addConfigTransforms(
+        // configure alice validator to connect to extra participant.
         (_, config) =>
           ConfigTransforms.bumpSomeValidatorAppPortsBy(22_000, Seq("aliceValidator"))(config),
         (_, config) =>
@@ -57,12 +61,12 @@ class PermissionedSynchronizerIntegrationTest
 
   "onboard validator in permissioned mode" in { implicit env =>
     initDsoWithSv1Only()
-    // start an extra participant
 
     // create a ParticipantSynchronizerPermission for the SV1 validator participant
 
     withClue("Phase 1: Set ParticipantSynchronizerPermission for SV1") {
 
+      // we add a ParticipantSynchronizerPermission only if its missing
       sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
         decentralizedSynchronizerId,
         sv1ValidatorBackend.participantClientWithAdminToken.id,
@@ -70,7 +74,9 @@ class PermissionedSynchronizerIntegrationTest
         case Some(res)
             if res.item.permission == ParticipantPermission.Submission => {} // ParticipantSynchronizerPermission already exists
 
-        case Some(res) =>
+        case Some(
+              res
+            ) => // update the existing ParticipantSynchronizerPermission if it doesn't have the required permission
           sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
             .propose(
               decentralizedSynchronizerId,
@@ -79,7 +85,7 @@ class PermissionedSynchronizerIntegrationTest
               serial = Some(res.context.serial.increment),
             )
 
-        case None =>
+        case None => // create a new ParticipantSynchronizerPermission if it doesn't exist
           sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
             .propose(
               decentralizedSynchronizerId,
@@ -88,6 +94,8 @@ class PermissionedSynchronizerIntegrationTest
               serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
             )
       }
+
+      // before moving forward, check that the ParticipantSynchronizerPermission is registered in the topology
 
       eventually(60.seconds, 1.second) {
         val authorized =
@@ -105,6 +113,8 @@ class PermissionedSynchronizerIntegrationTest
 
       // set the onboarding restriction to RestrictedOpen
 
+      // we update only if its not already RestrictedOpen.
+
       if (
         sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
@@ -116,6 +126,8 @@ class PermissionedSynchronizerIntegrationTest
         )
       }
 
+      // verify that topology transaction went through, synchronously
+
       eventually(60.seconds, 1.second) {
         val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
@@ -124,6 +136,8 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
+    // start the additional participant for alice and initialize it manually.
+
     withCanton(
       Seq(
         testResourcesPath / "standalone-participant-extra.conf"
@@ -131,13 +145,13 @@ class PermissionedSynchronizerIntegrationTest
       Seq(
       ),
       "aliceValidatorExtra",
-      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser, // so that alice validator connects to the new participant.
       "EXTRA_PARTICIPANT_DB" -> "alice_participant_new",
     ) {
 
       withClue("Phase 3: Submit a ParticipantSynchronizerPermission for the alice participant") {
 
-        // create a ParticipantSynchronizerPermission for the alice participant
+        // initialize the alice participant with all required keys.
 
         val aliceParticipantClient = new ParticipantClientReference(
           env,
@@ -154,7 +168,7 @@ class PermissionedSynchronizerIntegrationTest
 
         aliceParticipantClient.health.wait_for_ready_for_id()
 
-        // we need to generate signing key for alice, which in turn is used for the namespace.
+        // we need to generate root signing key for alice, which in turn is used for the namespace.
 
         val aliceRootKey = aliceParticipantClient.keys.secret
           .generate_signing_key(
@@ -190,7 +204,7 @@ class PermissionedSynchronizerIntegrationTest
           ),
         )
 
-        // encryption key for alice used in actions
+        // encryption key for alice
 
         val encryptionKey =
           aliceParticipantClient.keys.secret.generate_encryption_key("alice-encryption")
@@ -204,19 +218,22 @@ class PermissionedSynchronizerIntegrationTest
           signedBy = Seq(aliceRootKey.fingerprint, signingKey.fingerprint),
         )
 
-        // get the participant ID
+        // get the alice participant ID
 
         val aliceParticipantId = aliceParticipantClient.id
 
-        // submit the ParticipantSynchronizerPermission for alice
+        // submit the ParticipantSynchronizerPermission for alice, if not already existing
 
         sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
           decentralizedSynchronizerId,
           aliceParticipantId,
         ) match {
-          case Some(res) if res.item.permission == ParticipantPermission.Submission => {}
+          case Some(res)
+              if res.item.permission == ParticipantPermission.Submission => {} // we already have the topology transaction in place, do nothing.
 
-          case Some(res) =>
+          case Some(
+                res
+              ) => // update the existing ParticipantSynchronizerPermission if it doesn't have the required permission
             sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
               .propose(
                 decentralizedSynchronizerId,
@@ -225,7 +242,7 @@ class PermissionedSynchronizerIntegrationTest
                 serial = Some(res.context.serial.increment),
               )
 
-          case None =>
+          case None => // create a new ParticipantSynchronizerPermission if it doesn't exist
             sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
               .propose(
                 decentralizedSynchronizerId,
@@ -234,6 +251,8 @@ class PermissionedSynchronizerIntegrationTest
                 serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
               )
         }
+
+        // verify that the ParticipantSynchronizerPermission for alice is registered in the topology, before moving forward.
 
         withClue("Wait until alice topology transaction is registered") {
           eventually(60.seconds, 1.second) {
@@ -250,10 +269,11 @@ class PermissionedSynchronizerIntegrationTest
 
       withClue("Phase 4: Start the alice validator participant") {
 
-        // start the alice validator participant
-
-        aliceValidatorBackend.startSync()
-
+        // start the alice validator and make sure she can operate
+        eventuallySucceeds(60.seconds) {
+          aliceValidatorBackend.startSync()
+          aliceValidatorBackend.onboardUser("TestUser")
+        }
       }
 
       withClue("Phase 5: Reset the onboarding restriction back to UnrestrictedOpen") {
@@ -278,7 +298,6 @@ class PermissionedSynchronizerIntegrationTest
           currentParams.onboardingRestriction shouldBe UnrestrictedOpen
         }
       }
-
     }
   }
 }
