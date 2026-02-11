@@ -50,7 +50,9 @@ export const partyIdSchema = z
 export const svWeightSchema = z
   .string()
   .min(1, { message: 'Weight is required' })
-  .regex(/^\d+$/, { message: 'Weight must be a valid number' });
+  .regex(/^\d+_\d{4}$/, {
+    message: 'Weight must be expressed in basis points using fixed point notation, XX...X_XXXX',
+  });
 
 export const rewardAmountSchema = z
   .string()

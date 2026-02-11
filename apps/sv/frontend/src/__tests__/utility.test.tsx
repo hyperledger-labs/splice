@@ -10,6 +10,7 @@ import {
 import { test, expect, describe } from 'vitest';
 
 import { hasConflictingFields } from '../utils/configDiffs';
+import { formatBasisPoints } from '../utils/governance';
 
 describe('Utility', () => {
   test('hasConflictingFields function works as expected for DsoRulesConfig changes', async () => {
@@ -223,5 +224,12 @@ describe('Utility', () => {
       hasConflict: true,
       intersection: ['alice'],
     });
+  });
+
+  test('formatBasisPoints function works as expected', () => {
+    expect(formatBasisPoints('0')).toBe('0_0000');
+    expect(formatBasisPoints('1')).toBe('0_0001');
+    expect(formatBasisPoints('1010')).toBe('0_1010');
+    expect(formatBasisPoints('12345')).toBe('1_2345');
   });
 });

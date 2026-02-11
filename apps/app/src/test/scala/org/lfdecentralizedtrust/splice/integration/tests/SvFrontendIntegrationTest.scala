@@ -1433,7 +1433,7 @@ class SvFrontendIntegrationTest
 
     "NEW UI: Update SV Reward Weight" in { implicit env =>
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val newWeight = "5000"
+      val newWeight = "0_5000"
 
       assertCreateProposal("SRARC_UpdateSvRewardWeight", "update-sv-reward-weight") {
         implicit webDriver =>

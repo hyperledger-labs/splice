@@ -20,6 +20,7 @@ import {
 import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   createProposalActions,
+  formatBasisPoints,
   getInitialExpiration,
   getSvRewardWeight,
 } from '../../utils/governance';
@@ -35,6 +36,8 @@ interface ExtraFormField {
 }
 
 export type UpdateSvRewardWeightFormData = CommonProposalFormData & ExtraFormField;
+
+const LEADING_ZEROS = /^0+(?=\d)/;
 
 export const UpdateSvRewardWeightForm: React.FC = _ => {
   const dsoInfosQuery = useDsoInfos();
@@ -81,7 +84,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
             tag: 'SRARC_UpdateSvRewardWeight',
             value: {
               svParty: value.sv,
-              newRewardWeight: value.weight,
+              newRewardWeight: value.weight.replace('_', '').replace(LEADING_ZEROS, ''),
             },
           },
         },
@@ -109,7 +112,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
   const selectedSv = svOptions.find(o => o.value === form.state.values.sv);
 
   const currentWeight = useMemo(() => {
-    return getSvRewardWeight(svs, selectedSv?.value || '');
+    return formatBasisPoints(getSvRewardWeight(svs, selectedSv?.value || ''));
   }, [svs, selectedSv]);
 
   return (
