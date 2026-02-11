@@ -83,6 +83,7 @@ import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
 
+import java.nio.file.{Files, Paths}
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util
@@ -102,24 +103,38 @@ abstract class StoreTestBase
   protected val dummyHoldingPackageId = DummyHolding.TEMPLATE_ID.getPackageId
   protected val maliciousPackageId = "maliciouspackageid"
 
+  // Looks up the package name from the package ID in dars.lock, to avoid having to parse all DARs just to find this mapping
+  protected def tryGetPackageNameFromDarLock(identifier: Identifier): Option[String] = {
+    val path = Paths.get("daml/dars.lock")
+    Files
+      .readAllLines(path)
+      .asScala
+      .map(_.trim.split("\\s+"))
+      .filter(line => line.length > 1 && line(2) == identifier.getPackageId)
+      .map(_(0))
+      .headOption
+  }
+
   protected def getPackageName(identifier: Identifier) = {
-    PackageQualifiedName
-      .lookupFromResources(identifier)
-      .map(_.packageName)
-      // should only be necessary for upgrade/malicious identifiers
-      .orElse(
-        Map(
-          upgradedAppRewardCouponPackageId -> amuletCodegen.AppRewardCoupon.PACKAGE_NAME,
-          dummyHoldingPackageId -> DummyHolding.PACKAGE_NAME, // not in DarResources
-          maliciousPackageId -> "malicious-package",
+    tryGetPackageNameFromDarLock(identifier).getOrElse(
+      PackageQualifiedName
+        .lookupFromResources(identifier)
+        .map(_.packageName)
+        // should only be necessary for upgrade/malicious identifiers
+        .orElse(
+          Map(
+            upgradedAppRewardCouponPackageId -> amuletCodegen.AppRewardCoupon.PACKAGE_NAME,
+            dummyHoldingPackageId -> DummyHolding.PACKAGE_NAME, // not in DarResources
+            maliciousPackageId -> "malicious-package",
+          )
+            .get(identifier.getPackageId)
         )
-          .get(identifier.getPackageId)
-      )
-      .getOrElse(
-        throw new IllegalArgumentException(
-          s"Identifier is not present in resources nor does it look like mock data: $identifier"
+        .getOrElse(
+          throw new IllegalArgumentException(
+            s"Identifier is not present in resources nor does it look like mock data: $identifier"
+          )
         )
-      )
+    )
   }
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
