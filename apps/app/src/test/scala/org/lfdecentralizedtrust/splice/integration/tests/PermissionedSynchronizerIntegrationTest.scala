@@ -27,6 +27,8 @@ import scala.concurrent.duration.DurationInt
  * 5. Start the alice participant
  * */
 
+// Next Step: Using SvOfflineRootNamespaceKeyIntegrationTest as example, check if you need to use fresh SV1
+
 class PermissionedSynchronizerIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
