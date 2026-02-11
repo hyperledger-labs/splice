@@ -455,108 +455,44 @@ class DbUserWalletStore(
   override def listDevelopmentFundCouponHistory(after: Option[Long], limit: PageLimit)(implicit
       lc: TraceContext
   ): Future[
-    ResultsPage[
-      (DevelopmentFundCouponCreatedTxLogEntry, DevelopmentFundCouponArchivedTxLogEntry)
-    ]
+    ResultsPage[(DevelopmentFundCouponArchivedTxLogEntry, DevelopmentFundCouponCreatedTxLogEntry)]
   ] = {
+    def afterFilter(optAfter: Option[Long]) =
+      optAfter.fold(sql"")(x => sql" and a.entry_number < $x")
+
     val opName = "listDevelopmentFundCouponHistory"
-
-    def afterFilter(a: Option[Long]) =
-      a.fold(sql"")(x => sql" and entry_number < $x")
-
+    val colsA = TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated("a.")
+    val colsC = TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated("c.")
     waitUntilAcsIngested {
       for {
-        // 1) PAGE OVER ARCHIVED (includes status; stateless across requests)
-        archivedRows <- storage.query(
-          selectFromTxLogTable(
-            WalletTables.txLogTableName,
-            txLogStoreId,
-            where =
-              sql"tx_log_id = ${TxLogEntry.EntryType.DevelopmentFundCouponArchivedTxLogEntry}" ++
-                afterFilter(after),
-            orderLimit = sql"order by entry_number desc limit ${sqlLimit(limit)}",
-          ),
+        rows <- storage.query(
+          (sql"""
+           select #$colsA, #$colsC
+           from #${WalletTables.txLogTableName} a
+           join #${WalletTables.txLogTableName} c
+            on c.store_id = a.store_id
+              and c.tx_log_id = a.tx_log_id
+              and c.development_fund_coupon_contract_id = a.development_fund_coupon_contract_id
+           where a.store_id = $txLogStoreId
+             and a.tx_log_id = ${TxLogEntry.LogId.DevelopmentFundCouponTxLog}
+             and a.entry_type = ${TxLogEntry.EntryType.DevelopmentFundCouponArchivedTxLogEntry}
+             and c.entry_type = ${TxLogEntry.EntryType.DevelopmentFundCouponCreatedTxLogEntry}
+         """ ++ afterFilter(after) ++
+            sql" order by a.entry_number desc limit ${sqlLimit(limit)}").toActionBuilder
+            .as[(TxLogQueries.SelectFromTxLogTableResult, TxLogQueries.SelectFromTxLogTableResult)],
           opName,
         )
 
-        archivedLimited = applyLimit(opName, limit, archivedRows)
-        nextPageToken = archivedLimited.lastOption.map(_.entryNumber)
-
-        resultPage <- archivedLimited.headOption match {
-          case None =>
-            // no archived => no results, no next token
-            Future.successful(
-              ResultsPage(
-                Seq.empty[
-                  (
-                      DevelopmentFundCouponCreatedTxLogEntry,
-                      DevelopmentFundCouponArchivedTxLogEntry,
-                  )
-                ],
-                None,
-              )
-            )
-          case Some(maxArchivedRowInPage) =>
-            val archivedEntries =
-              archivedLimited.map(
-                txLogEntryFromRow[DevelopmentFundCouponArchivedTxLogEntry](txLogConfig)
-              )
-            val targetCids: Set[String] = archivedEntries.map(_.contractId).toSet
-            // Start scanning CREATED from just ABOVE the max archived entry_number in this page
-            // so we don't skip created entries interleaved between archived entries.
-            val createdScanStartAfter: Option[Long] =
-              Some(maxArchivedRowInPage.entryNumber + 1L)
-            // Batch size for scanning created. Adjust multiplier if needed.
-            val createdBatchSize: PageLimit = {
-              val raw = math.min(limit.maxPageSize, math.max(limit.limit * 20, limit.limit))
-              PageLimit.tryCreate(raw, limit.maxPageSize)
-            }
-
-            def fetchCreatedBatch(scanAfter: Option[Long]) =
-              storage.query(
-                selectFromTxLogTable(
-                  WalletTables.txLogTableName,
-                  txLogStoreId,
-                  where =
-                    sql"tx_log_id = ${TxLogEntry.EntryType.DevelopmentFundCouponCreatedTxLogEntry}" ++
-                      afterFilter(scanAfter),
-                  orderLimit = sql"order by entry_number desc limit ${sqlLimit(createdBatchSize)}",
-                ),
-                s"$opName:fetchCreatedBatch",
-              )
-
-            def collectCreated(
-                scanAfter: Option[Long],
-                found: Map[String, DevelopmentFundCouponCreatedTxLogEntry], // cid -> created
-            ): Future[Map[String, DevelopmentFundCouponCreatedTxLogEntry]] = {
-              if (found.size >= targetCids.size || scanAfter.isEmpty) {
-                Future.successful(found)
-              } else {
-                fetchCreatedBatch(scanAfter).flatMap { rows =>
-                  val nextScanAfter = rows.lastOption.map(_.entryNumber)
-                  val foundUpdated = rows.foldLeft(found) { (foundSoFar, row) =>
-                    val created =
-                      txLogEntryFromRow[DevelopmentFundCouponCreatedTxLogEntry](txLogConfig)(row)
-                    val cid = created.contractId
-                    if (targetCids.contains(cid) && !foundSoFar.contains(cid))
-                      foundSoFar.updated(cid, created)
-                    else
-                      foundSoFar
-                  }
-                  collectCreated(nextScanAfter, foundUpdated)
-                }
-              }
-            }
-
-            for {
-              createdByCid <- collectCreated(createdScanStartAfter, Map.empty)
-              // Keep the order of ARCHIVED page (DESC by archived entry_number)
-              zipped = archivedEntries.flatMap { a =>
-                createdByCid.get(a.contractId).map(c => c -> a)
-              }
-            } yield ResultsPage(zipped, nextPageToken)
+        resultsInPage = rows.map { case (aRow, cRow) =>
+          val archived =
+            txLogEntryFromRow[DevelopmentFundCouponArchivedTxLogEntry](txLogConfig)(aRow)
+          val created =
+            txLogEntryFromRow[DevelopmentFundCouponCreatedTxLogEntry](txLogConfig)(cRow)
+          (archived, created)
         }
-      } yield resultPage
+        afterToken = rows.lastOption.map { case (aRow, _) => aRow.entryNumber }
+      } yield ResultsPage(resultsInPage, afterToken)
     }
   }
+
 }

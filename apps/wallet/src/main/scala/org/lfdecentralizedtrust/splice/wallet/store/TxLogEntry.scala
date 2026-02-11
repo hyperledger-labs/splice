@@ -88,8 +88,7 @@ object TxLogEntry extends StoreErrors {
     val TransactionHistoryTxLog: String3 = String3.tryCreate("txh")
     val TransferOfferTxLog: String3 = String3.tryCreate("tof")
     val BuyTrafficRequestTxLog: String3 = String3.tryCreate("btr")
-    val DevelopmentFundCouponCreatedTxLog: String3 = String3.tryCreate("fcc")
-    val DevelopmentFundCouponArchivedTxLog: String3 = String3.tryCreate("fca")
+    val DevelopmentFundCouponTxLog: String3 = String3.tryCreate("dev")
   }
 
   object EntryType {

@@ -93,11 +93,15 @@ object WalletTables extends AcsTables {
       txLogId: String3,
       eventId: Option[String] = None,
       trackingId: Option[String] = None,
+      developmentFundCouponCid: Option[String] = None,
   ) extends TxLogRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "tx_log_id" -> IndexColumnValue[LengthLimitedString](txLogId),
       "event_id" -> IndexColumnValue(eventId.map(lengthLimited)),
       "tracking_id" -> IndexColumnValue(trackingId.map(lengthLimited)),
+      "development_fund_coupon_contract_id" -> IndexColumnValue(
+        developmentFundCouponCid.map(lengthLimited)
+      ),
     )
   }
 
@@ -122,15 +126,17 @@ object WalletTables extends AcsTables {
             TxLogEntry.LogId.TransferOfferTxLog,
             trackingId = Some(e.trackingId),
           )
-        case _: DevelopmentFundCouponCreatedTxLogEntry =>
+        case e: DevelopmentFundCouponCreatedTxLogEntry =>
           UserWalletTxLogStoreRowData(
             entry,
-            TxLogEntry.LogId.DevelopmentFundCouponCreatedTxLog,
+            TxLogEntry.LogId.DevelopmentFundCouponTxLog,
+            developmentFundCouponCid = Some(e.contractId),
           )
-        case _: DevelopmentFundCouponArchivedTxLogEntry =>
+        case e: DevelopmentFundCouponArchivedTxLogEntry =>
           UserWalletTxLogStoreRowData(
             entry,
-            TxLogEntry.LogId.DevelopmentFundCouponArchivedTxLog,
+            TxLogEntry.LogId.DevelopmentFundCouponTxLog,
+            developmentFundCouponCid = Some(e.contractId),
           )
         case e => throw new RuntimeException(s"Unknown TxLogEntry $e")
       }

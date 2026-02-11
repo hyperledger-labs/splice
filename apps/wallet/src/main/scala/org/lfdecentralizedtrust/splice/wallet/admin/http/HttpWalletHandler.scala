@@ -1712,7 +1712,7 @@ class HttpWalletHandler(
         page <- userWallet.store.listDevelopmentFundCouponHistory(after, pageLimit)
       } yield {
         val developmentFundCouponHistory = page.resultsInPage.map {
-          case (createdEntry, archivedEntry) =>
+          case (archivedEntry, createdEntry) =>
             TxLogEntry.Http.toArchivedDevelopmentFundCoupon(createdEntry, archivedEntry)
         }.toVector
         WalletResource.ListDevelopmentFundCouponHistoryResponseOK(

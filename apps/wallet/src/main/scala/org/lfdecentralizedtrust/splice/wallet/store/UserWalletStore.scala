@@ -438,7 +438,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
       lc: TraceContext
   ): Future[
     ResultsPage[
-      (DevelopmentFundCouponCreatedTxLogEntry, DevelopmentFundCouponArchivedTxLogEntry)
+      (DevelopmentFundCouponArchivedTxLogEntry, DevelopmentFundCouponCreatedTxLogEntry)
     ]
   ]
 

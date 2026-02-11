@@ -1319,7 +1319,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
             expected: Seq[(Double, DevelopmentFundCouponArchivedTxLogEntry.Status)],
         ) = {
           val page = listDevelopmentFundCouponHistory(after)
-          page.resultsInPage.map { case (createdEntry, archivedEntry) =>
+          page.resultsInPage.map { case (archivedEntry, createdEntry) =>
             createdEntry.amount -> archivedEntry.status
           } shouldBe expected
           page
@@ -1363,7 +1363,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
 
         val allArchivedAt =
           (page1.resultsInPage ++ page2.resultsInPage ++ page3.resultsInPage)
-            .flatMap(_._2.archivedAt)
+            .flatMap(_._1.archivedAt)
         allArchivedAt shouldBe allArchivedAt.sorted(Ordering[Instant].reverse)
       }
     }
