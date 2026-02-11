@@ -110,6 +110,7 @@ tests:
       # Set log levels for testing
       logLevel: DEBUG
       logLevelStdout: ERROR
+      logLevelApiRequest: DEBUG
     documentSelector:
       path: kind
       value: Deployment
@@ -124,6 +125,11 @@ tests:
           content:
             name: LOG_LEVEL_STDOUT
             value: ERROR
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOG_LEVEL_API_REQUEST
+            value: DEBUG
   - it: "sets anti affinity by default"
     documentSelector:
       path: kind
