@@ -29,8 +29,8 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnections,
+  SequencerConnectionValidation,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -104,7 +104,7 @@ class ParticipantAdminConnection(
       _.getSchedule(_),
     )
 
-  private val synchronizerIdCache =
+  private val synchronizerIdAliasCache =
     Scaffeine()
       .expireAfterWrite(10.minutes)
       .maximumSize(100)
@@ -131,7 +131,7 @@ class ParticipantAdminConnection(
   def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[SynchronizerId] = {
-    synchronizerIdCache.getFuture(
+    synchronizerIdAliasCache.getFuture(
       synchronizerAlias,
       alias => getPhysicalSynchronizerId(alias).map(_.logical),
     )
@@ -152,15 +152,6 @@ class ParticipantAdminConnection(
           .asRuntimeException()
       )(_.physicalSynchronizerId)
     )
-
-  /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
-    *  but in some cases we want to check the domain id
-    * without risking a full domain connection.
-    */
-  def getSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
-      traceContext: TraceContext
-  ): Future[SynchronizerId] =
-    getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias).map(_.logical)
 
   def getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
@@ -824,23 +815,6 @@ object ParticipantAdminConnection {
     */
   sealed trait HasParticipantId {
     def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId]
-  }
-
-  object HasParticipantId {
-    @com.google.common.annotations.VisibleForTesting
-    private[splice] def Const(participantId: ParticipantId): HasParticipantId =
-      new HasParticipantId {
-        override def getParticipantId()(implicit
-            traceContext: TraceContext
-        ): Future[ParticipantId] =
-          Future successful participantId
-      }
-
-    /** For tests that don't care about the random separation provided by the
-      * participant ID in the hash.
-      */
-    @com.google.common.annotations.VisibleForTesting
-    private[splice] val ForTesting = Const(ParticipantId("OnlyForTesting"))
   }
 
   def dropSequencerId(config: SynchronizerConnectionConfig): SynchronizerConnectionConfig =

@@ -420,14 +420,14 @@ object ConfigTransforms {
     o.map(bumpUrl(bump, _))
   }
 
-  def bumpCantonPortsBy(bump: Int, predicate: String => Boolean = _ => true): ConfigTransform = {
-
+  def bumpCantonSyncPortsBy(
+      bump: Int,
+      predicate: String => Boolean = _ => true,
+  ): ConfigTransform = {
     val transforms = Seq(
       updateAllSvAppConfigs((name, conf) =>
         if (predicate(name))
           conf
-            .focus(_.participantClient)
-            .modify(portTransform(bump, _))
             .focus(_.domains.global.url)
             .modify(_.map(bumpUrl(bump, _)))
             .focus(_.localSynchronizerNode)
@@ -437,8 +437,6 @@ object ConfigTransforms {
       updateAllScanAppConfigs((name, conf) =>
         if (predicate(name))
           conf
-            .focus(_.participantClient)
-            .modify(portTransform(bump, _))
             .focus(_.sequencerAdminClient)
             .modify(portTransform(bump, _))
             .focus(_.mediatorAdminClient)
@@ -450,12 +448,40 @@ object ConfigTransforms {
       updateAllValidatorConfigs((name, conf) =>
         if (predicate(name))
           conf
-            .focus(_.participantClient)
-            .modify(portTransform(bump, _))
             .focus(_.domains.global.url)
             .modify(bumpOptionalUrl(_, bump))
             .focus(_.domains.extra)
             .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
+        else conf
+      ),
+    )
+
+    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
+
+  }
+
+  def bumpCantonPortsBy(bump: Int, predicate: String => Boolean = _ => true): ConfigTransform = {
+
+    val transforms = Seq(
+      updateAllSvAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+        else conf
+      ),
+      updateAllScanAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+        else conf
+      ),
+      updateAllValidatorConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
         else conf
       ),
       updateAllSplitwellAppConfigs((name, conf) =>
@@ -470,7 +496,9 @@ object ConfigTransforms {
       ),
     )
 
-    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
+    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) =>
+      f compose tf
+    ) compose bumpCantonSyncPortsBy(bump, predicate)
 
   }
 
