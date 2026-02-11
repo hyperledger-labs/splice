@@ -327,13 +327,13 @@ class SvFrontendIntegrationTest
           },
       )
 
-    def navigateToLegacyGovernance(uiPort: Int)(implicit webDriver: WebDriverType): Unit =
+    def navigateToLegacyGovernancePage(uiPort: Int)(implicit webDriver: WebDriverType): Unit =
       go to s"http://localhost:$uiPort/governance-old"
 
     def loginToLegacyGovernance(uiPort: Int, ledgerApiUser: String)(implicit
         webDriver: WebDriverType
     ): Unit = {
-      navigateToLegacyGovernance(uiPort)
+      navigateToLegacyGovernancePage(uiPort)
       loginOnCurrentPage(uiPort, ledgerApiUser)
     }
 
@@ -933,7 +933,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can create a new vote request to revoke the featured app right", {
-              navigateToLegacyGovernance(sv1UIPort)
+              navigateToLegacyGovernancePage(sv1UIPort)
 
               changeAction("SRARC_RevokeFeaturedAppRight")
 

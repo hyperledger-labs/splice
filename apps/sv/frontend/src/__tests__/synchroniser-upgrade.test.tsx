@@ -12,7 +12,7 @@ import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
-import { changeAction, navigateToLegacyGovernance } from './helpers';
+import { changeAction, navigateToLegacyGovernancePage } from './helpers';
 
 dayjs.extend(timezone);
 
@@ -79,7 +79,7 @@ describe('SV user can', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction();
 
@@ -107,7 +107,7 @@ describe('SV user can', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction();
 
@@ -155,7 +155,7 @@ describe('SV user can', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction();
     await fillOutForm(user);
@@ -182,7 +182,7 @@ describe('SV user can', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction();
     await fillOutForm(user);
@@ -238,7 +238,7 @@ describe('SV user can', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction();
     await fillOutForm(user);
@@ -295,7 +295,7 @@ describe('SV user can', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction();
     await fillOutForm(user);
@@ -352,7 +352,7 @@ describe('SV user can', () => {
       const input = screen.getByRole('textbox');
       await user.type(input, 'sv1');
 
-      await navigateToLegacyGovernance();
+      await navigateToLegacyGovernancePage();
 
       await changeAction();
       await fillOutForm(user);

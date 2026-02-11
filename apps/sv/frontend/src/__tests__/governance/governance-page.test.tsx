@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { SvConfigProvider } from '../../utils';
 import userEvent from '@testing-library/user-event';
 import App from '../../App';
+import { navigateToGovernancePage } from '../helpers';
 
 type UserEvent = ReturnType<typeof userEvent.setup>;
 
@@ -28,13 +29,7 @@ async function login(user: UserEvent) {
   user.click(button);
 }
 
-async function navigateToGovernancePage(user: UserEvent) {
-  expect(await screen.findByTestId('navlink-governance')).toBeInTheDocument();
-  await user.click(screen.getByText('Governance'));
-}
-
-// Skipping this test until we switch to the new UI
-describe.skip('Governance Page', () => {
+describe('Governance Page', () => {
   test('Login and navigate to Governance Page', async () => {
     const user = userEvent.setup();
 
@@ -139,7 +134,7 @@ describe.skip('Governance Page', () => {
     const summary = screen.getByTestId('proposal-details-summary-value');
     expect(summary).toBeInTheDocument();
 
-    const url = screen.getByTestId('proposal-details-url-value');
+    const url = screen.getByTestId('proposal-details-url');
     expect(url).toBeInTheDocument();
 
     const votingInformationSection = screen.getByTestId('proposal-details-voting-information');

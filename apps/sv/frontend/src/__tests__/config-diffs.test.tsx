@@ -15,7 +15,7 @@ import { test, expect, describe } from 'vitest';
 import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
-import { changeAction, navigateToLegacyGovernance } from './helpers';
+import { changeAction, navigateToLegacyGovernancePage } from './helpers';
 
 const AppWithConfig = () => {
   return (
@@ -50,7 +50,7 @@ describe('SV can see AmuletRules config diffs', () => {
   test('while creating a vote request.', async () => {
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction(action);
 
@@ -109,7 +109,7 @@ describe('SV can see DsoRules config diffs', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await navigateToLegacyGovernance();
+    await navigateToLegacyGovernancePage();
 
     await changeAction(action);
 
@@ -189,7 +189,7 @@ async function goToGovernanceTabAndClickOnAction(
   user: ReturnType<typeof userEvent.setup>,
   index: number = 0
 ): Promise<void> {
-  await navigateToLegacyGovernance();
+  await navigateToLegacyGovernancePage();
 
   const button = await screen.findByText(tableType);
   expect(button).toBeDefined();
