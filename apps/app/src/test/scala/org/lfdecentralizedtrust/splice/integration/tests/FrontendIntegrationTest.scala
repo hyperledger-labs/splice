@@ -607,21 +607,27 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
           // Next, clear local storage, as our oauth library puts data in there
           // Note: again, you can only access the local storage of the current page.
-          clue("Clearing local storage") {
-            Try(
-              webDriver.executeScript(
-                """
-                  const auth0LocalState = Object.keys(localStorage).filter(k => k.startsWith("oidc."));
-                  console.debug(`Clearing localStorage keys: [${auth0LocalState.join(", ")}]`);
-                  auth0LocalState.forEach(k => localStorage.removeItem(k));
-                """
-              )
-            ).fold(e => logger.debug(s"Failed to clear local storage: $e"), _ => ())
-          }
+          clearAuth0WebStorage()
+
           // Finally, navigate away from the current page to clear any JavaScript state
           go to "about:blank"
           throw e
       }
+    }
+  }
+
+  @annotation.nowarn("msg=possible missing interpolator")
+  protected def clearAuth0WebStorage()(implicit webDriver: WebDriverType): Unit = {
+    clue("Clearing auth0 local storage") {
+      Try(
+        webDriver.executeScript(
+          """
+          const auth0LocalState = Object.keys(localStorage).filter(k => k.startsWith("oidc."));
+          console.debug(`Clearing localStorage keys: [${auth0LocalState.join(", ")}]`);
+          auth0LocalState.forEach(k => localStorage.removeItem(k));
+        """
+        )
+      ).fold(e => logger.debug(s"Failed to clear web storage: $e"), _ => ())
     }
   }
 
