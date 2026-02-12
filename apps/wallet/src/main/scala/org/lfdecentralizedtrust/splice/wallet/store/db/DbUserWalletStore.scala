@@ -468,8 +468,8 @@ class DbUserWalletStore(
         rows <- storage.query(
           (sql"""
            select #$colsA, #$colsC
-           from #${WalletTables.txLogTableName} a
-           join #${WalletTables.txLogTableName} c
+           from #${WalletTables.txLogTableName} a  -- coupon archivals
+           join #${WalletTables.txLogTableName} c  -- coupon creations
             on c.store_id = a.store_id
               and c.tx_log_id = a.tx_log_id
               and c.development_fund_coupon_contract_id = a.development_fund_coupon_contract_id
