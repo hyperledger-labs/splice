@@ -7,9 +7,6 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: true
-  splice_root:
-    description: "Path to splice repo"
-    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
   nix_path:
     description: "The path to nix flake directory"
     required: false
@@ -161,8 +158,18 @@ runs:
           nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
         fi
 
+    # Note that this if statement is temporary - in the future we will just refer to common-workflows repo @SHA1
     - name: Invoke nix before saving cache
-      uses: ./${{ inputs.splice_root }}/.github/actions/nix/run_bash_command_in_nix
+      if: ${{ github.repository == 'hyperledger-labs/splice' }}
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          echo "Validated nix"
+          ls -al
+
+    - name: Invoke nix before saving cache
+      if: ${{ github.repository != 'hyperledger-labs/splice' }}
+      uses: ./splice/.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
           echo "Validated nix"
