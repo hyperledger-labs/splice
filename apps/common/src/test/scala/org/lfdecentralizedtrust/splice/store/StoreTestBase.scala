@@ -104,6 +104,7 @@ abstract class StoreTestBase
   protected val maliciousPackageId = "maliciouspackageid"
 
   // Looks up the package name from the package ID in dars.lock, to avoid having to parse all DARs just to find this mapping
+  // TODO(#3937): this is quite hacky. What we should really do is just auto-generate DarResources instead of deriving it from DARs at runtime.
   protected def tryGetPackageNameFromDarLock(identifier: Identifier): Option[String] = {
     val path = Paths.get("daml/dars.lock")
     Files
