@@ -18,6 +18,7 @@ import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
 import Splice.Fees
 import qualified Splice.Api.FeaturedAppRightV1
+import qualified Splice.Api.FeaturedAppRightV2
 import Splice.Round
 import Splice.Types
 
@@ -255,9 +256,31 @@ template FeaturedAppRight with
                weight = weight
          pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
 
+    interface instance Splice.Api.FeaturedAppRightV2.FeaturedAppRight for FeaturedAppRight where
+      view = Splice.Api.FeaturedAppRightV2.FeaturedAppRightView with dso, provider
+
+      featuredAppRight_CreateActivityMarkerImpl _self arg = do
+         validateAppRewardBeneficiariesV2 arg.beneficiaries
+         require "Weight >= 1.0" (fromOptional 1.0 arg.weight >= 1.0)
+         require "Weight <= 10000.0" (fromOptional 1.0 arg.weight <= 10000.0)
+         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
+         cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+           create FeaturedAppActivityMarker
+             with
+               dso
+               provider
+               beneficiary = beneficiary
+               weight = weight * fromOptional 1.0 arg.weight
+         pure (Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
+
 validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
 validateAppRewardBeneficiaries beneficiaries = do
-  -- Note: we limit the minimal weight to limit the management overhead of the SVs
+  require "Beneficiary weights are between 0.0 and 1.0" (all (\beneficiary -> 0.0 < beneficiary.weight && beneficiary.weight <= 1.0) beneficiaries)
+  require "Beneficiary weights add up to 1.0" (sum (map (.weight) beneficiaries) == 1.0)
+  require "There are at most 20 beneficiaries" (length beneficiaries <= 20)
+
+validateAppRewardBeneficiariesV2 : [Splice.Api.FeaturedAppRightV2.AppRewardBeneficiary] -> Update ()
+validateAppRewardBeneficiariesV2 beneficiaries = do
   require "Beneficiary weights are between 0.0 and 1.0" (all (\beneficiary -> 0.0 < beneficiary.weight && beneficiary.weight <= 1.0) beneficiaries)
   require "Beneficiary weights add up to 1.0" (sum (map (.weight) beneficiaries) == 1.0)
   require "There are at most 20 beneficiaries" (length beneficiaries <= 20)
@@ -283,10 +306,14 @@ template FeaturedAppActivityMarker
   where
     signatory dso
     observer provider, beneficiary
-    ensure 0.0 < weight && weight <= 1.0
+    ensure 0.0 < weight && weight <= 10000.0
 
     interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppActivityMarker for FeaturedAppActivityMarker where
       view = Splice.Api.FeaturedAppRightV1.FeaturedAppActivityMarkerView with dso, provider, beneficiary, weight
+
+    interface instance Splice.Api.FeaturedAppRightV2.FeaturedAppActivityMarker for FeaturedAppActivityMarker where
+      view = Splice.Api.FeaturedAppRightV2.FeaturedAppActivityMarkerView with dso, provider, beneficiary, weight
+
 
 -- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
 -- Amulet transfer coordinated by the app of a provider.

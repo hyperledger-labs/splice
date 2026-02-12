@@ -5,7 +5,9 @@ module Splice.Util.FeaturedApp.UnitTests.BatchedMarkersProxy where
 
 import DA.Assert
 import Daml.Script
-import Splice.Api.FeaturedAppRightV1
+import Splice.Amulet
+import qualified Splice.Api.FeaturedAppRightV1 as FeaturedAppRightV1
+import qualified Splice.Api.FeaturedAppRightV2 as FeaturedAppRightV2
 import Splice.Util.FeaturedApp.BatchedMarkersProxy
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 
@@ -26,18 +28,35 @@ test = script do
     batches = [
       RewardBatch
         {
-          beneficiaries = [AppRewardBeneficiary provider 0.8, AppRewardBeneficiary beneficiary 0.2],
+          beneficiaries = [FeaturedAppRightV1.AppRewardBeneficiary provider 0.8, FeaturedAppRightV1.AppRewardBeneficiary beneficiary 0.2],
           numMarkers = 50
         },
       RewardBatch
         {
-          beneficiaries = [AppRewardBeneficiary beneficiary 1.0],
+          beneficiaries = [FeaturedAppRightV1.AppRewardBeneficiary beneficiary 1.0],
           numMarkers = 50
         }
       ]
 
+  submit provider $ exerciseCmd markerProxy $ BatchedMarkersProxy_CreateMarkersV2 with
+    featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+    batches = [
+      RewardBatchV2
+        {
+          beneficiaries = [FeaturedAppRightV2.AppRewardBeneficiary provider 0.8, FeaturedAppRightV2.AppRewardBeneficiary beneficiary 0.2],
+          markerWeight = 50.0
+        },
+      RewardBatchV2
+        {
+          beneficiaries = [FeaturedAppRightV2.AppRewardBeneficiary beneficiary 1.0],
+          markerWeight = 50.0
+        }
+      ]
 
-  markers <- queryInterface @FeaturedAppActivityMarker registry.dso
+
+  markers <- queryFilter @FeaturedAppActivityMarker registry.dso (\marker -> marker.weight <= 1.0)
   length markers === 150 -- 100 from first batch, 50 for each beneficiary and 50 from the second batch
+  markers <- queryFilter @FeaturedAppActivityMarker registry.dso (\marker -> marker.weight > 1.0)
+  length markers === 3 -- from the weighted markers created through CreateMarkersV2
 
   pure ()

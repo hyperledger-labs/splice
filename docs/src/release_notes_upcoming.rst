@@ -34,7 +34,20 @@
 
     - Daml
 
-      - Optimize the number of views in the automation run by the SV app to convert ``FeaturedAppActivityMarker`` contracts into ``AppRewardCoupon`` contracts.
+      - Optimize the number of views in the automation run by the SV app
+        to convert ``FeaturedAppActivityMarker`` contracts into
+        ``AppRewardCoupon`` contracts.
+
+      - Support weighting of featured app markers. This can be used
+        through the new ``BatchedMarkersProxy_CreateMarkersV2`` or
+        ``FeaturedAppRight_CreateActivityMarkerV2`` choice in the new
+        ``splice-api-featured-app-v2`` package. Note that this is intended
+        for creating markers proportional to the burn of applications not for
+        increasing the weight of markers created from regular app activity
+        e.g. to increase the weight of markers created as part of a transfer.
+        Refer to the tokenomics
+        committee for detailed guidelines on usage.
+
 
         This requires a Daml upgrade to
 

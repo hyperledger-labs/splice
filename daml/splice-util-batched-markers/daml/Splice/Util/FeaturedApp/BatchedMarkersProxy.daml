@@ -5,16 +5,28 @@
 -- to create multiple markers in one view.
 module Splice.Util.FeaturedApp.BatchedMarkersProxy where
 
-import Splice.Api.FeaturedAppRightV1
+import qualified Splice.Api.FeaturedAppRightV1 as FeaturedAppRightV1
+import qualified Splice.Api.FeaturedAppRightV2 as FeaturedAppRightV2
 
 data BatchedMarkersProxy_CreateMarkersResult = BatchedMarkersProxy_CreateMarkersResult
   with
-    results : [[FeaturedAppRight_CreateActivityMarkerResult]]
+    results : [[FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult]]
+
+data BatchedMarkersProxy_CreateMarkersV2Result = BatchedMarkersProxy_CreateMarkersV2Result
+  with
+    results : [FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult]
 
 data RewardBatch = RewardBatch
   with
-    beneficiaries : [AppRewardBeneficiary]
+    beneficiaries : [FeaturedAppRightV1.AppRewardBeneficiary]
     numMarkers : Int
+  deriving (Show, Eq)
+
+data RewardBatchV2 = RewardBatchV2
+  with
+    beneficiaries : [FeaturedAppRightV2.AppRewardBeneficiary]
+    markerWeight : Decimal
+     -- ^ The total weight of the markers that should be created.
   deriving (Show, Eq)
 
 template BatchedMarkersProxy with
@@ -25,7 +37,7 @@ template BatchedMarkersProxy with
 
     nonconsuming choice BatchedMarkersProxy_CreateMarkers : BatchedMarkersProxy_CreateMarkersResult
       with
-        featuredAppRightCid : ContractId FeaturedAppRight
+        featuredAppRightCid : ContractId FeaturedAppRightV1.FeaturedAppRight
         batches : [RewardBatch]
       observer dso :: concatMap (\b -> map (.beneficiary) b.beneficiaries) batches
       controller provider
@@ -34,9 +46,25 @@ template BatchedMarkersProxy with
          featuredAppRightView <- view <$> fetch featuredAppRightCid
          require "DSO party on featured app right is correct" (featuredAppRightView.dso == dso)
          results <- forA batches $ \batch -> forA [1..batch.numMarkers] $ \_ ->
-           exercise featuredAppRightCid FeaturedAppRight_CreateActivityMarker with
+           exercise featuredAppRightCid FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker with
              beneficiaries = batch.beneficiaries
          pure BatchedMarkersProxy_CreateMarkersResult with results
+
+    nonconsuming choice BatchedMarkersProxy_CreateMarkersV2 : BatchedMarkersProxy_CreateMarkersV2Result
+      with
+        featuredAppRightCid : ContractId FeaturedAppRightV2.FeaturedAppRight
+        batches : [RewardBatchV2]
+      observer dso :: concatMap (\b -> map (.beneficiary) b.beneficiaries) batches
+      controller provider
+      do require "markerWeight >= 1.0" (all (\b -> b.markerWeight >= 1.0) batches)
+         require "sum numMarkers <= 10000.0" (sum (map (.markerWeight) batches) <= 10000.0)
+         featuredAppRightView <- view <$> fetch featuredAppRightCid
+         require "DSO party on featured app right is correct" (featuredAppRightView.dso == dso)
+         results <- forA batches $ \batch ->
+           exercise featuredAppRightCid FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarker with
+             beneficiaries = batch.beneficiaries
+             weight = Some batch.markerWeight
+         pure BatchedMarkersProxy_CreateMarkersV2Result with results
 
 -- | Check whether a required condition is true. If it's not, abort the
 -- transaction with a message saying that the requirement was not met.
