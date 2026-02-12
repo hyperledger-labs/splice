@@ -159,7 +159,7 @@ runs:
         fi
 
     - name: Invoke nix before saving cache
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: hyperledger-labs/splice/.github/actions/nix/run_bash_command_in_nix@HEAD
       with:
         cmd: |
           echo "Validated nix"
