@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.HexString
@@ -9,6 +10,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   ValidatorRewardCoupon,
   ValidatorRight,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  PaymentTransferContext,
+  TransferContext,
+  TransferInput,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.InputValidatorRewardCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.mintingdelegation as mintingDelegationCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
@@ -329,6 +336,271 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
           }
         }
     }
+
+    "demonstrate vulnerability: proposal with invalid DSO can be accepted but reward collection fails" in {
+      implicit env =>
+        // This test demonstrates the security issue where a malicious beneficiary
+        // can create a MintingDelegationProposal with an invalid DSO party.
+        //
+        // Discovery: The wallet store's multiDomainAcsStore filters out contracts with
+        // invalid DSO due to DSO-based scoping. This means:
+        // 1. Proposals with invalid DSO are NOT visible via wallet API (accidental protection)
+        // 2. Delegations with invalid DSO are NOT visible to triggers (store filtering)
+        // However, direct ledger API access bypasses this filtering.
+        //
+        // This test demonstrates that:
+        // 1. A delegation with invalid DSO CAN be accepted (vulnerability)
+        // 2. The delegation EXISTS on the ledger
+        // 3. Minting FAILS at execution time due to DSO mismatch validation in AmuletRules_Transfer
+        //
+        // With Option B fix:
+        // - Accept would validate DSO against AmuletRules before creating delegation
+
+        val (_, _) = onboardAliceAndBob()
+        waitForWalletUser(aliceValidatorWalletClient)
+
+        aliceValidatorWalletClient.tap(100.0)
+
+        val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+        // Create malicious beneficiary and a recipient for transfers
+        val maliciousBeneficiary =
+          onboardExternalParty(aliceValidatorBackend, Some("malicious_beneficiary"))
+        val recipient = onboardExternalParty(aliceValidatorBackend, Some("recipient"))
+        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, maliciousBeneficiary)
+        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, recipient)
+
+        // Create ValidatorRight for the malicious beneficiary
+        createValidatorRight(maliciousBeneficiary)
+
+        val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
+
+        // Create proposal with INVALID DSO (use beneficiary party as fake DSO)
+        val fakeDso = maliciousBeneficiary.party
+
+        actAndCheck(
+          "Create minting delegation proposal with INVALID DSO",
+          createMintingDelegationProposalWithCustomDso(
+            maliciousBeneficiary,
+            aliceValidatorParty,
+            expiresAt,
+            fakeDso, // Wrong DSO!
+          ),
+        )(
+          "Proposal exists on ledger but NOT visible via wallet store (accidental filtering)",
+          _ => {
+            // The wallet store accidentally filters out proposals with invalid DSO
+            val walletProposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+            walletProposals.proposals shouldBe empty
+
+            // But the proposal EXISTS on the ledger - query ACS directly
+            val acsProposals =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .filterJava(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(
+                  aliceValidatorParty,
+                  _ => true,
+                )
+            acsProposals should have size 1
+          },
+        )
+
+        // Get the proposal contract ID from ACS for direct exercise
+        val proposal =
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(
+              aliceValidatorParty,
+              _ => true,
+            )
+            .head
+
+        // Validator accepts via direct ledger API (bypassing wallet store filtering)
+        // THIS SUCCEEDS - demonstrating the vulnerability (no DSO validation at accept time)
+        actAndCheck(
+          "Validator accepts proposal with invalid DSO via direct API (vulnerability: no validation)",
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              actAs = Seq(aliceValidatorParty),
+              commands = proposal.id
+                .exerciseMintingDelegationProposal_Accept(
+                  java.util.Optional
+                    .empty[mintingDelegationCodegen.MintingDelegation.ContractId]()
+                )
+                .commands
+                .asScala
+                .toSeq,
+            ),
+        )(
+          "Delegation is created with invalid DSO (vulnerability)",
+          _ => {
+            val delegations =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .filterJava(mintingDelegationCodegen.MintingDelegation.COMPANION)(
+                  aliceValidatorParty,
+                  _ => true,
+                )
+            delegations should have size 1
+            // Verify the delegation has the WRONG DSO
+            delegations.head.data.dso shouldBe fakeDso.toProtoPrimitive
+          },
+        )
+
+        // Fund malicious beneficiary so they can make a transfer
+        aliceValidatorWalletClient.transferPreapprovalSend(
+          maliciousBeneficiary.party,
+          30.0,
+          "funding-malicious-beneficiary",
+        )
+
+        eventually() {
+          aliceValidatorBackend
+            .getExternalPartyBalance(maliciousBeneficiary.party)
+            .totalUnlockedCoin
+            .toDouble should be > 0.0
+        }
+
+        // Pause triggers to control timing
+        val validatorRewardTrigger = collectRewardsAndMergeAmuletsTrigger(
+          aliceValidatorBackend,
+          aliceValidatorWalletClient.config.ledgerApiUser,
+        )
+
+        setTriggersWithin(triggersToPauseAtStart = Seq(validatorRewardTrigger)) {
+          // Transfer from malicious beneficiary to recipient
+          // This generates ValidatorRewardCoupons for malicious beneficiary (naturally created)
+          val prepareSend = aliceValidatorBackend.prepareTransferPreapprovalSend(
+            maliciousBeneficiary.party,
+            recipient.party,
+            BigDecimal(25.0),
+            CantonTimestamp.now().plus(Duration.ofHours(1)),
+            0L,
+            Some("malicious-to-recipient"),
+          )
+          aliceValidatorBackend.submitTransferPreapprovalSend(
+            maliciousBeneficiary.party,
+            prepareSend.transaction,
+            HexString.toHexString(
+              crypto(env.executionContext)
+                .signBytes(
+                  HexString.parseToByteString(prepareSend.txHash).value,
+                  maliciousBeneficiary.privateKey.asInstanceOf[SigningPrivateKey],
+                  usage = SigningKeyUsage.ProtocolOnly,
+                )
+                .value
+                .toProtoV30
+                .signature
+            ),
+            publicKeyAsHexString(maliciousBeneficiary.publicKey),
+          )
+
+          // Wait for recipient to receive funds (confirms transfer completed)
+          eventually() {
+            aliceValidatorBackend
+              .getExternalPartyBalance(recipient.party)
+              .totalUnlockedCoin
+              .toDouble should be > 0.0
+          }
+
+          // Verify ValidatorRewardCoupons were created for malicious beneficiary
+          val couponRound = eventually(40.seconds) {
+            val coupons =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .filterJava(ValidatorRewardCoupon.COMPANION)(
+                  maliciousBeneficiary.party,
+                  _.data.user == maliciousBeneficiary.party.toProtoPrimitive,
+                )
+            coupons should not be empty
+            coupons.head.data.round.number
+          }
+
+          // Advance rounds so coupon's round becomes issuing
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening
+
+          eventually() {
+            val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+            issuingRounds.map(_.payload.round.number).toSet should contain(couponRound)
+          }
+
+          // Get the delegation with invalid DSO (filter by beneficiary to avoid picking up
+          // the valid delegation from the first test)
+          val delegation =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(mintingDelegationCodegen.MintingDelegation.COMPANION)(
+                aliceValidatorParty,
+                d => d.data.beneficiary == maliciousBeneficiary.party.toProtoPrimitive,
+              )
+              .head
+
+          // Get the coupon to use as input
+          val coupon =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(ValidatorRewardCoupon.COMPANION)(
+                maliciousBeneficiary.party,
+                _.data.user == maliciousBeneficiary.party.toProtoPrimitive,
+              )
+              .head
+
+          // Build transfer context (similar to what the trigger does)
+          val amuletRules = sv1ScanBackend.getAmuletRules()
+          val (openRounds, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+          val openRound = openRounds
+            .filter(_.payload.opensAt.isBefore(env.environment.clock.now.toInstant))
+            .head
+          val issuingRoundsForCoupon =
+            issuingRounds.filter(_.payload.round.number == couponRound)
+
+          val validatorRight =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(ValidatorRight.COMPANION)(
+                maliciousBeneficiary.party,
+                _.data.user == maliciousBeneficiary.party.toProtoPrimitive,
+              )
+              .head
+
+          val transferContext = new TransferContext(
+            openRound.contractId,
+            issuingRoundsForCoupon.map(r => (r.payload.round, r.contractId)).toMap.asJava,
+            Map(maliciousBeneficiary.party.toProtoPrimitive -> validatorRight.id).asJava,
+            java.util.Optional.empty(),
+          )
+          val paymentContext = new PaymentTransferContext(
+            amuletRules.contractId,
+            transferContext,
+          )
+          val inputs: Seq[TransferInput] =
+            Seq(new InputValidatorRewardCoupon(coupon.id))
+
+          // Attempt to mint - this should FAIL with DSO mismatch
+          // The actual error logged is "DSO party expected by caller ... does not match actual DSO party ..."
+          // but CommandFailure doesn't preserve the underlying error message, so we just verify the command fails
+          clue("Attempting to mint with invalid-DSO delegation should fail") {
+            intercept[CommandFailure] {
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+                .submitJava(
+                  actAs = Seq(aliceValidatorParty),
+                  readAs = Seq(aliceValidatorParty, maliciousBeneficiary.party),
+                  commands = delegation.id
+                    .exerciseMintingDelegation_Mint(inputs.asJava, paymentContext)
+                    .commands
+                    .asScala
+                    .toSeq,
+                )
+            }
+          }
+
+          // Verify the coupon still exists (wasn't consumed)
+          clue("Coupon should still exist after failed mint attempt") {
+            val remainingCoupons =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .filterJava(ValidatorRewardCoupon.COMPANION)(
+                  maliciousBeneficiary.party,
+                  _.data.user == maliciousBeneficiary.party.toProtoPrimitive,
+                )
+            remainingCoupons should not be empty
+          }
+        }
+    }
   }
 
   private val DefaultAmuletMergeLimit = 10
@@ -344,6 +616,32 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
         beneficiary.toProtoPrimitive,
         delegate.toProtoPrimitive,
         dsoParty.toProtoPrimitive,
+        expiresAt,
+        DefaultAmuletMergeLimit.toLong,
+      )
+    )
+    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitJavaExternalOrLocal(
+        actingParty = beneficiaryParty.richPartyId,
+        commands = proposal.create.commands.asScala.toSeq,
+      )
+  }
+
+  // Helper method to create proposal with custom (potentially invalid) DSO
+  // Used to demonstrate the vulnerability where a malicious beneficiary can
+  // create a proposal with wrong DSO that the delegate may unknowingly accept
+  private def createMintingDelegationProposalWithCustomDso(
+      beneficiaryParty: OnboardingResult,
+      delegate: PartyId,
+      expiresAt: java.time.Instant,
+      dso: PartyId, // Can be any party, including invalid DSO
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
+    val beneficiary = beneficiaryParty.party
+    val proposal = new mintingDelegationCodegen.MintingDelegationProposal(
+      new mintingDelegationCodegen.MintingDelegation(
+        beneficiary.toProtoPrimitive,
+        delegate.toProtoPrimitive,
+        dso.toProtoPrimitive, // Using provided DSO (can be wrong!)
         expiresAt,
         DefaultAmuletMergeLimit.toLong,
       )
