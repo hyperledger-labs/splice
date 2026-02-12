@@ -7,6 +7,9 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: true
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
   nix_path:
     description: "The path to nix flake directory"
     required: false
@@ -159,7 +162,7 @@ runs:
         fi
 
     - name: Invoke nix before saving cache
-      uses: ./splice/.github/actions/nix/run_bash_command_in_nix
+      uses: ./${{ inputs.splice_root }}/.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
           echo "Validated nix"
