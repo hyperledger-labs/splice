@@ -229,6 +229,8 @@ class DbSequencerTrafficSummaryStore(
         )
         _ <-
           if (nonExisting.nonEmpty) {
+            // TODO(#3941): performance testing required
+            // this might need to be updated to insert entries in a batch
             DBIO
               .sequence(nonExisting.map { summary =>
                 for {
