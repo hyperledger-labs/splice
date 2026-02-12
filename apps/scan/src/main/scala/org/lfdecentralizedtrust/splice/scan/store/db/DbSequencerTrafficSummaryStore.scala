@@ -9,7 +9,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
@@ -18,7 +18,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
-import org.lfdecentralizedtrust.splice.store.{TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 import cats.data.NonEmptyList
 import slick.jdbc.canton.SQLActionBuilder
 
@@ -42,7 +42,6 @@ object DbSequencerTrafficSummaryStore {
   final case class TrafficSummaryT(
       rowId: Long,
       migrationId: Long,
-      domainId: SynchronizerId,
       sequencingTime: CantonTimestamp,
       sender: String,
       totalTrafficCost: Long,
@@ -53,7 +52,6 @@ object DbSequencerTrafficSummaryStore {
   final case class TrafficSummaryRowT(
       rowId: Long,
       migrationId: Long,
-      domainId: SynchronizerId,
       sequencingTime: CantonTimestamp,
       sender: String,
       totalTrafficCost: Long,
@@ -61,15 +59,51 @@ object DbSequencerTrafficSummaryStore {
 
   def apply(
       storage: DbStorage,
-      updateHistory: UpdateHistory,
+      party: PartyId,
+      participantId: ParticipantId,
+      synchronizerId: SynchronizerId,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext): DbSequencerTrafficSummaryStore =
-    new DbSequencerTrafficSummaryStore(storage, updateHistory, loggerFactory)
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+      closeContext: CloseContext,
+  ): Future[DbSequencerTrafficSummaryStore] = {
+    // Use store_name to make history_id per-synchronizer
+    val storeName = s"sequencer-traffic-${synchronizerId.toProtoPrimitive}"
+    getOrCreateHistoryId(storage, party, participantId, storeName).map { historyId =>
+      new DbSequencerTrafficSummaryStore(storage, historyId, synchronizerId, loggerFactory)
+    }
+  }
+
+  private def getOrCreateHistoryId(
+      storage: DbStorage,
+      party: PartyId,
+      participantId: ParticipantId,
+      storeName: String,
+  )(implicit ec: ExecutionContext, tc: TraceContext, closeContext: CloseContext): Future[Long] = {
+    storage.queryAndUpdate(
+      for {
+        _ <- sql"""
+          insert into update_history_descriptors (party, participant_id, store_name)
+          values ($party, $participantId, $storeName)
+          on conflict do nothing
+        """.asUpdate
+        idOpt <- sql"""
+          select id from update_history_descriptors
+          where party = $party and participant_id = $participantId and store_name = $storeName
+        """.as[Long].headOption
+      } yield idOpt.getOrElse(
+        throw new RuntimeException(s"Failed to get or create history_id for store $storeName")
+      ),
+      "getOrCreateHistoryId",
+    )
+  }
 }
 
 class DbSequencerTrafficSummaryStore(
     storage: DbStorage,
-    updateHistory: UpdateHistory,
+    historyId: Long,
+    val synchronizerId: SynchronizerId,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -80,10 +114,6 @@ class DbSequencerTrafficSummaryStore(
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
 
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
-
-  private def historyId = updateHistory.historyId
-
-  def waitUntilInitialized: Future[Unit] = updateHistory.waitUntilInitialized
 
   override protected def timeouts = new ProcessingTimeout
 
@@ -121,7 +151,6 @@ class DbSequencerTrafficSummaryStore(
       TrafficSummaryRowT(
         <<[Long], // row_id
         <<[Long], // migration_id
-        <<[SynchronizerId], // domain_id
         <<[CantonTimestamp], // sequencing_time
         <<[String], // sender
         <<[Long], // total_traffic_cost
@@ -143,14 +172,12 @@ class DbSequencerTrafficSummaryStore(
       insert into #${Tables.trafficSummaries}(
         history_id,
         migration_id,
-        domain_id,
         sequencing_time,
         sender,
         total_traffic_cost
       ) values (
         $historyId,
         ${row.migrationId},
-        ${row.domainId},
         ${row.sequencingTime},
         ${row.sender},
         ${row.totalTrafficCost}
@@ -273,7 +300,6 @@ class DbSequencerTrafficSummaryStore(
       (select
         row_id,
         migration_id,
-        domain_id,
         sequencing_time,
         sender,
         total_traffic_cost

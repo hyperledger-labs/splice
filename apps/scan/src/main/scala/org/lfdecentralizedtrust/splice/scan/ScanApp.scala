@@ -282,7 +282,15 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
-      scanTrafficStore = DbSequencerTrafficSummaryStore(storage, updateHistory, loggerFactory)(ec)
+      scanTrafficStore <- appInitStep("Create traffic store") {
+        DbSequencerTrafficSummaryStore(
+          storage,
+          updateHistory.updateStreamParty,
+          participantId,
+          synchronizerId,
+          loggerFactory,
+        )
+      }
       ingestionAutomation = new ScanIngestionAutomationService(
         config,
         clock,

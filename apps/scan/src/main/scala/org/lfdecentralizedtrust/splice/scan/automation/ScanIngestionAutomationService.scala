@@ -84,7 +84,6 @@ class ScanIngestionAutomationService(
         grpcClientMetrics,
         trafficStore,
         migrationId,
-        synchronizerId,
         trafficIngestionMetrics,
       )
     )

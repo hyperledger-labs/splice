@@ -18,7 +18,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
@@ -40,7 +39,6 @@ class SequencerTrafficSummaryStoreIngestion(
     grpcClientMetrics: GrpcClientMetrics,
     store: DbSequencerTrafficSummaryStore,
     migrationId: Long,
-    synchronizerId: SynchronizerId,
     ingestionMetrics: ScanSequencerTrafficIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -72,11 +70,9 @@ class SequencerTrafficSummaryStoreIngestion(
       val base: Source[Seq[v30.ConfirmationRequestTrafficSummary], NotUsed] =
         Source
           .future(
-            store.waitUntilInitialized.flatMap(_ =>
-              store
-                .maxSequencingTime(migrationId)
-                .map(_.getOrElse(CantonTimestamp.MinValue))
-            )
+            store
+              .maxSequencingTime(migrationId)
+              .map(_.getOrElse(CantonTimestamp.MinValue))
           )
           .map { ts =>
             logger.info(s"Streaming traffic summaries starting from $ts")
@@ -168,7 +164,6 @@ class SequencerTrafficSummaryStoreIngestion(
     store.TrafficSummaryT(
       rowId = 0,
       migrationId = migrationId,
-      domainId = synchronizerId,
       sequencingTime = CantonTimestamp
         .fromProtoTimestamp(summary.getSequencingTime)
         .getOrElse(throw new IllegalArgumentException("Invalid sequencing timestamp")),
