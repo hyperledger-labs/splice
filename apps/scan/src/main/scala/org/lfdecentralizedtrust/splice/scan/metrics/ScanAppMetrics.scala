@@ -21,6 +21,6 @@ class ScanAppMetrics(
     timeouts: ProcessingTimeout,
 ) extends BaseSpliceMetrics("scan", metricsFactory, storageHistograms, loggerFactory) {
   val dbScanStore = new DbScanStoreMetrics(metricsFactory, loggerFactory, timeouts)
-  val verdictIngestion = new ScanMediatorVerdictIngestionMetrics(metricsFactory)
-  val trafficIngestion = new ScanSequencerTrafficIngestionMetrics(metricsFactory)
+  val verdictIngestion = StreamIngestionMetrics.forVerdictIngestion(metricsFactory)
+  val trafficIngestion = StreamIngestionMetrics.forTrafficIngestion(metricsFactory)
 }

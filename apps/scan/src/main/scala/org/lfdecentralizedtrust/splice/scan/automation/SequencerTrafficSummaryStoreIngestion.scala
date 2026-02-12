@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
-import org.lfdecentralizedtrust.splice.scan.metrics.ScanSequencerTrafficIngestionMetrics
+import org.lfdecentralizedtrust.splice.scan.metrics.StreamIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbSequencerTrafficSummaryStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -39,7 +39,7 @@ class SequencerTrafficSummaryStoreIngestion(
     grpcClientMetrics: GrpcClientMetrics,
     store: DbSequencerTrafficSummaryStore,
     migrationId: Long,
-    ingestionMetrics: ScanSequencerTrafficIngestionMetrics,
+    ingestionMetrics: StreamIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -133,8 +133,8 @@ class SequencerTrafficSummaryStoreIngestion(
             val lastSequencingTime = batch.lastOption
               .flatMap(s => CantonTimestamp.fromProtoTimestamp(s.getSequencingTime).toOption)
               .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedSequencingTime.updateValue(lastSequencingTime)
-            ingestionMetrics.summaryCount.mark(batch.size.toLong)(MetricsContext.Empty)
+            ingestionMetrics.lastIngestedTimestamp.updateValue(lastSequencingTime)
+            ingestionMetrics.count.mark(batch.size.toLong)(MetricsContext.Empty)
             Success(
               TaskSuccess(
                 s"Inserted ${batch.size} traffic summaries. Last ingested sequencing_time is now ${store.lastIngestedSequencingTime}."

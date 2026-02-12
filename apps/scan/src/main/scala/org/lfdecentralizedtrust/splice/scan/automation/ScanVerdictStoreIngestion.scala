@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
-import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
+import org.lfdecentralizedtrust.splice.scan.metrics.StreamIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -42,7 +42,7 @@ class ScanVerdictStoreIngestion(
     store: DbScanVerdictStore,
     migrationId: Long,
     synchronizerId: SynchronizerId,
-    ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
+    ingestionMetrics: StreamIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -137,8 +137,8 @@ class ScanVerdictStoreIngestion(
             val lastRecordTime = batch.lastOption
               .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
               .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
-            ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
+            ingestionMetrics.lastIngestedTimestamp.updateValue(lastRecordTime)
+            ingestionMetrics.count.mark(batch.size.toLong)(MetricsContext.Empty)
             Success(
               TaskSuccess(
                 s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: ${batch

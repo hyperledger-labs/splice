@@ -16,10 +16,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanVerdictStore,
   DbSequencerTrafficSummaryStore,
 }
-import org.lfdecentralizedtrust.splice.scan.metrics.{
-  ScanMediatorVerdictIngestionMetrics,
-  ScanSequencerTrafficIngestionMetrics,
-}
+import org.lfdecentralizedtrust.splice.scan.metrics.StreamIngestionMetrics
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -43,8 +40,8 @@ class ScanIngestionAutomationService(
     trafficStore: DbSequencerTrafficSummaryStore,
     migrationId: Long,
     synchronizerId: SynchronizerId,
-    verdictIngestionMetrics: ScanMediatorVerdictIngestionMetrics,
-    trafficIngestionMetrics: ScanSequencerTrafficIngestionMetrics,
+    verdictIngestionMetrics: StreamIngestionMetrics,
+    trafficIngestionMetrics: StreamIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
