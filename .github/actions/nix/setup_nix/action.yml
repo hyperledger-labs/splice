@@ -158,7 +158,7 @@ runs:
           nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
         fi
 
-    # Note that this if statement is temporary - in the future we will just refer to common-workflows repo @SHA1
+    # This unfortunate workarond is due to the fact that 'uses' requires a raw string
     - name: Invoke nix before saving cache
       if: ${{ github.repository == 'hyperledger-labs/splice' }}
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -167,9 +167,10 @@ runs:
           echo "Validated nix"
           ls -al
 
+    # This unfortunate workarond is due to the fact that 'uses' requires a raw string
     - name: Invoke nix before saving cache
       if: ${{ github.repository != 'hyperledger-labs/splice' }}
-      uses: ./splice/.github/actions/nix/run_bash_command_in_nix
+      uses: $GITHUB_ACTION_PATH/../run_bash_command_in_nix
       with:
         cmd: |
           echo "Validated nix"
