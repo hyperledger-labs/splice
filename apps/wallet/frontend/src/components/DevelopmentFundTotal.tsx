@@ -1,19 +1,23 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Card, CardContent, Stack, Typography } from '@mui/material';
+import { Card, CardContent, Stack, Typography, CircularProgress } from '@mui/material';
 import { useDevelopmentFundContext } from '../contexts/DevelopmentFundCouponsContext';
 
 const DevelopmentFundTotal: React.FC = () => {
-  const { totalAmount } = useDevelopmentFundContext();
+  const { unclaimedTotal, isLoadingUnclaimedTotal } = useDevelopmentFundContext();
 
   return (
     <Card variant="outlined">
       <CardContent>
         <Stack spacing={1}>
           <Typography variant="h5">Development Fund Total</Typography>
-          <Typography variant="h4" fontWeight="bold">
-            {totalAmount.toFixed(4)} CC
+          <Typography variant="h4" fontWeight="bold" data-testid="unclaimed-total-amount">
+            {isLoadingUnclaimedTotal ? (
+              <CircularProgress size={24} />
+            ) : (
+              `${unclaimedTotal.toFixed(4)} CC`
+            )}
           </Typography>
         </Stack>
       </CardContent>

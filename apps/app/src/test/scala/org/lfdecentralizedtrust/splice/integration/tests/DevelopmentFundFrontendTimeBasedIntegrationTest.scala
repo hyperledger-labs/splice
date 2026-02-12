@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeA
 import java.time.Duration
 import java.time.format.DateTimeFormatter
 import java.util.Optional
+import scala.jdk.OptionConverters._
 
 class DevelopmentFundFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
@@ -54,7 +55,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
-      // Configure Alice Wallet as the Development Fund Manager
       .addConfigTransform((_, config) => {
         val aliceParticipant =
           ConfigTransforms
@@ -75,14 +75,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
     "complete full lifecycle via UI: allocation, withdrawal, claiming, and expiring" in {
       implicit env =>
-        // Setup: Onboard users
-        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val bobDamlUser = bobWalletClient.config.ledgerApiUser
 
-        // Get triggers for controlling automation
         val bobCollectRewardsTrigger =
           bobValidatorBackend
             .userWalletAutomation(bobDamlUser)
@@ -99,9 +97,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         // ===================================================================
 
         clue("Advance rounds to generate unclaimed development fund coupons") {
-          // Tap to create some activity that generates coupons
           aliceWalletClient.tap(100.0)
-          // Advance multiple rounds to accumulate unclaimed coupons
           Range(0, 6).foreach(_ => advanceRoundsToNextRoundOpening)
         }
 
@@ -122,23 +118,19 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             )(
               "Alice sees the Development Fund page without warning",
               _ => {
-                // DFM should NOT see the warning alert
                 find(className("MuiAlert-standardInfo")) shouldBe empty
-                // Should see the allocation form
                 waitForQuery(id("development-fund-allocation-beneficiary"))
               },
             )
 
-            // Check: Total unclaimed should be greater than 0
             val totalUnclaimedBefore = clue("Check: Total unclaimed should be positive") {
               eventually() {
-                val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+                val totalText = find(id("unclaimed-total-amount")).value.text
                 totalText should not be "0"
                 BigDecimal(totalText.split(" ").head)
               }
             }
 
-            // Get expiration date 30 days from now
             val expiresAt = env.environment.clock.now.plusSeconds(30 * 24 * 60 * 60)
             val expiresAtFormatted = DateTimeFormatter
               .ofPattern("MM/dd/yyyy hh:mm a")
@@ -149,57 +141,41 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
             actAndCheck(
               "Alice allocates a coupon to Bob via UI", {
-                // Fill in beneficiary
                 setAnsField(
                   textField("development-fund-allocation-beneficiary"),
                   bobParty.toProtoPrimitive,
                   bobParty.toProtoPrimitive,
                 )
-
-                // Fill in amount
                 eventuallyClickOn(id("development-fund-allocation-amount"))
                 textField("development-fund-allocation-amount").underlying.clear()
                 textField("development-fund-allocation-amount").underlying.sendKeys(
                   allocationAmount.toString
                 )
-
-                // Fill in expiration date
                 setDateTime("alice", "development-fund-allocation-expires-at", expiresAtFormatted)
-
-                // Fill in reason
                 eventuallyClickOn(id("development-fund-allocation-reason"))
                 textArea("development-fund-allocation-reason").underlying.sendKeys(allocationReason)
-
-                // Submit
                 eventuallyClickOn(id("development-fund-allocation-submit-button"))
               },
             )(
               "Coupon is allocated and shown in active list with correct fields",
               _ => {
                 eventually() {
-                  // Check: Total unclaimed has decreased
-                  val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+                  val totalText = find(id("unclaimed-total-amount")).value.text
                   val totalUnclaimedAfter = BigDecimal(totalText.split(" ").head)
                   totalUnclaimedAfter shouldBe (totalUnclaimedBefore - allocationAmount)
 
-                  // Check: New coupon appears in active list with all correct fields
                   val rows = findAll(cssSelector("tbody tr")).toSeq
                   rows should have size 1
                   val rowText = rows.head.text
-
-                  // Check beneficiary (party ID should be in the row)
                   rowText should include(bobParty.toProtoPrimitive.take(20))
-                  // Check amount
                   rowText should include("10.0000")
-                  // Check reason
                   rowText should include(allocationReason)
                 }
               },
             )
 
-            // Store unclaimed total before withdrawal
             val totalUnclaimedBeforeWithdrawal = eventually() {
-              val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+              val totalText = find(id("unclaimed-total-amount")).value.text
               BigDecimal(totalText.split(" ").head)
             }
 
@@ -209,31 +185,24 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
             actAndCheck(
               "Alice withdraws the coupon via UI", {
-                // Click withdraw button on the row
                 eventuallyClickOn(cssSelector("tbody tr button"))
-
-                // Wait for dialog and fill in reason
                 waitForQuery(cssSelector("[role='dialog']"))
                 val reasonField = webDriver.findElement(
                   org.openqa.selenium.By.cssSelector("[role='dialog'] textarea")
                 )
                 reasonField.sendKeys("Test withdrawal reason")
-
-                // Confirm withdrawal
                 eventuallyClickOn(cssSelector("[role='dialog'] button.MuiButton-contained"))
               },
             )(
               "Coupon is withdrawn, removed from active list, and unclaimed total increased",
               _ => {
                 eventually() {
-                  // Check: Coupon is not shown in Active List
                   val rows = findAll(cssSelector("tbody tr")).toSeq
                   rows.forall(row =>
                     row.text.contains("No development fund allocations found")
                   ) || rows.isEmpty shouldBe true
 
-                  // Check: Total unclaimed has increased
-                  val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+                  val totalText = find(id("unclaimed-total-amount")).value.text
                   val totalUnclaimedAfterWithdrawal = BigDecimal(totalText.split(" ").head)
                   totalUnclaimedAfterWithdrawal shouldBe (totalUnclaimedBeforeWithdrawal + allocationAmount)
                 }
@@ -248,16 +217,22 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
         clue("Claiming test") {
           val bobBalanceBefore = bobWalletClient.balance().unlockedQty
+          val claimingAllocationAmount = BigDecimal(10)
 
-          // Pause triggers
           bobCollectRewardsTrigger.pause().futureValue
           expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
 
-          // Allocate a coupon via UI
+          var totalUnclaimedBeforeAllocation = BigDecimal(0)
+
           withFrontEnd("alice") { implicit webDriver =>
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
+
+            totalUnclaimedBeforeAllocation = eventually() {
+              val totalText = find(id("unclaimed-total-amount")).value.text
+              BigDecimal(totalText.split(" ").head)
+            }
 
             val expiresAt = env.environment.clock.now.plusSeconds(30 * 24 * 60 * 60)
             val expiresAtFormatted = DateTimeFormatter
@@ -273,7 +248,9 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 )
                 eventuallyClickOn(id("development-fund-allocation-amount"))
                 textField("development-fund-allocation-amount").underlying.clear()
-                textField("development-fund-allocation-amount").underlying.sendKeys("10")
+                textField("development-fund-allocation-amount").underlying.sendKeys(
+                  claimingAllocationAmount.toString
+                )
                 setDateTime("alice", "development-fund-allocation-expires-at", expiresAtFormatted)
                 eventuallyClickOn(id("development-fund-allocation-reason"))
                 textArea("development-fund-allocation-reason").underlying.sendKeys(
@@ -282,26 +259,36 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 eventuallyClickOn(id("development-fund-allocation-submit-button"))
               },
             )(
-              "Coupon is allocated",
+              "Coupon is allocated and unclaimed total has decreased",
               _ => {
                 eventually() {
                   val rows = findAll(cssSelector("tbody tr")).toSeq
                   rows.exists(row => row.text.contains("10.0000")) shouldBe true
+
+                  val totalText = find(id("unclaimed-total-amount")).value.text
+                  val totalUnclaimedAfterAllocation = BigDecimal(totalText.split(" ").head)
+                  totalUnclaimedAfterAllocation shouldBe (totalUnclaimedBeforeAllocation - claimingAllocationAmount)
                 }
               },
             )
           }
 
-          // Resume beneficiary's trigger to claim
           bobCollectRewardsTrigger.resume()
 
           eventually() {
-            // Check if coupon is claimed (removed from active list)
             aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
-
-            // Check if beneficiary's balance has increased
             val bobBalanceAfter = bobWalletClient.balance().unlockedQty
             bobBalanceAfter should be > bobBalanceBefore
+          }
+
+          withFrontEnd("alice") { implicit webDriver =>
+            browseToAliceWallet(aliceDamlUser)
+            eventuallyClickOn(id("navlink-development-fund"))
+            eventually() {
+              val totalText = find(id("unclaimed-total-amount")).value.text
+              val totalUnclaimedAfterClaiming = BigDecimal(totalText.split(" ").head)
+              totalUnclaimedAfterClaiming shouldBe (totalUnclaimedBeforeAllocation - claimingAllocationAmount)
+            }
           }
 
           bobCollectRewardsTrigger.pause().futureValue
@@ -312,26 +299,21 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         // ===================================================================
 
         clue("Expiring test") {
-          // Ensure triggers are paused (expiredDevelopmentFundCouponTriggers already paused from claiming test)
           expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
 
-          // Track unclaimed total before allocation
           var totalUnclaimedBeforeAllocation = BigDecimal(0)
           val expiringAllocationAmount = BigDecimal(10)
 
-          // Allocate a coupon with short expiration via UI
           withFrontEnd("alice") { implicit webDriver =>
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
 
-            // Get unclaimed total before allocation
             totalUnclaimedBeforeAllocation = eventually() {
-              val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+              val totalText = find(id("unclaimed-total-amount")).value.text
               BigDecimal(totalText.split(" ").head)
             }
 
-            // Use a very short expiration (5 seconds from now)
             val expiresAt = env.environment.clock.now.plusSeconds(5)
             val expiresAtFormatted = DateTimeFormatter
               .ofPattern("MM/dd/yyyy hh:mm a")
@@ -362,8 +344,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 eventually() {
                   aliceWalletClient.listActiveDevelopmentFundCoupons() should have size 1
 
-                  // Check: Total unclaimed has decreased
-                  val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+                  val totalText = find(id("unclaimed-total-amount")).value.text
                   val totalUnclaimedAfterAllocation = BigDecimal(totalText.split(" ").head)
                   totalUnclaimedAfterAllocation shouldBe (totalUnclaimedBeforeAllocation - expiringAllocationAmount)
                 }
@@ -371,20 +352,17 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             )
           }
 
-          // Resume expiration triggers to expire the coupon
           expiredDevelopmentFundCouponTriggers.foreach(_.resume())
 
           eventually() {
-            // Check: Coupon is expired (removed from active list)
             aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
           }
 
-          // Check: Total unclaimed has increased (back to original)
           withFrontEnd("alice") { implicit webDriver =>
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             eventually() {
-              val totalText = find(cssSelector(".MuiCard-root h4")).value.text
+              val totalText = find(id("unclaimed-total-amount")).value.text
               val totalUnclaimedAfterExpiry = BigDecimal(totalText.split(" ").head)
               totalUnclaimedAfterExpiry shouldBe totalUnclaimedBeforeAllocation
             }
@@ -396,21 +374,16 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
   "Development Fund - Happy Path (DFM changes)" should {
 
     "handle DFM transition correctly" in { implicit env =>
-      // Setup: Onboard users
-      // user_1 = aliceWalletClient (initial DFM)
-      // user_2 = bobWalletClient (will become new DFM)
-      // charlie = beneficiary for coupons
-      val user1Party = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val user2Party = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val charlieParty = onboardWalletUser(charlieWalletClient, charlieValidatorBackend)
+      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val bobDamlUser = bobWalletClient.config.ledgerApiUser
       val charlieDamlUser = charlieWalletClient.config.ledgerApiUser
 
-      // Get triggers
       val charlieCollectRewardsTrigger =
-        charlieValidatorBackend
+        aliceValidatorBackend
           .userWalletAutomation(charlieDamlUser)
           .futureValue
           .trigger[CollectRewardsAndMergeAmuletsTrigger]
@@ -442,7 +415,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           eventuallyClickOn(id("navlink-development-fund"))
           waitForQuery(id("development-fund-allocation-beneficiary"))
 
-          // Coupon 1: Will be CLAIMED
           clue("Create coupon 1 (to be claimed)") {
             val expiresAt = env.environment.clock.now.plusSeconds(30 * 24 * 60 * 60)
             val expiresAtFormatted = DateTimeFormatter
@@ -475,19 +447,16 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
 
-            // Resume charlie's trigger to claim
             charlieCollectRewardsTrigger.resume()
             eventually() {
               aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
             }
             charlieCollectRewardsTrigger.pause().futureValue
 
-            // Refresh page for next allocation
             webDriver.navigate().refresh()
             waitForQuery(id("development-fund-allocation-beneficiary"))
           }
 
-          // Coupon 2: Will be WITHDRAWN
           clue("Create coupon 2 (to be withdrawn)") {
             val expiresAt = env.environment.clock.now.plusSeconds(30 * 24 * 60 * 60)
             val expiresAtFormatted = DateTimeFormatter
@@ -521,7 +490,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
 
-            // Withdraw via UI
             actAndCheck(
               "user_1 withdraws coupon 2", {
                 eventuallyClickOn(cssSelector("tbody tr button"))
@@ -545,7 +513,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             waitForQuery(id("development-fund-allocation-beneficiary"))
           }
 
-          // Coupon 3: Will be EXPIRED
           clue("Create coupon 3 (to be expired)") {
             val expiresAt = env.environment.clock.now.plusSeconds(5)
             val expiresAtFormatted = DateTimeFormatter
@@ -578,7 +545,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
 
-            // Resume expiration triggers
             expiredDevelopmentFundCouponTriggers.foreach(_.resume())
             eventually() {
               aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
@@ -589,7 +555,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             waitForQuery(id("development-fund-allocation-beneficiary"))
           }
 
-          // Coupon 4: Will remain ACTIVE
           clue("Create coupon 4 (to remain active)") {
             val expiresAt = env.environment.clock.now.plusSeconds(30 * 24 * 60 * 60)
             val expiresAtFormatted = DateTimeFormatter
@@ -650,14 +615,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           browseToAliceWallet(aliceDamlUser)
           eventuallyClickOn(id("navlink-development-fund"))
 
-          // Check if warning text is shown (former DFM should see the info alert)
           clue("Check: user_1 sees warning text") {
             eventually() {
               find(className("MuiAlert-standardInfo")).isDefined shouldBe true
             }
           }
 
-          // Check if active list shows 1 coupon
           clue("Check: user_1's Active List shows 1 coupon") {
             eventually() {
               val rows = findAll(cssSelector("tbody tr")).toSeq
@@ -665,7 +628,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             }
           }
 
-          // Action: Withdraw the active coupon
           clue("Action: user_1 withdraws the active coupon") {
             actAndCheck(
               "user_1 withdraws coupon 4", {
@@ -686,8 +648,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
           }
-
-          // Note: History List verification would show 4 coupons when API is available
         }
       }
 
@@ -700,7 +660,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           browseToBobWallet(bobDamlUser)
           eventuallyClickOn(id("navlink-development-fund"))
 
-          // Check if warning text is NOT shown (user_2 is the current DFM)
           clue("Check: user_2 does not see warning text") {
             eventually() {
               waitForQuery(id("development-fund-allocation-beneficiary"))
@@ -708,7 +667,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             }
           }
 
-          // Check if active list is empty
           clue("Check: user_2's Active List is empty") {
             eventually() {
               val rows = findAll(cssSelector("tbody tr")).toSeq
@@ -718,9 +676,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             }
           }
 
-          // Note: History List is empty (when API is available)
-
-          // Check if user_2 can allocate new coupons
           clue("Check: user_2 can allocate new coupons") {
             setTriggersWithin(
               triggersToPauseAtStart =
@@ -767,48 +722,22 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
   "Development Fund - Happy Path (normal user)" should {
 
-    "show appropriate UI and restrictions for non-DFM users" in { implicit env =>
-      // Setup: Onboard users
+    "show appropriate restrictions for non-DFM users" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val charlieParty = onboardWalletUser(charlieWalletClient, charlieValidatorBackend)
-
-      val charlieDamlUser = charlieWalletClient.config.ledgerApiUser
+      onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       // ===================================================================
       // As user_3 (normal user - not DFM, no coupons)
       // ===================================================================
 
       clue("As user_3 (normal user)") {
-        // Check if warning text is shown (via frontend - tab should not be visible)
-        withFrontEnd("charlie") { implicit webDriver =>
-          actAndCheck(
-            "user_3 logs in to wallet", {
-              browseToCharlieWallet(charlieDamlUser)
-            },
-          )(
-            "user_3 does not see the Development Fund tab",
-            _ => {
-              // The Development Fund tab should not be visible for non-DFM users
-              find(id("navlink-development-fund")) shouldBe empty
-            },
-          )
-        }
-
-        // Check if active list is empty
         clue("Check: user_3's Active List is empty") {
           charlieWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
         }
-
-        // Note: History List is empty (when API is available)
       }
     }
   }
 
-  // ===================================================================
-  // Helper Methods
-  // ===================================================================
-
-  /** Changes the Development Fund Manager via governance vote */
   private def changeDevelopmentFundManager(
       newDfm: PartyId
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
@@ -816,7 +745,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     val existingConfig = AmuletConfigSchedule(amuletRules)
       .getConfigAsOf(env.environment.clock.now)
 
-    // Create new config with updated DFM
     val newConfig = new AmuletConfig[USD](
       existingConfig.transferConfig,
       existingConfig.issuanceCurve,
@@ -839,7 +767,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
     val sv1Party = sv1Backend.getDsoInfo().svParty
 
-    // Create and execute vote request (single SV environment auto-approves)
     actAndCheck(
       "Create vote request to change DFM",
       sv1Backend.createVoteRequest(
@@ -853,7 +780,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     )(
       "Vote request is processed",
       _ => {
-        // In single SV environment, the vote is auto-approved
         sv1Backend.listVoteRequests() shouldBe empty
       },
     )
