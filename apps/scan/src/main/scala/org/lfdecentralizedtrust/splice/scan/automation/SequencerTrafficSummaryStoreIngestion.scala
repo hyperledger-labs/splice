@@ -3,35 +3,24 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
-import org.lfdecentralizedtrust.splice.automation.{
-  SourceBasedTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
+import org.lfdecentralizedtrust.splice.automation.{StreamIngestionService, TriggerContext}
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.StreamIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbSequencerTrafficSummaryStore
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, LifeCycle, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.{Done, NotUsed}
-import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
-import org.apache.pekko.stream.scaladsl.{Keep, Source}
-import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
-import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
-import monocle.Monocle.toAppliedFocusOps
-import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.sequencer.admin.v30
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
 
 class SequencerTrafficSummaryStoreIngestion(
     originalContext: TriggerContext,
@@ -39,19 +28,14 @@ class SequencerTrafficSummaryStoreIngestion(
     grpcClientMetrics: GrpcClientMetrics,
     store: DbSequencerTrafficSummaryStore,
     migrationId: Long,
-    ingestionMetrics: StreamIngestionMetrics,
+    protected val ingestionMetrics: StreamIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
     prettyTrafficBatch: Pretty[Seq[v30.ConfirmationRequestTrafficSummary]],
-) extends SourceBasedTrigger[Seq[v30.ConfirmationRequestTrafficSummary]]
-    with NamedLogging {
-
-  // enforce sequential DB ingestion
-  override protected lazy val context: TriggerContext =
-    originalContext.focus(_.config.parallelism).replace(1)
+) extends StreamIngestionService[v30.ConfirmationRequestTrafficSummary](originalContext) {
 
   private val sequencerClient =
     new SequencerTrafficClient(
@@ -61,99 +45,46 @@ class SequencerTrafficSummaryStoreIngestion(
       context.loggerFactory,
     )(ec, esf)
 
-  override protected def source(implicit
+  // ----- StreamIngestionService implementation -----
+
+  override protected def sourceName: String = "sequencer-traffic-ingestion"
+
+  override protected def batchConfig = StreamIngestionService.BatchConfig(
+    restartDelay = config.sequencerTrafficIngestion.restartDelay.asFiniteApproximation,
+    batchSize = config.sequencerTrafficIngestion.batchSize,
+    batchMaxWait = config.sequencerTrafficIngestion.batchMaxWait.underlying,
+  )
+
+  override protected def getMaxTimestamp(implicit tc: TraceContext): Future[CantonTimestamp] =
+    store.maxSequencingTime(migrationId).map(_.getOrElse(CantonTimestamp.MinValue))
+
+  override protected def streamFromClient(after: Option[CantonTimestamp])(implicit
       tc: TraceContext
-  ): Source[Seq[v30.ConfirmationRequestTrafficSummary], NotUsed] = {
+  ): Source[v30.ConfirmationRequestTrafficSummary, NotUsed] =
+    sequencerClient.streamTrafficSummaries(after)
 
-    def sequencerClientSource
-        : Source[Seq[v30.ConfirmationRequestTrafficSummary], (KillSwitch, Future[Done])] = {
-      val base: Source[Seq[v30.ConfirmationRequestTrafficSummary], NotUsed] =
-        Source
-          .future(
-            store
-              .maxSequencingTime(migrationId)
-              .map(_.getOrElse(CantonTimestamp.MinValue))
-          )
-          .map { ts =>
-            logger.info(s"Streaming traffic summaries starting from $ts")
-            Some(ts)
-          }
-          .flatMapConcat(sequencerClient.streamTrafficSummaries)
-          .groupedWithin(
-            math.max(1, config.sequencerTrafficIngestion.batchSize),
-            config.sequencerTrafficIngestion.batchMaxWait.underlying,
-          )
-
-      val withKs = base.viaMat(KillSwitches.single)(Keep.right)
-      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
-    }
-
-    val delay = config.sequencerTrafficIngestion.restartDelay.asFiniteApproximation
-    val policy = new RetrySourcePolicy[Unit, Seq[v30.ConfirmationRequestTrafficSummary]] {
-      override def shouldRetry(
-          lastState: Unit,
-          lastEmittedElement: Option[Seq[v30.ConfirmationRequestTrafficSummary]],
-          lastFailure: Option[Throwable],
-      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
-        val prefixMsg =
-          s"RetrySourcePolicy for restart of sequencerClientSource with ${delay} delay:"
-        lastFailure match {
-          case Some(t) =>
-            ingestionMetrics.restartErrors.mark()
-            logger.info(s"$prefixMsg Last failure: ${ErrorUtil.messageWithStacktrace(t)}")
-          case None =>
-            logger.debug(s"$prefixMsg No failure, normal restart.")
-        }
-        // always restart, even if the connection was closed normally (eg after a sequencer restart)
-        Some(delay -> ())
-      }
-    }
-
-    PekkoUtil
-      .restartSource(
-        name = "sequencer-traffic-ingestion",
-        initial = (),
-        mkSource = (_: Unit) => sequencerClientSource,
-        policy = policy,
-      )
-      .map(_.value)
-      .mapMaterializedValue(_ => NotUsed)
+  override protected def insertBatch(
+      batch: Seq[v30.ConfirmationRequestTrafficSummary]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val items: Seq[store.TrafficSummaryT] = batch.map(toDbRow)
+    store.insertTrafficSummaries(items)
   }
 
-  override protected def completeTask(batch: Seq[v30.ConfirmationRequestTrafficSummary])(implicit
-      tc: TraceContext
-  ): Future[TaskOutcome] = {
-    if (batch.isEmpty) Future.successful(TaskSuccess("empty batch"))
-    else {
-      val items: Seq[store.TrafficSummaryT] = batch.map(toDbRow)
-      store
-        .insertTrafficSummaries(items)
-        .transform {
-          case Success(_) =>
-            val lastSequencingTime = batch.lastOption
-              .flatMap(s => CantonTimestamp.fromProtoTimestamp(s.getSequencingTime).toOption)
-              .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedTimestamp.updateValue(lastSequencingTime)
-            ingestionMetrics.count.mark(batch.size.toLong)(MetricsContext.Empty)
-            Success(
-              TaskSuccess(
-                s"Inserted ${batch.size} traffic summaries. Last ingested sequencing_time is now ${store.lastIngestedSequencingTime}."
-              )
-            )
-          case Failure(ex) =>
-            ingestionMetrics.errors.mark()
-            Failure(ex)
-        }
-    }
-  }
+  override protected def getLastTimestamp(
+      batch: Seq[v30.ConfirmationRequestTrafficSummary]
+  ): CantonTimestamp =
+    batch.lastOption
+      .flatMap(s => CantonTimestamp.fromProtoTimestamp(s.getSequencingTime).toOption)
+      .getOrElse(CantonTimestamp.MinValue)
 
-  override protected def isStaleTask(batch: Seq[v30.ConfirmationRequestTrafficSummary])(implicit
-      tc: TraceContext
-  ): Future[Boolean] = Future.successful(false)
+  override protected def successMessage(
+      batch: Seq[v30.ConfirmationRequestTrafficSummary]
+  ): String =
+    s"Inserted ${batch.size} traffic summaries. Last ingested sequencing_time is now ${store.lastIngestedSequencingTime}."
 
-  private def toDbRow(
-      summary: v30.ConfirmationRequestTrafficSummary
-  ): store.TrafficSummaryT = {
+  // ----- Conversion -----
+
+  private def toDbRow(summary: v30.ConfirmationRequestTrafficSummary): store.TrafficSummaryT = {
     val envelopes = summary.envelopes.map { env =>
       store.EnvelopeT(
         trafficCost = env.envelopeTrafficCost,

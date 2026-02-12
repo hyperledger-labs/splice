@@ -7,6 +7,7 @@ import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Meter}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricQualification.Traffic
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.automation.StreamIngestionService
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
 /** Parameterized metrics class for stream-based ingestion services.
@@ -23,7 +24,8 @@ class StreamIngestionMetrics(
     timestampMetricName: String,
     timestampSummary: String,
     countSummary: String,
-) extends AutoCloseable {
+) extends StreamIngestionService.IngestionMetrics
+    with AutoCloseable {
   private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "scan" :+ prefixComponent
 
   val lastIngestedTimestamp: Gauge[CantonTimestamp] = SpliceMetrics.cantonTimestampGauge(
