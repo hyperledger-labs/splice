@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 19525,
+  "id": 1265,
   "links": [],
   "panels": [
     {
@@ -63,7 +63,7 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 24,
+        "w": 4,
         "x": 0,
         "y": 1
       },
@@ -167,10 +167,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 10
+        "h": 9,
+        "w": 20,
+        "x": 4,
+        "y": 1
       },
       "id": 3,
       "options": {
@@ -209,6 +209,19 @@
       ],
       "title": "Number of active subscriptions",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 5,
+      "panels": [],
+      "title": "Subscription Lag",
+      "type": "row"
     },
     {
       "datasource": {
@@ -274,7 +287,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 11
       },
       "id": 4,
       "options": {
@@ -306,6 +319,111 @@
       ],
       "title": "Subscriber cache misses",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull", "max"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "daml_sequencer_last_timestamp{namespace=~\"$namespace\"} - daml_sequencer_head_timestamp{namespace=~\"$namespace\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{namespace}} diff",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Head vs Last Timestamp Diff",
+      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -315,8 +433,8 @@
     "list": [
       {
         "current": {
-          "text": ["All"],
-          "value": ["$__all"]
+          "text": ["sv-1"],
+          "value": ["sv-1"]
         },
         "definition": "label_values(daml_sequencer_public_api_subscriptions,namespace)",
         "includeAll": true,
@@ -340,7 +458,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Sequencer Subscriptions",
-  "uid": "685922ac-4aca-4b28-a1a1-4375a93a514c",
-  "version": 3
+  "title": "Sequencer Subscriptions 2 (manual)",
+  "uid": "685922ac-4aca-4b28-a1a1-4375a93a514d",
+  "version": 1
 }
