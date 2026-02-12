@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -55,18 +54,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
-      .addConfigTransform((_, config) => {
-        val aliceParticipant =
-          ConfigTransforms
-            .getParticipantIds(config.parameters.clock)("alice")
-        val alicePartyHint =
-          config.validatorApps(InstanceName.tryCreate("aliceValidator")).validatorPartyHint.value
-        val alicePartyId = PartyId
-          .tryFromProtoPrimitive(
-            s"$alicePartyHint::${aliceParticipant.split("::").last}"
-          )
-        ConfigTransforms.withDevelopmentFundManager(alicePartyId)(config)
-      })
       .addConfigTransform((_, config) =>
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
@@ -75,8 +62,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
     "complete full lifecycle via UI: allocation, withdrawal, claiming, and expiring" in {
       implicit env =>
-        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+        clue("Set alice (wallet user) as initial DFM via governance vote") {
+          changeDevelopmentFundManager(aliceParty)
+        }
 
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val bobDamlUser = bobWalletClient.config.ledgerApiUser
@@ -374,9 +365,13 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
   "Development Fund - Happy Path (DFM changes)" should {
 
     "handle DFM transition correctly" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val user2Party = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+
+      clue("Set alice (wallet user) as initial DFM via governance vote") {
+        changeDevelopmentFundManager(aliceParty)
+      }
 
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val bobDamlUser = bobWalletClient.config.ledgerApiUser
@@ -723,8 +718,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
   "Development Fund - Happy Path (normal user)" should {
 
     "show appropriate restrictions for non-DFM users" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+
+      clue("Set alice (wallet user) as DFM via governance vote") {
+        changeDevelopmentFundManager(aliceParty)
+      }
 
       // ===================================================================
       // As user_3 (normal user - not DFM, no coupons)
