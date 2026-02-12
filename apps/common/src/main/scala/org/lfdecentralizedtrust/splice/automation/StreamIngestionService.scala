@@ -137,6 +137,8 @@ abstract class StreamIngestionService[T](
         case Failure(ex) =>
           ingestionMetrics.errors.mark()
           Failure(ex)
+        // TODO(#2856): just failing here may result in skipping ingestion.
+        // This must be fixed as otherwise we loose determinism! Fix this to ensure ingestion always works realiably.
       }
     }
   }
