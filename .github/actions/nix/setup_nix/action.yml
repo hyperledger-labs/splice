@@ -13,11 +13,6 @@ inputs:
     default: ${{ format('{0}/nix', github.repository == 'hyperledger-labs/splice' && '.' || 'splice') }}
   target:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
-#    type: choice
-#    options:
-#      - oss
-#      - default
-#      - static_tests
     required: true
   cache_version:
     description: "The cache version"
@@ -41,15 +36,25 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Validate input
+      if: "${{!( inputs.target == 'default' || inputs.target == 'oss' || inputs.target == 'static_tests')}}"
+      shell: bash
+      id: validate_input
+      run: |
+        echo "Target invalid: ${{ inputs.target }}"
+        echo "Target needs to be one of: 'default', 'oss', 'static_tests'"
+        exit 1
     - name: Compute cache Key
       id: cache_key
       shell: bash
       run: |
         set -euxo pipefail
         NIX_BINARY_VERSION=2.32.1
+        cd ${{ inputs.nix_path }}
         echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
-        cat ${{ inputs.nix_path }}/canton-sources.json
-        git ls-files ${{ inputs.nix_path }}/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+        cat ./canton-sources.json
+        git ls-files ./ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+        cd -
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
