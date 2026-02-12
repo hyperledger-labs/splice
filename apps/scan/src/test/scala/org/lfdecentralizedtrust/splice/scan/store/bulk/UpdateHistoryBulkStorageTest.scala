@@ -12,9 +12,12 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.Keep
 import org.apache.pekko.stream.testkit.TestSubscriber
-import org.apache.pekko.stream.testkit.scaladsl.TestSink
+import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
+import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
+import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -29,6 +32,8 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.math.Ordering.Implicits.*
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import io.circe.syntax.*
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -40,7 +45,7 @@ class UpdateHistoryBulkStorageTest
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
-    bulkDbReadChunkSize = 1000,
+    bulkDbReadChunkSize = 500,
     bulkZstdChunkSize = 10000L,
     maxFileSize,
   )
@@ -61,6 +66,31 @@ class UpdateHistoryBulkStorageTest
           new String(content.array(), "UTF-8") shouldBe "helloworld"
         }
       }
+    }
+
+    "zstd compression works" in {
+      val (pub, sub) = TestSource.probe[ByteString]
+        .via(ZstdGroupedWeight(bulkStorageTestConfig.bulkZstdChunkSize))
+        .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
+        .run()
+
+      val mockStore =
+        new MockUpdateHistoryStore(1500, Instant.ofEpochMilli)
+
+      val updates = mockStore.store.getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(bulkStorageTestConfig.bulkDbReadChunkSize)).futureValue
+      val encoded = updates.map(update =>
+        ScanHttpEncodings.encodeUpdate(
+          update,
+          definitions.DamlValueEncoding.CompactJson,
+          ScanHttpEncodings.V1,
+        )
+      )
+      val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
+      val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
+      pub.sendNext(updatesBytes)
+      sub.request(4)
+      sub.expectNoMessage(30.seconds)
+      succeed
     }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
