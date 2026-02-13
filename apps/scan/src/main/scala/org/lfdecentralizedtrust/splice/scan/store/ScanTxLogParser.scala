@@ -49,7 +49,12 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: Transaction, synchronizerId: SynchronizerId, root: Event)(implicit
+  private def parseTree(
+      tree: Transaction,
+      synchronizerId: SynchronizerId,
+      root: Event,
+      ignoreUnexpectedAmuletCreateArchive: Boolean,
+  )(implicit
       tc: TraceContext
   ): State = {
     // TODO(DACH-NY/canton-network-node#2930) add more checks on the nodes, at least that the DSO party is correct
@@ -67,6 +72,38 @@ class ScanTxLogParser(
               tree,
               synchronizerId,
               tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive,
+            )
+            state.copy(
+              entries = state.entries.map {
+                case e: TransferTxLogEntry =>
+                  e.copy(
+                    description = node.argument.value.description.orElse(""),
+                    eventId =
+                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                    transferKind = TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND,
+                  )
+                case e => e
+              }
+            )
+          case TransferPreapproval_SendV2(node) =>
+            val receiver = (node.result.value.result.summary.balanceChanges.asScala.keySet
+              .diff(Set(node.argument.value.sender)))
+              .headOption
+              .getOrElse(node.argument.value.sender)
+            val output = new splice.amuletrules.TransferOutput(
+              receiver,
+              BigDecimal(0).bigDecimal, // receiver fee ratio is irrelevant, there are no fees
+              node.argument.value.amount,
+              java.util.Optional.empty(), // lock
+            )
+            val state = State.fromTransferResult(
+              tree,
+              exercised,
+              synchronizerId,
+              sender = node.argument.value.sender,
+              outputs = Seq(output),
+              result = node.result.value.result,
             )
             state.copy(
               entries = state.entries.map {
@@ -96,8 +133,37 @@ class ScanTxLogParser(
               tree,
               synchronizerId,
               tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive = true,
             )
-            state.copy(
+            val stateWithTransfer = if (state.hasTransfer) {
+              // We hit this for transfers before the 24h signing change that call AmuletRules_Transfer internally.
+              state
+            } else {
+              val txLogEntry = new TransferTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                sender = Some(
+                  senderAmountNoFees(
+                    node.argument.value.transfer.sender,
+                    0.0, // Note: Because Scan tracks the sum of locked and unlocked input and output is 0.
+                  )
+                ),
+                // receiver is set to the sender as the amulet is locked to them
+                receivers = Seq(
+                  receiverAmountNoFees(
+                    node.argument.value.transfer.sender,
+                    node.argument.value.transfer.amount,
+                  )
+                ),
+                balanceChanges = Seq.empty,
+                round = 0L, // FIXME
+              )
+              State(
+                txLogEntry
+              )
+            }
+            stateWithTransfer.copy(
               entries = state.entries.map {
                 case e: TransferTxLogEntry =>
                   e.copy(
@@ -113,13 +179,89 @@ class ScanTxLogParser(
                 case e => e
               }
             )
+          case DirectTokenStandardTransfer(node) =>
+            val sender = node.argument.value.transfer.sender
+            val receiver = node.argument.value.transfer.receiver
+            val amount = node.argument.value.transfer.amount
+
+            val senderAmount = senderAmountNoFees(sender, amount)
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive = true,
+            )
+            if (state.hasTransfer) {
+              // We hit this for transfers before the 24h signing delay change that call AmuletRules_Transfer or TransferPreapproval_Send internally
+              // or transfers with the 24h signing delay change where sender != receiver which call into TransferPreapproval_SendV2
+              state
+            } else {
+              // We hit this only when sender = receiver and the 24h signing delay change is active as then there is no TransferPreapproval_SendV2 child.
+              // We just parse this as a plain transfer matching the behavior before the 24h signing delay change.
+              val txLogEntry = new TransferTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                eventId =
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                sender = Some(senderAmount),
+                receivers = Seq(receiverAmountNoFees(receiver, amount)),
+                balanceChanges = Seq.empty,
+                round = 0L, // FIXME
+                description = node.argument.value.transfer.meta.values
+                  .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
+              )
+              State(txLogEntry)
+            }
           case TransferInstruction_Accept(node) =>
             val state = parseTrees(
               tree,
               synchronizerId,
               tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive = true,
             )
-            state.copy(
+            val stateWithTransfer = if (state.hasTransfer) {
+              // We hit this for transfers before the 24h signing change that call AmuletRules_Transfer internally.
+              state
+            } else {
+              val coinCid = node.result.value.output match {
+                case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Completed =>
+                  assert(output.receiverHoldingCids.size == 1)
+                  output.receiverHoldingCids.get(0)
+                case output =>
+                  throw new RuntimeException(
+                    s"Unexpected transfer instruction result output, expected completed but got: $output"
+                  )
+              }
+              val coin =
+                tree
+                  .findCreation(
+                    splice.amulet.Amulet.COMPANION,
+                    new splice.amulet.Amulet.ContractId(coinCid.contractId),
+                  )
+                  .getOrElse(
+                    throw new RuntimeException(
+                      s"The amulet contract ${coinCid} was not found in transaction ${tree.getUpdateId}"
+                    )
+                  )
+              val sender = node.result.value.meta.values.get(TokenStandardMetadata.senderMetaKey)
+              val receiver = coin.payload.owner
+              val amount = coin.payload.amount.initialAmount
+
+              val txLogEntry = new TransferTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                eventId =
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                sender = Some(senderAmountNoFees(sender, amount)),
+                receivers = Seq(receiverAmountNoFees(receiver, amount)),
+                balanceChanges = Seq.empty,
+                round = 0L, // FIXME
+              )
+              State(txLogEntry)
+            }
+            stateWithTransfer.copy(
               entries = state.entries.map {
                 case e: TransferTxLogEntry =>
                   e.copy(
@@ -183,13 +325,23 @@ class ScanTxLogParser(
             State.fromRenewTransferPreapproval(eventId, synchronizerId, node)
           case AmuletExpire(node) =>
             State.empty
+          case AmuletExpireV2(node) =>
+            State.empty
           case LockedAmuletExpireAmulet(node) =>
+            State.empty
+          case LockedAmuletExpireAmuletV2(node) =>
             State.empty
           // We track the sum of locked/unlocked so this is a noop.
           case LockedAmuletUnlock(_) =>
             State.empty
           // We track the sum of locked/unlocked so this is a noop.
+          case LockedAmuletUnlockV2(_) =>
+            State.empty
+          // We track the sum of locked/unlocked so this is a noop.
           case LockedAmuletOwnerExpireLock(_) =>
+            State.empty
+          // We track the sum of locked/unlocked so this is a noop.
+          case LockedAmuletOwnerExpireLockV2(_) =>
             State.empty
           case AnsRules_CollectInitialEntryPayment(_) =>
             fromAnsEntryPaymentCollection(
@@ -208,9 +360,13 @@ class ScanTxLogParser(
               sws.SubscriptionPayment.CHOICE_SubscriptionPayment_Collect,
             )(_.amulet)
           case AmuletArchive(_) =>
-            throw new RuntimeException(
-              s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
-            )
+            if (!ignoreUnexpectedAmuletCreateArchive) {
+              throw new RuntimeException(
+                s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
+              )
+            } else {
+              State.empty
+            }
           case DsoRulesCloseVoteRequest(node) =>
             State.fromCloseVoteRequest(eventId, node)
           case ExternalPartyAmuletRules_CreateTransferCommand(node) =>
@@ -220,6 +376,7 @@ class ScanTxLogParser(
               tree,
               synchronizerId,
               tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive,
             )
             val transferCommandState = State.fromTransferCommand_Send(eventId, exercised, node)
             state.appended(transferCommandState)
@@ -227,11 +384,83 @@ class ScanTxLogParser(
             State.fromTransferCommand_Withdraw(eventId, exercised, node)
           case TransferCommand_Expire(node) =>
             State.fromTransferCommand_Expire(eventId, exercised, node)
+          case AllocationFactoryAllocate(node) =>
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive = true,
+            )
+            if (state.hasTransfer) {
+              // We hit this for allocations before the 24h signing change that call AmuletRules_Transfer internally.
+              state
+            } else {
+
+              val sender = node.argument.value.allocation.transferLeg.sender
+              val amount = node.argument.value.allocation.transferLeg.amount
+
+              val txLogEntry = new TransferTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                eventId =
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                sender = Some(senderAmountNoFees(sender, amount)),
+                receivers = Seq(
+                  receiverAmountNoFees(sender, amount)
+                ), // This step locks to the sender which scan displays as a transfer to yourself.
+                balanceChanges = Seq.empty,
+                round = 0L, // FIXME
+              )
+              State(txLogEntry)
+            }
+          case AllocationExecuteTransfer(node) =>
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive = true,
+            )
+            if (state.hasTransfer) {
+              // We hit this for allocations before the 24h signing change that call AmuletRules_Transfer internally.
+              state
+            } else {
+              assert(node.result.value.receiverHoldingCids.size == 1)
+              val coinCid = node.result.value.receiverHoldingCids.get(0)
+              val coin =
+                tree
+                  .findCreation(
+                    splice.amulet.Amulet.COMPANION,
+                    new splice.amulet.Amulet.ContractId(coinCid.contractId),
+                  )
+                  .getOrElse(
+                    throw new RuntimeException(
+                      s"The amulet contract ${coinCid} was not found in transaction ${tree.getUpdateId}"
+                    )
+                  )
+              val sender = node.result.value.meta.values.get(TokenStandardMetadata.senderMetaKey)
+              val receiver = coin.payload.owner
+              val amount = coin.payload.amount.initialAmount
+
+              val txLogEntry = new TransferTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                eventId =
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                sender = Some(senderAmountNoFees(sender, amount)),
+                receivers = Seq(receiverAmountNoFees(receiver, amount)),
+                balanceChanges = Seq.empty,
+                round = 0L, // FIXME
+              )
+              State(txLogEntry)
+            }
           case _ =>
             parseTrees(
               tree,
               synchronizerId,
               tree.getChildNodeIds(exercised).asScala.toList,
+              ignoreUnexpectedAmuletCreateArchive,
             )
         }
 
@@ -249,13 +478,21 @@ class ScanTxLogParser(
           case ClosedMiningRoundCreate(round) =>
             State.fromClosedMiningRoundCreate(tree, root, synchronizerId, round)
           case AmuletCreate(_) =>
-            throw new RuntimeException(
-              s"Unexpected amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
-            )
+            if (!ignoreUnexpectedAmuletCreateArchive) {
+              throw new RuntimeException(
+                s"Unexpected amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
+              )
+            } else {
+              State.empty
+            }
           case LockedAmuletCreate(_) =>
-            throw new RuntimeException(
-              s"Unexpected locked amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
-            )
+            if (!ignoreUnexpectedAmuletCreateArchive) {
+              throw new RuntimeException(
+                s"Unexpected locked amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
+              )
+            } else {
+              State.empty
+            }
           case _ => State.empty
         }
 
@@ -284,7 +521,12 @@ class ScanTxLogParser(
           )
         }
 
-    val stateFromPaymentCollection = parseTree(tree, synchronizerId, paymentCollectionEvent)
+    val stateFromPaymentCollection = parseTree(
+      tree,
+      synchronizerId,
+      paymentCollectionEvent,
+      ignoreUnexpectedAmuletCreateArchive = false,
+    )
     State.empty.appended(stateFromPaymentCollection)
   }
 
@@ -292,17 +534,23 @@ class ScanTxLogParser(
       tree: Transaction,
       synchronizerId: SynchronizerId,
       rootsNodeIds: List[Integer],
+      ignoreUnexpectedAmuletCreateArchive: Boolean,
   )(implicit
       tc: TraceContext
   ): State = {
     val roots = rootsNodeIds.map(tree.getEventsById.get(_))
-    roots.foldMap(parseTree(tree, synchronizerId, _))
+    roots.foldMap(parseTree(tree, synchronizerId, _, ignoreUnexpectedAmuletCreateArchive))
   }
 
   override def tryParse(tx: Transaction, domain: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
-    val ret = parseTrees(tx, domain, tx.getRootNodeIds.asScala.toList).entries
+    val ret = parseTrees(
+      tx,
+      domain,
+      tx.getRootNodeIds.asScala.toList,
+      ignoreUnexpectedAmuletCreateArchive = false,
+    ).entries
     ret
   }
 
@@ -326,6 +574,11 @@ object ScanTxLogParser {
     def appended(other: State): State = State(
       entries = entries.appendedAll(other.entries)
     )
+    def hasTransfer: Boolean =
+      entries.exists {
+        case _: TransferTxLogEntry => true
+        case _ => false
+      }
   }
 
   private object State {
@@ -463,26 +716,52 @@ object ScanTxLogParser {
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         rootEventId: Option[String] = None,
     ): State = {
-      val sender = Codec
-        .decode(Codec.Party)(node.argument.value.transfer.sender)
+      State.fromTransferResult(
+        tx,
+        event,
+        synchronizerId,
+        sender = node.argument.value.transfer.sender,
+        outputs = node.argument.value.transfer.outputs.asScala.toSeq,
+        result = node.result.value,
+        rootEventId = rootEventId,
+      )
+    }
+
+    def fromTransferResult(
+        tx: Transaction,
+        event: ExercisedEvent,
+        synchronizerId: SynchronizerId,
+        sender: String,
+        outputs: Seq[splice.amuletrules.TransferOutput],
+        result: splice.amuletrules.TransferResult,
+        rootEventId: Option[String] = None,
+    ): State = {
+      val senderParty = Codec
+        .decode(Codec.Party)(sender)
         .getOrElse(
           throw Status.INTERNAL
-            .withDescription(s"Cannot decode party ID ${node.argument.value.transfer.sender}")
+            .withDescription(s"Cannot decode party ID ${sender}")
             .asRuntimeException()
         )
-      val round = node.result.value.round
       val eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId)
       val rewardEntries =
         rewardsEntriesFromTransferSummary(
-          sender,
-          node.result.value.summary,
-          round.number,
+          senderParty,
+          result.summary,
+          result.round.number,
           synchronizerId,
           rootEventId.getOrElse(eventId),
         )
 
       val activityEntry = State(
-        transferTxLogEntry(tx, event, synchronizerId, node)
+        transferTxLogEntry(
+          tx,
+          event,
+          synchronizerId,
+          sender = sender,
+          outputs = outputs,
+          result = result,
+        )
       )
 
       rewardEntries
@@ -493,21 +772,22 @@ object ScanTxLogParser {
         tx: Transaction,
         event: Event,
         synchronizerId: SynchronizerId,
-        node: ExerciseNode[Transfer.Arg, Transfer.Res],
+        sender: String,
+        outputs: Seq[splice.amuletrules.TransferOutput],
+        result: splice.amuletrules.TransferResult,
     ): TransferTxLogEntry = {
-      val amuletPrice = node.result.value.summary.amuletPrice
-      val sender = parseSenderAmount(node.argument.value, node.result.value)
-      val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
+      val amuletPrice = result.summary.amuletPrice
+      val senderAmount = parseSenderAmount(sender, outputs, result)
+      val receiverAmounts = parseReceiverAmounts(outputs, result)
 
       new TransferTxLogEntry(
         offset = LegacyOffset.Api.fromLong(tx.getOffset),
         eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         domainId = synchronizerId,
         date = Some(tx.getEffectiveAt),
-        sender = Some(sender),
-        receivers = receivers,
-        balanceChanges = Seq.empty,
-        round = node.result.value.round.number,
+        sender = Some(senderAmount),
+        receivers = receiverAmounts,
+        round = result.round.number,
         amuletPrice = amuletPrice,
       )
     }
@@ -791,4 +1071,25 @@ object ScanTxLogParser {
       )
     }
   }
+
+  private def senderAmountNoFees(party: String, amount: BigDecimal) =
+    SenderAmount(
+      party = PartyId.tryFromProtoPrimitive(party),
+      inputAmuletAmount = amount,
+      inputAppRewardAmount = BigDecimal(0.0),
+      inputValidatorRewardAmount = BigDecimal(0.0),
+      senderChangeAmount = BigDecimal(0.0),
+      senderChangeFee = BigDecimal(0.0),
+      senderFee = BigDecimal(0.0),
+      holdingFees = BigDecimal(0.0),
+      inputSvRewardAmount = None,
+      inputValidatorFaucetAmount = None,
+    )
+
+  private def receiverAmountNoFees(party: String, amount: BigDecimal) =
+    ReceiverAmount(
+      party = PartyId.tryFromProtoPrimitive(party),
+      amount = amount,
+      receiverFee = BigDecimal(0.0),
+    )
 }
