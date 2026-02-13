@@ -196,6 +196,7 @@ object TxLogEntry extends StoreErrors {
         transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
         transferInstructionCid = Some(entry.transferInstructionCid).filter(_.nonEmpty),
         description = Some(entry.description).filter(_.nonEmpty),
+        developmentFundCouponsUsed = Codec.encode(entry.developmentFundCouponsUsed),
       )
     }
 
@@ -216,6 +217,9 @@ object TxLogEntry extends StoreErrors {
         appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
         svRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.svRewardsUsed)
+        developmentFundCouponsUsed <- Codec.decode(Codec.BigDecimal)(
+          item.developmentFundCouponsUsed
+        )
         transferInstructionAmount <- item.transferInstructionAmount.traverse(
           Codec.decode(Codec.BigDecimal)
         )
@@ -234,6 +238,7 @@ object TxLogEntry extends StoreErrors {
         transferInstructionAmount = transferInstructionAmount,
         transferInstructionCid = item.transferInstructionCid.getOrElse(""),
         description = item.description.getOrElse(""),
+        developmentFundCouponsUsed = developmentFundCouponsUsed,
       )
     }
 

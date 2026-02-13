@@ -21,6 +21,10 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
 }
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  TransferTxLogEntry,
+  TxLogEntry as walletLogEntry,
+}
 
 import java.time.Duration
 
@@ -28,7 +32,8 @@ import java.time.Duration
 class DevelopmentFundCouponIntegrationTest
     extends SvIntegrationTestBase
     with TriggerTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletTxLogTestUtil {
 
   private val unclaimedDevelopmentFundCouponsThreshold = 3
 
@@ -317,6 +322,7 @@ class DevelopmentFundCouponIntegrationTest
       )
     }
 
+    val bobBalanceBefore = bobWalletClient.balance().unlockedQty
     val (_, unclaimedDevelopmentFundCouponTotalBeforeClaiming) = setTriggersWithin(
       triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
     ) {
@@ -345,14 +351,18 @@ class DevelopmentFundCouponIntegrationTest
       )
     }
 
-    clue("Coupon is collected by the collect rewards automation") {
+    val bobBalanceAfter = clue("Coupon is collected by the collect rewards automation") {
       eventually() {
         aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+        val newBalance = 34 // 40 - fees
         checkWallet(
           bobParty,
           bobWalletClient,
-          Seq(exactly(34)), // 40 - fees
+          Seq(exactly(newBalance)),
         )
+        val bobBalanceAfter = bobWalletClient.balance().unlockedQty
+        bobBalanceAfter shouldBe newBalance
+        bobBalanceAfter
       }
     }
 
@@ -375,6 +385,21 @@ class DevelopmentFundCouponIntegrationTest
       )
       // Beneficiary cannot view the claimed coupon
       assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq())
+    }
+
+    clue("Claimed development fund coupon is included in the transaction history") {
+      checkTxHistory(
+        bobWalletClient,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: TransferTxLogEntry =>
+            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
+            logEntry.sender.value.party shouldBe bobParty.toProtoPrimitive
+            logEntry.sender.value.amount should be(bobBalanceAfter - bobBalanceBefore)
+            logEntry.receivers shouldBe empty
+            logEntry.developmentFundCouponsUsed shouldBe developmentFundCouponAmount
+          }
+        ),
+      )
     }
   }
 
