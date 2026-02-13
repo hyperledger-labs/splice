@@ -221,6 +221,76 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
         }
     }
 
+    "filter out proposals with invalid DSO from wallet API (accidental protection)" in {
+      implicit env =>
+        // This test confirms that proposals created with an invalid DSO are NOT visible
+        // via the wallet API methods. This is accidental protection due to DSO-based
+        // scoping in multiDomainAcsStore, not intentional validation.
+        //
+        // The proposal EXISTS on the ledger but is filtered out by the wallet store.
+
+        val (_, _) = onboardAliceAndBob()
+        waitForWalletUser(aliceValidatorWalletClient)
+
+        // Fund the validator wallet for external party setup
+        aliceValidatorWalletClient.tap(100.0)
+
+        val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+        val externalParty = onboardExternalParty(aliceValidatorBackend, Some("filtered_party"))
+        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, externalParty)
+
+        val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
+        val fakeDso = externalParty.party // Use beneficiary's party as invalid DSO
+
+        // Create proposal with invalid DSO
+        createMintingDelegationProposal(
+          externalParty,
+          aliceValidatorParty,
+          expiresAt,
+          customDso = Some(fakeDso),
+        )
+
+        // First verify the proposal DOES exist on the ledger (direct ACS query)
+        clue("Proposal should exist on ledger when queried directly") {
+          eventually() {
+            val acsProposals =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .filterJava(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(
+                  aliceValidatorParty,
+                  _.data.delegation.dso == fakeDso.toProtoPrimitive,
+                )
+            acsProposals should have size 1
+          }
+        }
+
+        // Now verify: Proposal is NOT visible via wallet API (filtered due to invalid DSO)
+        clue("Proposal with invalid DSO should NOT be visible via wallet API") {
+          val walletProposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+          walletProposals.proposals shouldBe empty
+        }
+
+        // Now create a valid proposal and verify it IS visible
+        val validExternalParty =
+          onboardExternalParty(aliceValidatorBackend, Some("valid_party"))
+        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, validExternalParty)
+
+        createMintingDelegationProposal(
+          validExternalParty,
+          aliceValidatorParty,
+          expiresAt,
+          // No customDso = uses real DSO
+        )
+
+        clue("Proposal with valid DSO should be visible via wallet API") {
+          eventually() {
+            val walletProposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+            // The valid proposal should appear (size 1), while the invalid-DSO proposal
+            // is filtered out. This confirms DSO-based filtering is working.
+            walletProposals.proposals should have size 1
+          }
+        }
+    }
+
     "demonstrate vulnerability: proposal with invalid DSO can be accepted but reward collection fails" in {
       implicit env =>
         // This test demonstrates the security issue where a malicious beneficiary
