@@ -57,18 +57,12 @@ export class HttpClient {
       ...(this.tag ? { name: this.tag } : undefined),
     };
 
-    console.debug(`Request data: ${JSON.stringify({ headers, body, url })}`);
-
     const resp = http.request(method, url, body, {
       headers,
       tags,
       redirects: 0,
     });
 
-    console.debug(`Response data: ${JSON.stringify(resp)}`);
-
-    return resp;
-  }
 
   // base HTTP request with simple error handling
   private _request<R extends ResponseType>(
