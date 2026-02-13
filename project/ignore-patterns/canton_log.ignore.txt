@@ -170,9 +170,7 @@ java.lang.IllegalStateException: cannot enqueue after timer shutdown
 Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*Causes: First received frame was not SETTINGS. Hex dump for first 5 bytes
 Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*GrpcServiceUnavailable: UNAVAILABLE/io exception
 
-# LSU test when sync nodes are stopped
-The operation 'request current time' was not successful.*RequestFailed\(No connection available\)
-Now retrying operation 'request current time'
-Connection has failed validation
+# During the LSU at upgrade time submissions time-out
+Submission timed out at
 
 # Make sure to have a trailing newline
