@@ -55,6 +55,7 @@ message TransferTxLogEntry {
   string transfer_instruction_amount = 14 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
   string transfer_instruction_cid = 15;
   string description = 16;
+  string development_fund_coupons_used = 17 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
 /** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */

@@ -1464,6 +1464,7 @@ components:
             - app_rewards_used
             - validator_rewards_used
             - sv_rewards_used
+            - development_fund_coupons_used
           properties:
             sender:
               $ref: "#/components/schemas/PartyAndAmount"
@@ -1480,6 +1481,8 @@ components:
             validator_rewards_used:
               type: string
             sv_rewards_used:
+              type: string
+            development_fund_coupons_used:
               type: string
             transfer_instruction_receiver:
               type: string

@@ -143,6 +143,7 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             app_rewards_used: '',
             validator_rewards_used: '',
             sv_rewards_used: '',
+            development_fund_coupons_used: '',
             details: '',
           },
           // incoming
@@ -168,6 +169,7 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             transfer_instruction_receiver: alicePartyId,
             transfer_instruction_amount: '10.0',
             description: 'test transfer',
+            development_fund_coupons_used: '0.0',
           },
           {
             transaction_type: 'transfer',
@@ -185,6 +187,7 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             app_rewards_used: '0.0',
             validator_rewards_used: '0.0',
             sv_rewards_used: '0.0',
+            development_fund_coupons_used: '0.0',
             details: '',
             transfer_instruction_cid:
               '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40401',
@@ -206,6 +209,7 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             app_rewards_used: '0.0',
             validator_rewards_used: '0.0',
             sv_rewards_used: '0.0',
+            development_fund_coupons_used: '0.0',
             details: '',
             transfer_instruction_cid:
               '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40401',
