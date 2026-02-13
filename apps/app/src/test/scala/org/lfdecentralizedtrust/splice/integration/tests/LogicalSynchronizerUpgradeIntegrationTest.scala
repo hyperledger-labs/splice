@@ -120,7 +120,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes without downtime" in { implicit env =>
-    startAllSync(
+    val allNodes = Seq[AppBackendReference](
       sv1ScanBackend,
       sv2ScanBackend,
       sv3ScanBackend,
@@ -133,6 +133,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
       sv2ValidatorBackend,
       sv3ValidatorBackend,
       sv4ValidatorBackend,
+    )
+    startAllSync(
+      allNodes*
     )
     actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
       "Scan transaction history is recorded and wallet balance is updated",
@@ -220,6 +223,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+    // used just to create connections to the new sync
     val allNewBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
     val upgradeTimeInstant = Instant
       .now()
@@ -479,6 +483,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
           },
         )
       }
+      // new sync nodes are started in process so to avoid log noise we stop everything before the test ends
+      stopAllAsync(aliceValidatorBackend).futureValue
+      aliceValidatorBackend.participantClientWithAdminToken.synchronizers.disconnect_all()
+      stopAllAsync(allNodes*).futureValue
+      allBackends.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
     }
   }
 
