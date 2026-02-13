@@ -35,7 +35,6 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 import java.time.Duration
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
-import scala.math.Ordering.Implicits.*
 
 class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
     extends IntegrationTest
@@ -134,24 +133,9 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
           s"External party wallet for beneficiary1 is ready: ${externalPartyWallet.store.key}"
         )
 
-        // Helper function to get beneficiary1's balance
-        def getBalance(): BigDecimal = BigDecimal(
-          aliceValidatorBackend
-            .getExternalPartyBalance(beneficiary1.party)
-            .totalUnlockedCoin
-        )
-
         // Advance rounds to ensure we have proper issuing rounds before creating coupons
-        // Following the pattern from WalletMintingDelegationTimeBasedIntegrationTest
         advanceRoundsToNextRoundOpening
         advanceRoundsToNextRoundOpening
-
-        // Get an issuing round to know what rounds are available
-        val issuingRound = eventually() {
-          val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-          issuingRounds.toList.headOption.value.payload
-        }
-        logger.debug(s"Current issuing round: ${issuingRound.round.number}")
 
         // Pause the validator's own reward collection trigger which would
         // normally mint coupons for itself, to avoid interference
@@ -168,135 +152,35 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
 
           // Pause minting delegation trigger while creating coupons to ensure we control timing
           setTriggersWithin(triggersToPauseAtStart = Seq(externalPartyMintingDelegationTrigger)) {
-            // Transfer from alice's validator wallet to beneficiary1 using transfer preapproval
-            // This generates activity for alice's validator (the provider for beneficiary1)
-            // Send 30 CC so beneficiary1 has enough to transfer 25 CC to beneficiary2
-            aliceValidatorWalletClient.transferPreapprovalSend(
-              beneficiary1.party,
-              30.0,
-              "validator-to-beneficiary1",
-            )
-
-            // Wait for beneficiary1 to receive the amulets
-            eventually() {
-              getBalance().toDouble should be > 0.0
-            }
+            // Fund beneficiary1 so they can make a transfer
+            fundExternalParty(beneficiary1, 30.0, "validator-to-beneficiary1")
 
             // Transfer from beneficiary1 to beneficiary2
             // This generates ValidatorRewardCoupons for beneficiary1 (the sender)
             // The transfer amount must be large enough (>15 amulets) so that the resulting
             // ValidatorRewardCoupon, when minted (coupon × 0.2 issuance rate), exceeds the
             // create fee (0.03). Otherwise the reward is entirely consumed by fees.
-            val prepareSend = aliceValidatorBackend.prepareTransferPreapprovalSend(
-              beneficiary1.party,
-              beneficiary2.party,
+            transferBetweenExternalParties(
+              beneficiary1,
+              beneficiary2,
               BigDecimal(25.0),
-              CantonTimestamp.now().plus(Duration.ofHours(1)),
-              0L,
-              Some("beneficiary1-to-beneficiary2"),
-            )
-            aliceValidatorBackend.submitTransferPreapprovalSend(
-              beneficiary1.party,
-              prepareSend.transaction,
-              HexString.toHexString(
-                crypto(env.executionContext)
-                  .signBytes(
-                    HexString.parseToByteString(prepareSend.txHash).value,
-                    beneficiary1.privateKey.asInstanceOf[SigningPrivateKey],
-                    usage = SigningKeyUsage.ProtocolOnly,
-                  )
-                  .value
-                  .toProtoV30
-                  .signature
-              ),
-              publicKeyAsHexString(beneficiary1.publicKey),
+              "beneficiary1-to-beneficiary2",
             )
 
             // Wait for beneficiary2 to receive the amulets
             eventually() {
-              aliceValidatorBackend
-                .getExternalPartyBalance(beneficiary2.party)
-                .totalUnlockedCoin
-                .toDouble should be > 0.0
+              getExternalPartyBalance(beneficiary2.party).toDouble should be > 0.0
             }
 
-            // Check that beneficiary1 has ValidatorRewardCoupons from the transfer they made
-            // This must be checked BEFORE advancing rounds, as the MintingDelegationCollectRewardsTrigger
-            // will collect these coupons during round processing
-            // Check that beneficiary1 has ValidatorRewardCoupons from the transfer they made
-            // and capture the coupon's round number for later verification
-            val couponRound =
-              clue("Verify beneficiary1 has ValidatorRewardCoupons from the transfer") {
-                eventually(40.seconds) {
-                  // First check all coupons visible to beneficiary1
-                  val allCouponsVisibleToBeneficiary1 =
-                    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-                      .filterJava(ValidatorRewardCoupon.COMPANION)(
-                        beneficiary1.party,
-                        _ => true,
-                      )
-                  logger.debug(
-                    s"All ValidatorRewardCoupons visible to beneficiary1: ${allCouponsVisibleToBeneficiary1.size}"
-                  )
-                  // Log details of each coupon to understand the user field
-                  allCouponsVisibleToBeneficiary1.foreach { coupon =>
-                    logger.debug(
-                      s"ValidatorRewardCoupon visible to beneficiary1: user=${coupon.data.user}, round=${coupon.data.round.number}, amount=${coupon.data.amount}"
-                    )
-                  }
-
-                  // Now check coupons where user=beneficiary1 (which is what the store filters by)
-                  val beneficiary1Coupons =
-                    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-                      .filterJava(ValidatorRewardCoupon.COMPANION)(
-                        beneficiary1.party,
-                        _.data.user == beneficiary1.party.toProtoPrimitive,
-                      )
-                  logger.debug(
-                    s"ValidatorRewardCoupons with user=beneficiary1: ${beneficiary1Coupons.size}"
-                  )
-                  beneficiary1Coupons should not be empty
-                  // Return the round number of the first coupon
-                  beneficiary1Coupons.head.data.round.number
-                }
-              }
-
-            // CRITICAL: Advance rounds BEFORE unpausing the minting delegation trigger
-            // The trigger only collects coupons from ISSUING rounds, not OPEN rounds.
-            // Transfers create coupons in the current OPEN round, so we must advance
-            // rounds to transition the coupon's round from open → issuing BEFORE
-            // the trigger runs.
-            logger.debug(
-              s"Coupon was created in round $couponRound, advancing rounds so it becomes issuing"
-            )
-
-            eventually() {
-              val openRounds = sv1ScanBackend
-                .getOpenAndIssuingMiningRounds()
-                ._1
-                .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
-              openRounds should not be empty
-            }
-
-            // Advance rounds multiple times to ensure the transfer's round becomes issuing
-            advanceRoundsToNextRoundOpening
-            advanceRoundsToNextRoundOpening
-            advanceRoundsToNextRoundOpening
-
-            // Verify that the coupon's round is now in issuing rounds
-            eventually() {
-              val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-              val issuingRoundNumbers = issuingRounds.map(_.payload.round.number).toSet
-              logger.debug(
-                s"Issuing rounds after advancement: $issuingRoundNumbers, coupon round: $couponRound"
-              )
-              issuingRoundNumbers should contain(couponRound)
-            }
+            // Wait for coupons and advance rounds so coupon's round becomes issuing
+            // CRITICAL: This must happen BEFORE unpausing the minting delegation trigger
+            val couponRound = waitForCouponsAndAdvanceToIssuingRound(beneficiary1.party)
+            logger.debug(s"Coupon round $couponRound is now issuing")
           }
           // Minting delegation trigger is now unpaused and will collect coupons
           // The coupon's round is now an issuing round, so the trigger should find it
 
-          val prevBeneficiary1Balance = getBalance()
+          val prevBeneficiary1Balance = getExternalPartyBalance(beneficiary1.party)
 
           // Advance time to trigger the reward automation
           advanceTimeForRewardAutomationToRunForCurrentRound
@@ -327,7 +211,7 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
           clue("Verify beneficiary1's balance increased from collected rewards") {
             eventually(40.seconds) {
               // Balance should have increased from reward collection via minting delegation
-              val newBeneficiary1Balance = getBalance()
+              val newBeneficiary1Balance = getExternalPartyBalance(beneficiary1.party)
               logger.debug(
                 s"Balance before: $prevBeneficiary1Balance, after: $newBeneficiary1Balance"
               )
@@ -352,9 +236,6 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
         // 1. A delegation with invalid DSO CAN be accepted (vulnerability)
         // 2. The delegation EXISTS on the ledger
         // 3. Minting FAILS at execution time due to DSO mismatch validation in AmuletRules_Transfer
-        //
-        // With Option B fix:
-        // - Accept would validate DSO against AmuletRules before creating delegation
 
         val (_, _) = onboardAliceAndBob()
         waitForWalletUser(aliceValidatorWalletClient)
@@ -380,11 +261,11 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
 
         actAndCheck(
           "Create minting delegation proposal with INVALID DSO",
-          createMintingDelegationProposalWithCustomDso(
+          createMintingDelegationProposal(
             maliciousBeneficiary,
             aliceValidatorParty,
             expiresAt,
-            fakeDso, // Wrong DSO!
+            customDso = Some(fakeDso), // Wrong DSO!
           ),
         )(
           "Proposal exists on ledger but NOT visible via wallet store (accidental filtering)",
@@ -445,18 +326,7 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
         )
 
         // Fund malicious beneficiary so they can make a transfer
-        aliceValidatorWalletClient.transferPreapprovalSend(
-          maliciousBeneficiary.party,
-          30.0,
-          "funding-malicious-beneficiary",
-        )
-
-        eventually() {
-          aliceValidatorBackend
-            .getExternalPartyBalance(maliciousBeneficiary.party)
-            .totalUnlockedCoin
-            .toDouble should be > 0.0
-        }
+        fundExternalParty(maliciousBeneficiary, 30.0, "funding-malicious-beneficiary")
 
         // Pause triggers to control timing
         val validatorRewardTrigger = collectRewardsAndMergeAmuletsTrigger(
@@ -467,60 +337,20 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
         setTriggersWithin(triggersToPauseAtStart = Seq(validatorRewardTrigger)) {
           // Transfer from malicious beneficiary to recipient
           // This generates ValidatorRewardCoupons for malicious beneficiary (naturally created)
-          val prepareSend = aliceValidatorBackend.prepareTransferPreapprovalSend(
-            maliciousBeneficiary.party,
-            recipient.party,
+          transferBetweenExternalParties(
+            maliciousBeneficiary,
+            recipient,
             BigDecimal(25.0),
-            CantonTimestamp.now().plus(Duration.ofHours(1)),
-            0L,
-            Some("malicious-to-recipient"),
-          )
-          aliceValidatorBackend.submitTransferPreapprovalSend(
-            maliciousBeneficiary.party,
-            prepareSend.transaction,
-            HexString.toHexString(
-              crypto(env.executionContext)
-                .signBytes(
-                  HexString.parseToByteString(prepareSend.txHash).value,
-                  maliciousBeneficiary.privateKey.asInstanceOf[SigningPrivateKey],
-                  usage = SigningKeyUsage.ProtocolOnly,
-                )
-                .value
-                .toProtoV30
-                .signature
-            ),
-            publicKeyAsHexString(maliciousBeneficiary.publicKey),
+            "malicious-to-recipient",
           )
 
           // Wait for recipient to receive funds (confirms transfer completed)
           eventually() {
-            aliceValidatorBackend
-              .getExternalPartyBalance(recipient.party)
-              .totalUnlockedCoin
-              .toDouble should be > 0.0
+            getExternalPartyBalance(recipient.party).toDouble should be > 0.0
           }
 
-          // Verify ValidatorRewardCoupons were created for malicious beneficiary
-          val couponRound = eventually(40.seconds) {
-            val coupons =
-              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-                .filterJava(ValidatorRewardCoupon.COMPANION)(
-                  maliciousBeneficiary.party,
-                  _.data.user == maliciousBeneficiary.party.toProtoPrimitive,
-                )
-            coupons should not be empty
-            coupons.head.data.round.number
-          }
-
-          // Advance rounds so coupon's round becomes issuing
-          advanceRoundsToNextRoundOpening
-          advanceRoundsToNextRoundOpening
-          advanceRoundsToNextRoundOpening
-
-          eventually() {
-            val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-            issuingRounds.map(_.payload.round.number).toSet should contain(couponRound)
-          }
+          // Wait for coupons and advance rounds so coupon's round becomes issuing
+          val couponRound = waitForCouponsAndAdvanceToIssuingRound(maliciousBeneficiary.party)
 
           // Get the delegation with invalid DSO (filter by beneficiary to avoid picking up
           // the valid delegation from the first test)
@@ -605,17 +435,23 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
 
   private val DefaultAmuletMergeLimit = 10
 
+  /** Creates a MintingDelegationProposal for an external party beneficiary.
+    * @param customDso If provided, uses this party as DSO (for testing invalid DSO scenarios).
+    *                  If None, uses the real DSO party.
+    */
   private def createMintingDelegationProposal(
       beneficiaryParty: OnboardingResult,
-      delegate: com.digitalasset.canton.topology.PartyId,
+      delegate: PartyId,
       expiresAt: java.time.Instant,
+      customDso: Option[PartyId] = None,
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
     val beneficiary = beneficiaryParty.party
+    val effectiveDso = customDso.getOrElse(dsoParty)
     val proposal = new mintingDelegationCodegen.MintingDelegationProposal(
       new mintingDelegationCodegen.MintingDelegation(
         beneficiary.toProtoPrimitive,
         delegate.toProtoPrimitive,
-        dsoParty.toProtoPrimitive,
+        effectiveDso.toProtoPrimitive,
         expiresAt,
         DefaultAmuletMergeLimit.toLong,
       )
@@ -627,30 +463,87 @@ class ValidatorRewardCouponMintingDelegationTimeBasedIntegrationTest
       )
   }
 
-  // Helper method to create proposal with custom (potentially invalid) DSO
-  // Used to demonstrate the vulnerability where a malicious beneficiary can
-  // create a proposal with wrong DSO that the delegate may unknowingly accept
-  private def createMintingDelegationProposalWithCustomDso(
-      beneficiaryParty: OnboardingResult,
-      delegate: PartyId,
-      expiresAt: java.time.Instant,
-      dso: PartyId, // Can be any party, including invalid DSO
+  /** Transfers amulets between two external parties with proper signing. */
+  private def transferBetweenExternalParties(
+      sender: OnboardingResult,
+      recipient: OnboardingResult,
+      amount: BigDecimal,
+      description: String,
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
-    val beneficiary = beneficiaryParty.party
-    val proposal = new mintingDelegationCodegen.MintingDelegationProposal(
-      new mintingDelegationCodegen.MintingDelegation(
-        beneficiary.toProtoPrimitive,
-        delegate.toProtoPrimitive,
-        dso.toProtoPrimitive, // Using provided DSO (can be wrong!)
-        expiresAt,
-        DefaultAmuletMergeLimit.toLong,
-      )
+    val prepareSend = aliceValidatorBackend.prepareTransferPreapprovalSend(
+      sender.party,
+      recipient.party,
+      amount,
+      CantonTimestamp.now().plus(Duration.ofHours(1)),
+      0L,
+      Some(description),
     )
-    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-      .submitJavaExternalOrLocal(
-        actingParty = beneficiaryParty.richPartyId,
-        commands = proposal.create.commands.asScala.toSeq,
-      )
+    aliceValidatorBackend.submitTransferPreapprovalSend(
+      sender.party,
+      prepareSend.transaction,
+      HexString.toHexString(
+        crypto(env.executionContext)
+          .signBytes(
+            HexString.parseToByteString(prepareSend.txHash).value,
+            sender.privateKey.asInstanceOf[SigningPrivateKey],
+            usage = SigningKeyUsage.ProtocolOnly,
+          )
+          .value
+          .toProtoV30
+          .signature
+      ),
+      publicKeyAsHexString(sender.publicKey),
+    )
+  }
+
+  /** Funds an external party and waits for balance to be positive. */
+  private def fundExternalParty(
+      party: OnboardingResult,
+      amount: Double,
+      description: String,
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
+    aliceValidatorWalletClient.transferPreapprovalSend(party.party, amount, description)
+    eventually() {
+      getExternalPartyBalance(party.party).toDouble should be > 0.0
+    }
+  }
+
+  /** Gets the unlocked coin balance for an external party. */
+  private def getExternalPartyBalance(
+      party: PartyId
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): BigDecimal = BigDecimal(
+    aliceValidatorBackend.getExternalPartyBalance(party).totalUnlockedCoin
+  )
+
+  /** Waits for ValidatorRewardCoupons to exist and advances rounds until the coupon's round is issuing.
+    * @return The round number of the coupon.
+    */
+  private def waitForCouponsAndAdvanceToIssuingRound(
+      beneficiary: PartyId
+  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long = {
+    val couponRound = eventually(40.seconds) {
+      val coupons =
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ValidatorRewardCoupon.COMPANION)(
+            beneficiary,
+            _.data.user == beneficiary.toProtoPrimitive,
+          )
+      coupons should not be empty
+      coupons.head.data.round.number
+    }
+
+    // Advance rounds so coupon's round becomes issuing
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
+
+    // Verify coupon round is now issuing
+    eventually() {
+      val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+      issuingRounds.map(_.payload.round.number).toSet should contain(couponRound)
+    }
+
+    couponRound
   }
 
   private def createValidatorRight(
