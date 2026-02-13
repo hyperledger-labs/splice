@@ -430,11 +430,19 @@ and perform reads and writes in the same :term:`BFT` manner used by regular vali
 In principle, this mode of operation is more robust than using a single connection to the sequencer operated by the SV itself.
 However, bugs in the BFT sequencer connection logic or severe instability of other SVs's sequencers can make it prudent to temporarily switch back to using a single sequencer connection.
 
-To do so, SV operators must:
+To do so, SV operators must perform the following steps.
 
-1. In ``validator-values.yaml``, add ``useSequencerConnectionsFromScan: false`` and set ``decentralizedSynchronizerUrl`` to your ``domain.sequencerPublicUrl`` value from ``sv-values.yaml``.
+Step 1. In ``sv-validator-values.yaml``, add the following.
 
-2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
+.. code-block:: yaml
+
+    synchronizer:
+      connectionType: "trust-single"
+      url: "SEQUENCER_PUBLIC_URI" # domain.sequencerPublicUrl from sv-values.yaml
+
+
+
+Step 2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
 
 .. code-block:: yaml
 
@@ -442,7 +450,7 @@ To do so, SV operators must:
         - name: ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION
           value: "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
 
-3. In ``sv-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
+Step 3. In ``sv-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
 
 .. code-block:: yaml
 
