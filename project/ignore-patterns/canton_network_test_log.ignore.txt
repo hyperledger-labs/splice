@@ -139,6 +139,3 @@ Simulated S3 write error
 # Warnings in s3Mock log (which we redirect to our logs), that we don't care about
 \[s3Mock\].*Ignoring option --illegal-access=warn
 Ryuk has been disabled
-
-# Happened after upgrading Selenium when calling `webDriver.quit()`, looks benign
-"message":"connection closed locally","logger_name":"o.o.s.remote.http.WebSocket"
