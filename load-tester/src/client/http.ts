@@ -57,12 +57,12 @@ export class HttpClient {
       ...(this.tag ? { name: this.tag } : undefined),
     };
 
-    const resp = http.request(method, url, body, {
+    return http.request(method, url, body, {
       headers,
       tags,
       redirects: 0,
     });
-
+  }
 
   // base HTTP request with simple error handling
   private _request<R extends ResponseType>(
