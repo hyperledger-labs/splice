@@ -362,6 +362,90 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     }
   }
 
+  "Development Fund - Unhappy path (invalid allocation values)" should {
+
+    "reject allocation when amount exceeds unclaimed development fund total" in {
+      implicit env =>
+        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+        clue("Set alice (wallet user) as DFM via governance vote") {
+          changeDevelopmentFundManager(aliceParty)
+        }
+
+        val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+
+        clue("Advance rounds to generate unclaimed development fund coupons") {
+          aliceWalletClient.tap(100.0)
+          Range(0, 6).foreach(_ => advanceRoundsToNextRoundOpening)
+        }
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToAliceWallet(aliceDamlUser)
+          eventuallyClickOn(id("navlink-development-fund"))
+          waitForQuery(id("development-fund-allocation-beneficiary"))
+
+          val totalUnclaimed = clue("Read unclaimed total from UI") {
+            eventually() {
+              val totalText = find(id("unclaimed-total-amount")).value.text
+              totalText should not be "0"
+              BigDecimal(totalText.split(" ").head)
+            }
+          }
+
+          val invalidAmount = totalUnclaimed + BigDecimal(100000)
+          val expiresAt = env.environment.clock.now.plusSeconds(30 * 24 * 60 * 60)
+          val expiresAtFormatted = DateTimeFormatter
+            .ofPattern("MM/dd/yyyy hh:mm a")
+            .format(expiresAt.toInstant.atZone(java.time.ZoneId.systemDefault()))
+
+          clue("Fill allocation form with amount larger than unclaimed total") {
+            setAnsField(
+              textField("development-fund-allocation-beneficiary"),
+              bobParty.toProtoPrimitive,
+              bobParty.toProtoPrimitive,
+            )
+            eventuallyClickOn(id("development-fund-allocation-amount"))
+            textField("development-fund-allocation-amount").underlying.clear()
+            textField("development-fund-allocation-amount").underlying.sendKeys(
+              invalidAmount.toString
+            )
+            setDateTime("alice", "development-fund-allocation-expires-at", expiresAtFormatted)
+            eventuallyClickOn(id("development-fund-allocation-reason"))
+            textArea("development-fund-allocation-reason").underlying.sendKeys(
+              "Invalid allocation test"
+            )
+          }
+
+          clue("Submit button is disabled due to amount exceeding available") {
+            eventually() {
+              find(id("development-fund-allocation-submit-button")).value.isEnabled shouldBe false
+            }
+          }
+
+          clue("Amount field shows available total (helper text)") {
+            eventually() {
+              val pageText = webDriver.getPageSource
+              pageText should include("Available:")
+            }
+          }
+
+          clue("Unclaimed total is unchanged (no allocation submitted)") {
+            val totalTextAfter = find(id("unclaimed-total-amount")).value.text
+            val totalUnclaimedAfter = BigDecimal(totalTextAfter.split(" ").head)
+            totalUnclaimedAfter shouldBe totalUnclaimed
+          }
+
+          clue("No new coupon appears in active list") {
+            val rows = findAll(cssSelector("tbody tr")).toSeq
+            rows.forall(row =>
+              row.text.contains("No development fund allocations found")
+            ) || rows.isEmpty shouldBe true
+          }
+        }
+    }
+  }
+
   "Development Fund - Happy Path (DFM changes)" should {
 
     "handle DFM transition correctly" in { implicit env =>
