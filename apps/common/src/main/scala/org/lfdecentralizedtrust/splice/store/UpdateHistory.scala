@@ -587,17 +587,19 @@ class UpdateHistory(
       .map(lengthLimited)
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
+    val safeExternalTransactionHash = tree.getExternalTransactionHash
 
+    import storage.DbStorageConverters.setParameterByteArray
     (sql"""
       insert into update_history_transactions(
         history_id, update_id, record_time,
         participant_offset, domain_id, migration_id,
-        effective_at, root_event_ids, workflow_id, command_id
+        effective_at, root_event_ids, workflow_id, command_id, external_transaction_hash
       )
       values (
         $historyId, $safeUpdateId, $safeRecordTime,
         $safeParticipantOffset, $safeSynchronizerId, $migrationId,
-        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId
+        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId, $safeExternalTransactionHash
       )
       returning row_id
     """.asUpdateReturning[Long].head)
@@ -1103,7 +1105,8 @@ class UpdateHistory(
         effective_at,
         root_event_ids,
         workflow_id,
-        command_id
+        command_id,
+        external_transaction_hash
       from update_history_transactions
       where
         history_id = $historyId and """ ++ afterFilter ++
@@ -1627,7 +1630,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
+          /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1716,6 +1719,7 @@ class UpdateHistory(
           <<[Seq[String]],
           <<[Option[String]],
           <<[Option[String]],
+          <<[Array[Byte]],
         )
       )
     }
@@ -2424,6 +2428,7 @@ object UpdateHistory {
       rootEventIds: Seq[String],
       workflowId: Option[String],
       commandId: Option[String],
+      externalTransactionHash: Array[Byte],
   )
 
   case class SelectFromCreateEvents(
