@@ -32,6 +32,10 @@
         This change implements Increment 1 "Make confirmation responses free using the heuristic implementation" from
         `CIP-104 - Traffic-Based App Rewards <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md#incremental-roll-out>`__.
 
+    - Validator and SV app
+
+       - The ``splice-util-batched-markers`` dar is now uploaded automatically.
+
     - Daml
 
       - Optimize the number of views in the automation run by the SV app
