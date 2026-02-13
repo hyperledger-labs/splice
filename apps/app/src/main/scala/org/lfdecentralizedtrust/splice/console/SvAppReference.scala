@@ -409,21 +409,32 @@ class SvAppBackendReference(
       config.participantClient.participantClientConfigWithAdminToken,
     )
 
-  private def localSynchronizerNode = config.localSynchronizerNode.getOrElse(
-    throw new RuntimeException("No synchronizer node configured for SV app")
+  private def localSynchronizerNode(id: Int) = config.localSynchronizerNodes.getOrElse(
+    id,
+    throw new RuntimeException("No synchronizer node configured for SV app"),
   )
 
   lazy val sequencerClient: SequencerClientReference =
+    sequencerClientForPSId(config.currentPhisicalSynchronizerNodeIndex.getOrElse(0))
+
+  def sequencerClientForPSId(psid: Int): SequencerClientReference = {
     new SequencerClientReference(
       consoleEnvironment,
       s"sequencer client for $name",
-      localSynchronizerNode.sequencer.toCantonConfig,
+      localSynchronizerNode(psid).sequencer.toCantonConfig,
     )
+  }
 
   lazy val mediatorClient: MediatorClientReference =
+    mediatorClientForPSId(config.currentPhisicalSynchronizerNodeIndex.getOrElse(0))
+
+  def mediatorClientForPSId(psid: Int): MediatorClientReference = {
     new MediatorClientReference(
       consoleEnvironment,
       s"mediator client for $name",
-      localSynchronizerNode.mediator.toCantonConfig,
+      localSynchronizerNode(
+        psid
+      ).mediator.toCantonConfig,
     )
+  }
 }

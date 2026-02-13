@@ -5,7 +5,6 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -55,6 +54,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
   override protected lazy val resetRequiredTopologyState: Boolean = false
 
   override def dbsSuffix = "lsu"
+  private val UpgradePSid = 1
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
@@ -77,36 +77,26 @@ class LogicalSynchronizerUpgradeIntegrationTest
               )
             )
           )
-        )(
-          config.copy(
-            svApps = config.svApps ++
-              Seq(1, 2, 3, 4).map(sv =>
-                InstanceName.tryCreate(s"sv${sv}Local") ->
-                  config
-                    .svApps(InstanceName.tryCreate(s"sv$sv"))
-              ),
-            scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
-              InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
-                config.scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
-            ),
-          )
-        )
+        )(config)
       )
       .addConfigTransforms((_, config) => {
+        ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+          config.copy(
+            domainMigrationDumpPath =
+              Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+          )
+        }(config)
+      })
+      .addConfigTransforms((_, config) => {
         ConfigTransforms
-          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))
-          .compose(
-            ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
-              if (name.endsWith("Local")) {
-                config
-              } else {
-                config.copy(
-                  domainMigrationDumpPath =
-                    Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
-                )
-              }
-            }
-          )(config)
+          .updateAllSvAppConfigs { (_, config) =>
+            config.copy(
+              currentPhisicalSynchronizerNodeIndex = Some(UpgradePSid),
+              localSynchronizerNodes =
+                config.localSynchronizerNodes + (UpgradePSid -> config.localSynchronizerNode.value),
+            )
+          }
+          .compose(ConfigTransforms.bumpCantonPSyncPortsBy(UpgradePSid, 22_000))(config)
       })
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
@@ -223,8 +213,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-    // used just to create connections to the new sync
-    val allNewBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
     val upgradeTimeInstant = Instant
       .now()
       .plusSeconds(60)
@@ -281,17 +269,17 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
       clue("init new nodes") {
-        allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
-          TraceContext.withNewTraceContext(s"init ${oldBackend.name}") { implicit traceContext =>
-            val expectedDirectory = directoryForDump(oldBackend.name, synchronizerFreezeTime)
+        allBackends.map { backend =>
+          TraceContext.withNewTraceContext(s"init ${backend.name}") { implicit traceContext =>
+            val expectedDirectory = directoryForDump(backend.name, synchronizerFreezeTime)
             expectedDirectory.exists shouldBe true
             val lsuSynchronizerState =
-              oldBackend.sequencerClient.topology.transactions.logical_upgrade_state()
+              backend.sequencerClient.topology.transactions.logical_upgrade_state()
             val dump = DomainMigrationInitializer
               .loadDomainMigrationDump((expectedDirectory / "domain_migration_dump.json").path)
             Using.resources(
-              sequencerAdminConnection(newBackend),
-              mediatorAdminConnection(newBackend),
+              sequencerAdminConnection(UpgradePSid, backend),
+              mediatorAdminConnection(UpgradePSid, backend),
             ) { (newSequencerAdminConnection, newMediatorAdminConnection) =>
               val sequencerInitializer =
                 new NodeInitializer(
@@ -301,37 +289,41 @@ class LogicalSynchronizerUpgradeIntegrationTest
                 )
               val mediatorInitializer =
                 new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
-
-              clue(s"init ${oldBackend.name} sequencer and mediator from dump") {
-                newBackend.sequencerClient.health.wait_for_ready_for_id()
+              val upgradeSequencerClient = backend.sequencerClientForPSId(UpgradePSid)
+              val upgradeMediatorClient = backend.mediatorClientForPSId(UpgradePSid)
+              clue(s"init ${backend.name} sequencer and mediator from dump") {
+                upgradeSequencerClient.health.wait_for_ready_for_id()
                 sequencerInitializer
                   .initializeFromDump(dump.nodeIdentities.sequencer)
                   .futureValue
 
-                newBackend.mediatorClient.health.wait_for_ready_for_id()
+                upgradeMediatorClient.health.wait_for_ready_for_id()
                 mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
               }
               val staticSynchronizerParameters =
-                oldBackend.sequencerClient.synchronizer_parameters.static.get()
+                backend.sequencerClient.synchronizer_parameters.static.get()
               val newStaticSyncParams = staticSynchronizerParameters.copy(
                 serial = staticSynchronizerParameters.serial + NonNegativeInt.one
               )
 
-              clue(s"init ${oldBackend.name} sequencer from synchronizer predecessor") {
-                newBackend.sequencerClient.health.wait_for_ready_for_initialization()
-                newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
+              clue(s"init ${backend.name} sequencer from synchronizer predecessor") {
+                upgradeSequencerClient.health.wait_for_ready_for_initialization()
+                upgradeSequencerClient.setup.initialize_from_synchronizer_predecessor(
                   lsuSynchronizerState,
                   newStaticSyncParams,
                 )
                 eventually(2.minutes) {
-                  newBackend.sequencerClient.topology.transactions
+                  upgradeSequencerClient.topology.transactions
                     .list(decentralizedSynchronizerId)
                     .result
                     .size shouldBe topologyTransactionsOnTheSync
                 }
               }
 
-              clue(s"init ${oldBackend.name} mediator") {
+              clue(s"init ${backend.name} mediator") {
+                val upgradeSynchronizerNodeConfig = backend.config.localSynchronizerNodes
+                  .get(UpgradePSid)
+                  .value
                 newMediatorAdminConnection
                   .initialize(
                     PhysicalSynchronizerId(
@@ -340,14 +332,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
                     ),
                     GrpcSequencerConnection
                       .create(
-                        newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+                        upgradeSynchronizerNodeConfig.sequencer.externalPublicApiUrl
                       )
                       .value,
-                    newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification.toInternal,
+                    upgradeSynchronizerNodeConfig.mediator.sequencerRequestAmplification.toInternal,
                   )
                   .futureValue
                 eventually(2.minutes) {
-                  newBackend.mediatorClient.topology.transactions
+                  upgradeMediatorClient.topology.transactions
                     .list(decentralizedSynchronizerId)
                     .result
                     .size shouldBe topologyTransactionsOnTheSync
@@ -373,14 +365,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
       )
 
       clue("Announce new sequencer urls") {
-        allBackends.zip(allNewBackends).par.map { case (oldBackend, newBackend) =>
-          oldBackend.sequencerClient.topology.lsu.sequencer_successors
+        allBackends.par.map { backend =>
+          backend.sequencerClient.topology.lsu.sequencer_successors
             .propose_successor(
-              oldBackend.sequencerClient.id,
+              backend.sequencerClient.id,
               NonEmpty(
                 Seq,
                 URI.create(
-                  newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+                  backend.config.localSynchronizerNodes
+                    .get(UpgradePSid)
+                    .value
+                    .sequencer
+                    .externalPublicApiUrl
                 ),
               ),
               decentralizedSynchronizerId,
@@ -389,21 +385,27 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
 
       clue("transfer traffic after upgrade") {
-        allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
+        allBackends.par.map { backend =>
           eventually(timeUntilSuccess = 2.minutes) {
-            oldBackend.mediatorClient.testing
+            backend.mediatorClient.testing
               .fetch_synchronizer_time(NonNegativeDuration.ofSeconds(10)) should be > upgradeTime
           }
 
-          clue(s"transfer traffic for  ${oldBackend.name}") {
-            newBackend.sequencerClient.traffic_control
-              .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
+          clue(s"transfer traffic for  ${backend.name}") {
+            backend
+              .sequencerClientForPSId(UpgradePSid)
+              .traffic_control
+              .set_lsu_state(backend.sequencerClient.traffic_control.get_lsu_state())
           }
         }
       }
 
-      val newSequencerUrls = allNewBackends.map { newBackend =>
-        newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+      val newSequencerUrls = allBackends.map { backend =>
+        backend.config.localSynchronizerNodes
+          .get(UpgradePSid)
+          .value
+          .sequencer
+          .externalPublicApiUrl
           .stripPrefix("http://")
       }
 
@@ -491,18 +493,21 @@ class LogicalSynchronizerUpgradeIntegrationTest
     }
   }
 
-  def sequencerAdminConnection(backend: SvAppBackendReference): SequencerAdminConnection =
+  def sequencerAdminConnection(
+      psid: Int,
+      backend: SvAppBackendReference,
+  ): SequencerAdminConnection =
     new SequencerAdminConnection(
-      backend.config.localSynchronizerNode.value.sequencer.adminApi,
+      backend.config.localSynchronizerNodes.get(psid).value.sequencer.adminApi,
       backend.spliceConsoleEnvironment.environment.config.monitoring.logging.api,
       loggerFactory,
       grpcClientMetrics,
       retryProvider,
     )
 
-  def mediatorAdminConnection(backend: SvAppBackendReference): MediatorAdminConnection =
+  def mediatorAdminConnection(psid: Int, backend: SvAppBackendReference): MediatorAdminConnection =
     new MediatorAdminConnection(
-      backend.config.localSynchronizerNode.value.mediator.adminApi,
+      backend.config.localSynchronizerNodes.get(psid).value.mediator.adminApi,
       backend.spliceConsoleEnvironment.environment.config.monitoring.logging.api,
       loggerFactory,
       grpcClientMetrics,

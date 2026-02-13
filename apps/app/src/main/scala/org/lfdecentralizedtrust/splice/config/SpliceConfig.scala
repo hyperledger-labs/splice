@@ -61,6 +61,7 @@ import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
+import pureconfig.configurable.{genericMapReader, genericMapWriter}
 import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.module.cats.{nonEmptyListReader, nonEmptyListWriter}
 import io.circe.parser.*
@@ -373,6 +374,22 @@ object SpliceConfig {
     import BaseCantonConfig.Readers.*
 
     import cantonConfigReaders.*
+
+    implicit def numericMapReader[K, V](implicit
+        numeric: Numeric[K],
+        valueReader: ConfigReader[V],
+    ): ConfigReader[Map[K, V]] =
+      genericMapReader[K, V](key =>
+        numeric
+          .parseString(key)
+          .toRight(
+            CannotConvert(
+              key,
+              s"Numeric type ${numeric.getClass.getSimpleName}",
+              "Key is not a valid number",
+            )
+          )
+      )
 
     implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
       SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))
@@ -814,6 +831,11 @@ object SpliceConfig {
 
     import writers.*
     import DeprecatedConfigUtils.*
+
+    implicit def mapWriter[K: Numeric, V](implicit
+        valueWriter: ConfigWriter[V]
+    ): ConfigWriter[Map[K, V]] =
+      genericMapWriter[K, V](_.toString)
 
     implicit val dbConfigWriter: ConfigWriter[DbConfig] = deriveWriter[DbConfig]
 

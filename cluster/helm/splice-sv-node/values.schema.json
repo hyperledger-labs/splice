@@ -38,10 +38,25 @@
       }
     },
     {
+      "oneOf": [
+        {
+          "required": ["domain"],
+          "not": {
+            "required": ["physicalSynchronizers"]
+          }
+        },
+        {
+          "required": ["physicalSynchronizers"],
+          "not": {
+            "required": ["domain"]
+          }
+        }
+      ]
+    },
+    {
       "required": [
         "auth",
         "defaultJvmOptions",
-        "domain",
         "imageRepo",
         "scan",
         "nodeIdentifier",
@@ -205,6 +220,55 @@
             },
             "skipInitialization": {
                 "type": "boolean"
+            },
+            "enableBftSequencer": {
+                "type": "boolean"
+            }
+          }
+        },
+        "physicalSynchronizers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "physicalSynchronizerId",
+              "sequencerPublicUrl",
+              "sequencerAddress",
+              "mediatorAddress"
+            ],
+            "properties": {
+              "physicalSynchronizerId": {
+                "type": "string"
+              },
+              "mediatorAddress": {
+                "type": "string"
+              },
+              "sequencerAddress": {
+                "type": "string"
+              },
+              "sequencerPublicUrl": {
+                "type": "string"
+              },
+              "sequencerPruningConfig": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "retentionPeriod": {
+                    "type": "string"
+                  },
+                  "pruningInterval": {
+                    "type": "string"
+                  }
+                }
+              },
+              "skipInitialization": {
+                  "type": "boolean"
+              },
+              "enableBftSequencer": {
+                  "type": "boolean"
+              }
             }
           }
         },

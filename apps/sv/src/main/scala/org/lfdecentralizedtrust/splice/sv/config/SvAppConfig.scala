@@ -290,7 +290,9 @@ case class SvAppBackendConfig(
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
-    localSynchronizerNode: Option[SvSynchronizerNodeConfig],
+    // TODO(#564): read this from scan
+    currentPhisicalSynchronizerNodeIndex: Option[Int] = Some(0),
+    localSynchronizerNodes: Map[Int, SvSynchronizerNodeConfig],
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -371,7 +373,15 @@ case class SvAppBackendConfig(
     dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig {
 
-  def shouldSkipSynchronizerInitialization =
+  lazy val localSynchronizerNode: Option[SvSynchronizerNodeConfig] = {
+    localSynchronizerNodes
+      .find { case (index, _) =>
+        currentPhisicalSynchronizerNodeIndex.contains(index)
+      }
+      .map(_._2)
+  }
+
+  def shouldSkipSynchronizerInitialization: Boolean =
     skipSynchronizerInitialization &&
       onboarding.fold(true) {
         case _: SvOnboardingConfig.FoundDso => true
