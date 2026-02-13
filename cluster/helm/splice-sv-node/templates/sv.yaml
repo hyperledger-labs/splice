@@ -165,38 +165,72 @@ spec:
             - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
               value: |
                 canton.sv-apps.sv.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
-            {{- with .Values.domain }}
+            {{- if .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
               #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
-                canton.sv-apps.sv.local-synchronizer-node {
+                canton.sv-apps.sv.local-synchronizer-nodes {
                   sequencer {
-                    {{- if .enableBftSequencer }}
+                    {{- if .Values.domain.enableBftSequencer }}
                     is-bft-sequencer = true
                     {{- end }}
                     admin-api {
-                      address = {{ .sequencerAddress | quote }}
+                      address = {{ .Values.domain.sequencerAddress | quote }}
                       port = 5009
                     }
                     internal-api {
-                      address = {{ .sequencerAddress | quote }}
+                      address = {{ .Values.domain.sequencerAddress | quote }}
                       port = 5008
                     }
-                    external-public-api-url = {{ .sequencerPublicUrl | quote }}
-                    {{- if .sequencerPruningConfig.enabled }}
+                    external-public-api-url = {{ .Values.domain.sequencerPublicUrl | quote }}
+                    {{- if .Values.domain.sequencerPruningConfig.enabled }}
                     pruning {
-                      pruning-interval = {{ .sequencerPruningConfig.pruningInterval | quote }}
-                      retention-period = {{ .sequencerPruningConfig.retentionPeriod | quote }}
+                      pruning-interval = {{ .Values.domain.sequencerPruningConfig.pruningInterval | quote }}
+                      retention-period = {{ .Values.domain.sequencerPruningConfig.retentionPeriod | quote }}
                     }
                     {{- end }}
                   }
                   mediator {
                     admin-api {
-                      address = {{ .mediatorAddress | quote }}
+                      address = {{ .Values.domain.mediatorAddress | quote }}
                       port = 5007
                     }
                   }
                 }
+            {{- else if .Values.physicalSynchronizers }}
+            {{- range $idx, $sync := .Values.physicalSynchronizers }}
+            - name: ADDITIONAL_CONFIG_SV_DOMAIN_{{ $idx }}
+              #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
+              value: |
+                canton.sv-apps.sv.local-synchronizer-nodes.{{ $sync.physicalSynchronizerId }} {
+                  sequencer {
+                    {{- if $sync.enableBftSequencer }}
+                    is-bft-sequencer = true
+                    {{- end }}
+                    admin-api {
+                      address = {{ $sync.sequencerAddress | quote }}
+                      port = 5009
+                    }
+                    internal-api {
+                      address = {{ $sync.sequencerAddress | quote }}
+                      port = 5008
+                    }
+                    external-public-api-url = {{ $sync.sequencerPublicUrl | quote }}
+                    {{- if $sync.sequencerPruningConfig.enabled }}
+                    pruning {
+                      pruning-interval = {{ $sync.sequencerPruningConfig.pruningInterval | quote }}
+                      retention-period = {{ $sync.sequencerPruningConfig.retentionPeriod | quote }}
+                    }
+                    {{- end }}
+                  }
+                  mediator {
+                    admin-api {
+                      address = {{ $sync.mediatorAddress | quote }}
+                      port = 5007
+                    }
+                  }
+                }
+            {{- end }}
             {{- end }}
             {{- if .Values.decentralizedSynchronizerUrl }}
             - name: SPLICE_APP_SV_GLOBAL_DOMAIN_URL
@@ -350,7 +384,7 @@ spec:
             - name: SPLICE_APP_EXPIRED_REWARD_COUPON_BATCH_SIZE
               value: {{ .Values.delegatelessAutomationExpiredRewardCouponBatchSize | quote }}
             {{- end }}
-            {{- if .Values.domain.skipInitialization }}
+            {{- if and .Values.domain .Values.domain.skipInitialization }}
             - name: ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION
               value: canton.sv-apps.sv.skip-synchronizer-initialization = true
             {{- end }}

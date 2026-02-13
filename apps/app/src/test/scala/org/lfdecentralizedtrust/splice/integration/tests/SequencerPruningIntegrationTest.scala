@@ -29,18 +29,20 @@ class SequencerPruningIntegrationTest
         (_, config) =>
           ConfigTransforms.updateAllSvAppConfigs { (_, config) =>
             config.copy(
-              localSynchronizerNode = config.localSynchronizerNode.map(synchronizerNode =>
-                synchronizerNode.copy(
-                  sequencer = synchronizerNode.sequencer.copy(
-                    pruning = Some(
-                      SequencerPruningConfig(
-                        pruningInterval = NonNegativeFiniteDuration(2.seconds),
-                        retentionPeriod = NonNegativeFiniteDuration(120.seconds),
+              localSynchronizerNodes = config.localSynchronizerNodes.view
+                .mapValues(synchronizerNode =>
+                  synchronizerNode.copy(
+                    sequencer = synchronizerNode.sequencer.copy(
+                      pruning = Some(
+                        SequencerPruningConfig(
+                          pruningInterval = NonNegativeFiniteDuration(2.seconds),
+                          retentionPeriod = NonNegativeFiniteDuration(120.seconds),
+                        )
                       )
                     )
                   )
                 )
-              ),
+                .toMap,
               // The pruning trigger only registers the advancing of time when things happen
               // on the ledger, so let's make sure that things happen frequently.
               onLedgerStatusReportInterval = NonNegativeFiniteDuration(30.seconds),

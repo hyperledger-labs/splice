@@ -420,6 +420,15 @@ object ConfigTransforms {
     o.map(bumpUrl(bump, _))
   }
 
+  def bumpCantonPSyncPortsBy(psid: Int, bump: Int) = {
+    updateAllSvAppConfigs((_, conf) =>
+      conf
+        .focus(_.localSynchronizerNodes)
+        .index(psid)
+        .modify(portTransform(bump, _))
+    )
+  }
+
   def bumpCantonSyncPortsBy(
       bump: Int,
       predicate: String => Boolean = _ => true,
@@ -430,8 +439,8 @@ object ConfigTransforms {
           conf
             .focus(_.domains.global.url)
             .modify(_.map(bumpUrl(bump, _)))
-            .focus(_.localSynchronizerNode)
-            .modify(_.map(portTransform(bump, _)))
+            .focus(_.localSynchronizerNodes)
+            .modify(_.view.mapValues(portTransform(bump, _)).toMap)
         else conf
       ),
       updateAllScanAppConfigs((name, conf) =>
@@ -502,34 +511,6 @@ object ConfigTransforms {
 
   }
 
-  def bumpSomeSvAppPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
-    updateAllSvAppConfigs((name, config) => {
-      if (svApps.contains(name)) {
-        config
-          .focus(_.adminApi)
-          .modify(portTransform(bump, _))
-      } else {
-        config
-      }
-    }) compose bumpSomeSvAppCantonPortsBy(bump, svApps)
-  }
-
-  def bumpSomeSvAppCantonPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
-    updateAllSvAppConfigs((name, config) => {
-      if (svApps.contains(name)) {
-        config
-          .focus(_.domains.global.url)
-          .modify(_.map(bumpUrl(bump, _)))
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(portTransform(bump, _)))
-      } else {
-        config
-      }
-    })
-  }
-
   def bumpUrl(bump: Int, uri: Uri): Uri = {
     uri.withPort(uri.effectivePort + bump)
   }
@@ -556,8 +537,8 @@ object ConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.participantClient.adminApi.port)
           .modify(setPortPrefix(range))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(c => setSvSynchronizerConfigPortsPrefix(range, c)))
+          .focus(_.localSynchronizerNodes)
+          .modify(_.view.mapValues(c => setSvSynchronizerConfigPortsPrefix(range, c)).toMap)
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
       } else {
@@ -706,15 +687,17 @@ object ConfigTransforms {
 
   def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
     config
-      .focus(_.localSynchronizerNode)
+      .focus(_.localSynchronizerNodes)
       .modify(
-        _.map(
-          _.focus(_.sequencer).modify(
-            _.copy(
-              isBftSequencer = true
+        _.view
+          .mapValues(
+            _.focus(_.sequencer).modify(
+              _.copy(
+                isBftSequencer = true
+              )
             )
           )
-        )
+          .toMap
       )
 
   def withBftSequencer(

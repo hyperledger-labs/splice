@@ -222,8 +222,12 @@ case class UseToxiproxy(
               .map { case (n, c) =>
                 (
                   n,
-                  c.focus(_.localSynchronizerNode)
-                    .modify(_.map(_.focus(_.sequencer).modify(addSequencerProxy(n.unwrap, _)))),
+                  c.focus(_.localSynchronizerNodes)
+                    .modify(
+                      _.view
+                        .mapValues(_.focus(_.sequencer).modify(addSequencerProxy(n.unwrap, _)))
+                        .toMap
+                    ),
                 )
               }
               .toMap
@@ -240,8 +244,12 @@ case class UseToxiproxy(
               .map { case (n, c) =>
                 (
                   n,
-                  c.focus(_.localSynchronizerNode)
-                    .modify(_.map(_.focus(_.mediator).modify(addMediatorProxy(n.unwrap, _)))),
+                  c.focus(_.localSynchronizerNodes)
+                    .modify(
+                      _.view
+                        .mapValues(_.focus(_.mediator).modify(addMediatorProxy(n.unwrap, _)))
+                        .toMap
+                    ),
                 )
               }
               .toMap

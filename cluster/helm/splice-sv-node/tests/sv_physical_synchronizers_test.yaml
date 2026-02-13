@@ -1,0 +1,160 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Validator values - physicalSynchronizers config"
+templates:
+  - sv.yaml
+release:
+  # Set for testing labels
+  name: mock-sv
+chart:
+  # Override for testing labels
+  version: 0.1.1
+  appVersion: 0.1.0
+
+# Things we need just to pass the schema - using physicalSynchronizers (new format)
+set:
+  physicalSynchronizers:
+    - physicalSynchronizerId: "mock-sync"
+      sequencerPublicUrl: "https://sequencer.mock.com"
+      sequencerAddress: "sequencer-address"
+      mediatorAddress: "mediator-address"
+      sequencerPruningConfig:
+        enabled: false
+  scan:
+    publicUrl: "https://scan.mock.com"
+    internalUrl: "https://scan-internal.mock.com"
+  nodeIdentifier: "helm-mock-1-validator"
+  onboardingName: "some-sv"
+  participantAddress: "mock-address"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
+tests:
+  - it: "sets physicalSynchronizers configuration with single synchronizer"
+    set:
+      physicalSynchronizers:
+        - physicalSynchronizerId: "sync-1"
+          sequencerPublicUrl: "https://sequencer1.test.com"
+          sequencerAddress: "sequencer1-address"
+          mediatorAddress: "mediator1-address"
+          enableBftSequencer: false
+          sequencerPruningConfig:
+            enabled: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_0')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.sync-1 {
+              sequencer {
+                admin-api {
+                  address = "sequencer1-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer1-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer1.test.com"
+              }
+              mediator {
+                admin-api {
+                  address = "mediator1-address"
+                  port = 5007
+                }
+              }
+            }
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')]
+
+  - it: "sets physicalSynchronizers configuration with multiple synchronizers"
+    set:
+      physicalSynchronizers:
+        - physicalSynchronizerId: "sync-alpha"
+          sequencerPublicUrl: "https://sequencer-alpha.test.com"
+          sequencerAddress: "sequencer-alpha-address"
+          mediatorAddress: "mediator-alpha-address"
+          enableBftSequencer: true
+          sequencerPruningConfig:
+            enabled: true
+            pruningInterval: "2h"
+            retentionPeriod: "14d"
+        - physicalSynchronizerId: "sync-beta"
+          sequencerPublicUrl: "https://sequencer-beta.test.com"
+          sequencerAddress: "sequencer-beta-address"
+          mediatorAddress: "mediator-beta-address"
+          enableBftSequencer: false
+          sequencerPruningConfig:
+            enabled: true
+            pruningInterval: "1h"
+            retentionPeriod: "7d"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_0')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.sync-alpha {
+              sequencer {
+                is-bft-sequencer = true
+                admin-api {
+                  address = "sequencer-alpha-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-alpha-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer-alpha.test.com"
+                pruning {
+                  pruning-interval = "2h"
+                  retention-period = "14d"
+                }
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-alpha-address"
+                  port = 5007
+                }
+              }
+            }
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_1')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.sync-beta {
+              sequencer {
+                admin-api {
+                  address = "sequencer-beta-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-beta-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer-beta.test.com"
+                pruning {
+                  pruning-interval = "1h"
+                  retention-period = "7d"
+                }
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-beta-address"
+                  port = 5007
+                }
+              }
+            }
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')]
