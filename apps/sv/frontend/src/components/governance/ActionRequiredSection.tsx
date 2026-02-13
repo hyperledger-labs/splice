@@ -84,7 +84,7 @@ const ActionCard = (props: ActionCardProps) => {
 
   return (
     <RouterLink
-      to={`/governance-beta/proposals/${contractId}`}
+      to={`/governance/proposals/${contractId}`}
       style={{ textDecoration: 'none' }}
       data-testid="action-required-card-link"
     >
