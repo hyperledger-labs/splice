@@ -8,6 +8,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AmuletRules_SetConfig,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  AppRewardCoupon,
+  ValidatorRewardCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -23,7 +27,6 @@ import spray.json.DefaultJsonProtocol.StringJsonFormat
 
 import java.time.{Duration, Instant}
 import scala.concurrent.Future
-import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
@@ -58,9 +61,15 @@ class ScanFrontendTimeBasedIntegrationTest
 
   private def stripTrailingZeros(num: BigDecimal) = BigDecimal(num.bigDecimal.stripTrailingZeros())
 
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+  )
+
   "A scan UI" should {
     "see expected rewards leaderboards" in { implicit env =>
-      val (_, bobUserParty) = onboardAliceAndBob()
+      val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
@@ -69,19 +78,20 @@ class ScanFrontendTimeBasedIntegrationTest
       // right in the transfer contexts of its submissions. We leave it here to test that it has no effect.
       grantFeaturedAppRight(aliceValidatorWalletClient)
 
-      clue("Tap to get some amulets") {
-        aliceWalletClient.tap(500.0)
-        aliceValidatorWalletClient.tap(100.0)
-      }
-
       clue(
-        s"Feature alice's validator and transfer some Amulet, to generate reward coupons"
+        s"Create some rewards"
       )({
-        p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
+        createRewards(
+          appRewards = Seq((aliceValidatorParty, 0.415, false)),
+          validatorRewards = Seq((aliceUserParty, 0.415)),
+        )
         advanceRoundsToNextRoundOpening
         advanceRoundsToNextRoundOpening
         advanceRoundsToNextRoundOpening
-        p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
+        createRewards(
+          appRewards = Seq((aliceValidatorParty, 0.115, false)),
+          validatorRewards = Seq((aliceValidatorParty, 0.115)),
+        )
       })
 
       clue("Advance rounds to collect rewards") {
@@ -239,16 +249,8 @@ class ScanFrontendTimeBasedIntegrationTest
         actAndCheck("Go to Scan UI main page", go to s"http://localhost:${scanUIPort}")(
           "Check the initial amulet config matches the defaults",
           _ => {
-            find(id("base-transfer-fee")).value.text should matchText(
-              s"${SpliceUtil.defaultCreateFee.fee.doubleValue()} USD"
-            )
-
             find(id("holding-fee")).value.text should matchText(
               s"${SpliceUtil.defaultHoldingFee.rate} USD/Round"
-            )
-
-            find(id("lock-holder-fee")).value.text should matchText(
-              s"${SpliceUtil.defaultLockHolderFee.fee.doubleValue()} USD"
             )
 
             find(id("round-tick-duration")).value.text should matchText {
@@ -256,15 +258,6 @@ class ScanFrontendTimeBasedIntegrationTest
               val minutes = BigDecimal(defaultTickDuration.duration.toSeconds) / 60
               s"${minutes.bigDecimal.stripTrailingZeros.toPlainString} Minutes"
             }
-
-            findAll(className("transfer-fee-row")).toList
-              .map(_.text)
-              .zip(SpliceUtil.defaultTransferFee.steps.asScala.toList)
-              .foreach({
-                case (txFeeRow, defaultStep) => {
-                  txFeeRow should include(defaultStep._1.setScale(0).toString)
-                }
-              })
           },
         )
       }

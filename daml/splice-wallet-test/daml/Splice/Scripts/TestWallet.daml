@@ -120,7 +120,7 @@ testSinglerReceiverAmuletPaymentRequest = script do
   aliceInitialAmulets <- query @Amulet alice.primaryParty
 
   let paymentAmount = 41.5 -- chosen to not return sender change
-  amulet <- tap app alice 42.0
+  amulet <- tap app alice 41.5
   transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount paymentAmount AmuletUnit)
@@ -216,9 +216,6 @@ testAmuletPaymentRequest = script do
   validatorUserId <- validateUserId "alice_validator"
   featuredValidator <- featureApp app (AmuletUser validatorUserId aliceValidator.primaryParty)
 
-  -- retrieve the config
-  config <- getAmuletConfig app
-  let transferConfig = config.transferConfig
   amulet <- tap app alice 27.0
   transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
@@ -227,11 +224,7 @@ testAmuletPaymentRequest = script do
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty (Some featuredValidator) transferRequest amulet
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedAmulet, lockedAmuletPayload)] <- query @LockedAmulet alice.primaryParty
-  lockedAmuletPayload.amulet.amount.initialAmount ===
-    15.0 +
-    10.0 +
-    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 15.0 +
-    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 10.0
+  lockedAmuletPayload.amulet.amount.initialAmount === 15.0 + 10.0
   lockedAmuletPayload.lock.holders === map (.primaryParty) [bob, charlie, provider1]
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
@@ -245,7 +238,7 @@ testAmuletPaymentRequest = script do
     round = lockedAmuletPayload.amulet.amount.createdAt
     reference = transferRequest
 
-  checkAmuletPositions alice [1.0, 1.615]
+  checkAmuletPositions alice [1.0, 2.0]
   checkAmuletPositions bob [1.0]
   checkAmuletPositions charlie [1.0]
 
@@ -266,24 +259,18 @@ testAmuletPaymentRequest = script do
       amulet.amount.initialAmount === 10.0
     _ -> abort $ "Expected exactly two amulets but got " <> show result.receiverAmulets
 
-  checkAmuletPositions alice [1.0, 1.615]
+  checkAmuletPositions alice [1.0, 2.0]
   checkAmuletPositions bob [1.0, 15.0]
   checkAmuletPositions charlie [1.0, 10.0]
 
   (_, round) <- getLatestActiveOpenRound app
 
-  [(_, coupon)] <- query @AppRewardCoupon provider1.primaryParty
   let transferConfigAmulet = transferConfigAmuletFromOpenRound round
-  coupon.amount ===
-    transferConfigAmulet.transferFee.initialRate * (15.0 + 10.0) +
-    transferConfigAmulet.createFee.fee * 2.0
-  coupon.featured === False
+
+  [] <- query @AppRewardCoupon provider1.primaryParty
 
   [(_, coupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
-  coupon.amount ===
-    transferConfigAmulet.createFee.fee + -- for one locked amulet
-    transferConfigAmulet.lockHolderFee.fee * 3.0 +
-    transferConfigAmulet.extraFeaturedAppRewardAmount
+  coupon.amount === transferConfigAmulet.extraFeaturedAppRewardAmount
   coupon.provider === aliceValidator.primaryParty
   coupon.featured === True
 
@@ -940,7 +927,7 @@ testInsufficientFundsBatchSubscriptions = script do
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
 
-  outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
+  outcomes === [COO_Error (ITR_InsufficientFunds 5.0)]
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.
@@ -962,7 +949,7 @@ testInsufficientFundsBatchSubscriptions = script do
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
-  outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
+  outcomes === [COO_Error (ITR_InsufficientFunds 5.0)]
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO party.

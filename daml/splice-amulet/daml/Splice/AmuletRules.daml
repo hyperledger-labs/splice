@@ -105,10 +105,10 @@ data AmuletRules_ConvertFeaturedAppActivityMarkersResult = AmuletRules_ConvertFe
 template AmuletRules
   with
     dso : Party
-    configSchedule : Schedule Time (AmuletConfig Unit.USD)
+    configSchedule : Schedule Time (AmuletConfig Unit.USD) -- Note: The schedule is no longer used, only the initial value
     isDevNet : Bool
   where
-    ensure validSchedule configSchedule validAmuletConfig
+    ensure validAmuletConfig configSchedule.initialValue && null configSchedule.futureValues
 
     signatory dso
 
@@ -123,9 +123,7 @@ template AmuletRules
         -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
         -- one under their control.
      controller sender
-     do checkExpectedDso dso expectedDso
-        fees <- computeFees dso context sender outputs
-        return AmuletRules_ComputeFeesResult with fees
+     do deprecatedChoice "splice-amulet" "FIXME" "AmuletRules_ComputeFees"
 
     nonconsuming choice AmuletRules_Transfer : TransferResult
       with
@@ -227,11 +225,8 @@ template AmuletRules
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
           Left err -> throw (InvalidTransfer err)
           Right _ -> pure ()
-        openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
-        let transferConfigAmulet = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
         (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
-        -- We want to burn exactly trafficCostAmulet, and createFee is already burnt by the self-transfer itself, so we subtract the createFee from the amount we split off and burn explicitly.
-        (transferResult, meta) <- splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase"
+        (transferResult, meta) <- splitAndBurn provider trafficCostAmulet inputs context dso "traffic purchase"
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
           dso
@@ -351,9 +346,7 @@ template AmuletRules
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let nr0 = case initialRound of
-                    Some round -> round
-                    None -> 0
+        let nr0 = fromOptional 0 initialRound
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
 
@@ -746,22 +739,6 @@ transferControllers t =
     addOutputController s (TransferOutput with receiver; lock; ..) =
       Set.insert receiver $ optional s (foldl (flip Set.insert) s) (holders <$> lock)
 
-computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-computeFees dso context sender outputs = do
-  openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
-  let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
-  return $ map (computeOutputFee transferConfigAmulet sender) outputs
-
-computeOutputFee : TransferConfig Amulet -> Party -> TransferOutput -> Decimal
-computeOutputFee transferConfigAmulet sender out0 =
-    transferConfigAmulet.createFee.fee + lockingFee + transferFee
-  where
-    out = dedupOutputLockHolders out0
-    lockingFee = optional 0.0 (\l -> transferConfigAmulet.lockHolderFee.fee * intToDecimal (length l.holders)) out.lock
-    transferFee
-      | sender == out.receiver = 0.0
-      | otherwise = chargeSteppedRate transferConfigAmulet.transferFee out.amount
-
 data InvalidTransferReason
   = ITR_InsufficientFunds with missingAmount : Decimal
   | ITR_UnknownSynchronizer with synchronizerId : Text
@@ -800,7 +777,7 @@ executeTransfer config context dso t = do
   -- compute summaries
   csum <- summarizeAndValidateContext context dso t
   isum <- summarizeAndConsumeInputs csum dso t.sender t.inputs
-  osum <- preprocessOutputs csum.config t.sender t.outputs
+  osum <- preprocessOutputs csum.config t.outputs
   summary <- summarizeTransfer t.sender csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
   case checkTransferConstraints t summary csum.config of
@@ -808,7 +785,7 @@ executeTransfer config context dso t = do
     Right _ -> pure ()
 
   -- issue rewards for burns
-  issueRewards config csum t.sender t.provider t.beneficiaries summary
+  issueRewards config csum t.provider t.beneficiaries
   -- record outputs
   (createdAmulets, senderChangeAmulet) <-
     createTransferOutputs csum.openRound csum.config dso t.sender summary osum
@@ -1090,11 +1067,11 @@ dedupOutputLockHolders out =
         holders = dedupSort $ filter (receiver /=) holders
         optContext
 
-preprocessOutputs : TransferConfig Amulet -> Party -> [TransferOutput] -> Update TransferOutputsSummary
-preprocessOutputs transferConfigAmulet sender outs =
+preprocessOutputs : TransferConfig Amulet -> [TransferOutput] -> Update TransferOutputsSummary
+preprocessOutputs transferConfigAmulet outs =
     mapA (preprocessOutput . dedupOutputLockHolders) outs
   where
-    preprocessOutput out@(TransferOutput with receiver; amount; lock; receiverFeeRatio)
+    preprocessOutput (TransferOutput with receiver; amount; lock; receiverFeeRatio)
       | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
           error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
       | otherwise = do
@@ -1104,13 +1081,11 @@ preprocessOutputs transferConfigAmulet sender outs =
             require "Fewer than the allowed number of lock holders"
               (length l.holders <= transferConfigAmulet.maxNumLockHolders)
           -- compute output
-          let outputFee = computeOutputFee transferConfigAmulet sender out
-              receiverOutputFee = outputFee * receiverFeeRatio
-          require "Amount is larger than receiver output fee" (receiverOutputFee < amount)
+          require "Amount is larger than receiver output fee" (0.0 < amount)
           return PreprocessedTransferOutput with
             owner = receiver
-            outputFee = outputFee
-            amount = amount - receiverOutputFee
+            outputFee = 0.0
+            amount
             lock
 
 summarizeTransfer : Party -> OpenMiningRound -> TransferConfig Amulet -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
@@ -1138,8 +1113,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       + inp.totalSvRewardAmount
       + fromOptional 0.0 inp.totalDevelopmentFundAmount
       - totalOutputAmount - sum outputFees
-    senderChangeFee = min transferConfigAmulet.createFee.fee leftOverAmount
-    senderChangeAmount = leftOverAmount - senderChangeFee
+    senderChangeAmount = leftOverAmount
 
     senderBalanceChange = if senderChangeAmount > 0.0 then
       BalanceChange with
@@ -1165,25 +1139,18 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       inputDevelopmentFundAmount = inp.totalDevelopmentFundAmount
       holdingFees = inp.totalHoldingFees
       outputFees
-      senderChangeFee
+      senderChangeFee = min 0.0 leftOverAmount -- There is never a change fee but the leftover amount is used in the insufficient funds check.
       senderChangeAmount
       amuletPrice = openRound.amuletPrice
 
-issueRewards : RewardsIssuanceConfig -> TransferContextSummary -> Party -> Party -> Optional [AppRewardBeneficiary] -> TransferSummary -> Update ()
-issueRewards config csum sender provider beneficiaries summary = do
-    when (config.issueValidatorRewards && usageFees > 0.0) $
-      void $ create ValidatorRewardCoupon with
-        dso = csum.openRound.dso
-        user = sender
-        amount = usageFees
-        round = csum.openRound.round
-
+issueRewards : RewardsIssuanceConfig -> TransferContextSummary -> Party -> Optional [AppRewardBeneficiary] -> Update ()
+issueRewards config csum provider beneficiaries = do
     if config.issueAppRewards
       then do
         let beneficiaries' = fromOptional [AppRewardBeneficiary provider 1.0] beneficiaries
         validateAppRewardBeneficiaries beneficiaries'
         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) beneficiaries')
-            totalAmount = usageFees + extraAppReward
+            totalAmount = if featured then csum.config.extraFeaturedAppRewardAmount else 0.0
         when (totalAmount > 0.0) $
           forA_ (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
             void $ create AppRewardCoupon with
@@ -1196,9 +1163,7 @@ issueRewards config csum sender provider beneficiaries summary = do
       else do
         require "beneficiaries are unset if issueAppRewards is false" (optional True null beneficiaries)
   where
-    usageFees = sum summary.outputFees
     featured = Some provider == csum.featuredAppProvider
-    extraAppReward = if featured then csum.config.extraFeaturedAppRewardAmount else 0.0
 
 createTransferOutputs
   : OpenMiningRound -> TransferConfig Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
@@ -1293,15 +1258,6 @@ exercisePaymentTransfer expectedDso PaymentTransferContext{..} transfer = do
     transfer
     context
     expectedDso = Some expectedDso
-
-exerciseComputeFees : Party -> PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-exerciseComputeFees expectedDso PaymentTransferContext{..} sender outputs = do
-  feesResult <- exercise amuletRules AmuletRules_ComputeFees with
-        context
-        sender
-        outputs
-        expectedDso = Some expectedDso
-  return feesResult.fees
 
 data PaymentTransferContext = PaymentTransferContext
   with

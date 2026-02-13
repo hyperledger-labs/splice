@@ -77,7 +77,7 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
-                expectedBalance = (4.4475, 8.895), // from the self-directory creation
+                expectedBalance = (4.5, 9.0), // from the self-directory creation
                 expectedSendAmount = "1.5" -> paymentCodegen.Unit.AMULETUNIT,
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
@@ -157,7 +157,7 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
-                expectedBalance = (4.4475, 8.895), // from the self-directory creation
+                expectedBalance = (4.5, 9.0), // from the self-directory creation
                 expectedSendAmount = "5.5" -> paymentCodegen.Unit.USDUNIT,
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
@@ -242,7 +242,7 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
-                expectedBalance = (4.4475, 8.895), // from the self-directory creation
+                expectedBalance = (4.5, 9.0), // from the self-directory creation
                 expectedReceivers = Seq(
                   (aliceUserParty, aliceEntryName, s"1.5 $amuletNameAcronym", "3 USD"),
                   (charlieUserParty, charlieEntryName, s"2.5 $amuletNameAcronym", "5 USD"),
@@ -325,7 +325,7 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
-                expectedBalance = (4.4475, 8.895), // from the self-directory creation
+                expectedBalance = (4.5, 9.0), // from the self-directory creation
                 expectedReceivers = Seq(
                   (aliceUserParty, aliceEntryName, "1.5 USD", s"0.75 $amuletNameAcronym"),
                   (charlieUserParty, charlieEntryName, "2.5 USD", s"1.25 $amuletNameAcronym"),
@@ -408,7 +408,7 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
-                expectedBalance = (4.4475, 8.895), // from the self-directory creation
+                expectedBalance = (4.5, 9.0), // from the self-directory creation
                 expectedReceivers = Seq(
                   (aliceUserParty, aliceEntryName, s"1.5 $amuletNameAcronym", "3 USD"),
                   (charlieUserParty, charlieEntryName, "2.5 USD", s"1.25 $amuletNameAcronym"),

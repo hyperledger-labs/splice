@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules,
   TransferOutput,
   TransferPreapproval,
 }
@@ -33,14 +32,11 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import org.scalatest.Assertion
 
 import java.time.Duration
 import java.util.UUID
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -1004,7 +1000,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           amuletCodegen.ValidatorRewardCoupon,
         ]
       ],
-      featured: Boolean,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) =
@@ -1024,7 +1019,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       val appRewardBalance = appRewards
         .foldLeft(BigDecimal(0))((total, coupon) => {
           val issuanceConfig = getIssuanceConfig(coupon.payload.round.number)
-          val issuancePerARC = if (featured) {
+          val issuancePerARC = if (coupon.payload.featured) {
             BigDecimal(issuanceConfig.issuancePerFeaturedAppRewardCoupon)
           } else {
             BigDecimal(issuanceConfig.issuancePerUnfeaturedAppRewardCoupon)
@@ -1309,10 +1304,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       val transferContext = scan.getUnfeaturedAppTransferContext(ledgerTime)
       val openRound = scan.getLatestOpenMiningRound(ledgerTime)
 
-      val supportsExpectedDsoParty =
-        validatorSupportsExpectedDsoParty(amuletRules, userValidator, env.environment.clock.now)(
-          env.executionContext
-        )
       userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
         commands = transferContext.amuletRules
@@ -1343,7 +1334,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
               // note: we don't provide a featured app right as sender == provider
               None.toJava,
             ),
-            Option.when(supportsExpectedDsoParty)(amuletRules.payload.dso).toJava,
+            java.util.Optional.of(amuletRules.payload.dso),
           )
           .commands
           .asScala
@@ -1352,6 +1343,39 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           DisclosedContracts.forTesting(amuletRules, openRound).toLedgerApiDisclosedContracts,
       )
     }
+
+  // Creating rewards normally can require a fair amount of setup now that fees are gone
+  // (the two easiest options are usually either a transfer through a featured TransferPreapproval or
+  // a traffic purchase). So for cases where you just need some rewards to test somtehing, e.g.,
+  // test the minting automation you can use this helper to directly create rewards through
+  // actAs = dso. Note that this only works in single-SV tests.
+  def createRewards(
+      appRewards: Seq[(PartyId, BigDecimal, Boolean)],
+      validatorRewards: Seq[(PartyId, BigDecimal)],
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    val now = env.environment.clock.now
+    val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      actAs = Seq(dsoParty),
+      commands = appRewards.flatMap { case (party, amount, featured) =>
+        new splice.amulet.AppRewardCoupon(
+          dsoParty.toProtoPrimitive,
+          party.toProtoPrimitive,
+          featured,
+          amount.bigDecimal,
+          openRound.payload.round,
+          java.util.Optional.empty(),
+        ).create.commands.asScala
+      } ++ validatorRewards.flatMap { case (party, amount) =>
+        new splice.amulet.ValidatorRewardCoupon(
+          dsoParty.toProtoPrimitive,
+          party.toProtoPrimitive,
+          amount.bigDecimal,
+          openRound.payload.round,
+        ).create.commands.asScala
+      },
+    )
+  }
 
   /** Directly exercises the AmuletRules_Transfer choice.
     * Note that all parties participating in the transfer need to be hosted on the same participant
@@ -1368,10 +1392,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val amuletRules = sv1ScanBackend.getAmuletRules()
     val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
     val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
-    val supportsExpectedDsoParty =
-      validatorSupportsExpectedDsoParty(amuletRules, userValidator, now)(
-        env.executionContext
-      )
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
 
@@ -1401,7 +1421,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
             // note: we don't provide a featured app right as sender == provider
             None.toJava,
           ),
-          Option.when(supportsExpectedDsoParty)(amuletRules.payload.dso).toJava,
+          java.util.Optional.of(amuletRules.payload.dso),
         )
         .commands
         .asScala
@@ -1409,30 +1429,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
-  }
-
-  def validatorSupportsExpectedDsoParty(
-      amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],
-      userValidator: ValidatorAppBackendReference,
-      now: CantonTimestamp,
-  )(implicit ec: ExecutionContext): Boolean = {
-    val synchronizerId = amuletRules.state.fold(
-      synchronizerId => synchronizerId,
-      fail("Expected AmuletRules to be assigned to a synchronizer."),
-    )
-    val packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-      synchronizerId,
-      userValidator.validatorAutomation.connection(SpliceLedgerConnectionPriority.Low),
-      loggerFactory,
-    )
-    val partiesOfInterest = Seq(
-      userValidator.getValidatorPartyId(),
-      PartyId.tryFromProtoPrimitive(amuletRules.contract.payload.dso),
-    )
-    packageVersionSupport
-      .supportsExpectedDsoParty(partiesOfInterest, now)
-      .futureValue
-      .supported
   }
 
   /** @param partyWalletClient the wallet in which to create the transfer preapproval

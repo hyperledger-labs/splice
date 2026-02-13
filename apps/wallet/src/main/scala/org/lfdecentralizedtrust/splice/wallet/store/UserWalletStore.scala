@@ -242,7 +242,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     mintingDelegationCodegen.MintingDelegationProposal.COMPANION
   )
 
-  def getAmuletBalanceWithHoldingFees(asOfRound: Long, deductHoldingFees: Boolean)(implicit
+  def getAmuletBalanceWithHoldingFees(asOfRound: Long)(implicit
       tc: TraceContext
   ): Future[(BigDecimal, BigDecimal)] = for {
     amulets <- multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
@@ -255,14 +255,14 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
       amulets.view
         .map(c =>
           BigDecimal(
-            SpliceUtil.currentAmount(c.payload, asOfRound, deductHoldingFees = deductHoldingFees)
+            c.payload.amount.initialAmount
           )
         )
         .sum
     (totalAmount, holdingFees)
   }
 
-  def getLockedAmuletBalance(asOfRound: Long, deductHoldingFees: Boolean)(implicit
+  def getLockedAmuletBalance()(implicit
       tc: TraceContext
   ): Future[BigDecimal] = for {
     lockedAmulets <- multiDomainAcsStore.listContracts(
@@ -272,8 +272,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     val totalAmount = lockedAmulets.view
       .map(c =>
         BigDecimal(
-          SpliceUtil
-            .currentAmount(c.payload.amulet, asOfRound, deductHoldingFees = deductHoldingFees)
+          c.payload.amulet.amount.initialAmount
         )
       )
       .sum

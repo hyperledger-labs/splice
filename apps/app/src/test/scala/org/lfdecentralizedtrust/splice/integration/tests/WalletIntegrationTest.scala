@@ -43,7 +43,6 @@ import scala.concurrent.Future
 import scala.util.Try
 import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import scala.jdk.OptionConverters.*
 
 class WalletIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -604,8 +603,8 @@ class WalletIntegrationTest
           "Alice and Bob's balance are updated",
           _ => {
             // Fees eat up quite a bit
-            bobWalletClient.balance().unlockedQty should beWithin(47, 48)
-            aliceWalletClient.balance().unlockedQty should beAround(40.0)
+            bobWalletClient.balance().unlockedQty should be(60.0)
+            aliceWalletClient.balance().unlockedQty should be(40.0)
           },
         )
         assertThrowsAndLogsCommandFailures(
@@ -655,20 +654,20 @@ class WalletIntegrationTest
               logEntry.description shouldBe "featured-transfer"
               val receiver = logEntry.receivers.loneElement
               receiver.party shouldBe aliceUserParty.toProtoPrimitive
-              receiver.amount should beAround(10.0)
+              receiver.amount should be(10.0)
               val sender = logEntry.sender.value
               sender.party shouldBe bobUserParty.toProtoPrimitive
-              sender.amount should beAround(-22)
+              sender.amount should be(-10)
             },
             { case logEntry: TransferTxLogEntry =>
               logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
               logEntry.description shouldBe "test-description"
               val receiver = logEntry.receivers.loneElement
               receiver.party shouldBe aliceUserParty.toProtoPrimitive
-              receiver.amount should beAround(40.0)
+              receiver.amount should be(40.0)
               val sender = logEntry.sender.value
               sender.party shouldBe bobUserParty.toProtoPrimitive
-              sender.amount should beAround(-52)
+              sender.amount should be(-40)
             },
             { case logEntry: BalanceChangeTxLogEntry =>
               logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
@@ -684,20 +683,20 @@ class WalletIntegrationTest
               logEntry.description shouldBe "featured-transfer"
               val receiver = logEntry.receivers.loneElement
               receiver.party shouldBe aliceUserParty.toProtoPrimitive
-              receiver.amount should beAround(10.0)
+              receiver.amount should be(10.0)
               val sender = logEntry.sender.value
               sender.party shouldBe bobUserParty.toProtoPrimitive
-              sender.amount should beAround(-22)
+              sender.amount should be(-10)
             },
             { case logEntry: TransferTxLogEntry =>
               logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
               logEntry.description shouldBe "test-description"
               val receiver = logEntry.receivers.loneElement
               receiver.party shouldBe aliceUserParty.toProtoPrimitive
-              receiver.amount should beAround(40.0)
+              receiver.amount should be(40.0)
               val sender = logEntry.sender.value
               sender.party shouldBe bobUserParty.toProtoPrimitive
-              sender.amount should beAround(-52)
+              sender.amount should be(-40)
             },
           ),
           ignore = {
@@ -789,12 +788,6 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       aliceValidatorWalletClient.tap(10.0)
 
-      val supportsExpectedDsoParty = validatorSupportsExpectedDsoParty(
-        sv1ScanBackend.getAmuletRules(),
-        aliceValidatorBackend,
-        env.environment.clock.now,
-      )
-
       def createTransferPreapprovalProposal =
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
@@ -805,7 +798,7 @@ class WalletIntegrationTest
               .create(
                 aliceUserParty.toProtoPrimitive,
                 aliceValidatorParty.toProtoPrimitive,
-                Option.when(supportsExpectedDsoParty)(dsoParty.toProtoPrimitive).toJava,
+                java.util.Optional.of(dsoParty.toProtoPrimitive),
               ),
           )
           .contractId
