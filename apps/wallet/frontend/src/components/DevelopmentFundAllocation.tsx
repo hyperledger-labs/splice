@@ -1,15 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import React, { useState } from 'react';
-import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useDevelopmentFundContext } from '../contexts/DevelopmentFundCouponsContext';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
 import {
   Alert,
   Button,
   Card,
   CardContent,
   FormControl,
+  FormHelperText,
   InputAdornment,
   OutlinedInput,
   Stack,
@@ -18,56 +16,35 @@ import {
 } from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';
-import BigNumber from 'bignumber.js';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { useWalletConfig } from '../utils/config';
+import { useDevelopmentFundAllocationForm } from '../hooks/useDevelopmentFundAllocationForm';
 
 const DevelopmentFundAllocation: React.FC = () => {
-  const { allocateDevelopmentFundCoupon } = useWalletClient();
-  const { isFundManager } = useDevelopmentFundContext();
-  const queryClient = useQueryClient();
   const config = useWalletConfig();
+
+  const {
+    formKey,
+    error,
+    beneficiary,
+    setBeneficiary,
+    amount,
+    setAmount,
+    expiresAt,
+    setExpiresAt,
+    reason,
+    setReason,
+    amountNum,
+    isAmountValid,
+    amountExceedsAvailable,
+    isValid,
+    allocateMutation,
+    isFundManager,
+    unclaimedTotal,
+  } = useDevelopmentFundAllocationForm();
+
   const disabled = !isFundManager;
-  const [error, setError] = useState<object | null>(null);
-  const [beneficiary, setBeneficiary] = useState<string>('');
-  const [amount, setAmount] = useState<string>('');
-  const [expiresAt, setExpiresAt] = useState<Dayjs | null>(null);
-  const [reason, setReason] = useState<string>('');
-
-  const isValid =
-    beneficiary &&
-    amount &&
-    BigNumber(amount).gt(0) &&
-    expiresAt &&
-    expiresAt.isAfter(dayjs()) &&
-    reason.trim().length > 0;
-
-  const allocateMutation = useMutation({
-    mutationFn: async () => {
-      if (!isValid || !expiresAt) {
-        throw new Error('Form is not valid');
-      }
-      return await allocateDevelopmentFundCoupon(
-        beneficiary,
-        new BigNumber(amount),
-        expiresAt.toDate(),
-        reason
-      );
-    },
-    onSuccess: () => {
-      setError(null);
-      setBeneficiary('');
-      setAmount('');
-      setExpiresAt(null);
-      setReason('');
-      queryClient.invalidateQueries({ queryKey: ['activeDevelopmentFundCoupons'] });
-    },
-    onError: error => {
-      console.error('Failed to allocate development fund coupon', error);
-      setError(error);
-    },
-  });
 
   return (
     <Stack spacing={2}>
@@ -77,7 +54,7 @@ const DevelopmentFundAllocation: React.FC = () => {
         sx={disabled ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
       >
         <CardContent sx={{ paddingX: '64px' }}>
-          <Stack spacing={3}>
+          <Stack key={formKey} spacing={3}>
             {error ? (
               <Alert severity="error">Failed to allocate: {JSON.stringify(error)}</Alert>
             ) : null}
@@ -95,10 +72,14 @@ const DevelopmentFundAllocation: React.FC = () => {
             <Stack direction="row" spacing={3}>
               <Stack spacing={1} sx={{ flex: 1 }}>
                 <Typography variant="h6">Amount</Typography>
-                <FormControl fullWidth disabled={disabled}>
+                <FormControl
+                  fullWidth
+                  disabled={disabled}
+                  error={amount !== '' && (!isAmountValid || amountExceedsAvailable)}
+                >
                   <OutlinedInput
                     id="development-fund-allocation-amount"
-                    type="text"
+                    type="number"
                     value={amount}
                     onChange={event => setAmount(event.target.value)}
                     endAdornment={
@@ -106,12 +87,18 @@ const DevelopmentFundAllocation: React.FC = () => {
                         {config.spliceInstanceNames.amuletNameAcronym}
                       </InputAdornment>
                     }
-                    error={amount !== '' && BigNumber(amount).lte(0)}
+                    error={amount !== '' && (!isAmountValid || amountExceedsAvailable)}
                     inputProps={{
                       'aria-label': 'amount',
                     }}
                     disabled={disabled}
                   />
+                  {amountExceedsAvailable && (
+                    <FormHelperText>
+                      Available: {unclaimedTotal.toFixed(4)}{' '}
+                      {config.spliceInstanceNames.amuletNameAcronym}
+                    </FormHelperText>
+                  )}
                 </FormControl>
               </Stack>
 
@@ -166,7 +153,16 @@ const DevelopmentFundAllocation: React.FC = () => {
                 variant="pill"
                 fullWidth
                 size="large"
-                onClick={() => allocateMutation.mutate()}
+                onClick={() =>
+                  amountNum &&
+                  expiresAt &&
+                  allocateMutation.mutate({
+                    beneficiary,
+                    amount: amountNum,
+                    expiresAt: expiresAt.toDate(),
+                    reason,
+                  })
+                }
               >
                 Allocate
               </Button>
