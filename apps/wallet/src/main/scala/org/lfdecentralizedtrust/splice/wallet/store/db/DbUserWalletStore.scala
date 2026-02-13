@@ -20,15 +20,23 @@ import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
-  DbTxLogAppStore,
   DbTransferInputQueries,
+  DbTxLogAppStore,
   TxLogQueries,
 }
-import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
+import org.lfdecentralizedtrust.splice.store.{
+  Limit,
+  LimitHelpers,
+  PageLimit,
+  ResultsPage,
+  TxLogStore,
+}
 import org.lfdecentralizedtrust.splice.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.wallet.store
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BuyTrafficRequestTxLogEntry,
+  DevelopmentFundCouponArchivedTxLogEntry,
+  DevelopmentFundCouponCreatedTxLogEntry,
   TransferOfferTxLogEntry,
   TxLogEntry,
   UserWalletStore,
@@ -442,4 +450,49 @@ class DbUserWalletStore(
         ),
       )
     }
+
+  // Paginated development fund coupon history ordered by most recent archival
+  override def listDevelopmentFundCouponHistory(after: Option[Long], limit: PageLimit)(implicit
+      lc: TraceContext
+  ): Future[
+    ResultsPage[(DevelopmentFundCouponArchivedTxLogEntry, DevelopmentFundCouponCreatedTxLogEntry)]
+  ] = {
+    def afterFilter(optAfter: Option[Long]) =
+      optAfter.fold(sql"")(x => sql" and a.entry_number < $x")
+
+    val opName = "listDevelopmentFundCouponHistory"
+    val colsA = TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated("a.")
+    val colsC = TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated("c.")
+    waitUntilAcsIngested {
+      for {
+        rows <- storage.query(
+          (sql"""
+           select #$colsA, #$colsC
+           from #${WalletTables.txLogTableName} a  -- coupon archivals
+           join #${WalletTables.txLogTableName} c  -- coupon creations
+            on c.store_id = a.store_id
+              and c.tx_log_id = a.tx_log_id
+              and c.development_fund_coupon_contract_id = a.development_fund_coupon_contract_id
+           where a.store_id = $txLogStoreId
+             and a.tx_log_id = ${TxLogEntry.LogId.DevelopmentFundCouponTxLog}
+             and a.entry_type = ${TxLogEntry.EntryType.DevelopmentFundCouponArchivedTxLogEntry}
+             and c.entry_type = ${TxLogEntry.EntryType.DevelopmentFundCouponCreatedTxLogEntry}
+         """ ++ afterFilter(after) ++
+            sql" order by a.entry_number desc limit ${sqlLimit(limit)}").toActionBuilder
+            .as[(TxLogQueries.SelectFromTxLogTableResult, TxLogQueries.SelectFromTxLogTableResult)],
+          opName,
+        )
+
+        resultsInPage = rows.map { case (aRow, cRow) =>
+          val archived =
+            txLogEntryFromRow[DevelopmentFundCouponArchivedTxLogEntry](txLogConfig)(aRow)
+          val created =
+            txLogEntryFromRow[DevelopmentFundCouponCreatedTxLogEntry](txLogConfig)(cRow)
+          (archived, created)
+        }
+        afterToken = rows.lastOption.map { case (aRow, _) => aRow.entryNumber }
+      } yield ResultsPage(resultsInPage, afterToken)
+    }
+  }
+
 }

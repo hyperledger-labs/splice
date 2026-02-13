@@ -431,6 +431,17 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
       tc: TraceContext
   ): Future[Seq[UserWalletStore.AnsEntryWithPayData]]
 
+  def listDevelopmentFundCouponHistory(
+      after: Option[Long],
+      limit: PageLimit,
+  )(implicit
+      lc: TraceContext
+  ): Future[
+    ResultsPage[
+      (DevelopmentFundCouponArchivedTxLogEntry, DevelopmentFundCouponCreatedTxLogEntry)
+    ]
+  ]
+
   // For cases where `companion` can have multiple contracts, but we just need
   // an arbitrary one; prefer an Assigned contract if available but accept an
   // in-flight contract as fallback.

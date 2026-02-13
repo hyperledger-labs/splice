@@ -152,3 +152,44 @@ message BuyTrafficRequestTxLogEntry {
   };
   string buyer = 6;
 }
+
+message DevelopmentFundCouponCreatedTxLogEntry {
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.DevelopmentFundCoupon.ContractId
+  string beneficiary = 2;
+  string fund_manager = 3;
+  string amount = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
+  google.protobuf.Timestamp expires_at = 5 [(scalapb.field).type = "java.time.Instant"];
+  string reason = 6;
+  google.protobuf.Timestamp created_at = 7 [(scalapb.field).type = "java.time.Instant"];
+}
+
+message DevelopmentFundCouponStatusClaimed {
+}
+
+message DevelopmentFundCouponStatusWithdrawn {
+  string reason = 1;
+}
+
+message DevelopmentFundCouponStatusExpired {
+}
+
+message DevelopmentFundCouponStatusRejected {
+  string reason = 1;
+}
+
+message DevelopmentFundCouponArchivedTxLogEntry {
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.DevelopmentFundCoupon.ContractIdº
+  oneof status {
+    DevelopmentFundCouponStatusClaimed claimed = 2;
+    DevelopmentFundCouponStatusWithdrawn withdrawn = 3;
+    DevelopmentFundCouponStatusExpired expired = 4;
+    DevelopmentFundCouponStatusRejected rejected = 5;
+  };
+  google.protobuf.Timestamp archived_at = 6 [(scalapb.field).type = "java.time.Instant"];
+}

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.wallet.store
 
 import cats.{Eval, Monoid}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -58,6 +59,11 @@ import org.lfdecentralizedtrust.splice.history.{
   AnsRules_CollectEntryRenewalPayment,
   AnsRules_CollectInitialEntryPayment,
   CreateTokenStandardTransferInstruction,
+  DevelopmentFundCouponCreate,
+  DevelopmentFundCoupon_Archive,
+  DevelopmentFundCoupon_Expire,
+  DevelopmentFundCoupon_Reject,
+  DevelopmentFundCoupon_Withdraw,
   LockedAmuletExpireAmulet,
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
@@ -651,8 +657,38 @@ class UserWalletTxLogParser(
             }
 
           case Transfer(node) =>
-            // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            now(State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer))
+            // Note: we generally do not parse child events, as all transfer-related information
+            // can be extracted from this node. The only exception is DevelopmentFundCoupon Archive
+            // child events, which must be processed to correctly build the coupon history.
+            for {
+              stateFromTransfer <- now(
+                State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer)
+              )
+              stateFromDevelopmentFundCouponArchives <- defer {
+                val start = exercised.getNodeId.intValue()
+                val end = exercised.getLastDescendantNodeId.intValue()
+                val developmentFundCouponArchiveNodeIds: List[Integer] =
+                  tree.getEventsById.asScala.collect {
+                    case (nodeId, ex: ExercisedEvent)
+                        if nodeId.intValue() >= start &&
+                          nodeId.intValue() <= end &&
+                          ex.getChoice == amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive.name &&
+                          ex.getPackageName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getPackageId
+                            .stripPrefix("#") &&
+                          ex.getTemplateId.getModuleName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getModuleName &&
+                          ex.getTemplateId.getEntityName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getEntityName =>
+                      nodeId
+                  }.toList
+
+                if (developmentFundCouponArchiveNodeIds.isEmpty) now(State.empty)
+                else
+                  parseTrees(
+                    tree,
+                    developmentFundCouponArchiveNodeIds,
+                    synchronizerId,
+                  )
+              }
+            } yield stateFromTransfer.appended(stateFromDevelopmentFundCouponArchives)
 
           // ------------------------------------------------------------------
           // Minting new amulets
@@ -785,6 +821,22 @@ class UserWalletTxLogParser(
             )
 
           // ------------------------------------------------------------------
+          // Development fund coupons
+          // ------------------------------------------------------------------
+
+          case DevelopmentFundCoupon_Withdraw(node) =>
+            now(State.fromDevelopmentFundCouponWithdraw(tree, node, exercised))
+
+          case DevelopmentFundCoupon_Expire(_) =>
+            now(State.fromDevelopmentFundCouponExpire(tree, exercised))
+
+          case DevelopmentFundCoupon_Reject(node) =>
+            now(State.fromDevelopmentFundCouponReject(tree, node, exercised))
+
+          case DevelopmentFundCoupon_Archive(_) =>
+            now(State.fromDevelopmentFundCouponArchive(tree, exercised))
+
+          // ------------------------------------------------------------------
           // Other
           // ------------------------------------------------------------------
 
@@ -839,6 +891,9 @@ class UserWalletTxLogParser(
               transferInstructionCid = create.contractId.contractId,
             )
             now(State(entries = immutable.Queue[TxLogEntry](entry)))
+
+          case DevelopmentFundCouponCreate(create) =>
+            now(State.fromDevelopmentFundCouponCreate(tree, create, created))
 
           case _ =>
             now(State.empty)
@@ -933,6 +988,8 @@ object UserWalletTxLogParser {
           case to: TransferOfferTxLogEntry => to.sender == partyStr || to.receiver == partyStr
           case btr: BuyTrafficRequestTxLogEntry => btr.buyer == partyStr
           case b: BalanceChangeTxLogEntry => b.receiver == partyStr
+          case fcc: DevelopmentFundCouponCreatedTxLogEntry => fcc.fundManager == partyStr
+          case _: DevelopmentFundCouponArchivedTxLogEntry => true
           // Only relevant notifications are added to parsing state
           case _: NotificationTxLogEntry => true
           case _: UnknownTxLogEntry => true
@@ -1243,6 +1300,7 @@ object UserWalletTxLogParser {
           eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
           subtype = Some(transactionSubtype.toProto),
           date = Some(tx.getEffectiveAt),
+          provider = node.argument.value.transfer.provider,
           sender = Some(sender),
           receivers = receivers,
           senderHoldingFees = node.result.value.summary.holdingFees,
@@ -1504,6 +1562,95 @@ object UserWalletTxLogParser {
         )
       )
     )
+
+    def fromDevelopmentFundCouponCreate(
+        tx: Transaction,
+        create: DevelopmentFundCouponCreate.ContractType,
+        createdEvent: CreatedEvent,
+    ): State = {
+      val newEntry = DevelopmentFundCouponCreatedTxLogEntry(
+        contractId = createdEvent.getContractId,
+        beneficiary = create.payload.beneficiary,
+        fundManager = create.payload.fundManager,
+        amount = create.payload.amount,
+        expiresAt = Some(create.payload.expiresAt),
+        reason = create.payload.reason,
+        createdAt = Some(tx.getEffectiveAt),
+      )
+      State(
+        entries = immutable.Queue(newEntry)
+      )
+    }
+
+    def fromDevelopmentFundCouponWithdraw(
+        tx: Transaction,
+        node: ExerciseNode[
+          DevelopmentFundCoupon_Withdraw.Arg,
+          DevelopmentFundCoupon_Withdraw.Res,
+        ],
+        event: ExercisedEvent,
+    ): State = {
+      fromDevelopmentFundCouponOperation(
+        event.getContractId,
+        DevelopmentFundCouponArchivedTxLogEntry.Status.Withdrawn(
+          DevelopmentFundCouponStatusWithdrawn(node.argument.value.reason)
+        ),
+        tx.getEffectiveAt,
+      )
+    }
+
+    def fromDevelopmentFundCouponExpire(tx: Transaction, event: ExercisedEvent): State = {
+      fromDevelopmentFundCouponOperation(
+        event.getContractId,
+        DevelopmentFundCouponArchivedTxLogEntry.Status.Expired(
+          DevelopmentFundCouponStatusExpired()
+        ),
+        tx.getEffectiveAt,
+      )
+    }
+
+    def fromDevelopmentFundCouponReject(
+        tx: Transaction,
+        node: ExerciseNode[
+          DevelopmentFundCoupon_Reject.Arg,
+          DevelopmentFundCoupon_Reject.Res,
+        ],
+        event: ExercisedEvent,
+    ): State = {
+      fromDevelopmentFundCouponOperation(
+        event.getContractId,
+        DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected(
+          DevelopmentFundCouponStatusRejected(node.argument.value.reason)
+        ),
+        tx.getEffectiveAt,
+      )
+    }
+
+    def fromDevelopmentFundCouponArchive(
+        tx: Transaction,
+        event: ExercisedEvent,
+    ): State = {
+      fromDevelopmentFundCouponOperation(
+        event.getContractId,
+        DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed(
+          DevelopmentFundCouponStatusClaimed()
+        ),
+        tx.getEffectiveAt,
+      )
+    }
+
+    private def fromDevelopmentFundCouponOperation(
+        contractId: String,
+        status: DevelopmentFundCouponArchivedTxLogEntry.Status,
+        archivedAt: Instant,
+    ) = {
+      val newEntry = DevelopmentFundCouponArchivedTxLogEntry(
+        contractId = contractId,
+        status = status,
+        archivedAt = Some(archivedAt),
+      )
+      State(entries = immutable.Queue(newEntry))
+    }
 
     private def getAmuletCreateEvent(tx: Transaction, cid: ContractId[AmuletCreate.T]) =
       tx.findCreation(AmuletCreate.companion, cid)

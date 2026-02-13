@@ -6,13 +6,15 @@ package org.lfdecentralizedtrust.splice.history
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules as externalPartyAmuletRulesCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
+  amulet as amuletCodegen,
+  ans as ansCodegen,
+  externalpartyamuletrules as externalPartyAmuletRulesCodegen,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   OpenMiningRound,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ExerciseNode,
@@ -269,6 +271,51 @@ object AmuletExpire
     extends ExerciseNodeCompanion.Mk(
       template = amuletCodegen.Amulet.COMPANION,
       choice = amuletCodegen.Amulet.CHOICE_Amulet_Expire,
+    )
+
+// Note: We use the DevelopmentFundCoupon create event instead of AmuletRules_AllocateDevelopmentFundCoupon because
+// the allocation choice is only visible to the fundManager, while the coupon creation
+// is visible to all coupon stakeholders, allowing the beneficiary to track its lifecycle.
+object DevelopmentFundCouponCreate {
+  type TCid = amuletCodegen.DevelopmentFundCoupon.ContractId
+  type T = amuletCodegen.DevelopmentFundCoupon
+  type ContractType = Contract[TCid, T]
+  val companion = amuletCodegen.DevelopmentFundCoupon.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
+case object DevelopmentFundCoupon_Withdraw
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Withdraw,
+    )
+
+case object DevelopmentFundCoupon_Expire
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_DsoExpire,
+    )
+
+case object DevelopmentFundCoupon_Reject
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Reject,
+    )
+
+// Note: We use the DevelopmentFundCoupon Archive exercise instead of AmuletRules_Transfer because
+// AmuletRules_Transfer is not visible to the fundManager. The coupon Archive exercise is visible to
+// coupon stakeholders (fundManager and beneficiary are observers), so both stores can derive the
+// corresponding ArchivedTxLogEntry.
+// This Archive event corresponds to the coupon being collected via AmuletRules_Transfer.
+case object DevelopmentFundCoupon_Archive
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive,
     )
 
 // TODO(DACH-NY/canton-network-node#2930): This is not really a Amulet event - consider either renaming the file, or splitting it into different ones based on event "types"
