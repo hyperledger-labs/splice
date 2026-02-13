@@ -123,12 +123,6 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       )
 
   "Batched activity marker creation produces only one view" in { implicit env =>
-    Seq(aliceValidatorBackend, sv1ValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
-      .foreach {
-        _.participantClient.upload_dar_unless_exists(
-          "daml/splice-util-batched-markers/.daml/dist/splice-util-batched-markers-current.dar"
-        )
-      }
     val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val splitwell = onboardWalletUser(splitwellWalletClient, splitwellValidatorBackend)

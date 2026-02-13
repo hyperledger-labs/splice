@@ -352,14 +352,28 @@ object DarResources {
     ),
   )
 
+  lazy val batchedMarkers_1_0_0 = DarResource("splice-util-batched-markers-1.0.0.dar")
+  lazy val batchedMarkers_1_0_1 = DarResource("splice-util-batched-markers-1.0.1.dar")
+  lazy val batchedMarkers_current = DarResource("splice-util-batched-markers-current.dar")
+  lazy val batchedMarkers = PackageResource(
+    batchedMarkers_current,
+    batchedMarkers_1_0_0,
+    Seq(
+      batchedMarkers_1_0_0,
+      batchedMarkers_1_0_1,
+    ),
+  )
+
   lazy val packageResources: Seq[PackageResource] =
     TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,
-      DarResources.splitwell,
+      DarResources.batchedMarkers,
       DarResources.dsoGovernance,
+      DarResources.splitwell,
       DarResources.validatorLifecycle,
       DarResources.wallet,
+      DarResources.walletPayments,
       DarResources.walletPayments,
     )
 
