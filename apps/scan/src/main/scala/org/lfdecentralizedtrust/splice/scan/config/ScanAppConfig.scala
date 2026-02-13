@@ -30,6 +30,17 @@ final case class MediatorVerdictIngestionConfig(
     restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
 )
 
+final case class SequencerTrafficIngestionConfig(
+    /** Whether sequencer traffic ingestion is enabled. */
+    enabled: Boolean = false,
+    /** Max traffic summary items for DB insert batch. */
+    batchSize: Int = 50,
+    /** Max time window to wait for DB insert batch. */
+    batchMaxWait: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(1),
+    /** Delay before restart on stream failure. */
+    restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -42,6 +53,7 @@ case class ScanAppBackendConfig(
     mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
+    sequencerTrafficIngestion: SequencerTrafficIngestionConfig = SequencerTrafficIngestionConfig(),
     isFirstSv: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     enableForcedAcsSnapshots: Boolean = false,

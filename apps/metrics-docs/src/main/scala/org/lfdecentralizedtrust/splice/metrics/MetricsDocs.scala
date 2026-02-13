@@ -13,7 +13,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.admin.api.client.DamlGrpcClientMetrics
 import org.lfdecentralizedtrust.splice.automation.TriggerMetrics
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
-import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
+import org.lfdecentralizedtrust.splice.scan.metrics.StreamIngestionMetrics
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningMetrics
 import org.lfdecentralizedtrust.splice.sv.automation.{
   AmuletPriceMetricsTrigger,
@@ -111,7 +111,8 @@ object MetricsDocs {
       NamedLoggerFactory.root,
       ProcessingTimeout(),
     )
-    new ScanMediatorVerdictIngestionMetrics(generator)
+    StreamIngestionMetrics.forVerdictIngestion(generator).discard
+    StreamIngestionMetrics.forTrafficIngestion(generator).discard
     val scanMetrics = generator.getAll()
     generator.reset()
     GeneratedMetrics(

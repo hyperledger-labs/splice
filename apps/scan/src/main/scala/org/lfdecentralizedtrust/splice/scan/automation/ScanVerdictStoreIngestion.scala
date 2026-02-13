@@ -3,37 +3,26 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
-import org.lfdecentralizedtrust.splice.automation.{
-  SourceBasedTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
+import org.lfdecentralizedtrust.splice.automation.{StreamIngestionService, TriggerContext}
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
-import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
+import org.lfdecentralizedtrust.splice.scan.metrics.StreamIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, LifeCycle, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.{Done, NotUsed}
-import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
-import org.apache.pekko.stream.scaladsl.{Keep, Source}
-import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
-import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
-import monocle.Monocle.toAppliedFocusOps
-import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.metrics.api.MetricsContext
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
-import com.digitalasset.canton.mediator.admin.v30
 
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
@@ -42,19 +31,14 @@ class ScanVerdictStoreIngestion(
     store: DbScanVerdictStore,
     migrationId: Long,
     synchronizerId: SynchronizerId,
-    ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
+    protected val ingestionMetrics: StreamIngestionMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
     prettyVerdictBatch: Pretty[Seq[v30.Verdict]],
-) extends SourceBasedTrigger[Seq[v30.Verdict]]
-    with NamedLogging {
-
-  // enforce sequential DB ingestion
-  override protected lazy val context: TriggerContext =
-    originalContext.focus(_.config.parallelism).replace(1)
+) extends StreamIngestionService[v30.Verdict](originalContext) {
 
   private val mediatorClient =
     new MediatorVerdictsClient(
@@ -64,97 +48,44 @@ class ScanVerdictStoreIngestion(
       context.loggerFactory,
     )(ec, esf)
 
-  override protected def source(implicit tc: TraceContext): Source[Seq[v30.Verdict], NotUsed] = {
+  // ----- StreamIngestionService implementation -----
 
-    def mediatorClientSource
-        : Source[Seq[v30.Verdict], (KillSwitch, scala.concurrent.Future[Done])] = {
-      val base: Source[Seq[v30.Verdict], NotUsed] =
-        Source
-          .future(
-            store.waitUntilInitialized.flatMap(_ =>
-              store
-                .maxVerdictRecordTime(migrationId)
-                .map(_.getOrElse(CantonTimestamp.MinValue))
-            )
-          )
-          .map { ts =>
-            logger.info(s"Streaming verdicts starting from $ts")
-            Some(ts)
-          }
-          .flatMapConcat(mediatorClient.streamVerdicts)
-          .groupedWithin(
-            math.max(1, config.mediatorVerdictIngestion.batchSize),
-            config.mediatorVerdictIngestion.batchMaxWait.underlying,
-          )
+  override protected def sourceName: String = "mediator-verdict-ingestion"
 
-      val withKs = base.viaMat(KillSwitches.single)(Keep.right)
-      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
-    }
+  override protected def batchConfig = StreamIngestionService.BatchConfig(
+    restartDelay = config.mediatorVerdictIngestion.restartDelay.asFiniteApproximation,
+    batchSize = config.mediatorVerdictIngestion.batchSize,
+    batchMaxWait = config.mediatorVerdictIngestion.batchMaxWait.underlying,
+  )
 
-    val delay = config.mediatorVerdictIngestion.restartDelay.asFiniteApproximation
-    val policy = new RetrySourcePolicy[Unit, Seq[v30.Verdict]] {
-      override def shouldRetry(
-          lastState: Unit,
-          lastEmittedElement: Option[Seq[v30.Verdict]],
-          lastFailure: Option[Throwable],
-      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
-        val prefixMsg =
-          s"RetrySourcePolicy for restart of mediatorClientSource with ${delay} delay:"
-        lastFailure match {
-          case Some(t) =>
-            ingestionMetrics.restartErrors.mark()
-            logger.info(s"$prefixMsg Last failure: ${ErrorUtil.messageWithStacktrace(t)}")
-          case None =>
-            logger.debug(s"$prefixMsg No failure, normal restart.")
-        }
-        // always restart, even if the connection was closed normally (eg after a mediator restart)
-        Some(delay -> ())
-      }
-    }
+  override protected def getMaxTimestamp(implicit tc: TraceContext): Future[CantonTimestamp] =
+    store.waitUntilInitialized.flatMap(_ =>
+      store.maxVerdictRecordTime(migrationId).map(_.getOrElse(CantonTimestamp.MinValue))
+    )
 
-    PekkoUtil
-      .restartSource(
-        name = "mediator-verdict-ingestion",
-        initial = (),
-        mkSource = (_: Unit) => mediatorClientSource,
-        policy = policy,
-      )
-      .map(_.value)
-      .mapMaterializedValue(_ => NotUsed)
+  override protected def streamFromClient(after: Option[CantonTimestamp])(implicit
+      tc: TraceContext
+  ): Source[v30.Verdict, NotUsed] =
+    mediatorClient.streamVerdicts(after)
+
+  override protected def insertBatch(batch: Seq[v30.Verdict])(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
+      batch.map(toDbRowAndViews)
+    store.insertVerdictAndTransactionViews(items)
   }
 
-  override protected def completeTask(batch: Seq[v30.Verdict])(implicit
-      tc: TraceContext
-  ): Future[TaskOutcome] = {
-    if (batch.isEmpty) Future.successful(TaskSuccess("empty batch"))
-    else {
-      val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
-        batch.map(toDbRowAndViews)
-      store
-        .insertVerdictAndTransactionViews(items)
-        .transform {
-          case Success(_) =>
-            val lastRecordTime = batch.lastOption
-              .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
-              .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
-            ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
-            Success(
-              TaskSuccess(
-                s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: ${batch
-                    .map(_.updateId)}"
-              )
-            )
-          case Failure(ex) =>
-            ingestionMetrics.errors.mark()
-            Failure(ex)
-        }
-    }
-  }
+  override protected def getLastTimestamp(batch: Seq[v30.Verdict]): CantonTimestamp =
+    batch.lastOption
+      .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
+      .getOrElse(CantonTimestamp.MinValue)
 
-  override protected def isStaleTask(batch: Seq[v30.Verdict])(implicit
-      tc: TraceContext
-  ): Future[Boolean] = Future.successful(false)
+  override protected def successMessage(batch: Seq[v30.Verdict]): String =
+    s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: ${batch
+        .map(_.updateId)}"
+
+  // ----- Conversion -----
 
   private def toDbRowAndViews(
       verdict: v30.Verdict
