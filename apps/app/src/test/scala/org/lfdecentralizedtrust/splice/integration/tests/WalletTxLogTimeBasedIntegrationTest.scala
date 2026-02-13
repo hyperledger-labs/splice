@@ -127,7 +127,6 @@ class WalletTxLogTimeBasedIntegrationTest
               logEntry.appRewardsUsed shouldBe appRewardAmount
               logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
               logEntry.senderHoldingFees shouldBe BigDecimal(0)
-              logEntry.amuletPrice shouldBe amuletPrice
             },
             { case logEntry: TransferTxLogEntry =>
               // Alice sending 40CC to Bob
@@ -139,7 +138,6 @@ class WalletTxLogTimeBasedIntegrationTest
                 receiver.amount should beWithin(40 - smallAmount, 40)
               }
               logEntry.senderHoldingFees shouldBe BigDecimal(0)
-              logEntry.amuletPrice shouldBe amuletPrice
             },
           ),
         )

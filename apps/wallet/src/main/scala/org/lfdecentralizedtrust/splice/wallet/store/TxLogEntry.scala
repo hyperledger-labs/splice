@@ -188,7 +188,6 @@ object TxLogEntry extends StoreErrors {
           .map(r => httpDef.PartyAndAmount(r.party, Codec.encode(r.amount)))
           .toVector,
         holdingFees = Codec.encode(entry.senderHoldingFees),
-        amuletPrice = Codec.encode(entry.amuletPrice),
         appRewardsUsed = Codec.encode(entry.appRewardsUsed),
         validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
         svRewardsUsed = Codec.encode(entry.svRewardsUsed.getOrElse(BigDecimal(0))),
@@ -213,7 +212,6 @@ object TxLogEntry extends StoreErrors {
           } yield PartyAndAmount(r.party, amount)
         )
         senderHoldingFees <- Codec.decode(Codec.BigDecimal)(item.holdingFees)
-        amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
         svRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.svRewardsUsed)
@@ -230,7 +228,6 @@ object TxLogEntry extends StoreErrors {
         sender = Some(PartyAndAmount(sender.party, senderAmount)),
         receivers = receivers,
         senderHoldingFees = senderHoldingFees,
-        amuletPrice = amuletPrice,
         appRewardsUsed = appRewardsUsed,
         validatorRewardsUsed = validatorRewardsUsed,
         svRewardsUsed = Some(svRewardsUsed),
@@ -256,7 +253,6 @@ object TxLogEntry extends StoreErrors {
         receivers = Vector(
           httpDef.PartyAndAmount(entry.receiver, Codec.encode(entry.amount))
         ),
-        amuletPrice = Codec.encode(entry.amuletPrice),
         transferInstructionCid =
           Option.when(!entry.transferInstructionCid.isEmpty)(entry.transferInstructionCid),
       )
@@ -267,7 +263,6 @@ object TxLogEntry extends StoreErrors {
     ): Either[String, BalanceChangeTxLogEntry] = {
       for {
         receiverAndAmount <- item.receivers.headOption.toRight("No receivers")
-        amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         subtype <- subtypeFromResponseItem(item.transactionSubtype)
       } yield BalanceChangeTxLogEntry(
         subtype = Some(subtype),
@@ -275,7 +270,6 @@ object TxLogEntry extends StoreErrors {
         date = Some(item.date.toInstant),
         receiver = receiverAndAmount.party,
         amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
-        amuletPrice = amuletPrice,
         transferInstructionCid = item.transferInstructionCid.getOrElse(""),
       )
     }
