@@ -64,6 +64,7 @@ template MemberTraffic with
     numPurchases : Int -- ^ Number of times extra traffic has been purchased
     amuletSpent : Decimal -- ^ Total Amulet spent on extra traffic
     usdSpent : Decimal -- ^ Total USD spent on extra traffic
+    totalReimbursed : Optional Int -- ^ The number of bytes of response traffic reimbursed to this member.
   where
     signatory dso
 
@@ -86,6 +87,7 @@ initialMemberTraffic dso memberId synchronizerId migrationId = MemberTraffic wit
     numPurchases = 0
     amuletSpent = 0.0
     usdSpent = 0.0
+    totalReimbursed = None
 
 data ForMemberTraffic = ForMemberTraffic with
     dso : Party
