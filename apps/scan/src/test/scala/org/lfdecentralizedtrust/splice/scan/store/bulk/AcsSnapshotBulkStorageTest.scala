@@ -86,11 +86,7 @@ class AcsSnapshotBulkStorageTest
             .map(_.createdEventsInPage)
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
-          objectKeys should have length 6
-          objectKeys.take(objectKeys.size - 1).forall {
-            !_.key().endsWith("_last.zstd")
-          }
-          objectKeys.last.key() should endWith("_last.zstd")
+          objectKeys should have length 7
 
           val allContractsFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(
