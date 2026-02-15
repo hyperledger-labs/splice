@@ -1,10 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import $file.^.^.`bootstrap-canton`
-
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction
+import $file.`bootstrap-canton`
 
 println("--- Applying Permissioned Initialization (SV1) ---")
 
@@ -18,7 +15,7 @@ println(s"Granting SV1 (${sv1Participant.id}) Submission permission...")
 sv1Participant.topology.participant_synchronizer_permissions.propose(
   synchronizerId,
   sv1Participant.id,
-  permission = ParticipantPermission.Submission,
+  permission = com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission,
   serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
 )
 
@@ -27,7 +24,8 @@ sv1Participant.topology.synchronizer_parameters.propose_update(
   synchronizerId,
   parameters =>
     parameters.update(
-      onboardingRestriction = OnboardingRestriction.RestrictedOpen
+      onboardingRestriction =
+        com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
     ),
 )
 
@@ -35,7 +33,9 @@ eventually() {
   val currentParams = sv1Participant.topology.synchronizer_parameters
     .get_dynamic_synchronizer_parameters(synchronizerId)
 
-  if (currentParams.onboardingRestriction != OnboardingRestriction.RestrictedOpen) {
+  if (
+    currentParams.onboardingRestriction != com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
+  ) {
     sys.error("Restriction failed to apply")
   }
 }
