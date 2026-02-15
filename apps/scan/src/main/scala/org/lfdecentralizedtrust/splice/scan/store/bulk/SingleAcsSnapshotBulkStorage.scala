@@ -82,7 +82,7 @@ class SingleAcsSnapshotBulkStorage(
         S3ZstdObjects(
           config,
           s3Connection,
-          { objIdx => s"$timestamp/ACS_$objIdx.zstd" },
+          { objIdx => s"${config.getSegmentKeyPrefix(timestamp, None)}/ACS_$objIdx.zstd" },
           loggerFactory,
         )
       )

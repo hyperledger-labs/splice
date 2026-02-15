@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.AcsSnapshot
+import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import java.time.{Duration, ZoneOffset}
 import java.time.temporal.ChronoField
@@ -69,6 +70,24 @@ case class ScanStorageConfig(
     timesToDoSnapshot(bulkAcsSnapshotPeriodHours).contains(
       snapshotTimestamp.toInstant.atOffset(ZoneOffset.UTC).get(ChronoField.HOUR_OF_DAY)
     )
+
+  /* Note that we do not include the migration ID in the end timestamp, as it might not yet be known
+   * when we start collecting updates for the segment (e.g. if we are up-to-date, and a migration will
+   * happen soon). Once the end time will have passed, the migration ID will be
+   * deterministic given the update history, so we do not lose any information or risk
+   * inconsistency between instances of Scan.
+   * If end timestamp is not give, it will be computed from the start timestamp
+   * based on the bulkAcsSnapshotPeriodHours period
+   */
+  def getSegmentKeyPrefix(
+      segmentStartTimestamp: TimestampWithMigrationId,
+      segmentEndTimestamp: Option[TimestampWithMigrationId],
+  ): String = {
+    val endTimestamp = segmentEndTimestamp.fold(
+      computeBulkSnapshotTimeAfter(segmentStartTimestamp.timestamp)
+    )(_.timestamp)
+    s"${segmentStartTimestamp.timestamp}-Migration-${segmentStartTimestamp.migrationId}-${endTimestamp}"
+  }
 
 }
 
