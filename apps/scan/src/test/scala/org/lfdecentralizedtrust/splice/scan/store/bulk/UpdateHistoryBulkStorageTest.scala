@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -83,6 +85,7 @@ class UpdateHistoryBulkStorageTest
             mockStore.store,
             bucketConnection,
             segment,
+            new HistoryMetrics(NoOpMetricsFactory)(MetricsContext.Empty),
             loggerFactory,
           )
           .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
@@ -169,6 +172,7 @@ class UpdateHistoryBulkStorageTest
               kvProvider,
               migrationId,
               bucketConnection,
+              new HistoryMetrics(NoOpMetricsFactory)(MetricsContext.Empty),
               loggerFactory,
             ).getSource()
               .toMat(TestSink.probe[UpdatesSegment])(Keep.both)

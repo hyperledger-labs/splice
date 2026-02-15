@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -24,6 +26,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HistoryMetrics,
   Limit,
   StoreTestBase,
   TimestampWithMigrationId,
@@ -69,6 +72,7 @@ class AcsSnapshotBulkStorageTest
               bulkStorageTestConfig,
               store,
               s3BucketConnection,
+              new HistoryMetrics(NoOpMetricsFactory)(MetricsContext.Empty),
               loggerFactory,
             )
             .runWith(Sink.ignore)
@@ -118,6 +122,7 @@ class AcsSnapshotBulkStorageTest
             store.store,
             s3BucketConnection,
             kvProvider,
+            new HistoryMetrics(NoOpMetricsFactory)(MetricsContext.Empty),
             loggerFactory,
           ).getSource()
             .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.both)

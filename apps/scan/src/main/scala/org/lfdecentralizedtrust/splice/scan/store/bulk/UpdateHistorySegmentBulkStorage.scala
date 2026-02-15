@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
@@ -14,6 +15,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HistoryMetrics,
   TimestampWithMigrationId,
   TreeUpdateWithMigrationId,
   UpdateHistory,
@@ -47,10 +49,11 @@ case class UpdatesSegment(
   * know when each segment is complete).
   */
 class UpdateHistorySegmentBulkStorage(
-    val config: ScanStorageConfig,
-    val updateHistory: UpdateHistory,
-    val s3Connection: S3BucketConnection,
-    val segment: UpdatesSegment,
+    config: ScanStorageConfig,
+    updateHistory: UpdateHistory,
+    s3Connection: S3BucketConnection,
+    segment: UpdatesSegment,
+    historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -148,9 +151,10 @@ class UpdateHistorySegmentBulkStorage(
           loggerFactory,
         )
       )
-      .map((o: S3ZstdObjects.Output) =>
+      .map((o: S3ZstdObjects.Output) => {
+        historyMetrics.BulkStorage.objectsCount.inc()(MetricsContext("object_type" -> "updates"))
         UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
-      )
+      })
   }
 }
 object UpdateHistorySegmentBulkStorage {
@@ -165,6 +169,7 @@ object UpdateHistorySegmentBulkStorage {
       config: ScanStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
@@ -177,6 +182,7 @@ object UpdateHistorySegmentBulkStorage {
         updateHistory,
         s3Connection,
         segment,
+        historyMetrics,
         loggerFactory,
       ).getSource
     }
@@ -186,6 +192,7 @@ object UpdateHistorySegmentBulkStorage {
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
       segment: UpdatesSegment,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
@@ -197,6 +204,7 @@ object UpdateHistorySegmentBulkStorage {
       updateHistory,
       s3Connection,
       segment,
+      historyMetrics,
       loggerFactory,
     ).getSource
 

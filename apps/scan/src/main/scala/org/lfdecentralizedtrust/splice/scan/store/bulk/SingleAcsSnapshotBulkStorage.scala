@@ -14,7 +14,7 @@ import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
-import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, TimestampWithMigrationId}
 
 import scala.concurrent.Future
 import io.circe.syntax.*
@@ -22,6 +22,7 @@ import io.circe.syntax.*
 import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.FiniteDuration
 import Position.*
+import com.daml.metrics.api.MetricsContext
 import org.apache.pekko.{Done, NotUsed}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
@@ -36,10 +37,11 @@ object Position {
 }
 
 class SingleAcsSnapshotBulkStorage(
-    val timestamp: TimestampWithMigrationId,
-    val config: ScanStorageConfig,
-    val acsSnapshotStore: AcsSnapshotStore,
-    val s3Connection: S3BucketConnection,
+    timestamp: TimestampWithMigrationId,
+    config: ScanStorageConfig,
+    acsSnapshotStore: AcsSnapshotStore,
+    s3Connection: S3BucketConnection,
+    historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -86,6 +88,11 @@ class SingleAcsSnapshotBulkStorage(
           loggerFactory,
         )
       )
+      .map(o => {
+        historyMetrics.BulkStorage.objectsCount
+          .inc()(MetricsContext("object_type" -> "ACS_snapshots"))
+        o
+      })
       // emit back the timestamp w. migrationId upon completion
       .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
 
@@ -150,6 +157,7 @@ object SingleAcsSnapshotBulkStorage {
       config: ScanStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
       s3Connection: S3BucketConnection,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       actorSystem: ActorSystem,
@@ -162,6 +170,7 @@ object SingleAcsSnapshotBulkStorage {
         config,
         acsSnapshotStore,
         s3Connection,
+        historyMetrics,
         loggerFactory,
       ).getSource
     }
@@ -173,6 +182,7 @@ object SingleAcsSnapshotBulkStorage {
       config: ScanStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
       s3Connection: S3BucketConnection,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       actorSystem: ActorSystem,
@@ -184,6 +194,7 @@ object SingleAcsSnapshotBulkStorage {
       config,
       acsSnapshotStore,
       s3Connection,
+      historyMetrics,
       loggerFactory,
     ).getRetryingSource
 
