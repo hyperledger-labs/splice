@@ -32,8 +32,8 @@ class S3BucketConnectionForUnitTests(
             }
 
             nextObject.toOption match {
-              case Some(data) => readAll(acc :+ data.data.array()) // Continue recursion
-              case None => acc // Stop at EOF
+              case Some(data) => readAll(acc :+ data.data.array())
+              case None => acc
             }
           }
 
@@ -51,29 +51,6 @@ class S3BucketConnectionForUnitTests(
     }
   }
 
-//  override def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
-//    val request = GetObjectRequest.builder.bucket(bucketName).key(key).build
-//    val resultCollector = new ByteArrayOutputStream
-//    for {
-//      s3Stream <- s3Client.getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse]).asScala
-//      dataInput = new DataInputStream(s3Stream.asInputStream())
-//    } yield {
-//      var done = false
-//      while (!done) {
-//        try {
-//          val next = PaddedData.readNext(dataInput)
-//          resultCollector.write(next.data.array())
-//        } catch {
-//          case _: EOFException =>
-//            done = true
-//        } finally {
-//          dataInput.close()
-//        }
-//      }
-//      ByteBuffer.wrap(resultCollector.toByteArray)
-//    }
-//  }
-//
   override def writeFullObject(key: String, content: ByteBuffer)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
@@ -134,22 +111,9 @@ object PaddedData {
   def readNext(source: DataInputStream): PaddedData = {
     val dataSize = source.readInt()
     val paddingSize = source.readInt()
-    println(s"Reading ${dataSize} bytes of data and skipped ${paddingSize} padding")
     val data = new Array[Byte](dataSize)
     source.readFully(data)
     source.skipBytes(paddingSize)
-    println(s"First 4 bytes: ${data.take(4).map(b => f"${b & 0xff}%02X").mkString(" ")}")
-    println(s"Last 4 bytes: ${data.drop(dataSize - 4).map(b => f"${b & 0xff}%02X").mkString(" ")}")
-    val fname = s"/tmp/out-${java.util.UUID.randomUUID()}.zstd"
-    println(s"Dumping to $fname")
-    val path = java.nio.file.Paths.get(fname)
-    java.nio.file.Files.write(path, data)
     PaddedData(paddingSize, ByteBuffer.wrap(data))
-//    val data = new Array[Byte](dataSize + paddingSize)
-//    source.readFully(data)
-//    println(s"First 4 bytes: ${data.take(4).map(b => f"${b & 0xFF}%02X").mkString(" ")}")
-//    println(s"Last 4 bytes: ${data.drop(dataSize + paddingSize - 4).map(b => f"${b & 0xFF}%02X").mkString(" ")}")
-//
-//    PaddedData(paddingSize, ByteBuffer.wrap(data.take(dataSize)))
   }
 }

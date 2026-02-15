@@ -120,12 +120,12 @@ class UpdateHistorySegmentBulkStorage(
     updatesBytes
   }
 
-  case class State(
+  private case class State(
       obj: s3Connection.AppendWriteObject,
       s3ObjIdx: Int,
       s3ObjSize: Int,
   )
-  case class ObjectChunk(
+  private case class ObjectChunk(
       bytes: ByteString,
       obj: s3Connection.AppendWriteObject,
       isLastChunkInObject: Boolean,
@@ -135,7 +135,7 @@ class UpdateHistorySegmentBulkStorage(
 
   private def getSource(implicit
       actorSystem: ActorSystem
-  ): Source[(UpdatesSegment, String), NotUsed] = {
+  ): Source[UpdateHistorySegmentBulkStorage.Output, NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(ZstdGroupedWeight(config.bulkZstdChunkSize))
@@ -164,7 +164,13 @@ class UpdateHistorySegmentBulkStorage(
                 state.s3ObjIdx + 1,
                 0,
               ),
-              ObjectChunk(chunk.bytes, state.obj, true, chunk.isLast, state.obj.prepareUploadNext()),
+              ObjectChunk(
+                chunk.bytes,
+                state.obj,
+                true,
+                chunk.isLast,
+                state.obj.prepareUploadNext(),
+              ),
             )
           case (state, chunk) =>
             logger.debug(
@@ -205,16 +211,30 @@ class UpdateHistorySegmentBulkStorage(
           logger.debug(
             s"Finished uploading part ${chunk.partNumber}, which is the last one for the object ${chunk.obj.key}, finishing the upload"
           )
-          chunk.obj.finish().map(_ => Some(chunk.obj.key))
+          chunk.obj
+            .finish()
+            .map(_ =>
+              Some(
+                UpdateHistorySegmentBulkStorage
+                  .Output(segment, chunk.obj.key, chunk.isLastObjectInSegment)
+              )
+            )
         case chunk => {
-          logger.debug(s"Finished uploading part ${chunk.partNumber}")
+          logger.debug(s"Finished uploading part ${chunk.partNumber} to object ${chunk.obj.key}")
           Future.successful(None)
         }
       }
-      .collect { case Some(key) => (segment, key) }
+      .collect { case Some(out) => out }
   }
 }
 object UpdateHistorySegmentBulkStorage {
+
+  case class Output(
+      segment: UpdatesSegment,
+      objectKey: String,
+      isLastObjectInSegment: Boolean,
+  )
+
   def asFlow(
       config: ScanStorageConfig,
       updateHistory: UpdateHistory,
@@ -224,7 +244,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[UpdatesSegment, (UpdatesSegment, String), NotUsed] =
+  ): Flow[UpdatesSegment, Output, NotUsed] =
     Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
       new UpdateHistorySegmentBulkStorage(
         config,
@@ -245,7 +265,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Source[(UpdatesSegment, String), NotUsed] =
+  ): Source[Output, NotUsed] =
     new UpdateHistorySegmentBulkStorage(
       config,
       updateHistory,
