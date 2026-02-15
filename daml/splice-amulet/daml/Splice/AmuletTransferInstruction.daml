@@ -74,7 +74,7 @@ executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update Transfer
 executeTransferInstr instr extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+    executeTwoStepTransfer twoStepTransfer [toInterfaceContractId instr.lockedAmulet] extraArgs
   pure TransferInstructionResult with
     -- TODO! This will change once there's a transfer instruction v2
     senderChangeCids = (map coerceInterfaceContractId senderHoldingCids)

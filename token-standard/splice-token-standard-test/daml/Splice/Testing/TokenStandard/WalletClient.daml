@@ -82,7 +82,6 @@ checkHolding p holdingCid amount = checkHoldingBounds p holdingCid (amount, amou
 checkHoldingBounds : Party -> ContractId Holding -> (Decimal, Decimal) -> Script ()
 checkHoldingBounds p holdingCid (lb, ub) = do
   holdingO <- queryInterfaceContractId p holdingCid
-  debug holdingO
   let holding = case holdingO of
         None -> error $ "Holding " <> show holdingCid <> " was not found"
         Some holding -> holding

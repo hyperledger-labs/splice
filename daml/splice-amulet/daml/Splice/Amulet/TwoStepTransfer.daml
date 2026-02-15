@@ -43,7 +43,7 @@ data TwoStepTransfer = TwoStepTransfer with
       -- ^ Provider that should be marked as the app provider on the second step.
     allowFeaturing : Bool
       -- ^ Whether the second step can be featured.
-
+      deriving (Eq, Show)
 -- | The extra amount locked to guard against the transfer fees changing between
 -- the time of locking the amulet and the time of executing the actual transfer.
 feeReserveMultiplier : Decimal
@@ -109,9 +109,9 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
     )
 
 executeTwoStepTransfer
-  : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
+  : TwoStepTransfer -> [ContractId Holding] -> ExtraArgs
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
-executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
+executeTwoStepTransfer TwoStepTransfer{..} holdingCids extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
   (paymentContext, beneficiaries) <-
     if allowFeaturing
@@ -124,9 +124,20 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         context <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
         pure (context, None)
   let openRoundCid = paymentContext.context.openMiningRound
-  -- unlock amulet
-  unlockResult <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
-  let amuletCid = unlockResult.amuletSum.amulet
+  
+  -- TODO: Is there a better way of doing this?
+  inputs <- forA holdingCids (\cid -> do
+      holding <- fetch cid
+      case fromInterface @Amulet holding of
+        Some _ -> return $ InputAmulet (fromInterfaceContractId cid)
+        None -> case fromInterface @LockedAmulet holding of
+          Some _ -> do
+            -- unlock amulet
+            unlockResult <- exercise (fromInterfaceContractId @LockedAmulet cid) LockedAmulet_Unlock with openRoundCid
+            return $ InputAmulet (unlockResult.amuletSum.amulet)
+          None -> abort "Received a non-amulet holding Id"
+    )
+
   -- execute transfer
   let receiverOutputs = map (\(receiver, amount) -> TransferOutput with
           receiver
@@ -138,7 +149,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   let amuletRulesTransfer = Splice.AmuletRules.Transfer with
         sender
         provider
-        inputs = [InputAmulet amuletCid]
+        inputs
         outputs = receiverOutputs
         beneficiaries
   result <- exercisePaymentTransfer dso paymentContext amuletRulesTransfer

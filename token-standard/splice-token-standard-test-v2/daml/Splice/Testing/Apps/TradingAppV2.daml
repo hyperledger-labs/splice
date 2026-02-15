@@ -6,21 +6,17 @@
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
 module Splice.Testing.Apps.TradingAppV2 where
 
-import DA.Foldable qualified as F
-import DA.Optional (fromSomeNote)
+import DA.Optional (catOptionals, optionalToList)
 import DA.Set qualified as Set
-import DA.TextMap as TextMap
-import DA.Map as Map
+import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationRequestV2
-import Splice.Api.Token.HoldingV2 (Account)
-import DA.List (groupOn)
+import Splice.Api.Token.HoldingV2 (Account, Holding, InstrumentId)
+import DA.List (dedupSort, groupOn)
 import DA.Foldable (mapA_)
-import DA.List.Total (dedup)
 import DA.Assert ((===))
-import qualified DA.Traversable as Traversable
 import DA.Time
 import DA.Date
 
@@ -28,35 +24,35 @@ maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
 template OTCTradeAllocationRequest with
-    otcTrade : OTCTrade
+    venue : Party
     otcTradeCid : ContractId OTCTrade
+    authorizer : Account
+    transferLegs : [TransferLeg]
+    createdAt : Time
+    settleAt : Time
+    settlementDeadline : Optional Time
+
   where
-    signatory otcTrade.venue
-    observer otcTrade.venue, tradingParties (otcTrade.transferLegs)
+    signatory venue
+    observer accountParties authorizer
 
     interface instance AllocationRequest for OTCTradeAllocationRequest where
       view = AllocationRequestView with
         settlement = SettlementInfo with
-          executor = otcTrade.venue
-          requestedAt = otcTrade.createdAt
+          executor = venue
+          requestedAt = createdAt
           settlementRef = makeTradeRef otcTradeCid
-          settleAt = otcTrade.settleAt
+          settleAt = settleAt
           meta = emptyMetadata
           controllerOverride = Some [] -- We will settle using only executor authority.
-          settlementDeadline = otcTrade.settlementDeadline
-        transferLegs = otcTrade.transferLegs
+          settlementDeadline = settlementDeadline
+        transferLegs = transferLegs
         meta = emptyMetadata
 
       allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that assets won't be allocated / that the trade is being rejected.
-        require "Actor is a trader or their account providers" 
-          (F.any 
-            (\leg -> 
-              actor == leg.sender.owner || 
-              actor == leg.receiver.owner || 
-              Some actor == leg.receiver.provider || 
-              Some actor == leg.receiver.provider) 
-            otcTrade.transferLegs)
+        require "Actor is is the needed authorizer" 
+          (actor == authorizer.owner || Some actor == authorizer.provider)
         pure ChoiceExecutionMetadata with meta = emptyMetadata
 
       allocationRequest_WithdrawImpl _self _extraArgs =
@@ -65,7 +61,7 @@ template OTCTradeAllocationRequest with
 
 template OTCTrade with
     venue : Party
-    transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
+    transferLegs : [TransferLeg]
     createdAt : Time
     settleAt : Time
     settlementDeadline : Optional Time
@@ -75,66 +71,51 @@ template OTCTrade with
 
     nonconsuming choice OTCTrade_RequestAllocations : [ContractId OTCTradeAllocationRequest]
       with
+        fee : TransferLeg
+        -- ^ An extra transfer leg to represent the fee for the executor.
       controller venue
       do
-        let 
+        let
+          allLegs = fee::transferLegs
+          allTraders = dedupSort $ concatMap (\tl -> [tl.sender, tl.receiver]) transferLegs
           legsByAdmin =
-            map TextMap.fromList $
-            groupOn (\(_, tl) -> tl.instrumentId.admin) $
-            TextMap.toList transferLegs
-        mapA (\transferLegs -> create (OTCTradeAllocationRequest (this with transferLegs) self)) legsByAdmin
+            groupOn (.instrumentId.admin) $
+            allLegs
+        concat <$> 
+          forA legsByAdmin (\legs -> do
+            catOptionals <$> forA allTraders (\trader -> do
+              let trader_legs = filter (\leg -> trader == leg.sender || trader == leg.receiver) legs
+              if null trader_legs
+                then return None
+                else do
+                  Some <$> create OTCTradeAllocationRequest with 
+                    otcTradeCid = self
+                    authorizer = trader
+                    transferLegs = trader_legs
+                    ..
+              )
+          )
 
-    choice OTCTrade_Settle : Map Party (Map Account Allocation_ExecuteTransferResult)
+    -- Nonconsuming to avoid disclusures inside.
+    nonconsuming choice OTCTrade_Settle : (Map.Map (InstrumentId, Account) [ContractId Holding], [Metadata])
       with
-        allocationsWithContext : Map Party (Map Account (ContractId Allocation, ExtraArgs))
+        fee : TransferLeg
+        holdingCids : Map.Map (InstrumentId, Account) [ContractId Holding]
+        allocationsWithContext : Map.Map (Party, Account) (ContractId Allocation, ExtraArgs)
         -- ^ Allocations sorted by admin and sender.
         allocationRequests : [ContractId OTCTradeAllocationRequest]
       controller venue
       do
+        archive self
         -- Could be safer by validating the requests match the trade, but venue is the only authorizer
         -- so we can assume the checks happened off-ledger. 
         mapA_ archive allocationRequests
-        -- validate and execute transferLegs
-        let settlementInfo = SettlementInfo with
-              executor = venue
-              requestedAt = createdAt
-              settlementRef = makeTradeRef self
-              settleAt
-              meta = emptyMetadata
-              controllerOverride = Some []
-              settlementDeadline
-        let expectedAllocations = expectedTradeAllocations settlementInfo transferLegs
-        let outerMergedMaps = zipMaps allocationsWithContext expectedAllocations
-        exercises <- forMapWithKey outerMergedMaps \admin (optAdminAllocsWithContext,  optExpectedAdminAllocs) -> do
-          let adminAllocsWithContext = fromSomeNote ("Allocations are missing for admin " <> show admin) optAdminAllocsWithContext
-          let expectedAdminAllocs = fromSomeNote ("Allocation with context provided for unexpected admin " <> show admin) optExpectedAdminAllocs
-          let innerMergedMaps = zipMaps adminAllocsWithContext expectedAdminAllocs
-          forMapWithKey innerMergedMaps \trader (optAllocWithContext,  optExpectedAlloc) -> do
-            let (allocCid, extraArgs) = fromSomeNote ("Allocation is missing for admin " <> show admin <> " and trader " <> show trader) optAllocWithContext
-            let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected admin " <> show admin) optExpectedAlloc
-            -- fetch and validate the allocation instruction
-            instr <- fetch @Allocation allocCid
-            let instrView = view @Allocation instr
-            case matchAllocationWithMeta expectedAlloc instrView.allocation of
-              Right () -> return ()
-              Left mismatch -> abort
-                ("Submitted allocation does not match expected allocation." <> "\nMismatch: " <> mismatch)
-
-            -- Fetch extra auths
-            let requiredReceiverAuth = (view instr).requiredReceiverAuth
-            extraAuth <- forA requiredReceiverAuth
-              (\receiver -> do
-                debug ("authorizing incoming for " <> show admin <> ", " <> show trader <> ", " <> show receiver)
-                (recAllocCid, recExtraArgs) <- case Map.lookup receiver innerMergedMaps of
-                  Some (optReceiverAllocWithContext, _) -> 
-                    return $ fromSomeNote ("Allocation is missing for admin " <> show admin <> " and trader " <> show receiver) optReceiverAllocWithContext
-                  None -> abort ("Extra auth needed for receiver that is not present in any transfer legs: " <> show receiver)
-                exercise recAllocCid Allocation_AuthorizeIncoming with extraArgs = recExtraArgs
-              )
-            -- on first pass don't settle yet as we may still need the extra auth.
-            return $ (allocCid, Allocation_ExecuteTransfer with extraArgs; extraAuth)
-        -- Exercise on second pass
-        Traversable.mapA (Traversable.mapA (uncurry exercise)) exercises
+        -- 
+        -- We use the default implementation.
+        settleAllocations
+          (transferLegs ++ [fee])
+          holdingCids
+          allocationsWithContext
 
     -- NOTE: this choice is an approximation to what a real app would do.
     -- As it stands, the venue can't cancel allocations that come right after
@@ -164,34 +145,14 @@ template OTCTrade with
           )
           allocationsWithContext            
 
-expectedTradeAllocations
-  : SettlementInfo -> TextMap Api.Token.AllocationV2.TransferLeg
-  -> Map Party (Map Account AllocationSpecification)
-expectedTradeAllocations settlementInfo transferLegs = Map.fromList allocsByAdminAndTrader
-  where 
-    legsByAdmin =
-      map (\tls@((_, tl)::_) -> (tl.instrumentId.admin, TextMap.fromList tls)) $
-      groupOn (\(_, tl) -> tl.instrumentId.admin) $
-      TextMap.toList transferLegs
-    accountsForLegs tls = dedup $ concatMap (\(_, tl) -> [tl.sender, tl.receiver]) (TextMap.toList tls)
-    legsForAccount tls account = 
-      TextMap.fromList $ 
-      Prelude.filter (\(_, tl) -> tl.sender == account || tl.receiver == account) $
-      TextMap.toList tls
-    allocForAccountAndLegs account tls = AllocationSpecification with
-      settlement = settlementInfo
-      transferLegs = legsForAccount tls account
-    allocsByAccount tls = map 
-      (\trader -> (trader, allocForAccountAndLegs trader $ legsForAccount tls trader))
-      (accountsForLegs tls)
-    allocsByAdminAndTrader = map 
-      (\(admin, tls) -> (admin, Map.fromList (allocsByAccount tls)))
-      legsByAdmin
-     
+accountParties : Account -> [Party]
+accountParties account = account.owner::optionalToList account.provider
 
+transferLegParties : TransferLeg -> [Party]
+transferLegParties tl = accountParties tl.sender ++ accountParties tl.receiver
 
-tradingParties : TextMap Api.Token.AllocationV2.TransferLeg -> Set.Set Party
-tradingParties = F.foldl (\acc t -> Set.insert t.sender.owner (Set.insert t.receiver.owner acc)) Set.empty
+tradingParties : [Api.Token.AllocationV2.TransferLeg] -> Set.Set Party
+tradingParties tls = Set.fromList $ concatMap transferLegParties tls
 
 -- | Check whether a required condition is true. If it's not, abort the
 -- transaction with a message saying that the requirement was not met.
@@ -204,23 +165,5 @@ makeTradeRef tradeCid = Api.Token.AllocationV2.Reference with
   id = "OTCTradeProposal" -- set to the name of the template to simplify debugging
   cid = Some (coerceContractId tradeCid)
 
-
--- Additional text map utilities
---------------------------------
-
-zipMaps : (Ord k) => Map k a -> Map k b -> Map k (Optional a, Optional b)
-zipMaps m1 m2 =
-  Map.merge
-    (\_ v1 -> Some (Some v1, None))
-    (\_ v2 -> Some (None, Some v2))
-    (\_ v1 v2 -> Some (Some v1, Some v2))
-    m1
-    m2
-
-forMapWithKey : (Ord k) => Applicative f => Map k a -> (k -> a -> f b) -> f (Map k b)
-forMapWithKey m f =
-    Map.fromList <$> mapA f' (Map.toList m)
-  where
-    f' (k, v) = (k,) <$> f k v
 
 

@@ -26,7 +26,6 @@ import Splice.Expiry (maxExpiry)
 import Splice.Types
 import Splice.Util
 
-
 import DA.Exception
 
 -- | Rules contract that can be used in transactions that require signatures
@@ -403,9 +402,12 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
   let sender = creator
   let amount = allocationAmount sender arg.allocation
-  let expiresAt = min 
-        (maxExpiry openMiningRound amount)
-        (fromOptional maxTime allocation.settlement.settlementDeadline)
+
+  let 
+    deadline = fromOptional maxTime allocation.settlement.settlementDeadline
+    expiresAt = if amount == 0.0
+      then deadline
+      else  min deadline (maxExpiry openMiningRound amount)
   require "Allocation.settlement.settleAt <= Allocation.expiresAt" 
     (settlement.settleAt <= expiresAt)
 
@@ -431,13 +433,16 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   assertDeadlineExceeded "requestedAt" requestedAt
 
   -- inputHoldingCids:
-  require "At least one input holding must be provided" (not $ null inputHoldingCids)
+  require "At least one input holding must be provided" (amount == 0.0 || not (null inputHoldingCids))
 
   -- lock the funds
-  let twoStepTransfer = allocationToTwoStepTransfer sender dso expiresAt arg.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer sender arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
 
-  (lockedAmulet, senderChangeCids, meta) <-
-    prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
+  (lockedAmulet, senderChangeCids, meta) <- if amount == 0.0 
+    then return (None, [], emptyMetadata)
+    else do
+      (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
+      return (Some la, cids, m)
   -- create the amulet allocation
   allocationCid <- toInterfaceContractId <$> create AmuletAllocation with
     allocation = arg.allocation

@@ -20,7 +20,7 @@ import DA.Time
 import DA.Date
 import DA.Text (parseInt)
 import DA.Optional (fromSome, fromOptional)
-import Splice.Api.Token.HoldingV2 (basicAccount)
+import qualified DA.Map as Map
 
 -- Utils
 --------
@@ -109,8 +109,8 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
       controllerOverride
       settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
 
-transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> AllocationV2.TransferLeg
-transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} = 
+transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> Text -> AllocationV2.TransferLeg
+transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId = 
   AllocationV2.TransferLeg with
     instrumentId = instrumentId_v1_to_v2 instrumentId
     sender = senderAccount
@@ -133,7 +133,7 @@ allocation_specification_v1_to_v2 : AllocationV1.AllocationSpecification -> Allo
 allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} = 
   AllocationV2.AllocationSpecification with
     settlement = settlement_info_v1_to_v2 settlement
-    transferLegs = TextMap.fromList ((transferLegId, transfer_leg_v1_to_v2 transferLeg)::otherLegs)
+    transferLegs = (transfer_leg_v1_to_v2 transferLeg transferLegId)::otherLegs
   where
     otherLegs = case TextMap.lookup "canton.network/otherLegs" transferLeg.meta.values of
       None -> []
@@ -143,29 +143,15 @@ allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.Allocatio
 allocation_view_v1_to_v2 AllocationV1.AllocationView{..} = 
   AllocationV2.AllocationView with
     allocation = allocation_specification_v1_to_v2 allocation
-    holdingCids = map coerceInterfaceContractId holdingCids
+    holdingCids = Map.fromList [(instrumentId_v1_to_v2 allocation.transferLeg.instrumentId, map coerceInterfaceContractId holdingCids)] 
     meta
-    senders
-    requiredReceiverAuth
+    sender
     expiresAt
   where
-    numExtraSenders = TextMap.lookup "canton.network/numExtraSenders" meta.values >>= parseInt
     sender = HoldingV2.Account with
       owner = allocation.transferLeg.sender
       provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
       id = TextMap.lookup "canton.network/sender.id" meta.values
-    extraSenders = case numExtraSenders of 
-      None -> []
-      Some num -> map
-        (\n -> HoldingV2.Account with
-          owner = fromSome $ TextMap.lookup ("canton.network/sender[" <> show n <> "].owner") meta.values >>= partyFromText
-          provider = TextMap.lookup ("canton.network/sender[" <> show n <> "].provider") meta.values >>= partyFromText
-          id = TextMap.lookup ("canton.network/sender[" <> show n <> "].id") meta.values)
-        [1..num]
-    senders = sender::extraSenders
-    requiredReceiverAuth = case TextMap.lookup "canton.network/requiredReceiverAuth" meta.values of
-      None -> []
-      Some ol -> [] -- TODO: Parse extra auth list.
     expiresAt = Some $ optional 
       (allocation.settlement.settleBefore)
       decodeTime
@@ -214,16 +200,16 @@ allocation_specification_v2_to_v1 : AllocationV2.AllocationSpecification -> Allo
 allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} = 
   AllocationV1.AllocationSpecification with
     settlement = settlement_info_v2_to_v1 settlement
-    transferLegId
+    transferLegId = transferLeg'.transferLegId
     transferLeg = transfer_leg_v2_to_v1 transferLeg
   where
-    (transferLegId, transferLeg')::other = if TextMap.size transferLegs > 0
-      then TextMap.toList transferLegs
+    transferLeg'::other = if not (null transferLegs)
+      then transferLegs
       else error "Cannot downcast an allocation specification without any legs."
     meta = Metadata with 
       values =
         TextMap.insert "canton.network/version" "v2" $
-        TextMap.insert "canton.network/otherLegs" (show other) $
+        TextMap.insert "canton.network/otherLegs" (show other) $ -- TODO
         transferLeg'.meta.values
     transferLeg = transferLeg' with meta
 
@@ -231,28 +217,16 @@ allocation_view_v2_to_v1 : AllocationV2.AllocationView -> AllocationV1.Allocatio
 allocation_view_v2_to_v1 AllocationV2.AllocationView{..} = 
   AllocationV1.AllocationView with
     allocation = allocation_specification_v2_to_v1 allocation
-    holdingCids = map coerceInterfaceContractId holdingCids
+    holdingCids = concatMap (\(_, holdingCids) -> map coerceInterfaceContractId holdingCids) (Map.toList holdingCids)
     meta = meta'
   where 
-    sender::extraSenders = senders
-    meta0 = Metadata with
+    meta' = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
         insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
         insertOptional "canton.network/sender.id" (sender.id) $ 
-        TextMap.insert "canton.network/requiredReceiverAuth" (show requiredReceiverAuth) $
         insertOptional "canton.network/expiresAt" (fmap encodeTime expiresAt) $
         meta.values
-    meta' = Metadata with
-      values = foldl
-        (\acc (s, n) ->
-          TextMap.insert ("canton.network/sender[" <> show n <> "].owner") (partyToText s.owner) $
-          insertOptional ("canton.network/sender[" <> show n <> "].provider") (partyToText <$> s.provider) $
-          insertOptional ("canton.network/sender[" <> show n <> "].id") (s.id) $
-          acc
-        )
-        meta0.values
-        (zip extraSenders [1..(length extraSenders)])
       
 
 -- Choices
@@ -260,7 +234,6 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
 allocation_execute_transfer_v1_to_v2 : AllocationV1.Allocation_ExecuteTransfer -> AllocationV2.Allocation_ExecuteTransfer
 allocation_execute_transfer_v1_to_v2 AllocationV1.Allocation_ExecuteTransfer{..} =
   AllocationV2.Allocation_ExecuteTransfer with
-    extraAuth = []
     ..
 
 allocation_transfer_result_v2_to_v1 : AllocationV2.Allocation_ExecuteTransferResult -> AllocationV1.Allocation_ExecuteTransferResult

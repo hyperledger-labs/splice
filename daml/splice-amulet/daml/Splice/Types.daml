@@ -9,8 +9,6 @@ import Splice.Api.Token.HoldingV2
 import Splice.Api.Token.TransferInstructionV2
 import Splice.Util (HasCheckedFetch(..))
 
-import DA.TextMap qualified as TextMap
-
 newtype Round = Round with number : Int
   deriving (Eq, Show, Ord)
 
@@ -55,6 +53,6 @@ instance HasCheckedFetch TransferInstructionView ForDso where
 
 instance HasCheckedFetch AllocationView ForDso where
   contractGroupId AllocationView {..} = 
-    let tl::_ = (TextMap.toList allocation.transferLegs)
-    in ForDso with dso = tl._2.instrumentId.admin
+    let tl::_ = allocation.transferLegs
+    in ForDso with dso = tl.instrumentId.admin
 

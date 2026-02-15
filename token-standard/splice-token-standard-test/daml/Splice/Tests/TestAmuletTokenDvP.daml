@@ -114,9 +114,6 @@ setupOtcTrade  = do
 
   -- alice accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
-  holdings <- WalletClient.listHoldings alice amuletId
-  debug holdings
-
   now <- getTime
 
   -- test that using the wrong admin party fails
@@ -131,7 +128,6 @@ setupOtcTrade  = do
 
   -- alice accepts allocation request directly via her wallet
   -- TODO(tech-debt): test here and for all steps that the expected ledger time bounds are present on the submissions
-  debug inputHoldingCids
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc

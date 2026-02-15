@@ -9,7 +9,6 @@ import DA.Time
 import Daml.Script
 import DA.List
 import DA.Optional
-import DA.TextMap as TextMap
 
 import Splice.Amulet
 import Splice.AmuletRules
@@ -1107,20 +1106,21 @@ testTokenStandardAllocate = script do
 
   let amuletId = registry.instrumentId
   let aliceAccount = HoldingV2.basicAccount alice
-  let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
+  let mkTransfer transferLegId sender receiver amount = Api.Token.AllocationV2.TransferLeg with
+        transferLegId
         sender
         receiver
         amount
         instrumentId = amuletId
         meta = emptyMetadata
-  let aliceLeg = mkTransfer aliceAccount aliceAccount 100.0
+  let aliceLeg = mkTransfer "leg0" aliceAccount aliceAccount 100.0
 
   -- provider proposes a trade for alice with herself
   now <- getTime
   let settleAt = now `addRelTime` hours 1
   proposalCid <- submit provider $ createCmd OTCTrade with
     venue = provider
-    transferLegs = TextMap.fromList [("leg0", aliceLeg)]
+    transferLegs = [aliceLeg]
     settleAt
     createdAt = now
     settlementDeadline = None
@@ -1129,6 +1129,7 @@ testTokenStandardAllocate = script do
   -- provider initiates settlement
   _ <- submit provider $
     exerciseCmd proposalCid OTCTrade_RequestAllocations with
+      fee = mkTransfer "fee" aliceAccount aliceAccount 1.0
 
   [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
 

@@ -27,7 +27,6 @@ import DA.Traversable qualified as Traversable
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
-import Splice.Api.Token.AllocationRequestV2
 import Splice.Api.Token.AllocationInstructionV2
 
 import Splice.Amulet
@@ -50,8 +49,9 @@ data AllocatedOTCTrade = AllocatedOTCTrade
     registry : AmuletRegistry.AmuletRegistry
     otcTradeCid : ContractId OTCTrade
     otcTrade : OTCTrade
-    requestCid : ContractId OTCTradeAllocationRequest
+    requestCids : [ContractId OTCTradeAllocationRequest]
     amuletId : InstrumentId
+    feeLeg : TransferLeg
   deriving (Show, Eq)
 
 setupOtcTrade : Script AllocatedOTCTrade
@@ -77,7 +77,10 @@ setupOtcTrade  = do
   AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
   AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
 
-  let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
+  let 
+    mkTransfer id sender receiver amount = 
+      Api.Token.AllocationV2.TransferLeg with
+        transferLegId = id
         sender = basicAccount sender
         receiver = basicAccount receiver
         amount
@@ -86,8 +89,9 @@ setupOtcTrade  = do
   -- Note: here we use Amulet as the single asset, as that is all we have available in this repository.
   -- Given that we are using only the DvP interface, that should though be a fine stand-in for
   -- a DvP across two assets from different registries.
-  let aliceLeg = mkTransfer alice bob 100.0
-  let bobLeg = mkTransfer bob alice 20.0
+  let aliceLeg = mkTransfer "leg0" alice bob 100.0
+  let bobLeg = mkTransfer "leg1" bob alice 20.0
+  let feeLeg = mkTransfer "fee" bob provider 1.0
 
   -- venue creates a trade
   now <- getTime
@@ -95,28 +99,34 @@ setupOtcTrade  = do
       deadline = now `addRelTime` hours 2
   otcTradeCid <- submit provider $ createCmd OTCTrade with
     venue = provider
-    transferLegs = TextMap.fromList [("leg0", aliceLeg), ("leg1", bobLeg)]
+    transferLegs = [aliceLeg, bobLeg]
     settleAt
     createdAt = now
     settlementDeadline = Some deadline
 
+  let
+    settlement = SettlementInfo with
+      executor = provider
+      requestedAt = now
+      settlementRef = makeTradeRef otcTradeCid
+      settleAt = settleAt
+      meta = emptyMetadata
+      controllerOverride = Some [] -- We will settle using only executor authority.
+      settlementDeadline = Some deadline
+
   -- venue requests settlement
-  [requestCid] <- submit provider $
+  requestCids <- submit provider $
     exerciseCmd otcTradeCid OTCTrade_RequestAllocations with
+      fee = feeLeg
 
   Some otcTrade <- queryContractId provider otcTradeCid
 
   -- Alice sees the allocation request in her wallet
   [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
-  let 
-    [(_, tl)] = filter (\(_, tl) -> tl.sender == basicAccount alice) (TextMap.toList aliceAlloc.transferLegs)
-  tl.amount === 100.0
+  aliceAlloc.transferLegs === [aliceLeg, bobLeg]
 
   -- alice accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
-  holdings <- WalletClient.listHoldings alice amuletId
-  debug holdings
-
   now <- getTime
 
   -- test that using the wrong admin party fails
@@ -132,7 +142,6 @@ setupOtcTrade  = do
 
   -- alice accepts allocation request directly via her wallet
   -- TODO(DACH-NY/canton-network-node#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
-  debug inputHoldingCids
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
@@ -159,11 +168,8 @@ setupOtcTrade  = do
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
-  let 
-    [(_, tl)] = filter (\(_, tl) -> tl.sender == basicAccount bob) (TextMap.toList aliceAlloc.transferLegs)
-  tl.amount === 20.0
-
-  -- bob accepts allocation request directly via her wallet
+  bobAlloc.transferLegs === [feeLeg, aliceLeg, bobLeg]
+  -- bob accepts allocation request directly via his wallet
   inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
@@ -175,11 +181,17 @@ setupOtcTrade  = do
   submitWithDisclosures' bob enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
-  factoryView <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid AllocationFactory_PublicFetch
-    with
-      expectedAdmin = registry.dso
-      actor = alice
-  factoryView === AllocationFactoryView registry.dso emptyMetadata
+  -- Lastly, the venue creates an allocation for the fee leg.
+  enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
+    expectedAdmin = registry.dso
+    allocation = AllocationSpecification with transferLegs = [feeLeg]; settlement
+    inputHoldingCids = []
+    requestedAt = now
+    extraArgs = emptyExtraArgs
+    creator = provider
+  submitWithDisclosures' provider enrichedChoice.disclosures $
+    exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+    
   pure AllocatedOTCTrade with
     alice
     bob
@@ -190,9 +202,9 @@ setupOtcTrade  = do
     providerBeneficiaries
     otcTradeCid
     otcTrade
-    requestCid
+    requestCids
     amuletId
-
+    feeLeg
 
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP : Script ()
@@ -205,31 +217,47 @@ testDvP = script do
   -- provider runs automation that completes the settlement
   let otcTradeRef = makeTradeRef otcTradeCid
   allocationsMap <- appBackendListAllocations provider otcTradeRef
-  let [(_, amuletAllocations)] = Map.toList allocationsMap
-  Map.size amuletAllocations === 2
+  Map.size allocationsMap === 3
 
   let beneficiaryMetadata = AmuletRegistry.beneficiariesToMetadata providerBeneficiaries
-  richAllocationsWithContext <- Traversable.forA amuletAllocations $ \(allocCid, _) -> do
+  richAllocationsWithContext <- Traversable.forA allocationsMap $ \(allocCid, alloc) -> do
     context <- RegistryApi.getAllocation_TransferContext registry allocCid beneficiaryMetadata
     let extraArgs = ExtraArgs with
           context = context.choiceContext
           meta = beneficiaryMetadata
-    pure (context.disclosures, (allocCid, extraArgs))
-  let disclosures = foldMap fst richAllocationsWithContext
+    pure (allocCid, extraArgs, context.disclosures, alloc.holdingCids)
+  let 
+    disclosures = foldMap ((._3) . snd) (Map.toList richAllocationsWithContext)
+    holdingCids = Map.fromList $ 
+      concatMap 
+        (\((_, authorizer), (_, _, _, holdings_map)) -> 
+          map (\(instrId, hs') -> ((instrId, authorizer), hs')) (Map.toList holdings_map)) 
+        (Map.toList richAllocationsWithContext)
+
+    allocationsWithContext = Map.fromList $ map (\(k, (cid, ea, _, _)) -> (k, (cid, ea))) (Map.toList richAllocationsWithContext)
 
   results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
-    allocationsWithContext = Map.fromList [(amuletId.admin, fmap snd richAllocationsWithContext)]
-    allocationRequests = [requestCid]
+    fee = feeLeg
+    holdingCids
+    allocationsWithContext
+    allocationRequests = requestCids
 
   -- check metadata
-  forA_ results $ \result -> forA_ result $ \innerResult -> expectBurn innerResult.meta
+  forA_ results._2 $ \meta -> expectBurn meta
 
   -- check that the expected transfers happened
   WalletClient.checkHoldingWithAmountExists alice amuletId 20.0
-  WalletClient.checkHoldingWithAmountExists bob amuletId 100.0
+  WalletClient.checkHoldingWithAmountExists bob amuletId 100.87
 
-  WalletClient.checkBalanceApprox alice amuletId 919.0 -- around 1 $ of fees paid
-  WalletClient.checkBalanceApprox bob amuletId 1079.8  -- around 0.2 $ of fees paid
+  -- 1.25 burned:
+  -- Allocation: 0.13 = 2 * 0.03/0.5 create fee + 0.005/0.5 lock fee
+  -- Transfer 1: 1.12 = 2 * 0.03/0.5 create fee + 100 * 0.01 transfer fee
+  WalletClient.checkBalanceApprox alice amuletId 918.75 -- around 1 $ of fees paid
+  -- 0.58 burned:
+  -- Allocation: 0.13 = 2 * 0.03/0.5 create fee + 0.005/0.5 lock fee
+  -- Transfer 1: 0.32 = 2 * 0.03/0.5 create fee + 20 * 0.01 transfer fee
+  -- Transfer 2: 0.13 = 2 * 0.03/0.5 create fee + 1 * 0.01 transfer fee
+  WalletClient.checkBalanceApprox bob amuletId 1078.42  
 
   -- check that the provider got their featured app reward coupons
   coupons <- map snd <$> query @AppRewardCoupon provider
@@ -250,12 +278,12 @@ testDvP = script do
         unless (numCoupons == expectedNumCoupons ) $
           fail $ "Expected " <> show expectedNumCoupons <> " coupons for " <> show b <> ", but got " <> show numCoupons
 
-  debug aliceAmount
   checkCouponExists aliceAmount
   checkCouponExists bobAmount
 
-  checkNumCouponsFor providerBeneficiary1 2
-  checkNumCouponsFor providerBeneficiary2 2
+  -- Thanks to the fee leg, there are now three coupons each.
+  checkNumCouponsFor providerBeneficiary1 3
+  checkNumCouponsFor providerBeneficiary2 3
 
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()
@@ -265,8 +293,7 @@ testDvPCancel = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
   let otcTradeRef = makeTradeRef otcTradeCid
   allocationsMap <- appBackendListAllocations provider otcTradeRef
-  let [(_, amuletAllocations)] = Map.toList allocationsMap
-  Map.size amuletAllocations === 2
+  Map.size allocationsMap === 3
 
   [(_, aliceLockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
   [(bobLockedHoldingCid, _)] <- WalletClient.listLockedHoldings bob registry.instrumentId
@@ -276,7 +303,7 @@ testDvPCancel = script do
   -- expire the amulet for bob to test both cases where the amulet still exists for alice and where it doesn't for bob
   AmuletRegistry.expireLockAsOwner registry bobLockedHoldingCid
 
-  richAllocationsWithContext <- Traversable.forA amuletAllocations $ \(allocCid, _) -> do
+  richAllocationsWithContext <- Traversable.forA allocationsMap $ \(allocCid, _) -> do
     context <- RegistryApi.getAllocation_CancelContext registry allocCid emptyMetadata
     let extraArgs = ExtraArgs with
           context = context.choiceContext
@@ -285,7 +312,7 @@ testDvPCancel = script do
   let disclosures = foldMap fst richAllocationsWithContext
   _ <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Cancel with
     allocationsWithContext = Map.values $ fmap snd richAllocationsWithContext
-    allocationRequests = [requestCid]
+    allocationRequests = requestCids
   [] <- WalletClient.listLockedHoldings alice registry.instrumentId
   WalletClient.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
 
@@ -325,17 +352,17 @@ testDvPWithdraw = script do
 
 -- | List all allocations matching a particular settlement reference, sorted by their admin and trader.
 -- This function would be run on the trading app provider's backend as part of an automation loop.
-appBackendListAllocations : Party -> Reference -> Script (Map Party (Map Account (ContractId Allocation, AllocationView)))
+appBackendListAllocations : Party -> Reference -> Script (Map(Party, Account) (ContractId Allocation, AllocationView))
 appBackendListAllocations p ref = do
   allocs <- queryInterface @Allocation p
   let matchingAllocs = do
         (cid, Some fundedAllocation) <- allocs
         guard (fundedAllocation.allocation.settlement.settlementRef == ref)
-        let (_, tl)::_ = TextMap.toList fundedAllocation.allocation.transferLegs
+        let tl::_ = fundedAllocation.allocation.transferLegs
             admin = tl.instrumentId.admin
-            [sender] = fundedAllocation.senders
-        return (admin, Map.fromList [(sender, (cid, fundedAllocation))])
-  pure $ Map.fromListWithR Map.union matchingAllocs
+            sender = fundedAllocation.sender
+        return ((admin, sender), (cid, fundedAllocation))
+  pure $ Map.fromList matchingAllocs
 
 expectBurn : Metadata -> Script ()
 expectBurn meta =

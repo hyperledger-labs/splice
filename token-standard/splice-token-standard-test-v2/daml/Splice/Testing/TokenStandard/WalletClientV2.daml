@@ -30,7 +30,6 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
 import DA.Action (unless)
 import DA.Optional (isSome)
-import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 import Splice.Api.Token.AllocationRequestV2 qualified as AllocationRequestV2
@@ -83,7 +82,6 @@ checkHolding p holdingCid amount = checkHoldingBounds p holdingCid (amount, amou
 checkHoldingBounds : Party -> ContractId HoldingV2.Holding -> (Decimal, Decimal) -> Script ()
 checkHoldingBounds p holdingCid (lb, ub) = do
   holdingO <- queryInterfaceContractId p holdingCid
-  debug holdingO
   let holding = case holdingO of
         None -> error $ "Holding " <> show holdingCid <> " was not found"
         Some holding -> holding
@@ -118,19 +116,17 @@ listTransferOffers p instrumentId = do
   pure pendingOffers
 
 -- | List all allocations requested from the owner for a specific instrument.
--- Currently targeting V1.
 listRequestedAllocationsForAdmin : Party -> Party -> Script [AllocationV2.AllocationSpecification]
 listRequestedAllocationsForAdmin p admin = do
   reqs <- queryInterface @AllocationRequestV2.AllocationRequest p
-  trace reqs $ pure ()
   let amuletAllocs = do
         (_reqCid, Some req) <- reqs
         let transferLegs = do
-              (tfId, tf) <- TextMap.toList req.transferLegs
+              tf <- req.transferLegs
               guard (tf.instrumentId.admin ==  admin)
               guard (p == tf.sender.owner || p == tf.receiver.owner)
-              return (tfId, tf)
+              return tf
         pure AllocationV2.AllocationSpecification with
           settlement = req.settlement
-          transferLegs = TextMap.fromList transferLegs
+          transferLegs
   pure amuletAllocs

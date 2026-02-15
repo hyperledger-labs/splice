@@ -649,7 +649,7 @@ template WalletAppInstall
       controller validatorParty
       do allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
           -- Amulet only supports a single sender per allocation
-         let [HoldingV2.Account{HoldingV2.owner = sender}] = (view allocation).senders
+         let HoldingV2.Account{HoldingV2.owner = sender} = (view allocation).sender
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise allocationCid withdrawArg
 
