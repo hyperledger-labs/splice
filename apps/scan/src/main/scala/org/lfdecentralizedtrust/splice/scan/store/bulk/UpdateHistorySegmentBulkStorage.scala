@@ -151,93 +151,17 @@ class UpdateHistorySegmentBulkStorage(
   ): Source[UpdateHistorySegmentBulkStorage.Output, NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
-      .via(ZstdGroupedWeight(config.bulkZstdFrameSize))
-      .statefulMap(() =>
-        State(
-          s3Connection.newAppendWriteObject(
-            s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_0.zstd"
-          ),
-          0,
-          0,
+      .via(
+        S3ZstdObjects(
+          config,
+          s3Connection,
+          { objIdx => s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_$objIdx.zstd" },
+          loggerFactory,
         )
-      )(
-        {
-          case (state, chunk) if state.s3ObjSize + chunk.bytes.length > config.bulkMaxFileSize =>
-            logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${config.bulkMaxFileSize}, so this is the last chunk for the object"
-            )
-            logger.debug(
-              s"First 4 bytes are: ${chunk.bytes.take(4).map(b => f"${b & 0xff}%02X").mkString(" ")}"
-            )
-            (
-              State(
-                s3Connection.newAppendWriteObject(
-                  s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_${state.s3ObjIdx + 1}.zstd"
-                ),
-                state.s3ObjIdx + 1,
-                0,
-              ),
-              ObjectChunk(
-                chunk.bytes,
-                state.obj,
-                true,
-                chunk.isLast,
-                state.obj.prepareUploadNext(),
-              ),
-            )
-          case (state, chunk) =>
-            logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${config.bulkMaxFileSize}"
-            )
-            (
-              State(
-                state.obj,
-                state.s3ObjIdx,
-                state.s3ObjSize + chunk.bytes.length,
-              ),
-              ObjectChunk(
-                chunk.bytes,
-                state.obj,
-                false,
-                chunk.isLast,
-                state.obj.prepareUploadNext(),
-              ),
-            )
-        },
-        onComplete = state => {
-          logger.debug("Done reading updates for segment")
-          Some(
-            ObjectChunk(ByteString.empty, state.obj, true, true, -1)
-          )
-        },
       )
-      .mapAsync(4) { // TODO(#3429): make the parallelism (4) configurable
-        case chunk: ObjectChunk if chunk.partNumber >= 0 =>
-          logger.debug(
-            s"Uploading a chunk of size ${chunk.bytes.toArrayUnsafe().length} as partNumber ${chunk.partNumber} of ${chunk.obj.key}"
-          )
-          chunk.obj.upload(chunk.partNumber, chunk.bytes.asByteBuffer).map(_ => chunk)
-        case chunk => Future.successful(chunk)
-      }
-      .mapAsync(1) {
-        case chunk: ObjectChunk if chunk.isLastChunkInObject =>
-          logger.debug(
-            s"Finished uploading part ${chunk.partNumber}, which is the last one for the object ${chunk.obj.key}, finishing the upload"
-          )
-          chunk.obj
-            .finish()
-            .map(_ =>
-              Some(
-                UpdateHistorySegmentBulkStorage
-                  .Output(segment, chunk.obj.key, chunk.isLastObjectInSegment)
-              )
-            )
-        case chunk => {
-          logger.debug(s"Finished uploading part ${chunk.partNumber} to object ${chunk.obj.key}")
-          Future.successful(None)
-        }
-      }
-      .collect { case Some(out) => out }
+      .map((o: S3ZstdObjects.Output) =>
+        UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
+      )
   }
 }
 object UpdateHistorySegmentBulkStorage {
