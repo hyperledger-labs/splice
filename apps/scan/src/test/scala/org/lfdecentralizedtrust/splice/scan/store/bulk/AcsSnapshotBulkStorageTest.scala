@@ -73,13 +73,13 @@ class AcsSnapshotBulkStorageTest
               TimestampWithMigrationId(ts, 0),
               bulkStorageTestConfig,
               store,
-              s3BucketConnection,
+              bucketConnection,
               new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
               loggerFactory,
             )
             .runWith(Sink.ignore)
 
-          s3Objects <- s3BucketConnection.listObjects
+          s3Objects <- bucketConnection.listObjects
           allContracts <- store
             .queryAcsSnapshot(
               0,
@@ -110,7 +110,7 @@ class AcsSnapshotBulkStorageTest
 
           val allContractsFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(
-              s3BucketConnection,
+              bucketConnection,
               io.circe.parser.decode[httpApi.CreatedEvent],
             )
           )
