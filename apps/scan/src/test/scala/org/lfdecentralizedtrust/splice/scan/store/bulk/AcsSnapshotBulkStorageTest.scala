@@ -54,7 +54,7 @@ class AcsSnapshotBulkStorageTest
     dbAcsSnapshotPeriodHours = 3,
     bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
-    bulkZstdChunkSize = 10000L,
+    bulkZstdFrameSize = 10000L,
     bulkMaxFileSize = 50000L,
   )
 

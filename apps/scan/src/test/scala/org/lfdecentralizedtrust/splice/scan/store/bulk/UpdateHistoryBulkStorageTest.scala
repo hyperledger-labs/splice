@@ -41,7 +41,7 @@ class UpdateHistoryBulkStorageTest
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
     bulkDbReadChunkSize = 500,
-    bulkZstdChunkSize = 10000L,
+    bulkZstdFrameSize = 10000L,
     maxFileSize,
   )
 
