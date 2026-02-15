@@ -120,19 +120,6 @@ class UpdateHistorySegmentBulkStorage(
     updatesBytes
   }
 
-  private case class State(
-      obj: s3Connection.AppendWriteObject,
-      s3ObjIdx: Int,
-      s3ObjSize: Int,
-  )
-  private case class ObjectChunk(
-      bytes: ByteString,
-      obj: s3Connection.AppendWriteObject,
-      isLastChunkInObject: Boolean,
-      isLastObjectInSegment: Boolean,
-      partNumber: Int,
-  )
-
   private def getSource(implicit
       actorSystem: ActorSystem
   ): Source[UpdateHistorySegmentBulkStorage.Output, NotUsed] = {
