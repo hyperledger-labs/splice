@@ -9,6 +9,19 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 
+/** Pekko source for compressing data and dumping it to S3 objects.
+ * The data is compressed into chunks of size >=config.bulkZstdFrameSize. Each chunk is a frame
+ * in zstd terms (i.e. a complete zstd object). The chunks are written into
+ * s3 objects of size >=config.bulkMaxFileSize (as multi-frame zstd objects, which
+ * are simply a concatenation of zstd objects), using multi-part upload (where
+ * each chunk/frame is a part in the upload).
+ * Whenever an S3 object is fully written, the flow emits an Output object
+ * with the name of the object just written (useful for monitoring
+ * progress and testing), and a flag of whether this is the last object and the source has been
+ * completed (useful when streaming a sequence of segments or ACS snapshots, so that we can easily
+ * know when each segment/snapshot is complete).
+ */
+
 class S3ZstdObjects(
     s3Connection: S3BucketConnection,
     override val loggerFactory: NamedLoggerFactory

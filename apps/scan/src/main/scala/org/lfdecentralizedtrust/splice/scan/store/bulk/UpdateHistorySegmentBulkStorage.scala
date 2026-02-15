@@ -33,19 +33,6 @@ case class UpdatesSegment(
     toTimestamp: TimestampWithMigrationId,
 )
 
-/** Pekko source for dumping all updates from a segment to S3 objects.
-  * Reads updates from the updateStore, encodes and compresses them
-  * into chunks of size >=config.bulkZstdFrameSize. Each chunk is a frame
-  * in zstd terms (i.e. a complete zstd object). The chunks are written into
-  * s3 objects of size >=config.bulkMaxFileSize (as multi-frame zstd objects, which
-  * are simply a concatenation of zstd objects), using multi-part upload (where
-  * each chunk/frame is a part in the upload).
-  * Whenever an object is fully written, the source emits an Output object
-  * with the segment details, the name of the object just written (useful for monitoring
-  * progress and testing), and a flag of whether this is the last object in this
-  * segment (useful when streaming a sequence of segments, so that we can easily
-  * know when each segment is complete).
-  */
 class UpdateHistorySegmentBulkStorage(
     val config: ScanStorageConfig,
     val updateHistory: UpdateHistory,
