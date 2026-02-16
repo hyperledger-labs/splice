@@ -35,7 +35,9 @@ class RunbookSvCometBftPreflightIntegrationTest extends IntegrationTestWithShare
 
   "the CometBFT node is a validator" in { env =>
     val sv = env.svs.remote.find(_.name == "sv").value
-    sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+    eventuallySucceeds() {
+      sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+    }
   }
 
 }
