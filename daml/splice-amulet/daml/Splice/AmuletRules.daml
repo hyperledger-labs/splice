@@ -114,10 +114,6 @@ data AmuletRules_UpdateExternalPartyConfigStatesResult = AmuletRules_UpdateExter
     newExternalPartyConfigStateCid : ContractId ExternalPartyConfigState
   deriving (Show, Eq)
 
-data AmuletRules_DisableFeaturedAppMarkersResult = AmuletRules_DisableFeaturedAppMarkersResult with
-    newFeaturedAppRightCids : [ContractId FeaturedAppRight]
-  deriving (Show, Eq)
-
 -- | The rules governing how Amulet users can modify the Amulet state managed by the DSO party.
 template AmuletRules
   with
@@ -827,32 +823,6 @@ template AmuletRules
           amuletPrice = validatedRounds.latestUsableRound.amuletPrice
           transferConfig = transferConfigToTransferConfigV2 validatedRounds.latestUsableRound.transferConfigUsd
         pure AmuletRules_UpdateExternalPartyConfigStatesResult with ..
-
-    -- Disable featured app marker creation in a batch of featured app rights.
-    -- FIXME: consider whether we even need this. The incentives should be in place to stop creating markers altogether.
-    nonconsuming choice AmuletRules_DisableFeaturedAppMarkers : AmuletRules_DisableFeaturedAppMarkersResult
-      with
-        openMiningRoundTriple : OpenMiningRoundTriple
-        featuredAppRightCids : [ContractId FeaturedAppRight]
-        providers : [Party]
-      observer providers
-      controller dso
-      do
-        -- require that traffic-based app rewards is also enabled for the oldest round
-        -- to avoid app providers loosing the ability to create featured app markers too early
-        validatedRounds <- validateOpenMiningRoundTriple dso openMiningRoundTriple
-        require "oldest round has traffic-based rewards enabled"
-          (useTrafficBasedAppRewards validatedRounds.oldestRound.rewardAccountingVersion)
-
-        require "non-empty app rights" (not (null featuredAppRightCids))
-        require "unique app rights" (unique featuredAppRightCids)
-        require "equal number of providers and app rights" (length featuredAppRightCids == length providers)
-
-        newFeaturedAppRightCids <- forA_ (zip providers featuredAppRightCids) $ \(provider, cid) -> do
-          appRight <- fetchAndArchive (ForOwner with dso; owner = provider) cid
-          create appRight with enableMarkerCreation = Some False
-
-        pure AmuletRules_DisableFeaturedAppMarkersResult with newFeaturedAppRightCids
 
 
 data OpenMiningRoundTriple = OpenMiningRoundTriple
