@@ -34,9 +34,8 @@ use_cometbft=0
 use_bft=0
 collect_metrics=0
 logFileHint=canton
-permissioned=0
 
-args=$(getopt -o "hdDap:cB:wsbtfFegmP" -l "help" -- "$@")
+args=$(getopt -o "hdDap:cB:wsbtfFegm" -l "help" -- "$@")
 
 eval set -- "$args"
 
@@ -99,10 +98,6 @@ do
             logFileHint=canton-missing-signatures
             shift
             echo "using a custom canton bootstrap script: $bootstrapScriptPath"
-            ;;
-        -P)
-            permissioned=1
-            echo "Permissioned mode enabled."
             ;;
         --)
             shift
@@ -212,11 +207,6 @@ fi;
 if [[ $use_bft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/bft-sequencer-global-domain-overrides.conf"
 fi;
-
-if [[ $permissioned -eq 1 ]]; then
-  bootstrapScriptPath="scripts/bootstrap/bootstrap-canton-permissioned.sc"
-  logFileHint="canton-permissioned"
-fi
 
 
 tmux_cmd_canton() {
