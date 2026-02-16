@@ -35,9 +35,11 @@ import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, Synchro
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 
 import scala.jdk.OptionConverters.*
 import java.time.Instant
@@ -409,21 +411,33 @@ class SvAppBackendReference(
       config.participantClient.participantClientConfigWithAdminToken,
     )
 
-  private def localSynchronizerNode = config.localSynchronizerNode.getOrElse(
-    throw new RuntimeException("No synchronizer node configured for SV app")
-  )
+  private def localSynchronizerNode(id: PhysicalSynchronizerSerial) =
+    config.localSynchronizerNodes.getOrElse(
+      id,
+      throw new RuntimeException("No synchronizer node configured for SV app"),
+    )
 
   lazy val sequencerClient: SequencerClientReference =
+    sequencerClientForPSId(config.currentPhysicalSynchronizerSerial.getOrElse(NonNegativeInt.zero))
+
+  def sequencerClientForPSId(psid: PhysicalSynchronizerSerial): SequencerClientReference = {
     new SequencerClientReference(
       consoleEnvironment,
       s"sequencer client for $name",
-      localSynchronizerNode.sequencer.toCantonConfig,
+      localSynchronizerNode(psid).sequencer.toCantonConfig,
     )
+  }
 
   lazy val mediatorClient: MediatorClientReference =
+    mediatorClientForPSId(config.currentPhysicalSynchronizerSerial.getOrElse(NonNegativeInt.zero))
+
+  def mediatorClientForPSId(psid: PhysicalSynchronizerSerial): MediatorClientReference = {
     new MediatorClientReference(
       consoleEnvironment,
       s"mediator client for $name",
-      localSynchronizerNode.mediator.toCantonConfig,
+      localSynchronizerNode(
+        psid
+      ).mediator.toCantonConfig,
     )
+  }
 }

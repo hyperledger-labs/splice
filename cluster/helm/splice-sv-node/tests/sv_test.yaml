@@ -138,3 +138,45 @@ tests:
               }
               backup-interval = "24h"
             }
+  - it: "sets domain configuration (backwards compatible)"
+    set:
+      domain:
+        sequencerPublicUrl: "https://sequencer.test.com"
+        sequencerAddress: "sequencer-test-address"
+        mediatorAddress: "mediator-test-address"
+        enableBftSequencer: true
+        sequencerPruningConfig:
+          enabled: true
+          pruningInterval: "1h"
+          retentionPeriod: "7d"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes {
+              sequencer {
+                is-bft-sequencer = true
+                admin-api {
+                  address = "sequencer-test-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer-test-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer.test.com"
+                pruning {
+                  pruning-interval = "1h"
+                  retention-period = "7d"
+                }
+              }
+              mediator {
+                admin-api {
+                  address = "mediator-test-address"
+                  port = 5007
+                }
+              }
+            }

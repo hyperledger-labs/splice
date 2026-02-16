@@ -302,12 +302,14 @@ case class EnvironmentDefinition(
   ): EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllSvAppConfigs_(
-        _.focus(_.localSynchronizerNode)
+        _.focus(_.localSynchronizerNodes)
           .modify(
-            _.map(d =>
-              d.focus(_.sequencer.sequencerAvailabilityDelay)
-                .replace(duration)
-            )
+            _.view
+              .mapValues(d =>
+                d.focus(_.sequencer.sequencerAvailabilityDelay)
+                  .replace(duration)
+              )
+              .toMap
           )
       )(config)
     )
