@@ -23,6 +23,7 @@ import org.openqa.selenium.{
   WebDriverException,
   WebElement,
 }
+import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
 import org.openqa.selenium.support.ui.{ExpectedCondition, ExpectedConditions, WebDriverWait}
 import org.scalatest.{Assertion, ParallelTestExecution}
@@ -155,7 +156,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   val frontendNames: Seq[String] = Seq()
 
-  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
+  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor with WebStorage
 
   val aliceWalletUIPort = 3000
   val bobWalletUIPort = 3001
@@ -253,7 +254,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
     biDi.addListener[LogEntry](
       Log.entryAdded(),
-      (logEntry: LogEntry) => {
+      logEntry => {
         logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
           val msg = consoleLogEntry.getText
           val ctx = traceContextFromConsoleMessage(msg)
@@ -265,7 +266,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           }
         }
       },
-    )
+    );
     val JSON = new Json()
     biDi.addListener[NavigationInfo](
       new Event[NavigationInfo](
@@ -276,9 +277,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           NavigationInfo.fromJson(input)
         },
       ),
-      (navigationInfo: NavigationInfo) =>
-        logger.debug(s"dom content loaded for ${navigationInfo.url}"),
-    )
+      navigationInfo => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
+    );
   }
 
   protected def startWebDrivers() = {
@@ -308,18 +308,17 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   protected def clearWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Clearing web drivers")
-    eventually(60.seconds, retryOnTestFailuresOnly = false) {
+    eventually(60.seconds) {
       webDrivers.values.toList.parTraverse { implicit webDriver =>
         Future {
-          // Reset web storage so we see the login window again.
-          // You cannot reset web storage of about:blank so
+          // Reset session storage so we see the login window again.
+          // You cannot reset session storage of about:blank so
           // we exclude this.
           if (currentUrl != "about:blank") {
-            webDriver.executeScript("""localStorage.clear()""")
-            webDriver.executeScript("""sessionStorage.clear()""")
-            webDriver.executeScript(
-              """return localStorage.length + sessionStorage.length"""
-            ) shouldBe 0
+            webDriver.getSessionStorage().clear()
+            eventually() {
+              webDriver.getSessionStorage().keySet.asScala shouldBe empty
+            }
           }
         }
       }.futureValue
@@ -512,17 +511,14 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     }
   }
 
-  @annotation.nowarn("msg=possible missing interpolator")
   protected def logLocalAndSessionStorage()(implicit webDriver: WebDriverType): Unit = {
     clue("Logging local and session storage") {
       // Note: only logging keys, as values might contain sensitive information
       Try {
-        webDriver.executeScript("""
-          console.debug(`localStorage = [${Object.keys(localStorage).join(", ")}]`);
-        """)
-        webDriver.executeScript("""
-          console.debug(`sessionStorage = [${Object.keys(sessionStorage).join(", ")}]`);
-        """)
+        val localStorageKeys = webDriver.getLocalStorage.keySet.asScala
+        logger.debug(s"localStorage:\n${localStorageKeys.mkString("\n")}")
+        val sessionStorageKeys = webDriver.getSessionStorage.keySet.asScala
+        logger.debug(s"sessionStorage:\n${sessionStorageKeys.mkString("\n")}")
       }.fold(e => logger.debug(s"Failed to log storage: $e"), _ => ())
     }
   }
@@ -617,27 +613,18 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
           // Next, clear local storage, as our oauth library puts data in there
           // Note: again, you can only access the local storage of the current page.
-          clearAuth0WebStorage()
-
+          clue("Clearing local storage") {
+            val auth0LocalState =
+              webDriver.getLocalStorage.keySet.asScala.filter(_.startsWith("oidc."))
+            logger.debug(
+              s"Deleting the following keys from localStorage: $auth0LocalState"
+            )
+            auth0LocalState.foreach(webDriver.getSessionStorage.removeItem)
+          }
           // Finally, navigate away from the current page to clear any JavaScript state
           go to "about:blank"
           throw e
       }
-    }
-  }
-
-  @annotation.nowarn("msg=possible missing interpolator")
-  protected def clearAuth0WebStorage()(implicit webDriver: WebDriverType): Unit = {
-    clue("Clearing auth0 local storage") {
-      Try(
-        webDriver.executeScript(
-          """
-          const auth0LocalState = Object.keys(localStorage).filter(k => k.startsWith("oidc."));
-          console.debug(`Clearing localStorage keys: [${auth0LocalState.join(", ")}]`);
-          auth0LocalState.forEach(k => localStorage.removeItem(k));
-        """
-        )
-      ).fold(e => logger.debug(s"Failed to clear web storage: $e"), _ => ())
     }
   }
 
