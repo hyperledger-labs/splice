@@ -36,7 +36,6 @@ trait AmuletConfigUtil extends TestCommon {
       tickDuration: NonNegativeFiniteDuration,
       maxNumInputs: Int = 100,
       holdingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      createFee: BigDecimal = SpliceUtil.defaultCreateFee.fee,
   )(implicit
       env: SpliceTests.SpliceTestConsoleEnvironment
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
@@ -45,9 +44,7 @@ trait AmuletConfigUtil extends TestCommon {
     val existingTransferConfig = existingAmuletConfig.transferConfig
     new splice.amuletconfig.AmuletConfig(
       new splice.amuletconfig.TransferConfig(
-        new splice.fees.FixedFee(
-          createFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
-        ),
+        existingTransferConfig.createFee,
         new splice.fees.RatePerRound(
           holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
         ),

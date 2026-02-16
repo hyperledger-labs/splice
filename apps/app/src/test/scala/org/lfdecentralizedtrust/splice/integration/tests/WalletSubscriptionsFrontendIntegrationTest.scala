@@ -160,7 +160,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               .valueOrFail("Balance is not shown")
               // from the original `createAnsEntry`
               .text should matchText(
-              s"Total Available Balance: 4.4475 $amuletNameAcronym / 8.895 USD"
+              s"Total Available Balance: 4.5 $amuletNameAcronym / 9 USD"
             )
 
             find(className("sub-request-description"))

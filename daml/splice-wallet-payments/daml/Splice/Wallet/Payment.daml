@@ -117,8 +117,6 @@ template AppPaymentRequest
            receiverAmountToAmuletReceiverAmount dso contextRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
-         outputFees <- exerciseComputeFees dso context sender (map mkReceiverOutput amuletReceiverAmounts)
-
          -- We know that the contextRound (=latest Round) won't be archived before
          -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
          let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
@@ -132,7 +130,7 @@ template AppPaymentRequest
               outputs =
                 [ TransferOutput with
                     receiver = sender
-                    amount = sum outputFees + sum (map (.amuletAmount) amuletReceiverAmounts)
+                    amount = sum (map (.amuletAmount) amuletReceiverAmounts)
                     lock = Some TimeLock with
                       holders = dedupSort $ provider :: map (.receiver) receiverAmounts
                       expiresAt = expiresAt

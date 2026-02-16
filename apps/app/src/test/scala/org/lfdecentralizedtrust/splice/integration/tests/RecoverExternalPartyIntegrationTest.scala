@@ -242,9 +242,7 @@ class RecoverExternalPartyIntegrationTest
           bobValidatorBackend
             .getExternalPartyBalance(aliceParty)
             .totalUnlockedCoin
-        ) should beAround(
-          BigDecimal(2000 - 1000 - 16.0 - 6.0 /* 16 output fees, 6.0 sender change fees */ )
-        )
+        ) should be(BigDecimal(1000))
       },
     )
   }

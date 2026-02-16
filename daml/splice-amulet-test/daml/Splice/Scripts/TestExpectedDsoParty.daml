@@ -43,32 +43,3 @@ testExpectedDsoParty_Transfer = do
     transferChoice with expectedDso = Some app.dso
 
   pure ()
-
--- | Test that the checks on the expected DSO party work for AmuletRules_ComputeFees
-testExpectedDsoParty_ComputeFees : Script ()
-testExpectedDsoParty_ComputeFees = do
-  defaultAppWithUsers <- setupDefaultAppWithUsers
-  let DefaultAppWithUsers{..} = defaultAppWithUsers
-
-  let outputAmount1 = 20.00
-
-  context <- getPaymentTransferContext app alice
-  let computeFeesChoice = AmuletRules_ComputeFees with
-        sender = alice.primaryParty
-        outputs = [ TransferOutput with
-                      receiver = bob.primaryParty
-                      receiverFeeRatio = 0.0
-                      amount = outputAmount1
-                      lock = None
-                  ]
-        context = context.context
-        expectedDso = None
-
-  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
-    computeFeesChoice
-  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
-    computeFeesChoice with expectedDso = Some alice.primaryParty
-  submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
-    computeFeesChoice with expectedDso = Some app.dso
-
-  pure ()

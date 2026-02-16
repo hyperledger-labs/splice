@@ -487,8 +487,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       initialConfig.decentralizedSynchronizer,
       initialConfig.tickDuration,
       initialConfig.packageConfig,
-      java.util.Optional.empty(),
-      java.util.Optional.empty(),
+      initialConfig.transferPreapprovalFee,
+      initialConfig.featuredAppActivityMarkerAmount,
       java.util.Optional.empty(),
     )
 
