@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.config
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
   NonNegativeLong,
   NonNegativeNumeric,
   PositiveInt,
@@ -35,6 +36,7 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
@@ -291,8 +293,10 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     // TODO(#564): read this from scan
-    currentPhysicalSynchronizerId: Option[Int] = Some(0),
-    localSynchronizerNodes: Map[Int, SvSynchronizerNodeConfig],
+    currentPhysicalSynchronizerSerial: Option[PhysicalSynchronizerSerial] = Some(
+      NonNegativeInt.zero
+    ),
+    localSynchronizerNodes: Map[PhysicalSynchronizerSerial, SvSynchronizerNodeConfig],
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -376,7 +380,7 @@ case class SvAppBackendConfig(
   lazy val localSynchronizerNode: Option[SvSynchronizerNodeConfig] = {
     localSynchronizerNodes
       .find { case (index, _) =>
-        currentPhysicalSynchronizerId.contains(index)
+        currentPhysicalSynchronizerSerial.contains(index)
       }
       .map(_._2)
   }
@@ -415,6 +419,8 @@ object SvAppBackendConfig {
     PositiveInt.tryCreate(5),
     NonNegativeFiniteDuration.ofSeconds(10),
   )
+
+  type PhysicalSynchronizerSerial = NonNegativeInt
 }
 
 case class SvCometBftConfig(

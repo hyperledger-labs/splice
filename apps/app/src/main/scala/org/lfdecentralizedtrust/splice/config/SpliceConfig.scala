@@ -50,7 +50,7 @@ import com.digitalasset.canton.config.ConfigErrors.{
   SubstitutionError,
 }
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeNumeric}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
@@ -387,6 +387,21 @@ object SpliceConfig {
               key,
               s"Numeric type ${numeric.getClass.getSimpleName}",
               "Key is not a valid number",
+            )
+          )
+      )
+
+    implicit def nonNegativeIntMapReader[V](implicit
+        valueReader: ConfigReader[V]
+    ): ConfigReader[Map[NonNegativeInt, V]] =
+      genericMapReader[NonNegativeInt, V](key =>
+        NonNegativeInt
+          .create(key.toInt)
+          .leftMap(violation =>
+            CannotConvert(
+              key,
+              s"NonNegativeInt",
+              s"Key is not a valid number: $violation",
             )
           )
       )
@@ -836,6 +851,11 @@ object SpliceConfig {
         valueWriter: ConfigWriter[V]
     ): ConfigWriter[Map[K, V]] =
       genericMapWriter[K, V](_.toString)
+
+    implicit def nonNegativeIntMapWriter[V](implicit
+        valueWriter: ConfigWriter[V]
+    ): ConfigWriter[Map[NonNegativeInt, V]] =
+      genericMapWriter[NonNegativeInt, V](key => key.value.toString)
 
     implicit val dbConfigWriter: ConfigWriter[DbConfig] = deriveWriter[DbConfig]
 

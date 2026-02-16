@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.directoryForDump
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
@@ -53,7 +54,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
   override protected lazy val resetRequiredTopologyState: Boolean = false
 
   override def dbsSuffix = "lsu"
-  private val UpgradePSid = 1
+  private val UpgradePSid = NonNegativeInt.one
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
@@ -78,7 +79,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms
           .updateAllSvAppConfigs { (_, config) =>
             config.copy(
-              currentPhysicalSynchronizerId = Some(0),
+              currentPhysicalSynchronizerSerial = Some(NonNegativeInt.zero),
               localSynchronizerNodes =
                 config.localSynchronizerNodes + (UpgradePSid -> config.localSynchronizerNode.value),
             )
@@ -481,7 +482,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
   }
 
   def sequencerAdminConnection(
-      psid: Int,
+      psid: PhysicalSynchronizerSerial,
       backend: SvAppBackendReference,
   ): SequencerAdminConnection =
     new SequencerAdminConnection(
@@ -492,7 +493,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
       retryProvider,
     )
 
-  def mediatorAdminConnection(psid: Int, backend: SvAppBackendReference): MediatorAdminConnection =
+  def mediatorAdminConnection(
+      psid: PhysicalSynchronizerSerial,
+      backend: SvAppBackendReference,
+  ): MediatorAdminConnection =
     new MediatorAdminConnection(
       backend.config.localSynchronizerNodes.get(psid).value.mediator.adminApi,
       backend.spliceConsoleEnvironment.environment.config.monitoring.logging.api,

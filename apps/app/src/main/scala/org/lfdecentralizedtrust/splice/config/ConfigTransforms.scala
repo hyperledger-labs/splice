@@ -31,6 +31,7 @@ import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 
 import scala.collection.mutable
 import scala.collection.parallel.CollectionConverters.ImmutableMapIsParallelizable
@@ -420,7 +421,7 @@ object ConfigTransforms {
     o.map(bumpUrl(bump, _))
   }
 
-  def bumpCantonPSyncPortsBy(psid: Int, bump: Int) = {
+  def bumpCantonPSyncPortsBy(psid: PhysicalSynchronizerSerial, bump: Int) = {
     updateAllSvAppConfigs((_, conf) =>
       conf
         .focus(_.localSynchronizerNodes)
