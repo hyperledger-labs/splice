@@ -25,6 +25,7 @@ import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
+import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig
@@ -88,6 +89,9 @@ data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResu
 
 data AmuletRules_ClaimExpiredRewardsV2Result = AmuletRules_ClaimExpiredRewardsV2Result with
     unclaimedRewardCid : Optional (ContractId UnclaimedReward)
+
+data AmuletRules_StartProcessingRewardsV2Result = AmuletRules_StartProcessingRewardsV2Result with
+    processRewardsCid : ContractId ProcessRewardsV2
 
 data AmuletRules_UnhideRewardCouponsV2Result = AmuletRules_UnhideRewardCouponsV2Result with
     rewardCouponCids : [ContractId RewardCouponV2]
@@ -664,6 +668,25 @@ template AmuletRules
               else Some <$> create UnclaimedReward with dso; amount
         return AmuletRules_ClaimExpiredRewardsV2Result with
           unclaimedRewardCid
+
+    nonconsuming choice AmuletRules_StartProcessingRewardsV2 : AmuletRules_StartProcessingRewardsV2Result
+      with
+        calculateRewardsCid : ContractId CalculateRewardsV2
+        batchHash : CryptoHash.Hash
+      controller dso
+      do
+        calculateRewards <- fetchAndArchive (ForDso with dso) calculateRewardsCid
+        now <- getTime
+        let rewardsExpireAt = addRelTime now (hours 48) -- FIXME: make expiry duration configurable
+        processRewardsCid <- create ProcessRewardsV2 with
+          dso
+          round = calculateRewards.round
+          dryRun = calculateRewards.dryRun
+          rewardsExpireAt
+          batchHash
+
+        return AmuletRules_StartProcessingRewardsV2Result with
+          processRewardsCid
 
     -- batch conversion of hidden coupons
     nonconsuming choice AmuletRules_UnhideRewardCouponsV2 : AmuletRules_UnhideRewardCouponsV2Result

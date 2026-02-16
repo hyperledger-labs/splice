@@ -26,22 +26,16 @@ import Splice.Util
 overall:
 - remove AmuletRules_ClaimExpiredRewards; and add missing getAndValidateSvParty calls to DsoRules_ClaimExpiredRewards
   - add checked fetches for all coupons in ClaimExpiredRewards
-- check naming to prepare for a change where more reward issuance works through this mechanism (e.g. SV and validator rewards)
-  - e.g., name `GenericRewardCoupon` and pull that through
 
 splice-amulet:
 
-- decide whether we even need AppRewardV2
-  - main motivation: batched minting
-  - adjust amulet rules transfer to support RewardsV2V2
 - introduce ExternalAmuletRules_MintWithBeneficiaries
   - add API package for it
 
+dso:
+- add choices for DSO to trigger the reward calculation and processing based on CalculateRewardsV2 and ProcessRewardsV2
 
-splice-dso:
-- switch to iterated committments to enable bounded-size batches
-
-releas notes:
+release notes:
 - call out cycling of featured app rights; and markers created during switch-over time
 
 Notes for apps:
@@ -143,6 +137,8 @@ batchBeneficiaries ignoredBeneficiaries batch = case batch of
     [ beneficiary | MintingAllowance{..} <- mintingAllowances, not (Set.member beneficiary ignoredBeneficiaries) ]
 
 
+-- instances
+
 instance CryptoHash.Hashable MintingAllowance where
   hash MintingAllowance{..} =
     CryptoHash.hashRecord
@@ -156,3 +152,10 @@ instance CryptoHash.Hashable Batch where
       CryptoHash.hashVariant "BatchOfBatches" [CryptoHash.hash batchHashes]
     BatchOfMintingAllowances mintingAllowances ->
       CryptoHash.hashVariant "BatchOfMintingAllowances" [CryptoHash.hash mintingAllowances]
+
+
+instance HasCheckedFetch CalculateRewardsV2 ForDso where
+  contractGroupId CalculateRewardsV2 with .. = ForDso with ..
+
+instance HasCheckedFetch ProcessRewardsV2 ForDso where
+  contractGroupId ProcessRewardsV2 with .. = ForDso with ..
