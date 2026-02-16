@@ -22,6 +22,7 @@ import Splice.Amulet.TokenApiUtils (amuletInstrumentId)
 import qualified DA.Map as Map
 import DA.Optional (fromSome)
 import DA.Assert ((===))
+import DA.List (groupOn)
 
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
@@ -72,14 +73,16 @@ template AmuletAllocation
             meta = emptyMetadata
 
       allocation_getTransferAuthorizationsImpl _self Allocation_GetTransferAuthorizations{..} = do
+        let
+          grouped_tls = groupOn (\tl -> (tl.sender, tl.receiver)) allocation.transferLegs
         TextMap.fromList . concat <$>
           mapA
-            (\tl ->
+            (\tls@(tl::_) ->
               if tl.sender.owner == sender || (sender `notElem` allocationControllers allocation)
                 then do
                   authCid <- create AmuletAllocationTransferAuthorization with
                     authorizer = sender
-                    transferLeg = tl
+                    transferLegs = tls
                     settlement = allocation.settlement
                     admin
                     expiresAt
@@ -87,7 +90,7 @@ template AmuletAllocation
                   return [(tl.transferLegId, toInterfaceContractId authCid)]
                 else return []
             )
-            allocation.transferLegs
+            grouped_tls
 
     interface instance AllocationV1.Allocation for AmuletAllocation where
       view = allocation_view_v2_to_v1 (view (toInterface @Allocation this))
@@ -123,7 +126,9 @@ allocationToTwoStepTransfer sender transferLegs admin expiresAt settlement =
 
 transferAmuletAllocation : AmuletAllocationTransferAuthorization -> [ContractId Holding] -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation aata holdingCids = do
-  let twoStepTransfer = allocationToTwoStepTransfer aata.transferLeg.sender.owner [aata.transferLeg] aata.admin aata.expiresAt aata.settlement
+  let
+    TransferLeg{sender}::_ = aata.transferLegs
+    twoStepTransfer = allocationToTwoStepTransfer sender.owner aata.transferLegs aata.admin aata.expiresAt aata.settlement
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer holdingCids aata.extraArgs
   pure Allocation_ExecuteTransferResult
@@ -143,29 +148,35 @@ unlockAmuletAllocation amuletAllocation extraArgs = do
 template AmuletAllocationTransferAuthorization
   with
     settlement : SettlementInfo
-    transferLeg : TransferLeg
+    transferLegs : [TransferLeg]
     extraArgs : ExtraArgs
     expiresAt : Time
     authorizer : Party
     admin : Party
   where
-    signatory admin, authorizer, settlement.executor     
+    signatory admin, authorizer, settlement.executor
+    -- Validate
+    ensure not (null transferLegs) &&
+      let TransferLeg{sender; receiver}::_ = transferLegs
+       in all (\tl -> tl.sender == sender && tl.receiver == receiver) transferLegs
+            && (basicAccount authorizer == sender || basicAccount authorizer == receiver)
 
     interface instance AllocationTransferAuthorization for AmuletAllocationTransferAuthorization where
       view = AllocationTransferAuthorizationView with 
         settlement
-        transferLeg
+        transferLegs
         authorizer = basicAccount authorizer
 
       allocationTransferAuthorization_transferImpl _self AllocationTransferAuthorization_Transfer{..} = do
+        let TransferLeg{sender; receiver}::_ = transferLegs
         -- Check this is called on the sender side.
-        transferLeg.sender === basicAccount authorizer
+        sender === basicAccount authorizer
         case receiverAuth of
           Some authCid -> do
             -- validate the extra auth
             extraAuth <- fetch (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid)
             extraAuth === this with
-              authorizer = transferLeg.receiver.owner
+              authorizer = receiver.owner
             exercise (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid) 
               AmuletAllocationTransferAuthorization_TransferWithExtraAuth with
                 extraController = authorizer

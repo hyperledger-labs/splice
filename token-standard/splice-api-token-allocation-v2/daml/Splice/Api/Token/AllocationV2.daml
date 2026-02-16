@@ -18,6 +18,7 @@ import DA.Assert ((===))
 import DA.Optional (isSome, fromOptional, optionalToList)
 import DA.Map as Map (insert, toList, lookup, fromList, Map)
 import DA.Action (foldlA)
+import qualified DA.Set as Set
 
 -- | A generic type to refer to data defined within an app.
 
@@ -110,7 +111,7 @@ data AllocationView = AllocationView with
 -- authorizers are always the signatories so not made available in the viewtype.
 data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView with
   settlement : SettlementInfo
-  transferLeg : TransferLeg
+  transferLegs : [TransferLeg]
   authorizer : Account
   -- ^ the settlement to which this authorization applies. 
 
@@ -155,9 +156,13 @@ interface Allocation where
 
   choice Allocation_GetTransferAuthorizations : TextMap (ContractId AllocationTransferAuthorization)
   -- ^ Transfer the authority from this Allocation to AllocationTransferAuthorizations which
-  -- can then be used in conjunctionw ith other AllocationTransferAuthorizations to execute
-  -- transfers. The return type is a map from transfer leg Id to authorization. Registries
-  -- may choose to omit authorizations that are not needed.
+  -- can then be used in conjunction with other AllocationTransferAuthorizations to execute
+  -- transfers. The return type is a map from transferLegId to authorizations. The key in which
+  -- an authorization is returned is the id of the _first_ transferLeg that it covers.
+  -- If receiver authorizations are required, the receiver authorization must be returned on
+  -- the same key as the sender authorization, and cover the same sets of legs.
+  -- The standard algorithm under which the authorizations must be settleable is implemented in
+  -- `settleAllocations`.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
@@ -222,7 +227,7 @@ interface AllocationTransferAuthorization where
       extraObservers : [Party]
         -- ^ Extra observers to optimize views
     observer extraObservers
-    controller allocationControllers (AllocationSpecification (view this).settlement [(view this).transferLeg])
+    controller allocationControllers (AllocationSpecification (view this).settlement (view this).transferLegs)
     do allocationTransferAuthorization_transferImpl this self arg
 
 -- Result types
@@ -351,31 +356,40 @@ settleAuthorizations
   -- match the instrumentIds on the allocations.
   authsByLeg
   -- ^ The needed AllocationTransferAuthorizations soted by leg and authorizer.
- = foldlA (\(hs, ms) tl -> do
-    -- Get a receiver authorization as needed
-    let auth_r = Map.lookup (tl.transferLegId, tl.receiver) authsByLeg
-    -- Get input holdings
-    let h = fromOptional [] (Map.lookup (tl.instrumentId, tl.sender) hs)
+ = do
+  (res_holdings, res_metas, _) <- foldlA (\(hs, ms, stls) tl -> 
+    if tl.transferLegId `elem` stls
+      then return (hs, ms, stls) -- Already settled. Do nothing.
+      else do
+        -- Get a receiver authorization as needed
+        let auth_r = Map.lookup (tl.transferLegId, tl.receiver) authsByLeg
+        -- Get input holdings
+        let h = fromOptional [] (Map.lookup (tl.instrumentId, tl.sender) hs)
 
-    res <- case Map.lookup (tl.transferLegId, tl.sender) authsByLeg of
-      None -> abort ("No sender authorization found for transferLeg " <> show tl)
-      Some auth_s -> 
-        exercise auth_s AllocationTransferAuthorization_Transfer with
-          receiverAuth = auth_r
-          holdingCids = h
-          extraObservers = if isSome auth_r then tl.receiver.owner::(optionalToList tl.receiver.provider) else []
-    -- Update the holdings maps
-    let 
-      hs' =
-        Map.insert (tl.instrumentId, tl.sender) res.senderHoldingCids $
-        Map.insert (tl.instrumentId, tl.receiver) 
-          (res.receiverHoldingCids ++ fromOptional [] (Map.lookup (tl.instrumentId, tl.receiver) hs)) $
-        hs
-      
-    return (hs', res.meta::ms)
-  )
-  (holdings, [])
-  transferLegs
+        (res, settled_legs) <- case Map.lookup (tl.transferLegId, tl.sender) authsByLeg of
+          None -> abort ("No sender authorization found for transferLeg " <> show tl)
+          Some auth_s -> do
+            auth <- fetch auth_s
+            let sls = map (.transferLegId) (view auth).transferLegs
+            r <- exercise auth_s AllocationTransferAuthorization_Transfer with
+              receiverAuth = auth_r
+              holdingCids = h
+              extraObservers = if isSome auth_r then tl.receiver.owner::(optionalToList tl.receiver.provider) else []
+            return (r, sls)
+        -- Update the holdings maps
+        let 
+          hs' =
+            Map.insert (tl.instrumentId, tl.sender) res.senderHoldingCids $
+            Map.insert (tl.instrumentId, tl.receiver) 
+              (res.receiverHoldingCids ++ fromOptional [] (Map.lookup (tl.instrumentId, tl.receiver) hs)) $
+            hs
+          stls' = dedupSort (settled_legs ++ stls)
+          
+        return (hs', res.meta::ms, stls')
+    )
+    (holdings, [], [])
+    transferLegs
+  return (res_holdings, res_metas)
 
 
 default_allocation_executeTransferImpl : Allocation -> ContractId Allocation -> Allocation_ExecuteTransfer -> Update Allocation_ExecuteTransferResult

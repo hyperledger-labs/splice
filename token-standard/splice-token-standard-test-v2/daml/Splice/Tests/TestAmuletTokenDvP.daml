@@ -89,8 +89,10 @@ setupOtcTrade  = do
   -- Note: here we use Amulet as the single asset, as that is all we have available in this repository.
   -- Given that we are using only the DvP interface, that should though be a fine stand-in for
   -- a DvP across two assets from different registries.
-  let aliceLeg = mkTransfer "leg0" alice bob 100.0
-  let bobLeg = mkTransfer "leg1" bob alice 20.0
+  let aliceLeg = mkTransfer "leg0_a" alice bob 50.0
+      aliceLeg2 = mkTransfer "leg0_b" alice bob 50.0
+  let bobLeg = mkTransfer "leg1_a" bob alice 10.0
+      bobLeg2 = mkTransfer "leg1_b" bob alice 10.0
   let feeLeg = mkTransfer "fee" bob provider 1.0
 
   -- venue creates a trade
@@ -99,7 +101,7 @@ setupOtcTrade  = do
       deadline = now `addRelTime` hours 2
   otcTradeCid <- submit provider $ createCmd OTCTrade with
     venue = provider
-    transferLegs = [aliceLeg, bobLeg]
+    transferLegs = [aliceLeg, aliceLeg2, bobLeg, bobLeg2]
     settleAt
     createdAt = now
     settlementDeadline = Some deadline
@@ -123,7 +125,7 @@ setupOtcTrade  = do
 
   -- Alice sees the allocation request in her wallet
   [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
-  aliceAlloc.transferLegs === [aliceLeg, bobLeg]
+  aliceAlloc.transferLegs === [aliceLeg, aliceLeg2, bobLeg, bobLeg2]
 
   -- alice accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
@@ -168,7 +170,8 @@ setupOtcTrade  = do
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
-  bobAlloc.transferLegs === [feeLeg, aliceLeg, bobLeg]
+  bobAlloc.transferLegs === [feeLeg, aliceLeg, aliceLeg2, bobLeg, bobLeg2]
+
   -- bob accepts allocation request directly via his wallet
   inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
@@ -246,18 +249,20 @@ testDvP = script do
   forA_ results._2 $ \meta -> expectBurn meta
 
   -- check that the expected transfers happened
-  WalletClient.checkHoldingWithAmountExists alice amuletId 20.0
-  WalletClient.checkHoldingWithAmountExists bob amuletId 100.87
+  -- Alice should have two holdings of 10 as no merging happens after she receives.
+  WalletClient.checkHoldingWithAmountExists alice amuletId 10.0
+  -- Bob should have a single holding of 100 as his two 50.0s get merged in the fee leg.
+  WalletClient.checkHoldingWithAmountExists bob amuletId 101.05
 
   -- 1.25 burned:
   -- Allocation: 0.13 = 2 * 0.03/0.5 create fee + 0.005/0.5 lock fee
-  -- Transfer 1: 1.12 = 2 * 0.03/0.5 create fee + 100 * 0.01 transfer fee
-  WalletClient.checkBalanceApprox alice amuletId 918.75 -- around 1 $ of fees paid
+  -- Transfer 1: 1.12 = 3 * 0.03/0.5 create fee + 100 * 0.01 transfer fee
+  WalletClient.checkBalanceApprox alice amuletId 918.69 -- around 1 $ of fees paid
   -- 0.58 burned:
   -- Allocation: 0.13 = 2 * 0.03/0.5 create fee + 0.005/0.5 lock fee
-  -- Transfer 1: 0.32 = 2 * 0.03/0.5 create fee + 20 * 0.01 transfer fee
+  -- Transfer 1: 0.32 = 3 * 0.03/0.5 create fee + 20 * 0.01 transfer fee
   -- Transfer 2: 0.13 = 2 * 0.03/0.5 create fee + 1 * 0.01 transfer fee
-  WalletClient.checkBalanceApprox bob amuletId 1078.42  
+  WalletClient.checkBalanceApprox bob amuletId 1078.36  
 
   -- check that the provider got their featured app reward coupons
   coupons <- map snd <$> query @AppRewardCoupon provider
@@ -270,8 +275,8 @@ testDvP = script do
 
       extraAppReward = 2.0 -- 1 $ (at 0.5 Amulet per $)
       providerWeight = 0.8
-      aliceAmount = providerWeight * (extraAppReward + 1.06) -- 1% fees plus the 0.06 Amulet create fee  (at 0.5 Amulet per $)
-      bobAmount = providerWeight * (extraAppReward + 0.26) -- 0.5% fees (at 0.5 Amulet per $)
+      aliceAmount = providerWeight * (extraAppReward + 1.12) -- 1% fees plus the 2 * 0.06 Amulet create fee  (at 0.5 Amulet per $)
+      bobAmount = providerWeight * (extraAppReward + 0.32) -- 0.5% fees (at 0.5 Amulet per $)
 
       checkNumCouponsFor b expectedNumCoupons = do
         let numCoupons = length $ filter (\c -> c.beneficiary == Some b) coupons
