@@ -378,20 +378,14 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on the network you are connecting to (devnet/testnet/mainnet).
 
 You need to configure how your validator connects to the network's **scan** services by defining a ``scanClient`` block in your ``standalone-validator-values.yaml``.
-There are three modes of ``scanClient``:
-
-- ``bft``: (default mode) connects to all scans and validates via majority agreement.
-- ``bft-custom``: connects to a specific list of trusted SVs and validates against a custom threshold. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of scan responses that need to agree for a response to be considered valid.
-- ``trust-single``: connects to one specific trusted scan.
-
-
-For your selected ``scanClient`` type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|. For ``bft-custom`` and ``bft`` modes of ``scanClient``, you can specify more than one scan seed URL by separating them with commas.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: SCAN_CLIENT_CONFIGURATION_START
     :end-before: SCAN_CLIENT_CONFIGURATION_END
 
+
+For your selected ``scanClient`` type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|. For ``bft-custom`` and ``bft`` modes of ``scanClient``, you can specify more than one scan seed URL by separating them with commas.
 
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-validator-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
