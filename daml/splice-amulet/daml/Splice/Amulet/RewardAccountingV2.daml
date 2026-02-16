@@ -13,6 +13,7 @@ import DA.Foldable (forA_)
 
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Amulet
+import Splice.AmuletConfig
 import Splice.Types
 import Splice.Util
 
@@ -28,7 +29,7 @@ splice-amulet:
 
 - decide whether we even need AppRewardV2
   - main motivation: batched minting
-  - adjust amulet rules transfer to support AppRewardsV2
+  - adjust amulet rules transfer to support RewardsV2V2
 - introduce ExternalAmuletRules_MintWithBeneficiaries
   - add API package for it
 
@@ -64,11 +65,14 @@ Notes on design:
 
 
 -- | Reminder for DSO to confirm the app reward amounts for the given round.
-template ConfirmAppRewards with
+template ConfirmRewardsV2 with
     dso : Party
     round : Round
+    source : RewardCouponSource
     batchSize : Int -- ^ The number of minting allowances to include in each batch.
-    dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessAppRewards contracts.
+    rewardAccountingVersion : RewardCalculationVersion
+      -- FIXME: change name
+    dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
   where
     signatory dso
 
@@ -85,19 +89,20 @@ data Batch
   | BatchOfMintingAllowances MintingAllowances
   deriving (Eq, Show)
 
-data ProcessAppRewards_ProcessBatchResult = ProcessAppRewards_ProcessBatchResult {}
+data ProcessRewardsV2_ProcessBatchResult = ProcessRewardsV2_ProcessBatchResult {}
   deriving (Eq, Show)
 
-template ProcessAppRewards with
+template ProcessRewardsV2 with
     dso : Party
     round : Round
+    source : RewardCouponSource
     dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
     rewardsExpireAt : Time
     batchHash : CryptoHash.Hash
   where
     signatory dso
 
-    choice ProcessAppRewards_ProcessBatch : ProcessAppRewards_ProcessBatchResult
+    choice ProcessRewardsV2_ProcessBatch : ProcessRewardsV2_ProcessBatchResult
       with
         batch : Batch
       observer batchBeneficiaries batch -- FIXME: remove parties that do not vet splice-amulet
@@ -108,9 +113,10 @@ template ProcessAppRewards with
         case batch of
           BatchOfBatches batchHashes -> do
             forA_ batchHashes $ \newBatchHash ->
-              create ProcessAppRewards with
+              create ProcessRewardsV2 with
                 dso
                 round
+                source
                 rewardsExpireAt
                 dryRun
                 batchHash = newBatchHash
@@ -119,12 +125,13 @@ template ProcessAppRewards with
               forA_ mintingAllowances $ \MintingAllowance{..} -> do
                 create RewardCouponV2 with
                   dso
-                  provider = beneficiary
-                  amount
                   round
+                  source
+                  beneficiary
+                  amount
                   expiresAt = rewardsExpireAt
         -- intentationally not returning any information here to save computational overhead
-        return ProcessAppRewards_ProcessBatchResult {}
+        return ProcessRewardsV2_ProcessBatchResult {}
 
 batchBeneficiaries : Batch -> [Party]
 batchBeneficiaries batch = case batch of

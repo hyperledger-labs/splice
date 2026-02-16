@@ -25,6 +25,7 @@ import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
+import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig, defaultTransferPreapprovalFee, getExternalPartyConfigStateTickDuration)
 import qualified Splice.AmuletConfig as Unit
@@ -459,7 +460,7 @@ template AmuletRules
         -- trigger off-ledger reward calculation if needed
         let batchSize = 100 -- FIXME: make configurable
         forA_ (offLedgerRewardCalculationVersion roundToArchive.rewardAccountingVersion) $ \rav ->
-            create ConfirmAppRewards with
+            create ConfirmRewardsV2 with
                 dso
                 round = roundToArchive.round
                 rewardAccountingVersion = rav
@@ -467,7 +468,7 @@ template AmuletRules
                 dryRun = False
 
         forA_ (offLedgerRewardCalculationVersion roundToArchive.dryRunRewardCalculationVersion) $ \rav ->
-            create ConfirmAppRewards with
+            create ConfirmRewardsV2 with
                 dso
                 round = roundToArchive.round
                 rewardAccountingVersion = rav

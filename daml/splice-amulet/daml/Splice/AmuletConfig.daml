@@ -159,6 +159,9 @@ data PackageConfig = PackageConfig
 validPackageConfig : PackageConfig -> Bool
 validPackageConfig _ = True
 
+instance Patchable RewardCalculationVersion where
+  patch = patchScalar
+
 instance Patchable (AmuletConfig USD) where
   patch new base current = AmuletConfig with
     transferConfig = patch new.transferConfig base.transferConfig current.transferConfig
@@ -170,6 +173,8 @@ instance Patchable (AmuletConfig USD) where
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
     optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
     externalPartyConfigStateTickDuration = patch new.externalPartyConfigStateTickDuration base.externalPartyConfigStateTickDuration current.externalPartyConfigStateTickDuration
+    rewardAccountingVersion = patch new.rewardAccountingVersion base.rewardAccountingVersion current.rewardAccountingVersion
+    dryRunRewardCalculationVersion = patch new.dryRunRewardCalculationVersion base.dryRunRewardCalculationVersion current.dryRunRewardCalculationVersion
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with
