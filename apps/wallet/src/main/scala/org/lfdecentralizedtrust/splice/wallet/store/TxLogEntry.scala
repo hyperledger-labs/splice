@@ -195,7 +195,8 @@ object TxLogEntry extends StoreErrors {
         transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
         transferInstructionCid = Some(entry.transferInstructionCid).filter(_.nonEmpty),
         description = Some(entry.description).filter(_.nonEmpty),
-        developmentFundCouponsUsed = Codec.encode(entry.developmentFundCouponsUsed),
+        developmentFundCouponsUsed =
+          Codec.encode(entry.developmentFundCouponsUsed.getOrElse(BigDecimal(0))),
       )
     }
 
@@ -235,7 +236,7 @@ object TxLogEntry extends StoreErrors {
         transferInstructionAmount = transferInstructionAmount,
         transferInstructionCid = item.transferInstructionCid.getOrElse(""),
         description = item.description.getOrElse(""),
-        developmentFundCouponsUsed = developmentFundCouponsUsed,
+        developmentFundCouponsUsed = Some(developmentFundCouponsUsed),
       )
     }
 

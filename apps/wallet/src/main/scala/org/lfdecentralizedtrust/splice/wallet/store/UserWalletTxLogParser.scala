@@ -882,7 +882,7 @@ class UserWalletTxLogParser(
               appRewardsUsed = BigDecimal(0.0),
               validatorRewardsUsed = BigDecimal(0.0),
               svRewardsUsed = Some(BigDecimal(0.0)),
-              developmentFundCouponsUsed = BigDecimal(0.0),
+              developmentFundCouponsUsed = None,
               description = create.payload.transfer.meta.values
                 .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
               transferInstructionReceiver = receiver,
@@ -1303,9 +1303,8 @@ object UserWalletTxLogParser {
           appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
           validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
           svRewardsUsed = Some(BigDecimal(node.result.value.summary.inputSvRewardAmount)),
-          developmentFundCouponsUsed = BigDecimal(
-            node.result.value.summary.inputDevelopmentFundAmount.orElse(java.math.BigDecimal.ZERO)
-          ),
+          developmentFundCouponsUsed =
+            node.result.value.summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
         )
 
       State(entries = immutable.Queue[TxLogEntry](transferEntry))
@@ -1394,9 +1393,8 @@ object UserWalletTxLogParser {
         senderHoldingFees = node.result.value.summary.holdingFees,
         appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
         validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
-        developmentFundCouponsUsed = BigDecimal(
-          node.result.value.summary.inputDevelopmentFundAmount.orElse(java.math.BigDecimal.ZERO)
-        ),
+        developmentFundCouponsUsed =
+          node.result.value.summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
       )
 
       State(
@@ -1474,8 +1472,7 @@ object UserWalletTxLogParser {
         senderHoldingFees = summary.holdingFees,
         appRewardsUsed = BigDecimal(summary.inputAppRewardAmount),
         validatorRewardsUsed = BigDecimal(summary.inputValidatorRewardAmount),
-        developmentFundCouponsUsed =
-          BigDecimal(summary.inputDevelopmentFundAmount.orElse(java.math.BigDecimal.ZERO)),
+        developmentFundCouponsUsed = summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
       )
 
       State(
