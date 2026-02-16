@@ -35,9 +35,9 @@ data AllocationInstructionView = AllocationInstructionView with
       -- ^ The holdings to be used to fund the allocation.
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
-    senders : [Account]
-      -- ^ The senders of the allocation - who typically instructed the allocation instruction
-      -- and later appear on the Allocation as senders.
+    sender : Account
+      -- ^ The sender of the allocation - who typically instructed the allocation instruction
+      -- and later appear on the Allocation as sender.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for
       -- extensibility; e.g., more detailed status information.
@@ -61,7 +61,7 @@ interface AllocationInstruction where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller concatMap (\acc -> acc.owner :: optionalToList acc.provider) (view this).senders
+    controller (view this).sender.owner::optionalToList (view this).sender.provider
     do allocationInstruction_withdrawImpl this self arg
 
   choice AllocationInstruction_Update : AllocationInstructionResult

@@ -113,7 +113,8 @@ data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView w
   settlement : SettlementInfo
   transferLegs : [TransferLeg]
   authorizer : Account
-  -- ^ the settlement to which this authorization applies. 
+  -- ^ the settlement to which this authorization applies.
+    deriving (Eq, Show)
 
 
 
