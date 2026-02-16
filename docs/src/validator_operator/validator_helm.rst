@@ -394,11 +394,6 @@ For your selected ``scanClient`` type, replace ``TRUSTED_SCAN_URL`` with a URL o
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
 You need to configure how your validator's participant connects to **sequencers** by defining a ``synchronizer`` config in your ``validator-values.yaml``.
-``synchronizer`` supports three modes of operation:
-
-- ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.
-- ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of sequencer responses that need to agree for a response to be considered valid.
-- ``trust-single``: connects to one specific url. Replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the URL of the sequencer you trust.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
