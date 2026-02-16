@@ -83,7 +83,7 @@ data AmuletConfig unit = AmuletConfig with
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
     externalPartyConfigStateTickDuration : Optional RelTime -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts.
-    rewardAccountingVersion : Optional RewardCalculationVersion
+    rewardCalculationVersion : Optional RewardCalculationVersion
       -- ^ Which version of reward accounting to use. See docs for `RewardCalculationVersion` for details.
     dryRunRewardCalculationVersion : Optional RewardCalculationVersion
       -- ^ Which version of reward accounting to dry-run. Used to test-drive the off-ledger reward accounting
@@ -173,7 +173,7 @@ instance Patchable (AmuletConfig USD) where
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
     optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
     externalPartyConfigStateTickDuration = patch new.externalPartyConfigStateTickDuration base.externalPartyConfigStateTickDuration current.externalPartyConfigStateTickDuration
-    rewardAccountingVersion = patch new.rewardAccountingVersion base.rewardAccountingVersion current.rewardAccountingVersion
+    rewardCalculationVersion = patch new.rewardCalculationVersion base.rewardCalculationVersion current.rewardCalculationVersion
     dryRunRewardCalculationVersion = patch new.dryRunRewardCalculationVersion base.dryRunRewardCalculationVersion current.dryRunRewardCalculationVersion
 
 instance Patchable (TransferConfig USD) where

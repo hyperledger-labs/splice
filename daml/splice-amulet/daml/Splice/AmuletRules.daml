@@ -382,6 +382,7 @@ template AmuletRules
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
+        let rewardCalculationVersion = configUsd.rewardCalculationVersion
         let nr0 = fromOptional 0 initialRound
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
@@ -410,11 +411,11 @@ template AmuletRules
         let transferConfigUsd = configUsd.transferConfig
 
         oldest <- create OpenMiningRound with
-          dso; round = Round nr0; amuletPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+          dso; round = Round nr0; amuletPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0; rewardCalculationVersion
         newestOpen <- create OpenMiningRound with
-          dso; round = Round nr1; amuletPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+          dso; round = Round nr1; amuletPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1; rewardCalculationVersion
         last <- create OpenMiningRound with
-          dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+          dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2; rewardCalculationVersion
 
         exercise self AmuletRules_UpdateToLatestSchemaVersion with
           openMiningRoundTriple = OpenMiningRoundTriple with
@@ -455,11 +456,11 @@ template AmuletRules
 
         -- trigger off-ledger reward calculation if needed
         let batchSize = 100 -- FIXME: make configurable
-        forA_ (offLedgerRewardCalculationVersion roundToArchive.rewardAccountingVersion) $ \rav ->
+        forA_ (offLedgerRewardCalculationVersion roundToArchive.rewardCalculationVersion) $ \rav ->
             create ConfirmRewardsV2 with
                 dso
                 round = roundToArchive.round
-                rewardAccountingVersion = rav
+                rewardCalculationVersion = rav
                 batchSize = batchSize
                 dryRun = False
 
@@ -467,7 +468,7 @@ template AmuletRules
             create ConfirmRewardsV2 with
                 dso
                 round = roundToArchive.round
-                rewardAccountingVersion = rav
+                rewardCalculationVersion = rav
                 batchSize = batchSize
                 dryRun = True
 
@@ -491,7 +492,7 @@ template AmuletRules
               transferConfigUsd = configUsd.transferConfig
               issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
               tickDuration
-              rewardAccountingVersion = configUsd.rewardAccountingVersion
+              rewardCalculationVersion = configUsd.rewardCalculationVersion
         return AmuletRules_AdvanceOpenMiningRoundsResult with
           summarizingRoundCid = newSummarizingRound
           openRoundCid = newOpenRound
@@ -776,7 +777,7 @@ template AmuletRules
         round <- fetchReferenceData (ForDso dso) openMiningRoundCid
         require ("mining round is open: " <> show round) (round.opensAt <= now)
         let configUsd = getValueAsOf now configSchedule
-        if useTrafficBasedAppRewards round.rewardAccountingVersion
+        if useTrafficBasedAppRewards round.rewardCalculationVersion
           then
             -- Ignore markers for rounds where traffic-based rewards are enabled.
             -- We need this, as stopping marker creation is delayed by up to 48h as we can only propagate

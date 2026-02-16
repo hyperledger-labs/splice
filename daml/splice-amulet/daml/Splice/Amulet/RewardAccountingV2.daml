@@ -70,7 +70,7 @@ template ConfirmRewardsV2 with
     round : Round
     source : RewardCouponSource
     batchSize : Int -- ^ The number of minting allowances to include in each batch.
-    rewardAccountingVersion : RewardCalculationVersion
+    rewardCalculationVersion : RewardCalculationVersion
       -- FIXME: change name
     dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
   where
