@@ -26,7 +26,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchroniz
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.directoryForDump
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.scan.config.CacheConfig
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.util.*
@@ -67,18 +66,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllScanAppConfigs_(conf =>
-          conf.copy(cache =
-            conf.cache.copy(cachedByParty =
-              CacheConfig(
-                ttl = NonNegativeFiniteDuration.ofMillis(1),
-                maxSize = 2000,
-              )
-            )
-          )
-        )(config)
-      )
       .addConfigTransforms((_, config) => {
         ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
           config.copy(
@@ -91,7 +78,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms
           .updateAllSvAppConfigs { (_, config) =>
             config.copy(
-              currentPhisicalSynchronizerNodeIndex = Some(UpgradePSid),
+              currentPhysicalSynchronizerId = Some(0),
               localSynchronizerNodes =
                 config.localSynchronizerNodes + (UpgradePSid -> config.localSynchronizerNode.value),
             )

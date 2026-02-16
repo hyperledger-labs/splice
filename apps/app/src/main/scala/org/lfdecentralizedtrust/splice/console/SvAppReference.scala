@@ -415,7 +415,7 @@ class SvAppBackendReference(
   )
 
   lazy val sequencerClient: SequencerClientReference =
-    sequencerClientForPSId(config.currentPhisicalSynchronizerNodeIndex.getOrElse(0))
+    sequencerClientForPSId(config.currentPhysicalSynchronizerId.getOrElse(0))
 
   def sequencerClientForPSId(psid: Int): SequencerClientReference = {
     new SequencerClientReference(
@@ -426,7 +426,7 @@ class SvAppBackendReference(
   }
 
   lazy val mediatorClient: MediatorClientReference =
-    mediatorClientForPSId(config.currentPhisicalSynchronizerNodeIndex.getOrElse(0))
+    mediatorClientForPSId(config.currentPhysicalSynchronizerId.getOrElse(0))
 
   def mediatorClientForPSId(psid: Int): MediatorClientReference = {
     new MediatorClientReference(

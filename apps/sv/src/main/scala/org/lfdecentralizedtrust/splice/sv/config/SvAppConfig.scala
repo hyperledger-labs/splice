@@ -291,7 +291,7 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     // TODO(#564): read this from scan
-    currentPhisicalSynchronizerNodeIndex: Option[Int] = Some(0),
+    currentPhysicalSynchronizerId: Option[Int] = Some(0),
     localSynchronizerNodes: Map[Int, SvSynchronizerNodeConfig],
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
@@ -376,7 +376,7 @@ case class SvAppBackendConfig(
   lazy val localSynchronizerNode: Option[SvSynchronizerNodeConfig] = {
     localSynchronizerNodes
       .find { case (index, _) =>
-        currentPhisicalSynchronizerNodeIndex.contains(index)
+        currentPhysicalSynchronizerId.contains(index)
       }
       .map(_._2)
   }
