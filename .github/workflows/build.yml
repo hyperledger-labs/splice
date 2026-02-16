@@ -133,6 +133,19 @@ jobs:
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
+  scala_test_permissioned_canton:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-medium
+      test_names_file: 'test-full-class-names-permissioned.log'
+      start_canton_options: -w
+      parallelism: 1
+      test_name: permissioned-synchronizer
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
   scala_test_disaster_recovery:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -333,6 +346,7 @@ jobs:
     - scala_test_disaster_recovery
     - scala_test_with_cometbft
     - scala_test_wall_clock_time
+    - scala_test_permissioned_canton
     - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
     - scala_test_docker_compose
