@@ -1378,7 +1378,8 @@ class UpdateHistory(
         effective_at,
         root_event_ids,
         workflow_id,
-        command_id
+        command_id,
+        external_transaction_hash
       from  update_history_transactions
       where update_id = $safeUpdateId
       and history_id = $historyId
