@@ -87,7 +87,7 @@ data AppRewardCoupon_DsoExpireResult = AppRewardCoupon_DsoExpireResult with
   featured : Bool
   amount : Decimal
 
-data AppRewardCouponV2_DsoExpireResult = AppRewardCouponV2_DsoExpireResult with
+data RewardCouponV2_DsoExpireResult = RewardCouponV2_DsoExpireResult with
   amount : Decimal
 
 data ValidatorRewardCoupon_DsoExpireResult = ValidatorRewardCoupon_DsoExpireResult with
@@ -387,26 +387,34 @@ template AppRewardCoupon
          return AppRewardCoupon_DsoExpireResult with
            ..
 
--- | A coupon for receiving traffic-based app rewards.
+data RewardCouponSource
+  = RCS_A -- ^ Rewards from the app reward tranche.
+  | RCS_V -- ^ Rewards from the validator tranche.
+  | RCS_SV -- ^ Rewards from the SV tranche.
+  deriving (Eq, Show)
+
+-- | A coupon for receiving rewards from a specific source.
 --
--- Designed so that minting can be batched in longer time intervals than a single round.
-template AppRewardCouponV2
+-- Used to implement rewards minting based on off-ledger calculations.
+-- See Splice.Amulet.RewardAccountingV2 for details.
+template RewardCouponV2
   with
     dso : Party
-    provider : Party -- ^ Application provider
-    amount : Decimal -- ^ The amount of reward to be claimed. Denominated in Amulet.
+    beneficiary : Party -- ^ The party that can claim the reward.
     round : Round -- ^ The round for which this reward can be claimed.
-    expiresAt : Time -- ^ Time-based expiry.
+    source : RewardCouponSource -- ^ The source of the reward.
+    amount : Decimal -- ^ The amount of reward to be claimed. Denominated in Amulet.
+    expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be claimed.
   where
     signatory dso
-    observer provider
+    observer beneficiary
     ensure amount > 0.0
 
-    choice AppRewardCouponV2_DsoExpire : AppRewardCouponV2_DsoExpireResult
+    choice RewardCouponV2_DsoExpire : RewardCouponV2_DsoExpireResult
       controller dso
       do
         assertDeadlineExceeded "expiresAt" expiresAt
-        return AppRewardCouponV2_DsoExpireResult with
+        return RewardCouponV2_DsoExpireResult with
           amount
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
@@ -595,11 +603,11 @@ instance HasCheckedFetch LockedAmulet ForOwner where
 instance HasCheckedFetch AppRewardCoupon ForOwner where
   contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = fromOptional provider beneficiary
 
-instance HasCheckedFetch AppRewardCouponV2 ForOwner where
-  contractGroupId AppRewardCouponV2{..} = ForOwner with dso; owner = provider
+instance HasCheckedFetch RewardCouponV2 ForOwner where
+  contractGroupId RewardCouponV2{..} = ForOwner with dso; owner = provider
 
-instance HasCheckedFetch AppRewardCouponV2 ForDso where
-  contractGroupId AppRewardCouponV2{..} = ForDso with dso
+instance HasCheckedFetch RewardCouponV2 ForDso where
+  contractGroupId RewardCouponV2{..} = ForDso with dso
 
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary

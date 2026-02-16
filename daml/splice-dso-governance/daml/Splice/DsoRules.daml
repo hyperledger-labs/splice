@@ -1365,14 +1365,14 @@ template DsoRules with
     -- batch claim of expired rewards that use time-based expiry
     nonconsuming choice DsoRules_ClaimExpiredRewardsV2 : DsoRules_ClaimExpiredRewardsV2Result
       with
-        appRewardCouponCids : [ContractId AppRewardCouponV2]
+        appRewardCouponCids : [ContractId RewardCouponV2]
         sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
         expiredAmounts <- forA appRewardCouponCids $ \cid -> do
           _ <- fetchChecked (ForDso with dso) cid
-          expireResult <- exercise cid AppRewardCouponV2_DsoExpire
+          expireResult <- exercise cid RewardCouponV2_DsoExpire
           return expireResult.amount
         let amount = sum expiredAmounts
         unclaimedRewardCid <- if (amount <= 0.0)

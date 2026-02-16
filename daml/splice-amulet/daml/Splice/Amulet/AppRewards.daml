@@ -38,7 +38,7 @@ releas notes:
 Notes for apps:
 
 - wallet:
-  - collect AppRewardCouponV2
+  - collect RewardCouponV2
 
 
 
@@ -113,7 +113,7 @@ template ProcessAppRewards with
           BatchOfMintingAllowances mintingAllowances -> do
             unless dryRun $ do
               forA_ mintingAllowances $ \MintingAllowance{..} -> do
-                create AppRewardCouponV2 with
+                create RewardCouponV2 with
                   dso
                   provider = beneficiary
                   amount
