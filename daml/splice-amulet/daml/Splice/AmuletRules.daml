@@ -27,7 +27,10 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
 import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletConfig (transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig, defaultTransferPreapprovalFee, getExternalPartyConfigStateTickDuration)
+import Splice.AmuletConfig
+  ( transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig
+  , defaultTransferPreapprovalFee, getExternalPartyConfigStateTickDuration, useTrafficBasedAppRewards
+  )
 import qualified Splice.AmuletConfig as Unit
 import Splice.ExternalPartyConfigState
 import Splice.Schedule
@@ -455,27 +458,25 @@ template AmuletRules
             tickDuration = roundToArchive.tickDuration
 
         -- trigger off-ledger reward calculation if needed
+        let configUsd = getValueAsOf now configSchedule
         let batchSize = 100 -- FIXME: make configurable
-        forA_ (offLedgerRewardCalculationVersion roundToArchive.rewardCalculationVersion) $ \rav ->
-            create ConfirmRewardsV2 with
+        when (useTrafficBasedAppRewards roundToArchive.rewardCalculationVersion) $ do
+            void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
-                rewardCalculationVersion = rav
                 batchSize = batchSize
                 dryRun = False
 
-        forA_ (offLedgerRewardCalculationVersion roundToArchive.dryRunRewardCalculationVersion) $ \rav ->
-            create ConfirmRewardsV2 with
+        when (useTrafficBasedAppRewards configUsd.dryRunRewardCalculationVersion) $ do
+            void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
-                rewardCalculationVersion = rav
                 batchSize = batchSize
                 dryRun = True
 
         -- create the new open round
         newOpenRound <- do
-          let configUsd = getValueAsOf now configSchedule
-              tickDuration = configUsd.tickDuration
+          let tickDuration = configUsd.tickDuration
               -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
               opensAt = addRelTime (max now latestRound.opensAt) tickDuration
               newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
@@ -852,7 +853,7 @@ validateOpenMiningRoundTriple dso roundTriple = do
     latestUsableRound = maximumOn (.round.number) usableRounds
 
 miningRoundTripleCids : OpenMiningRoundTriple -> [ContractId OpenMiningRound]
-miningRoundTripleCids OpenMiningRoundTriple{} = [round0Cid, round1Cid, round2Cid]
+miningRoundTripleCids OpenMiningRoundTriple {..} = [round0Cid, round1Cid, round2Cid]
 
 
 -- Transfer logic

@@ -91,6 +91,9 @@ defaultAmuletConfig = AmuletConfig with
 
   optDevelopmentFundManager = None
 
+  rewardCalculationVersion = None
+  dryRunRewardCalculationVersion = None
+
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
 defaultAmuletConfigSchedule = Schedule with

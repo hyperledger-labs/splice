@@ -6,14 +6,18 @@
 --
 -- It is a Version 2 compared to the previous reward accounting mechanism that is based on tracking
 -- all state on-ledger using App|Validator|SvRewardCoupon and IssuingMiningRound contracts.
+--
+-- The design is flexible to allow for extending it to other kinds of rewards
+-- that are based on off-ledger calculations, but the initial implementation is
+-- specialized to traffic-based app rewards.
 module Splice.Amulet.RewardAccountingV2 where
 
 import DA.Action (unless)
 import DA.Foldable (forA_)
+import DA.Set as Set
 
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Amulet
-import Splice.AmuletConfig
 import Splice.Types
 import Splice.Util
 
@@ -64,14 +68,12 @@ Notes on design:
 
 
 
--- | Reminder for DSO to confirm the app reward amounts for the given round.
-template ConfirmRewardsV2 with
+
+-- | Reminder for DSO to calculate and confirm the app reward amounts for the given round.
+template CalculateRewardsV2 with
     dso : Party
     round : Round
-    source : RewardCouponSource
     batchSize : Int -- ^ The number of minting allowances to include in each batch.
-    rewardCalculationVersion : RewardCalculationVersion
-      -- FIXME: change name
     dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
   where
     signatory dso
@@ -95,7 +97,6 @@ data ProcessRewardsV2_ProcessBatchResult = ProcessRewardsV2_ProcessBatchResult {
 template ProcessRewardsV2 with
     dso : Party
     round : Round
-    source : RewardCouponSource
     dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
     rewardsExpireAt : Time
     batchHash : CryptoHash.Hash
@@ -105,7 +106,9 @@ template ProcessRewardsV2 with
     choice ProcessRewardsV2_ProcessBatch : ProcessRewardsV2_ProcessBatchResult
       with
         batch : Batch
-      observer batchBeneficiaries batch -- FIXME: remove parties that do not vet splice-amulet
+        beneficiariesWithWrongVettingState : Set Party
+          -- ^ Beneficiaries that do not have the correct vetting state for receiving rewards.
+      observer batchBeneficiaries beneficiariesWithWrongVettingState batch
       controller dso
       do
         let actualHash = CryptoHash.hash batch
@@ -116,27 +119,29 @@ template ProcessRewardsV2 with
               create ProcessRewardsV2 with
                 dso
                 round
-                source
                 rewardsExpireAt
                 dryRun
                 batchHash = newBatchHash
           BatchOfMintingAllowances mintingAllowances -> do
             unless dryRun $ do
-              forA_ mintingAllowances $ \MintingAllowance{..} -> do
+              forA_ mintingAllowances $ \MintingAllowance{..} ->
                 create RewardCouponV2 with
                   dso
                   round
-                  source
                   beneficiary
                   amount
                   expiresAt = rewardsExpireAt
+                  hidden = Set.member beneficiary beneficiariesWithWrongVettingState
+
         -- intentationally not returning any information here to save computational overhead
         return ProcessRewardsV2_ProcessBatchResult {}
 
-batchBeneficiaries : Batch -> [Party]
-batchBeneficiaries batch = case batch of
+batchBeneficiaries : Set Party -> Batch -> [Party]
+batchBeneficiaries ignoredBeneficiaries batch = case batch of
   BatchOfBatches _ -> []
-  BatchOfMintingAllowances mintingAllowances -> map (.beneficiary) mintingAllowances
+  BatchOfMintingAllowances mintingAllowances ->
+    [ beneficiary | MintingAllowance{..} <- mintingAllowances, not (Set.member beneficiary ignoredBeneficiaries) ]
+
 
 instance CryptoHash.Hashable MintingAllowance where
   hash MintingAllowance{..} =

@@ -375,27 +375,28 @@ template AppRewardCoupon
          return AppRewardCoupon_DsoExpireResult with
            ..
 
-data RewardCouponSource
-  = RCS_A -- ^ Rewards from the app reward tranche.
-  | RCS_V -- ^ Rewards from the validator tranche.
-  | RCS_SV -- ^ Rewards from the SV tranche.
-  deriving (Eq, Show)
-
--- | A coupon for receiving rewards from a specific source.
+-- | A coupon for receiving rewards, which is currently only used for
+-- traffic-based app rewards.
 --
--- Used to implement rewards minting based on off-ledger calculations.
+-- Designed to be flexible so we could extend it to include other kinds of rewards
+-- that are based on on off-ledger calculations.
 -- See Splice.Amulet.RewardAccountingV2 for details.
 template RewardCouponV2
   with
     dso : Party
     beneficiary : Party -- ^ The party that can claim the reward.
     round : Round -- ^ The round for which this reward can be claimed.
-    source : RewardCouponSource -- ^ The source of the reward.
     amount : Decimal -- ^ The amount of reward to be claimed. Denominated in Amulet.
     expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be claimed.
+    hidden : Bool
+      -- ^ Whether this should be hidden from the beneficiary due to the
+      -- beneficiary not having the correct vetting state at the time of coupon
+      -- creation. The DSO will then attempt to show the coupon to the
+      -- beneficiary again when they change their vetting state unless the
+      -- coupon expired in the meantime.
   where
     signatory dso
-    observer beneficiary
+    observer if hidden then [] else [beneficiary]
     ensure amount > 0.0
 
     choice RewardCouponV2_DsoExpire : RewardCouponV2_DsoExpireResult
@@ -404,6 +405,7 @@ template RewardCouponV2
         assertDeadlineExceeded "expiresAt" expiresAt
         return RewardCouponV2_DsoExpireResult with
           amount
+
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
 -- hosted by a validator operator.
