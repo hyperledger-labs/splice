@@ -11,6 +11,9 @@ inputs:
     description: "If set to false, no caches will be saved"
     required: false
     default: "true"
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
 
 runs:
   using: 'composite'
@@ -21,6 +24,7 @@ runs:
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).classes }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Store SBT Cache
       if: ${{ fromJson(inputs.save_caches) }}
@@ -28,6 +32,7 @@ runs:
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).sbt }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Store frontend node_modules
       if: ${{ fromJson(inputs.save_caches) }}
@@ -35,6 +40,7 @@ runs:
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).node_modules }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Store Daml artifacts
       if: ${{ fromJson(inputs.save_caches) }}
@@ -42,13 +48,14 @@ runs:
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).daml }}
+        splice_root: ${{ inputs.splice_root }}
 
     - name: Collect test reports
       shell: bash
       run: |
         sudo mkdir -p /cache/test-reports
         sudo chown $(whoami):$(whoami) "/cache/test-reports"
-        for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
+        for subproject in `find ${{ inputs.splice_root }} -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
         do
           # `|| true` to avoid failing if there are no test reports
           cp -v "$subproject"/target/test-reports/TEST-*.xml /cache/test-reports/ || true

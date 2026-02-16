@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateDevelopmentFundCouponResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
+  ListDevelopmentFundCouponHistoryResponse,
   ListMintingDelegationProposalsResponse,
   ListMintingDelegationsResponse,
   TransferInstructionResultResponse,
@@ -599,7 +600,7 @@ abstract class WalletAppReference(
   @Help.Description(
     "Exercises the choice AllocationRequest_Reject from the Token Standard on the passed contract id."
   )
-  def rejectAllocationRequest(id: AllocationRequest.ContractId) = {
+  def rejectAllocationRequest(id: AllocationRequest.ContractId): Unit = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
     }
@@ -653,6 +654,19 @@ abstract class WalletAppReference(
       httpCommand(
         HttpWalletAppClient.WithdrawDevelopmentFundCoupon(developmentFundCouponContractId, reason)
       )
+    }
+
+  @Help.Summary("List the history of development fund coupons")
+  @Help.Description(
+    "Lists archived development fund coupons for the configured user acting as the development fund manager, " +
+      "starting with the most recently archived ones and returning paginated results."
+  )
+  def listDevelopmentFundCouponHistory(
+      after: Option[Long] = None,
+      limit: Int,
+  ): ListDevelopmentFundCouponHistoryResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListDevelopmentFundCouponHistory(after, limit))
     }
 
   @Help.Summary("List MintingDelegationProposals")

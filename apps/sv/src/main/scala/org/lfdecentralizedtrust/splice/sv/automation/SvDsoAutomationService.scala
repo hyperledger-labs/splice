@@ -84,7 +84,6 @@ class SvDsoAutomationService(
       dsoStore,
       ledgerClient,
       retryProvider,
-      config.ingestFromParticipantBegin,
       config.parameters,
     ) {
 
@@ -233,8 +232,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        config.preparationTimeRecordTimeTolerance,
-        config.mediatorDeduplicationTimeout,
+        config,
       )
     )
 

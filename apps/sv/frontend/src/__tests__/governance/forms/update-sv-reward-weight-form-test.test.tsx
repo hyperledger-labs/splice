@@ -87,7 +87,7 @@ describe('Update SV Reward Weight Form', () => {
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
@@ -119,7 +119,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '0_1000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -231,8 +231,8 @@ describe('Update SV Reward Weight Form', () => {
       });
     };
 
-    await validateCurrentWeightFor('Digital-Asset-2', '10');
-    await validateCurrentWeightFor('Digital-Asset-Eng-2', '12345');
+    await validateCurrentWeightFor('Digital-Asset-2', '0_0010');
+    await validateCurrentWeightFor('Digital-Asset-Eng-2', '1_2345');
   });
 
   test('Weight is reset when sv changes', async () => {
@@ -249,8 +249,8 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput.getAttribute('value')).toBe('');
 
     // set the weight before changing sv
-    await user.type(weightInput, '10999');
-    expect(weightInput.getAttribute('value')).toBe('10999');
+    await user.type(weightInput, '1_0999');
+    expect(weightInput.getAttribute('value')).toBe('1_0999');
 
     const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
     expect(memberDropdown).toBeInTheDocument();
@@ -266,7 +266,7 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput.getAttribute('value')).toBe('');
   });
 
-  test('Weight must be a valid number', async () => {
+  test('Weight must be in basis points notation', async () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
@@ -274,12 +274,15 @@ describe('Update SV Reward Weight Form', () => {
       </Wrapper>
     );
 
+    const errorMessage =
+      'Weight must be expressed in basis points using fixed point notation, XX...X_XXXX';
+
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
     await user.type(weightInput, '123abc');
 
     await waitFor(() => {
-      expect(screen.getByText('Weight must be a valid number')).toBeInTheDocument();
+      expect(screen.getByText(errorMessage)).toBeInTheDocument();
     });
 
     await user.clear(weightInput);
@@ -287,7 +290,15 @@ describe('Update SV Reward Weight Form', () => {
     await user.click(screen.getByTestId('update-sv-reward-weight-action'));
 
     await waitFor(() => {
-      expect(screen.queryByText('Weight must be a valid number')).toBeNull();
+      expect(screen.getByText(errorMessage)).toBeInTheDocument();
+    });
+
+    await user.clear(weightInput);
+    await user.type(weightInput, '0_1001');
+    await user.click(screen.getByTestId('update-sv-reward-weight-action'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
     });
   });
 
@@ -331,7 +342,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '0_1000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -380,7 +391,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput.getAttribute('value')).toBe('');
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '0_1000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -390,8 +401,8 @@ describe('Update SV Reward Weight Form', () => {
     await user.click(submitButton); //review proposal
 
     await waitFor(() => {
-      expect(screen.getByTestId('config-change-current-value').textContent).toBe('12345');
-      expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
+      expect(screen.getByTestId('config-change-current-value').textContent).toBe('1_2345');
+      expect(screen.getByTestId('config-change-new-value').textContent).toBe('0_1000');
     });
   });
 
@@ -435,7 +446,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '0_1000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -446,5 +457,55 @@ describe('Update SV Reward Weight Form', () => {
     await user.click(submitButton); //submit proposal
 
     await screen.findByText('Successfully submitted the proposal');
+  });
+
+  test('should send reward weight to backend without underscore', async () => {
+    let requestBody = '';
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, async (req, res, ctx) => {
+        requestBody = await req.text();
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    await user.type(weightInput, '0_1000');
+
+    await user.click(actionInput); // triggers onBlur validation
+    await waitFor(async () => {
+      expect(submitButton).not.toBeDisabled();
+    });
+
+    await user.click(submitButton); // review proposal
+    await user.click(submitButton); // submit proposal
+
+    await waitFor(() => {
+      expect(requestBody).toContain('"newRewardWeight":"1000"');
+    });
   });
 });

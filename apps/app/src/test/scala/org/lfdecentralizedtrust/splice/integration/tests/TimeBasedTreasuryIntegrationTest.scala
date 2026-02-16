@@ -3,13 +3,17 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
+  updateAllSvAppFoundDsoConfigs_,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpiredAmuletTrigger
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.HasExecutionContext
+import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 import java.time.Duration
@@ -20,6 +24,10 @@ class TimeBasedTreasuryIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
+  // We increase holding fees for this test so we can expire amulets within a few rounds
+  // without running into problematic because of, e.g., create fees.
+  val holdingFee = BigDecimal(0.5)
+
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
@@ -27,6 +35,11 @@ class TimeBasedTreasuryIntegrationTest
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialHoldingFee).replace(holdingFee))(
+          config
+        )
       )
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
@@ -40,7 +53,7 @@ class TimeBasedTreasuryIntegrationTest
 
     // create two amulets in alice's wallet
     aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq(exactly(50)))
+    checkWallet(alice, aliceWalletClient, Seq(exactly(50)), holdingFee)
 
     // run a transfer such that alice's validator has some rewards
     p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
@@ -48,7 +61,7 @@ class TimeBasedTreasuryIntegrationTest
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
     // and give alice another amulet.
     aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
+    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)), holdingFee)
 
     // advance by two ticks, so the issuing round of round 1 is created
     advanceRoundsToNextRoundOpening
@@ -63,7 +76,7 @@ class TimeBasedTreasuryIntegrationTest
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
       // and amulets are automatically merged.
-      checkWallet(alice, aliceWalletClient, Seq((59, 61)))
+      checkWallet(alice, aliceWalletClient, Seq((59, 61)), holdingFee)
       // same for validator rewards
       aliceValidatorWalletClient
         .listValidatorRewardCoupons()
@@ -75,9 +88,9 @@ class TimeBasedTreasuryIntegrationTest
     implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-      aliceWalletClient.tap(110)
+      aliceWalletClient.tap(1100)
 
-      checkBalance(aliceWalletClient, Some(1), exactly(110), exactly(0), exactly(0))
+      checkBalance(aliceWalletClient, Some(1), exactly(1100), exactly(0), exactly(0))
       // leads to archival of open round 0
       advanceRoundsToNextRoundOpening
 
@@ -86,16 +99,16 @@ class TimeBasedTreasuryIntegrationTest
         aliceUserParty,
         aliceValidatorParty,
         aliceWalletClient.list().amulets,
-        10,
+        100,
         sv1ScanBackend,
-        Duration.ofDays(10),
+        Duration.ofDays(1),
         getLedgerTime,
       )
       checkBalance(
         aliceWalletClient,
         Some(2),
-        (99, 100),
-        exactly(10),
+        (999, 1000),
+        exactly(100),
         // due to merge in this round, no holding fees.
         exactly(0),
       )
@@ -106,9 +119,9 @@ class TimeBasedTreasuryIntegrationTest
       checkBalance(
         aliceWalletClient,
         Some(3),
-        (99, 100),
-        (9, 10),
-        exactly(SpliceUtil.defaultHoldingFee.rate),
+        (999, 1000),
+        exactly(100),
+        exactly(holdingFee),
       )
   }
 
@@ -198,4 +211,54 @@ class TimeBasedTreasuryIntegrationTest
     )
   }
 
+  "merge also amulet that should be expired" in { implicit env =>
+    val (_, _) = onboardAliceAndBob()
+    val aliceUserName = aliceWalletClient.config.ledgerApiUser
+    val mergeAmuletsTrigger = aliceValidatorBackend
+      .userWalletAutomation(aliceUserName)
+      .futureValue
+      .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+    clue("Pause amulet merges and expires") {
+      sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger].pause().futureValue
+      mergeAmuletsTrigger.pause().futureValue
+    }
+
+    actAndCheck(
+      "Tap amulet that will expire in a round", {
+        aliceWalletClient.tap(holdingFee)
+        aliceWalletClient.tap(holdingFee)
+      },
+    )(
+      "Alice has 2 Amulets",
+      _ => {
+        aliceWalletClient.list().amulets should have length 2
+      },
+    )
+
+    clue("Advance rounds so that holding fees become relevant") {
+      advanceRoundsToNextRoundOpening
+    }
+
+    actAndCheck(
+      "Resume amulets merging automation", {
+        mergeAmuletsTrigger.resume()
+      },
+    )(
+      "Amulets got merged",
+      _ => {
+        aliceWalletClient.list().amulets should have length 1
+      },
+    )
+    clue("Final sanity check") {
+      checkBalance(
+        aliceWalletClient,
+        Some(2),
+        (holdingFee, 2 * holdingFee),
+        exactly(0),
+        // We just merged => fresh amulet
+        exactly(0),
+      )
+    }
+  }
 }

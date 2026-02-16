@@ -44,6 +44,10 @@ object TxLogEntry extends StoreErrors {
       case _: NotificationTxLogEntry => EntryType.NotificationTxLogEntry
       case _: TransferOfferTxLogEntry => EntryType.TransferOfferTxLogEntry
       case _: BuyTrafficRequestTxLogEntry => EntryType.BuyTrafficRequestTxLogEntry
+      case _: DevelopmentFundCouponCreatedTxLogEntry =>
+        EntryType.DevelopmentFundCouponCreatedTxLogEntry
+      case _: DevelopmentFundCouponArchivedTxLogEntry =>
+        EntryType.DevelopmentFundCouponArchivedTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -63,6 +67,10 @@ object TxLogEntry extends StoreErrors {
         case EntryType.NotificationTxLogEntry => from[NotificationTxLogEntry](json)
         case EntryType.TransferOfferTxLogEntry => from[TransferOfferTxLogEntry](json)
         case EntryType.BuyTrafficRequestTxLogEntry => from[BuyTrafficRequestTxLogEntry](json)
+        case EntryType.DevelopmentFundCouponCreatedTxLogEntry =>
+          from[DevelopmentFundCouponCreatedTxLogEntry](json)
+        case EntryType.DevelopmentFundCouponArchivedTxLogEntry =>
+          from[DevelopmentFundCouponArchivedTxLogEntry](json)
         case _ => throw txDecodingFailed()
       }
     } catch {
@@ -80,6 +88,7 @@ object TxLogEntry extends StoreErrors {
     val TransactionHistoryTxLog: String3 = String3.tryCreate("txh")
     val TransferOfferTxLog: String3 = String3.tryCreate("tof")
     val BuyTrafficRequestTxLog: String3 = String3.tryCreate("btr")
+    val DevelopmentFundCouponTxLog: String3 = String3.tryCreate("dev")
   }
 
   object EntryType {
@@ -89,6 +98,8 @@ object TxLogEntry extends StoreErrors {
     val TransferTxLogEntry: String3 = String3.tryCreate("tra")
     val BalanceChangeTxLogEntry: String3 = String3.tryCreate("bal")
     val NotificationTxLogEntry: String3 = String3.tryCreate("not")
+    val DevelopmentFundCouponCreatedTxLogEntry: String3 = String3.tryCreate("fcc")
+    val DevelopmentFundCouponArchivedTxLogEntry: String3 = String3.tryCreate("fca")
   }
 
   object Http {
@@ -177,7 +188,6 @@ object TxLogEntry extends StoreErrors {
           .map(r => httpDef.PartyAndAmount(r.party, Codec.encode(r.amount)))
           .toVector,
         holdingFees = Codec.encode(entry.senderHoldingFees),
-        amuletPrice = Codec.encode(entry.amuletPrice),
         appRewardsUsed = Codec.encode(entry.appRewardsUsed),
         validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
         svRewardsUsed = Codec.encode(entry.svRewardsUsed.getOrElse(BigDecimal(0))),
@@ -185,6 +195,7 @@ object TxLogEntry extends StoreErrors {
         transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
         transferInstructionCid = Some(entry.transferInstructionCid).filter(_.nonEmpty),
         description = Some(entry.description).filter(_.nonEmpty),
+        developmentFundCouponsUsed = Codec.encode(entry.developmentFundCouponsUsed),
       )
     }
 
@@ -201,10 +212,12 @@ object TxLogEntry extends StoreErrors {
           } yield PartyAndAmount(r.party, amount)
         )
         senderHoldingFees <- Codec.decode(Codec.BigDecimal)(item.holdingFees)
-        amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
         svRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.svRewardsUsed)
+        developmentFundCouponsUsed <- Codec.decode(Codec.BigDecimal)(
+          item.developmentFundCouponsUsed
+        )
         transferInstructionAmount <- item.transferInstructionAmount.traverse(
           Codec.decode(Codec.BigDecimal)
         )
@@ -215,7 +228,6 @@ object TxLogEntry extends StoreErrors {
         sender = Some(PartyAndAmount(sender.party, senderAmount)),
         receivers = receivers,
         senderHoldingFees = senderHoldingFees,
-        amuletPrice = amuletPrice,
         appRewardsUsed = appRewardsUsed,
         validatorRewardsUsed = validatorRewardsUsed,
         svRewardsUsed = Some(svRewardsUsed),
@@ -223,6 +235,7 @@ object TxLogEntry extends StoreErrors {
         transferInstructionAmount = transferInstructionAmount,
         transferInstructionCid = item.transferInstructionCid.getOrElse(""),
         description = item.description.getOrElse(""),
+        developmentFundCouponsUsed = developmentFundCouponsUsed,
       )
     }
 
@@ -240,7 +253,6 @@ object TxLogEntry extends StoreErrors {
         receivers = Vector(
           httpDef.PartyAndAmount(entry.receiver, Codec.encode(entry.amount))
         ),
-        amuletPrice = Codec.encode(entry.amuletPrice),
         transferInstructionCid =
           Option.when(!entry.transferInstructionCid.isEmpty)(entry.transferInstructionCid),
       )
@@ -251,7 +263,6 @@ object TxLogEntry extends StoreErrors {
     ): Either[String, BalanceChangeTxLogEntry] = {
       for {
         receiverAndAmount <- item.receivers.headOption.toRight("No receivers")
-        amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         subtype <- subtypeFromResponseItem(item.transactionSubtype)
       } yield BalanceChangeTxLogEntry(
         subtype = Some(subtype),
@@ -259,7 +270,6 @@ object TxLogEntry extends StoreErrors {
         date = Some(item.date.toInstant),
         receiver = receiverAndAmount.party,
         amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
-        amuletPrice = amuletPrice,
         transferInstructionCid = item.transferInstructionCid.getOrElse(""),
       )
     }
@@ -428,6 +438,41 @@ object TxLogEntry extends StoreErrors {
         status = BuyTrafficRequestStatus.Failed,
         failureReason = httpDef.BuyTrafficRequestFailedResponse.FailureReason.Expired,
       )
+    }
+
+    def toArchivedDevelopmentFundCoupon(
+        createdEntry: DevelopmentFundCouponCreatedTxLogEntry,
+        archivedEntry: DevelopmentFundCouponArchivedTxLogEntry,
+    ): httpDef.ArchivedDevelopmentFundCoupon = {
+      val createdAt = createdEntry.createdAt.getOrElse(throw txMissingField())
+      val archivedAt = archivedEntry.archivedAt.getOrElse(throw txMissingField())
+      val expiresAt = createdEntry.expiresAt.getOrElse(throw txMissingField())
+      val (status, optRejectionOrWithdrawalReason) = toStatusResponse(archivedEntry.status)
+      httpDef.ArchivedDevelopmentFundCoupon(
+        createdAt = java.time.OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC),
+        archivedAt = java.time.OffsetDateTime.ofInstant(archivedAt, ZoneOffset.UTC),
+        beneficiary = createdEntry.beneficiary,
+        fundManager = createdEntry.fundManager,
+        amount = Codec.encode(createdEntry.amount),
+        expiresAt = java.time.OffsetDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
+        reason = createdEntry.reason,
+        status = status,
+        rejectionOrWithdrawalReason = optRejectionOrWithdrawalReason,
+      )
+    }
+
+    private def toStatusResponse(
+        status: DevelopmentFundCouponArchivedTxLogEntry.Status
+    ): (httpDef.ArchivedDevelopmentFundCoupon.Status, Option[String]) = status match {
+      case DevelopmentFundCouponArchivedTxLogEntry.Status.Empty => throw txMissingField()
+      case _: DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed =>
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Claimed -> None
+      case _: DevelopmentFundCouponArchivedTxLogEntry.Status.Expired =>
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Expired -> None
+      case status: DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected =>
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Rejected -> Some(status.value.reason)
+      case status: DevelopmentFundCouponArchivedTxLogEntry.Status.Withdrawn =>
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Withdrawn -> Some(status.value.reason)
     }
   }
 

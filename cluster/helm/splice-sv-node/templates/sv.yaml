@@ -124,11 +124,6 @@ spec:
             - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
               value: {{ .Values.auth.jwks.readTimeout | quote }}
             {{ end }}
-            {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
-            - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
-              value: |
-                canton.sv-apps.sv.ingest-update-history-from-participant-begin = false
-            {{ end }}
             {{- with .Values.persistence }}
             - name: ADDITIONAL_CONFIG_PERSISTENCE
               value: |

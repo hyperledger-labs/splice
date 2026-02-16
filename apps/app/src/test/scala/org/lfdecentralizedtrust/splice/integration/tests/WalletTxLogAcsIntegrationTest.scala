@@ -93,7 +93,6 @@ class WalletTxLogAcsIntegrationTest
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount.bigDecimal shouldBe mintAmount
-            logEntry.amuletPrice shouldBe amuletPrice
           }
         ),
         trafficTopups = IgnoreTopupsDevNet,

@@ -1,7 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.{
+  featuredapprightv1,
+  featuredapprightv2,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.util.featuredapp.batchedmarkersproxy
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
@@ -17,8 +20,10 @@ import org.lfdecentralizedtrust.splice.util.*
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.topology.PartyId
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_16
 class BatchedFeaturedAppActivityMarkerIntegrationTest
     extends IntegrationTestWithSharedEnvironment
+    with ScanTestUtil
     with WalletTestUtil
     with TimeTestUtil
     with SplitwellTestUtil
@@ -72,6 +77,37 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       )
   }
 
+  def createBatchedMarkersV2(
+      validator: ValidatorAppBackendReference,
+      provider: PartyId,
+      proxyCid: batchedmarkersproxy.BatchedMarkersProxy.ContractId,
+      featuredAppRightCid: amulet.FeaturedAppRight.ContractId,
+      batches: Seq[(Seq[(PartyId, Double)], BigDecimal)],
+  ) = {
+    validator.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitJava(
+        actAs = Seq(provider),
+        commands = proxyCid
+          .exerciseBatchedMarkersProxy_CreateMarkersV2(
+            featuredAppRightCid.toInterface(featuredapprightv2.FeaturedAppRight.INTERFACE),
+            batches.map { case (beneficiaries, markerWeight) =>
+              new batchedmarkersproxy.RewardBatchV2(
+                beneficiaries.map { case (beneficiary, weight) =>
+                  new featuredapprightv2.AppRewardBeneficiary(
+                    beneficiary.toProtoPrimitive,
+                    BigDecimal(weight).bigDecimal,
+                  )
+                }.asJava,
+                markerWeight.bigDecimal,
+              )
+            }.asJava,
+          )
+          .commands()
+          .asScala
+          .toSeq,
+      )
+  }
+
   def createBatchedMarkersProxy(validator: ValidatorAppBackendReference, provider: PartyId)(implicit
       env: SpliceTestConsoleEnvironment
   ) =
@@ -87,12 +123,6 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       )
 
   "Batched activity marker creation produces only one view" in { implicit env =>
-    Seq(aliceValidatorBackend, sv1ValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
-      .foreach {
-        _.participantClient.upload_dar_unless_exists(
-          "daml/splice-util-batched-markers/.daml/dist/splice-util-batched-markers-current.dar"
-        )
-      }
     val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val splitwell = onboardWalletUser(splitwellWalletClient, splitwellValidatorBackend)
@@ -122,23 +152,35 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       bob.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
     )
+
     actAndCheck(
-      "Splitwell creates batched marker",
-      createBatchedMarkers(
-        splitwellValidatorBackend,
-        splitwell,
-        splitwellProxy.contractId,
-        splitwellFeaturedAppRightCid,
-        Seq((Seq((splitwell, 1.0)), 50)),
-      ),
+      "Splitwell creates batched marker through the v2 choice", {
+        createBatchedMarkers(
+          splitwellValidatorBackend,
+          splitwell,
+          splitwellProxy.contractId,
+          splitwellFeaturedAppRightCid,
+          Seq((Seq((splitwell, 1.0)), 50)),
+        )
+        createBatchedMarkersV2(
+          splitwellValidatorBackend,
+          splitwell,
+          splitwellProxy.contractId,
+          splitwellFeaturedAppRightCid,
+          Seq((Seq((splitwell, 1.0)), 50)),
+        )
+      },
     )(
-      "sv1 observes 200 total markers",
+      "sv1 observes 201 total markers",
       _ =>
         // The first call prdouces 50 for alice with weight 0.8, 50 for bob with weight 0.2 and 50 for alice with weight 1.0
-        // The second produces 50 for splitwell with weight 50
+        // The second produces 50 for splitwell with weight 50.
+        // The third one produces one marker with weight 1.
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) should have size 200,
+          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) should have size 201,
     )
+
+    val scanCursorBeforeConversion = latestEventHistoryCursor(sv1ScanBackend)
 
     actAndCheck(
       "Resume the featured app marker conversion",
@@ -148,7 +190,8 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       _ => {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) shouldBe empty
-        val events = sv1ScanBackend.getEventHistory(1000, None, CompactJson)
+        val events =
+          sv1ScanBackend.getEventHistory(1000, Some(scanCursorBeforeConversion), CompactJson)
         // Note: There may actually be multiple batches in the trigger because we can't easily synchronize on it having ingested all the markers.
         // We don't care all that much about whether the trigger needs to run multiple time for this test.
         val conversionEvents = events.filter {
@@ -163,7 +206,9 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
           }
         }
         // Check that we actually got some so the forAll does not become redundant
-        conversionEvents should not be empty
+        withClue(s"Unfiltered events: $events") {
+          conversionEvents should not be empty
+        }
         // Check that each conversion only produces 2 views, one for the SV and one for validator
         forAll(conversionEvents) { event =>
           val views = event.verdict.value.transactionViews.views

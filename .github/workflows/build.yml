@@ -124,10 +124,10 @@ jobs:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-medium
-      test_names_file: 'test-full-class-names-record-time-tolerance.log'
+      test_names_file: 'test-full-class-names-dynamic-synchronizer-params-reconciliation.log'
       start_canton_options: -s
       parallelism: 1
-      test_name: record-time-tolerance
+      test_name: dyn-sync-params-reconciliation
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}

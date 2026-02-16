@@ -1389,12 +1389,14 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
+      val providerPartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+
       // First, create a Grant proposal and capture the contract ID
       val grantProposalContractId = assertCreateProposal(
         "SRARC_GrantFeaturedAppRight",
         "grant-featured-app",
       ) { implicit webDriver =>
-        fillOutTextField("grant-featured-app-idValue", "test-provider-party-id")
+        fillOutTextField("grant-featured-app-idValue", providerPartyId)
       }
 
       // Now create a Revoke proposal using the Grant proposal's contract ID
@@ -1431,7 +1433,7 @@ class SvFrontendIntegrationTest
 
     "NEW UI: Update SV Reward Weight" in { implicit env =>
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val newWeight = "5000"
+      val newWeight = "0_5000"
 
       assertCreateProposal("SRARC_UpdateSvRewardWeight", "update-sv-reward-weight") {
         implicit webDriver =>

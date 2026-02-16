@@ -10,7 +10,7 @@ import com.digitalasset.canton.topology.store.TimeQuery
 
 import java.time.Duration
 
-class RecordTimeToleranceTimeBasedIntegrationTest
+class DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
@@ -30,6 +30,8 @@ class RecordTimeToleranceTimeBasedIntegrationTest
                 .copy(
                   preparationTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofMinutes(1),
                   mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofMinutes(2),
+                  // We disable it here to see that it gets changed to true by the reconciliation trigger of sv1Local
+                  enableFreeConfirmationResponses = false,
                 ))
         )
       })
@@ -53,7 +55,13 @@ class RecordTimeToleranceTimeBasedIntegrationTest
       sv1Backend.participantClient.topology.synchronizer_parameters
         .get_dynamic_synchronizer_parameters(synchronizerId)
         .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofMinutes(2)
+      sv1Backend.participantClient.topology.synchronizer_parameters
+        .get_dynamic_synchronizer_parameters(synchronizerId)
+        .trafficControl
+        .getOrElse(throw new RuntimeException("Traffic control parameters not found"))
+        .freeConfirmationResponses shouldBe false
       sv1Backend.stop()
+
       sv1LocalBackend.startSync()
       eventually() {
         sv1Backend.participantClient.topology.synchronizer_parameters
@@ -62,7 +70,14 @@ class RecordTimeToleranceTimeBasedIntegrationTest
         sv1Backend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(synchronizerId)
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)
+        // Free confirmation responses are enabled via the ReconcileDynamicSynchronizerParametersTrigger when the SV starts, let's wait until this is the case.
+        sv1Backend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(synchronizerId)
+          .trafficControl
+          .getOrElse(throw new RuntimeException("Traffic control parameters not found"))
+          .freeConfirmationResponses shouldBe true
       }
+
       // We go slightly above 48h as time is not actually completely still in simtime, the microseconds still advance.
       advanceTime(Duration.ofHours(49))
       eventually() {
@@ -78,7 +93,7 @@ class RecordTimeToleranceTimeBasedIntegrationTest
           store = TopologyStoreId.Synchronizer(synchronizerId),
           timeQuery = TimeQuery.Range(None, None),
         )
-      txs should have length (3)
+      txs should have length 3
       sv1LocalBackend.stop()
   }
 }

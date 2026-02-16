@@ -7,22 +7,14 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
-release-notes:: Upcoming
+.. release-notes:: Upcoming
 
-- Daml
+    - Wallet UI
 
-  - Optimize the number of views in the automation run by the SV app to convert ``FeaturedAppActivityMarker`` contracts into ``AppRewardCoupon`` contracts.
+      - The wallet UI transaction hisory now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenace overhead.
 
-    This requires a Daml upgrade to
+    - Scan UI
 
-      ================== =======
-      name               version
-      ================== =======
-      amulet             0.1.16
-      amuletNameService  0.1.17
-      dsoGovernance      0.1.22
-      splitwell          0.1.16
-      validatorLifecycle 0.1.6
-      wallet             0.1.17
-      walletPayments     0.1.16
-      ================== =======
+      - The scan UI transaction hisory now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenace overhead.

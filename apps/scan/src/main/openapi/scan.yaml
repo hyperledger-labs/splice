@@ -2086,10 +2086,6 @@ components:
             The round for which this transaction was registered.
           type: integer
           format: int64
-        amulet_price:
-          description: |
-            The amulet price for the round at which this transfer was executed.
-          type: string
         transfer:
           description: |
             A (batch) transfer from sender to receivers.
@@ -2923,10 +2919,6 @@ components:
             The round for which this transaction was registered.
           type: integer
           format: int64
-        amulet_price:
-          description: |
-            The amulet price for the round at which this transfer was executed.
-          type: string
         transfer:
           description: |
             A (batch) transfer from sender to receivers.

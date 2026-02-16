@@ -60,8 +60,6 @@ class UserWalletManager(
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     validatorTopupConfig: ValidatorTopupConfig,
     walletSweep: Map[String, WalletSweepConfig],
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
@@ -236,8 +234,6 @@ class UserWalletManager(
       packageVersionSupport,
       domainMigrationInfo,
       participantId,
-      ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       Option.when(endUserParty == store.walletKey.validatorParty)(validatorTopupConfig),
       // TODO(DACH-NY/canton-network-node#12554): make it easier to configure the sweep functionality and guard better against operator errors (typos, etc.)
       walletSweep.get(endUserParty.toProtoPrimitive),

@@ -2,14 +2,14 @@
   "name": "@lfdecentralizedtrust/splice-pulumi-infra",
   "main": "src/index.ts",
   "dependencies": {
-    "@pulumi/auth0": "3.21.0",
+    "@pulumi/auth0": "3.36.0",
     "@pulumi/kubernetes-cert-manager": "0.2.0",
     "@pulumiverse/grafana": "0.16.3",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"
   },
   "overrides": {
     "@pulumi/kubernetes-cert-manager": {
-      "@pulumi/kubernetes": "4.21.1"
+      "@pulumi/kubernetes": "4.25.0"
     }
   },
   "scripts": {

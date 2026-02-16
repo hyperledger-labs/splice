@@ -456,6 +456,7 @@ class SV1Initializer(
       PositiveFiniteDuration.tryOfSeconds(
         sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toSeconds
       ),
+      freeConfirmationResponses = config.enableFreeConfirmationResponses,
     )
   }
 

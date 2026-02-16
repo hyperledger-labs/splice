@@ -80,7 +80,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
     this.instanceName = instanceName;
     this.namespace = xns;
-    this.zone = GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE');
+    const zoneFromEnv = config.optionalEnv('DB_CLOUDSDK_COMPUTE_ZONE') || GCP_ZONE;
+    if (!zoneFromEnv) {
+      throw new Error(
+        'GCP_ZONE is not set in the environment, and DB_CLOUDSDK_COMPUTE_ZONE is also not set. One of these must be set to specify the zone for the Cloud SQL instance.'
+      );
+    }
+    this.zone = zoneFromEnv;
 
     this.databaseInstance = this.pgSvc = new gcp.sql.DatabaseInstance(
       instanceLogicalName,

@@ -118,12 +118,10 @@ class WalletTxLogIntegrationTest
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(12.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(11.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -146,7 +144,6 @@ class WalletTxLogIntegrationTest
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
             logEntry.amount shouldBe 47.0
-            logEntry.amuletPrice shouldBe amuletPrice
           }
         ),
         trafficTopups = IgnoreTopupsDevNet,
@@ -216,7 +213,6 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             // Accepting the self-payment request created a 10CC locked amulet,
@@ -229,22 +225,18 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(30.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(20.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(10.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -311,22 +303,18 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(30.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(20.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(10.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -408,7 +396,6 @@ class WalletTxLogIntegrationTest
               receiver2.amount shouldBe BigDecimal(transferAmountUSDinAmulet)
             }
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             // Accepting the payment request created a locked amulet,
@@ -421,12 +408,10 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -471,7 +456,6 @@ class WalletTxLogIntegrationTest
         }
 
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
-        logEntry.amuletPrice shouldBe amuletPrice
       }
 
       checkTxHistory(
@@ -481,7 +465,6 @@ class WalletTxLogIntegrationTest
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -570,7 +553,6 @@ class WalletTxLogIntegrationTest
         }
 
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
-        logEntry.amuletPrice shouldBe amuletPrice
       }
 
       checkTxHistory(
@@ -585,12 +567,10 @@ class WalletTxLogIntegrationTest
             logEntry.sender.value.amount should beWithin(-50 - smallAmount, -50)
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -715,7 +695,6 @@ class WalletTxLogIntegrationTest
         }
 
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
-        logEntry.amuletPrice shouldBe amuletPrice
       }
 
       checkTxHistory(
@@ -735,7 +714,6 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           checkSubscriptionPaymentTransfer(
             walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentCollected
@@ -751,12 +729,10 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -849,12 +825,10 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -976,7 +950,6 @@ class WalletTxLogIntegrationTest
         }
 
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
-        logEntry.amuletPrice shouldBe amuletPrice
       }
 
       checkTxHistory(
@@ -986,7 +959,6 @@ class WalletTxLogIntegrationTest
             // Rejecting the second payment returned the 42CC locked amulet.
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.SubscriptionPaymentRejected.toProto
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             // Accepting the self-payment request created a 42CC locked amulet,
@@ -1000,7 +972,6 @@ class WalletTxLogIntegrationTest
             logEntry.receivers shouldBe empty
             // Depending on timing we may have incurred holding fees at this point.
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           checkSubscriptionPaymentTransfer(
             walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentCollected
@@ -1016,12 +987,10 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -1115,7 +1084,6 @@ class WalletTxLogIntegrationTest
             }
 
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionPaymentAccepted.toProto
@@ -1126,7 +1094,6 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.InitialEntryPaymentCollection.toProto
@@ -1140,7 +1107,6 @@ class WalletTxLogIntegrationTest
             }
 
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.SubscriptionInitialPaymentAccepted.toProto
@@ -1151,12 +1117,10 @@ class WalletTxLogIntegrationTest
             )
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount shouldBe usdAsTappedAmulet(100.0)
-            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -1184,7 +1148,6 @@ class WalletTxLogIntegrationTest
         )
         logEntry.receivers shouldBe empty
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
-        logEntry.amuletPrice shouldBe amuletPrice
       }
       val tapTxLog: CheckTxHistoryFn = { case logEntry: BalanceChangeTxLogEntry =>
         logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
@@ -1224,7 +1187,6 @@ class WalletTxLogIntegrationTest
         )
         logEntry.receivers shouldBe empty
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
-        logEntry.amuletPrice shouldBe amuletPrice
       }
       val expectedTxLogEntries = Seq(renewTxLog, creationTxLog, tapTxLog)
       checkTxHistory(

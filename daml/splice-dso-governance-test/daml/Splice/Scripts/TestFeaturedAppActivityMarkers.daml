@@ -11,6 +11,7 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.DsoRules
 import qualified Splice.Api.FeaturedAppRightV1
+import qualified Splice.Api.FeaturedAppRightV2
 import Splice.Api.FeaturedAppRightV1 (FeaturedAppRight_CreateActivityMarkerResult(..))
 
 import Splice.Scripts.Util
@@ -24,9 +25,10 @@ testFeaturedAppActivityMarkers = do
   (app, dso, (sv1, sv2, sv3, _)) <- initMainNetWithAmuletPrice amuletPrice
   provider1 <- allocateParty "provider1"
   provider2 <- allocateParty "provider2"
+  provider3 <- allocateParty "provider3"
   beneficiary <- allocateParty "beneficiary"
   -- runAmuletDepositBots relies on ValidatorRight contracts so we create it here
-  forA_ [provider1, provider2, beneficiary] $ \user -> submit user $ createCmd ValidatorRight with
+  forA_ [provider1, provider2, provider3, beneficiary] $ \user -> submit user $ createCmd ValidatorRight with
     dso
     user
     validator = user
@@ -36,7 +38,7 @@ testFeaturedAppActivityMarkers = do
 
   [(amuletRulesCid, _)] <- query @AmuletRules dso
 
-  forA_ [provider1, provider2] $ \provider -> do
+  forA_ [provider1, provider2, provider3] $ \provider -> do
     let action = ARC_DsoRules with
           dsoAction = SRARC_GrantFeaturedAppRight $ DsoRules_GrantFeaturedAppRight with
             provider
@@ -59,6 +61,7 @@ testFeaturedAppActivityMarkers = do
 
   [(featuredAppRightCid1, _)] <- queryInterface @Splice.Api.FeaturedAppRightV1.FeaturedAppRight provider1
   [(featuredAppRightCid2, _)] <- queryInterface @Splice.Api.FeaturedAppRightV1.FeaturedAppRight provider2
+  [(featuredAppRightCid3, _)] <- queryInterface @Splice.Api.FeaturedAppRightV2.FeaturedAppRight provider3
 
   -- Fails if weights do not add up to 1.0
   submitMustFail provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
@@ -79,23 +82,27 @@ testFeaturedAppActivityMarkers = do
   FeaturedAppRight_CreateActivityMarkerResult [marker4Iface] <- submit provider2 $ exerciseCmd featuredAppRightCid2 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider2 1.0]
+  Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult [marker5Iface] <- submit provider3 $ exerciseCmd featuredAppRightCid3 Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarker
+    with
+      beneficiaries = [Splice.Api.FeaturedAppRightV2.AppRewardBeneficiary provider3 1.0]
+      weight = Some 50.0
 
-  let [marker1, marker2, marker3, marker4] = map fromInterfaceContractId [marker1Iface, marker2Iface, marker3Iface, marker4Iface]
+  let [marker1, marker2, marker3, marker4, marker5] = map fromInterfaceContractId [marker1Iface, marker2Iface, marker3Iface, marker4Iface] ++ [fromInterfaceContractId marker5Iface]
 
   (openMiningRoundCid, openMiningRound) <- getLatestOpenRound app
 
   DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult (AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids) <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers with
     amuletRulesCid
     argument = AmuletRules_ConvertFeaturedAppActivityMarkers with
-      markerCids = [marker1, marker3, marker2, marker4] -- interleave different providers to test grouping
+      markerCids = [marker1, marker3, marker2, marker4, marker5] -- interleave different providers to test grouping
       openMiningRoundCid
       observers = Some [provider1, provider2, beneficiary]
     sv = Some sv1
 
   -- markers are archived
-  [None, None, None, None] <- mapA (queryContractId @FeaturedAppActivityMarker dso) [marker1, marker2, marker3, marker4]
+  [None, None, None, None, None] <- mapA (queryContractId @FeaturedAppActivityMarker dso) [marker1, marker2, marker3, marker4, marker5]
 
-  [Some coupon1, Some coupon2, Some coupon3] <- mapA (queryContractId @AppRewardCoupon dso) couponCids
+  [Some coupon1, Some coupon2, Some coupon3, Some coupon4] <- mapA (queryContractId @AppRewardCoupon dso) couponCids
   coupon1 === AppRewardCoupon with
       dso
       provider = provider1
@@ -117,6 +124,13 @@ testFeaturedAppActivityMarkers = do
       featured = True
       round = openMiningRound.round
       amount = defaultFeaturedAppActivityMarkerAmount / amuletPrice
+  coupon4  === AppRewardCoupon with
+      dso
+      provider = provider3
+      beneficiary = Some provider3
+      featured = True
+      round = openMiningRound.round
+      amount = 50.0 * defaultFeaturedAppActivityMarkerAmount / amuletPrice
 
   -- ensure that the round is in issuing phase
   runNextIssuanceD app amuletPrice

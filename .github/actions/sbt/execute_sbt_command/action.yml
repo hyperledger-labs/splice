@@ -41,6 +41,9 @@ inputs:
     description: "Whether to fail if the SBT command output contains errors"
     required: false
     default: "true"
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
 
 runs:
   using: 'composite'
@@ -48,7 +51,7 @@ runs:
     - name: Execute SBT command"
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
-        additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD ${{ inputs.additional_nix_args }}"
+        additional_nix_args: "--keep GITHUB_ACTION_PATH --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD ${{ inputs.additional_nix_args }}"
         cmd: |
             # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
@@ -82,11 +85,22 @@ runs:
               echo "After SBT"
 
               if [[ "${{ inputs.fail_on_error_in_output }}" == "true" ]]; then
-                .github/actions/scripts/check-sbt-output.sh "sbt_output"
+                # Note that we're using GITHUB_ACTION_PATH 
+                # because of a GHA bug - using ${{ github.action_path }} won't work
+                # https://github.com/actions/runner/issues/2185#issuecomment-1750670864
+                $GITHUB_ACTION_PATH/../../scripts/check-sbt-output.sh "sbt_output"
               fi
             }
             export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
             export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"
+
+            # Ensure that we're in the root of splice before execution
+            pushd ${{ inputs.splice_root }} &> /dev/null
+
             ${{ inputs.pre_sbt_cmd }}
             run_sbt
             ${{ inputs.post_sbt_cmd }}
+
+            # Move back to the original directory
+            # || true because if we did a pushd . before the stack is considered to be empty
+            popd &> /dev/null || true
