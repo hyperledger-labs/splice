@@ -406,7 +406,7 @@ You need to configure how your validator's participant connects to **sequencers*
 - ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of sequencer responses that need to agree for a response to be considered valid.
 - ``trust-single``: connects to one specific url. Replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the URL of the sequencer you trust.
 
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: SYNCHRONIZER_CONFIGURATION_START
     :end-before: SYNCHRONIZER_CONFIGURATION_END

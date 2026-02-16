@@ -432,7 +432,7 @@ However, bugs in the BFT sequencer connection logic or severe instability of oth
 
 To do so, SV operators must perform the following steps.
 
-Step 1. In ``sv-validator-values.yaml``, add the following.
+Step 1. In ``validator-values.yaml``, replace the existing ``synchronizer`` config with the following.
 
 .. code-block:: yaml
 
