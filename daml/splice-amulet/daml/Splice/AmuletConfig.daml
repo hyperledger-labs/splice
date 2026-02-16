@@ -49,22 +49,22 @@ data TransferConfigV2 unit = TransferConfigV2 with
 
 -- FIXME: consider renaming to `RewardCalculationVersion`
 data RewardCalculationVersion
-  = RAV_V1 -- ^ Purely on-ledger reward accounting as described in the whitepaper plus the CIPs before CIP-104.
-  | RAV_V2 -- ^ Use off-ledger accounting based on traffic for app rewards as described in CIP-104.
+  = RCV_V1 -- ^ Purely on-ledger reward accounting as described in the whitepaper plus the CIPs before CIP-104.
+  | RCV_V2 -- ^ Use off-ledger accounting based on traffic for app rewards as described in CIP-104.
   deriving (Eq, Show)
 
 useTrafficBasedAppRewards : Optional RewardCalculationVersion -> Bool
 useTrafficBasedAppRewards rav = case rav of
   None -> False
-  Some RAV_V1 -> False
-  Some RAV_V2 -> True
+  Some RCV_V1 -> False
+  Some RCV_V2 -> True
 
 -- | Get the off-ledger reward accounting version to use.
 offLedgerRewardCalculationVersion : Optional RewardCalculationVersion -> Optional RewardCalculationVersion
 offLedgerRewardCalculationVersion rav = case rav of
   None -> None
-  Some RAV_V1 -> None
-  Some RAV_V2 -> Some RAV_V2
+  Some RCV_V1 -> None
+  Some RCV_V2 -> Some RCV_V2
 
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --

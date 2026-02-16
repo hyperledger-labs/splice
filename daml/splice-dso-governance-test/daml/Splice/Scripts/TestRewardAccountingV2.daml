@@ -1,0 +1,88 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestRewardAccountingV2 where
+
+import DA.Assert
+import DA.List
+import DA.Set as Set
+import DA.Time
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Amulet.RewardAccountingV2
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.DsoRules
+import Splice.Types
+
+import Splice.Scripts.Util
+import Splice.Scripts.DsoTestUtils
+
+import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
+
+
+-- | Tests that reward accounting works.
+test_reward_accounting_v2 : Script ()
+test_reward_accounting_v2 = do
+    -- enable traffic based app rewards, which are the first use-case for reward accounting v2
+  let amuletConfig = defaultAmuletConfig with
+        rewardCalculationVersion = Some RCV_V2
+  (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
+
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+
+  setTime demoTime
+
+  -- move the first round through issuance, which will also trigger the reward calculation for this round
+  runNextIssuanceD app 1.0
+
+
+  -- setup demo data
+  let mintingAllowances = sortOn (.beneficiary)
+        [ MintingAllowance alice 1000.0
+        , MintingAllowance bob 2000.0
+        ]
+  let rootBatch = BatchOfMintingAllowances mintingAllowances
+  let rootBatchHash = CryptoHash.hash rootBatch
+
+  -- get the
+  [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
+
+  -- setup reimbursement workflow state
+  confirmAndExecutionAction app ARC_AmuletRules with
+    amuletRulesAction = CRARC_StartProcessingRewardsV2
+      AmuletRules_StartProcessingRewardsV2 with
+        calculateRewardsCid
+        batchHash = rootBatchHash
+
+
+  [(processRewardsCid, _)] <- query @ProcessRewardsV2 app.dso
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ProcessRewardsV2_ProcessBatch with
+    sv = sv1
+    processRewardsCid
+    choiceArg = ProcessRewardsV2_ProcessBatch with
+      batch = rootBatch
+      beneficiariesWithWrongVettingState = Set.empty
+
+  let expectedCoupons = do
+        MintingAllowance{..} <- mintingAllowances
+        pure RewardCouponV2 with
+          dso = app.dso
+          beneficiary
+          amount
+          round = Round 0
+          expiresAt = addRelTime demoTime (days 2)
+          hidden = False
+
+  actualCoupons0 <- query @RewardCouponV2 app.dso
+  let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
+  actualCoupons === expectedCoupons
+
+  pure ()
+
