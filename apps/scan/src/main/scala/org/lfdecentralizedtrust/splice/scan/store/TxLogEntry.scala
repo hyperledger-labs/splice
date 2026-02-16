@@ -174,7 +174,6 @@ object TxLogEntry extends StoreErrors {
           )
         ),
         round = Some(entry.round),
-        amuletPrice = Some(Codec.encode(entry.amuletPrice)),
       )
 
     private def toTapResponseItem(entry: TapTxLogEntry) = httpDef.TransactionHistoryResponseItem(
@@ -191,7 +190,6 @@ object TxLogEntry extends StoreErrors {
         )
       ),
       round = Some(entry.round),
-      amuletPrice = Some(Codec.encode(entry.amuletPrice)),
     )
 
     private def toMintResponseItem(entry: MintTxLogEntry) = httpDef.TransactionHistoryResponseItem(
