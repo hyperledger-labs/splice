@@ -47,6 +47,8 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision "shell", name: "system", upload_path: "/tmp/vagrant-shell-system", reset: true do |s|
     s.inline = shell_variables + shell_common + shell_helpers + <<~'SHELL'
+      apt-get update
+
       apt-get install -y \
         bash-completion \
         command-not-found \
