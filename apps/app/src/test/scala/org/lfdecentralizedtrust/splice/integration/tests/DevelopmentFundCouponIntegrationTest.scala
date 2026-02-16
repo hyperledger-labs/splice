@@ -5,32 +5,21 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
-import org.lfdecentralizedtrust.splice.console.{
-  ValidatorAppBackendReference,
-  WalletAppClientReference,
-}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.console.{ValidatorAppBackendReference, WalletAppClientReference}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
-  AdvanceOpenMiningRoundTrigger,
-  ExpiredDevelopmentFundCouponTrigger,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{AdvanceOpenMiningRoundTrigger, ExpiredDevelopmentFundCouponTrigger}
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
-import org.lfdecentralizedtrust.splice.wallet.store.{
-  TransferTxLogEntry,
-  TxLogEntry as walletLogEntry,
-}
+import org.lfdecentralizedtrust.splice.wallet.store.{TransferTxLogEntry, TxLogEntry as walletLogEntry}
 
 import java.time.Duration
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_21
 class DevelopmentFundCouponIntegrationTest
-    extends SvIntegrationTestBase
+    extends IntegrationTestWithSharedEnvironment
     with TriggerTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil {
