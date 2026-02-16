@@ -83,7 +83,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
                 config.localSynchronizerNodes + (UpgradePSid -> config.localSynchronizerNode.value),
             )
           }
-          .compose(ConfigTransforms.bumpCantonPSyncPortsBy(UpgradePSid, 22_000))(config)
+          .andThen(ConfigTransforms.bumpCantonPSyncPortsBy(UpgradePSid, 22_000))(config)
       })
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
