@@ -3,7 +3,7 @@ cpus   = 4 # Cores
 memory = 8 # GiB
 ipaddr = "192.168.56.10"
 
-nix_cache_size = 20 # GiB
+nix_cache_size = 30 # GiB
 nix_cache_image_path = "/vagrant/vagrant-nix-cache/nix-cache.img"
 nix_cache_mount_path = "/nix-cache"
 
