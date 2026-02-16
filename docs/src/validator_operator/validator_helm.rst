@@ -399,7 +399,7 @@ For your selected ``scanClient`` type, replace ``TRUSTED_SCAN_URL`` with a URL o
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-You need to configure how your validator's participant connects to **sequencers** by defining a ``synchronizer`` config in your ``standalone-validator-values.yaml``.
+You need to configure how your validator's participant connects to **sequencers** by defining a ``synchronizer`` config in your ``validator-values.yaml``.
 ``synchronizer`` supports three modes of operation:
 
 - ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.
