@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpiredDevelopmentFundCouponTrigger,
 }
-import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.{
   TransferTxLogEntry,
@@ -302,8 +302,8 @@ class DevelopmentFundCouponIntegrationTest
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val beneficiary = bobParty
-    val initialUnclaimedDevelopmentFundCouponAmount = 1000
-    val developmentFundCouponAmount = 40.0
+    val initialUnclaimedDevelopmentFundCouponAmount = BigDecimal(SpliceUtil.damlDecimal(1000))
+    val developmentFundCouponAmount = BigDecimal(SpliceUtil.damlDecimal(40.0))
     val expiresAt = CantonTimestamp.now().plus(Duration.ofDays(1))
     val reason = "Bob has contributed to the Daml repo"
 
@@ -396,7 +396,7 @@ class DevelopmentFundCouponIntegrationTest
             logEntry.sender.value.party shouldBe bobParty.toProtoPrimitive
             logEntry.sender.value.amount should be(bobBalanceAfter - bobBalanceBefore)
             logEntry.receivers shouldBe empty
-            logEntry.developmentFundCouponsUsed shouldBe developmentFundCouponAmount
+            logEntry.developmentFundCouponsUsed shouldBe Some(developmentFundCouponAmount)
           }
         ),
       )
