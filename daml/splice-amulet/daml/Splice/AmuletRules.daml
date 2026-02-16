@@ -458,7 +458,7 @@ template AmuletRules
 
         -- trigger off-ledger reward calculation if needed
         let batchSize = 100 -- FIXME: make configurable
-        forA_ (offLedgerRewardAccountingVersion roundToArchive.rewardAccountingVersion) $ \rav ->
+        forA_ (offLedgerRewardCalculationVersion roundToArchive.rewardAccountingVersion) $ \rav ->
             create ConfirmAppRewards with
                 dso
                 round = roundToArchive.round
@@ -466,7 +466,7 @@ template AmuletRules
                 batchSize = batchSize
                 dryRun = False
 
-        forA_ (offLedgerRewardAccountingVersion roundToArchive.dryRunRewardAccountingVersion) $ \rav ->
+        forA_ (offLedgerRewardCalculationVersion roundToArchive.dryRunRewardCalculationVersion) $ \rav ->
             create ConfirmAppRewards with
                 dso
                 round = roundToArchive.round

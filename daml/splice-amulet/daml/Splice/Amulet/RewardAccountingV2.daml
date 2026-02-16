@@ -1,8 +1,12 @@
 -- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Templates and support code for app activity and rewards accounting.
-module Splice.Amulet.AppRewards where
+-- | Templates and support code for reward accounting based on off-ledger calculations, as initially
+-- described in CIP-104 for traffic-based app rewards.
+--
+-- It is a Version 2 compared to the previous reward accounting mechanism that is based on tracking
+-- all state on-ledger using App|Validator|SvRewardCoupon and IssuingMiningRound contracts.
+module Splice.Amulet.RewardAccountingV2 where
 
 import DA.Action (unless)
 import DA.Foldable (forA_)
