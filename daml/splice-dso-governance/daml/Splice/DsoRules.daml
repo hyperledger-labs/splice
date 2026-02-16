@@ -262,7 +262,10 @@ data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult wit
     unclaimedReward: Optional (ContractId UnclaimedReward)
 
 data DsoRules_ClaimExpiredRewardsV2Result = DsoRules_ClaimExpiredRewardsV2Result with
-    unclaimedReward: Optional (ContractId UnclaimedReward)
+    result : AmuletRules_ClaimExpiredRewardsV2Result
+
+data DsoRules_UnhideRewardCouponsV2Result = DsoRules_UnhideRewardCouponsV2Result with
+    result : AmuletRules_UnhideRewardCouponsV2Result
 
 data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
     unclaimedReward: ContractId UnclaimedReward
@@ -1362,24 +1365,29 @@ template DsoRules with
         return DsoRules_ClaimExpiredRewardsResult with
           unclaimedReward = unclaimedRewardCid
 
-    -- batch claim of expired rewards that use time-based expiry
     nonconsuming choice DsoRules_ClaimExpiredRewardsV2 : DsoRules_ClaimExpiredRewardsV2Result
       with
-        appRewardCouponCids : [ContractId RewardCouponV2]
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_ClaimExpiredRewardsV2
         sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        expiredAmounts <- forA appRewardCouponCids $ \cid -> do
-          _ <- fetchChecked (ForDso with dso) cid
-          expireResult <- exercise cid RewardCouponV2_DsoExpire
-          return expireResult.amount
-        let amount = sum expiredAmounts
-        unclaimedRewardCid <- if (amount <= 0.0)
-              then pure None
-              else Some <$> create UnclaimedReward with dso; amount
+        result <- exercise amuletRulesCid choiceArg
         return DsoRules_ClaimExpiredRewardsV2Result with
-          unclaimedReward = unclaimedRewardCid
+          result
+
+    nonconsuming choice DsoRules_UnhideRewardCouponsV2 : DsoRules_UnhideRewardCouponsV2Result
+      with
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_UnhideRewardCouponsV2
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid choiceArg
+        return DsoRules_UnhideRewardCouponsV2Result with
+          result
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice DsoRules_MergeUnclaimedRewards : DsoRules_MergeUnclaimedRewardsResult

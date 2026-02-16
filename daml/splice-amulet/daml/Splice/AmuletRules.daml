@@ -86,6 +86,12 @@ data AmuletRules_MiningRound_ArchiveResult = AmuletRules_MiningRound_ArchiveResu
 data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResult with
     unclaimedRewardCid : Optional (ContractId UnclaimedReward)
 
+data AmuletRules_ClaimExpiredRewardsV2Result = AmuletRules_ClaimExpiredRewardsV2Result with
+    unclaimedRewardCid : Optional (ContractId UnclaimedReward)
+
+data AmuletRules_UnhideRewardCouponsV2Result = AmuletRules_UnhideRewardCouponsV2Result with
+    rewardCouponCids : [ContractId RewardCouponV2]
+
 data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewardsResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
@@ -632,6 +638,56 @@ template AmuletRules
               then pure None
               else Some <$> create UnclaimedReward with dso; amount
         return AmuletRules_ClaimExpiredRewardsResult with unclaimedRewardCid
+
+    -- batch claim of expired rewards that use time-based expiry
+    nonconsuming choice AmuletRules_ClaimExpiredRewardsV2 : AmuletRules_ClaimExpiredRewardsV2Result
+      with
+        rewardCouponCids : [ContractId RewardCouponV2]
+        beneficiaries : [Party]
+      observer beneficiaries
+      controller dso
+      do
+        require "at least one coupon" (not (null rewardCouponCids))
+
+        -- archive coupons
+        coupons <- forA rewardCouponCids $ \cid -> do
+          coupon <- fetchChecked (ForDso with dso) cid
+          _ <- exercise cid RewardCouponV2_DsoExpire
+          return coupon
+        let actualBeneficiaries = dedupSort [ coupon.beneficiary | coupon <- coupons ]
+        require "beneficiaries match coupons" (dedupSort beneficiaries == actualBeneficiaries)
+
+        -- create unclaimed reward for the total
+        let amount = sum [ coupon.amount | coupon <- coupons ]
+        unclaimedRewardCid <- if (amount <= 0.0)
+              then pure None
+              else Some <$> create UnclaimedReward with dso; amount
+        return AmuletRules_ClaimExpiredRewardsV2Result with
+          unclaimedRewardCid
+
+    -- batch conversion of hidden coupons
+    nonconsuming choice AmuletRules_UnhideRewardCouponsV2 : AmuletRules_UnhideRewardCouponsV2Result
+      with
+        hiddenRewardCouponCids : [ContractId RewardCouponV2]
+        beneficiaries : [Party]
+      observer beneficiaries
+      controller dso
+      do
+        require "at least one coupon" (not (null hiddenRewardCouponCids))
+
+        -- unhide coupons
+        results <- forA hiddenRewardCouponCids $ \cid -> do
+          coupon <- fetchAndArchive (ForDso with dso) cid
+          require "coupon is hidden" coupon.hidden
+          cid <- create coupon with hidden = False
+          pure (cid, coupon.beneficiary)
+
+        -- check specified beneficiaries match actual beneficiaries of the coupons
+        let (rewardCouponCids, actualBeneficiaries) = unzip results
+        require "beneficiaries match coupons" (dedupSort beneficiaries == dedupSort actualBeneficiaries)
+
+        return AmuletRules_UnhideRewardCouponsV2Result with
+          rewardCouponCids
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice AmuletRules_MergeUnclaimedRewards : AmuletRules_MergeUnclaimedRewardsResult
@@ -1214,6 +1270,23 @@ summarizeAndConsumeInputs csum dso sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
         totalDevelopmentFundAmount = (+ coupon.amount) <$> s.totalDevelopmentFundAmount
 
+    summarizeAndConsumeInput _round s (InputRewardCouponV2 couponCid) = do
+      coupon <- fetchAndArchive forOwner couponCid
+      assertWithinDeadline "RewardCouponV2.expiresAt" coupon.expiresAt
+      return TransferInputsSummary with
+        totalAmuletAmount = s.totalAmuletAmount
+        -- Note: in the current implementation RewardCouponV2 is only used for app rewards.
+        -- This may change in the future. As part of such a change we'll adjust the attribution done here.
+        totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
+        totalSvRewardAmount = s.totalSvRewardAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
+
     summarizeAndConsumeValidatorFaucetInput s couponCid = do
       coupon <- fetchAndArchive forOwner couponCid
       -- compute balance change
@@ -1509,6 +1582,7 @@ data TransferInput
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
   | InputDevelopmentFundCoupon (ContractId DevelopmentFundCoupon)
+  | InputRewardCouponV2 (ContractId RewardCouponV2)
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.

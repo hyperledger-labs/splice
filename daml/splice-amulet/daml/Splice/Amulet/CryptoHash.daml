@@ -2,8 +2,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Utilities to compute cryptographic hashes of Daml data structures.
--- We use this for example for computing compact commitments for moving
--- off-ledger data shared by the SV nodes on-ledger.
+-- We use this for computing compact commitments for reflecting off-ledger data
+-- shared by the SV nodes on-ledger.
 module Splice.Amulet.CryptoHash
   (
     Hash(..),
@@ -78,7 +78,7 @@ instance Hashable a => Hashable [a] where
 -- one recursively. Concretely, we use the following rules:
 --
 --   - hash scalars by hashing their string rendering
---   - hash lists by hashing the concatenation of the length and the element hashes
+--   - hash lists by hashing the length and the element hashes using "|" as a separator
 --   - hash records by hashing the list of field hashes
 --   - hash variants by hashing the list of fields prefixed with tag for the variant constructor
 --
@@ -96,11 +96,11 @@ hashText : Text -> Hash
 hashText = Hash . T.sha256
 
 hashListInternal : [Text] -> Hash
-hashListInternal ts = Hash $ T.sha256 $ mconcat (show (length ts) :: "|" :: ts)
+hashListInternal ts = Hash $ T.sha256 $ T.intercalate "|" (show (length ts) :: ts)
 
 hashVariantInternal : Text -> [Text] -> Hash
 hashVariantInternal tag fieldValues =
-  Hash $ T.sha256 $ mconcat (tag :: "|" :: show (length fieldValues) :: "|" :: fieldValues)
+  Hash $ T.sha256 $ T.intercalate "|" (tag :: show (length fieldValues) :: fieldValues)
 
 -- we view optionals as lists of length 0 or 1 to simplify the encoding in other systems
 hashOptionalInternal : Optional Hash -> Hash
