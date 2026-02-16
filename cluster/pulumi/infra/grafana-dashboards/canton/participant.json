@@ -273,13 +273,13 @@
             "uid": "${DS}"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "daml_sequencer_client_submissions_in_flight{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "editorMode": "builder",
+          "expr": "sum by(synchronizer, type, namespace, job, node) (daml_sequencer_client_submissions_in_flight{namespace=~\"$namespace\", component=\"participant\", job=~\"$job\", node=~\"$participant\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{namespace}} {{job}} {{node}}",
+          "legendFormat": "{{namespace}} {{job}} {{node}} {{sync}} {{type}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -819,11 +819,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_health_status{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "expr": "daml_health_status{namespace=~\"$namespace\",job=~\"$job\", node=~\"$participant\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}} {{job}} {{node}}",
+          "legendFormat": "{{namespace}} {{job}} {{node}} {{component}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -841,8 +841,8 @@
     "list": [
       {
         "current": {
-          "text": ["multi-validator"],
-          "value": ["multi-validator"]
+          "text": ["sv-1"],
+          "value": ["sv-1"]
         },
         "datasource": {
           "type": "prometheus",
@@ -866,8 +866,8 @@
       {
         "allValue": ".*",
         "current": {
-          "text": ["multi-participant-3-1"],
-          "value": ["multi-participant-3-1"]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",
@@ -891,7 +891,7 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "All",
+          "text": ["All"],
           "value": ["$__all"]
         },
         "datasource": {
