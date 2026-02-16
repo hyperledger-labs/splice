@@ -113,6 +113,10 @@ data AmuletRules_UpdateExternalPartyConfigStatesResult = AmuletRules_UpdateExter
     newExternalPartyConfigStateCid : ContractId ExternalPartyConfigState
   deriving (Show, Eq)
 
+data AmuletRules_DisableFeaturedAppMarkersResult = AmuletRules_DisableFeaturedAppMarkersResult with
+    newFeaturedAppRightCids : [ContractId FeaturedAppRight]
+  deriving (Show, Eq)
+
 -- | The rules governing how Amulet users can modify the Amulet state managed by the DSO party.
 template AmuletRules
   with
@@ -444,13 +448,33 @@ template AmuletRules
         require "latestRound is open" (latestRound.opensAt <= now)
         require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.tickDuration <= now)
 
-        -- archive and create the rounds
+        -- create the right state to start summarizing the round
         newSummarizingRound <- create SummarizingMiningRound with
             dso
             round = roundToArchive.round
             amuletPrice = roundToArchive.amuletPrice
             issuanceConfig = roundToArchive.issuanceConfig
             tickDuration = roundToArchive.tickDuration
+
+        -- trigger off-ledger reward calculation if needed
+        let batchSize = 100 -- FIXME: make configurable
+        forA_ (offLedgerRewardAccountingVersion roundToArchive.rewardAccountingVersion) $ \rav ->
+            create ConfirmAppRewards with
+                dso
+                round = roundToArchive.round
+                rewardAccountingVersion = rav
+                batchSize = batchSize
+                dryRun = False
+
+        forA_ (offLedgerRewardAccountingVersion roundToArchive.dryRunRewardAccountingVersion) $ \rav ->
+            create ConfirmAppRewards with
+                dso
+                round = roundToArchive.round
+                rewardAccountingVersion = rav
+                batchSize = batchSize
+                dryRun = True
+
+        -- create the new open round
         newOpenRound <- do
           let configUsd = getValueAsOf now configSchedule
               tickDuration = configUsd.tickDuration
@@ -470,6 +494,7 @@ template AmuletRules
               transferConfigUsd = configUsd.transferConfig
               issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
               tickDuration
+              rewardAccountingVersion = configUsd.rewardAccountingVersion
         return AmuletRules_AdvanceOpenMiningRoundsResult with
           summarizingRoundCid = newSummarizingRound
           openRoundCid = newOpenRound
@@ -747,15 +772,20 @@ template AmuletRules
         observers : Optional [Party] -- ^ A list of choice observers. This is expected to be set to the union of all providers and beneficiaries to ensure that this creates only one view.
       observer fromOptional [] observers
       controller dso
-      do now <- getTime
-         markers <- mapA (fetchAndArchive (ForDso dso)) markerCids
-         let groupedMarkers = Map.fromListWithR (+) (map (\m -> ((m.provider, m.beneficiary), m.weight)) markers)
-         round <- fetchReferenceData (ForDso dso) openMiningRoundCid
-         require ("mining round is open: " <> show round) (round.opensAt <= now)
-         let configUsd = getValueAsOf now configSchedule
-         if fromOptional False round.useTrafficBasedAppRewards
-           then pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = []
-           else do
+      do
+        now <- getTime
+        markers <- mapA (fetchAndArchive (ForDso dso)) markerCids
+        let groupedMarkers = Map.fromListWithR (+) (map (\m -> ((m.provider, m.beneficiary), m.weight)) markers)
+        round <- fetchReferenceData (ForDso dso) openMiningRoundCid
+        require ("mining round is open: " <> show round) (round.opensAt <= now)
+        let configUsd = getValueAsOf now configSchedule
+        if useTrafficBasedAppRewards round.rewardAccountingVersion
+          then
+            -- Ignore markers for rounds where traffic-based rewards are enabled.
+            -- We need this, as stopping marker creation is delayed by up to 48h as we can only propagate
+            -- that via the `ExternalPartyConfigState`.
+            pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = []
+          else do
             -- If the amount is not set or is <= 0 we just archive the marker contracts.
             markerCids <- forA (optionalToList configUsd.featuredAppActivityMarkerAmount) $ \amountUsd -> do
               let amountAmulet = amountUsd / round.amuletPrice
@@ -797,6 +827,33 @@ template AmuletRules
           transferConfig = transferConfigToTransferConfigV2 validatedRounds.latestUsableRound.transferConfigUsd
         pure AmuletRules_UpdateExternalPartyConfigStatesResult with ..
 
+    -- Disable featured app marker creation in a batch of featured app rights.
+    -- FIXME: consider whether we even need this. The incentives should be in place to stop creating markers altogether.
+    nonconsuming choice AmuletRules_DisableFeaturedAppMarkers : AmuletRules_DisableFeaturedAppMarkersResult
+      with
+        openMiningRoundTriple : OpenMiningRoundTriple
+        featuredAppRightCids : [ContractId FeaturedAppRight]
+        providers : [Party]
+      observer providers
+      controller dso
+      do
+        -- require that traffic-based app rewards is also enabled for the oldest round
+        -- to avoid app providers loosing the ability to create featured app markers too early
+        validatedRounds <- validateOpenMiningRoundTriple dso openMiningRoundTriple
+        require "oldest round has traffic-based rewards enabled"
+          (useTrafficBasedAppRewards validatedRounds.oldestRound.rewardAccountingVersion)
+
+        require "non-empty app rights" (not (null featuredAppRightCids))
+        require "unique app rights" (unique featuredAppRightCids)
+        require "equal number of providers and app rights" (length featuredAppRightCids == length providers)
+
+        newFeaturedAppRightCids <- forA_ (zip providers featuredAppRightCids) $ \(provider, cid) -> do
+          appRight <- fetchAndArchive (ForOwner with dso; owner = provider) cid
+          create appRight with enableMarkerCreation = Some False
+
+        pure AmuletRules_DisableFeaturedAppMarkersResult with newFeaturedAppRightCids
+
+
 data OpenMiningRoundTriple = OpenMiningRoundTriple
   with
     round0Cid : ContractId OpenMiningRound
@@ -821,6 +878,9 @@ validateOpenMiningRoundTriple dso roundTriple = do
   pure $ ValidatedOpenMiningRounds with
     oldestRound = round0
     latestUsableRound = maximumOn (.round.number) usableRounds
+
+miningRoundTripleCids : OpenMiningRoundTriple -> [ContractId OpenMiningRound]
+miningRoundTripleCids OpenMiningRoundTriple{} = [round0Cid, round1Cid, round2Cid]
 
 
 -- Transfer logic

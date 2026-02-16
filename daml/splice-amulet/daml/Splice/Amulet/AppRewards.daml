@@ -32,6 +32,9 @@ splice-amulet:
 splice-dso:
 - switch to iterated committments to enable bounded-size batches
 
+releas notes:
+- call out cycling of featured app rights; and markers created during switch-over time
+
 Notes for apps:
 
 - wallet:
@@ -39,7 +42,14 @@ Notes for apps:
 
 
 
-
+Notes on design:
+- roll-out
+  - enable dry-run of RAV_V2
+    ==> app reward calculation will be simulated, but no app reward coupons will be issued
+  - enable RAV_V2 for real
+    ==> all open rounds at this point will use RAV_V2
+    ==> activity markers will be dropped by trigger
+    ==> featured app rights
 
 
 
@@ -53,8 +63,8 @@ Notes for apps:
 template ConfirmAppRewards with
     dso : Party
     round : Round
+    batchSize : Int -- ^ The number of minting allowances to include in each batch.
     dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessAppRewards contracts.
-    rewardsExpireAt : Time
   where
     signatory dso
 

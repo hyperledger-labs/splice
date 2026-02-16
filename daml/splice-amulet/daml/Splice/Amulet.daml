@@ -257,6 +257,8 @@ template ValidatorRight with
 template FeaturedAppRight with
     dso : Party
     provider : Party
+    enableMarkerCreation : Optional Bool
+      -- ^ Whether on-ledger featured app activity markers should be created. Default is true, i.e., markers are created.
   where
     signatory dso
     observer provider
@@ -271,38 +273,47 @@ template FeaturedAppRight with
       controller provider
       do return FeaturedAppRight_CancelResult
 
-
     interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppRight for FeaturedAppRight where
       view = Splice.Api.FeaturedAppRightV1.FeaturedAppRightView with dso, provider
 
       featuredAppRight_CreateActivityMarkerImpl _self arg = do
-         validateAppRewardBeneficiaries arg.beneficiaries
-         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
-         cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
-           create FeaturedAppActivityMarker
-             with
-               dso
-               provider
-               beneficiary = beneficiary
-               weight = weight
-         pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
+        cids <-
+          if fromOptional True enableMarkerCreation
+            then do
+              validateAppRewardBeneficiaries arg.beneficiaries
+              let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
+              forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+                create FeaturedAppActivityMarker
+                  with
+                    dso
+                    provider
+                    beneficiary = beneficiary
+                    weight = weight
+            else
+              pure []
+        pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
 
     interface instance Splice.Api.FeaturedAppRightV2.FeaturedAppRight for FeaturedAppRight where
       view = Splice.Api.FeaturedAppRightV2.FeaturedAppRightView with dso, provider
 
       featuredAppRight_CreateActivityMarkerImpl _self arg = do
-         validateAppRewardBeneficiariesV2 arg.beneficiaries
-         require "Weight >= 1.0" (fromOptional 1.0 arg.weight >= 1.0)
-         require "Weight <= 10000.0" (fromOptional 1.0 arg.weight <= 10000.0)
-         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
-         cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
-           create FeaturedAppActivityMarker
-             with
-               dso
-               provider
-               beneficiary = beneficiary
-               weight = weight * fromOptional 1.0 arg.weight
-         pure (Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
+        cids <-
+          if fromOptional True enableMarkerCreation
+            then do
+              validateAppRewardBeneficiariesV2 arg.beneficiaries
+              require "Weight >= 1.0" (fromOptional 1.0 arg.weight >= 1.0)
+              require "Weight <= 10000.0" (fromOptional 1.0 arg.weight <= 10000.0)
+              let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
+              cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+                create FeaturedAppActivityMarker
+                  with
+                    dso
+                    provider
+                    beneficiary = beneficiary
+                    weight = weight * fromOptional 1.0 arg.weight
+            else
+              pure []
+        pure (Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
 
 validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
 validateAppRewardBeneficiaries beneficiaries = do

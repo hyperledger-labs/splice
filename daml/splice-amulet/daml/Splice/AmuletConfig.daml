@@ -47,6 +47,25 @@ data TransferConfigV2 unit = TransferConfigV2 with
     maxNumLockHolders : Int
   deriving (Eq, Show)
 
+-- FIXME: consider renaming to `RewardCalculationVersion`
+data RewardAccountingVersion
+  = RAV_V1 -- ^ Purely on-ledger reward accounting as described in the whitepaper plus the CIPs before CIP-104.
+  | RAV_V2 -- ^ Use off-ledger accounting based on traffic for app rewards as described in CIP-104.
+  deriving (Eq, Show)
+
+useTrafficBasedAppRewards : Optional RewardAccountingVersion -> Bool
+useTrafficBasedAppRewards rav = case rav of
+  None -> False
+  Some RAV_V1 -> False
+  Some RAV_V2 -> True
+
+-- | Get the off-ledger reward accounting version to use.
+offLedgerRewardAccountingVersion : Optional RewardAccountingVersion -> Optional RewardAccountingVersion
+offLedgerRewardAccountingVersion rav = case rav of
+  None -> None
+  Some RAV_V1 -> None
+  Some RAV_V2 -> Some RAV_V2
+
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --
 -- See Splice.Scripts.Parameters for concrete values.
@@ -64,6 +83,11 @@ data AmuletConfig unit = AmuletConfig with
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
     externalPartyConfigStateTickDuration : Optional RelTime -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts.
+    rewardAccountingVersion : Optional RewardAccountingVersion
+      -- ^ Which version of reward accounting to use. See docs for `RewardAccountingVersion` for details.
+    dryRunRewardAccountingVersion : Optional RewardAccountingVersion
+      -- ^ Which version of reward accounting to dry-run. Used to test-drive the off-ledger reward accounting
+      -- changes before fully switching over.
   deriving (Eq, Show)
 
 getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
