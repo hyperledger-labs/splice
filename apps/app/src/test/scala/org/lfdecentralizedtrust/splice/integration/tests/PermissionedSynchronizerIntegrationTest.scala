@@ -24,31 +24,17 @@ class PermissionedSynchronizerIntegrationTest
 
     sv1Backend.stop()
 
-    withClue("Phase 1: Set ParticipantSynchronizerPermission for SV1") {
-      actAndCheck(
-        "Propose SV1 ParticipantSynchronizerPermission",
-        sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-          .propose(
-            decentralizedSynchronizerId,
-            sv1ValidatorBackend.participantClientWithAdminToken.id,
-            permission = ParticipantPermission.Submission,
-            serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
-          ),
-      )(
-        "Verify SV1 permission is registered",
-        _ => {
-          val authorized =
-            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-              .find(
-                decentralizedSynchronizerId,
-                sv1ValidatorBackend.participantClientWithAdminToken.id,
-              )
-          authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
-        },
-      )
+    withClue("Set ParticipantSynchronizerPermission for SV1") {
+
+      sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+        .propose(
+          decentralizedSynchronizerId,
+          sv1ValidatorBackend.participantClientWithAdminToken.id,
+          permission = ParticipantPermission.Submission,
+        )
     }
 
-    withClue("Phase 2: change onboarding restriction to RestrictedOpen") {
+    withClue("change onboarding restriction to RestrictedOpen") {
       actAndCheck(
         "Propose RestrictedOpen onboarding restriction",
         sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
@@ -68,7 +54,7 @@ class PermissionedSynchronizerIntegrationTest
 
     sv1Nodes.foreach(s => s.startSync())
 
-    withClue("Phase 3: Submit a ParticipantSynchronizerPermission for the alice participant") {
+    withClue("Submit a ParticipantSynchronizerPermission for the alice participant") {
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
 
       actAndCheck(
@@ -78,7 +64,6 @@ class PermissionedSynchronizerIntegrationTest
             decentralizedSynchronizerId,
             aliceParticipantId,
             permission = ParticipantPermission.Submission,
-            serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
           ),
       )(
         "Wait until alice topology transaction is registered",
@@ -94,7 +79,7 @@ class PermissionedSynchronizerIntegrationTest
       )
     }
 
-    withClue("Phase 4: Start the alice validator participant") {
+    withClue("Start the alice validator participant") {
       actAndCheck(
         "Start Alice validator",
         aliceValidatorBackend.startSync(),
