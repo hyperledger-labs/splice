@@ -27,6 +27,12 @@ overall:
 - Separate PR: add missing getAndValidateSvParty calls to DsoRules_ClaimExpiredRewards
   - add checked fetches for all coupons in ClaimExpiredRewards
 
+api:
+- introduce api package: splice-api-reward-minting-v1
+
+tests:
+- minting delegation of RewardCouponV2
+
 release notes:
 - call out cycling of featured app rights; and markers created during switch-over time
 
