@@ -35,7 +35,7 @@ jobs:
       - name: Run consistency check
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
-          additional_nix_args: "--keep PATH"
+          additional_nix_args: "--keep ARTIFACTORY_USERNAME --keep ARTIFACTORY_PASSWORD --keep PATH"
           cmd: |
             CURRENT_VERSION=$(jq -r '.version' nix/canton-sources.json)
 
