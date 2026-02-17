@@ -999,7 +999,7 @@ summarizeAndValidateContext context dso tf = do
 
 summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
 summarizeAndValidateExternalPartyContext context dso tf = do
-  -- check that the current mining round is open
+  -- check the referenced ExternalPartyConfigState
   externalPartyConfigState <- fetchReferenceData (ForDso with dso) context.externalPartyConfigState
 
   -- check the featured app right, if present
