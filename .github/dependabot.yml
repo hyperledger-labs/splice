@@ -20,9 +20,14 @@ updates:
       - "martinflorian-da"
     labels:
       - "static"
-  - package-ecosystem: "actions"
-    directory: "/" # This is interpreted as .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/" # For GitHub Actions '/' means .github/workflows/**/*.{yaml,yml}
+    # Check for updates to GitHub Actions every week
     schedule:
-      interval: "daily"
+      interval: "weekly"
     labels:
       - "static"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
