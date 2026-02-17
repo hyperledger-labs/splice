@@ -102,7 +102,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       Try(sv1ScanBackend.getAcsSnapshot(dsoParty, None)).isFailure should be(true),
       _.warningMessage should include("resulted in a timeout after 1 millisecond"),
       _.errorMessage should include(
-        "Command failed, message: The server is taking too long to respond to the request"
+        "Command failed, message: The server is taking too long to respond to the (GET) request"
       ),
     )
   }
