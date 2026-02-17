@@ -1631,7 +1631,9 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
+          /*externalTransactionHash = */ Option(updateRow.externalTransactionHash)
+            .map(ByteString.copyFrom)
+            .getOrElse(ByteString.EMPTY),
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
