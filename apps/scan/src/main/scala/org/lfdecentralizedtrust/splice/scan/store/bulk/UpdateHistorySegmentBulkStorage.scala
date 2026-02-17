@@ -211,7 +211,7 @@ class UpdateHistorySegmentBulkStorage(
           )
         },
       )
-      .mapAsync(4) {
+      .mapAsync(4) { // TODO(#3429): make the parallelism (4) configurable
         case chunk: ObjectChunk if chunk.partNumber >= 0 =>
           logger.debug(
             s"Uploading a chunk of size ${chunk.bytes.toArrayUnsafe().length} as partNumber ${chunk.partNumber} of ${chunk.obj.key}"

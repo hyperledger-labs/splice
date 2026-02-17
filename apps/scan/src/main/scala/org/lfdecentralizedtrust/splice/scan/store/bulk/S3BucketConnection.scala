@@ -116,8 +116,7 @@ class S3BucketConnection(
         response <- s3Client
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
           .asScala
-      } yield {
-        parts
+        res <- parts
           .put(
             partNumber,
             CompletedPart
@@ -126,9 +125,14 @@ class S3BucketConnection(
               .eTag(response.eTag())
               .build(),
           )
-          .fold(())(_ =>
-            throw new RuntimeException(s"Part number $partNumber uploaded more than once")
+          .fold(
+            Future.successful(())
+          )(_ =>
+            Future.failed(new RuntimeException(s"Part number $partNumber uploaded more than once"))
           )
+
+      } yield {
+        res
       }
     }
 
