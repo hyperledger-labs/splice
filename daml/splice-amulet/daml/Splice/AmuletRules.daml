@@ -31,6 +31,7 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig
   ( transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig
   , defaultTransferPreapprovalFee, getExternalPartyConfigStateTickDuration, useTrafficBasedAppRewards
+  , RewardCalculationVersion, useFeaturedAppMarkers
   )
 import qualified Splice.AmuletConfig as Unit
 import Splice.ExternalPartyConfigState
@@ -903,6 +904,7 @@ template AmuletRules
           holdingFeesOpenRoundNumber = validatedRounds.oldestRound.round
           amuletPrice = validatedRounds.latestUsableRound.amuletPrice
           transferConfig = transferConfigToTransferConfigV2 validatedRounds.latestUsableRound.transferConfigUsd
+          rewardCalculationVersion = validatedRounds.latestUsableRound.rewardCalculationVersion
         pure AmuletRules_UpdateExternalPartyConfigStatesResult with ..
 
 
@@ -1052,6 +1054,7 @@ data TransferContextSummaryV2 = TransferContextSummaryV2 with
     amuletPrice : Decimal
     issuingMiningRounds : Map Round IssuingMiningRound
     validatorRights : Map Party (ContractId ValidatorRight)
+    rewardCalculationVersion : Optional RewardCalculationVersion
   deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with
@@ -1111,6 +1114,7 @@ summarizeAndValidateContext context dso tf = do
     issuingMiningRounds = Map.fromList issuingMiningRounds
     validatorRights = Map.fromList validatorRights
     amuletPrice = openRound.amuletPrice
+    rewardCalculationVersion = openRound.rewardCalculationVersion
 
 summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
 summarizeAndValidateExternalPartyContext context dso tf = do
@@ -1132,6 +1136,7 @@ summarizeAndValidateExternalPartyContext context dso tf = do
     -- no minting for long lived transfers
     validatorRights = Map.empty
     amuletPrice = externalPartyConfigState.amuletPrice
+    rewardCalculationVersion = externalPartyConfigState.rewardCalculationVersion
 
 getValidatorRight : TransferContextSummaryV2 -> Party -> Update (ContractId ValidatorRight)
 getValidatorRight csum user =
@@ -1416,22 +1421,24 @@ summarizeTransfer sender openRoundNumber amuletPrice transferConfigAmulet inp pr
       amuletPrice
 
 issueRewards : RewardsIssuanceConfig -> TransferContextSummaryV2 -> Party -> Optional [AppRewardBeneficiary] -> Update ()
-issueRewards config csum provider beneficiaries = do
-    if config.issueAppRewards
-      then do
-        let beneficiaries' = fromOptional [AppRewardBeneficiary provider 1.0] beneficiaries
-        validateAppRewardBeneficiaries beneficiaries'
-        let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) beneficiaries')
-        when featured $
-          forA_ (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
-            void $ create FeaturedAppActivityMarker
-              with
-                dso = csum.dso
-                provider
-                beneficiary = beneficiary
-                weight = weight
-      else do
-        require "beneficiaries are unset if issueAppRewards is false" (optional True null beneficiaries)
+issueRewards config csum provider beneficiaries
+  | useFeaturedAppMarkers csum.rewardCalculationVersion = do
+      if config.issueAppRewards
+        then do
+          let beneficiaries' = fromOptional [AppRewardBeneficiary provider 1.0] beneficiaries
+          validateAppRewardBeneficiaries beneficiaries'
+          let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) beneficiaries')
+          when featured $
+            forA_ (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+              void $ create FeaturedAppActivityMarker
+                with
+                  dso = csum.dso
+                  provider
+                  beneficiary = beneficiary
+                  weight = weight
+        else do
+          require "beneficiaries are unset if issueAppRewards is false" (optional True null beneficiaries)
+    | otherwise = pure ()
   where
     featured = Some provider == csum.featuredAppProvider
 
@@ -2053,6 +2060,7 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
         holdingFeesOpenRoundNumber = validatedRounds.oldestRound.round
         amuletPrice = validatedRounds.latestUsableRound.amuletPrice
         transferConfig = transferConfig
+        rewardCalculationVersion = validatedRounds.latestUsableRound.rewardCalculationVersion
       configState1 = configState0 with
         targetArchiveAfter = configState0.targetArchiveAfter `addRelTime` getExternalPartyConfigStateTickDuration config
   create configState0

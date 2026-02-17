@@ -59,7 +59,11 @@ useTrafficBasedAppRewards rav = case rav of
   Some RCV_V1 -> False
   Some RCV_V2 -> True
 
+useFeaturedAppMarkers : Optional RewardCalculationVersion -> Bool
+useFeaturedAppMarkers = not . useTrafficBasedAppRewards
+
 -- | Get the off-ledger reward accounting version to use.
+-- FIXME: remove
 offLedgerRewardCalculationVersion : Optional RewardCalculationVersion -> Optional RewardCalculationVersion
 offLedgerRewardCalculationVersion rav = case rav of
   None -> None
