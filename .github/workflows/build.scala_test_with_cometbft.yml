@@ -40,6 +40,7 @@ jobs:
           # Checkout the PR head commit to get the commit message
           ref: ${{ github.event.pull_request.head.sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Split tests
         id: prep
@@ -110,6 +111,7 @@ jobs:
         with:
           ref: ${{ inputs.commit_sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Tests
         uses: ./splice-shared-gha/.github/actions/tests/scala_test

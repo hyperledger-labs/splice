@@ -89,6 +89,7 @@ jobs:
           # Checkout with full history to get all commit messages on the branch
           fetch-depth: 0
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Split tests
         id: prep
@@ -132,6 +133,7 @@ jobs:
         with:
           ref: ${{ inputs.commit_sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Tests
         uses: ./splice-shared-gha/.github/actions/tests/scala_test
