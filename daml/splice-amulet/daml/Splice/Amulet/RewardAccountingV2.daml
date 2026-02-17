@@ -27,11 +27,6 @@ overall:
 - Separate PR: add missing getAndValidateSvParty calls to DsoRules_ClaimExpiredRewards
   - add checked fetches for all coupons in ClaimExpiredRewards
 
-splice-amulet:
-
-- introduce ExternalAmuletRules_MintWithBeneficiaries
-  - add API package for it
-
 release notes:
 - call out cycling of featured app rights; and markers created during switch-over time
 

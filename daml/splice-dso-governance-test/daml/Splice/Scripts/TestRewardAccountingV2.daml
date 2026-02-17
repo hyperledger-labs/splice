@@ -63,7 +63,7 @@ test_reward_accounting_v2 = do
   let rootBatchHash = CryptoHash.hash rootBatch
   let batchesWithHiding = [(b1, [bob]), (b2, [dora]), (rootBatch, [])]
 
-  -- get the
+  -- get the contract representing the pending calculation and confirmation of rewards for round 0
   [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
 
   -- setup reimbursement workflow state

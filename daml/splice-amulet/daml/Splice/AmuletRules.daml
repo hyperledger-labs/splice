@@ -860,9 +860,8 @@ template AmuletRules
         let configUsd = getValueAsOf now configSchedule
         if useTrafficBasedAppRewards round.rewardCalculationVersion
           then
-            -- Ignore markers for rounds where traffic-based rewards are enabled.
-            -- We need this, as stopping marker creation is delayed by up to 48h as we can only propagate
-            -- that via the `ExternalPartyConfigState`.
+            -- Markers may still be created for rounds that use traffic-based app rewards
+            -- ==> just archive the markers.
             pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = []
           else do
             -- If the amount is not set or is <= 0 we just archive the marker contracts.

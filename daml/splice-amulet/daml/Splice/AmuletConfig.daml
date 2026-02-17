@@ -47,7 +47,8 @@ data TransferConfigV2 unit = TransferConfigV2 with
     maxNumLockHolders : Int
   deriving (Eq, Show)
 
--- FIXME: consider renaming to `RewardCalculationVersion`
+-- | Version of the scheme that is used to calculate rewards.
+-- FIXME: consider using an integer for a more seamless transition to future versions.
 data RewardCalculationVersion
   = RCV_V1 -- ^ Purely on-ledger reward accounting as described in the whitepaper plus the CIPs before CIP-104.
   | RCV_V2 -- ^ Use off-ledger accounting based on traffic for app rewards as described in CIP-104.
@@ -61,14 +62,6 @@ useTrafficBasedAppRewards rav = case rav of
 
 useFeaturedAppMarkers : Optional RewardCalculationVersion -> Bool
 useFeaturedAppMarkers = not . useTrafficBasedAppRewards
-
--- | Get the off-ledger reward accounting version to use.
--- FIXME: remove
-offLedgerRewardCalculationVersion : Optional RewardCalculationVersion -> Optional RewardCalculationVersion
-offLedgerRewardCalculationVersion rav = case rav of
-  None -> None
-  Some RCV_V1 -> None
-  Some RCV_V2 -> Some RCV_V2
 
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --
