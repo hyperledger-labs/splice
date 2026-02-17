@@ -298,7 +298,7 @@ amulet_transferFactory_transferImpl this _self arg = do
             senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
             output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
               receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
-            meta = copyOnlyBurnMeta result.meta
+            meta = fromOptional emptyMetadata result.meta
 
       | otherwise -> do
           -- prepare a two-step transfer
@@ -337,7 +337,7 @@ amulet_transferFactory_transferImpl this _self arg = do
         senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
         output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
           receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
-        meta = copyOnlyBurnMeta (Some result.meta)
+        meta = result.meta
 
 
 -- Token standard allocation factory

@@ -175,16 +175,6 @@ expireLockKey = "expire-lock"
 -- Metadata utilities
 ---------------------
 
--- | Copy only the burn metadata. Used for token standard choices to copy the burn
--- from a transfer result.
-copyOnlyBurnMeta : Optional Metadata -> Metadata
-copyOnlyBurnMeta optOrigMeta = fromOptional emptyMetadata $ do
-  origMeta <- optOrigMeta
-  origValue <- TextMap.lookup burnedMetaKey origMeta.values
-  pure $ Metadata with
-    values =
-      TextMap.singleton burnedMetaKey origValue
-
 beneficiariesFromMetadata : Metadata -> Either Text (Optional [AppRewardBeneficiary])
 beneficiariesFromMetadata meta = do
   let optBs = TextMap.lookup appRewardBeneficiariesMetaKey meta.values
