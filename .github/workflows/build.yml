@@ -58,7 +58,7 @@ jobs:
         with:
           # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
-          recursive: true
+          submodules: true
       - name: Check if static only
         uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
         id: static_only
