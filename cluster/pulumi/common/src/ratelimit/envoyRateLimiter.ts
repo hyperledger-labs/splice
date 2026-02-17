@@ -3,6 +3,39 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 
+/* TODO implement this
+
+* Read scan.yaml and ensure every endpoint matches a actions.pathPrefix entry in the RateLimitEnvoyFilterArgs rateLimits.
+    * pathPrefix starts with /api/scan in RateLimitEnvoyFilterArgs but not in scan.yaml; only consider the subset of pathPrefix items that start with /api/scan
+    * If any scan.yaml endpoint doesn't have a matching prefix, error with the set of endpoints with missing prefixes in the RateLimitEnvoyFilter constructor
+    * If there is a prefix that begins with /api/scan in RateLimitEnvoyFilterArgs but doesn’t match any endpoint in scan.yaml, also error about that. Report both types of errors at the same time, don’t fail fast for one or the other
+    * scan.yaml is in apps/scan/src/main/openapi and is in openapi format
+    * a scan.yaml endpoint is a yaml key immediately under paths ; { starts a wildcard variable match so should not be counted against the pathPrefix
+
+* Add union of un-banned path prefixes to cloud armor throttle rule in cloudArmor.ts
+    * pathExpr is limited to 1024 characters by Google. So switch the call to startsWith to use matches instead, combine all the paths with |, and as a special case collect paths that start with /api/scan and factor that part of the string out of the regexp union
+    * the function to extract path prefixes and their banned/unbanned status should be exported from envoyRateLimiter.ts and also used in the code that checks for scan.yaml coverage
+    * This is needed because otherwise more requests guaranteed not to reach scan would still count towards overall throttle; spamming 404 paths would be an easy DoS
+
+* in deployment/config.yaml, add pathPrefixes under sv.scan.externalRateLimits.rateLimits setting the unlimited mode for most endpoints except /v0/acs, which is already covered
+    * if scan.yaml says an endpoint is deprecated, set it to banned mode instead. Put a comment explaining why for each banned case
+
+
+For your clarification questions
+1. Yes, just strip to /v0/domains in that case.
+2. All paths in scan.yaml start with /api/scan, this prefix is just not included in scan.yaml. Treat /readyz like any other endpoint.
+3. They should share one limit.
+4. They should be unified, only edit deployment/config.yaml.
+
+Further plan modifications:
+* There is no need to introduce a function determining deprecated status. Just do that statically, and statically decide on banned/unbanned status when making changes to the yaml file.
+* Instead of using 0, 0 for banned cases, change `limits: Limits` below to `limits: Limits | Banned`. Define the new type Banned to introduce a discriminating key. When handling this case in RateLimitEnvoyFilter, skip it instead of actually setting the limit to 0, and add a TODO explaining that banning for real needs a special short-circuit for whitelisted IPs.
+* Similarly, add another type Unlimited to the union for the unlimited cases. In this case, don't create an EnvoyFilter because the default filter is already present, and is the correct one.
+* Use /api/scan/ as the common prefix for cloudArmor regex instead of /api/scan, because every endpoint always starts with /.
+* Where you use the variable configuredPrefixes, say configuredScanPrefixes instead.
+* There is no need for new dependencies. See cluster/pulumi/common/src/config/configLoader.ts for the function readAndParseYaml that can be used.
+ */
+
 interface Limits {
   maxTokens: number;
   tokensPerFill: number;
