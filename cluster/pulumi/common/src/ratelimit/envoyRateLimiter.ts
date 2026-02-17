@@ -42,6 +42,17 @@ interface Limits {
   fillInterval: string;
 }
 
+interface Banned {
+  type: 'banned';
+  reason?: string;
+}
+
+interface Unlimited {
+  type: 'unlimited';
+}
+
+type RateLimitConfig = Limits | Banned | Unlimited;
+
 export interface RateLimitEnvoyFilterArgs {
   namespace: string;
 
@@ -66,7 +77,7 @@ export interface RateLimitEnvoyFilterArgs {
           clientIp: boolean;
         }
     )[];
-    limits: Limits;
+    limits: RateLimitConfig;
   }[];
 }
 
