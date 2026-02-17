@@ -9,25 +9,15 @@ import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCrede
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import software.amazon.awssdk.services.s3.model.{
-  CompleteMultipartUploadRequest,
-  CompletedMultipartUpload,
-  CompletedPart,
-  CreateMultipartUploadRequest,
-  GetObjectRequest,
-  GetObjectResponse,
-  ListObjectsRequest,
-  ListObjectsResponse,
-  PutObjectRequest,
-  UploadPartRequest,
-}
+import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, GetObjectRequest, GetObjectResponse, ListObjectsRequest, ListObjectsResponse, PutObjectRequest, UploadPartRequest}
 
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
 import java.net.URI
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import java.util.concurrent.atomic.AtomicInteger
+import scala.collection.concurrent.TrieMap
+import scala.concurrent.{ExecutionContext, Future}
 
 case class S3Config(
     endpoint: URI,
@@ -91,18 +81,18 @@ class S3BucketConnection(
       .build();
 
     private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
-    private val parts = new AtomicReference(Seq.empty[Option[CompletedPart]])
+    private val numParts = new AtomicInteger(0)
+    private val parts = TrieMap.empty[Integer, CompletedPart]
 
-    /* Must be called sequentially. It is a fast operation that just initializes the next upload slot */
-    def prepareUploadNext(): Int = {
-      parts.set(parts.get :+ None)
-      parts.get().length // Part numbers are 1-based in S3
-    }
+    /** Call this once before uploading a new part.
+     *  */
+    def prepareUploadNext(): Int = numParts.incrementAndGet()
 
-    /* Thread safe, may be called in parallel.
-       partNumber must be an index returned from prepareUploadNext()
-     */
+    /** Thread safe, may be called in parallel.
+      *       partNumber must be an index returned from prepareUploadNext()
+      */
     def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
+      require(numParts.get() >= partNumber)
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -116,42 +106,25 @@ class S3BucketConnection(
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
           .asScala
       } yield {
-        blocking {
-          synchronized {
-            parts.set(
-              parts.get.updated(
-                partNumber - 1,
-                Some(
-                  CompletedPart
-                    .builder()
-                    .partNumber(partNumber)
-                    .eTag(response.eTag())
-                    .build()
-                ),
-              )
-            )
-          }
-        }
+        parts.put(
+          partNumber,
+          CompletedPart
+            .builder()
+            .partNumber(partNumber)
+            .eTag(response.eTag())
+            .build()
+        ).fold(())(_ => throw new RuntimeException(s"Part number $partNumber uploaded more than once"))
       }
     }
 
     def finish(): Future[Unit] = {
-      require(parts.get().nonEmpty)
+      require(numParts.get() > 0)
+      require(parts.size == numParts.get(), "completeMultiPartUpload may not be called before all parts have finished uploading")
       for {
         id <- uploadId
         completedMultipartUpload = CompletedMultipartUpload
           .builder()
-          .parts(
-            parts.get
-              .map(
-                _.getOrElse(
-                  throw new RuntimeException(
-                    "completeMultiPartUpload may not be called before all parts have finished uploading"
-                  )
-                )
-              )
-              .asJava
-          )
+          .parts(parts.toSeq.sortBy(_._1).map(_._2).asJava)
           .build();
 
         completeRequest = CompleteMultipartUploadRequest

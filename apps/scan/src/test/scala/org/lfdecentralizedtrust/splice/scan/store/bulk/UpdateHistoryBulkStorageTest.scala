@@ -20,13 +20,11 @@ import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKey
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
 import scala.math.Ordering.Implicits.*
 import java.nio.ByteBuffer
 

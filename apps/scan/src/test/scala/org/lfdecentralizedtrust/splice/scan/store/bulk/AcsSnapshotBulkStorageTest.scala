@@ -32,14 +32,12 @@ import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 import org.mockito.invocation.InvocationOnMock
-import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.nio.ByteBuffer
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
 import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorageTest
