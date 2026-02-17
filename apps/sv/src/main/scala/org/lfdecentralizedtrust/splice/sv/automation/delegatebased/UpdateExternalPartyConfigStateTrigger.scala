@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.store.ExternalPartyConfigStateStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -84,18 +83,14 @@ class UpdateExternalPartyConfigStateTrigger(
   override protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[UpdateExternalPartyConfigStateTrigger.Task]
   )(implicit tc: TraceContext): Future[Boolean] = {
-    import cats.instances.future.*
-
-    (for {
-      _ <- MonadUtil.sequentialTraverse(task.work.externalPartyConfigStatePair.toSeq)(co =>
-        OptionT(
-          store.multiDomainAcsStore
-            .lookupContractById(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(
-              co.contractId
-            )
-        )
-      )
-    } yield ()).isEmpty
+    for {
+      oldest <- store.multiDomainAcsStore.lookupContractById(
+        splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION
+      )(task.work.externalPartyConfigStatePair.oldest.contractId)
+      newest <- store.multiDomainAcsStore.lookupContractById(
+        splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION
+      )(task.work.externalPartyConfigStatePair.newest.contractId)
+    } yield (oldest.isEmpty || newest.isEmpty)
   }
 }
 
