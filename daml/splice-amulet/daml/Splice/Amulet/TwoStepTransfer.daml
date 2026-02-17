@@ -60,7 +60,7 @@ holdingToTransferInputs forOwner inputHoldingCids =
 
 -- | Prepare a two-step transfer of amulet by locking the funds.
 prepareTwoStepTransfer : TwoStepTransfer -> Time -> [ContractId Holding] -> ExternalPartyTransferContext -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
-prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentContext = do
+prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context = do
   require "requestedAt < transferBefore" (requestedAt < transferBefore)
   -- lock the amulet
   transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) inputHoldingCids
