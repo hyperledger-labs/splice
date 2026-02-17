@@ -22,7 +22,7 @@ class PermissionedSynchronizerIntegrationTest
   "onboard validator in permissioned mode" in { implicit env =>
     initDsoWithSv1Only()
 
-    sv1Nodes.foreach(s => s.stop())
+    sv1Backend.stop()
 
     withClue("Phase 1: Set ParticipantSynchronizerPermission for SV1") {
       actAndCheck(
