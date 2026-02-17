@@ -74,41 +74,42 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.commit_sha }}
+          submodules: "recursive"
 
       - name: Setup
         id: setup
-        uses: ./.github/actions/tests/common_test_setup
+        uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
           test_name: static_tests
           target: 'static_tests'
 
       - name: Check Grafana Dashboards
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-grafana-dashboards.sh
 
       - name: Check trailing whitespace
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-trailing-whitespace.sh
 
       - name: Run Daml warts check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-daml-warts.sh
 
       - name: Run Daml return types check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-daml-return-types.sh
 
       - name: Run Daml interface implementations check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-daml-interface-impls.sh
 
       - name: Checking TODOs
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         if: ${{ inputs.skip_todo_check == false }}
         with:
           cmd: |
@@ -123,32 +124,32 @@ jobs:
           CIRCLE_PULL_REQUEST: ${{ github.event.pull_request.number }}
 
       - name: Lint GHA
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/actionlint.sh
 
       - name: Check for strings that should not be used in Splice
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-repo-names.sh
 
       - name: Check that docker base images are pinned by digest
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-base-images.sh
 
       - name: Check that npm packages are properly namespaced
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: ./scripts/check-npm-package-names.py
 
       - name: SBT-based static checks
-        uses: ./.github/actions/sbt/execute_sbt_command
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         with:
           cmd: "Test/compile lint updateTestConfigForParallelRuns"
 
       - name: Verify no changes in SBT test files
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: git add . && git diff --staged --exit-code test*.log
 
@@ -158,7 +159,7 @@ jobs:
 
       - name: Report Failures on Slack & Github
         if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
-        uses: ./.github/actions/tests/failure_notifications
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
         with:
           workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
           service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'

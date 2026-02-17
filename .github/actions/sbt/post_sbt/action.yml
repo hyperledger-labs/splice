@@ -20,7 +20,7 @@ runs:
   steps:
     - name: Store precompiled classes
       if: ${{ fromJson(inputs.save_caches) }}
-      uses: ./.github/actions/cache/precompiled_classes/save
+      uses: ./splice-shared-gha/.github/actions/cache/precompiled_classes/save
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).classes }}
@@ -28,7 +28,7 @@ runs:
 
     - name: Store SBT Cache
       if: ${{ fromJson(inputs.save_caches) }}
-      uses: ./.github/actions/cache/sbt/save
+      uses: ./splice-shared-gha/.github/actions/cache/sbt/save
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).sbt }}
@@ -36,7 +36,7 @@ runs:
 
     - name: Store frontend node_modules
       if: ${{ fromJson(inputs.save_caches) }}
-      uses: ./.github/actions/cache/frontend_node_modules/save
+      uses: ./splice-shared-gha/.github/actions/cache/frontend_node_modules/save
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).node_modules }}
@@ -44,7 +44,7 @@ runs:
 
     - name: Store Daml artifacts
       if: ${{ fromJson(inputs.save_caches) }}
-      uses: ./.github/actions/cache/daml_artifacts/save
+      uses: ./splice-shared-gha/.github/actions/cache/daml_artifacts/save
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).daml }}

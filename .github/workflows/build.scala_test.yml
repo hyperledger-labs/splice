@@ -88,10 +88,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           # Checkout with full history to get all commit messages on the branch
           fetch-depth: 0
+          submodules: "recursive"
 
       - name: Split tests
         id: prep
-        uses: ./.github/actions/tests/pre_scala_test
+        uses: ./splice-shared-gha/.github/actions/tests/pre_scala_test
         with:
           parallelism: ${{ inputs.parallelism }}
           test_names_file: ${{ inputs.test_names_file }}
@@ -130,9 +131,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.commit_sha }}
+          submodules: "recursive"
 
       - name: Run Tests
-        uses: ./.github/actions/tests/scala_test
+        uses: ./splice-shared-gha/.github/actions/tests/scala_test
         with:
           with_canton: ${{ inputs.with_canton }}
           start_canton_options: ${{ inputs.start_canton_options }}

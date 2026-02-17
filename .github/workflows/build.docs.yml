@@ -18,10 +18,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.commit_sha }}
+          submodules: "recursive"
 
       - name: Setup
         id: setup
-        uses: ./.github/actions/tests/common_test_setup
+        uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
           test_name: docs
           save_nix_cache: true
@@ -31,7 +32,7 @@ jobs:
           upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
 
       - name: Build docs
-        uses: ./.github/actions/sbt/execute_sbt_command
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         with:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
@@ -46,14 +47,14 @@ jobs:
           path: docs/html/html
 
       - name: Post-SBT job
-        uses: ./.github/actions/sbt/post_sbt
+        uses: ./splice-shared-gha/.github/actions/sbt/post_sbt
         with:
           cache_version: 7
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Report Failures on Slack & Github
         if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
-        uses: ./.github/actions/tests/failure_notifications
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
         with:
           workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
           service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'

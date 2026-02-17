@@ -25,7 +25,7 @@ jobs:
         run: ./.github/actions/scripts/common_setup.sh
 
       - name: Set up Nix (Self hosted)
-        uses: ./.github/actions/nix/setup_nix
+        uses: ./splice-shared-gha/.github/actions/nix/setup_nix
         with:
           cache_version: 7
           artifactory_user: dummy
@@ -33,7 +33,7 @@ jobs:
           target: default
       
       - name: Check for the latest version and create a PR to splice
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
@@ -45,7 +45,7 @@ jobs:
 
       - name: Report Failures on Slack & Github
         if: failure() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
-        uses: ./.github/actions/tests/failure_notifications
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
         with:
           workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
           service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
