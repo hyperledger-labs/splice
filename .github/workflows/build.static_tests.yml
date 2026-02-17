@@ -15,6 +15,43 @@ on:
         default: false
 
 jobs:
+  check_canton_consistency:
+    runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-small' || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    container:
+      image: ${{ inputs.self_hosted && 'us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12' || '' }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Setup Nix
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: canton_consistency
+          target: 'static_tests'
+
+      - name: Run consistency check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            CURRENT_VERSION=$(jq -r '.version' nix/canton-sources.json)
+
+            echo "Validating that hashes in nix/canton-sources.json match version: $CURRENT_VERSION"
+
+            ./build-tools/bump-canton.sh "$CURRENT_VERSION"
+
+            git add nix/canton-sources.json
+            if ! git diff --staged --exit-code nix/canton-sources.json; then
+              echo "-------------------------------------------------------"
+              echo "FAIL: Canton version and hashes are out of sync!"
+              echo "It looks like the version was bumped without updating the SHA256 hashes."
+              echo "Run './build-tools/bump-canton.sh $CURRENT_VERSION' and commit the changes."
+              echo "-------------------------------------------------------"
+              exit 1
+            fi
+            echo "Success: Hashes match the version."
   static_tests:
     runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-small' || 'ubuntu-24.04' }}
     timeout-minutes: 35
