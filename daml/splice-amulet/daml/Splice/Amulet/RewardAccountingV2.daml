@@ -44,7 +44,12 @@ Notes on design:
   - enable RAV_V2 for real
     ==> all open rounds at this point will use RAV_V2
     ==> activity markers will be dropped by trigger
-    ==> featured app rights
+    ==> markers will stop being created by splice code with a delay of up to 48h
+        (some app providers might still create markers directly)
+
+  - create new splice version that deprecates marker creation via a failing choice
+    - roll it out once nobody creates markers anymore (verify this using Scan)
+
 
 
 -}
