@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/cluster/pulumi"
+    schedule:
+      interval: "daily"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
+    labels:
+      - "static"
+  - package-ecosystem: "npm"
+    directory: "/load-tester"
+    schedule:
+      interval: "daily"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
+    labels:
+      - "static"
+  - package-ecosystem: "actions"
+    directory: "/" # This is interpreted as .github/workflows
+    schedule:
+      interval: "daily"
+    labels:
+      - "static"
