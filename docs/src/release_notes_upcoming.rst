@@ -44,6 +44,9 @@
            - The config schedule on ``AmuletRules`` can no longer contain ``futureValues``. The ability to do so through the UI was removed in CIP 51 but
              in theory it would have still been possible to set this through internal APIs.
 
+         - This does change transaction structure, in particular, ``AmuletRules_Transfer`` is no longer a child node of the token standard operations and some other choices.
+           Token standard compliant history parsing should not require adjustments however apps that parses the Splice choices directly may need to be adjusted.
+
        - ``TransferCommand`` is deprecated and will removed in a future
          version. It was originally introduced to support 24h signing
          delays and is no longer required now that this is also available
