@@ -432,15 +432,13 @@ However, bugs in the BFT sequencer connection logic or severe instability of oth
 
 To do so, SV operators must perform the following steps.
 
-Step 1. In ``validator-values.yaml``, replace the existing ``synchronizer`` config with the following.
+Step 1. In ``sv-validator-values.yaml``, add the following ``synchronizer`` config.
 
 .. code-block:: yaml
 
     synchronizer:
       connectionType: "trust-single"
       url: "SEQUENCER_PUBLIC_URI" # domain.sequencerPublicUrl from sv-values.yaml
-
-
 
 Step 2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
 
