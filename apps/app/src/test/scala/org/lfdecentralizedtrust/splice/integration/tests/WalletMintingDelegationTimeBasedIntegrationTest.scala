@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
   MintingDelegationCollectRewardsTrigger,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.store.Limit
@@ -34,7 +34,7 @@ import scala.jdk.CollectionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceWallet_0_1_16
 class WalletMintingDelegationTimeBasedIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with TriggerTestUtil
