@@ -20,9 +20,6 @@ class PermissionedSynchronizerIntegrationTest
       .withManualStart
 
   "onboard validator in permissioned mode" in { implicit env =>
-    // we use the steps initDso -> stop SV1 -> set permissions -> change onboarding -> start SV1 in order to mimic a permissioned synchronizer on bootstrap.
-    // if these steps are to be removed from the integration test, then these exact steps should be added to canton bootstrap script.
-
     initDsoWithSv1Only()
 
     sv1Backend.stop()
