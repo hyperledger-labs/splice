@@ -9,7 +9,18 @@ import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCrede
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, GetObjectRequest, GetObjectResponse, ListObjectsRequest, ListObjectsResponse, PutObjectRequest, UploadPartRequest}
+import software.amazon.awssdk.services.s3.model.{
+  CompleteMultipartUploadRequest,
+  CompletedMultipartUpload,
+  CompletedPart,
+  CreateMultipartUploadRequest,
+  GetObjectRequest,
+  GetObjectResponse,
+  ListObjectsRequest,
+  ListObjectsResponse,
+  PutObjectRequest,
+  UploadPartRequest,
+}
 
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
@@ -85,7 +96,7 @@ class S3BucketConnection(
     private val parts = TrieMap.empty[Integer, CompletedPart]
 
     /** Call this once before uploading a new part.
-     *  */
+      */
     def prepareUploadNext(): Int = numParts.incrementAndGet()
 
     /** Thread safe, may be called in parallel.
@@ -106,20 +117,27 @@ class S3BucketConnection(
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
           .asScala
       } yield {
-        parts.put(
-          partNumber,
-          CompletedPart
-            .builder()
-            .partNumber(partNumber)
-            .eTag(response.eTag())
-            .build()
-        ).fold(())(_ => throw new RuntimeException(s"Part number $partNumber uploaded more than once"))
+        parts
+          .put(
+            partNumber,
+            CompletedPart
+              .builder()
+              .partNumber(partNumber)
+              .eTag(response.eTag())
+              .build(),
+          )
+          .fold(())(_ =>
+            throw new RuntimeException(s"Part number $partNumber uploaded more than once")
+          )
       }
     }
 
     def finish(): Future[Unit] = {
       require(numParts.get() > 0)
-      require(parts.size == numParts.get(), "completeMultiPartUpload may not be called before all parts have finished uploading")
+      require(
+        parts.size == numParts.get(),
+        "completeMultiPartUpload may not be called before all parts have finished uploading",
+      )
       for {
         id <- uploadId
         completedMultipartUpload = CompletedMultipartUpload
