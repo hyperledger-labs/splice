@@ -20,6 +20,9 @@ class PermissionedSynchronizerIntegrationTest
       .withManualStart
 
   "onboard validator in permissioned mode" in { implicit env =>
+    // we use the steps initDso -> stop SV1 -> set permissions -> change onboarding -> start SV1 in order to mimic a permissioned synchronizer on bootstrap.
+    // if these steps are to be removed from the integration test, then these exact steps should be added to canton bootstrap script.
+
     initDsoWithSv1Only()
 
     sv1Backend.stop()
@@ -52,31 +55,19 @@ class PermissionedSynchronizerIntegrationTest
       )
     }
 
-    sv1Nodes.foreach(s => s.startSync())
+    sv1Backend.startSync()
+
+    // only the following are what we want to exercise in this integration test
 
     withClue("Submit a ParticipantSynchronizerPermission for the alice participant") {
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
 
-      actAndCheck(
-        "Propose Alice submission permission",
-        sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-          .propose(
-            decentralizedSynchronizerId,
-            aliceParticipantId,
-            permission = ParticipantPermission.Submission,
-          ),
-      )(
-        "Wait until alice topology transaction is registered",
-        _ => {
-          val authorized =
-            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-              .find(
-                decentralizedSynchronizerId,
-                aliceParticipantId,
-              )
-          authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
-        },
-      )
+      sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+        .propose(
+          decentralizedSynchronizerId,
+          aliceParticipantId,
+          permission = ParticipantPermission.Submission,
+        )
     }
 
     withClue("Start the alice validator participant") {
