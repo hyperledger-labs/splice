@@ -15,7 +15,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, AmuletRules_SetConfig}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AmuletRules_SetConfig,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyconfigstate.ExternalPartyConfigState
@@ -356,12 +359,18 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
 
     clue("ExternalPartyConfigState contracts are created") {
       eventually() {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs.filterJava(ExternalPartyConfigState.COMPANION)(dsoParty) should have size 2
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ExternalPartyConfigState.COMPANION)(dsoParty) should have size 2
       }
     }
 
     clue("AmuletRules is updated to latest version") {
-      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs.filterJava(AmuletRules.COMPANION)(dsoParty).loneElement.data.contractStateSchemaVersion.toScala shouldBe Some(1L)
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(AmuletRules.COMPANION)(dsoParty)
+        .loneElement
+        .data
+        .contractStateSchemaVersion
+        .toScala shouldBe Some(1L)
     }
 
     // We check this as splice-amulet < 0.1.14 did not support setting the fees to zero;

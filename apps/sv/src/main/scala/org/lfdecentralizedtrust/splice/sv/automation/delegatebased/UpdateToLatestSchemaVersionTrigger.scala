@@ -31,7 +31,7 @@ class UpdateToLatestSchemaVersionTrigger(
     with SvTaskBasedTrigger[
       UpdateToLatestSchemaVersionTrigger.Task
     ] {
-import UpdateToLatestSchemaVersionTrigger.Task
+  import UpdateToLatestSchemaVersionTrigger.Task
   private val store = svTaskContext.dsoStore
 
   private val maxVersion = 1L
@@ -39,11 +39,17 @@ import UpdateToLatestSchemaVersionTrigger.Task
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] = {
     for {
       amuletRulesO <- store.lookupAmuletRules()
-      supports24hSubmissionDelay <- svTaskContext.packageVersionSupport.supports24hSubmissionDelay(Seq(store.key.dsoParty, store.key.svParty), context.clock.now)
+      supports24hSubmissionDelay <- svTaskContext.packageVersionSupport.supports24hSubmissionDelay(
+        Seq(store.key.dsoParty, store.key.svParty),
+        context.clock.now,
+      )
     } yield {
-      amuletRulesO.toList.filter(c =>
-        c.contract.payload.contractStateSchemaVersion.toScala.fold(true)(_ < maxVersion) && supports24hSubmissionDelay.supported
-      ).map(Task(_))
+      amuletRulesO.toList
+        .filter(c =>
+          c.contract.payload.contractStateSchemaVersion.toScala
+            .fold(true)(_ < maxVersion) && supports24hSubmissionDelay.supported
+        )
+        .map(Task(_))
     }
   }
 
@@ -85,16 +91,21 @@ import UpdateToLatestSchemaVersionTrigger.Task
   override protected def isStaleTask(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] =
-    store.multiDomainAcsStore.lookupContractById(splice.amuletrules.AmuletRules.COMPANION)(task.amuletRules.contractId).map(_.isEmpty)
+    store.multiDomainAcsStore
+      .lookupContractById(splice.amuletrules.AmuletRules.COMPANION)(task.amuletRules.contractId)
+      .map(_.isEmpty)
 }
 
 object UpdateToLatestSchemaVersionTrigger {
   case class Task(
-    amuletRules: AssignedContract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
+      amuletRules: AssignedContract[
+        splice.amuletrules.AmuletRules.ContractId,
+        splice.amuletrules.AmuletRules,
+      ]
   ) extends PrettyPrinting {
 
     override def pretty: Pretty[this.type] = prettyOfClass(
-      param("amuletRules", _.amuletRules),
+      param("amuletRules", _.amuletRules)
     )
   }
 }
