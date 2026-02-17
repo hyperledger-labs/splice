@@ -78,13 +78,16 @@ class SingleAcsSnapshotBulkStorage(
         case Index(i) => getAcsSnapshotChunk(timestamp, Some(i)).map(Some(_))
         case End => Future.successful(None)
       }
-      .via(S3ZstdObjects(
-        config,
-        s3Connection,
-        {objIdx => s"$timestamp/ACS_$objIdx.zstd"},
-        loggerFactory))
+      .via(
+        S3ZstdObjects(
+          config,
+          s3Connection,
+          { objIdx => s"$timestamp/ACS_$objIdx.zstd" },
+          loggerFactory,
+        )
+      )
       // emit back the timestamp w. migrationId upon completion
-      .collect{case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
+      .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
 
   }
 
