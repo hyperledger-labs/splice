@@ -161,16 +161,7 @@ runs:
     # This unfortunate workarond is due to the fact that 'uses' requires a raw string
     - name: Invoke nix before saving cache
       if: ${{ github.repository == 'hyperledger-labs/splice' }}
-      uses: ./.github/actions/nix/run_bash_command_in_nix
-      with:
-        cmd: |
-          echo "Validated nix"
-          ls -al
-
-    # This unfortunate workarond is due to the fact that 'uses' requires a raw string
-    - name: Invoke nix before saving cache
-      if: ${{ github.repository != 'hyperledger-labs/splice' }}
-      uses: $GITHUB_ACTION_PATH/../run_bash_command_in_nix
+      uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
           echo "Validated nix"

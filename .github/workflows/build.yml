@@ -58,7 +58,7 @@ jobs:
         with:
           # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
-          submodules: true
+          submodules: "recursive"
       - name: Check if static only
         uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
         id: static_only
@@ -348,8 +348,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: "recursive"
       - name: Check if static only
-        uses: ./.github/actions/tests/skip_on_static
+        uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
         id: static_only
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}

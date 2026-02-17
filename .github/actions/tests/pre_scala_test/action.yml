@@ -34,7 +34,7 @@ runs:
   using: "composite"
   steps:
     - name: Check if static only
-      uses: ./.github/actions/tests/skip_on_static
+      uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
       id: check
       with:
         gh_token: ${{ inputs.gh_token }}
@@ -106,7 +106,7 @@ runs:
 
     - name: Split tests
       id: split_tests
-      uses: ./.github/actions/tests/split_tests
+      uses: ./splice-shared-gha/.github/actions/tests/split_tests
       with:
         test_reports_dir: '/cache/test-reports'
         test_names_file: ${{ inputs.test_names_file }}

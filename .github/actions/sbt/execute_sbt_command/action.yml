@@ -49,7 +49,7 @@ runs:
   using: 'composite'
   steps:
     - name: Execute SBT command"
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
       with:
         additional_nix_args: "--keep GITHUB_ACTION_PATH --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD ${{ inputs.additional_nix_args }}"
         cmd: |

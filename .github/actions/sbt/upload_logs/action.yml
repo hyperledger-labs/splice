@@ -38,7 +38,7 @@ runs:
     # Certain characters are disallowed in artifact filenames in GHA, so we need to sanitize them
     - name: Sanitize filenames
       # Runs in nix to have access to `rename`
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
           rename -a : . ${{ inputs.splice_root }}/log/* || true
