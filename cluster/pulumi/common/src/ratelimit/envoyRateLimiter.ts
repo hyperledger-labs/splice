@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as path from 'path';
 
-import { readAndParseYaml } from '../config/configLoader';
+import { parseScanYamlEndpoints } from '../config/scanEndpoints';
 
 interface Limits {
   maxTokens: number;
@@ -28,6 +27,20 @@ export interface PathPrefixInfo {
   isBanned: boolean;
 }
 
+interface LocalLimit<L> {
+  actions: (
+    | {
+        name: string;
+        pathPrefix: string;
+      }
+    | {
+        name: string;
+        clientIp: boolean;
+      }
+  )[];
+  limits: L;
+}
+
 export interface RateLimitEnvoyFilterArgs {
   namespace: string;
 
@@ -40,20 +53,8 @@ export interface RateLimitEnvoyFilterArgs {
    * */
   globalLimits: Limits;
 
-  rateLimits?: // all the rate limits must be respected, there's an AND relationship between them
-  {
-    actions: (
-      | {
-          name: string;
-          pathPrefix: string;
-        }
-      | {
-          name: string;
-          clientIp: boolean;
-        }
-    )[];
-    limits: RateLimitConfig;
-  }[];
+  // all the rate limits must be respected, there's an AND relationship between them
+  rateLimits?: LocalLimit<RateLimitConfig>[];
 }
 
 export function extractPathPrefixes(
@@ -74,30 +75,6 @@ export function extractPathPrefixes(
         }));
     })
     .filter(info => info.pathPrefix.startsWith('/api/scan'));
-}
-
-function parseScanYamlEndpoints(scanYamlPath: string): string[] {
-  const yaml = readAndParseYaml(scanYamlPath);
-  const paths = yaml.paths || {};
-
-  const endpoints = new Set<string>();
-
-  for (const path of Object.keys(paths)) {
-    // Prepend /api/scan prefix
-    let fullPath = '/api/scan' + path;
-
-    // Strip to segment before first {
-    const paramIndex = fullPath.indexOf('{');
-    if (paramIndex !== -1) {
-      // Find the / before the {
-      const lastSlash = fullPath.lastIndexOf('/', paramIndex);
-      fullPath = fullPath.substring(0, lastSlash);
-    }
-
-    endpoints.add(fullPath);
-  }
-
-  return Array.from(endpoints).sort();
 }
 
 function validateEndpointCoverage(
@@ -126,6 +103,43 @@ function validateEndpointCoverage(
   return { missing, orphaned };
 }
 
+function validateEffectiveRateLimits(
+  args: RateLimitEnvoyFilterArgs
+): LocalLimit<Limits>[] | undefined {
+  // Validate scan.yaml endpoint coverage
+  const scanEndpoints = parseScanYamlEndpoints();
+
+  const configuredScanPrefixes = (args.rateLimits || [])
+    .flatMap(rl => rl.actions)
+    .filter(action => 'pathPrefix' in action && action.pathPrefix.startsWith('/api/scan'))
+    .map(action => ('pathPrefix' in action ? action.pathPrefix : ''));
+
+  const { missing, orphaned } = validateEndpointCoverage(scanEndpoints, configuredScanPrefixes);
+
+  if (missing.length > 0 || orphaned.length > 0) {
+    const errorParts: string[] = ['Rate limit configuration errors:'];
+    if (missing.length > 0) {
+      errorParts.push(
+        `- Missing rate limit prefixes for scan.yaml endpoints: ${missing.join(', ')}`
+      );
+    }
+    if (orphaned.length > 0) {
+      errorParts.push(
+        `- Orphaned rate limit prefixes not matching any scan.yaml endpoint: ${orphaned.join(', ')}`
+      );
+    }
+    throw new Error(errorParts.join('\n'));
+  }
+
+  // Filter out banned and unlimited entries
+  return args.rateLimits?.filter((rl): rl is LocalLimit<Limits> => {
+    // TODO: in banned case, implement actual banning with special short-circuit for whitelisted IPs
+    // Currently skipping banned endpoints instead of setting 0/0 limits
+    // in unlimited case, we fall back to globalRateLimit so don't need a rule
+    return !('type' in rl.limits);
+  });
+}
+
 export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
   public readonly envoyFilter: k8s.apiextensions.CustomResource;
 
@@ -135,61 +149,7 @@ export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
     opts?: pulumi.ComponentResourceOptions
   ) {
     super('splice:RateLimit', `splice-${args.namespace}-${name}`, args, opts);
-
-    // Validate scan.yaml endpoint coverage
-    const scanYamlPath = path.join(
-      __dirname,
-      '../../../../../apps/scan/src/main/openapi/scan.yaml'
-    );
-    const scanEndpoints = parseScanYamlEndpoints(scanYamlPath);
-
-    const configuredScanPrefixes = (args.rateLimits || [])
-      .flatMap(rl => rl.actions)
-      .filter(action => 'pathPrefix' in action && action.pathPrefix.startsWith('/api/scan'))
-      .map(action => ('pathPrefix' in action ? action.pathPrefix : ''));
-
-    const { missing, orphaned } = validateEndpointCoverage(scanEndpoints, configuredScanPrefixes);
-
-    if (missing.length > 0 || orphaned.length > 0) {
-      const errorParts: string[] = ['Rate limit configuration errors:'];
-      if (missing.length > 0) {
-        errorParts.push(
-          `- Missing rate limit prefixes for scan.yaml endpoints: ${missing.join(', ')}`
-        );
-      }
-      if (orphaned.length > 0) {
-        errorParts.push(
-          `- Orphaned rate limit prefixes not matching any scan.yaml endpoint: ${orphaned.join(', ')}`
-        );
-      }
-      throw new Error(errorParts.join('\n'));
-    }
-
-    // Check if all limits are unlimited - if so, skip creating EnvoyFilter
-    const allUnlimited =
-      args.rateLimits?.every(rl => 'type' in rl.limits && rl.limits.type === 'unlimited') ?? true;
-
-    if (allUnlimited) {
-      // Don't create EnvoyFilter - default filter already provides unlimited access
-      this.envoyFilter = undefined as any;
-      this.registerOutputs({});
-      return;
-    }
-
-    // Filter out banned and unlimited entries
-    const effectiveRateLimits = args.rateLimits?.filter(rl => {
-      if ('type' in rl.limits) {
-        if (rl.limits.type === 'banned') {
-          // TODO: Implement actual banning with special short-circuit for whitelisted IPs
-          // Currently skipping banned endpoints instead of setting 0/0 limits
-          return false;
-        }
-        if (rl.limits.type === 'unlimited') {
-          return false;
-        }
-      }
-      return true;
-    });
+    const effectiveRateLimits = validateEffectiveRateLimits(args);
 
     const rateLimitActions: unknown[] =
       effectiveRateLimits?.map(rateLimit => {
