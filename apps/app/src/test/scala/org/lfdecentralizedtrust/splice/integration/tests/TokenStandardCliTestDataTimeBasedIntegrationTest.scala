@@ -320,8 +320,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob,
                   bobInstructionCids(0),
-                  // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
-                  // so the lower bound is 1min in the past.
+// we advanced time by 2min since the transfer instruction
                   expectedTimeBounds =
                     Some((CantonTimestamp.MinValue, now.plusSeconds(60).addMicros(-1))),
                 )
