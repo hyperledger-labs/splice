@@ -32,5 +32,5 @@
         Please see the updated :ref:`documentation for Helm-based deployments <helm-validator-install>`.
         This introduces the new configuration keys ``scanClient`` and ``synchronizer`` as the new recommended way to configure **scan** and **sequencer** connections.
         Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
-        We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration options as soon as possible.
+        We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration key options as soon as possible.
         Docker Compose-based deployments do not currently support the new custom configuration options.
