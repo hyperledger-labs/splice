@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftConnectionConfig, CometBftHttpRpcClient}
@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment with SvTestUtil {
+class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
 
   import ExecutionContext.Implicits.global
 

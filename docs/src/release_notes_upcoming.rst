@@ -7,22 +7,30 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
-release-notes:: Upcoming
+.. release-notes:: Upcoming
 
-- Daml
+    - Wallet UI
 
-  - Optimize the number of views in the automation run by the SV app to convert ``FeaturedAppActivityMarker`` contracts into ``AppRewardCoupon`` contracts.
+      - The wallet UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenance overhead.
 
-    This requires a Daml upgrade to
+    - Wallet backend
 
-      ================== =======
-      name               version
-      ================== =======
-      amulet             0.1.16
-      amuletNameService  0.1.17
-      dsoGovernance      0.1.22
-      splitwell          0.1.16
-      validatorLifecycle 0.1.6
-      wallet             0.1.17
-      walletPayments     0.1.16
-      ================== =======
+      - Fix a bug (`#3970 <https://github.com/hyperledger-labs/splice/issues/3970>`__) that caused transaction history
+        for entries created by Splice versions prior to 0.5.11 to fail to decode in the backend and thus not show in the
+        wallet UI.
+        These entries now shown again in the wallet UI.
+
+    - Scan UI
+
+      - The scan UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenance overhead.
+
+    - Validator
+
+      - Add support for custom fault-tolerance configurations for **scan** and **sequencer** connections.
+        Please see the updated :ref:`documentation for Helm-based deployments <helm-validator-install>`.
+        This introduces the new configuration keys ``scanClient`` and ``synchronizer`` as the new recommended way to configure **scan** and **sequencer** connections.
+        Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
+        We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration key options as soon as possible.
+        Docker Compose-based deployments do not currently support the new custom configuration options.

@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchron
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.{SynchronizerFeesTestUtil, WalletTestUtil}
@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.Member
 import org.slf4j.event.Level
 
 class MemberTrafficIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with SynchronizerFeesTestUtil
     with WalletTestUtil {

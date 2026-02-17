@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.ArchiveClosedMiningRoundsTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
@@ -29,7 +29,7 @@ import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.util.*
 
 class UnclaimedSvRewardsScriptIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with HasActorSystem

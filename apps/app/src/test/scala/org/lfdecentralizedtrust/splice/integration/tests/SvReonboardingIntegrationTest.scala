@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
@@ -45,7 +45,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class SvReonboardingIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ProcessTestUtil
     with StandaloneCanton
     with WalletTestUtil {

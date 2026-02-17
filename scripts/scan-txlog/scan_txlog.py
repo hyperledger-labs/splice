@@ -3938,6 +3938,8 @@ class State:
                 return self.handle_allocation_cancel(transaction, event)
             case "BatchedMarkersProxy_CreateMarkers":
                 return HandleTransactionResult.empty()
+            case "BatchedMarkersProxy_CreateMarkersV2":
+                return HandleTransactionResult.empty()
             # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
             # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
             # no handling of `AllocationRequest` choices as they are not visible to the DSO party

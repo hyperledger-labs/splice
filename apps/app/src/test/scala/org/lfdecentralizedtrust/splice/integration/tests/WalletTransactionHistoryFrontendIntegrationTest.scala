@@ -25,7 +25,7 @@ import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 
 class WalletTransactionHistoryFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice", "sv1", "scan")
+    extends FrontendIntegrationTest("alice", "sv1", "scan")
     with WalletTestUtil
     with WalletTxLogTestUtil
     with WalletFrontendTestUtil

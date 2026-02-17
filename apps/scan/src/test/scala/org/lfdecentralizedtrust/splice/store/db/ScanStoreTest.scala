@@ -709,7 +709,6 @@ abstract class ScanStoreTest
             balanceChanges = Seq(),
             receivers = Seq(ReceiverAmount(user2, BigDecimal(i), zero)),
             round = round,
-            amuletPrice = BigDecimal(1.0),
           )
         }.toList
         def stripEventIdAndOffset(tx: TransferTxLogEntry) =
@@ -750,7 +749,7 @@ abstract class ScanStoreTest
                 inputValidatorRewardAmount = sender.inputValidatorRewardAmount.toDouble,
                 inputSvRewardAmount = sender.inputSvRewardAmount.fold(0.0)(_.toDouble),
                 balanceChanges = Map(),
-                amuletPrice = tx.amuletPrice.toDouble,
+                amuletPrice = 1.0,
               ),
             )(
               store.multiDomainAcsStore

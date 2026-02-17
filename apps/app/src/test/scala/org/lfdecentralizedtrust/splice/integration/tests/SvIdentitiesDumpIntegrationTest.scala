@@ -4,7 +4,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppConfigs
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SvIdentitiesDumpIntegrationTest.testDumpOutputDir
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import monocle.macros.syntax.lens.*
@@ -17,7 +17,7 @@ import org.slf4j.event.Level
 
 import java.nio.file.{Path, Paths}
 
-class SvIdentitiesDumpIntegrationTest extends IntegrationTestWithSharedEnvironment {
+class SvIdentitiesDumpIntegrationTest extends IntegrationTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

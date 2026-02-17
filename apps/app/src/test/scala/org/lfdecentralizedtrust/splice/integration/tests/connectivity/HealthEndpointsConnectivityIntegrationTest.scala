@@ -2,9 +2,9 @@ package org.lfdecentralizedtrust.splice.integration.tests.connectivity
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 
-class HealthEndpointsConnectivityIntegrationTest extends IntegrationTest {
+class HealthEndpointsConnectivityIntegrationTest extends IntegrationTestWithIsolatedEnvironment {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

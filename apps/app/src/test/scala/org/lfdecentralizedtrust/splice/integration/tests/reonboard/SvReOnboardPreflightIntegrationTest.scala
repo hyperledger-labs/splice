@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests.reonboard
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.{
   PreflightIntegrationTestUtil,
   SvUiPreflightIntegrationTestUtil,
@@ -19,7 +19,7 @@ import org.scalatest.time.{Minute, Span}
 import scala.concurrent.duration.DurationInt
 
 class SvReOnboardPreflightIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("validator", "sv")
+    extends FrontendIntegrationTest("validator", "sv")
     with SvUiPreflightIntegrationTestUtil
     with SvFrontendTestUtil
     with PreflightIntegrationTestUtil

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.
 import org.lfdecentralizedtrust.splice.http.v0.definitions.AllocationInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.*
@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import java.util.Optional
 
 class AmuletAllocationsIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil {

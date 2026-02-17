@@ -1,13 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests.reonboard
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.PreflightIntegrationTestUtil
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 import org.scalatest.time.{Minutes, Span}
 
 class PrepareSvReonboardPreflightIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    extends FrontendIntegrationTest("sv")
     with PreflightIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil {

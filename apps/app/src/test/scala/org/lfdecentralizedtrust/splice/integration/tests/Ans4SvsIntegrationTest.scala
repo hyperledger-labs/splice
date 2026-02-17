@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subscriptionsCodegen
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.TerminatedSubscriptionTrigger
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
@@ -13,7 +13,10 @@ import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
 }
 import org.scalatest.Assertion
 
-class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
+class Ans4SvsIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with WalletTestUtil
+    with TriggerTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

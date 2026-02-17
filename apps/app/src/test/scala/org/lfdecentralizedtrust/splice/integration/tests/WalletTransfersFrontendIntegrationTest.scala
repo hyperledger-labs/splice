@@ -18,7 +18,7 @@ import java.util.UUID
 import BaseWalletTransfersFrontendIntegrationTest.*
 
 abstract class BaseWalletTransfersFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
+    extends FrontendIntegrationTest("alice", "bob")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil {

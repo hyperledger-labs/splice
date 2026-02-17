@@ -498,8 +498,6 @@ describe('Wallet user can', () => {
       )
     ).toBeDefined();
     expect(await screen.findByText('(Transfer offer 009a97ffdf… withdrawn)')).toBeDefined();
-    // The withdraw has a dummy conversion rate of 0 so no amulet conversion rate is displayed
-    expect(await screen.findAllByText('@')).toHaveLength(3);
   });
 
   test('navigate to delegations tab and see proposals and delegations tables sorted by expiration', async () => {

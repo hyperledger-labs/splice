@@ -4,9 +4,9 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 
-class SvNoSynchronizerConnectivityIntegrationTest extends IntegrationTest {
+class SvNoSynchronizerConnectivityIntegrationTest extends IntegrationTestWithIsolatedEnvironment {
 
   override protected def runEventHistorySanityCheck: Boolean = false
 
