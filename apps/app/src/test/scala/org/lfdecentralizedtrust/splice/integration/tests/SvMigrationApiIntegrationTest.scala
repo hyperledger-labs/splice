@@ -61,7 +61,7 @@ object SvMigrationApiIntegrationTest {
     ).parent / s"export_at_${timestamp.toEpochMilli}"
   }
 
-  private def migrationDumpPathForSv(name: String) = {
+  def migrationDumpPathForSv(name: String): File = {
     migrationDumpDir(name) / "domain_migration_dump.json"
   }
 

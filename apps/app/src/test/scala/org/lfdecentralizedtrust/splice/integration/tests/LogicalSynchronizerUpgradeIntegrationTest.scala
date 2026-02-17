@@ -24,14 +24,14 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryReq
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.directoryForDump
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
-import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
+import org.lfdecentralizedtrust.splice.sv.lsu.LsuState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import org.scalatest.time.{Minutes, Span}
+import org.scalatest.TryValues
 
 import java.net.URI
 import java.time.{Duration, Instant}
@@ -48,7 +48,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
     with SvTestUtil
     with WalletTestUtil
     with StandaloneCanton
-    with HasExecutionContext {
+    with HasExecutionContext
+    with TryValues {
 
   override protected def runEventHistorySanityCheck: Boolean = false
   override protected lazy val resetRequiredTopologyState: Boolean = false
@@ -224,7 +225,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       ),
     )() {
 
-      val announcement = clue(s"Announce upgrade at $upgradeTime") {
+      clue(s"Announce upgrade at $upgradeTime") {
         allBackends.par.map { backend =>
           backend.participantClientWithAdminToken.topology.lsu.announcement
             .propose(
@@ -238,33 +239,29 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .head
       }
 
-      val synchronizerFreezeTime = announcement.context.validFrom
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
         .list(store = Synchronizer(decentralizedSynchronizerId))
         .result
         .size - 1 // minus 1 for the logical upgrade transaction
 
-      clue("trigger dump") {
+      clue("wait for export") {
         allBackends.par.map { backend =>
-          eventuallySucceeds(suppressErrors = false) {
-            backend.triggerDecentralizedSynchronizerMigrationDump(
-              0,
-              Some(
-                synchronizerFreezeTime
-              ),
-            )
+          eventuallySucceeds() {
+            val expectedFile =
+              SvMigrationApiIntegrationTest.migrationDumpPathForSv(backend.name)
+            expectedFile.exists shouldBe true
           }
         }
       }
       clue("init new nodes") {
         allBackends.map { backend =>
           TraceContext.withNewTraceContext(s"init ${backend.name}") { implicit traceContext =>
-            val expectedDirectory = directoryForDump(backend.name, synchronizerFreezeTime)
-            expectedDirectory.exists shouldBe true
-            val lsuSynchronizerState =
-              backend.sequencerClient.topology.transactions.logical_upgrade_state()
-            val dump = DomainMigrationInitializer
-              .loadDomainMigrationDump((expectedDirectory / "domain_migration_dump.json").path)
+            val expectedFile =
+              SvMigrationApiIntegrationTest.migrationDumpPathForSv(backend.name)
+            val lsuExport = BackupDump
+              .readFromPath[LsuState](expectedFile.path)
+              .success
+              .value
             Using.resources(
               sequencerAdminConnection(UpgradePSid, backend),
               mediatorAdminConnection(UpgradePSid, backend),
@@ -282,11 +279,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
               clue(s"init ${backend.name} sequencer and mediator from dump") {
                 upgradeSequencerClient.health.wait_for_ready_for_id()
                 sequencerInitializer
-                  .initializeFromDump(dump.nodeIdentities.sequencer)
+                  .initializeFromDump(lsuExport.nodeIdentities.sequencer)
                   .futureValue
 
                 upgradeMediatorClient.health.wait_for_ready_for_id()
-                mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
+                mediatorInitializer
+                  .initializeFromDump(lsuExport.nodeIdentities.mediator)
+                  .futureValue
               }
               val staticSynchronizerParameters =
                 backend.sequencerClient.synchronizer_parameters.static.get()
@@ -297,7 +296,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
               clue(s"init ${backend.name} sequencer from synchronizer predecessor") {
                 upgradeSequencerClient.health.wait_for_ready_for_initialization()
                 upgradeSequencerClient.setup.initialize_from_synchronizer_predecessor(
-                  lsuSynchronizerState,
+                  lsuExport.synchronizerState,
                   newStaticSyncParams,
                 )
                 eventually(2.minutes) {

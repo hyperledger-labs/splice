@@ -1440,6 +1440,22 @@ abstract class TopologyAdminConnection(
       logger,
     )
 
+  def listLsuAnnouncements(synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
+  ): Future[Seq[TopologyResult[LsuAnnouncement]]] = runCmd(
+    TopologyAdminCommands.Read.ListLsuAnnouncement(
+      BaseQuery(
+        TopologyStoreId.Synchronizer(synchronizerId),
+        proposals = false,
+        timeQuery = TimeQuery.HeadState,
+        ops = Some(TopologyChangeOp.Replace),
+        filterSigningKey = "",
+        protocolVersion = None,
+      ),
+      synchronizerId.filterString,
+    )
+  ).map(_.map(r => TopologyResult(r.context, r.item)))
+
   def ensurePartyUnhostedFromParticipant(
       retryFor: RetryFor,
       synchronizerId: SynchronizerId,

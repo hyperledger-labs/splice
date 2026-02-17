@@ -11,8 +11,8 @@ import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
-  TriggerClass,
   aTrigger,
+  TriggerClass,
 }
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
@@ -48,6 +48,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppB
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.lsu.LsuStateExportTrigger
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.nio.file.Path
@@ -215,6 +216,14 @@ class SvDsoAutomationService(
 
     (localSynchronizerNode, config.domainMigrationDumpPath) match {
       case (Some(synchronizerNode), Some(dumpPath)) =>
+        registerTrigger(
+          new LsuStateExportTrigger(
+            triggerContext,
+            synchronizerNode.sequencerAdminConnection,
+            synchronizerNode.mediatorAdminConnection,
+            dumpPath,
+          )
+        )
         registerTrigger(
           new DecentralizedSynchronizerMigrationTrigger(
             config.domainMigrationId,
