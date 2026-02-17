@@ -8,7 +8,7 @@ import scala.concurrent.duration.*
 import scala.sys.process.*
 
 class LocalNetFrontendIntegrationTest
-    extends FrontendIntegrationTest("frontend")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("frontend")
     with FrontendLoginUtil
     with WalletFrontendTestUtil {
   override def environmentDefinition: SpliceEnvironmentDefinition =

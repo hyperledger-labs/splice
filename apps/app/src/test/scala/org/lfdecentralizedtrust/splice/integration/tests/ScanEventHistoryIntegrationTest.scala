@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions
@@ -21,7 +21,7 @@ import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.metrics.MetricValue
 
 class ScanEventHistoryIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil

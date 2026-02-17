@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
@@ -22,7 +22,7 @@ import scala.jdk.CollectionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class FeaturedAppActivityMarkerIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil
     with SplitwellTestUtil

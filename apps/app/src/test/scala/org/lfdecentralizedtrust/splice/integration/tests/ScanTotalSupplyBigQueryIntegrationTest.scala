@@ -29,7 +29,7 @@ import scala.sys.process.Process
 import java.time.temporal.ChronoUnit
 
 class ScanTotalSupplyBigQueryIntegrationTest
-    extends SpliceTests.IntegrationTest
+    extends SpliceTests.IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with SplitwellTestUtil
     with TimeTestUtil

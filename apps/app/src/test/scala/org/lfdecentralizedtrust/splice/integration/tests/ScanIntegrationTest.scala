@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
@@ -45,7 +45,10 @@ import scala.util.{Success, Try}
 
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
-class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
+class ScanIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with WalletTestUtil
+    with TimeTestUtil {
   private val defaultPageSize = Limit.DefaultMaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

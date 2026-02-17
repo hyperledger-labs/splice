@@ -17,7 +17,7 @@ import scala.jdk.CollectionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceWallet_0_1_16
 class WalletFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil

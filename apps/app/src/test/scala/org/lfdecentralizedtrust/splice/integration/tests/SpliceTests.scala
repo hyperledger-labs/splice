@@ -93,7 +93,7 @@ object SpliceTests extends LazyLogging {
   type IsolatedSpliceEnvironments =
     IsolatedEnvironments[SpliceConfig, SpliceEnvironment]
 
-  trait IntegrationTest
+  trait IntegrationTestWithIsolatedEnvironment
       extends BaseIntegrationTest[SpliceConfig, SpliceEnvironment]
       with IsolatedSpliceEnvironments
       with TestCommon
@@ -168,7 +168,7 @@ object SpliceTests extends LazyLogging {
         .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
-  trait IntegrationTestWithSharedEnvironment
+  trait IntegrationTest
       extends BaseIntegrationTest[SpliceConfig, SpliceEnvironment]
       with SharedSpliceEnvironment
       with BeforeAndAfterEach

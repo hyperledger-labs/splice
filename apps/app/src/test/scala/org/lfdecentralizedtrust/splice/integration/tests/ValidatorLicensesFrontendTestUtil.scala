@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
-trait ValidatorLicensesFrontendTestUtil { self: FrontendIntegrationTestWithSharedEnvironment =>
+trait ValidatorLicensesFrontendTestUtil { self: FrontendIntegrationTest =>
 
   def getLicensesTableRows(implicit webDriver: WebDriverType): Seq[Element] = {
     findAll(className("validator-licenses-table-row")).toList

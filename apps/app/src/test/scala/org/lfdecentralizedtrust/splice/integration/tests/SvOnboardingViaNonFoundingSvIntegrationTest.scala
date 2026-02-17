@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvAppClientConfig}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.SvOffboardingSequencerTrigger
@@ -22,7 +22,7 @@ import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.time.{Minute, Span}
 
 class SvOnboardingViaNonFoundingSvIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with SvTestUtil
     with StandaloneCanton {
 

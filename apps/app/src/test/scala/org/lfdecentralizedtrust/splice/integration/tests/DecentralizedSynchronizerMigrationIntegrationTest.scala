@@ -55,7 +55,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
@@ -100,7 +100,7 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class DecentralizedSynchronizerMigrationIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ExternallySignedPartyTestUtil
     with ProcessTestUtil
     with SvTestUtil

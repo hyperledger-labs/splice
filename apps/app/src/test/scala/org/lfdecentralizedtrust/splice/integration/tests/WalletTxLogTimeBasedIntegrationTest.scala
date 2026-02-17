@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   ExpiredAmuletTrigger,
   ExpiredLockedAmuletTrigger,
@@ -35,7 +35,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTxLogTimeBasedIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil

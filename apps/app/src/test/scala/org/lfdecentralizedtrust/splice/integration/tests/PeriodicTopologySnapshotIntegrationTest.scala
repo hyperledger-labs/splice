@@ -5,7 +5,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.google.cloud.storage.Blob
 import org.lfdecentralizedtrust.splice.config.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.GcpBucket
 import org.slf4j.event.Level
 
@@ -13,7 +13,8 @@ import java.nio.charset.StandardCharsets
 import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.duration.DurationInt
 
-class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig] extends IntegrationTest {
+class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig]
+    extends IntegrationTestWithIsolatedEnvironment {
 
   private val bucket = new GcpBucket(topologySnapshotLocation.bucket, loggerFactory)
 

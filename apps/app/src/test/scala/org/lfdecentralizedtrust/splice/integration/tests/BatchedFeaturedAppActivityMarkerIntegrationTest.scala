@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.FeaturedAppActivityMarkerTrigger
@@ -22,7 +22,7 @@ import com.digitalasset.canton.topology.PartyId
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_16
 class BatchedFeaturedAppActivityMarkerIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with ScanTestUtil
     with WalletTestUtil
     with TimeTestUtil

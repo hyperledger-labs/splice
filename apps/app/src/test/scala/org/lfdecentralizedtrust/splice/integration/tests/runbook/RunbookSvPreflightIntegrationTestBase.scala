@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests.runbook
 import com.digitalasset.canton.topology.SynchronizerId
 import io.circe.parser.{parse as parseJson}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.util.{
   AnsFrontendTestUtil,
   Auth0Util,
@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 abstract class RunbookSvPreflightIntegrationTestBase
-    extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    extends FrontendIntegrationTest("sv")
     with PreflightIntegrationTestUtil
     with SvUiPreflightIntegrationTestUtil
     with FrontendLoginUtil

@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 }
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.TokenStandardMetadata
@@ -26,7 +26,7 @@ import scala.util.Using
 // This is an integration test because it requires a live canton & scan to function
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardCliIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with TokenStandardTest
     with HasExecutionContext
     with ExternallySignedPartyTestUtil

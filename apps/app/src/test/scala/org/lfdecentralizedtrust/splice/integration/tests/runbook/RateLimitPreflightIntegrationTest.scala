@@ -7,7 +7,7 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.scalatest.Assertion
@@ -17,7 +17,7 @@ import scala.concurrent.{Future, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
 
-class RateLimitPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
+class RateLimitPreflightIntegrationTest extends IntegrationTest {
 
   override lazy val resetRequiredTopologyState: Boolean = false
   override protected def runTokenStandardCliSanityCheck: Boolean = false

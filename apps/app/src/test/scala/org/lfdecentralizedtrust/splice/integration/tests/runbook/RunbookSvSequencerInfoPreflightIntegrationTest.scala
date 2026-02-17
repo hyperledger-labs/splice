@@ -2,14 +2,14 @@ package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** Preflight test that makes sure that the sequencer url is published to dsoRules
   */
-class RunbookSvSequencerInfoPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
+class RunbookSvSequencerInfoPreflightIntegrationTest extends IntegrationTest {
 
   override lazy val resetRequiredTopologyState: Boolean = false
   override protected def runTokenStandardCliSanityCheck: Boolean = false
