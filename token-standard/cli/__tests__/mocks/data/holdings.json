@@ -68,7 +68,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "27749df25d5b493cdb3d9ba8e37d075d46883f1d179356562cb167c2a587b6b4",
+          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -137,7 +137,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "27749df25d5b493cdb3d9ba8e37d075d46883f1d179356562cb167c2a587b6b4",
+          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -206,7 +206,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "27749df25d5b493cdb3d9ba8e37d075d46883f1d179356562cb167c2a587b6b4",
+          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -275,7 +275,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "27749df25d5b493cdb3d9ba8e37d075d46883f1d179356562cb167c2a587b6b4",
+          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
