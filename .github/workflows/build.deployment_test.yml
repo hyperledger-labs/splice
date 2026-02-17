@@ -20,6 +20,7 @@ jobs:
         with:
           ref: ${{ inputs.commit_sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup

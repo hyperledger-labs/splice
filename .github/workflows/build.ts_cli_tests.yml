@@ -20,6 +20,7 @@ jobs:
           # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if static only
         uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
@@ -33,6 +34,7 @@ jobs:
         with:
           ref: ${{ inputs.commit_sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup
         id: setup

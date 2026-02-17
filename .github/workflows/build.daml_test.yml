@@ -19,6 +19,7 @@ jobs:
         with:
           ref: ${{ inputs.commit_sha }}
           submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if static only
         uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
