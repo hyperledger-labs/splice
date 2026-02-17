@@ -299,6 +299,10 @@ data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_Amu
   with
     result : AmuletRules_ConvertFeaturedAppActivityMarkersResult
 
+data DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult = DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult
+  with
+    result : AmuletRules_UpdateToLatestSchemaVersionResult
+
 data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with
     unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
 
@@ -1499,6 +1503,17 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
+
+    nonconsuming choice DsoRules_AmuletRules_UpdateToLatestSchemaVersion : DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        argument : AmuletRules_UpdateToLatestSchemaVersion
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid argument
+        pure DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult with result
 
 
     -- Unallocated unclaimed activity record

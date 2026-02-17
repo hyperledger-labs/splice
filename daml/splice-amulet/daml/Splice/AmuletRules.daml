@@ -133,6 +133,7 @@ template AmuletRules
       controller dso
       do
          let currentVersion = fromOptional 0 contractStateSchemaVersion
+         -- When changing this, also update UpdateToLatestSchemaVersionTrigger
          let maxVersion = 1
          require "currentVersion < maxVersion" (currentVersion < maxVersion)
 

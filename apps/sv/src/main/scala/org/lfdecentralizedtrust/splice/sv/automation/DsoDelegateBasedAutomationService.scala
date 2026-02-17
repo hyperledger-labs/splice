@@ -126,6 +126,13 @@ class DsoDelegateBasedAutomationService(
         svTaskContext,
       )
     )
+
+    registerTrigger(
+      new UpdateToLatestSchemaVersionTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
   }
 
 }
@@ -162,5 +169,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredUnclaimedActivityRecordTrigger],
     aTrigger[MergeUnclaimedDevelopmentFundCouponsTrigger],
     aTrigger[ExpiredDevelopmentFundCouponTrigger],
+    aTrigger[UpdateToLatestSchemaVersionTrigger],
   )
 }
