@@ -7,5 +7,5 @@
   "canton_base_image_sha256": "sha256:2d527af1919b6a85f665bcc0aafa45979ba000b823bcc328704a4ea9888b3eeb",
   "canton_participant_image_sha256": "sha256:3fc47fe355b9bdb6728dc1f66aa186f85e78e953861a745725b89374807ed451",
   "canton_mediator_image_sha256": "sha256:f41a9356cff154e5fe74dbbf1ff27a7b6bf244f2f27a68d8f397b5d74310e3c2",
-  "canton_sequencer_image_sha256": "sha256:27d3e04db8b9db5dc17745ede2465d93c22f8ff18f60eb71ecda2b7f01ad84cf+1"
+  "canton_sequencer_image_sha256": "sha256:27d3e04db8b9db5dc17745ede2465d93c22f8ff18f60eb71ecda2b7f01ad84cf"
 }
