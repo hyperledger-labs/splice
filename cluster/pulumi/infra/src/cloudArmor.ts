@@ -148,41 +148,7 @@ function addThrottleAndBanRules(
       if (throttleAcrossAllEndpointsAllIps.maxRequestsBeforeHttp429 > 0) {
         const ruleName = `throttle-all-endpoints-all-ips-${confEntryHead}`;
 
-        // Extract un-banned path prefixes and build optimized regex
-        let pathExpr: string;
-        if (scanExternalRateLimits.rateLimits && scanExternalRateLimits.rateLimits.length > 0) {
-          const pathPrefixes = extractPathPrefixes(scanExternalRateLimits.rateLimits)
-            .filter(p => !p.isBanned)
-            .map(p => p.pathPrefix);
-
-          // Factor out /api/scan/ prefix (with trailing slash)
-          const scanPrefix = '/api/scan/';
-          const scanPathRxs = pathPrefixes
-            .filter(p => p.startsWith(scanPrefix))
-            .map(p => _.escapeRegExp(p.substring(scanPrefix.length))); // Remove prefix for factoring
-
-          // Build regex pattern
-          if (scanPathRxs.length > 0) {
-            const regexPattern = `${scanPrefix}(${scanPathRxs.join('|')})`;
-            pathExpr = `request.path.matches(R"^${regexPattern}")`;
-
-            // limit from https://docs.cloud.google.com/armor/quotas#limits
-            // in which a "subexpression" is an arg to && or ||
-            if (pathExpr.length > 1024) {
-              throw new Error(
-                `Cloud Armor path expression exceeds 1024 character limit (current: ${pathExpr.length}). ` +
-                  `Consider grouping path prefixes more aggressively.`
-              );
-            }
-          } else {
-            // Fallback to simple prefix if no scan paths
-            pathExpr = `request.path.startsWith(R"${pathPrefix}")`;
-          }
-        } else {
-          // No rate limits specified, use simple prefix matching
-          pathExpr = `request.path.startsWith(R"${pathPrefix}")`;
-        }
-
+        const pathExpr = allowedPathsCondition(scanExternalRateLimits, pathPrefix);
         const hostExpr = `request.headers['host'].matches(R"^${_.escapeRegExp(hostname)}(?::[0-9]+)?$")`;
         const matchExpr = `${pathExpr} && ${hostExpr}`;
 
@@ -252,4 +218,42 @@ function addDefaultDenyRule(
     },
     opts
   );
+}
+
+// Extract un-banned path prefixes and build optimized regex
+function allowedPathsCondition(scanExternalRateLimits: PerEndpointLimits, pathPrefix: string) {
+  if (scanExternalRateLimits.rateLimits && scanExternalRateLimits.rateLimits.length > 0) {
+    const pathPrefixes = extractPathPrefixes(scanExternalRateLimits.rateLimits)
+      .filter(p => !p.isBanned)
+      .map(p => p.pathPrefix);
+
+    // Factor out /api/scan/ prefix (with trailing slash)
+    const scanPrefix = '/api/scan/';
+    const scanPathRxs = pathPrefixes
+      .filter(p => p.startsWith(scanPrefix))
+      .map(p => _.escapeRegExp(p.substring(scanPrefix.length))); // Remove prefix for factoring
+
+    // Build regex pattern
+    if (scanPathRxs.length > 0) {
+      const regexPattern = `${scanPrefix}(${scanPathRxs.join('|')})`;
+      const pathExpr = `request.path.matches(R"^${regexPattern}")`;
+
+      // limit from https://docs.cloud.google.com/armor/quotas#limits
+      // in which a "subexpression" is an arg to && or ||
+      if (pathExpr.length > 1024) {
+        throw new Error(
+          `Cloud Armor path expression exceeds 1024 character limit (current: ${pathExpr.length}). ` +
+            `Consider grouping path prefixes more aggressively.`
+        );
+      }
+
+      return pathExpr;
+    } else {
+      // Fallback to simple prefix if no scan paths
+      return `request.path.startsWith(R"${pathPrefix}")`;
+    }
+  } else {
+    // No rate limits specified, use simple prefix matching
+    return `request.path.startsWith(R"${pathPrefix}")`;
+  }
 }
