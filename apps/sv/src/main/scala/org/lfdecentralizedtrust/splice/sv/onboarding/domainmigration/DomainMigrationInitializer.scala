@@ -316,7 +316,7 @@ class DomainMigrationInitializer(
       _ <- domainDataRestorer.connectDomainAndRestoreData(
         synchronizerAlias,
         domainMigrationDump.nodeIdentities.synchronizerId,
-        SequencerConnections.single(localSynchronizerNodes.current.sequencerConnection),
+        SequencerConnections.single(localSynchronizerNodes.current.internalSequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
@@ -508,7 +508,7 @@ class DomainMigrationInitializer(
               mediatorAdminConnection
                 .initialize(
                   synchronizerId,
-                  localSynchronizerNodes.current.sequencerConnection,
+                  localSynchronizerNodes.current.internalSequencerConnection,
                   localSynchronizerNodes.current.mediatorSequencerAmplification.toInternal,
                 ),
               logger,

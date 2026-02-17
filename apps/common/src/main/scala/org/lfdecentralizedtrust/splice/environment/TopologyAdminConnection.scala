@@ -1456,6 +1456,57 @@ abstract class TopologyAdminConnection(
     )
   ).map(_.map(r => TopologyResult(r.context, r.item)))
 
+  def findSequencerSuccessors(synchronizerId: SynchronizerId, sequencerId: SequencerId)(implicit
+      tc: TraceContext
+  ): Future[Option[TopologyResult[LsuSequencerConnectionSuccessor]]] = runCmd(
+    TopologyAdminCommands.Read.ListLsuSequencerConnectionSuccessor(
+      BaseQuery(
+        TopologyStoreId.Synchronizer(synchronizerId),
+        proposals = false,
+        timeQuery = TimeQuery.HeadState,
+        ops = Some(TopologyChangeOp.Replace),
+        filterSigningKey = "",
+        protocolVersion = None,
+      ),
+      sequencerId.filterString,
+    )
+  ).map(_.headOption.map(r => TopologyResult(r.context, r.item)))
+
+  def ensureSequencerSuccessor(
+      synchronizerId: SynchronizerId,
+      sequencerId: SequencerId,
+      connection: GrpcConnection,
+  )(implicit tc: TraceContext): Future[TopologyResult[LsuSequencerConnectionSuccessor]] = {
+    retryProvider.ensureThat(
+      RetryFor.Automation,
+      s"sequencer_successor_$sequencerId",
+      s"sequencer successor for $sequencerId is published with connection $connection",
+      findSequencerSuccessors(synchronizerId, sequencerId).map { result =>
+        result.filter(_.mapping.connection == connection).toRight(result)
+      },
+      (previous: Option[TopologyResult[LsuSequencerConnectionSuccessor]]) => {
+        logger.info(s"Adding sequencer $sequencerId successor with connection $connection")
+        (previous match {
+          case Some(successor) =>
+            proposeMapping(
+              synchronizerId,
+              successor.mapping,
+              successor.base.serial + PositiveInt.one,
+              isProposal = false,
+            )
+          case None =>
+            proposeMapping(
+              synchronizerId,
+              LsuSequencerConnectionSuccessor(sequencerId, synchronizerId, connection),
+              PositiveInt.one,
+              isProposal = false,
+            )
+        }).map(_ => ())
+      },
+      logger,
+    )
+  }
+
   def ensurePartyUnhostedFromParticipant(
       retryFor: RetryFor,
       synchronizerId: SynchronizerId,

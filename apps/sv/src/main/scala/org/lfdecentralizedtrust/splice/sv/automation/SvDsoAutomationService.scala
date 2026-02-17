@@ -48,7 +48,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppB
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
-import org.lfdecentralizedtrust.splice.sv.lsu.LsuStateTransferTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
 import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
@@ -237,7 +237,7 @@ class SvDsoAutomationService(
     (localSynchronizerNodes.map(_.current), localSynchronizerNodes.flatMap(_.successor)) match {
       case (Some(currentSynchronizerNode), Some(successorSynchronizerNode)) =>
         registerTrigger(
-          new LsuStateTransferTrigger(
+          new LogicalSynchronizerUpgradeTrigger(
             triggerContext,
             currentSynchronizerNode,
             successorSynchronizerNode,
@@ -552,6 +552,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
-      aTrigger[LsuStateTransferTrigger],
+      aTrigger[LogicalSynchronizerUpgradeTrigger],
     )
 }
