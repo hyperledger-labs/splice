@@ -3,7 +3,10 @@
 
 module Splice.Scripts.TestRewardAccountingV2 where
 
+
+import DA.Action (void)
 import DA.Assert
+import DA.Foldable (forA_)
 import DA.List
 import DA.Set as Set
 import DA.Time
@@ -34,6 +37,8 @@ test_reward_accounting_v2 = do
 
   alice <- allocateParty "Alice"
   bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  dora <- allocateParty "Dora"
 
   setTime demoTime
 
@@ -42,12 +47,19 @@ test_reward_accounting_v2 = do
 
 
   -- setup demo data
-  let mintingAllowances = sortOn (.beneficiary)
+  let mintingAllowances1 = sortOn (.beneficiary)
         [ MintingAllowance alice 1000.0
         , MintingAllowance bob 2000.0
         ]
-  let rootBatch = BatchOfMintingAllowances mintingAllowances
+  let mintingAllowances2 = sortOn (.beneficiary)
+        [ MintingAllowance charlie 30.0
+        , MintingAllowance dora 5.1
+        ]
+  let b1 = BatchOfMintingAllowances mintingAllowances1
+  let b2 = BatchOfMintingAllowances mintingAllowances2
+  let rootBatch = BatchOfBatches [CryptoHash.hash b1, CryptoHash.hash b2]
   let rootBatchHash = CryptoHash.hash rootBatch
+  let batchesWithHiding = [(b1, []), (b2, [dora]), (rootBatch, [])]
 
   -- get the
   [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
@@ -59,26 +71,31 @@ test_reward_accounting_v2 = do
         calculateRewardsCid
         batchHash = rootBatchHash
 
-
-  [(processRewardsCid, _)] <- query @ProcessRewardsV2 app.dso
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
-  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ProcessRewardsV2_ProcessBatch with
-    sv = sv1
-    processRewardsCid
-    choiceArg = ProcessRewardsV2_ProcessBatch with
-      batch = rootBatch
-      beneficiariesWithWrongVettingState = Set.empty
+  let processBatches = do
+        states <- query @ProcessRewardsV2 app.dso
+        forA_ states $ \(processRewardsCid, processRewards) -> do
+          let Some (b, badVettingState) = find (\(b, _) -> CryptoHash.hash b == processRewards.batchHash) batchesWithHiding
+          void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ProcessRewardsV2_ProcessBatch with
+            sv = sv1
+            processRewardsCid
+            choiceArg = ProcessRewardsV2_ProcessBatch with
+              batch = b
+              beneficiariesWithWrongVettingState = Set.fromList badVettingState
+
+  processBatches -- expand root hash into batch hashes
+  processBatches -- expand follow-up batches into coupons
 
   let expectedCoupons = do
-        MintingAllowance{..} <- mintingAllowances
+        MintingAllowance{..} <- mintingAllowances1 ++ mintingAllowances2
         pure RewardCouponV2 with
           dso = app.dso
           beneficiary
           amount
           round = Round 0
           expiresAt = addRelTime demoTime (days 2)
-          hidden = False
+          hidden = beneficiary == dora
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
