@@ -21,7 +21,6 @@ import {
   createRoutesFromElements,
   useLocation,
   useNavigate,
-  useParams,
 } from 'react-router';
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
@@ -91,16 +90,6 @@ const ConditionalThemeProvider: React.FC<React.PropsWithChildren> = ({ children 
   );
 };
 
-const GovernanceBetaProposalRedirect: React.FC = () => {
-  const { contractId } = useParams();
-  return (
-    <Navigate
-      to={contractId ? `/governance/proposals/${contractId}` : '/governance/proposals'}
-      replace
-    />
-  );
-};
-
 const App: React.FC = () => {
   const config = useSvConfig();
   const router = createBrowserRouter(
@@ -127,20 +116,6 @@ const App: React.FC = () => {
           <Route path="governance/proposals" element={<Governance />} />
           <Route path="governance/proposals/create" element={<CreateProposal />} />
           <Route path="governance/proposals/:contractId" element={<VoteRequestDetails />} />
-
-          <Route path="governance-beta" element={<Navigate to="/governance/proposals" replace />} />
-          <Route
-            path="governance-beta/proposals"
-            element={<Navigate to="/governance/proposals" replace />}
-          />
-          <Route
-            path="governance-beta/proposals/create"
-            element={<Navigate to="/governance/proposals/create" replace />}
-          />
-          <Route
-            path="governance-beta/proposals/:contractId"
-            element={<GovernanceBetaProposalRedirect />}
-          />
         </Route>
       </Route>
     )
