@@ -254,7 +254,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         val (transferPreapprovalCid, updateId) = submitResult
         transferPreapprovalCid.contractId should not be empty
         updateId should not be empty
-        checkExternalPartyExists(externalPartyOnboarding.party)
+        checkExternalPartyExists(provider, externalPartyOnboarding.party)
         submitResult
       },
     )
