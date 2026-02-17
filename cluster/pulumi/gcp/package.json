@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
-    "@kubernetes/client-node": "^0.22.3",
+    "@kubernetes/client-node": "^1.4.0",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@types/auth0": "^3.3.11",
     "auth0": "^4.28.0"
