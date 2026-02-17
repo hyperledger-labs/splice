@@ -61,7 +61,7 @@ test_reward_accounting_v2 = do
   let b2 = BatchOfMintingAllowances mintingAllowances2
   let rootBatch = BatchOfBatches [CryptoHash.hash b1, CryptoHash.hash b2]
   let rootBatchHash = CryptoHash.hash rootBatch
-  let batchesWithHiding = [(b1, []), (b2, [dora]), (rootBatch, [])]
+  let batchesWithHiding = [(b1, [bob]), (b2, [dora]), (rootBatch, [])]
 
   -- get the
   [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
@@ -97,13 +97,25 @@ test_reward_accounting_v2 = do
           amount
           round = Round 0
           expiresAt = addRelTime demoTime (days 2)
-          hidden = beneficiary == dora
+          hidden = beneficiary `elem` [bob, dora]
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
   actualCoupons === expectedCoupons
 
-  -- TODO: publish Dora's coupon
+  -- publish Bob's and Dora's hidden coupon
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  hiddenCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> c.hidden)
+  void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_UnhideRewardCouponsV2 with
+    sv = sv1
+    amuletRulesCid
+    choiceArg = AmuletRules_UnhideRewardCouponsV2 with
+      hiddenRewardCouponCids = map fst hiddenCoupons
+      beneficiaries = map (._2.beneficiary) hiddenCoupons
+
+  couponsAfterUnhiding <- query @RewardCouponV2 app.dso
+  sortOn (.beneficiary) (map snd couponsAfterUnhiding) ===
+    map (\c -> c with hidden = False) expectedCoupons
 
   -- mint alice's coupon in a split fashion
   -- FIXME: create and use utilities for these queries
