@@ -41,7 +41,7 @@ interface LocalLimit<L> {
   limits: L;
 }
 
-export interface RateLimitEnvoyFilterArgs {
+interface RateLimitEnvoyFilterArgs extends PerEndpointLimits {
   namespace: string;
 
   appLabel: pulumi.Input<string>;
@@ -52,13 +52,15 @@ export interface RateLimitEnvoyFilterArgs {
    * Used when no descriptors match the request.
    * */
   globalLimits: Limits;
+}
 
+export interface PerEndpointLimits {
   // all the rate limits must be respected, there's an AND relationship between them
   rateLimits?: LocalLimit<RateLimitConfig>[];
 }
 
 export function extractPathPrefixes(
-  rateLimits?: RateLimitEnvoyFilterArgs['rateLimits']
+  rateLimits?: PerEndpointLimits['rateLimits']
 ): PathPrefixInfo[] {
   if (!rateLimits) {
     return [];
@@ -67,12 +69,16 @@ export function extractPathPrefixes(
   return rateLimits
     .flatMap(rl => {
       const isBanned = 'type' in rl.limits && rl.limits.type === 'banned';
-      return rl.actions
-        .filter(action => 'pathPrefix' in action)
-        .map(action => ({
-          pathPrefix: action.pathPrefix,
-          isBanned,
-        }));
+      return rl.actions.flatMap(action =>
+        'pathPrefix' in action
+          ? [
+              {
+                pathPrefix: action.pathPrefix,
+                isBanned,
+              },
+            ]
+          : []
+      );
     })
     .filter(info => info.pathPrefix.startsWith('/api/scan'));
 }
