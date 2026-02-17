@@ -45,6 +45,8 @@ monitoring:
           rate: 25
       delegatelessContention:
         thresholdPerNamespace: 0.05
+      deployment:
+        pendingPeriodMinutes: 5
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
