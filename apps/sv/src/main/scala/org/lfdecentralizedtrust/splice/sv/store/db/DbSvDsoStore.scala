@@ -891,7 +891,7 @@ class DbSvDsoStore(
                   and mining_round is not null
                 order by mining_round desc limit 1)
                 and coalesce(acs.amulet_round_of_expiry <= (
-                  select (create_arguments->'holdingFeesOpenRoundNumber'->>'number')::bigint as mining_round
+                  select mining_round
                   from dso_acs_store
                   where store_id = $acsStoreId
                     and migration_id = $domainMigrationId

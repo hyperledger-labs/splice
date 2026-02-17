@@ -1387,7 +1387,8 @@ object SvDsoStore {
         co.payload.dso == dso
       ) { contract =>
         DsoAcsStoreRowData(
-          contract
+          contract,
+          miningRound = Some(contract.payload.holdingFeesOpenRoundNumber.number),
         )
       },
     )
