@@ -1012,11 +1012,10 @@ summarizeAndValidateExternalPartyContext context dso tf = do
     config = scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) $ externalPartyConfigState.transferConfig
     featuredAppProvider
     openRoundNumber = externalPartyConfigState.holdingFeesOpenRoundNumber
+    amuletPrice = externalPartyConfigState.amuletPrice
     -- no minting for long lived transfers
     issuingMiningRounds = Map.empty
-    -- no minting for long lived transfers
     validatorRights = Map.empty
-    amuletPrice = externalPartyConfigState.amuletPrice
 
 getValidatorRight : TransferContextSummaryV2 -> Party -> Update (ContractId ValidatorRight)
 getValidatorRight csum user =
