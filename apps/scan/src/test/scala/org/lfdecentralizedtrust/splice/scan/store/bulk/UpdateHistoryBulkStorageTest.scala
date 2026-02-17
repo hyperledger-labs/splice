@@ -121,11 +121,7 @@ class UpdateHistoryBulkStorageTest
 
         clue("Check that the dumped content is correct") {
           for {
-            s3Objects <- bucketConnection.s3Client
-              .listObjects(
-                ListObjectsRequest.builder().bucket("bucket").build()
-              )
-              .asScala
+            s3Objects <- bucketConnection.listObjects
             allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
               None,
               HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),

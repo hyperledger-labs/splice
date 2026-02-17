@@ -75,11 +75,7 @@ class AcsSnapshotBulkStorageTest
             )
             .runWith(Sink.ignore)
 
-          s3Objects <- s3BucketConnection.s3Client
-            .listObjects(
-              ListObjectsRequest.builder().bucket("bucket").build()
-            )
-            .asScala
+          s3Objects <- s3BucketConnection.listObjects
           allContracts <- store
             .queryAcsSnapshot(
               0,

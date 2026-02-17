@@ -16,6 +16,8 @@ import software.amazon.awssdk.services.s3.model.{
   CreateMultipartUploadRequest,
   GetObjectRequest,
   GetObjectResponse,
+  ListObjectsRequest,
+  ListObjectsResponse,
   PutObjectRequest,
   UploadPartRequest,
 }
@@ -35,7 +37,7 @@ case class S3Config(
 )
 
 class S3BucketConnection(
-    val s3Client: S3AsyncClient, // TODO: make it private, and wrap all methods that we want to be used?
+    s3Client: S3AsyncClient,
     bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
@@ -73,6 +75,9 @@ class S3BucketConnection(
   def newAppendWriteObject(
       key: String
   )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
+
+  def listObjects: Future[ListObjectsResponse] =
+    s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */
