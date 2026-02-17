@@ -156,6 +156,329 @@ sv:
             maxTokens: 10
             tokensPerFill: 5
             fillInterval: 60s
+
+        # Health/status endpoints (unlimited)
+        - actions:
+            - name: readyz
+              pathPrefix: /api/scan/readyz
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: livez
+              pathPrefix: /api/scan/livez
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: status
+              pathPrefix: /api/scan/status
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: version
+              pathPrefix: /api/scan/version
+          limits:
+            type: unlimited
+
+        # External API endpoints (unlimited)
+        - actions:
+            - name: dso-info
+              pathPrefix: /api/scan/v0/dso
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: validator-faucets
+              pathPrefix: /api/scan/v0/validators
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: scans
+              pathPrefix: /api/scan/v0/scans
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: sequencers
+              pathPrefix: /api/scan/v0/dso-sequencers
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: bft-sequencers
+              pathPrefix: /api/scan/v0/sv-bft-sequencers
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: domains
+              pathPrefix: /api/scan/v0/domains
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: closed-rounds
+              pathPrefix: /api/scan/v0/closed-rounds
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: mining-rounds
+              pathPrefix: /api/scan/v0/open-and-issuing-mining-rounds
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: updates
+              pathPrefix: /api/scan/v0/updates
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: v2-updates
+              pathPrefix: /api/scan/v2/updates
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: state
+              pathPrefix: /api/scan/v0/state
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: holdings
+              pathPrefix: /api/scan/v0/holdings
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: ans-entries
+              pathPrefix: /api/scan/v0/ans-entries
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: dso-party-id
+              pathPrefix: /api/scan/v0/dso-party-id
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: transactions
+              pathPrefix: /api/scan/v0/transactions
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: backfilling
+              pathPrefix: /api/scan/v0/backfilling
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: admin-validator-licenses
+              pathPrefix: /api/scan/v0/admin/validator
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: admin-sv-voterequests
+              pathPrefix: /api/scan/v0/admin/sv/voterequests
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: admin-sv-voteresults
+              pathPrefix: /api/scan/v0/admin/sv/voteresults
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: activities
+              pathPrefix: /api/scan/v0/activities
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: amulet-price-votes
+              pathPrefix: /api/scan/v0/amulet-price
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: amulet-rules
+              pathPrefix: /api/scan/v0/amulet-rules
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: ans-rules
+              pathPrefix: /api/scan/v0/ans-rules
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: events
+              pathPrefix: /api/scan/v0/events
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: external-party-amulet-rules
+              pathPrefix: /api/scan/v0/external-party-amulet-rules
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: feature-support
+              pathPrefix: /api/scan/v0/feature-support
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: featured-apps
+              pathPrefix: /api/scan/v0/featured-apps
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: migrations-schedule
+              pathPrefix: /api/scan/v0/migrations
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: splice-instance-names
+              pathPrefix: /api/scan/v0/splice-instance-names
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: synchronizer-bootstrapping-transactions
+              pathPrefix: /api/scan/v0/synchronizer-bootstrapping-transactions
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: synchronizer-identities
+              pathPrefix: /api/scan/v0/synchronizer-identities
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: top-validators-by-purchased-traffic
+              pathPrefix: /api/scan/v0/top-validators-by-purchased-traffic
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: top-validators-by-validator-faucets
+              pathPrefix: /api/scan/v0/top-validators-by-validator-faucets
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: top-validators-by-validator-rewards
+              pathPrefix: /api/scan/v0/top-validators-by-validator-rewards
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: transfer-command-counter
+              pathPrefix: /api/scan/v0/transfer-command-counter
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: transfer-command-status
+              pathPrefix: /api/scan/v0/transfer-command
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: transfer-preapprovals
+              pathPrefix: /api/scan/v0/transfer-preapprovals
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: unclaimed-development-fund-coupons
+              pathPrefix: /api/scan/v0/unclaimed-development-fund-coupons
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: voterequest
+              pathPrefix: /api/scan/v0/voterequest
+          limits:
+            type: unlimited
+
+        - actions:
+            - name: voterequests
+              pathPrefix: /api/scan/v0/voterequests
+          limits:
+            type: unlimited
+
+        # Deprecated/Banned endpoints
+        - actions:
+            - name: v1-updates
+              pathPrefix: /api/scan/v1/updates
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: aggregated-rounds
+              pathPrefix: /api/scan/v0/aggregated-rounds
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: round-totals
+              pathPrefix: /api/scan/v0/round-totals
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: round-party-totals
+              pathPrefix: /api/scan/v0/round-party-totals
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: amulet-config-for-round
+              pathPrefix: /api/scan/v0/amulet-config-for-round
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: round-of-latest-data
+              pathPrefix: /api/scan/v0/round-of-latest-data
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: rewards-collected
+              pathPrefix: /api/scan/v0/rewards-collected
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
+
+        - actions:
+            - name: top-providers
+              pathPrefix: /api/scan/v0/top-providers-by-app-rewards
+          limits:
+            type: banned
+            reason: "endpoint is deprecated (scan.yaml deprecated: true)"
 svs:
   default:
     logging:
