@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.store.Limit
@@ -43,7 +43,7 @@ import scala.math.Ordering.Implicits.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class SvTimeBasedRewardCouponIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with SvTimeBasedIntegrationTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil

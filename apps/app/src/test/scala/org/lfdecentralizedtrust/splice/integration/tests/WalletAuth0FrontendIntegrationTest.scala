@@ -15,7 +15,7 @@ import monocle.macros.syntax.lens.*
 import java.net.URI
 
 class WalletAuth0FrontendIntegrationTest
-    extends FrontendIntegrationTest("randomUser")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("randomUser")
     with FrontendLoginUtil
     with WalletTestUtil
     with WalletFrontendTestUtil {

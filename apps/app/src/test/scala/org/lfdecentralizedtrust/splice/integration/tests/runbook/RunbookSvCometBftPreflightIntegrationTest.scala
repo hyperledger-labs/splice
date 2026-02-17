@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 
 import java.net.{InetSocketAddress, Socket}
 import scala.concurrent.duration.DurationInt
@@ -9,7 +9,7 @@ import scala.util.Using
 
 /** Preflight test that makes sure that the cometBFT node of the node deployed through sv-runbook has initialized fine.
   */
-class RunbookSvCometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
+class RunbookSvCometBftPreflightIntegrationTest extends IntegrationTest {
 
   override lazy val resetRequiredTopologyState: Boolean = false
   override protected def runTokenStandardCliSanityCheck: Boolean = false

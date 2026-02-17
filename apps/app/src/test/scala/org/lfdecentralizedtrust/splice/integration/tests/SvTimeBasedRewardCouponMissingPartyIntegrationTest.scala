@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import org.lfdecentralizedtrust.splice.sv.config.BeneficiaryConfig
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
@@ -19,7 +19,7 @@ import org.slf4j.event.Level
 import scala.math.Ordering.Implicits.*
 
 class SvTimeBasedRewardCouponMissingPartyIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with SvTimeBasedIntegrationTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil

@@ -7,7 +7,7 @@ import com.digitalasset.canton.SynchronizerAlias
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.{ParticipantClientReference, SvAppBackendReference}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 
 import scala.jdk.OptionConverters.*
@@ -24,7 +24,7 @@ import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorTrustedSynchronizerConfig
 
 class ValidatorSequencerConnectionIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with SvTestUtil
     with WalletTestUtil {
 

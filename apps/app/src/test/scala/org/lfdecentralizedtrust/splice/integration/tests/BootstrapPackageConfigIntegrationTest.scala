@@ -34,7 +34,7 @@ import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources, P
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
@@ -50,7 +50,9 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
-class BootstrapPackageConfigIntegrationTest extends IntegrationTest with SplitwellTestUtil {
+class BootstrapPackageConfigIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with SplitwellTestUtil {
 
   // this test starts up on older version (see initialPackageConfig), which don't define token-standard interfaces
   // and thus everything will show up as raw create/archives.

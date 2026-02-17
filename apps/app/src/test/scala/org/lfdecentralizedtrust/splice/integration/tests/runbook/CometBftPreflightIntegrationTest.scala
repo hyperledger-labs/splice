@@ -1,13 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import java.net.{InetSocketAddress, Socket}
 import scala.util.Using
 
 /** Preflight test that makes sure that the cometBFT nodes of *our* SVs (1-3 + DA-1) have initialized fine.
   */
-class CometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
+class CometBftPreflightIntegrationTest extends IntegrationTest {
 
   override lazy val resetRequiredTopologyState: Boolean = false
   override protected def runTokenStandardCliSanityCheck: Boolean = false
