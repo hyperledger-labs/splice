@@ -321,7 +321,7 @@ amulet_transferFactory_transferImpl this _self arg = do
 
     Some preapprovalCid -> do
       -- use a payment context with featuring so the preapproval provider can be featured
-      paymentContext <- paymentFromChoiceContext dso extraArgs.context
+      paymentContext <- externalPartyTransferFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
       inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
       result <- exercise preapprovalCid TransferPreapproval_SendV2

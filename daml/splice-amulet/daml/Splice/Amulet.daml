@@ -35,6 +35,11 @@ data AmuletExpireSummary = AmuletExpireSummary with
       -- ^ The change of total holding fees introduced by a amulet expiry.
   deriving (Eq, Show)
 
+data AmuletExpireV2Summary = AmuletExpireV2Summary
+  with
+    owner : Party
+  deriving (Eq, Show)
+
 -- | Result of an operation that created a new amulet, e.g.,
 -- by minting a fresh amulet, or by unlocking a locked amulet.
 data AmuletCreateSummary amuletContractId = AmuletCreateSummary with
@@ -48,7 +53,7 @@ data Amulet_ExpireResult = Amulet_ExpireResult with
   meta : Optional Api.Token.MetadataV1.Metadata
 
 data Amulet_ExpireV2Result = Amulet_ExpireV2Result with
-  expireSum : AmuletExpireSummary -- FIXME: Consider trimming this down, scan and wallet tx log parser do currently need the non-round values though
+  expireSum : AmuletExpireV2Summary
   meta : Api.Token.MetadataV1.Metadata
 
 data LockedAmulet_UnlockResult = LockedAmulet_UnlockResult with
@@ -72,7 +77,7 @@ data LockedAmulet_ExpireAmuletResult = LockedAmulet_ExpireAmuletResult with
   meta : Optional Api.Token.MetadataV1.Metadata
 
 data LockedAmulet_ExpireAmuletV2Result = LockedAmulet_ExpireAmuletV2Result with
-  expireSum : AmuletExpireSummary
+  expireSum : AmuletExpireV2Summary
   meta : Api.Token.MetadataV1.Metadata
 
 data ValidatorRight_ArchiveAsValidatorResult = ValidatorRight_ArchiveAsValidatorResult
@@ -136,11 +141,8 @@ template Amulet
         externalPartyConfigState1Cid : ContractId ExternalPartyConfigState
       controller dso
       do  requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid this
-          let expireSum = AmuletExpireSummary with
+          let expireSum = AmuletExpireV2Summary with
                 owner = owner
-                round = amount.createdAt
-                changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
-                changeToHoldingFeesRate = - (amount.ratePerRound.rate)
           return Amulet_ExpireV2Result with
             meta = simpleHoldingTxMeta TxKind_ExpireDust None (Some amount.initialAmount)
             ..
@@ -218,11 +220,8 @@ template LockedAmulet
       controller amulet.dso
       do
          requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid amulet
-         let expireSum = AmuletExpireSummary with
+         let expireSum = AmuletExpireV2Summary with
                owner = amulet.owner
-               round = amulet.amount.createdAt
-               changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 amulet.amount)
-               changeToHoldingFeesRate = - (amulet.amount.ratePerRound.rate)
          return LockedAmulet_ExpireAmuletV2Result with
            meta = simpleHoldingTxMeta TxKind_ExpireDust None (Some amulet.amount.initialAmount)
            ..

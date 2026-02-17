@@ -228,13 +228,13 @@ data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
 
 data DsoRules_Amulet_ExpireV2Result = DsoRules_Amulet_ExpireV2Result with
-  expireSum : AmuletExpireSummary
+  expireSum : AmuletExpireV2Summary
 
 data DsoRules_LockedAmulet_ExpireAmuletResult = DsoRules_LockedAmulet_ExpireAmuletResult with
     expireSum : AmuletExpireSummary
 
 data DsoRules_LockedAmulet_ExpireAmuletV2Result = DsoRules_LockedAmulet_ExpireAmuletV2Result with
-    expireSum : AmuletExpireSummary
+    expireSum : AmuletExpireV2Summary
 
 data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
     summarizingRound: ContractId SummarizingMiningRound

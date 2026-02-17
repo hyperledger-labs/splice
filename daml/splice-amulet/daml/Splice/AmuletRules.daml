@@ -1886,8 +1886,8 @@ totalBurnFromSummary TransferSummary{..} = sum outputFees + holdingFees + sender
 -- Token standard context parsing
 ---------------------------------
 
-paymentFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update ExternalPartyTransferContext
-paymentFromChoiceContext dso context = do
+externalPartyTransferFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update ExternalPartyTransferContext
+externalPartyTransferFromChoiceContext dso context = do
   externalPartyConfigState <- getFromContextU @(ContractId ExternalPartyConfigState) context externalPartyConfigStateContextKey
   _ <- fetchChecked (ForDso with dso) externalPartyConfigState
   optFeaturedAppRightCid <- lookupFromContextU @(ContractId FeaturedAppRight) context featuredAppRightContextKey
@@ -1898,7 +1898,7 @@ paymentFromChoiceContext dso context = do
 -- | Used when we want to ignore a featured app right, even if it is present in the context.
 unfeaturedPaymentContextFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update ExternalPartyTransferContext
 unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
-  context <- paymentFromChoiceContext dso choiceContext
+  context <- externalPartyTransferFromChoiceContext dso choiceContext
   pure context with featuredAppRight = None
 
 bootstrapContractStateSchemaVersion : AmuletRules -> AmuletRules_UpdateToLatestSchemaVersion -> Int -> Update ()

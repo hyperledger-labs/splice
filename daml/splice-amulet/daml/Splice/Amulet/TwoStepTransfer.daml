@@ -80,7 +80,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
         inputs = transferInputs
         beneficiaries = None
 
-  result <- executeExternalPartyTransfer dso paymentContext transfer
+  result <- executeExternalPartyTransfer dso context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   pure
     ( lockedAmulet
@@ -93,11 +93,11 @@ executeTwoStepTransfer
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
-  (paymentContext, beneficiaries) <-
+  (context, beneficiaries) <-
     if allowFeaturing
       then do
         beneficiaries <- either fail pure $ beneficiariesFromMetadata extraArgs.meta
-        context <- paymentFromChoiceContext dso extraArgs.context
+        context <- externalPartyTransferFromChoiceContext dso extraArgs.context
         pure (context, beneficiaries)
       else do
         -- ignore beneficiaries in case we are not allowing featuring
@@ -118,7 +118,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
         beneficiaries
-  result <- executeExternalPartyTransfer dso paymentContext amuletRulesTransfer
+  result <- executeExternalPartyTransfer dso context amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
     , createdAmuletToHolding <$> result.createdAmulets

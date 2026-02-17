@@ -58,13 +58,8 @@ testScaledHoldingFees = do
     externalPartyConfigState0Cid = config0Cid
     externalPartyConfigState1Cid = config1Cid
 
-  -- Check the expire result. In particular, actual holding fee should be based
-  -- on the amulet price when the amulet was created, not the current one.
-  let expectedSummary= AmuletExpireSummary with
+  let expectedSummary= AmuletExpireV2Summary with
         owner = alice.primaryParty
-        round = curAmulet.amount.createdAt
-        changeToInitialAmountAsOfRoundZero = negate (getValueAsOfRound0 curAmulet.amount)
-        changeToHoldingFeesRate = negate scaledHoldingFee
       expectedMeta = Metadata $ TextMap.fromList
         [ ("splice.lfdecentralizedtrust.org/burned", show curAmulet.amount.initialAmount)
         , ("splice.lfdecentralizedtrust.org/tx-kind","expire-dust")
