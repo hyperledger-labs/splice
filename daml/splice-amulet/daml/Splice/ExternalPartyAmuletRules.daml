@@ -13,17 +13,30 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationInstructionV1 as Api.Token.AllocationInstructionV1
 
+import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.Amulet.TwoStepTransfer
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.ExternalPartyConfigState
 import Splice.Types
 import Splice.Util
 
 
-
 import DA.Exception
+
+
+data ExternalPartyAmuletRules_MintWithBeneficiariesResult = ExternalPartyAmuletRules_MintWithBeneficiariesResult with
+  inputRewardAmounts : TextMap.TextMap Decimal
+  ultimateBeneficiaryHoldingCids : [ContractId Amulet]
+  beneficiaryHoldingCid : Optional (ContractId Amulet)
+  meta : Metadata
+
+data MintingBeneficiary = MintingBeneficiary with
+    minter : Party
+    amount : Decimal
+  deriving (Eq, Show)
 
 -- | Rules contract that can be used in transactions that require signatures
 -- from an external party. This is intended to get archived and recreated as rarely as possible
@@ -63,6 +76,56 @@ template ExternalPartyAmuletRules
            nonce
            description
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
+
+    -- FIXME: convert into api package
+    nonconsuming choice ExternalPartyAmuletRules_MintWithBeneficiaries : ExternalPartyAmuletRules_MintWithBeneficiariesResult
+      with
+        beneficiary : Party
+        mintingBeneficiaries : [MintingBeneficiary]
+        rewardCouponCids : [ContractId RewardCouponV2]
+        externalPartyConfigStateCid : ContractId ExternalPartyConfigState
+        expectedDso : Party
+      controller beneficiary :: map (.minter) mintingBeneficiaries
+      do
+        checkExpectedDso dso (Some expectedDso)
+        let context = ExternalPartyTransferContext with
+              externalPartyConfigState = externalPartyConfigStateCid
+              featuredAppRight = None
+        -- reuse transfer code to inherit the validation logic present in there, even though we are doing direct minting here
+        let transfer = Transfer with
+              sender = beneficiary
+              provider = beneficiary
+              inputs = map InputRewardCouponV2 rewardCouponCids
+              outputs = do
+                ub <- mintingBeneficiaries
+                pure TransferOutput with
+                  receiver = ub.minter
+                  amount = ub.amount
+                  receiverFeeRatio = 0.0
+                  lock = None
+              beneficiaries = None
+
+        result <- executeExternalPartyTransfer dso context transfer
+
+        let summary = result.summary
+        let getAndInsert k get m
+              | v /= 0.0 = TextMap.insertWith (+) k v m
+              | otherwise = m
+              where
+                v = get summary
+        let getAndInsert' k get m = getAndInsert k (fromOptional 0.0 . get) m
+        pure ExternalPartyAmuletRules_MintWithBeneficiariesResult with
+          inputRewardAmounts =
+            -- NOTE: not sure about this representation
+            getAndInsert "app" (.inputAppRewardAmount) $
+            getAndInsert "validator" (.inputValidatorRewardAmount) $
+            getAndInsert "sv" (.inputSvRewardAmount) $
+            getAndInsert' "development" (.inputDevelopmentFundAmount) $
+            TextMap.empty
+          beneficiaryHoldingCid = result.senderChangeAmulet
+          ultimateBeneficiaryHoldingCids = [ cid | TransferResultAmulet cid <- result.createdAmulets ]
+          meta = copyOnlyBurnMeta result.meta
+
 
     interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
       view = Api.Token.TransferInstructionV1.TransferFactoryView with

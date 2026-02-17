@@ -24,16 +24,13 @@ import Splice.Util
 {- TODO
 
 overall:
-- remove AmuletRules_ClaimExpiredRewards; and add missing getAndValidateSvParty calls to DsoRules_ClaimExpiredRewards
+- Separate PR: add missing getAndValidateSvParty calls to DsoRules_ClaimExpiredRewards
   - add checked fetches for all coupons in ClaimExpiredRewards
 
 splice-amulet:
 
 - introduce ExternalAmuletRules_MintWithBeneficiaries
   - add API package for it
-
-dso:
-- add choices for DSO to trigger the reward calculation and processing based on CalculateRewardsV2 and ProcessRewardsV2
 
 release notes:
 - call out cycling of featured app rights; and markers created during switch-over time
@@ -53,9 +50,6 @@ Notes on design:
     ==> all open rounds at this point will use RAV_V2
     ==> activity markers will be dropped by trigger
     ==> featured app rights
-
-
-
 
 
 -}

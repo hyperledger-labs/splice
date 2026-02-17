@@ -18,6 +18,8 @@ import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.AmuletConfig
 import Splice.AmuletRules
+import Splice.ExternalPartyAmuletRules
+import Splice.ExternalPartyConfigState
 import Splice.DsoRules
 import Splice.Types
 
@@ -100,6 +102,33 @@ test_reward_accounting_v2 = do
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
   actualCoupons === expectedCoupons
+
+  -- TODO: publish Dora's coupon
+
+  -- mint alice's coupon in a split fashion
+  -- FIXME: create and use utilities for these queries
+  [(externalPartyRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
+  (externalPartyConfigCid, _)::_ <- query @ExternalPartyConfigState app.dso
+  [(aliceCouponCid, _)] <- query @RewardCouponV2 alice
+  void $ submitMulti [alice, bob, charlie] [app.dso] $
+    exerciseCmd externalPartyRulesCid ExternalPartyAmuletRules_MintWithBeneficiaries with
+      beneficiary = alice
+      rewardCouponCids = [aliceCouponCid]
+      mintingBeneficiaries =
+        [ MintingBeneficiary with
+            minter = bob
+            amount = 100.0
+        , MintingBeneficiary with
+            minter = charlie
+            amount = 200.0
+        ]
+      expectedDso = app.dso
+      externalPartyConfigStateCid = externalPartyConfigCid
+
+  amulets <- query @Splice.Amulet.Amulet app.dso
+  let actualAmounts = sort [ (a.owner, a.amount.initialAmount) | (_, a) <- amulets ]
+  let expectedAmounts = sort [ (alice, 700.0), (bob, 100.0), (charlie, 200.0) ]
+  actualAmounts === expectedAmounts
 
   pure ()
 
