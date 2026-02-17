@@ -63,7 +63,8 @@ data AmuletConfig unit = AmuletConfig with
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
-    externalPartyConfigStateTickDuration : Optional RelTime -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts.
+    externalPartyConfigStateTickDuration : Optional RelTime 
+      -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts. Default: 24h.
   deriving (Eq, Show)
 
 getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
