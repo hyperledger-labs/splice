@@ -27,7 +27,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
   const scanUrl = `${baseScanUrl}/api/scan`;
   return [
     rest.get(`${scanUrl}/v0/feature-support`, (_, res, ctx) => {
-      return res(ctx.json<FeatureSupportResponse>({ }));
+      return res(ctx.json<FeatureSupportResponse>({}));
     }),
 
     dsoInfoHandler(scanUrl),

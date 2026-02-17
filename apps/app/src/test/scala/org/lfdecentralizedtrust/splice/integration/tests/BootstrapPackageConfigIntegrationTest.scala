@@ -15,9 +15,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AmuletRules_SetConfig,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyconfigstate.ExternalPartyConfigState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -48,6 +52,7 @@ import org.scalatest.time.{Minute, Span}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.DurationInt
+import scala.jdk.OptionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class BootstrapPackageConfigIntegrationTest extends IntegrationTest with SplitwellTestUtil {
@@ -229,7 +234,8 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         ),
         amuletConfig.transferPreapprovalFee,
         amuletConfig.featuredAppActivityMarkerAmount,
-        java.util.Optional.empty(),
+        amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -351,6 +357,22 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
       }
     }
 
+    clue("ExternalPartyConfigState contracts are created") {
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ExternalPartyConfigState.COMPANION)(dsoParty) should have size 2
+      }
+    }
+
+    clue("AmuletRules is updated to latest version") {
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(AmuletRules.COMPANION)(dsoParty)
+        .loneElement
+        .data
+        .contractStateSchemaVersion
+        .toScala shouldBe Some(1L)
+    }
+
     // We check this as splice-amulet < 0.1.14 did not support setting the fees to zero;
     // and we want to ensure that the upgrade works as expected.
     clue("Change AmuletConfig to zero fees") {
@@ -371,6 +393,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         amuletConfig.transferPreapprovalFee,
         amuletConfig.featuredAppActivityMarkerAmount,
         amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(

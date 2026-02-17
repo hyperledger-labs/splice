@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -41,36 +42,73 @@ class ExpiredLockedAmuletTrigger(
   override protected def completeTaskAsDsoDelegate(
       task: Task,
       controller: String,
-  )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-    dsoRules <- store.getDsoRules()
-    cmds = task.work.expiredContracts.flatMap(co =>
-      dsoRules
-        .exercise(
-          _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
-            co.contractId,
-            new splice.amulet.LockedAmulet_ExpireAmulet(
-              latestOpenMiningRound.contractId
-            ),
-            Optional.of(controller),
-          )
-        )
-        .update
-        .commands()
-        .asScala
-        .toSeq
-    )
-    _ <- svTaskContext
-      .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
-      .submit(
-        Seq(store.key.svParty),
-        Seq(store.key.dsoParty),
-        update = cmds,
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val informees = task.work.expiredContracts
+      .flatMap(c =>
+        PartyId.tryFromProtoPrimitive(
+          c.payload.amulet.owner
+        ) +: c.payload.lock.holders.asScala.toSeq.map(PartyId.tryFromProtoPrimitive(_))
       )
-      .noDedup
-      .withSynchronizerId(dsoRules.domain)
-      .yieldUnit()
-  } yield TaskSuccess(s"archived expired locked amulet")
+      .toSet + store.key.dsoParty
+    for {
+      dsoRules <- store.getDsoRules()
+      supports24hSubmissionDelay <- svTaskContext.packageVersionSupport.supports24hSubmissionDelay(
+        informees.toSeq,
+        context.clock.now,
+      )
+      cmds <-
+        if (supports24hSubmissionDelay.supported) {
+          store.getExternalPartyConfigStatesPair().map { externalPartyConfigStates =>
+            task.work.expiredContracts.flatMap(co =>
+              dsoRules
+                .exercise(
+                  _.exerciseDsoRules_LockedAmulet_ExpireAmuletV2(
+                    co.contractId,
+                    new splice.amulet.LockedAmulet_ExpireAmuletV2(
+                      externalPartyConfigStates.oldest.contractId,
+                      externalPartyConfigStates.newest.contractId,
+                    ),
+                    Optional.of(controller),
+                  )
+                )
+                .update
+                .commands()
+                .asScala
+                .toSeq
+            )
+          }
+        } else {
+          store.getLatestActiveOpenMiningRound().map { round =>
+            task.work.expiredContracts.flatMap(co =>
+              dsoRules
+                .exercise(
+                  _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
+                    co.contractId,
+                    new splice.amulet.LockedAmulet_ExpireAmulet(
+                      round.contractId
+                    ),
+                    Optional.of(controller),
+                  )
+                )
+                .update
+                .commands()
+                .asScala
+                .toSeq
+            )
+          }
+        }
+      _ <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
+        .submit(
+          Seq(store.key.svParty),
+          Seq(store.key.dsoParty),
+          update = cmds,
+        )
+        .noDedup
+        .withSynchronizerId(dsoRules.domain)
+        .yieldUnit()
+    } yield TaskSuccess(s"archived expired locked amulet")
+  }
 }
 
 object ExpiredLockedAmuletTrigger {
