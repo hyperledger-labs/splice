@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.topology.transaction.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.store.Limit
 
@@ -11,9 +11,7 @@ import java.nio.file.Files
 import java.util.UUID
 import scala.concurrent.duration.*
 
-class MultiHostValidatorOperatorIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
-    with WalletTestUtil {
+class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

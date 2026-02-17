@@ -374,7 +374,6 @@ object ScanTxLogParser {
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
-            amuletPrice = acsum.amuletPrice,
             round = acsum.round.number,
           )
         case TransactionType.Mint =>
@@ -385,7 +384,6 @@ object ScanTxLogParser {
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
-            amuletPrice = acsum.amuletPrice,
             round = acsum.round.number,
           )
         case unexpected =>
@@ -495,7 +493,6 @@ object ScanTxLogParser {
         synchronizerId: SynchronizerId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
     ): TransferTxLogEntry = {
-      val amuletPrice = node.result.value.summary.amuletPrice
       val sender = parseSenderAmount(node.argument.value, node.result.value)
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
 
@@ -508,7 +505,6 @@ object ScanTxLogParser {
         receivers = receivers,
         balanceChanges = Seq.empty,
         round = node.result.value.round.number,
-        amuletPrice = amuletPrice,
       )
     }
 

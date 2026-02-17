@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
@@ -24,7 +24,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 
-class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
+class DistributedDomainIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with SvTestUtil
+    with WalletTestUtil {
 
   // Changed to a non-default value (the default is 250ms) to see that we correctly modify it.
   val observationLatency = NonNegativeFiniteDuration.ofMillis(500)

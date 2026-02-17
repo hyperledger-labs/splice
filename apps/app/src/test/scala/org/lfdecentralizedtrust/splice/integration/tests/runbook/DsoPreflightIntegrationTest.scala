@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 
 import scala.concurrent.duration.DurationInt
 
@@ -13,7 +13,7 @@ import io.circe.parser.parse
 /** Preflight test that makes sure that *our* SVs (1-3 + DA-1) have initialized fine.
   */
 class DsoPreflightIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("sv", "docs")
+    extends FrontendIntegrationTest("sv", "docs")
     with PreflightIntegrationTestUtil
     with SvUiPreflightIntegrationTestUtil {
 

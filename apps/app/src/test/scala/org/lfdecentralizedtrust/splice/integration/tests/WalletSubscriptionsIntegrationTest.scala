@@ -5,7 +5,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.
   SubscriptionRequest,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
@@ -13,9 +13,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
-class WalletSubscriptionsIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
-    with WalletTestUtil {
+class WalletSubscriptionsIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

@@ -2,10 +2,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
-import SpliceTests.IntegrationTest
+import SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.SvTestUtil
 
-trait SvIntegrationTestBase extends IntegrationTest with SvTestUtil {
+trait SvIntegrationTestBase extends IntegrationTestWithIsolatedEnvironment with SvTestUtil {
 
   protected val amuletDarPath =
     s"daml/dars/splice-amulet-${InitialPackageVersions.initialPackageVersion(DarResources.amulet)}.dar"

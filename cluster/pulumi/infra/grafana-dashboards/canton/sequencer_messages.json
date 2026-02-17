@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 448,
+  "id": 1203,
   "links": [],
   "panels": [
     {
@@ -977,6 +977,141 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Average size per sequencer message in the last hour",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "total"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "total"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(increase(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\"}[1h])) / sum(increase(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[1h]))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "total",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum by(type) (increase(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\"}[1h])) / sum by(type) (increase(daml_sequencer_block_events_total{namespace=\"$namespace\", job=\"$job\"}[1h]))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "type",
+          "useBackend": false
+        }
+      ],
+      "title": "Average Sequencer Message Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1037,7 +1172,7 @@
         "h": 11,
         "w": 20,
         "x": 0,
-        "y": 58
+        "y": 69
       },
       "id": 12,
       "options": {
@@ -1108,8 +1243,8 @@
       },
       {
         "current": {
-          "text": "global-domain-7-sequencer",
-          "value": "global-domain-7-sequencer"
+          "text": "global-domain-4-sequencer",
+          "value": "global-domain-4-sequencer"
         },
         "datasource": {
           "type": "prometheus",
@@ -1138,5 +1273,5 @@
   "timezone": "",
   "title": "Sequencer Messages",
   "uid": "fdjrxql2alblsd",
-  "version": 2
+  "version": 1
 }
