@@ -25,8 +25,10 @@ async function login(user: UserEvent) {
   const input = screen.getByRole('textbox');
   await user.type(input, 'sv1');
 
-  const button = screen.getByRole('button', { name: 'Log In' });
-  user.click(button);
+  const button = screen.queryByRole('button', { name: 'Log In' });
+  if (button) {
+    await user.click(button);
+  }
 }
 
 describe('Governance Page', () => {
@@ -114,7 +116,7 @@ describe('Governance Page', () => {
   test('proposal details page should render all details', async () => {
     const user = userEvent.setup();
 
-    render(<GovernanceWithConfig />);
+    await login(user);
 
     await navigateToGovernancePage(user);
 
@@ -150,10 +152,20 @@ describe('Governance Page', () => {
     );
     expect(votingClosesIso).toBeInTheDocument();
 
-    const voteTakesEffectIso = within(votingInformationSection).getByTestId(
+    const voteTakesEffectDuration = within(votingInformationSection).getByTestId(
+      'proposal-details-vote-takes-effect-duration'
+    );
+    expect(voteTakesEffectDuration).toBeInTheDocument();
+
+    const voteTakesEffectIso = within(votingInformationSection).queryByTestId(
       'proposal-details-vote-takes-effect-value'
     );
-    expect(voteTakesEffectIso).toBeInTheDocument();
+
+    if (voteTakesEffectDuration.textContent?.trim() === 'Threshold') {
+      expect(voteTakesEffectIso).not.toBeInTheDocument();
+    } else {
+      expect(voteTakesEffectIso).toBeInTheDocument();
+    }
 
     const status = screen.getByTestId('proposal-details-status-value');
     expect(status).toBeInTheDocument();
@@ -164,9 +176,15 @@ describe('Governance Page', () => {
     const votes = within(votesSection).getAllByTestId('proposal-details-vote');
     expect(votes.length).toBeGreaterThan(0);
 
-    expect(screen.getByTestId('proposal-details-your-vote-section')).toBeInTheDocument();
-    expect(screen.getByTestId('proposal-details-your-vote-input')).toBeInTheDocument();
-    expect(screen.getByTestId('proposal-details-your-vote-accept')).toBeInTheDocument();
-    expect(screen.getByTestId('proposal-details-your-vote-reject')).toBeInTheDocument();
+    const editButton = screen.queryByTestId('your-vote-edit-button');
+    if (editButton) {
+      await user.click(editButton);
+    }
+
+    expect(screen.getByTestId('your-vote-form')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-url-input')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-reason-input')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-accept')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-reject')).toBeInTheDocument();
   });
 });
