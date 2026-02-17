@@ -3,7 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME, extractPathPrefixes } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import * as config from './config';
 
@@ -138,8 +138,40 @@ function addThrottleAndBanRules(
       if (throttleAcrossAllEndpointsAllIps.maxRequestsBeforeHttp429 > 0) {
         const ruleName = `throttle-all-endpoints-all-ips-${confEntryHead}`;
 
-        // Build the expression for path and hostname matching
-        const pathExpr = `request.path.startsWith(R"${pathPrefix}")`;
+        // Extract un-banned path prefixes and build optimized regex
+        let pathExpr: string;
+        if (rateLimits && rateLimits.length > 0) {
+          const pathPrefixes = extractPathPrefixes(rateLimits)
+            .filter(p => !p.isBanned)
+            .map(p => p.pathPrefix);
+
+          // Factor out /api/scan/ prefix (with trailing slash)
+          const scanPrefix = '/api/scan/';
+          const scanPaths = pathPrefixes
+            .filter(p => p.startsWith(scanPrefix))
+            .map(p => p.substring(scanPrefix.length)); // Remove prefix for factoring
+
+          // Build regex pattern
+          if (scanPaths.length > 0) {
+            const regexPattern = `${scanPrefix}(${scanPaths.join('|')})`;
+            pathExpr = `request.path.matches(R"^${regexPattern}")`;
+
+            // Validate length
+            if (pathExpr.length > 1024) {
+              throw new Error(
+                `Cloud Armor path expression exceeds 1024 character limit (current: ${pathExpr.length}). ` +
+                  `Consider grouping path prefixes more aggressively.`
+              );
+            }
+          } else {
+            // Fallback to simple prefix if no scan paths
+            pathExpr = `request.path.startsWith(R"${pathPrefix}")`;
+          }
+        } else {
+          // No rate limits specified, use simple prefix matching
+          pathExpr = `request.path.startsWith(R"${pathPrefix}")`;
+        }
+
         const hostExpr = `request.headers['host'].matches(R"^${_.escapeRegExp(hostname)}(?::[0-9]+)?$")`;
         const matchExpr = `${pathExpr} && ${hostExpr}`;
 
