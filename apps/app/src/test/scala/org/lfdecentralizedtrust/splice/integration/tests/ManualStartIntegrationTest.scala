@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
@@ -32,7 +32,7 @@ import java.util.UUID
 import scala.concurrent.duration.DurationInt
 
 class ManualStartIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with TriggerTestUtil
     with StandaloneCanton {

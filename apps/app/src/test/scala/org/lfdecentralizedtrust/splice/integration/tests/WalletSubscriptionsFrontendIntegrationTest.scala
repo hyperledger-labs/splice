@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import java.time.{Duration, LocalDate}
 
 class WalletSubscriptionsFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with FrontendLoginUtil
     with TimeTestUtil {

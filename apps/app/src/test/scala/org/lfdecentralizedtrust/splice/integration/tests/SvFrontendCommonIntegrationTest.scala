@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.util.FrontendLoginUtil
 import org.openqa.selenium.{By, Keys}
 
 abstract class SvFrontendCommonIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2")
+    extends FrontendIntegrationTest("sv1", "sv2")
     with FrontendLoginUtil {
 
   def vote(

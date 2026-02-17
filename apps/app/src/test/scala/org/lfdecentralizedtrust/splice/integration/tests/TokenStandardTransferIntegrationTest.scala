@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   Transfer,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
@@ -37,7 +37,7 @@ import scala.jdk.CollectionConverters.*
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
 class TokenStandardTransferIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with WalletTestUtil
     with WalletTxLogTestUtil
     with HasActorSystem

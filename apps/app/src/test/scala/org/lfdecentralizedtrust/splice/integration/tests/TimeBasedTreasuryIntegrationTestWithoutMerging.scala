@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -23,7 +23,7 @@ import scala.annotation.nowarn
 
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with AmuletConfigUtil

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireRewardCouponsTrigger,
@@ -29,7 +29,9 @@ import scala.jdk.CollectionConverters.*
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 // This test simulates reward expiry after a Daml upgrade where the node hosting the parties that are informees
 // on the rewards has not vetted the new Daml versions.
-class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
+class RewardExpiryIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with TriggerTestUtil {
 
   // this test starts up on older version (see initialPackageConfig), which don't define token-standard interfaces
   // and thus everything will show up as raw create/archives.

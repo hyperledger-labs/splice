@@ -1,12 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import java.nio.file.{Files, Path, Paths}
 
-final class CombinedDumpDirectoryExportIntegrationTest extends IntegrationTest {
+final class CombinedDumpDirectoryExportIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment {
 
   private val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
 

@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.util.{Contract, SvTestUtil}
 import scala.concurrent.duration.*
 
 class SvExpiredRewardsCollectionTimeBasedIntegrationTest
-    extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment
+    extends SvTimeBasedIntegrationTestBase
     with SvTestUtil {
 
   "collect expired reward coupons" in { implicit env =>

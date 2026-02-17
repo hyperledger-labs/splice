@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as wal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subsCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AnsSubscriptionRenewalPaymentTrigger
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
@@ -41,7 +41,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTxLogIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil

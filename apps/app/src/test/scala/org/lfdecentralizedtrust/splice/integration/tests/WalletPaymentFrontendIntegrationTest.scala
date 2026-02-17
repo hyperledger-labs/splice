@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import com.digitalasset.canton.topology.PartyId
 
 class WalletPaymentFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil {

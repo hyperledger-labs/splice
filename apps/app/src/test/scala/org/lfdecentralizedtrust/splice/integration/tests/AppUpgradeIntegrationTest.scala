@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as wal
 import org.lfdecentralizedtrust.splice.integration.tests.AppUpgradeIntegrationTest.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
@@ -41,7 +41,7 @@ import scala.util.Using.Releasable
 import scala.concurrent.duration.*
 
 class AppUpgradeIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with PostgresAroundEach
     with ProcessTestUtil
     with SplitwellTestUtil

@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithIsolatedEnvironment,
   IntegrationTest,
-  IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
   TestCommon,
 }
@@ -100,8 +100,8 @@ trait CustomMatchers {
     new TextMixedWithNumbersMatcher(pattern, values, tolerance)
 }
 
-abstract class FrontendIntegrationTest(override val frontendNames: String*)
-    extends IntegrationTest
+abstract class FrontendIntegrationTestWithIsolatedEnvironment(override val frontendNames: String*)
+    extends IntegrationTestWithIsolatedEnvironment
     with FrontendTestCommon
     with ParallelTestExecution {
 
@@ -125,8 +125,8 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
   }
 }
 
-abstract class FrontendIntegrationTestWithSharedEnvironment(override val frontendNames: String*)
-    extends IntegrationTestWithSharedEnvironment
+abstract class FrontendIntegrationTest(override val frontendNames: String*)
+    extends IntegrationTest
     with FrontendTestCommon {
 
   override def beforeAll() = {

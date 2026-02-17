@@ -63,8 +63,8 @@ Vagrant.configure("2") do |config|
       # The image is used to give Nix freedom to set ownership and permissions which is not possible with synced folders directly
       [[ -d "$NIX_CACHE_MOUNT_PATH" ]] || mkdir -p "$NIX_CACHE_MOUNT_PATH"
       [[ -d "$(dirname "$NIX_CACHE_IMAGE_PATH")" ]] || mkdir -p "$(dirname "$NIX_CACHE_IMAGE_PATH")"
-      [[ -f "$NIX_CACHE_IMAGE_PATH" ]] || { truncate -s "${NIX_CACHE_SIZE}G" "$NIX_CACHE_IMAGE_PATH"; mkfs.ext4 "$NIX_CACHE_IMAGE_PATH"; }
-      nix_cache_image_fstab="$NIX_CACHE_IMAGE_PATH $NIX_CACHE_MOUNT_PATH ext4 loop 0 0"
+      [[ -f "$NIX_CACHE_IMAGE_PATH" ]] || { truncate -s "${NIX_CACHE_SIZE}G" "$NIX_CACHE_IMAGE_PATH"; mkfs.btrfs "$NIX_CACHE_IMAGE_PATH"; }
+      nix_cache_image_fstab="$NIX_CACHE_IMAGE_PATH $NIX_CACHE_MOUNT_PATH btrfs loop,compress=zstd 0 0"
       append_line_to_file "$nix_cache_image_fstab" /etc/fstab
       nix_daemon_needs_restart=false
       mountpoint "$NIX_CACHE_MOUNT_PATH" || { mount "$NIX_CACHE_MOUNT_PATH" && nix_daemon_needs_restart=true; }

@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.AnsSubscriptionInitialPaymentTrigger
@@ -44,7 +44,7 @@ import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class WalletManualRoundsIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with WalletTestUtil
     with SplitwellTestUtil
     with TriggerTestUtil {
