@@ -10,7 +10,6 @@ export const BucketRateLimitSchema = z.object({
 
 export const BannedSchema = z.object({
   type: z.literal('banned'),
-  reason: z.string().optional(),
 });
 
 export const UnlimitedSchema = z.object({

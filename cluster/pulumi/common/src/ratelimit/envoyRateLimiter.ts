@@ -13,7 +13,6 @@ interface Limits {
 
 interface Banned {
   type: 'banned';
-  reason?: string;
 }
 
 interface Unlimited {
