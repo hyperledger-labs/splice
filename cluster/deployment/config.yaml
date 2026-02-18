@@ -190,7 +190,7 @@ sv:
             type: unlimited
 
         - actions:
-            - name: validator-faucets
+            - name: validators
               pathPrefix: /api/scan/v0/validators
           limits:
             type: unlimited
@@ -202,7 +202,7 @@ sv:
             type: unlimited
 
         - actions:
-            - name: sequencers
+            - name: dso-sequencers
               pathPrefix: /api/scan/v0/dso-sequencers
           limits:
             type: unlimited
@@ -226,13 +226,13 @@ sv:
             type: unlimited
 
         - actions:
-            - name: mining-rounds
+            - name: open-and-issuing-mining-rounds
               pathPrefix: /api/scan/v0/open-and-issuing-mining-rounds
           limits:
             type: unlimited
 
         - actions:
-            - name: updates
+            - name: v0-updates
               pathPrefix: /api/scan/v0/updates
           limits:
             type: unlimited
@@ -280,19 +280,19 @@ sv:
             type: unlimited
 
         - actions:
-            - name: admin-validator-licenses
+            - name: validator-licenses
               pathPrefix: /api/scan/v0/admin/validator
           limits:
             type: unlimited
 
         - actions:
-            - name: admin-sv-voterequests
+            - name: sv-voterequests
               pathPrefix: /api/scan/v0/admin/sv/voterequests
           limits:
             type: unlimited
 
         - actions:
-            - name: admin-sv-voteresults
+            - name: sv-voteresults
               pathPrefix: /api/scan/v0/admin/sv/voteresults
           limits:
             type: unlimited
