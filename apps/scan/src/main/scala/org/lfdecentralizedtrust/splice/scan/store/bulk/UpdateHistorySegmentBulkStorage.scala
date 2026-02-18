@@ -152,7 +152,7 @@ class UpdateHistorySegmentBulkStorage(
         )
       )
       .map((o: S3ZstdObjects.Output) => {
-        historyMetrics.BulkStorage.objectsCount.inc()(MetricsContext("object_type" -> "updates"))
+        historyMetrics.BulkStorage.incUpdateObjects()
         UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
       })
   }

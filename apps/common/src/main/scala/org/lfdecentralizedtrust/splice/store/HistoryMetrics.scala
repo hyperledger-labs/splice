@@ -266,6 +266,12 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
           Traffic,
         )
       )(metricsContext)
+
+    def incAcsSnapshotObjects(): Unit =
+      objectsCount.inc()(MetricsContext("object_type" -> "ACS_snapshots"))
+
+    def incUpdateObjects(): Unit =
+      objectsCount.inc()(MetricsContext("object_type" -> "updates"))
   }
 
   def metricsContextFromUpdate(

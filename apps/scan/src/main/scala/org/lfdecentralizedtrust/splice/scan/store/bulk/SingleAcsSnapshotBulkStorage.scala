@@ -88,10 +88,9 @@ class SingleAcsSnapshotBulkStorage(
           loggerFactory,
         )
       )
-      .map(o => {
-        historyMetrics.BulkStorage.objectsCount
-          .inc()(MetricsContext("object_type" -> "ACS_snapshots"))
-        o
+      .map(_ => {
+        historyMetrics.BulkStorage.incAcsSnapshotObjects()
+        _
       })
       // emit back the timestamp w. migrationId upon completion
       .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
