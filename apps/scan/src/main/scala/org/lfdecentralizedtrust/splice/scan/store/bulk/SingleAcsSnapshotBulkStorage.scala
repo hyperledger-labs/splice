@@ -88,10 +88,7 @@ class SingleAcsSnapshotBulkStorage(
           loggerFactory,
         )
       )
-      .map(_ => {
-        historyMetrics.BulkStorage.incAcsSnapshotObjects()
-        _
-      })
+      .wireTap(_ => historyMetrics.BulkStorage.incAcsSnapshotObjects())
       // emit back the timestamp w. migrationId upon completion
       .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
 
