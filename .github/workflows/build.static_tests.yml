@@ -15,6 +15,53 @@ on:
         default: false
 
 jobs:
+  check_canton_consistency:
+    runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-x-small' || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    container:
+      image: ${{ inputs.self_hosted && 'us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12' || '' }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Setup Nix
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: canton_consistency
+          target: 'static_tests'
+
+      - name: Run consistency check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          additional_nix_args: "--keep PATH"
+          cmd: |
+            CURRENT_VERSION=$(jq -r '.version' nix/canton-sources.json)
+            echo "Validating Docker digests for Canton version: $CURRENT_VERSION"
+
+            function set_value() {
+              local key="$1"
+              local value="$2"
+              jq --arg key "$key" --arg value "$value" '.[ $key ] = $value' nix/canton-sources.json > nix/canton-sources.tmp.json
+              mv nix/canton-sources.tmp.json nix/canton-sources.json
+            }
+
+            for img in base participant mediator sequencer; do
+              echo "Fetching image sha256 for canton-$img..."
+              sha=$(skopeo inspect --override-os linux --override-arch amd64 "docker://europe-docker.pkg.dev/da-images/public-all/docker/canton-$img:${CURRENT_VERSION}" --format '{{.Digest}}')
+              set_value "canton_${img}_image_sha256" "$sha"
+            done
+
+            git add nix/canton-sources.json
+            if ! git diff --staged --exit-code nix/canton-sources.json; then
+              echo "-------------------------------------------------------"
+              echo "FAIL: Canton Docker digests are out of sync with version $CURRENT_VERSION!"
+              echo "Please run './build-tools/bump-canton.sh $CURRENT_VERSION' locally to fix this."
+              echo "-------------------------------------------------------"
+              exit 1
+            fi
+            echo "Success: Docker digests match the version."
   static_tests:
     runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-small' || 'ubuntu-24.04' }}
     timeout-minutes: 35
