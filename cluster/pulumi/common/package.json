@@ -38,7 +38,7 @@
     "@types/lodash": "^4.14.189",
     "@types/sinon": "^10.0.15",
     "@types/ws": "^8.18.1",
-    "dedent": "^1.7.0",
+    "dedent": "^1.7.1",
     "sinon": "^15.0.4"
   }
 }
