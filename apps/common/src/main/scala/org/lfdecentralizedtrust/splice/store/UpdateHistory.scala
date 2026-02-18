@@ -1631,7 +1631,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ Option(updateRow.externalTransactionHash)
+          /*externalTransactionHash = */ updateRow.externalTransactionHash
             .map(ByteString.copyFrom)
             .getOrElse(ByteString.EMPTY),
         )
@@ -1710,6 +1710,8 @@ class UpdateHistory(
   private implicit lazy val GetResultSelectFromTransactions: GetResult[SelectFromTransactions] =
     GetResult { prs =>
       import prs.*
+      implicit val GetResultOptionByteArray: GetResult[Option[Array[Byte]]] =
+        GetResult(pr => pr.nextBytesOption())
       (SelectFromTransactions.apply _).tupled(
         (
           <<[Long],
@@ -1722,7 +1724,7 @@ class UpdateHistory(
           <<[Seq[String]],
           <<[Option[String]],
           <<[Option[String]],
-          <<[Array[Byte]],
+          <<[Option[Array[Byte]]],
         )
       )
     }
@@ -2431,7 +2433,7 @@ object UpdateHistory {
       rootEventIds: Seq[String],
       workflowId: Option[String],
       commandId: Option[String],
-      externalTransactionHash: Array[Byte],
+      externalTransactionHash: Option[Array[Byte]],
   )
 
   case class SelectFromCreateEvents(
