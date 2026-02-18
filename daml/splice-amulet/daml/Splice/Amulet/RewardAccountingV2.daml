@@ -29,9 +29,13 @@ overall:
 
 api:
 - introduce api package: splice-api-reward-minting-v1
+  - take a note wrt integration with HoldingV2 interface introduced by token standard v2
 
 tests:
 - minting delegation of RewardCouponV2
+
+docs:
+- call out reward minting API
 
 release notes:
 - call out cycling of featured app rights; and markers created during switch-over time

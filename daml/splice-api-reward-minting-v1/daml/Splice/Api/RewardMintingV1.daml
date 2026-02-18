@@ -1,0 +1,68 @@
+-- | An API for apps to programmatically mint their rewards.
+-- It can also be used by external parties to create minting transactions with long submission delays.
+module Splice.Api.RewardMintingV1 where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+
+
+-- Interface to refer to coupons
+--------------------------------
+
+data RewardCouponView = RewardCouponView
+  with
+    dso : Party
+      -- ^ The DSO party.
+    beneficiary : Party
+      -- ^ The party that is granted the right to mint the amount on the coupon.
+    amount : Decimal
+      -- ^ Amulet amount that can be minted with this coupon.
+    expiresAt : Time
+      -- ^ Expiration time of the coupon. The minting right granted by the coupon can only be exercised before this time.
+    meta : Metadata
+      -- ^ Metadata associated with this coupon. Provided for extensibility.
+  deriving (Show, Eq)
+
+interface RewardCoupon where
+  viewtype RewardCouponView
+
+
+-- Interface to request minting of rewards
+------------------------------------------
+
+data MintingBeneficiary = MintingBeneficiary with
+    beneficiary : Party
+    amount : Decimal
+  deriving (Eq, Show)
+
+data RewardMintingFactoryView = RewardMintingFactoryView with
+    dso : Party
+  deriving (Show, Eq)
+
+-- | An interface for contracts allowing application providers to record their featured activity.
+interface RewardMintingFactory where
+  viewtype RewardMintingFactoryView
+
+  rewardMintingFactory_mintImpl
+    : ContractId RewardMintingFactory -> RewardMintingFactory_Mint -> Update RewardMintingFactory_MintResult
+
+  nonconsuming choice RewardMintingFactory_Mint : RewardMintingFactory_MintResult
+    -- ^ Mint rewards.
+    with
+        -- FIXME: comments
+        couponBeneficiary : Party
+        mintingBeneficiaries : [MintingBeneficiary]
+        rewardCouponCids : [ContractId RewardCoupon]
+        expectedDso : Party
+        extraArgs : ExtraArgs
+    controller couponBeneficiary :: map (.beneficiary) mintingBeneficiaries
+    do rewardMintingFactory_mintImpl this self arg
+
+-- | Result of calling the `Minting` choice.
+data RewardMintingFactory_MintResult = RewardMintingFactory_MintResult
+  with
+    mintingBeneficiaryHoldingsCids : [ContractId Holding]
+      -- ^ The holdings created for the minting beneficiaries, in the same order as the `mintingBeneficiaries` in the choice arguments.
+    couponBeneficiaryHoldingCid : Optional (ContractId Holding)
+      -- ^ The holding created for the coupon beneficiary, if any. This is optional to allow minting without creating a holding for the beneficiary, in which case the beneficiary would receive the minted amount directly in their wallet without an associated holding contract.
+
