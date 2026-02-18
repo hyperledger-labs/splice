@@ -115,6 +115,7 @@ class DbScanStore(
     ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
+    override val defaultLimit: Limit,
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
@@ -301,7 +302,7 @@ class DbScanStore(
   override def listEntries(
       namePrefix: String,
       now: CantonTimestamp,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[

@@ -24,8 +24,10 @@ import scala.jdk.OptionConverters.RichOptional
 /** Vote information that can be determined from active ledger contracts */
 trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
+  def defaultLimit: Limit
+
   def listAmuletPriceVotes(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[
@@ -36,7 +38,7 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
       .listContracts(splice.dso.amuletprice.AmuletPriceVote.COMPANION, limit)
       .map(_ map (_.contract))
 
-  def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
+  def listVoteRequests(limit: Limit = defaultLimit)(implicit tc: TraceContext): Future[
     Seq[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]]
   ] =
     multiDomainAcsStore
@@ -99,7 +101,7 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
   def listVoteRequestsByTrackingCid(
       voteRequestCids: Seq[splice.dsorules.VoteRequest.ContractId],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
@@ -132,7 +134,7 @@ trait VotesStore extends ActiveVotesStore {
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[DsoRules_CloseVoteRequestResult]]

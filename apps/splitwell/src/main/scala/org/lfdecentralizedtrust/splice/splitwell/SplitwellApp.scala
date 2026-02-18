@@ -129,6 +129,7 @@ class SplitwellApp(
       migrationInfo,
       participantId,
       config.automation.ingestion,
+      config.parameters.defaultLimit,
     )
     // splitwell does not need to have UpdateHistory
     automation = new SplitwellAutomationService(

@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStore, DbScanStoreMetrics, ScanTables}
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
@@ -71,6 +71,7 @@ class ScanStoreIngestionPerformanceTest(
       IngestionConfig(),
       new DbScanStoreMetrics(NoOpMetricsFactory, loggerFactory, timeouts),
       0L,
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
   }
 
