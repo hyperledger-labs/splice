@@ -87,24 +87,15 @@ function validateEndpointCoverage(
   scanEndpoints: string[],
   configuredScanPrefixes: string[]
 ): { missing: string[]; orphaned: string[] } {
-  const missing: string[] = [];
-  const orphaned: string[] = [];
-
   // Check for missing prefixes
-  for (const endpoint of scanEndpoints) {
-    const hasMatch = configuredScanPrefixes.some(prefix => endpoint.startsWith(prefix));
-    if (!hasMatch) {
-      missing.push(endpoint);
-    }
-  }
+  const missing = scanEndpoints.filter(
+    endpoint => !configuredScanPrefixes.some(prefix => endpoint.startsWith(prefix))
+  );
 
   // Check for orphaned prefixes
-  for (const prefix of configuredScanPrefixes) {
-    const hasMatch = scanEndpoints.some(endpoint => endpoint.startsWith(prefix));
-    if (!hasMatch) {
-      orphaned.push(prefix);
-    }
-  }
+  const orphaned = configuredScanPrefixes.filter(
+    prefix => !scanEndpoints.some(endpoint => endpoint.startsWith(prefix))
+  );
 
   return { missing, orphaned };
 }
