@@ -552,5 +552,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
+      aTrigger[LsuStateTransferTrigger],
     )
 }
