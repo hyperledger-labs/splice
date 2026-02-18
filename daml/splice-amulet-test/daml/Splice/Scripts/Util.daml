@@ -47,7 +47,16 @@ import Splice.Util
 data AmuletApp = AmuletApp with
     dso : Party
     dsoUser : AmuletUser
+    registry : Registry.AmuletRegistry
   deriving (Eq, Ord, Show)
+
+mkAmuletApp : Party -> AmuletUser -> AmuletApp
+mkAmuletApp dso dsoUser = AmuletApp with
+    dso
+    dsoUser
+    registry = Registry.AmuletRegistry with
+      dso
+      instrumentId = amuletInstrumentId dso
 
 demoTime : Time
 demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
@@ -66,7 +75,7 @@ genericSetupApp dsoPrefix = do
   dso <- allocateParty (dsoPrefix <> "dso-party")
   dsoUser <- validateUserId (dsoPrefix <> "dummy-dso-user")
   _ <- createUser (User dsoUser (Some dso)) []
-  let app =  AmuletApp with dso, dsoUser = AmuletUser dsoUser dso
+  let app = mkAmuletApp dso (AmuletUser dsoUser dso)
 
   recordValidatorOf app app.dso app.dso
 

@@ -13,6 +13,7 @@ import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.RewardMintingV1 qualified as Api.RewardMintingV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -405,6 +406,14 @@ template RewardCouponV2
         assertDeadlineExceeded "expiresAt" expiresAt
         return RewardCouponV2_DsoExpireResult with
           amount
+
+    interface instance Api.RewardMintingV1.RewardCoupon for RewardCouponV2 where
+      view = Api.RewardMintingV1.RewardCouponView with
+        dso
+        beneficiary
+        amount
+        expiresAt
+        meta = Api.Token.MetadataV1.emptyMetadata
 
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user

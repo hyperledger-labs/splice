@@ -13,19 +13,20 @@ import DA.Time
 
 import Daml.Script
 
+import Splice.Api.RewardMintingV1 qualified as Api.RewardMintingV1
+
 import Splice.Amulet
 import Splice.Amulet.RewardAccountingV2
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.AmuletConfig
 import Splice.AmuletRules
-import Splice.ExternalPartyAmuletRules
-import Splice.ExternalPartyConfigState
 import Splice.DsoRules
 import Splice.Types
 
 import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
 
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
 
 
@@ -118,24 +119,12 @@ test_reward_accounting_v2 = do
     map (\c -> c with hidden = False) expectedCoupons
 
   -- mint alice's coupon in a split fashion
-  -- FIXME: create and use utilities for these queries
-  [(externalPartyRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
-  (externalPartyConfigCid, _)::_ <- query @ExternalPartyConfigState app.dso
-  [(aliceCouponCid, _)] <- query @RewardCouponV2 alice
-  void $ submitMulti [alice, bob, charlie] [app.dso] $
-    exerciseCmd externalPartyRulesCid ExternalPartyAmuletRules_MintWithBeneficiaries with
-      beneficiary = alice
-      rewardCouponCids = [aliceCouponCid]
-      mintingBeneficiaries =
-        [ MintingBeneficiary with
-            minter = bob
-            amount = 100.0
-        , MintingBeneficiary with
-            minter = charlie
-            amount = 200.0
-        ]
-      expectedDso = app.dso
-      externalPartyConfigStateCid = externalPartyConfigCid
+  coupons <- queryInterface @Api.RewardMintingV1.RewardCoupon alice
+  AmuletRegistry.mintRewards app.registry alice
+    [ (bob, 100.0)
+    , (charlie, 200.0)
+    ]
+    (map fst coupons)
 
   amulets <- query @Splice.Amulet.Amulet app.dso
   let actualAmounts = sort [ (a.owner, a.amount.initialAmount) | (_, a) <- amulets ]

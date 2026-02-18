@@ -1,6 +1,8 @@
--- | An API for apps to programmatically mint their rewards.
+-- | An API for apps to programmatically mint their Amulet rewards.
 -- It can also be used by external parties to create minting transactions with long submission delays.
 module Splice.Api.RewardMintingV1 where
+
+import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
@@ -40,29 +42,64 @@ data RewardMintingFactoryView = RewardMintingFactoryView with
   deriving (Show, Eq)
 
 -- | An interface for contracts allowing application providers to record their featured activity.
+--
+-- FIXME: add open-api specification for receiving factory and its related contracts.
 interface RewardMintingFactory where
   viewtype RewardMintingFactoryView
 
+  rewardMintingFactory_publicFetchImpl : ContractId RewardMintingFactory -> RewardMintingFactory_PublicFetch -> Update RewardMintingFactoryView
   rewardMintingFactory_mintImpl
     : ContractId RewardMintingFactory -> RewardMintingFactory_Mint -> Update RewardMintingFactory_MintResult
 
   nonconsuming choice RewardMintingFactory_Mint : RewardMintingFactory_MintResult
-    -- ^ Mint rewards.
+    -- ^ Mint amulet rewards.
     with
-        -- FIXME: comments
         couponBeneficiary : Party
+          -- ^ The beneficiary of the reward coupons. Can be a decentralized party use for operations only.
         mintingBeneficiaries : [MintingBeneficiary]
+          -- ^ The beneficiaries of the minting. These parties actually mint the rewards and should be seen as the ultimate beneficiaries.
         rewardCouponCids : [ContractId RewardCoupon]
+          -- ^ The reward coupons to use for minting.
         expectedDso : Party
+          -- ^ The expected DSO party of the factory. Implementations MUST validate that this matches
+          -- the DSO party of the factory.
+          -- Callers SHOULD ensure they get `expectedDso` from a trusted source, e.g., a read against
+          -- their own participant. That way they can ensure that it is safe to exercise a choice
+          -- on a factory contract acquired from an untrusted source *provided*
+          -- all vetted Daml packages only contain interface implementations
+          -- that check the expected admin party.
         extraArgs : ExtraArgs
+          -- ^ Extra arguments for extensibility.
     controller couponBeneficiary :: map (.beneficiary) mintingBeneficiaries
     do rewardMintingFactory_mintImpl this self arg
+
+  nonconsuming choice RewardMintingFactory_PublicFetch : RewardMintingFactoryView
+    -- ^ Fetch the view of the factory contract.
+    with
+      expectedDso : Party
+        -- ^ The expected DSO party of the factory. Implementations MUST validate that this matches
+        -- the DSO party of the factory.
+        -- Callers SHOULD ensure they get `expectedDso` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      actor : Party
+        -- ^ The party fetching the contract.
+    controller actor
+    do rewardMintingFactory_publicFetchImpl this self arg
+
 
 -- | Result of calling the `Minting` choice.
 data RewardMintingFactory_MintResult = RewardMintingFactory_MintResult
   with
-    mintingBeneficiaryHoldingsCids : [ContractId Holding]
+    inputRewardAmounts : TextMap.TextMap Decimal
+      -- ^ The amount of Amulet from different reward sources that were used as inputs for the minting. The keys of the map are the contract IDs of the input reward coupons, and the values are the amounts from those coupons that were used for minting.
+      --  This is provided for informational purposes.
+    mintingBeneficiaryHoldingCids : [ContractId Holding]
       -- ^ The holdings created for the minting beneficiaries, in the same order as the `mintingBeneficiaries` in the choice arguments.
     couponBeneficiaryHoldingCid : Optional (ContractId Holding)
       -- ^ The holding created for the coupon beneficiary, if any. This is optional to allow minting without creating a holding for the beneficiary, in which case the beneficiary would receive the minted amount directly in their wallet without an associated holding contract.
+    meta : Metadata
+      -- ^ Metadata associated with the minting result. Provided for extensibility.
 

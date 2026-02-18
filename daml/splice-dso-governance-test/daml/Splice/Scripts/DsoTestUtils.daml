@@ -127,11 +127,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
     DsoBootstrap_Bootstrap
 
   dsoUserId <- validateUserId "dso-user"
-  let app = AmuletApp with
-        dso
-        dsoUser = AmuletUser with
-          userId = dsoUserId
-          primaryParty = dso
+  let app = mkAmuletApp dso (AmuletUser dsoUserId dso)
 
   -- add more sv nodes
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
