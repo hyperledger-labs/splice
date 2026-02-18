@@ -102,6 +102,9 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
     `splice-util-token-standard-wallet-test-daml`,
+    `splice-util-token-standard-wallet-test-daml`,
+    `splice-util-batched-markers-daml`,
+    `splice-util-batched-markers-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -651,6 +654,14 @@ lazy val `splice-featured-app-api-v1-daml` =
       BuildCommon.damlSettings
     )
 
+lazy val `splice-featured-app-api-v2-daml` =
+  project
+    .in(file("daml/splice-api-featured-app-v2"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+
 lazy val `splice-amulet-daml` =
   project
     .in(file("daml/splice-amulet"))
@@ -665,7 +676,8 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-amulet-test-daml` =
@@ -768,7 +780,8 @@ lazy val `splice-util-featured-app-proxies-daml` =
         (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-token-standard-wallet-daml` =
@@ -781,7 +794,8 @@ lazy val `splice-util-token-standard-wallet-daml` =
         (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
 
 lazy val `splice-util-featured-app-proxies-test-daml` =
@@ -805,6 +819,28 @@ lazy val `splice-util-token-standard-wallet-test-daml` =
       Compile / damlDependencies :=
         (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+
+lazy val `splice-util-batched-markers-daml` =
+  project
+    .in(file("daml/splice-util-batched-markers"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `splice-util-batched-markers-test-daml` =
+  project
+    .in(file("daml/splice-util-batched-markers-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`splice-util-batched-markers-daml` / Compile / damlBuild).value ++
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
 
@@ -885,6 +921,8 @@ lazy val `apps-common` =
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
       `splice-featured-app-api-v1-daml`,
+      `splice-featured-app-api-v2-daml`,
+      `splice-util-batched-markers-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -1963,7 +2001,8 @@ updateTestConfigForParallelRuns := {
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def isEnterpriseIntegrationTest(name: String): Boolean = name.contains("Enterprise")
-
+  def isPermissionedSynchronizerTest(name: String): Boolean =
+    name.contains("PermissionedSynchronizer")
   def isIntegrationTest(name: String): Boolean =
     name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
       "IntegrationTest"
@@ -2024,8 +2063,8 @@ updateTestConfigForParallelRuns := {
     name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
-  def isRecordTimeToleranceTest(name: String): Boolean =
-    name contains "RecordTimeToleranceTimeBasedIntegrationTest"
+  def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
+    name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
   def isLSUTest(name: String): Boolean =
     name contains "LogicalSynchronizerUpgradeIntegrationTest"
 
@@ -2043,6 +2082,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "permissioned synchronizer tests",
+      "test-full-class-names-permissioned.log",
+      (t: String) => isPermissionedSynchronizerTest(t),
+    ),
     (
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",
@@ -2159,9 +2203,9 @@ updateTestConfigForParallelRuns := {
       (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t),
     ),
     (
-      "tests to check record time tolerance",
-      "test-full-class-names-record-time-tolerance.log",
-      (t: String) => isRecordTimeToleranceTest(t),
+      "tests to check dynamic synchronizer parameter reconciliation",
+      "test-full-class-names-dynamic-synchronizer-params-reconciliation.log",
+      (t: String) => isDynamicSynchronizerParamsReconciliationTest(t),
     ),
     (
       "tests with simulated time",

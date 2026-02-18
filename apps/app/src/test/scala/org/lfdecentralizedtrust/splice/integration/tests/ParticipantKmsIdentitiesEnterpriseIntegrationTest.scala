@@ -11,13 +11,13 @@ import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 
 import java.nio.file.{Path, Paths}
 
 class ParticipantKmsIdentitiesEnterpriseIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with StandaloneCanton {
 
   override protected def runEventHistorySanityCheck: Boolean = false

@@ -19,7 +19,7 @@ import scala.jdk.CollectionConverters.*
 import scala.sys.process.*
 
 class DockerComposeValidatorFrontendIntegrationTest
-    extends FrontendIntegrationTest("frontend")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("frontend")
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with AnsFrontendTestUtil {

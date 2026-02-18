@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as wal
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.SplitwellAppClientReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import SpliceTests.BracketSynchronous.*
 import org.lfdecentralizedtrust.splice.util.{MultiDomainTestUtil, SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
@@ -20,7 +20,7 @@ import scala.util.Try
 // TODO(#2703) Reenable or delete
 @Ignore
 class SplitwellUpgradeIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with MultiDomainTestUtil
     with SplitwellTestUtil
     with WalletTestUtil {

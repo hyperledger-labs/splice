@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
@@ -29,7 +29,9 @@ import monocle.macros.syntax.lens.*
 import java.nio.file.{Files, Path, Paths}
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
-class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with StandaloneCanton {
+class ParticipantPlaintextIdentitiesIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with StandaloneCanton {
 
   val svNodePath: File = testResourcesPath / "local-sv-node"
   val validatorNodePath: File = testResourcesPath / "local-validator-node"

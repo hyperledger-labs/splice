@@ -3,13 +3,15 @@ package org.lfdecentralizedtrust.splice.integration.tests.connectivity
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.console.CommandFailure
 import monocle.macros.syntax.lens.*
 
-class WalletAppConnectivityIntegrationTest extends IntegrationTest with WalletTestUtil {
+class WalletAppConnectivityIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with WalletTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

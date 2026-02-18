@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.openqa.selenium.By
 
-trait VotesFrontendTestUtil { self: FrontendIntegrationTestWithSharedEnvironment =>
+trait VotesFrontendTestUtil { self: FrontendIntegrationTest =>
 
   def getAllVoteRows(tableBodyId: String)(implicit webDriver: WebDriverType) = {
     def tableBody = find(id(tableBodyId))

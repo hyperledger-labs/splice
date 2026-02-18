@@ -3,14 +3,14 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
 
 class WalletSurviveCantonRestartIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ProcessTestUtil
     with StandaloneCanton
     with WalletTestUtil {

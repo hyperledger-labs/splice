@@ -359,4 +359,24 @@ describe('Set Amulet Config Rules Form', () => {
     await user.click(jsonDiffs);
     expect(screen.queryByTestId('config-diffs-display')).toBeInTheDocument();
   });
+
+  test('should have decentralized synchronizer fields disabled', async () => {
+    render(
+      <Wrapper>
+        <SetAmuletConfigRulesForm />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      const activeSyncInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerActiveSynchronizer'
+      );
+      expect(activeSyncInput).toBeDisabled();
+
+      const requiredSyncInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerRequiredSynchronizers1'
+      );
+      expect(requiredSyncInput).toBeDisabled();
+    });
+  });
 });

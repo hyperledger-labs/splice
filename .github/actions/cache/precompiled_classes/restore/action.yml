@@ -4,6 +4,9 @@ inputs:
   cache_version:
     description: "Version of the cache"
     required: true
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
 outputs:
   cache_hit:
     description: "Cache hit"
@@ -17,10 +20,25 @@ runs:
       uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: /tmp/classes
-        key: classes-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}
+        key: classes-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/project/Dependencies.scala', inputs.splice_root), format('{0}/project/CantonDependencies.scala', inputs.splice_root), format('{0}/project/Houserules.scala', inputs.splice_root), format('{0}/project/plugins.sbt', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/openapi-cache-key.txt', inputs.splice_root)) }} rev:${{ github.sha }}
         restore-keys: |
-          classes-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }}
-          classes-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }}
+          classes-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/project/Dependencies.scala', inputs.splice_root), format('{0}/project/CantonDependencies.scala', inputs.splice_root), format('{0}/project/Houserules.scala', inputs.splice_root), format('{0}/project/plugins.sbt', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/openapi-cache-key.txt', inputs.splice_root)) }}
+          classes-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/project/Dependencies.scala', inputs.splice_root), format('{0}/project/CantonDependencies.scala', inputs.splice_root), format('{0}/project/Houserules.scala', inputs.splice_root), format('{0}/project/plugins.sbt', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/openapi-cache-key.txt', inputs.splice_root)) }}
     - name: Extract precompiled classes
       shell: bash
-      run: ./.github/actions/scripts/extract_precompiled_classes.sh
+      run: |
+        set -euo pipefail
+        if [[ -e /tmp/classes/classes.tar.gz ]]; then
+          pushd ${{ inputs.splice_root }}
+          tar --use-compress-program=pigz -xf /tmp/classes/classes.tar.gz
+          # For some reason, the reset below may change file modification times stamps, if we don't run `git status`.
+          git status
+          # Reset changes to files under version control.
+          git reset --hard
+          # Delete untracked files, except for ignored files.
+          git clean -fd
+          echo "Finished restoring the pre-compiled cache files"
+          popd
+        else
+          echo "No precompiled classes found. Skipping..."
+        fi

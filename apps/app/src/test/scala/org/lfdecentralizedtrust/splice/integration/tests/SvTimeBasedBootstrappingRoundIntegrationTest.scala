@@ -6,8 +6,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 import java.time.Duration as JavaDuration
 
-class SvTimeBasedBootstrappingRoundIntegrationTest
-    extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment {
+class SvTimeBasedBootstrappingRoundIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition

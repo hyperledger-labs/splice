@@ -15,8 +15,9 @@ import org.openqa.selenium.WebDriver
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceWallet_0_1_16
 class WalletFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil
@@ -231,16 +232,11 @@ class WalletFrontendIntegrationTest
 
         // Onboard three external parties as beneficiaries
         val beneficiary1Onboarding =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary1"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary1Onboarding)
-
+          onboardAndSetupExternalParty(aliceValidatorBackend, Some("beneficiary1"))
         val beneficiary2Onboarding =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary2"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary2Onboarding)
-
+          onboardAndSetupExternalParty(aliceValidatorBackend, Some("beneficiary2"))
         val beneficiary3Onboarding =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary3"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary3Onboarding)
+          onboardAndSetupExternalParty(aliceValidatorBackend, Some("beneficiary3"))
 
         // 2. Verify empty initial state via API
         clue("Check that no minting delegation proposals exist initially") {
@@ -337,11 +333,11 @@ class WalletFrontendIntegrationTest
             },
           )
 
-          // 7. Withdraw one delegation via UI
+          // 7. Cancel one delegation via UI
           actAndCheck(
-            "Alice clicks Withdraw on the first delegation and confirms", {
-              clickByCssSelector(".delegation-row .delegation-withdraw")
-              eventuallyClickOn(id("withdraw-delegation-confirmation-dialog-accept-button"))
+            "Alice clicks Cancel on the first delegation and confirms", {
+              clickByCssSelector(".delegation-row .delegation-cancel")
+              eventuallyClickOn(id("cancel-delegation-confirmation-dialog-accept-button"))
             },
           )(
             "1 proposal remains, 1 delegation remains",

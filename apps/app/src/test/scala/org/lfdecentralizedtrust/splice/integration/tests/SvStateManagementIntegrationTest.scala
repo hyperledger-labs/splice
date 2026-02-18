@@ -37,6 +37,8 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 
+import com.digitalasset.canton.console.CommandFailure
+
 import java.util.Optional
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.jdk.CollectionConverters.MapHasAsScala
@@ -583,6 +585,38 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       }
     }
 
+  }
+
+  "getPartyToParticipant returns the participant for a known party" in { implicit env =>
+    initDso()
+    val sv1Party = sv1Backend.getDsoInfo().svParty.toProtoPrimitive
+    val partyComponents = sv1Party.split("::", 2)
+    val sv1PartyPrefix = s"${partyComponents(0)}::${partyComponents(1).take(1)}"
+
+    clue("looking up a known party returns a non-empty participant id") {
+      val response = sv1Backend.getPartyToParticipant(sv1Party)
+      response.participantId should not be empty
+    }
+
+    clue("looking up a prefix of a known party fails with a 404") {
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        a[CommandFailure] should be thrownBy {
+          sv1Backend.getPartyToParticipant(sv1PartyPrefix)
+        },
+        lines => forAll(lines)(_.errorMessage should include("HTTP 404")),
+      )
+    }
+
+    clue("looking up an unknown party fails with a 404") {
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        a[CommandFailure] should be thrownBy {
+          sv1Backend.getPartyToParticipant(
+            "wrong-party-id::123321321"
+          )
+        },
+        lines => forAll(lines)(_.errorMessage should include("HTTP 404")),
+      )
+    }
   }
 
   "Vote requests expire" in { implicit env =>

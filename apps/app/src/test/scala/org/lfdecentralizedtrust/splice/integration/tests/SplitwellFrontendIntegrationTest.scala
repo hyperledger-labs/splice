@@ -12,7 +12,7 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration.DurationInt
 
 class SplitwellFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment(
+    extends FrontendIntegrationTest(
       "aliceSplitwell",
       "bobSplitwell",
       "charlieSplitwell",

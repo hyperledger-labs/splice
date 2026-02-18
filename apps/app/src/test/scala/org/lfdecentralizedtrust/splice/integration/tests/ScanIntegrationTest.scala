@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
@@ -45,7 +45,10 @@ import scala.util.{Success, Try}
 
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
-class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
+class ScanIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with WalletTestUtil
+    with TimeTestUtil {
   private val defaultPageSize = Limit.DefaultMaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -102,7 +105,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       Try(sv1ScanBackend.getAcsSnapshot(dsoParty, None)).isFailure should be(true),
       _.warningMessage should include("resulted in a timeout after 1 millisecond"),
       _.errorMessage should include(
-        "Command failed, message: The server is taking too long to respond to the request"
+        "Command failed, message: The server is taking too long to respond to the (GET) request"
       ),
     )
   }

@@ -4,7 +4,7 @@ import com.digitalasset.canton.SynchronizerAlias
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.splitwell.automation.AcceptedAppPaymentRequestsTrigger
 import org.lfdecentralizedtrust.splice.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 
@@ -12,7 +12,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 class SplitwellIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with SplitwellTestUtil
     with WalletTestUtil
     with TriggerTestUtil {

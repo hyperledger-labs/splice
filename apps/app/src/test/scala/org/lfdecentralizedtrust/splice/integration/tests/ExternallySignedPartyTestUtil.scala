@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 trait ExternallySignedPartyTestUtil extends TestCommon {
 
@@ -143,6 +144,25 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
     acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
   }
 
+  protected def onboardAndSetupExternalParty(
+      validatorBackend: ValidatorAppBackendReference,
+      partyHint: Option[String] = None,
+  )(implicit env: SpliceTestConsoleEnvironment): OnboardingResult = {
+    val onboarding = onboardExternalParty(validatorBackend, partyHint)
+    eventuallySucceeds() {
+      // While there is a server-side retry on this, it is not always sufficiently long in our tests,
+      // so we wrap it here in an eventuallySucceeds()
+      try {
+        createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
+      } catch {
+        case NonFatal(_) =>
+          // if this check passes, we're done, stop retrying
+          checkExternalPartyExists(validatorBackend, onboarding.party)
+      }
+    }
+    onboarding
+  }
+
   protected def createExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
@@ -234,13 +254,18 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         val (transferPreapprovalCid, updateId) = submitResult
         transferPreapprovalCid.contractId should not be empty
         updateId should not be empty
-        provider.lookupTransferPreapprovalByParty(externalPartyOnboarding.party) should not be empty
-        provider.scanProxy.lookupTransferPreapprovalByParty(
-          externalPartyOnboarding.party
-        ) should not be empty
+        checkExternalPartyExists(provider, externalPartyOnboarding.party)
         submitResult
       },
     )
     result
+  }
+
+  private def checkExternalPartyExists(
+      provider: ValidatorAppBackendReference,
+      externalParty: PartyId,
+  ) = {
+    provider.lookupTransferPreapprovalByParty(externalParty) should not be empty
+    provider.scanProxy.lookupTransferPreapprovalByParty(externalParty) should not be empty
   }
 }

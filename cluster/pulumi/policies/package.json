@@ -2,16 +2,8 @@
   "name": "@lfdecentralizedtrust/splice-pulumi-policy",
   "main": "src/index.ts",
   "dependencies": {
-    "@pulumi/kubernetes-cert-manager": "0.2.0",
-    "@pulumiverse/grafana": "0.16.3",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
-    "@pulumi/gcp": "^9.10.0",
     "@pulumi/policy": "1.20.0"
-  },
-  "overrides": {
-    "@pulumi/kubernetes-cert-manager": {
-      "@pulumi/kubernetes": "4.21.1"
-    }
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

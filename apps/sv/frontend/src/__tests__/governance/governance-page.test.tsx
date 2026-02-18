@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { SvConfigProvider } from '../../utils';
 import userEvent from '@testing-library/user-event';
 import App from '../../App';
+import { navigateToGovernancePage } from '../helpers';
 
 type UserEvent = ReturnType<typeof userEvent.setup>;
 
@@ -24,17 +25,13 @@ async function login(user: UserEvent) {
   const input = screen.getByRole('textbox');
   await user.type(input, 'sv1');
 
-  const button = screen.getByRole('button', { name: 'Log In' });
-  user.click(button);
+  const button = screen.queryByRole('button', { name: 'Log In' });
+  if (button) {
+    await user.click(button);
+  }
 }
 
-async function navigateToGovernancePage(user: UserEvent) {
-  expect(await screen.findByTestId('navlink-governance-beta')).toBeInTheDocument();
-  await user.click(screen.getByText('Governance'));
-}
-
-// Skipping this test until we switch to the new UI
-describe.skip('Governance Page', () => {
+describe('Governance Page', () => {
   test('Login and navigate to Governance Page', async () => {
     const user = userEvent.setup();
 
@@ -119,7 +116,7 @@ describe.skip('Governance Page', () => {
   test('proposal details page should render all details', async () => {
     const user = userEvent.setup();
 
-    render(<GovernanceWithConfig />);
+    await login(user);
 
     await navigateToGovernancePage(user);
 
@@ -139,7 +136,7 @@ describe.skip('Governance Page', () => {
     const summary = screen.getByTestId('proposal-details-summary-value');
     expect(summary).toBeInTheDocument();
 
-    const url = screen.getByTestId('proposal-details-url-value');
+    const url = screen.getByTestId('proposal-details-url');
     expect(url).toBeInTheDocument();
 
     const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
@@ -155,10 +152,20 @@ describe.skip('Governance Page', () => {
     );
     expect(votingClosesIso).toBeInTheDocument();
 
-    const voteTakesEffectIso = within(votingInformationSection).getByTestId(
+    const voteTakesEffectDuration = within(votingInformationSection).getByTestId(
+      'proposal-details-vote-takes-effect-duration'
+    );
+    expect(voteTakesEffectDuration).toBeInTheDocument();
+
+    const voteTakesEffectIso = within(votingInformationSection).queryByTestId(
       'proposal-details-vote-takes-effect-value'
     );
-    expect(voteTakesEffectIso).toBeInTheDocument();
+
+    if (voteTakesEffectDuration.textContent?.trim() === 'Threshold') {
+      expect(voteTakesEffectIso).not.toBeInTheDocument();
+    } else {
+      expect(voteTakesEffectIso).toBeInTheDocument();
+    }
 
     const status = screen.getByTestId('proposal-details-status-value');
     expect(status).toBeInTheDocument();
@@ -169,9 +176,15 @@ describe.skip('Governance Page', () => {
     const votes = within(votesSection).getAllByTestId('proposal-details-vote');
     expect(votes.length).toBeGreaterThan(0);
 
-    expect(screen.getByTestId('proposal-details-your-vote-section')).toBeInTheDocument();
-    expect(screen.getByTestId('proposal-details-your-vote-input')).toBeInTheDocument();
-    expect(screen.getByTestId('proposal-details-your-vote-accept')).toBeInTheDocument();
-    expect(screen.getByTestId('proposal-details-your-vote-reject')).toBeInTheDocument();
+    const editButton = screen.queryByTestId('your-vote-edit-button');
+    if (editButton) {
+      await user.click(editButton);
+    }
+
+    expect(screen.getByTestId('your-vote-form')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-url-input')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-reason-input')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-accept')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-reject')).toBeInTheDocument();
   });
 });

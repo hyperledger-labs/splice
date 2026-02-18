@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
@@ -31,7 +31,7 @@ import org.slf4j.event.Level
 import java.nio.file.{Files, Path, Paths}
 
 trait ValidatorReonboardingIntegrationTestBase
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ProcessTestUtil
     with StandaloneCanton
     with ExternallySignedPartyTestUtil

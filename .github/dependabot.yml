@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/cluster/pulumi"
+    schedule:
+      interval: "daily"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
+    labels:
+      - "static"
+    commit-message:
+      prefix: "[ci] "
+  - package-ecosystem: "npm"
+    directory: "/load-tester"
+    schedule:
+      interval: "daily"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
+    labels:
+      - "static"
+    commit-message:
+      prefix: "[ci] "
+  - package-ecosystem: "github-actions"
+    directory: "/" # For GitHub Actions '/' means .github/workflows/**/*.{yaml,yml}
+    # Check for updates to GitHub Actions every week
+    schedule:
+      interval: "weekly"
+    labels:
+      - "static"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
+    commit-message:
+      prefix: "[ci] "

@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 import com.digitalasset.canton.admin.api.client.data.DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters
 import com.digitalasset.canton.time.{PositiveFiniteDuration, PositiveSeconds}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
@@ -30,6 +29,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,8 +42,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     val participantAdminConnection: ParticipantAdminConnection,
-    preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration,
-    mediatorDeduplicationTimeout: NonNegativeFiniteDuration,
+    config: SvAppBackendConfig,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -52,7 +51,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
     with SyncConnectionStalenessCheck {
 
   private val internalPreparationTimeRecordTimeTolerance =
-    InternalNonNegativeFiniteDuration.fromConfig(preparationTimeRecordTimeTolerance)
+    InternalNonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance)
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -87,6 +86,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         amuletConfig,
         decentralizedSynchronizerConfig,
         preparationTimeRecordTimeToleranceTarget,
+        config.enableFreeConfirmationResponses,
       )
     } yield
       if (state.mapping.parameters != updatedConfig)
@@ -109,17 +109,19 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       stateHistory: Seq[TopologyResult[SynchronizerParametersState]],
   )(implicit tc: TraceContext): Option[InternalNonNegativeFiniteDuration] = {
     val requiredMinMediatorDeduplicationTimeout =
-      InternalNonNegativeFiniteDuration.fromConfig(preparationTimeRecordTimeTolerance * 2)
+      InternalNonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance * 2)
     val currentParameters = currentState.mapping.parameters
     if (currentParameters.mediatorDeduplicationTimeout < requiredMinMediatorDeduplicationTimeout) {
       logger.info(
-        s"Current mediator deduplication timeout is ${currentParameters.mediatorDeduplicationTimeout}, to change to preparationTimeRecordTimeTolerance $preparationTimeRecordTimeTolerance it must be at least $requiredMinMediatorDeduplicationTimeout"
+        s"Current mediator deduplication timeout is ${currentParameters.mediatorDeduplicationTimeout}, to change to preparationTimeRecordTimeTolerance $config.preparationTimeRecordTimeTolerance it must be at least $requiredMinMediatorDeduplicationTimeout"
       )
       None
     } else {
       val incompatibleTransactions = stateHistory.filterNot(tx =>
         ConsoleDynamicSynchronizerParameters(tx.mapping.parameters)
-          .compatibleWithNewPreparationTimeRecordTimeTolerance(preparationTimeRecordTimeTolerance)
+          .compatibleWithNewPreparationTimeRecordTimeTolerance(
+            config.preparationTimeRecordTimeTolerance
+          )
       )
       val lastValidUntil: Instant = incompatibleTransactions
         .map(_.base.validUntil)
@@ -131,7 +133,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         Some(internalPreparationTimeRecordTimeTolerance)
       } else {
         logger.info(
-          s"preparationTimeRecordTimeTolerance can only be changed to $preparationTimeRecordTimeTolerance at $minSafeChangePoint, current domain time is $domainTime"
+          s"preparationTimeRecordTimeTolerance can only be changed to $config.preparationTimeRecordTimeTolerance at $minSafeChangePoint, current domain time is $domainTime"
         )
         None
       }
@@ -150,6 +152,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           task.amuletConfig,
           task.synchronizerConfig,
           task.preparationTimeRecordTimeToleranceTarget,
+          config.enableFreeConfirmationResponses,
         ),
         forceChanges =
           if (task.preparationTimeRecordTimeToleranceTarget.isDefined)
@@ -178,6 +181,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       amuletConfig: AmuletConfig[USD],
       synchronizerConfig: Option[SynchronizerConfig],
       preparationTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
+      enableFreeConfirmationResponses: Boolean,
   ): DynamicSynchronizerParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
@@ -192,6 +196,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(
             domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
           ),
+          freeConfirmationResponses = enableFreeConfirmationResponses,
         )
       },
       reconciliationInterval = synchronizerConfig
@@ -204,7 +209,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         existingDomainParameters.preparationTimeRecordTimeTolerance
       ),
       mediatorDeduplicationTimeout =
-        InternalNonNegativeFiniteDuration.fromConfig(mediatorDeduplicationTimeout),
+        InternalNonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
     )
   }
 }

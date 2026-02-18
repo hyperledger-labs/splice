@@ -16,7 +16,7 @@ description: |
   as Daml script code can currently not be shared via .dars across SDKs. The dependencies
   are normal .dar files and can be shared by copying the .dars.
   (TODO(#594): remove this limitation)
-version: 1.0.9
+version: 1.0.10
 source: daml
 dependencies:
   - daml-prim

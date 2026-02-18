@@ -199,11 +199,13 @@ final class HttpErrorHandler(
   }
 
   def timeoutHandler(timeout: Duration, request: HttpRequest)(implicit tc: TraceContext) = {
-    logger.warn(s"Request to ${request.uri} resulted in a timeout after $timeout.")
+    logger.warn(
+      s"Request to ${request.uri} (${request.method.value}) resulted in a timeout after $timeout."
+    )
     val contentType = MediaTypes.`application/json`
     val errorResponse =
       d0.ErrorResponse(
-        s"The server is taking too long to respond to the request at ${request.uri}"
+        s"The server is taking too long to respond to the (${request.method.value}) request at ${request.uri}"
       )
     val responseEntity = HttpEntity(
       contentType = contentType,

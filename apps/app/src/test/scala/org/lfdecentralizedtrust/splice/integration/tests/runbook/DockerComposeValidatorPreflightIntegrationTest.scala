@@ -1,14 +1,14 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 
 import scala.concurrent.duration.*
 import scala.sys.process.*
 
 class DockerComposeValidatorPreflightIntegrationTest
-    extends FrontendIntegrationTest("alice-selfhosted")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("alice-selfhosted")
     with FrontendLoginUtil
     with WalletFrontendTestUtil {
   override lazy val resetRequiredTopologyState: Boolean = false

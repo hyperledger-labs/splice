@@ -79,6 +79,11 @@ type BasicValidatorConfig = {
   logAsync?: boolean;
   resources?: K8sResourceSchema;
   version: CnChartVersion;
+  synchronizer?: {
+    // note that this doesn't currently cover all use cases
+    connectionType: string;
+    url: string;
+  };
 };
 
 export type ValidatorInstallConfig = BasicValidatorConfig & {
@@ -181,6 +186,8 @@ export async function installValidatorApp(
       migration: config.migration,
       additionalUsers: config.additionalUsers || [],
       additionalEnvVars: config.additionalEnvVars || undefined,
+      // TODO(tech-debt) there should be a way to pass arbitrary new values here via the `config`
+      synchronizer: config.synchronizer,
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
       decentralizedSynchronizerUrl: config.svValidator

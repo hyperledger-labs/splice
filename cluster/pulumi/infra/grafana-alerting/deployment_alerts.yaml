@@ -61,7 +61,7 @@ groups:
           panelId: 11
           noDataState: OK
           execErrState: OK
-          for: 5m
+          for: $PENDING_PERIOD_IN_MINUTESm
           annotations:
             __dashboardUid__: QP_wDqDnz
             __panelId__: "11"
@@ -94,7 +94,7 @@ groups:
           panelId: 27
           noDataState: OK
           execErrState: Alerting
-          for: 5m
+          for: $PENDING_PERIOD_IN_MINUTESm
           annotations:
             __dashboardUid__: QP_wDqDnz
             __panelId__: "27"

@@ -15,7 +15,7 @@ import { test, expect, describe } from 'vitest';
 import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
-import { changeAction } from './helpers';
+import { changeAction, navigateToLegacyGovernancePage } from './helpers';
 
 const AppWithConfig = () => {
   return (
@@ -48,14 +48,9 @@ describe('SV can see AmuletRules config diffs', () => {
   const action = 'CRARC_SetConfig';
 
   test('while creating a vote request.', async () => {
-    const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
+    await navigateToLegacyGovernancePage();
 
     await changeAction(action);
 
@@ -114,11 +109,7 @@ describe('SV can see DsoRules config diffs', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
+    await navigateToLegacyGovernancePage();
 
     await changeAction(action);
 
@@ -198,11 +189,7 @@ async function goToGovernanceTabAndClickOnAction(
   user: ReturnType<typeof userEvent.setup>,
   index: number = 0
 ): Promise<void> {
-  expect(await screen.findByText('Governance')).toBeDefined();
-  await user.click(screen.getByText('Governance'));
-
-  expect(await screen.findByText('Vote Requests')).toBeDefined();
-  expect(await screen.findByText('Governance')).toBeDefined();
+  await navigateToLegacyGovernancePage();
 
   const button = await screen.findByText(tableType);
   expect(button).toBeDefined();

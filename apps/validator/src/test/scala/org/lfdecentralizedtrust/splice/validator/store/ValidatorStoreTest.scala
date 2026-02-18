@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
-import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
@@ -32,7 +32,7 @@ import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
 import java.time.Instant
 import scala.concurrent.Future
 
-abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
+abstract class ValidatorStoreTest extends StoreTestBase with HasExecutionContext {
 
   "ValidatorStore" should {
 

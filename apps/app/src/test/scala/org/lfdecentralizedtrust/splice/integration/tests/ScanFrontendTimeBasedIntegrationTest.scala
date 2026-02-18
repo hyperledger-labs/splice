@@ -26,7 +26,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
+    extends FrontendIntegrationTest("scan-ui")
     with AmuletConfigUtil
     with WalletTestUtil
     with WalletFrontendTestUtil

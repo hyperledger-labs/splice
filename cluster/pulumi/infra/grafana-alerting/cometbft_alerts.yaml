@@ -104,13 +104,13 @@ groups:
               maxDataPoints: 43200
               refId: threshold
               type: math
-        dashboardUid: UJyurCTWz
+        dashboardUid: UJyurCTWy
         panelId: 48
         noDataState: $NODATA
         execErrState: OK
         for: 15m
         annotations:
-          __dashboardUid__: UJyurCTWz
+          __dashboardUid__: UJyurCTWy
           __panelId__: "48"
           description: We're missing {{ index $values "invalid_voting_power" }} voting power from a total of {{ index $values "total_voting_power" }}. We can tolerate f = {{ index $values "acceptable_invalid_voting_power" }}.
           runbook_url: ""
@@ -231,13 +231,13 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        dashboardUid: UJyurCTWz
+        dashboardUid: UJyurCTWy
         panelId: 66
         noDataState: $NODATA
         execErrState: OK
         for: 10m
         annotations:
-          __dashboardUid__: UJyurCTWz
+          __dashboardUid__: UJyurCTWy
           __panelId__: "66"
           description: Current height {{ index $values "latest_height" }} on node {{ $labels.service }} in {{ $labels.namespace }}
           runbook_url: ""
@@ -421,13 +421,13 @@ groups:
               reducer: last
               refId: latest_block_height
               type: reduce
-        dashboardUid: UJyurCTWz
+        dashboardUid: UJyurCTWy
         panelId: 66
         noDataState: $NODATA
         execErrState: OK
         for: 5m
         annotations:
-          __dashboardUid__: UJyurCTWz
+          __dashboardUid__: UJyurCTWy
           __panelId__: "66"
           severity: critical
           description: |-
@@ -517,13 +517,13 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        dashboardUid: UJyurCTWz
+        dashboardUid: UJyurCTWy
         panelId: 68
         noDataState: $NODATA
         execErrState: OK
         for: 120m
         annotations:
-          __dashboardUid__: UJyurCTWz
+          __dashboardUid__: UJyurCTWy
           __panelId__: "68"
           description: This alert triggers when the expected maximum hourly-averaged block rate threshold is reached.
           runbook_url: ""

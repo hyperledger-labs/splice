@@ -5,7 +5,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.amuletconversionratefeed.AmuletConversionRateFeed
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.config.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.FollowAmuletConversionRateFeedTrigger
 import org.lfdecentralizedtrust.splice.util.{
@@ -18,7 +18,7 @@ import scala.jdk.OptionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmuletNameService_0_1_15
 class FollowAmuletConversionRateFeedTimeBasedIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with SvTestUtil {

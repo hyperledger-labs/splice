@@ -123,8 +123,8 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
 
         return createSvRewardWeightProposal(
           svToUpdate,
-          currentWeight,
-          dsoAction.value.newRewardWeight
+          formatBasisPoints(currentWeight),
+          formatBasisPoints(dsoAction.value.newRewardWeight)
         );
       }
       case 'SRARC_CreateUnallocatedUnclaimedActivityRecord':
@@ -259,6 +259,14 @@ export function configFormDataToConfigChanges(
   return onlyChangedFields
     ? changes.filter(change => change.currentValue !== change.newValue)
     : changes;
+}
+
+export function formatBasisPoints(value: string): string {
+  if (!value) return '';
+  const padded = value.padStart(5, '0');
+  const integerPart = padded.slice(0, -4);
+  const decimalPart = padded.slice(-4);
+  return `${integerPart}_${decimalPart}`;
 }
 
 export function getSvRewardWeight(svs: [string, SvInfo][], svPartyId: string): string {

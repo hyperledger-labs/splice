@@ -360,6 +360,31 @@ object HttpSvOperatorAppClient {
     }
   }
 
+  case class GetPartyToParticipant(partyId: String)
+      extends BaseCommand[
+        http.GetPartyToParticipantResponse,
+        definitions.GetPartyToParticipantResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetPartyToParticipantResponse] =
+      client.getPartyToParticipant(
+        partyId = partyId,
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.GetPartyToParticipantResponse,
+      Either[String, definitions.GetPartyToParticipantResponse],
+    ] = { case http.GetPartyToParticipantResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
   case class GetCometBftNodeDump()
       extends BaseCommand[
         http.GetCometBftNodeDebugDumpResponse,

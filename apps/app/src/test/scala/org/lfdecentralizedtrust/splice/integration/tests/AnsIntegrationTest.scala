@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
@@ -35,7 +35,10 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
+class AnsIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with WalletTestUtil
+    with TriggerTestUtil {
 
   import WalletTestUtil.*
 

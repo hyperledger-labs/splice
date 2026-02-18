@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 
 class WalletNoDevNetFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil {

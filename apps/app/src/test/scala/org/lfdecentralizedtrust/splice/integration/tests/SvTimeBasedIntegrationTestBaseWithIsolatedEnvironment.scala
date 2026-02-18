@@ -8,8 +8,8 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithIsolatedEnvironment,
   IntegrationTest,
-  IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
@@ -104,7 +104,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with SvTimeBasedIntegrationTestUtil {
   protected val baseEnvironmentDefinition: EnvironmentDefinition = EnvironmentDefinition
     .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
@@ -128,8 +128,8 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     baseEnvironmentDefinition
 }
 
-abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
-    extends IntegrationTestWithSharedEnvironment
+abstract class SvTimeBasedIntegrationTestBase
+    extends IntegrationTest
     with SvTimeBasedIntegrationTestUtil {
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition

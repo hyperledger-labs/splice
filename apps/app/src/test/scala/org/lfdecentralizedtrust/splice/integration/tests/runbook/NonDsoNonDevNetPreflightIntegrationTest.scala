@@ -3,14 +3,14 @@ package org.lfdecentralizedtrust.splice.integration.tests.runbook
 import org.lfdecentralizedtrust.splice.config.IdentityDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.DataExportTestUtil
 
 // Integration test for everything from a core deployment that is not part of an SV node
 final class NonDsoNonDevNetPreflightIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with DataExportTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false

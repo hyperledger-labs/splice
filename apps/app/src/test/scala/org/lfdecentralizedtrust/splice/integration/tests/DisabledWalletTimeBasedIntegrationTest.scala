@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   UnclaimedReward,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultIssuanceCurve
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
@@ -17,7 +17,7 @@ import org.slf4j.event.Level
 import scala.concurrent.duration.DurationInt
 
 class DisabledWalletTimeBasedIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with SvTestUtil {

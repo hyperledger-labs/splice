@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
@@ -9,7 +9,7 @@ import org.slf4j.event.Level
 import scala.concurrent.duration.DurationInt
 
 class ScanConnectionIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with AmuletConfigUtil
     with WalletTestUtil {
 

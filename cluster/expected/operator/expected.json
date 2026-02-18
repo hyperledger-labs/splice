@@ -203,6 +203,7 @@
             "name": "splice-node-deployment"
           }
         },
+        "retryMaxBackoffDurationSeconds": 600,
         "retryOnUpdateConflict": true,
         "serviceAccountName": "deployment-sa",
         "stack": "organization/deployment/deployment.mock",
@@ -259,7 +260,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "image": "pulumi/pulumi:0.0.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -644,7 +645,7 @@
           }
         ]
       },
-      "version": "2.2.0"
+      "version": "2.4.1"
     },
     "name": "pulumi-kubernetes-operator",
     "provider": "",
@@ -763,5 +764,15 @@
     "name": "splice-node-deployment",
     "provider": "",
     "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "bash SPLICE_ROOT/cluster/pulumi/operator/pulumi-operator-crd-update.sh 2.4.1"
+    },
+    "name": "update-pulumi-operator-crd-2.4.1",
+    "provider": "",
+    "type": "command:local:Command"
   }
 ]

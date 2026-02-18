@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   TransferTxLogEntry,
@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithSynchronizerFeesIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SynchronizerFeesTestUtil

@@ -10,7 +10,7 @@ import monocle.macros.syntax.lens.*
 import java.net.URI
 
 class AnsAuth0FrontendIntegrationTest
-    extends FrontendIntegrationTest("alice")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("alice")
     with WalletTestUtil
     with AnsFrontendTestUtil
     with FrontendLoginUtil {
