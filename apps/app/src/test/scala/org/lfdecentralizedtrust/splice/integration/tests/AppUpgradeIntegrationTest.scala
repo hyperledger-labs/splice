@@ -148,7 +148,7 @@ class AppUpgradeIntegrationTest
             spliceProcs.startBundledSplice(conf, inputConfig)
           }
 
-          eventually(10.minute) {
+          eventually(5.minute) {
             Seq("sv1", "sv2", "sv3").foreach(sv => {
               sv_client(s"${sv}Client").httpHealth.successOption.exists(_.active) should be(
                 true
