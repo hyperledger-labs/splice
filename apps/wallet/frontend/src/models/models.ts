@@ -2,12 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
-import {
-  AmuletPosition,
-  ArchivedDevelopmentFundCouponStatusEnum,
-} from '@lfdecentralizedtrust/wallet-openapi';
-
-export type { ArchivedDevelopmentFundCouponStatusEnum };
+import { AmuletPosition } from '@lfdecentralizedtrust/wallet-openapi';
 
 import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';
 import {
@@ -148,6 +143,11 @@ export interface DevelopmentFundCoupon {
   withdrawalReason?: string;
 }
 
+export type ArchivedDevelopmentFundCouponStatusEnum =
+  | 'claimed'
+  | 'withdrawn'
+  | 'rejected'
+  | 'expired';
 
 export interface CouponHistoryEvent {
   id: string;
