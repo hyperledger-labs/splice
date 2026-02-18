@@ -22,7 +22,6 @@ import io.circe.syntax.*
 import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.FiniteDuration
 import Position.*
-import com.daml.metrics.api.MetricsContext
 import org.apache.pekko.{Done, NotUsed}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
