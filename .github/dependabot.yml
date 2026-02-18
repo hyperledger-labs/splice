@@ -10,6 +10,7 @@ updates:
       - "martinflorian-da"
     labels:
       - "static"
+    prefix: "[ci] "
   - package-ecosystem: "npm"
     directory: "/load-tester"
     schedule:
@@ -20,6 +21,7 @@ updates:
       - "martinflorian-da"
     labels:
       - "static"
+    prefix: "[ci] "
   - package-ecosystem: "github-actions"
     directory: "/" # For GitHub Actions '/' means .github/workflows/**/*.{yaml,yml}
     # Check for updates to GitHub Actions every week
@@ -31,3 +33,4 @@ updates:
       - "krzysztofczyz-da"
       - "mblaze-da"
       - "martinflorian-da"
+    prefix: "[ci] "
