@@ -24,8 +24,6 @@ import scala.jdk.OptionConverters.RichOptional
 /** Vote information that can be determined from active ledger contracts */
 trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
-  def defaultLimit: Limit
-
   def listAmuletPriceVotes(
       limit: Limit = defaultLimit
   )(implicit
