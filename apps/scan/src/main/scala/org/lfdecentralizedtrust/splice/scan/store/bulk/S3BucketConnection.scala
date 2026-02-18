@@ -140,7 +140,7 @@ class S3BucketConnection(
       require(numParts.get() > 0)
       require(
         parts.size == numParts.get(),
-        "completeMultiPartUpload may not be called before all parts have finished uploading",
+        "finish may not be called before all parts have finished uploading",
       )
       for {
         id <- uploadId

@@ -25,17 +25,12 @@ class S3BucketConnectionForUnitTests(
     s3Client.getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse]).asScala.map {
       s3Stream =>
         Using.resource(new DataInputStream(s3Stream.asInputStream())) { dataInput =>
-          @tailrec
-          def readAll(acc: Vector[Array[Byte]]): Vector[Array[Byte]] = {
-            val nextObject: Try[PaddedData] = Try {
-              PaddedData.readNext(dataInput)
+          def readAll(acc: Vector[Array[Byte]]): Vector[Array[Byte]] =
+            Vector.unfold(()){ _ => 
+              Try {
+                PaddedData.readNext(dataInput)
+              }.toOption.map((_, ()))
             }
-
-            nextObject.toOption match {
-              case Some(data) => readAll(acc :+ data.data.array())
-              case None => acc
-            }
-          }
 
           def concatenate(chunks: Vector[Array[Byte]]): ByteBuffer = {
             val totalSize = chunks.map(_.length).sum
