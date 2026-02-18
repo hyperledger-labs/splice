@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ArchivedDevelopmentFundCouponStatusEnum } from '@lfdecentralizedtrust/wallet-openapi';
+import { ArchivedDevelopmentFundCouponStatusEnum } from '../models/models';
 
 export const formatDate = (date: Date): string => {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
