@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
@@ -14,7 +14,7 @@ import scala.collection.mutable
 import scala.sys.process.{Process, ProcessLogger}
 
 trait ExternallySignedTxTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with HasExecutionContext
     with ExternallySignedPartyTestUtil
     with HasTempDirectory {

@@ -67,9 +67,10 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       walletParty: PartyId,
       wallet: WalletAppClientReference,
       expectedAmountRanges: Seq[(BigDecimal, BigDecimal)],
+      holdingFee: BigDecimal = defaultHoldingFeeAmulet.bigDecimal,
   ): Unit = clue(s"checking wallet with $expectedAmountRanges") {
     val expectedRatePerRound = new feesCodegen.RatePerRound(
-      defaultHoldingFeeAmulet.bigDecimal setScale 10
+      holdingFee.bigDecimal setScale 10
     )
     eventually(10.seconds, 500.millis) {
       val amulets =
@@ -1124,6 +1125,28 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         synchronizerId = synchronizerId,
       )
     created.contractId
+  }
+
+  def rejectDevelopmentFundCoupon(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      userParty: PartyId,
+      developmentFuncCouponCid: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      reason: String,
+      synchronizerId: Option[SynchronizerId] = None,
+  ): amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId = {
+    participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq(),
+        update = developmentFuncCouponCid.exerciseDevelopmentFundCoupon_Reject(
+          reason
+        ),
+        synchronizerId = synchronizerId,
+      )
+      .exerciseResult
+      .unclaimedDevelopmentFundCouponCid
   }
 
   protected def retryCommandSubmission[T](f: => T) = {

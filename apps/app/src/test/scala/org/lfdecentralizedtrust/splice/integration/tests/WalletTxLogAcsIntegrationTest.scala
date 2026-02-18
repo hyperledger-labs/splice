@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodeg
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SplitwellTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
@@ -14,7 +14,7 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 
 class WalletTxLogAcsIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -93,7 +93,6 @@ class WalletTxLogAcsIntegrationTest
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount.bigDecimal shouldBe mintAmount
-            logEntry.amuletPrice shouldBe amuletPrice
           }
         ),
         trafficTopups = IgnoreTopupsDevNet,

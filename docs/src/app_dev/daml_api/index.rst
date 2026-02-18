@@ -33,7 +33,14 @@ Featured App Activity Markers API (CIP-0047)
   for its background on its design and its specification.
 
 * See the reference docs below for the Daml interfaces that are part of the Featured App Activity Markers API;
-  or `read the source code <https://github.com/hyperledger-labs/splice/blob/main/daml/splice-api-featured-app-v1/daml/Splice/Api/FeaturedAppRightV1.daml>`__.
+  or `read the source code <https://github.com/hyperledger-labs/splice/blob/main/daml/splice-api-featured-app-v2/daml/Splice/Api/FeaturedAppRightV2.daml>`__.
+
+   .. toctree::
+      :maxdepth: 1
+
+      ../api/splice-api-featured-app-v2/index
+
+   or the old API:
 
    .. toctree::
       :maxdepth: 1

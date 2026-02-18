@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.console.{
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.ccToDollars
@@ -35,7 +35,7 @@ import java.util.UUID
 import scala.concurrent.duration.DurationInt
 
 abstract class WalletSweepIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with WalletTestUtil
     with TriggerTestUtil {
 

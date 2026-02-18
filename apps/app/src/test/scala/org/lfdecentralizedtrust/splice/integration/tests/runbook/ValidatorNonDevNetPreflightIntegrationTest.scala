@@ -1,13 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.util.WalletFrontendTestUtil
 
 /** Base for preflight tests running against a deployed non-devnet validator
   */
 abstract class ValidatorNonDevNetPreflightIntegrationTestBase
-    extends FrontendIntegrationTestWithSharedEnvironment("validator-user", "sv1-user")
+    extends FrontendIntegrationTest("validator-user", "sv1-user")
     with WalletFrontendTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false

@@ -1,0 +1,71 @@
+-- | The API for featured apps to record their activity.
+-- This package extends FeaturedAppRightV1 with support for specifying
+-- a weight when creating a marker to improve efficiency.
+module Splice.Api.FeaturedAppRightV2 where
+
+-- | Specification of a beneficiary of featured app rewards.
+data AppRewardBeneficiary = AppRewardBeneficiary
+  with
+    beneficiary : Party
+      -- ^ The party that is granted the right to mint the weighted amount of reward for this activity.
+    weight : Decimal
+      -- ^ A weight between 0.0 and 1.0 that defines how much of the reward this beneficiary can mint.
+  deriving (Show, Eq, Ord)
+
+-- | An interface for contracts allowing application providers to record their featured activity.
+-- Note that most instances of amulet will likely define some fair usage constraints.
+interface FeaturedAppRight where
+  viewtype FeaturedAppRightView
+
+  featuredAppRight_CreateActivityMarkerImpl : ContractId FeaturedAppRight -> FeaturedAppRight_CreateActivityMarker -> Update FeaturedAppRight_CreateActivityMarkerResult
+
+  nonconsuming choice FeaturedAppRight_CreateActivityMarker : FeaturedAppRight_CreateActivityMarkerResult
+    -- ^ Record activity due to a featured app.
+    with
+      beneficiaries : [AppRewardBeneficiary]
+        -- ^ The set of beneficiaries and weights that define how the rewards should be split up
+        -- between the beneficiary parties.
+        --
+        -- Implementations SHOULD check that the weights are positive and add up to 1.0.
+        -- Implementations MAY also impose a limit on the maximum number of beneficiaries.
+      weight : Optional Decimal
+        -- ^ A weight for the resulting markers. None defaults to a weight of 1.0.
+        -- Specifying a weight of 5 for example makes the resulting markers equivalent
+        -- to 5 markers of weight 1 in terms of rewards they generate.
+        -- The weight must be >= 1.0
+        -- Implementations MAY impose an upper limit on the weight.
+    observer (view this).provider :: map (.beneficiary) beneficiaries
+    controller (view this).provider
+    do featuredAppRight_CreateActivityMarkerImpl this self arg
+
+-- | Result of calling the `FeaturedAppRight_CreateActivityMarker` choice.
+data FeaturedAppRight_CreateActivityMarkerResult = FeaturedAppRight_CreateActivityMarkerResult
+  with
+    activityMarkerCids : [ContractId FeaturedAppActivityMarker]
+      -- ^ The set of activity markers created by the choice.
+
+
+data FeaturedAppRightView = FeaturedAppRightView
+  with
+    dso : Party
+      -- ^ The DSO party.
+    provider : Party
+      -- ^ The featured app provider.
+  deriving (Show, Eq)
+
+-- | A marker created by a featured application for activity generated from that app. This is used
+-- to record activity other than amulet transfers, which have built-in support for recording featured app activity.
+interface FeaturedAppActivityMarker where
+  viewtype FeaturedAppActivityMarkerView
+
+data FeaturedAppActivityMarkerView = FeaturedAppActivityMarkerView
+  with
+    dso : Party
+      -- ^ The DSO party.
+    provider : Party
+      -- ^ The featured app provider.
+    beneficiary : Party
+      -- ^ The party that is granted the right to mint the weighted amount of reward for this activity.
+    weight : Decimal
+      -- ^ A weight between 0.0 and 1.0 that defines how much of the reward this beneficiary can mint.
+  deriving (Show, Eq)

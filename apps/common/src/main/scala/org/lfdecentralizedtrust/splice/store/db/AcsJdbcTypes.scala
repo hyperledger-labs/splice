@@ -7,7 +7,7 @@ import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
-import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
+import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String3, String300}
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
@@ -165,12 +165,19 @@ trait AcsJdbcTypes {
     (ints: Seq[Int], pp: PositionedParameters) =>
       DbParameterUtils.setArrayIntOParameterDb(Some(ints.toArray), pp)
 
+  protected implicit lazy val longArraySetParameter: SetParameter[Array[Long]] = (v, pp) =>
+    pp.setObject(v, java.sql.Types.ARRAY)
+
   private val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>
       pp.setObject(
         pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
         JDBCType.ARRAY.getVendorTypeNumber,
       )
+
+  protected implicit lazy val string3ArraySetParameter: SetParameter[Array[String3]] =
+    (strings: Array[String3], pp: PositionedParameters) =>
+      stringArraySetParameter(strings.map(_.str), pp)
 
   protected implicit lazy val string2066ArraySetParameter: SetParameter[Array[String2066]] =
     (strings: Array[String2066], pp: PositionedParameters) =>
@@ -182,6 +189,10 @@ trait AcsJdbcTypes {
 
   protected implicit def contractIdArraySetParameter[T]: SetParameter[Array[ContractId[T]]] =
     (ids: Array[ContractId[T]], pp: PositionedParameters) =>
+      stringArraySetParameter(ids.map(_.contractId), pp)
+
+  protected implicit def contractIdAnyArraySetParameter: SetParameter[Array[ContractId[?]]] =
+    (ids: Array[ContractId[?]], pp: PositionedParameters) =>
       stringArraySetParameter(ids.map(_.contractId), pp)
 
   protected implicit def partyIdGetResult[T]: GetResult[PartyId] =
@@ -239,6 +250,11 @@ trait AcsJdbcTypes {
   protected implicit lazy val partyIdSetParameterOption: SetParameter[Option[PartyId]] =
     (partyId: Option[PartyId], pp: PositionedParameters) =>
       implicitly[SetParameter[Option[String2066]]]
+        .apply(partyId.map(party => lengthLimited(party.toProtoPrimitive)), pp)
+
+  protected implicit lazy val partyIdSetParameterArray: SetParameter[Array[PartyId]] =
+    (partyId: Array[PartyId], pp: PositionedParameters) =>
+      implicitly[SetParameter[Array[String2066]]]
         .apply(partyId.map(party => lengthLimited(party.toProtoPrimitive)), pp)
 
   protected implicit lazy val memberIdSetParameter: SetParameter[Member] =

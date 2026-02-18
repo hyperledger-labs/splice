@@ -45,6 +45,8 @@ services:
   sequencer-mediator:
     image: "${IMAGE_REPO}canton-domain:${IMAGE_TAG}"
     environment:
+      - LOG_LEVEL_STDOUT=${LOG_LEVEL:-INFO}
+      - LOG_LEVEL_CANTON=${LOG_LEVEL:-INFO}
       - CANTON_DOMAIN_POSTGRES_SERVER=${SPLICE_SV_DB_SERVER}
       - CANTON_DOMAIN_POSTGRES_PORT=${SPLICE_SV_DB_PORT}
       - CANTON_DOMAIN_POSTGRES_USER=${SPLICE_SV_DB_USER}
@@ -62,6 +64,8 @@ services:
   participant:
     image: "${IMAGE_REPO}canton-participant:${IMAGE_TAG}"
     environment:
+      - LOG_LEVEL_STDOUT=${LOG_LEVEL:-INFO}
+      - LOG_LEVEL_CANTON=${LOG_LEVEL:-INFO}
       - CANTON_PARTICIPANT_POSTGRES_SERVER=${SPLICE_SV_DB_SERVER}
       - CANTON_PARTICIPANT_POSTGRES_SCHEMA=participant
       - CANTON_PARTICIPANT_POSTGRES_USER=${SPLICE_SV_DB_USER}
@@ -81,6 +85,8 @@ services:
   validator:
     image: "${IMAGE_REPO}validator-app:${IMAGE_TAG}"
     environment:
+      - LOG_LEVEL_STDOUT=${LOG_LEVEL:-INFO}
+      - LOG_LEVEL_CANTON=${LOG_LEVEL:-INFO}
       - SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
       - SPLICE_APP_VALIDATOR_AUTH_AUDIENCE=${SV_AUTH_AUDIENCE}
       - SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS=participant
@@ -149,6 +155,8 @@ services:
   scan:
     image: "${IMAGE_REPO}scan-app:${IMAGE_TAG}"
     environment:
+      - LOG_LEVEL_STDOUT=${LOG_LEVEL:-INFO}
+      - LOG_LEVEL_CANTON=${LOG_LEVEL:-INFO}
       - SPLICE_APP_SCAN_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
       - |
         ADDITIONAL_CONFIG_PERSISTENCE=
@@ -201,6 +209,8 @@ services:
   sv-app:
     image: "${IMAGE_REPO}sv-app:${IMAGE_TAG}"
     environment:
+      - LOG_LEVEL_STDOUT=${LOG_LEVEL:-INFO}
+      - LOG_LEVEL_CANTON=${LOG_LEVEL:-INFO}
       - SPLICE_APP_SV_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
       - SPLICE_APP_SV_AUTH_AUDIENCE=${SV_AUTH_AUDIENCE}
       - |

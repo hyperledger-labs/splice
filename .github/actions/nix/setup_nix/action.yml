@@ -7,13 +7,17 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: true
+  nix_path:
+    description: "The path to nix flake directory"
+    required: false
+    default: ${{ format('{0}/nix', github.repository == 'hyperledger-labs/splice' && '.' || 'splice') }}
   target:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
-    type: choice
-    options:
-      - oss
-      - default
-      - static_tests
+#    type: choice
+#    options:
+#      - oss
+#      - default
+#      - static_tests
     required: true
   cache_version:
     description: "The cache version"
@@ -44,13 +48,12 @@ runs:
         set -euxo pipefail
         NIX_BINARY_VERSION=2.32.1
         echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
-        cat nix/canton-sources.json
-        git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+        cat ${{ inputs.nix_path }}/canton-sources.json
+        git ls-files ${{ inputs.nix_path }}/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
         echo "nix binary version: $NIX_BINARY_VERSION" >> /tmp/nix-cache-key # different nix versions might behave differently and corrupt the caches
-        echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
         echo "target: ${{ inputs.target }}" >> /tmp/nix-cache-key
         if [ "${{ inputs.target }}" != 'default' ]; then
           echo "Using OSS only dependencies"
@@ -58,6 +61,9 @@ runs:
         cat /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         echo "cache_key=$cache_key" >> $GITHUB_ENV
+
+        echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
+        echo ${{ inputs.nix_path }} > /tmp/nix_path # Create a file to indicate where the nix config is (so we don't need to re-specifify nix_path to run_bash_command_in_nix)
 
     - name: Download cache (for non-self-hosted)
       if: ${{ !startsWith(runner.name, 'self-hosted') }}
@@ -119,26 +125,16 @@ runs:
           # 1. It doesn't work on CircleCI (sethostname is not allowed)
           # 2. We don't plan to build anything, so the risk is fairly low
           mkdir -p ~/.config/nix
-          if [ true ]; then
-            cat <<EOF > ~/.config/nix/nix.conf
-            sandbox = false
-            netrc-file = /etc/nix/netrc
-            extra-experimental-features = nix-command flakes
-            substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
-            trusted-substituters = file:///cache/nix/binary_cache?trusted=1
-            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-            cores = 4
-            max-jobs = 16
+          cat <<EOF > ~/.config/nix/nix.conf
+          sandbox = false
+          netrc-file = /etc/nix/netrc
+          extra-experimental-features = nix-command flakes
+          substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
+          trusted-substituters = file:///cache/nix/binary_cache?trusted=1
+          trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+          cores = 4
+          max-jobs = 16
         EOF
-          else
-            cat <<EOF > ~/.config/nix/nix.conf
-            sandbox = false
-            netrc-file = /etc/nix/netrc
-            extra-experimental-features = nix-command flakes
-            cores = 4
-            max-jobs = 16
-        EOF
-          fi
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
@@ -154,7 +150,7 @@ runs:
           export USER=$(whoami)
           echo "Running nix.sh"
           . ~/.nix-profile/etc/profile.d/nix.sh
-          nix develop path:nix#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+          nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
         fi
 
     - name: Invoke nix before saving cache

@@ -13,3 +13,9 @@ prometheusRw: ""
 
 # k8s tolerations for all deployed pods (optional)
 # tolerations:
+
+resources:
+  requests:
+    memory: "5Gi"
+  limits:
+    memory: "8Gi"

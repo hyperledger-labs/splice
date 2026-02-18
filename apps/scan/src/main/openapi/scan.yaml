@@ -2086,10 +2086,6 @@ components:
             The round for which this transaction was registered.
           type: integer
           format: int64
-        amulet_price:
-          description: |
-            The amulet price for the round at which this transfer was executed.
-          type: string
         transfer:
           description: |
             A (batch) transfer from sender to receivers.
@@ -2923,10 +2919,6 @@ components:
             The round for which this transaction was registered.
           type: integer
           format: int64
-        amulet_price:
-          description: |
-            The amulet price for the round at which this transfer was executed.
-          type: string
         transfer:
           description: |
             A (batch) transfer from sender to receivers.
@@ -2943,18 +2935,13 @@ components:
           $ref: "#/components/schemas/AbortTransferInstruction"
     Transfer:
       description: |
-        A transfer between one sender and possibly many receivers, provided by an application provider.
+        A transfer between one sender and possibly many receivers
       type: object
       required:
-        - provider
         - sender
         - receivers
         - balance_changes
       properties:
-        provider:
-          description: |
-            The application provider.
-          type: string
         sender:
           description: |
             The sender amounts and fees.
@@ -3825,6 +3812,7 @@ components:
         - informees
         - confirming_parties
         - sub_views
+        - view_hash
       properties:
         view_id:
           type: integer
@@ -3842,6 +3830,9 @@ components:
           items:
             type: integer
             format: int32
+        view_hash:
+          description: Hash of the view, for correlation with sequencer traffic data. Empty for older data ingested before this field was added.
+          type: string
     Quorum:
       type: object
       required:

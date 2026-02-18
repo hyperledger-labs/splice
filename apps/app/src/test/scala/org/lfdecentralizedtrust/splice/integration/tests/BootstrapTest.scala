@@ -5,12 +5,12 @@ import com.digitalasset.canton.ConsoleScriptRunner
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.useSelfSignedTokensForLedgerApiAuth
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
-class BootstrapTest extends IntegrationTest {
+class BootstrapTest extends IntegrationTestWithIsolatedEnvironment {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

@@ -16,7 +16,7 @@ import com.digitalasset.canton.topology.{Namespace, ParticipantId}
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.{PostgresAroundEach, ProcessTestUtil}
@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.util.{PostgresAroundEach, ProcessTestUtil
 import scala.util.Random
 
 trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
-  this: IntegrationTest & ProcessTestUtil =>
+  this: IntegrationTestWithIsolatedEnvironment & ProcessTestUtil =>
 
   override def usesDbs: Seq[String] = {
     randomDbs

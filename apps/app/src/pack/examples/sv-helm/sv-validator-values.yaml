@@ -16,3 +16,7 @@ persistence:
 
 topup:
   enabled: false
+
+scanClient:
+  scanType: "trust-single"
+  scanAddress: "TRUSTED_SCAN_URL"

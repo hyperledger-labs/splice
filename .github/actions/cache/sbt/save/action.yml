@@ -4,6 +4,9 @@ inputs:
   cache_version:
     description: "Version of the cache"
     required: true
+  splice_root:
+    description: "Path to splice repo"
+    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
   load_cache_hit:
     description: "Cache hit from the restore SBT job (should be the cache_hit output from the restore SBT job)"
     required: true
@@ -18,7 +21,7 @@ runs:
         path: |
           /github/home/.ivy2/cache
           /github/home/.sbt
-        key: sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}-${{ hashFiles('project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
+        key: sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles(format('{0}/project/Dependencies.scala', inputs.splice_root), format('{0}/project/CantonDependencies.scala', inputs.splice_root)) }}-${{ hashFiles(format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/Houserules.scala', inputs.splice_root), format('{0}/project/plugins.sbt', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root)) }}
     - name: Not storing SBT cache
       if: ${{ fromJson(inputs.load_cache_hit) }}
       shell: bash

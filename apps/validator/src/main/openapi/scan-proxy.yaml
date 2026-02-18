@@ -250,6 +250,20 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/scan-proxy/unclaimed-development-fund-coupons:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "listUnclaimedDevelopmentFundCoupons"
+      description: |
+        List all unclaimed development fund coupons.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/ListUnclaimedDevelopmentFundCouponsResponse"
 components:
   schemas:
     # does not include the TTL, and the contracts are not-MaybeCached

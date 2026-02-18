@@ -306,8 +306,6 @@ case class SvAppBackendConfig(
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(2),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
-    ingestFromParticipantBegin: Boolean = true,
-    ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     extraBeneficiaries: Seq[BeneficiaryConfig] = Seq.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],
@@ -375,6 +373,11 @@ case class SvAppBackendConfig(
     unclaimedDevelopmentFundCouponsThreshold: Int = 10,
     svAcsStoreDescriptorUserVersion: Option[Long] = None,
     dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
+    // TODO(#3897) Consider removing this once we're confident in this approach.
+    // Safety option in case setting the observers ends up causing issues e.g. overloading validators that now receive larger transactions.
+    convertFeaturedAppActivityMarkerObservers: Boolean = true,
+    // Whether to ensure that heuristic free confirmation responses get enabled on the synchronizer via the ReconcileDynamicSynchronizerConfigTrigger.
+    enableFreeConfirmationResponses: Boolean = true,
 ) extends SpliceBackendConfig {
 
   lazy val localSynchronizerNode: Option[SvSynchronizerNodeConfig] = {

@@ -11,7 +11,7 @@ description: |
   are normal .dar files and can be shared by copying the .dars.
   (TODO(#594): remove this limitation)
 source: daml
-version: 1.0.7
+version: 1.0.8
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -34,4 +34,3 @@ codegen:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
     decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceUtilFeaturedAppProxiesTest
     output-directory: target/daml-codegen-java
-

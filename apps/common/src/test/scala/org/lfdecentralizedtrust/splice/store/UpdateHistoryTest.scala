@@ -29,7 +29,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import UpdateHistory.UpdateHistoryResponse
-import StoreTest.*
+import StoreTestBase.*
 import cats.data.NonEmptyList
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {

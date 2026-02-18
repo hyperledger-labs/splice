@@ -1009,7 +1009,6 @@ class HttpScanHandler(
             transfer = txItem.transfer,
             abortTransferInstruction = txItem.abortTransferInstruction,
             round = txItem.round,
-            amuletPrice = txItem.amuletPrice,
           )
         }.toVector
       )

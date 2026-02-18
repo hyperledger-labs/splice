@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, AnsFrontendTestU
 import org.openqa.selenium.support.ui.ExpectedConditions
 
 class AnsFrontendIntegrationTest
-    extends FrontendIntegrationTest("alice")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("alice")
     with WalletTestUtil
     with AnsFrontendTestUtil
     with FrontendLoginUtil {

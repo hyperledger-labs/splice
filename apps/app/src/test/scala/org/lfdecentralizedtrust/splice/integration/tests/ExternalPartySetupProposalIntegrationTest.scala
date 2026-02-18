@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
@@ -53,7 +53,7 @@ import scala.jdk.OptionConverters.*
 
 // TODO(DACH-NY/canton-network-node#14568) Merge this into ExternallySignedPartyOnboardingTest
 class ExternalPartySetupProposalIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with TriggerTestUtil
@@ -444,6 +444,18 @@ class ExternalPartySetupProposalIntegrationTest
           rewards.loneElement.data.featured shouldBe true
         },
       )
+
+      val txs = sv1ScanBackend.listActivity(None, 1000)
+      // Alice transfers twice (1000, and then 500 to bob)
+      forExactly(2, txs) { tx =>
+        // Test that the tx history for the TransferCommand_Send exercise gets parsed properly.
+        val transfer = tx.transfer.value
+        transfer.sender.party shouldBe aliceParty.toProtoPrimitive
+        transfer.transferKind shouldBe Some(
+          definitions.Transfer.TransferKind.members.PreapprovalSend
+        )
+        transfer.description shouldBe Some("transfer-command-description")
+      }
 
       // Check that transfer command gets archived if preapproval does not exist.
       val sv1Party = sv1Backend.getDsoInfo().svParty

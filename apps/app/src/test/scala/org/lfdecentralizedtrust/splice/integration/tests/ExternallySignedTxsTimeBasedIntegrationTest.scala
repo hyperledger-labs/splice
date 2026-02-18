@@ -7,7 +7,7 @@ import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
@@ -17,7 +17,7 @@ import java.util.Base64
 // does token standard stuff
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class ExternallySignedTxsTimeBasedIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with ExternallySignedPartyTestUtil
     with TimeTestUtil

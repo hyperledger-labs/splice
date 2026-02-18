@@ -131,12 +131,12 @@ message TransferTxLogEntry {
   string offset = 2;
   string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
-  string provider = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string provider = 5; // unused: reserved fields don't work well with the json en/decoding so we keep it here.
   SenderAmount sender = 6;
   repeated ReceiverAmount receivers = 7;
   repeated BalanceChange balance_changes = 8;
   int64 round = 9;
-  string amulet_price = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 10; // Unused but our decoding infrastructure doesn't like reserved fields.
 
   string description = 11;
 
@@ -158,7 +158,7 @@ message TapTxLogEntry {
   string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
   int64 round = 7;
-  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 8; // Unused but our decoding infrastructure doesn't like reserved fields.
 }
 
 message MintTxLogEntry {
@@ -172,7 +172,7 @@ message MintTxLogEntry {
   string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
   int64 round = 7;
-  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 8; // Unused but our decoding infrastructure doesn't like reserved fields.
 }
 
 message SvRewardTxLogEntry {

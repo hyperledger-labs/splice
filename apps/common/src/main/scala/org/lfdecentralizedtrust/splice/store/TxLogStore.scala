@@ -106,7 +106,7 @@ object TxLogStore {
     def parser: Parser[TXE]
 
     /** Defines index columns */
-    def entryToRow: TXE => TxLogRowData
+    def entryToRow: TXE => Option[TxLogRowData]
 
     /** Encodes the entry payload to a JSON object */
     def encodeEntry: TXE => (String3, String)

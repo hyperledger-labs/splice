@@ -58,18 +58,32 @@ sealed abstract class ExerciseNodeCompanion extends BaseExerciseNodeCompanion {
 }
 
 object ExerciseNodeCompanion {
-  // convert R's upper bound to a typeclass if you need to support incompatible
-  // choice return types, e.g. Archive's Unit
-  abstract class Mk[T, A, R <: DefinedDataType[?]](
+  trait ResToValue[R] {
+    def toValue(r: R): CodegenValue
+  }
+
+  object ResToValue {
+    // Default: any DefinedDataType can be converted via .toValue
+    implicit def definedDataTypeResToValue[R <: DefinedDataType[?]]: ResToValue[R] =
+      (r: R) => r.toValue
+
+    // Special-case: Archive returns Unit
+    implicit val unitResToValue: ResToValue[com.daml.ledger.javaapi.data.Unit] =
+      (_: com.daml.ledger.javaapi.data.Unit) => com.daml.ledger.javaapi.data.Unit.getInstance()
+  }
+
+  // Choice results are converted to LF Values via a typeclass so we can support Unit (Archive).
+  abstract class Mk[T, A, R](
       override val choice: Choice[T, A, R],
       override val template: ContractCompanion[?, ?, T],
-  ) extends ExerciseNodeCompanion {
+  )(implicit toValue: ResToValue[R])
+      extends ExerciseNodeCompanion {
     type Tpl = T
     type Arg = A
     type Res = R
 
     final override def resToValue(r: Res): CodegenValue =
-      r.toValue
+      toValue.toValue(r)
   }
 }
 

@@ -3,14 +3,14 @@ package org.lfdecentralizedtrust.splice.integration.tests.runbook
 import org.lfdecentralizedtrust.splice.config.IdentityDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.util.DataExportTestUtil
 import org.lfdecentralizedtrust.splice.util.FrontendLoginUtil
 
 import scala.util.Try
 
 abstract class SvNonDevNetPreflightIntegrationTestBase
-    extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    extends FrontendIntegrationTest("sv")
     with SvUiPreflightIntegrationTestUtil
     with DataExportTestUtil
     with FrontendLoginUtil {

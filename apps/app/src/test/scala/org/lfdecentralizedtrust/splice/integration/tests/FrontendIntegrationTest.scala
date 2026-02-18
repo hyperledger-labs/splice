@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithIsolatedEnvironment,
   IntegrationTest,
-  IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
   TestCommon,
 }
@@ -100,8 +100,8 @@ trait CustomMatchers {
     new TextMixedWithNumbersMatcher(pattern, values, tolerance)
 }
 
-abstract class FrontendIntegrationTest(override val frontendNames: String*)
-    extends IntegrationTest
+abstract class FrontendIntegrationTestWithIsolatedEnvironment(override val frontendNames: String*)
+    extends IntegrationTestWithIsolatedEnvironment
     with FrontendTestCommon
     with ParallelTestExecution {
 
@@ -125,8 +125,8 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
   }
 }
 
-abstract class FrontendIntegrationTestWithSharedEnvironment(override val frontendNames: String*)
-    extends IntegrationTestWithSharedEnvironment
+abstract class FrontendIntegrationTest(override val frontendNames: String*)
+    extends IntegrationTest
     with FrontendTestCommon {
 
   override def beforeAll() = {
@@ -445,11 +445,21 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   protected def screenshot()(implicit webDriver: WebDriverType): Unit = {
     clue("Saving screenshot") {
       val fullScreen = webDriver.findElement(By.tagName("body"))
-      val screenshotFile = fullScreen.getScreenshotAs(OutputType.FILE)
-      val time = Calendar.getInstance.getTime
-      val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
-      val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString
-      FileUtils.copyFile(screenshotFile, new File(filename))
+      // Note: we only do one attempt to capture the screenshot, as we're interested in the current
+      // state for debugging. If we waited, we would see a screenshot of a later state that does
+      // reflect the error we're trying to debug.
+      try {
+        val screenshotFile = fullScreen.getScreenshotAs(OutputType.FILE)
+        val time = Calendar.getInstance.getTime
+        val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
+        val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString
+        FileUtils.copyFile(screenshotFile, new File(filename))
+      } catch {
+        case e: org.openqa.selenium.WebDriverException =>
+          // We still want to be notified of the failure through the log checker,
+          // we just don't want to stop generating debug info if the screenshot fails.
+          logger.warn("Failed to take screenshot", e)
+      }
     }
   }
 

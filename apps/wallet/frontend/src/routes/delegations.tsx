@@ -135,7 +135,7 @@ export const Delegations: React.FC = () => {
               <TableCell>Beneficiary</TableCell>
               <TableCell>Merge Threshold</TableCell>
               <TableCell>Expiration</TableCell>
-              <TableCell>Withdraw</TableCell>
+              <TableCell>Cancel</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -213,28 +213,28 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
           conditions={[
             {
               disabled: withdrawMutation.isPending,
-              reason: 'Withdrawing delegation...',
+              reason: 'Cancelling delegation...',
             },
           ]}
         >
           <Button
             variant="outlined"
             size="small"
-            className="delegation-withdraw"
+            className="delegation-cancel"
             onClick={handleWithdrawClick}
           >
-            Withdraw
+            Cancel
           </Button>
         </DisableConditionally>
         <ConfirmationDialog
           showDialog={confirmDialogOpen}
           onAccept={handleConfirmAccept}
           onClose={handleConfirmClose}
-          title="Withdraw Minting Delegation"
-          attributePrefix="withdraw-delegation"
+          title="Cancel Minting Delegation"
+          attributePrefix="cancel-delegation"
         >
           <Typography>
-            Are you sure you want to withdraw this minting delegation for{' '}
+            Are you sure you want to cancel this minting delegation for{' '}
             {shortenPartyId(contract.payload.beneficiary)}?
           </Typography>
         </ConfirmationDialog>

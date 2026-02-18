@@ -10,6 +10,13 @@ import com.daml.ledger.javaapi.data.codegen.{
   DamlRecord,
   Contract as JavaGenContract,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceAmulet,
   DecoderSpliceAmuletNameService,
@@ -17,14 +24,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceValidatorLifecycle,
   DecoderSpliceWallet,
   DecoderSpliceWalletPayments,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
-  allocationinstructionv1,
-  allocationrequestv1,
-  allocationv1,
-  holdingv1,
-  transferinstructionv1,
+  DecoderBatchedMarkers,
 }
 
 import scala.jdk.CollectionConverters.*
@@ -55,6 +55,7 @@ object ContractCompanions {
     DecoderSpliceValidatorLifecycle.contractDecoder,
     DecoderSpliceWallet.contractDecoder,
     DecoderSpliceWalletPayments.contractDecoder,
+    DecoderBatchedMarkers.contractDecoder,
   )
 
   // Unfortunately interfaces need to be declared explicitly, as there's no auto-generated list of decoders
@@ -67,6 +68,7 @@ object ContractCompanions {
     allocationinstructionv1.AllocationInstruction.INTERFACE,
     allocationinstructionv1.AllocationFactory.INTERFACE,
     featuredapprightv1.FeaturedAppRight.INTERFACE,
+    featuredapprightv2.FeaturedAppRight.INTERFACE,
   )
 
   private def templatesMatch(id: Identifier, qualifiedName: QualifiedName) =

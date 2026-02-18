@@ -12,7 +12,7 @@ import org.openqa.selenium.StaleElementReferenceException
 import java.time.Duration
 
 class WalletFrontendTimeBasedIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil

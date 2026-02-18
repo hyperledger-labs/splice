@@ -225,6 +225,7 @@ svs:
         maxDuration: "30m"
         retentionPeriod: "7d"
     participant:
+      bftSequencerConnection: false
       kms:
         keyRingId: sv-da-1_participant_mock
         locationId: us-central1
@@ -288,6 +289,10 @@ cluster:
   nodePools:
     apps:
       nodeType: n2-standard-16
+    hyperdiskApps:
+      nodeType: c4-standard-16
+      minNodes: 0
+      maxNodes: 1
 networkWide:
   maxVettingDelay: 1m
 validators:

@@ -54,7 +54,10 @@ class PackageVetting(
       PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationV1,
       PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1,
       PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
-    ).map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
+    ).map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg)) ++
+      DarResources.batchedMarkers.all.map(pkg =>
+        PackageIdResolver.Package.SpliceUtilBatchedMarkers -> pkg.metadata.version
+      )
 
     vetPackages(
       domainId,

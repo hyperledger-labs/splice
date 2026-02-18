@@ -27,7 +27,7 @@ runs:
       run: |
         set -euo pipefail
         target="$(cat /tmp/nix_target)"
-        echo "target=$target"
+        nix_path="$(cat /tmp/nix_path)"
         echo "sourcing nix profile"
         export USER=$(whoami)
         . ~/.nix-profile/etc/profile.d/nix.sh
@@ -47,7 +47,7 @@ runs:
             sleep $SLEEP_DURATION
           fi
           nix develop \
-            path:nix#$target \
+            path:$nix_path#$target \
             --verbose \
             --ignore-environment \
             --keep USER \
@@ -142,7 +142,7 @@ runs:
         echo "Running actual command"
         # Run the command for real within the nix environment
         nix develop \
-          path:nix#$target \
+          path:$nix_path#$target \
           --verbose \
           --ignore-environment \
           --keep USER \
@@ -158,6 +158,7 @@ runs:
           --keep GCP_DA_CN_SCRATCHNET_KEY \
           --keep GCP_DA_CN_SCRATCHNET2_KEY \
           --keep GCP_DA_CN_MAINNET_KEY \
+          --keep GCP_DA_CN_SPLICE_KEY \
           --keep CIRCLE_BRANCH \
           --keep TARGET_CLUSTER \
           $ADDITIONAL_NIX_ARGS \

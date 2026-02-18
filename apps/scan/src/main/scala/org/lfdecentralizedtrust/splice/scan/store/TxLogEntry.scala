@@ -153,7 +153,6 @@ object TxLogEntry extends StoreErrors {
           .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
         transfer = Some(
           httpDef.Transfer(
-            provider = entry.provider.toProtoPrimitive,
             sender = toResponse(entry.sender.getOrElse(throw txMissingField())),
             receivers = entry.receivers.map(toResponse).toVector,
             balanceChanges = entry.balanceChanges.map(toResponse).toVector,
@@ -175,7 +174,6 @@ object TxLogEntry extends StoreErrors {
           )
         ),
         round = Some(entry.round),
-        amuletPrice = Some(Codec.encode(entry.amuletPrice)),
       )
 
     private def toTapResponseItem(entry: TapTxLogEntry) = httpDef.TransactionHistoryResponseItem(
@@ -192,7 +190,6 @@ object TxLogEntry extends StoreErrors {
         )
       ),
       round = Some(entry.round),
-      amuletPrice = Some(Codec.encode(entry.amuletPrice)),
     )
 
     private def toMintResponseItem(entry: MintTxLogEntry) = httpDef.TransactionHistoryResponseItem(

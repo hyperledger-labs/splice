@@ -15,7 +15,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
+import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressionRule}
 import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
@@ -34,7 +34,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   schedule as scheduleCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -52,11 +52,14 @@ import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
   Trees,
 }
-import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Numeric
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
@@ -80,6 +83,7 @@ import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
 
+import java.nio.file.{Files, Paths}
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util
@@ -88,30 +92,50 @@ import scala.concurrent.{Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-abstract class StoreTest extends AsyncWordSpec with BaseTest {
+abstract class StoreTestBase
+    extends AsyncWordSpec
+    with BaseTest
+    with HasActorSystem
+    with HasExecutionContext
+    with NamedLogging {
 
   protected val upgradedAppRewardCouponPackageId = "upgradedpackageid"
   protected val dummyHoldingPackageId = DummyHolding.TEMPLATE_ID.getPackageId
   protected val maliciousPackageId = "maliciouspackageid"
 
+  // Looks up the package name from the package ID in dars.lock, to avoid having to parse all DARs just to find this mapping
+  // TODO(#3937): this is quite hacky. What we should really do is just auto-generate DarResources instead of deriving it from DARs at runtime.
+  protected def tryGetPackageNameFromDarLock(identifier: Identifier): Option[String] = {
+    val path = Paths.get("daml/dars.lock")
+    Files
+      .readAllLines(path)
+      .asScala
+      .map(_.trim.split("\\s+"))
+      .filter(line => line.length > 1 && line(2) == identifier.getPackageId)
+      .map(_(0))
+      .headOption
+  }
+
   protected def getPackageName(identifier: Identifier) = {
-    PackageQualifiedName
-      .lookupFromResources(identifier)
-      .map(_.packageName)
-      // should only be necessary for upgrade/malicious identifiers
-      .orElse(
-        Map(
-          upgradedAppRewardCouponPackageId -> amuletCodegen.AppRewardCoupon.PACKAGE_NAME,
-          dummyHoldingPackageId -> DummyHolding.PACKAGE_NAME, // not in DarResources
-          maliciousPackageId -> "malicious-package",
+    tryGetPackageNameFromDarLock(identifier).getOrElse(
+      PackageQualifiedName
+        .lookupFromResources(identifier)
+        .map(_.packageName)
+        // should only be necessary for upgrade/malicious identifiers
+        .orElse(
+          Map(
+            upgradedAppRewardCouponPackageId -> amuletCodegen.AppRewardCoupon.PACKAGE_NAME,
+            dummyHoldingPackageId -> DummyHolding.PACKAGE_NAME, // not in DarResources
+            maliciousPackageId -> "malicious-package",
+          )
+            .get(identifier.getPackageId)
         )
-          .get(identifier.getPackageId)
-      )
-      .getOrElse(
-        throw new IllegalArgumentException(
-          s"Identifier is not present in resources nor does it look like mock data: $identifier"
+        .getOrElse(
+          throw new IllegalArgumentException(
+            s"Identifier is not present in resources nor does it look like mock data: $identifier"
+          )
         )
-      )
+    )
   }
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
@@ -808,7 +832,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
   }
 
-  protected lazy val dummyDomain = StoreTest.dummyDomain
+  protected lazy val dummyDomain = StoreTestBase.dummyDomain
 
   protected val dummy2Domain = SynchronizerId.tryFromString("dummy2::domain")
 
@@ -954,23 +978,26 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     updateId = updateId,
   )
 
+  protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {
+    case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
+      ActiveContract(
+        domain,
+        toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
+        counter,
+      )
+  }
+
   protected def acs(
-      acs: Seq[StoreTest.AcsImportEntry] = Seq.empty,
-      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
-      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      acs: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map { case StoreTest.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
-        ActiveContract(
-          domain,
-          toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
-          counter,
-        )
-      },
+      acs.map(acsImportEntryToActiveContract),
       incompleteOut.map {
-        case StoreTest.AcsImportIncompleteEntry(
+        case StoreTestBase.AcsImportIncompleteEntry(
               c,
               sourceDomain,
               targetDomain,
@@ -988,7 +1015,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           )
       },
       incompleteIn.map {
-        case StoreTest.AcsImportIncompleteEntry(
+        case StoreTestBase.AcsImportIncompleteEntry(
               c,
               sourceDomain,
               targetDomain,
@@ -1009,9 +1036,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   } yield ()
 
   protected def initWithAcs(
-      activeContracts: Seq[StoreTest.AcsImportEntry] = Seq.empty,
-      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
-      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      activeContracts: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
@@ -1058,20 +1085,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       underlying.ingestionFilter
     override def initialize()(implicit traceContext: TraceContext) =
       underlying.initialize()
-    override def ingestAcs(
+
+    override def ingestAcsStreamInBatches(
+        source: Source[Seq[BaseLedgerConnection.ActiveContractsItem], NotUsed],
         offset: Long,
-        acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit traceContext: TraceContext) =
-      withoutRepeatedIngestionWarning(
-        underlying.ingestAcs(
-          offset,
-          acs,
-          incompleteOut,
-          incompleteIn,
-        )(traceContext)
-      )
+    )(implicit tc: TraceContext, mat: Materializer): Future[Unit] =
+      withoutRepeatedIngestionWarning(underlying.ingestAcsStreamInBatches(source, offset)(tc, mat))
 
     override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
@@ -1421,7 +1440,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 }
 
-object StoreTest {
+object StoreTestBase {
 
   implicit class IngestSingleElementSink(underlying: MultiDomainAcsStore.IngestionSink) {
     final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
@@ -1503,13 +1522,15 @@ object StoreTest {
   }
 
   val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
-    override def parser: org.lfdecentralizedtrust.splice.store.StoreTest.TestTxLogStoreParser.type =
+    override def parser
+        : org.lfdecentralizedtrust.splice.store.StoreTestBase.TestTxLogStoreParser.type =
       TestTxLogStoreParser
-    override def entryToRow
-        : org.lfdecentralizedtrust.splice.store.TestTxLogEntry => org.lfdecentralizedtrust.splice.store.db.TxLogRowData.TxLogRowDataWithoutIndices.type =
-      _ => TxLogRowData.noIndices
-    override def encodeEntry = StoreTest.TxLogEntry.encode
-    override def decodeEntry = StoreTest.TxLogEntry.decode
+    override def entryToRow: org.lfdecentralizedtrust.splice.store.TestTxLogEntry => Option[
+      org.lfdecentralizedtrust.splice.store.db.TxLogRowData.TxLogRowDataWithoutIndices.type
+    ] =
+      _ => Some(TxLogRowData.noIndices)
+    override def encodeEntry = StoreTestBase.TxLogEntry.encode
+    override def decodeEntry = StoreTestBase.TxLogEntry.decode
   }
 
   case class AcsImportEntry(

@@ -38,12 +38,21 @@ export const expiryEffectiveDateSchema = z
     path: ['effectiveDate'],
   });
 
-export const grantRevokeFeaturedAppRightSchema = z.string().min(1, { message: 'Required' });
+export const revokeFeaturedAppRightSchema = z.string().min(1, { message: 'Required' });
+
+export const partyIdSchema = z
+  .string()
+  .min(1, { message: 'Required' })
+  .regex(/^[a-zA-Z0-9_-]+::[a-zA-Z0-9_-]+$/, {
+    message: 'Invalid PartyId format. Expected format: identifier::fingerprint',
+  });
 
 export const svWeightSchema = z
   .string()
   .min(1, { message: 'Weight is required' })
-  .regex(/^\d+$/, { message: 'Weight must be a valid number' });
+  .regex(/^\d+_\d{4}$/, {
+    message: 'Weight must be expressed in basis points using fixed point notation, XX...X_XXXX',
+  });
 
 export const rewardAmountSchema = z
   .string()
@@ -133,8 +142,13 @@ export const validateUrl = (value: string): string | false => {
   return result.success ? false : result.error.issues[0].message;
 };
 
-export const validateGrantRevokeFeaturedAppRight = (value: string): string | false => {
-  const result = grantRevokeFeaturedAppRightSchema.safeParse(value);
+export const validateRevokeFeaturedAppRight = (value: string): string | false => {
+  const result = revokeFeaturedAppRightSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validatePartyId = (value: string): string | false => {
+  const result = partyIdSchema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 

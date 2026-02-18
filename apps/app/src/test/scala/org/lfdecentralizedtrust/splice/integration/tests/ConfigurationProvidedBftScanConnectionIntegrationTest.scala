@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.data.NonEmptyList
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -15,7 +15,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 class ConfigurationProvidedBftScanConnectionIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with SvTestUtil
     with HasExecutionContext

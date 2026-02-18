@@ -4,7 +4,7 @@ import com.digitalasset.canton.concurrent.Threading
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{
   DisclosedContracts,
   SplitwellTestUtil,
@@ -17,7 +17,7 @@ import com.digitalasset.canton.HasExecutionContext
 // This test just exists to trigger an OwnerExpireLock exercise
 // to test the scan tx log script as we don't have automation that triggers this atm.
 class ScanTxLogOwnerExpireLockIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil

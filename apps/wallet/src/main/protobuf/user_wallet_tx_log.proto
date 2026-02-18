@@ -43,11 +43,11 @@ message TransferTxLogEntry {
   string event_id = 1;
   TransactionSubtype subtype = 2;
   google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
-  string provider = 4;
+  string provider = 4; // unused: reserved fields don't work well with the json en/decoding so we keep it here.
   PartyAndAmount sender = 5;
   repeated PartyAndAmount receivers = 6;
   string sender_holding_fees = 7 [(scalapb.field).type = "scala.math.BigDecimal"];
-  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 8; // Unused but our decoding infrastructure doesn't like reserved fields.
   string app_rewards_used = 9 [(scalapb.field).type = "scala.math.BigDecimal"];
   string validator_rewards_used = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
   string sv_rewards_used = 11 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
@@ -55,6 +55,7 @@ message TransferTxLogEntry {
   string transfer_instruction_amount = 14 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
   string transfer_instruction_cid = 15;
   string description = 16;
+  string development_fund_coupons_used = 17 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
 }
 
 /** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */
@@ -67,7 +68,7 @@ message BalanceChangeTxLogEntry {
   google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
   string receiver = 4;
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
-  string amulet_price = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 6; // Unused but our decoding infrastructure doesn't like reserved fields.
   string transfer_instruction_cid = 7;
 }
 
@@ -151,4 +152,45 @@ message BuyTrafficRequestTxLogEntry {
     BuyTrafficRequestStatusExpired expired = 5;
   };
   string buyer = 6;
+}
+
+message DevelopmentFundCouponCreatedTxLogEntry {
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.DevelopmentFundCoupon.ContractId
+  string beneficiary = 2;
+  string fund_manager = 3;
+  string amount = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
+  google.protobuf.Timestamp expires_at = 5 [(scalapb.field).type = "java.time.Instant"];
+  string reason = 6;
+  google.protobuf.Timestamp created_at = 7 [(scalapb.field).type = "java.time.Instant"];
+}
+
+message DevelopmentFundCouponStatusClaimed {
+}
+
+message DevelopmentFundCouponStatusWithdrawn {
+  string reason = 1;
+}
+
+message DevelopmentFundCouponStatusExpired {
+}
+
+message DevelopmentFundCouponStatusRejected {
+  string reason = 1;
+}
+
+message DevelopmentFundCouponArchivedTxLogEntry {
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.DevelopmentFundCoupon.ContractIdº
+  oneof status {
+    DevelopmentFundCouponStatusClaimed claimed = 2;
+    DevelopmentFundCouponStatusWithdrawn withdrawn = 3;
+    DevelopmentFundCouponStatusExpired expired = 4;
+    DevelopmentFundCouponStatusRejected rejected = 5;
+  };
+  google.protobuf.Timestamp archived_at = 6 [(scalapb.field).type = "java.time.Instant"];
 }

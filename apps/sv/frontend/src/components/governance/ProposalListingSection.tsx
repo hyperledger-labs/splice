@@ -62,7 +62,7 @@ const sortProposals = (
 const getColumnsCount = (...shown: (boolean | undefined)[]) => 4 + shown.filter(Boolean).length;
 
 const getGridTemplate = (columnsCount: number) =>
-  `1fr minmax(0, 0.7fr) ${'1fr '.repeat(columnsCount - 2).trim()}`;
+  `minmax(0, 1fr) minmax(0, 0.7fr) ${'1fr '.repeat(columnsCount - 2).trim()}`;
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
@@ -194,7 +194,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
 
   return (
     <TableRow
-      onClick={() => navigate(`/governance-beta/proposals/${contractId}`)}
+      onClick={() => navigate(`/governance/proposals/${contractId}`)}
       sx={{
         display: 'grid',
         gridTemplateColumns: gridTemplate,
@@ -207,8 +207,13 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       }}
       data-testid={`${uniqueId}-row`}
     >
-      <TableCell data-testid={`${uniqueId}-row-action-name`}>
-        <TableBodyTypography>{actionName}</TableBodyTypography>
+      <TableCell data-testid={`${uniqueId}-row-action-name`} sx={{ overflow: 'hidden' }}>
+        <Typography
+          {...tableBodyTypography}
+          sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
+          {actionName}
+        </Typography>
         {description && (
           <Typography
             data-testid={`${uniqueId}-row-description`}

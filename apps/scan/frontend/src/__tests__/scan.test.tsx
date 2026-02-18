@@ -91,7 +91,7 @@ test('recent activity link from tab opens a tab', async () => {
   expect(within(firstRow).getByText('Automation')).toBeDefined();
   expect(within(firstRow).getByText(`0.03 ${spliceInstanceNames.amuletNameAcronym}`)).toBeDefined();
   expect(
-    within(firstRow).getByText(`1 ${spliceInstanceNames.amuletNameAcronym}/USD`)
+    within(firstRow).getByText(`200 ${spliceInstanceNames.amuletNameAcronym}/USD`)
   ).toBeDefined();
 });
 

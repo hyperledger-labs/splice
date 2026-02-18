@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResources}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -29,7 +29,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.util.{Random, Try}
 
-class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
+class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment with WalletTestUtil {
 
   private val invalidValidator = "aliceValidatorInvalid"
   private val validatorPartyHint = s"imnotvalid_${(new scala.util.Random).nextInt(10000)}"

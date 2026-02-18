@@ -5,7 +5,12 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, StoreTest, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryMetrics,
+  PageLimit,
+  StoreTestBase,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import com.digitalasset.canton.resource.DbStorage
@@ -16,7 +21,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequiremen
 
 import scala.concurrent.Future
 
-class ScanEventStoreTest extends StoreTest with HasExecutionContext with SplicePostgresTest {
+class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with SplicePostgresTest {
 
   "ScanEventStore" should {
     "combine verdict and update events by update_id" in {
@@ -927,6 +932,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
           informees = informees.map(_.toProtoPrimitive),
           confirmingParties = Json.arr(),
           subViews = Seq.empty,
+          viewHash = Some(s"hash-$viewId"),
         )
       )
     }

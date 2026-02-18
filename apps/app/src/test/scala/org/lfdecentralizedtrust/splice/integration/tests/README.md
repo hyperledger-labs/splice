@@ -80,7 +80,7 @@ This can, for example, cause contracts with expiration times to expire and get a
 Starting up our [test topology](apps/app/src/test/resources/simple-topology.conf) is time-intensive.
 Whenever a test suite affords it (which should be most of the time),
 we therefore want to do this only once for the whole test suite.
-This is realized by defining test classes as `extends IntegrationTestWithSharedEnvironment` / `extends FrontendIntegrationTestWithSharedEnvironment(...)`.
+This is realized by defining test classes as `extends IntegrationTest` / `extends FrontendIntegrationTest(...)`.
 Use tests with a shared environment whenever it's possible!
 It prevents our CI waiting times from exploding.
 

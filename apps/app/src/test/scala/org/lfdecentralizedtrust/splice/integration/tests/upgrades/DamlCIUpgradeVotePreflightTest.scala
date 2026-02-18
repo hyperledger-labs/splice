@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests.upgrades
 
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.SvUiPreflightIntegrationTestUtil
 import org.lfdecentralizedtrust.splice.util.SvFrontendTestUtil
 import org.openqa.selenium.By
@@ -16,7 +16,7 @@ import scala.collection.parallel.CollectionConverters.*
   * Note that it needs to run on the commit of the upgrade, so that DarResources.*_current points to the latest version.
   */
 class DamlCIUpgradeVotePreflightTest
-    extends FrontendIntegrationTestWithSharedEnvironment(
+    extends FrontendIntegrationTest(
       "sv1",
       "sv2",
       "sv3",

@@ -21,7 +21,7 @@ export const FormControls: React.FC<FormControlsProps> = props => {
     if (showConfirmation) {
       onEdit();
     } else {
-      navigate('/governance-beta/proposals/create');
+      navigate('/governance/proposals/create');
     }
   };
 
