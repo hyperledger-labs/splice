@@ -262,3 +262,44 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED')].value
           pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.trusted-synchronizer-config\.threshold = 2'
+
+  - it: "configures migrate-validator-party-scan-admin-api URL based on scanClient"
+    set:
+      migrateValidatorParty: true
+      scanClient:
+        scanType: "trust-single"
+        scanAddress: "https://trusted-migration-scan.url"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.migrate-validator-party\.scan\.admin-api\.url = "https://trusted-migration-scan\.url"'
+
+  - it: "picks the first seedUrl for migrate-validator-party-scan-admin-api in BFT mode"
+    set:
+      migrateValidatorParty: true
+      scanClient:
+        scanType: "bft"
+        seedUrls:
+          - "https://first-seed.url"
+          - "https://second-seed.url"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.migrate-validator-party\.scan\.admin-api\.url = "https://first-seed\.url"'
+
+  - it: "falls back to legacy internal address for migrate-validator-party-scan-admin-api when scanClient is missing"
+    set:
+      migrateValidatorParty: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.migrate-validator-party\.scan\.admin-api\.url = \$\{_scan\.admin-api\.address\}'

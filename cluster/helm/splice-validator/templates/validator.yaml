@@ -223,7 +223,15 @@ spec:
         {{- if  .Values.migrateValidatorParty }}
         - name: ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY
           value: |
+            {{- if .Values.scanClient}}
+              {{- if eq .Values.scanClient.scanType "trust-single" }}
+            canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = {{ .Values.scanClient.scanAddress | quote }}
+              {{- else}}
+            canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = {{ index .Values.scanClient.seedUrls 0 | quote }}
+              {{- end }}
+            {{- else }}
             canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = ${_scan.admin-api.address}
+            {{- end }}
         {{- end }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
