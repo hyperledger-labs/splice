@@ -175,7 +175,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           </Typography>
           <Button
             component={RouterLink}
-            to="/governance-beta/proposals"
+            to="/governance/proposals"
             size="small"
             color="secondary"
             startIcon={<ChevronLeft fontSize="small" />}

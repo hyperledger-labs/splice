@@ -11,7 +11,7 @@ import {
   UpdateId,
   updateIdFromEventId,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { useActivity } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
+import { useActivity, useAmuletPrice } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import BigNumber from 'bignumber.js';
 import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
@@ -42,6 +42,7 @@ export const ActivityTable: React.FC = () => {
     hasNextPage,
     isFetchingNextPage,
   } = useActivity();
+  const amuletPriceQuery = useAmuletPrice();
 
   const { ref, inView } = useInView();
 
@@ -63,12 +64,14 @@ export const ActivityTable: React.FC = () => {
 
   return (
     <Stack spacing={4} direction="column" data-testid="activity-table">
-      {isLoading ? (
+      {isLoading || amuletPriceQuery.isLoading ? (
         <Loading />
       ) : isError ? (
         <ErrorDisplay message={'Error while fetching recent activity.'} />
       ) : hasNoActivities(pagedActivities) ? (
         <Typography variant="h6">No recent activity available yet</Typography>
+      ) : amuletPriceQuery.isError ? (
+        <ErrorDisplay message={'Error while fetching amulet price.'} />
       ) : (
         <TitledTable title="Recent Activity">
           <TableHead>
@@ -95,6 +98,7 @@ export const ActivityTable: React.FC = () => {
                     <ActivityRow
                       key={activity.eventId + activity.activityType}
                       activity={activity}
+                      amuletPrice={amuletPriceQuery.data!}
                     />
                   ))
             )}
@@ -126,7 +130,6 @@ interface ActivityView {
   feesBurnt: BigNumber;
   transferAmount: BigNumber;
   rewardsCollected: RewardsCollected;
-  amuletPrice: BigNumber;
   eventId: string;
 }
 
@@ -205,7 +208,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       feesBurnt: feesBurnt,
       transferAmount: transferAmount,
       rewardsCollected: rewardsCollected,
-      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -218,7 +220,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(mint.amulet_amount),
       rewardsCollected: {},
-      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -231,7 +232,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(tap.amulet_amount),
       rewardsCollected: {},
-      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -241,9 +241,10 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
 
 interface ActivityRowProps {
   activity: ActivityView;
+  amuletPrice: BigNumber;
 }
 
-const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
+const ActivityRow: React.FC<ActivityRowProps> = ({ activity, amuletPrice }) => {
   return (
     <TableRow className="activity-row">
       <TableCell>
@@ -271,22 +272,16 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         })()}
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay
-          amountAmulet={activity.transferAmount}
-          amuletPrice={activity.amuletPrice}
-        />
+        <ActivityAmountDisplay amountAmulet={activity.transferAmount} amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell align="right">
         <ActivityRewardDisplay rewards={activity.rewardsCollected} />
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay
-          amountAmulet={activity.feesBurnt}
-          amuletPrice={activity.amuletPrice}
-        />
+        <ActivityAmountDisplay amountAmulet={activity.feesBurnt} amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell align="right">
-        <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={activity.amuletPrice} />
+        <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell>
         <UpdateId updateId={updateIdFromEventId(activity.eventId)} />

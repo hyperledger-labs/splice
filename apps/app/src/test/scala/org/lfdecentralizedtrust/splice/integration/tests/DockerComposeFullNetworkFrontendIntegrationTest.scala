@@ -11,7 +11,7 @@ import java.lang.ProcessBuilder
 import scala.jdk.CollectionConverters.*
 
 class DockerComposeFullNetworkFrontendIntegrationTest
-    extends FrontendIntegrationTest("frontend")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("frontend")
     with FrontendLoginUtil
     with WalletFrontendTestUtil {
   override def environmentDefinition: SpliceEnvironmentDefinition =

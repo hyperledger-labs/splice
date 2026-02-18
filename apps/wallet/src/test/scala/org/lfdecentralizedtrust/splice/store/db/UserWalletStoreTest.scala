@@ -1,7 +1,13 @@
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
+  amulet as amuletCodegen,
+  amuletrules as amuletRulesCodegen,
+  ans as ansCodegen,
+  round as roundCodegen,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -11,7 +17,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
   transferpreapproval as preapprovalCodegen,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -20,6 +25,11 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   BuyTrafficRequestStatusRejected,
   BuyTrafficRequestTxLogEntry,
+  DevelopmentFundCouponArchivedTxLogEntry,
+  DevelopmentFundCouponStatusClaimed,
+  DevelopmentFundCouponStatusExpired,
+  DevelopmentFundCouponStatusRejected,
+  DevelopmentFundCouponStatusWithdrawn,
   TransferOfferStatusAccepted,
   TransferOfferTxLogEntry,
   TxLogEntry,
@@ -48,7 +58,9 @@ import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.DevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
 import org.scalatest.{Assertion, Succeeded}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll as scForAll
 
@@ -56,6 +68,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.{Optional, UUID}
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 
 abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecutionContext {
 
@@ -1022,6 +1035,340 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
     }
   }
 
+  "listDevelopmentFundCouponHistory" should {
+    "return correct results" in {
+      def mkAllocateDevelopmentFundCoupon(
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          beneficiary: PartyId,
+          fundManager: PartyId,
+          amount: Double,
+          expiresAt: CantonTimestamp,
+          reason: String,
+      )(offset: Long) = {
+        mkAllocateDevelopmentFundCouponTx(
+          offset,
+          contractId,
+          beneficiary,
+          fundManager,
+          amount,
+          expiresAt,
+          reason,
+        )
+      }
+
+      def mkDevelopmentFundCouponDsoExpire(
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId
+      )(offset: Long) = {
+        mkDevelopmentFundCouponDsoExpireTx(
+          offset,
+          contractId.contractId,
+        )
+      }
+
+      def ingestDevelopmentFundCouponDsoExpire(
+          store: UserWalletStore,
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      ) =
+        dummyDomain.ingest(
+          mkDevelopmentFundCouponDsoExpire(
+            contractId
+          )
+        )(
+          store.multiDomainAcsStore
+        )
+
+      def mkDevelopmentFundCouponWithdraw(
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          reason: String,
+      )(offset: Long) = {
+        mkDevelopmentFundCouponWithdrawTx(
+          offset,
+          contractId.contractId,
+          reason,
+        )
+      }
+
+      def ingestDevelopmentFundCouponWithdraw(
+          store: UserWalletStore,
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          reason: String,
+      ) =
+        dummyDomain.ingest(
+          mkDevelopmentFundCouponWithdraw(
+            contractId,
+            reason,
+          )
+        )(
+          store.multiDomainAcsStore
+        )
+
+      def mkDevelopmentFundCouponReject(
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          reason: String,
+      )(offset: Long) = {
+        mkDevelopmentFundCouponRejectTx(
+          offset,
+          contractId.contractId,
+          reason,
+        )
+      }
+
+      def ingestDevelopmentFundCouponReject(
+          store: UserWalletStore,
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          reason: String,
+      ) =
+        dummyDomain.ingest(
+          mkDevelopmentFundCouponReject(
+            contractId,
+            reason,
+          )
+        )(
+          store.multiDomainAcsStore
+        )
+
+      def mkTransferTransactionWithDevelopmentFundCouponArchive(
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          beneficiary: PartyId,
+      )(offset: Long) = {
+        mkTransferTransactionWithDevelopmentFundCouponArchiveTx(
+          offset,
+          contractId,
+          beneficiary,
+        )
+      }
+
+      def ingestTransferTransactionWithDevelopmentFundCouponArchive(
+          store: UserWalletStore,
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          beneficiary: PartyId,
+      ) =
+        dummyDomain.ingest(
+          mkTransferTransactionWithDevelopmentFundCouponArchive(
+            contractId,
+            beneficiary,
+          )
+        )(
+          store.multiDomainAcsStore
+        )
+
+      def ingestDevelopmentFundCoupon(
+          store: UserWalletStore,
+          contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+          beneficiary: PartyId,
+          fundManager: PartyId,
+          amount: Double,
+          expiresAt: CantonTimestamp,
+          reason: String,
+      ) =
+        dummyDomain.ingest(
+          mkAllocateDevelopmentFundCoupon(
+            contractId,
+            beneficiary,
+            fundManager,
+            amount,
+            expiresAt,
+            reason,
+          )
+        )(
+          store.multiDomainAcsStore
+        )
+
+      val beneficiary = user1
+      val fundManager = user2
+      for {
+        fundManagerStore <- mkStore(fundManager)
+        coupon1Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon2Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon3Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon4Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon5Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon6Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon7Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon8Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        coupon9Cid = new DevelopmentFundCoupon.ContractId(nextCid())
+        // Creation
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon1Cid,
+          beneficiary,
+          fundManager,
+          10.0,
+          time(1),
+          "reason_1",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon2Cid,
+          beneficiary,
+          fundManager,
+          20.0,
+          time(2),
+          "reason_2",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon3Cid,
+          beneficiary,
+          fundManager,
+          30.0,
+          time(3),
+          "reason_3",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon4Cid,
+          beneficiary,
+          fundManager,
+          40.0,
+          time(4),
+          "reason_4",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon5Cid,
+          beneficiary,
+          fundManager,
+          50.0,
+          time(5),
+          "reason_5",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon6Cid,
+          beneficiary,
+          fundManager,
+          60.0,
+          time(6),
+          "reason_6",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon7Cid,
+          beneficiary,
+          fundManager,
+          70.0,
+          time(7),
+          "reason_7",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon8Cid,
+          beneficiary,
+          fundManager,
+          80.0,
+          time(8),
+          "reason_8",
+        )
+        _ <- ingestDevelopmentFundCoupon(
+          fundManagerStore,
+          coupon9Cid,
+          beneficiary,
+          fundManager,
+          90.0,
+          time(9),
+          "reason_9",
+        )
+        // Archival
+        coupon2RejectionReason = "coupon_2_rejection_reason"
+        _ <- ingestDevelopmentFundCouponReject(
+          fundManagerStore,
+          coupon2Cid,
+          coupon2RejectionReason,
+        )
+        _ <-
+          ingestTransferTransactionWithDevelopmentFundCouponArchive(
+            fundManagerStore,
+            coupon1Cid,
+            beneficiary,
+          )
+        coupon3WithdrawalReason = "coupon_3_withdrawal_reason"
+        _ <- ingestDevelopmentFundCouponWithdraw(
+          fundManagerStore,
+          coupon3Cid,
+          coupon3WithdrawalReason,
+        )
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
+          fundManagerStore,
+          coupon5Cid,
+          beneficiary,
+        )
+        _ <- ingestDevelopmentFundCouponDsoExpire(fundManagerStore, coupon4Cid)
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
+          fundManagerStore,
+          coupon7Cid,
+          beneficiary,
+        )
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
+          fundManagerStore,
+          coupon6Cid,
+          beneficiary,
+        )
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
+          fundManagerStore,
+          coupon8Cid,
+          beneficiary,
+        )
+      } yield {
+        def listDevelopmentFundCouponHistory(after: Option[Long]) = fundManagerStore
+          .listDevelopmentFundCouponHistory(after, PageLimit.tryCreate(3))(TraceContext.empty)
+          .futureValue
+
+        def assertPage(
+            after: Option[Long],
+            expected: Seq[(Double, DevelopmentFundCouponArchivedTxLogEntry.Status)],
+        ) = {
+          val page = listDevelopmentFundCouponHistory(after)
+          page.resultsInPage.map { case (archivedEntry, createdEntry) =>
+            createdEntry.amount -> archivedEntry.status
+          } shouldBe expected
+          page
+        }
+
+        val claimedStatus = DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed(
+          DevelopmentFundCouponStatusClaimed()
+        )
+        val expiredStatus = DevelopmentFundCouponArchivedTxLogEntry.Status.Expired(
+          DevelopmentFundCouponStatusExpired()
+        )
+        def withdrawnStatus(reason: String) =
+          DevelopmentFundCouponArchivedTxLogEntry.Status.Withdrawn(
+            DevelopmentFundCouponStatusWithdrawn(reason)
+          )
+        def rejectedStatus(reason: String) =
+          DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected(
+            DevelopmentFundCouponStatusRejected(reason)
+          )
+
+        // Archival order: 2, 1,  3, 5, 4,   7, 6, 8
+        // Coupon 9 is not archived
+        val page1 =
+          assertPage(None, Seq((80.0, claimedStatus), (60.0, claimedStatus), (70.0, claimedStatus)))
+        val page2 = assertPage(
+          page1.nextPageToken,
+          Seq(
+            (40.0, expiredStatus),
+            (50.0, claimedStatus),
+            (30.0, withdrawnStatus(coupon3WithdrawalReason)),
+          ),
+        )
+        val page3 =
+          assertPage(
+            page2.nextPageToken,
+            Seq((10.0, claimedStatus), (20.0, rejectedStatus(coupon2RejectionReason))),
+          )
+        val page4 = listDevelopmentFundCouponHistory(page3.nextPageToken)
+        page4.resultsInPage shouldBe empty
+        page4.nextPageToken should not be defined
+
+        val allArchivedAt =
+          (page1.resultsInPage ++ page2.resultsInPage ++ page3.resultsInPage)
+            .flatMap(_._1.archivedAt)
+        allArchivedAt shouldBe allArchivedAt.sorted(Ordering[Instant].reverse)
+      }
+    }
+  }
+
   private lazy val provider1 = providerParty(1)
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
@@ -1515,6 +1862,220 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
         ).toValue,
       ),
       Seq(),
+      dummyDomain,
+    )
+  }
+
+  private def mkAllocateDevelopmentFundCouponTx(
+      offset: Long,
+      contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      beneficiary: PartyId,
+      fundManager: PartyId,
+      amount: Double,
+      expiresAt: CantonTimestamp,
+      reason: String,
+  ) = {
+    val amuletRulesCid = nextCid()
+    val unclaimedDevelopmentFundCouponCids = Seq(
+      new amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId(nextCid())
+    )
+
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        amuletRulesCid,
+        amuletRulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+        None,
+        amuletRulesCodegen.AmuletRules.CHOICE_AmuletRules_AllocateDevelopmentFundCoupon.name,
+        consuming = false,
+        new amuletRulesCodegen.AmuletRules_AllocateDevelopmentFundCoupon(
+          unclaimedDevelopmentFundCouponCids.asJava,
+          beneficiary.toProtoPrimitive,
+          damlDecimal(amount),
+          expiresAt.toInstant,
+          reason,
+          fundManager.toProtoPrimitive,
+        ).toValue,
+        new amuletRulesCodegen.AmuletRules_AllocateDevelopmentFundCouponResult(
+          contractId,
+          Optional.empty(),
+        ).toValue,
+      ),
+      Seq(
+        toCreatedEvent(
+          developmentFundCoupon(contractId, beneficiary, fundManager, amount, expiresAt, reason),
+          Seq(dsoParty),
+          Seq(beneficiary, fundManager),
+        )
+      ),
+      dummyDomain,
+    )
+  }
+
+  private def developmentFundCoupon(
+      contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      beneficiary: PartyId,
+      fundManager: PartyId,
+      amount: Double,
+      expiresAt: CantonTimestamp,
+      reason: String,
+  ) = {
+    val templateId = amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
+    contract(
+      identifier = templateId,
+      contractId = contractId,
+      payload = new amuletCodegen.DevelopmentFundCoupon(
+        dsoParty.toProtoPrimitive,
+        beneficiary.toProtoPrimitive,
+        fundManager.toProtoPrimitive,
+        damlDecimal(amount),
+        expiresAt.toInstant,
+        reason,
+      ),
+    )
+  }
+
+  private def mkDevelopmentFundCouponDsoExpireTx(
+      offset: Long,
+      developmentFundCouponCid: String,
+  ) = {
+    val unclaimedDevelopmentFundCouponCid =
+      new amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId(nextCid())
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        developmentFundCouponCid,
+        amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+        None,
+        amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_DsoExpire.name,
+        consuming = true,
+        new amuletCodegen.DevelopmentFundCoupon_DsoExpire().toValue,
+        new amuletCodegen.DevelopmentFundCoupon_DsoExpireResult(
+          unclaimedDevelopmentFundCouponCid
+        ).toValue,
+      ),
+      Seq(),
+      dummyDomain,
+    )
+  }
+
+  private def mkDevelopmentFundCouponWithdrawTx(
+      offset: Long,
+      developmentFundCouponCid: String,
+      reason: String,
+  ) = {
+    val unclaimedDevelopmentFundCouponCid =
+      new amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId(nextCid())
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        developmentFundCouponCid,
+        amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+        None,
+        amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Withdraw.name,
+        consuming = true,
+        new amuletCodegen.DevelopmentFundCoupon_Withdraw(reason).toValue,
+        new amuletCodegen.DevelopmentFundCoupon_WithdrawResult(
+          unclaimedDevelopmentFundCouponCid
+        ).toValue,
+      ),
+      Seq(),
+      dummyDomain,
+    )
+  }
+
+  private def mkDevelopmentFundCouponRejectTx(
+      offset: Long,
+      developmentFundCouponCid: String,
+      reason: String,
+  ) = {
+    val unclaimedDevelopmentFundCouponCid =
+      new amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId(nextCid())
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        developmentFundCouponCid,
+        amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+        None,
+        amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Reject.name,
+        consuming = true,
+        new amuletCodegen.DevelopmentFundCoupon_Reject(reason).toValue,
+        new amuletCodegen.DevelopmentFundCoupon_RejectResult(
+          unclaimedDevelopmentFundCouponCid
+        ).toValue,
+      ),
+      Seq(),
+      dummyDomain,
+    )
+  }
+
+  private def mkTransferTransactionWithDevelopmentFundCouponArchiveTx(
+      offset: Long,
+      developmentFundCouponCid: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      beneficiary: PartyId,
+  ) = {
+    val amuletRulesCid = nextCid()
+    val openMiningRoundCid = new roundCodegen.OpenMiningRound.ContractId(nextCid())
+
+    mkExerciseTx(
+      offset,
+      // Note: This is a mocked transfer and is intentionally not fully consistent;
+      // the test only cares about the coupon archival
+      exercisedEvent(
+        amuletRulesCid,
+        amuletRulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+        None,
+        amuletRulesCodegen.AmuletRules.CHOICE_AmuletRules_Transfer.name,
+        consuming = false,
+        new amuletRulesCodegen.AmuletRules_Transfer(
+          new amuletRulesCodegen.Transfer(
+            beneficiary.toProtoPrimitive,
+            beneficiary.toProtoPrimitive,
+            Seq().asJava,
+            Seq().asJava,
+            Optional.empty(),
+          ),
+          new amuletRulesCodegen.TransferContext(
+            openMiningRoundCid,
+            Map.empty[Round, roundCodegen.IssuingMiningRound.ContractId].asJava,
+            Map.empty[String, amuletCodegen.ValidatorRight.ContractId].asJava,
+            Optional.empty(),
+          ),
+          Optional.of(dsoParty.toProtoPrimitive),
+        ).toValue,
+        new amuletRulesCodegen.TransferResult(
+          new Round(1),
+          new amuletRulesCodegen.TransferSummary(
+            damlDecimal(0),
+            damlDecimal(0),
+            damlDecimal(0),
+            damlDecimal(0),
+            Map.empty[String, amuletRulesCodegen.BalanceChange].asJava,
+            damlDecimal(0.0),
+            Seq().asJava,
+            damlDecimal(0.0),
+            damlDecimal(10.0),
+            damlDecimal(0.15),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.of(damlDecimal(10.0)),
+          ),
+          Seq().asJava,
+          Optional.empty(),
+          Optional.empty(),
+        ).toValue,
+      ),
+      Seq(
+        exercisedEvent(
+          developmentFundCouponCid.contractId,
+          amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+          None,
+          amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive.name,
+          consuming = true,
+          new DamlRecord(),
+          damlUnit.getInstance(),
+        )
+      ),
       dummyDomain,
     )
   }

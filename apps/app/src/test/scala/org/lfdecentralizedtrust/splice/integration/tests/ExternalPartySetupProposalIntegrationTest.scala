@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
@@ -53,7 +53,7 @@ import scala.jdk.OptionConverters.*
 
 // TODO(DACH-NY/canton-network-node#14568) Merge this into ExternallySignedPartyOnboardingTest
 class ExternalPartySetupProposalIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with TriggerTestUtil

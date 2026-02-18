@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.util.*
 import com.daml.nonempty.NonEmpty
@@ -23,7 +23,7 @@ import scala.util.control.NonFatal
 /** Base for preflight tests running against a deployed validator
   */
 abstract class ValidatorPreflightIntegrationTestBase
-    extends FrontendIntegrationTestWithSharedEnvironment(
+    extends FrontendIntegrationTest(
       "alice-validator",
       "bob-validator",
       "charlie-validator",

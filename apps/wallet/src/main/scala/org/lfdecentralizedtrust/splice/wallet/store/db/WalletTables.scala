@@ -14,6 +14,8 @@ import org.lfdecentralizedtrust.splice.store.db.{
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BuyTrafficRequestTxLogEntry,
+  DevelopmentFundCouponArchivedTxLogEntry,
+  DevelopmentFundCouponCreatedTxLogEntry,
   TransferOfferTxLogEntry,
   TxLogEntry,
 }
@@ -91,11 +93,15 @@ object WalletTables extends AcsTables {
       txLogId: String3,
       eventId: Option[String] = None,
       trackingId: Option[String] = None,
+      developmentFundCouponCid: Option[String] = None,
   ) extends TxLogRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "tx_log_id" -> IndexColumnValue[LengthLimitedString](txLogId),
       "event_id" -> IndexColumnValue(eventId.map(lengthLimited)),
       "tracking_id" -> IndexColumnValue(trackingId.map(lengthLimited)),
+      "development_fund_coupon_contract_id" -> IndexColumnValue(
+        developmentFundCouponCid.map(lengthLimited)
+      ),
     )
   }
 
@@ -119,6 +125,18 @@ object WalletTables extends AcsTables {
             entry,
             TxLogEntry.LogId.TransferOfferTxLog,
             trackingId = Some(e.trackingId),
+          )
+        case e: DevelopmentFundCouponCreatedTxLogEntry =>
+          UserWalletTxLogStoreRowData(
+            entry,
+            TxLogEntry.LogId.DevelopmentFundCouponTxLog,
+            developmentFundCouponCid = Some(e.contractId),
+          )
+        case e: DevelopmentFundCouponArchivedTxLogEntry =>
+          UserWalletTxLogStoreRowData(
+            entry,
+            TxLogEntry.LogId.DevelopmentFundCouponTxLog,
+            developmentFundCouponCid = Some(e.contractId),
           )
         case e => throw new RuntimeException(s"Unknown TxLogEntry $e")
       }

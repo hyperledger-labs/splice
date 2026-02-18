@@ -5,7 +5,7 @@ import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, TimeTestUtil, Wa
 import org.openqa.selenium.WebDriver
 
 class SvFrontendTimeBasedIntegrationTest
-    extends FrontendIntegrationTest("sv1", "sv2")
+    extends FrontendIntegrationTestWithIsolatedEnvironment("sv1", "sv2")
     with FrontendLoginUtil
     with WalletTestUtil
     with TimeTestUtil {
