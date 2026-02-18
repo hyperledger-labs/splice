@@ -599,7 +599,7 @@ class JoiningNodeInitializer(
   ): Unit = {
     // throws a RuntimeException if the trigger is not registered
     service.trigger[SvOnboardingUnlimitedTrafficTrigger]: Unit
-    service.trigger[ReconcileSequencerLimitWithMemberTrafficTrigger]: Unit
+    assert(service.triggers[ReconcileSequencerLimitWithMemberTrafficTrigger].nonEmpty)
   }
 
   private def waitForSvToObtainUnlimitedTraffic(

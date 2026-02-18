@@ -3,6 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
@@ -12,15 +19,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.topology.{SynchronizerId, Member}
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -33,7 +32,7 @@ import scala.jdk.CollectionConverters.*
 class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    sequencerAdminConnectionO: Option[SequencerAdminConnection],
+    sequencerAdminConnection: SequencerAdminConnection,
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     ec: ExecutionContext,
@@ -62,9 +61,6 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         },
         memberId => {
           val synchronizerId = SynchronizerId.tryFromString(memberTraffic.payload.synchronizerId)
-          val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
-            sequencerAdminConnectionO
-          )
           sequencerAdminConnection.getStatus
             .map(_.successOption.map(_.synchronizerId))
             .flatMap {

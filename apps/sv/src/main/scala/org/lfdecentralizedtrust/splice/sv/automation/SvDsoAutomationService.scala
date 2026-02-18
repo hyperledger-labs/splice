@@ -298,22 +298,28 @@ class SvDsoAutomationService(
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
-    registerTrigger(
-      new ReconcileSequencerLimitWithMemberTrafficTrigger(
-        triggerContext,
-        dsoStore,
-        localSynchronizerNodes.map(_.current).map(_.sequencerAdminConnection),
-        config.trafficBalanceReconciliationDelay,
+    localSynchronizerNodes
+      .map(_.current)
+      .foreach(current =>
+        registerTrigger(
+          new ReconcileSequencerLimitWithMemberTrafficTrigger(
+            triggerContext,
+            dsoStore,
+            current.sequencerAdminConnection,
+            config.trafficBalanceReconciliationDelay,
+          )
+        )
       )
-    )
-    registerTrigger(
-      new ReconcileSequencerLimitWithMemberTrafficTrigger(
-        triggerContext,
-        dsoStore,
-        localSynchronizerNodes.flatMap(_.successor).map(_.sequencerAdminConnection),
-        config.trafficBalanceReconciliationDelay,
+    localSynchronizerNodes.flatMap(_.successor).foreach { successor =>
+      registerTrigger(
+        new ReconcileSequencerLimitWithMemberTrafficTrigger(
+          triggerContext,
+          dsoStore,
+          successor.sequencerAdminConnection,
+          config.trafficBalanceReconciliationDelay,
+        )
       )
-    )
+    }
     registerTrigger(
       new SvOnboardingUnlimitedTrafficTrigger(
         onboardingTriggerContext,
