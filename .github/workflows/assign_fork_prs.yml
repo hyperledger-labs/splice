@@ -20,6 +20,6 @@ jobs:
                 issue_number: pr.number,
                 owner: pr.base.repo.owner.login,
                 repo: pr.base.repo.name,
-                assignees: ['isegall-da', 'martinflorian-da', 'ray-roestenburg-da'],
+                assignees: ['isegall-da', 'martinflorian-da', 'ray-roestenburg-da', 'rautenrieth-da'],
               });
             }
