@@ -389,15 +389,14 @@ template RewardCouponV2
     round : Round -- ^ The round for which this reward can be claimed.
     amount : Decimal -- ^ The amount of reward to be claimed. Denominated in Amulet.
     expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be claimed.
-    hidden : Bool
-      -- ^ Whether this should be hidden from the beneficiary due to the
-      -- beneficiary not having the correct vetting state at the time of coupon
-      -- creation. The DSO will then attempt to show the coupon to the
-      -- beneficiary again when they change their vetting state unless the
-      -- coupon expired in the meantime.
+    beneficiaryIsObserver : Bool
+      -- ^ Whether the beneficiary should be an observer, which they are unless
+      -- their vetting state at the time of coupon creation does not allow it.
+      -- The DSO will then attempt to make the beneficiary an observer when they
+      -- change their vetting state unless the coupon expired in the meantime.
   where
     signatory dso
-    observer if hidden then [] else [beneficiary]
+    observer if beneficiaryIsObserver then [beneficiary] else []
     ensure amount > 0.0
 
     choice RewardCouponV2_DsoExpire : RewardCouponV2_DsoExpireResult

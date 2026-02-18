@@ -98,25 +98,25 @@ test_reward_accounting_v2 = do
           amount
           round = Round 0
           expiresAt = addRelTime demoTime (days 2)
-          hidden = beneficiary `elem` [bob, dora]
+          beneficiaryIsObserver = not $ beneficiary `elem` [bob, dora]
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
   actualCoupons === expectedCoupons
 
-  -- publish Bob's and Dora's hidden coupon
+  -- make Bob and Dora observers of their coupons (simulates them changing their vetting state)
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
-  hiddenCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> c.hidden)
+  unobservableCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> not c.beneficiaryIsObserver)
   void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_UnhideRewardCouponsV2 with
     sv = sv1
     amuletRulesCid
     choiceArg = AmuletRules_UnhideRewardCouponsV2 with
-      hiddenRewardCouponCids = map fst hiddenCoupons
-      beneficiaries = map (._2.beneficiary) hiddenCoupons
+      rewardCouponCids = map fst unobservableCoupons
+      beneficiaries = map (._2.beneficiary) unobservableCoupons
 
   couponsAfterUnhiding <- query @RewardCouponV2 app.dso
   sortOn (.beneficiary) (map snd couponsAfterUnhiding) ===
-    map (\c -> c with hidden = False) expectedCoupons
+    map (\c -> c with beneficiaryIsObserver = True) expectedCoupons
 
   -- mint alice's coupon in a split fashion
   coupons <- queryInterface @Api.RewardMintingV1.RewardCoupon alice

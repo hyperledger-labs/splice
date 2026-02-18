@@ -129,7 +129,8 @@ template ProcessRewardsV2 with
                   beneficiary
                   amount
                   expiresAt = rewardsExpireAt
-                  hidden = Set.member beneficiary beneficiariesWithWrongVettingState
+                  beneficiaryIsObserver =
+                    not $ Set.member beneficiary beneficiariesWithWrongVettingState
 
         -- intentationally not returning any information here to save computational overhead
         return ProcessRewardsV2_ProcessBatchResult {}

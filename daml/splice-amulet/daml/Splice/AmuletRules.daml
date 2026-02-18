@@ -689,21 +689,21 @@ template AmuletRules
         return AmuletRules_StartProcessingRewardsV2Result with
           processRewardsCid
 
-    -- batch conversion of hidden coupons
+    -- batch conversion of coupons not yet observable by their beneficiaries
     nonconsuming choice AmuletRules_UnhideRewardCouponsV2 : AmuletRules_UnhideRewardCouponsV2Result
       with
-        hiddenRewardCouponCids : [ContractId RewardCouponV2]
+        rewardCouponCids : [ContractId RewardCouponV2]
         beneficiaries : [Party]
       observer beneficiaries
       controller dso
       do
-        require "at least one coupon" (not (null hiddenRewardCouponCids))
+        require "at least one coupon" (not (null rewardCouponCids))
 
         -- unhide coupons
-        results <- forA hiddenRewardCouponCids $ \cid -> do
+        results <- forA rewardCouponCids $ \cid -> do
           coupon <- fetchAndArchive (ForDso with dso) cid
-          require "coupon is hidden" coupon.hidden
-          cid <- create coupon with hidden = False
+          require "beneficiary is no observer on the coupon" (coupon.beneficiaryIsObserver == False)
+          cid <- create coupon with beneficiaryIsObserver = True
           pure (cid, coupon.beneficiary)
 
         -- check specified beneficiaries match actual beneficiaries of the coupons
