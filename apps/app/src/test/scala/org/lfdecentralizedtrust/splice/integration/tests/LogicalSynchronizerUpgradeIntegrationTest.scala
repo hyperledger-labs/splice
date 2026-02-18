@@ -4,6 +4,7 @@ import better.files.File.apply
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
@@ -94,7 +95,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
 
-  "migrate global domain to new nodes without downtime" in { implicit env =>
+  "upgrade synchronizer to new physical synchronizer without downtime" in { implicit env =>
     val allNodes = Seq[AppBackendReference](
       sv1ScanBackend,
       sv2ScanBackend,
@@ -269,12 +270,16 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
+      clue(s"wait for upgrade time ${upgradeTime}") {
+        Threading.sleep(Duration.between(Instant.now(), upgradeTimeInstant).toMillis.abs)
+      }
+
       clue("new nodes are initialized") {
         allBackends.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
-            eventually(2.minutes) {
+            eventuallySucceeds(2.minutes) {
               upgradeSequencerClient.topology.transactions
                 .list(decentralizedSynchronizerId)
                 .result
@@ -283,7 +288,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           }
 
           clue(s"check ${backend.name} initialized mediator") {
-            eventually(2.minutes) {
+            eventuallySucceeds(2.minutes) {
               upgradeMediatorClient.topology.transactions
                 .list(decentralizedSynchronizerId)
                 .result
