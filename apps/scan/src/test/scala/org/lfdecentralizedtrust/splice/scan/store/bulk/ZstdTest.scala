@@ -96,12 +96,13 @@ class ZstdTest extends StoreTestBase with HasS3Mock {
           sub.expectNext().bytes
         }
 
+      val allEncodedTxs = encode(txs)
       def uncompressAndCompare(compressed: ByteString, fromIdx: Int, toIdx: Int) = {
         val inputStream = new ByteArrayInputStream(compressed.toArray)
         val uncompressed = ("zstd -d" #< inputStream).!!
         val decoded =
           uncompressed.split("\n").map(io.circe.parser.decode[UpdateHistoryItem](_)).map(_.value)
-        decoded should contain theSameElementsInOrderAs encode(txs).slice(fromIdx, toIdx)
+        decoded should contain theSameElementsInOrderAs allEncodedTxs.slice(fromIdx, toIdx)
       }
 
       clue("Each output element is a valid zstd object, and so is their concatenation") {
