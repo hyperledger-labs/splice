@@ -43,7 +43,6 @@ class WalletMintingDelegationTimeBasedIntegrationTest
   private val DefaultAmuletMergeLimit = 10
 
   // We create many coupons directly, so avoid running sanity checks
-  override protected def runUpdateHistorySanityCheck: Boolean = false
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =

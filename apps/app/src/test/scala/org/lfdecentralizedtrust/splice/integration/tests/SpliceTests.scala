@@ -45,7 +45,6 @@ import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
   TokenStandardCliSanityCheckPlugin,
-  UpdateHistorySanityCheckPlugin,
   WaitForPorts,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
@@ -122,20 +121,9 @@ object SpliceTests extends LazyLogging {
     protected val durationUntilExpiration: Duration =
       durationUntilOffboardingEffectivity.minusSeconds(1)
 
-    protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
     protected lazy val skipAcsSnapshotChecks: Boolean = false
-    if (runUpdateHistorySanityCheck) {
-      registerPlugin(
-        new UpdateHistorySanityCheckPlugin(
-          sanityChecksIgnoredRootCreates,
-          sanityChecksIgnoredRootExercises,
-          skipAcsSnapshotChecks,
-          loggerFactory,
-        )
-      )
-    }
 
     protected def runEventHistorySanityCheck: Boolean = true
     if (runEventHistorySanityCheck) {
@@ -183,20 +171,9 @@ object SpliceTests extends LazyLogging {
     type SpliceEnvironmentDefinition =
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
-    protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
     protected lazy val skipAcsSnapshotChecks: Boolean = false
-    if (runUpdateHistorySanityCheck) {
-      registerPlugin(
-        new UpdateHistorySanityCheckPlugin(
-          sanityChecksIgnoredRootCreates,
-          sanityChecksIgnoredRootExercises,
-          skipAcsSnapshotChecks,
-          loggerFactory,
-        )
-      )
-    }
 
     protected def runEventHistorySanityCheck: Boolean = true
     if (runEventHistorySanityCheck) {

@@ -37,11 +37,6 @@ class DevelopmentFundCouponIntegrationTest
 
   private val unclaimedDevelopmentFundCouponsThreshold = 3
 
-  // TODO(#3549): scan_txlog does not handle development fund coupons correctly, so this is currently disabled.
-  //  We should decide whether we want to fix scan_txlog for DevelopmentFundCoupons, or narrow its scope enough that we won't care
-  //  (i.e. don't try to be complete, don't use it to assert on scan's aggregates, etc)
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition

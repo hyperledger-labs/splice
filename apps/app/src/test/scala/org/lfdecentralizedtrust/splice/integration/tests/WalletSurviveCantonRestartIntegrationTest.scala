@@ -21,7 +21,6 @@ class WalletSurviveCantonRestartIntegrationTest
 
   // Can sometimes be unhappy when doing funky `withCanton` things; disabling them for simplicity
   override protected def runTokenStandardCliSanityCheck: Boolean = false
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition

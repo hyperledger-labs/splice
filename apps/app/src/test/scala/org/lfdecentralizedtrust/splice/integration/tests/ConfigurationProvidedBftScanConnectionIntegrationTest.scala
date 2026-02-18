@@ -22,7 +22,6 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
     with HasActorSystem {
 
   override protected def runEventHistorySanityCheck: Boolean = false
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

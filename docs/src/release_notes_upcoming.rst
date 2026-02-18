@@ -34,3 +34,7 @@
         Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
         We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration key options as soon as possible.
         Docker Compose-based deployments do not currently support the new custom configuration options.
+
+    - Scan txlog script
+
+      - scan_txlog.py script has been deprecated. It will not be maintained moving forward, and will be removed completely in a future release.
