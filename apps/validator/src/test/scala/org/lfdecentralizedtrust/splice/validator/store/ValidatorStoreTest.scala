@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
-import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreTestBase}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, PageLimit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
@@ -380,6 +380,7 @@ class DbValidatorStoreTest
       ),
       participantId = mkParticipantId("ValidatorStoreTest"),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

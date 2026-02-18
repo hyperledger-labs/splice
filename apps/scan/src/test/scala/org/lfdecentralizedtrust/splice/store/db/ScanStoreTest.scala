@@ -1984,6 +1984,7 @@ class DbScanStoreTest
       IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
       acsStoreDescriptorUserVersion,
       txLogStoreDescriptorUserVersion,
     )(parallelExecutionContext, implicitly, implicitly)

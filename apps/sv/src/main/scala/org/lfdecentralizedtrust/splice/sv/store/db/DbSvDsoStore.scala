@@ -83,6 +83,7 @@ class DbSvDsoStore(
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
     acsStoreDescriptorUserVersion: Option[Long] = None,
+    override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -136,7 +137,7 @@ class DbSvDsoStore(
 
   override def listExpiredAnsSubscriptions(
       now: CantonTimestamp,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleAnsSubscription]] = waitUntilAcsIngested {
     for {
       joinedRows <- storage
@@ -192,7 +193,7 @@ class DbSvDsoStore(
     }
   }
 
-  override def listSvOnboardingConfirmed(limit: Limit)(implicit
+  override def listSvOnboardingConfirmed(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =
     waitUntilAcsIngested {
@@ -413,7 +414,7 @@ class DbSvDsoStore(
       packageQualifiedName: PackageQualifiedName,
       round: Long,
       synchronizerId: SynchronizerId,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[R]] = {
@@ -597,7 +598,7 @@ class DbSvDsoStore(
       } yield assignedContractFromRow(ClosedMiningRound.COMPANION)(result)).value
     }
 
-  override def listOldestSummarizingMiningRounds(limit: Limit = Limit.DefaultLimit)(implicit
+  override def listOldestSummarizingMiningRounds(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[AssignedContract[SummarizingMiningRound.ContractId, SummarizingMiningRound]]] =
     for {
@@ -748,7 +749,7 @@ class DbSvDsoStore(
   override def listInitialPaymentConfirmationByAnsName(
       confirmer: PartyId,
       name: String,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] =
     waitUntilAcsIngested {
       for {
@@ -804,7 +805,7 @@ class DbSvDsoStore(
 
   override def listSvOnboardingRequestsBySvs(
       dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]] =
@@ -925,7 +926,7 @@ class DbSvDsoStore(
     )
   }
 
-  override def listSvAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
+  override def listSvAmuletPriceVotes(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[AmuletPriceVote.ContractId, AmuletPriceVote]]] = waitUntilAcsIngested {
     import scala.jdk.CollectionConverters.*
@@ -1067,7 +1068,7 @@ class DbSvDsoStore(
 
   override def listVoteRequestsByTrackingCid(
       trackingCids: Seq[VoteRequest.ContractId],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = waitUntilAcsIngested {
@@ -1321,7 +1322,7 @@ class DbSvDsoStore(
   override def listClosedRounds(
       roundNumbers: Set[Long],
       synchronizerId: SynchronizerId,
-      limit: Limit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound]]
   ] = {

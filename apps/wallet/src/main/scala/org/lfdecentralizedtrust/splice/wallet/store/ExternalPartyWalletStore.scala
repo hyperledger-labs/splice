@@ -41,12 +41,12 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
   /** The key identifying the parties considered by this store. */
   def key: ExternalPartyWalletStore.Key
 
-  def listAmulets(limit: Limit = Limit.DefaultLimit)(implicit
+  def listAmulets(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[Amulet.ContractId, Amulet]]] =
     multiDomainAcsStore.listContracts(Amulet.COMPANION, limit).map(_.map(_.contract))
 
-  def listLockedAmulets(limit: Limit = Limit.DefaultLimit)(implicit
+  def listLockedAmulets(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[LockedAmulet.ContractId, LockedAmulet]]] =
     multiDomainAcsStore.listContracts(LockedAmulet.COMPANION, limit).map(_.map(_.contract))
@@ -58,7 +58,7 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
       .findAnyContractWithOffset(TransferCommandCounter.COMPANION)
       .map(_.value.map(_.contract))
 
-  def listMintingDelegations(limit: Limit = Limit.DefaultLimit)(implicit
+  def listMintingDelegations(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[
     mintingDelegationCodegen.MintingDelegation.ContractId,
@@ -70,7 +70,7 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
 
   def listSortedLivenessActivityRecords(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
@@ -82,7 +82,7 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
   ]]
 
   def listUnclaimedActivityRecords(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[Seq[
     Contract[
       UnclaimedActivityRecord.ContractId,
@@ -94,7 +94,7 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
       .map(_.map(_.contract))
 
   def listDevelopmentFundCoupons(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[Seq[
     Contract[
       DevelopmentFundCoupon.ContractId,
@@ -122,6 +122,7 @@ object ExternalPartyWalletStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -135,6 +136,7 @@ object ExternalPartyWalletStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      defaultLimit,
     )
   }
 

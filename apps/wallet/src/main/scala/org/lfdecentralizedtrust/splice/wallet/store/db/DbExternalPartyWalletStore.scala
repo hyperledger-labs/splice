@@ -38,6 +38,7 @@ class DbExternalPartyWalletStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -83,7 +84,7 @@ class DbExternalPartyWalletStore(
 
   override def listSortedLivenessActivityRecords(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[

@@ -22,7 +22,7 @@ trait TransferInputStore extends AppStore with LimitHelpers {
   // TODO(#2257): we don't really need the round here anymore
   def listSortedAmuletsAndQuantity(
       submittingRound: Long,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[(BigDecimal, InputAmulet)]] = for {
@@ -53,7 +53,7 @@ trait TransferInputStore extends AppStore with LimitHelpers {
     */
   def listSortedValidatorRewards(
       activeIssuingRoundsO: Option[Set[Long]],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]
   ]] =
@@ -82,7 +82,7 @@ trait TransferInputStore extends AppStore with LimitHelpers {
     */
   def listSortedAppRewards(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[AppRewardCoupon.ContractId, AppRewardCoupon], BigDecimal)
   ]] =

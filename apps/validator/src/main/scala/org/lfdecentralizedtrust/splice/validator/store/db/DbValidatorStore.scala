@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   AcsTables,
   DbAppStore,
 }
-import org.lfdecentralizedtrust.splice.store.{LimitHelpers, PageLimit}
+import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
@@ -52,6 +52,7 @@ class DbValidatorStore(
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
     acsStoreDescriptorUserVersion: Option[Long] = None,
+    override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
