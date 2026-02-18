@@ -12,7 +12,6 @@ import java.nio.ByteBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 import scala.util.{Try, Using}
-import scala.annotation.tailrec
 
 class S3BucketConnectionForUnitTests(
     s3Client: S3AsyncClient,
