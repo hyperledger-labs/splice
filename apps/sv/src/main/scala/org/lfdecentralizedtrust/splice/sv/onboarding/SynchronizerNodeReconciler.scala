@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SynchronizerNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider, SpliceLedgerConnection}
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeState
@@ -24,6 +23,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.MapHasAsScala
@@ -42,7 +42,7 @@ class SynchronizerNodeReconciler(
   private val dsoParty = dsoStore.key.dsoParty
 
   def reconcileSynchronizerNodeConfigIfRequired(
-      synchronizerNode: Option[SynchronizerNode],
+      synchronizerNodes: Option[LocalSynchronizerNodes],
       synchronizerId: SynchronizerId,
       state: SynchronizerNodeState,
       migrationId: Long,
@@ -51,9 +51,11 @@ class SynchronizerNodeReconciler(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Unit] = {
+    // TODO(#564) - add ability to sync all the synchronizers
+    val currentNode = synchronizerNodes.map(_.current)
     def setConfigIfRequired() = for {
-      localSequencerConfig <- SvUtil.getSequencerConfig(synchronizerNode, migrationId)
-      localMediatorConfig <- SvUtil.getMediatorConfig(synchronizerNode)
+      localSequencerConfig <- SvUtil.getSequencerConfig(currentNode, migrationId)
+      localMediatorConfig <- SvUtil.getMediatorConfig(currentNode)
       localScanConfig = java.util.Optional.of(new ScanConfig(scanConfig.publicUrl.toString()))
       rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
@@ -119,7 +121,7 @@ class SynchronizerNodeReconciler(
             synchronizerNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
             localSequencerConfig.map { c =>
               val sequencerAvailabilityDelay =
-                synchronizerNode
+                currentNode
                   .map(_.sequencerAvailabilityDelay)
                   .getOrElse(
                     sys.error(

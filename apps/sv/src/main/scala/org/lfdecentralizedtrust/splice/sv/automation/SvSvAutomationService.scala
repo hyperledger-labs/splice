@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
@@ -30,6 +29,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -43,7 +43,7 @@ class SvSvAutomationService(
     storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    localSynchronizerNode: Option[LocalSynchronizerNode],
+    localSynchronizerNodes: Option[LocalSynchronizerNodes],
     retryProvider: RetryProvider,
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -89,10 +89,11 @@ class SvSvAutomationService(
         config.domains.global.alias,
         topologySnapshotConfig,
         triggerContext,
-        localSynchronizerNode
+        localSynchronizerNodes
           .getOrElse(
             sys.error("Cannot take topology snapshot with no localSynchronizerNode")
           )
+          .current
           .sequencerAdminConnection,
         participantAdminConnection,
         clock,
@@ -107,9 +108,11 @@ class SvSvAutomationService(
         dsoStore,
         backupConfig,
         participantAdminConnection,
-        localSynchronizerNode.getOrElse(
-          sys.error("Cannot dump identities with no localSynchronizerNode")
-        ),
+        localSynchronizerNodes
+          .getOrElse(
+            sys.error("Cannot dump identities with no localSynchronizerNode")
+          )
+          .current,
         triggerContext,
       )
     )

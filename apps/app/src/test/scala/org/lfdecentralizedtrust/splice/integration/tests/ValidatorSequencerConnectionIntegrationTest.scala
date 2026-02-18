@@ -136,7 +136,7 @@ class ValidatorSequencerConnectionIntegrationTest
   }
 
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String = {
-    val fullUrl = sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+    val fullUrl = sv.config.localSynchronizerNodes.current.value.sequencer.externalPublicApiUrl
     Uri(fullUrl).authority.toString()
   }
 

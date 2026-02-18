@@ -6,6 +6,23 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 import cats.implicits.catsSyntaxApplicativeByName
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.sequencing.SequencerConnections
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
   SpliceInstanceNamesConfig,
@@ -34,7 +51,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode}
 import org.lfdecentralizedtrust.splice.sv.config.{
@@ -56,25 +73,8 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigra
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.SequencerConnections
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.io.FileNotFoundException
 import java.nio.file.Path
@@ -82,7 +82,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
-    localSynchronizerNode: LocalSynchronizerNode,
+    localSynchronizerNodes: LocalSynchronizerNodes,
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
     cometBftConfig: Option[SvCometBftConfig],
@@ -200,7 +200,7 @@ class DomainMigrationInitializer(
         dsoStore,
         ledgerClient,
         participantAdminConnection,
-        Some(localSynchronizerNode),
+        Some(localSynchronizerNodes),
       )
       connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       _ <- SetupUtil
@@ -239,7 +239,7 @@ class DomainMigrationInitializer(
           participantAdminConnection,
           retryProvider,
           newCometBftNode,
-          Some(localSynchronizerNode),
+          Some(localSynchronizerNodes),
           upgradesConfig,
           spliceInstanceNamesConfig,
           loggerFactory,
@@ -316,7 +316,7 @@ class DomainMigrationInitializer(
       _ <- domainDataRestorer.connectDomainAndRestoreData(
         synchronizerAlias,
         domainMigrationDump.nodeIdentities.synchronizerId,
-        SequencerConnections.single(localSynchronizerNode.sequencerConnection),
+        SequencerConnections.single(localSynchronizerNodes.current.sequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
@@ -325,14 +325,14 @@ class DomainMigrationInitializer(
   }
 
   private val mediatorAdminConnection: MediatorAdminConnection =
-    localSynchronizerNode.mediatorAdminConnection
+    localSynchronizerNodes.current.mediatorAdminConnection
 
   private def initializeSynchronizerNode(
       nodeIdentities: SynchronizerNodeIdentities,
       genesisState: Seq[ByteString],
   ): Future[Unit] = {
     val synchronizerNodeInitiaizer = SynchronizerNodeInitializer(
-      localSynchronizerNode,
+      localSynchronizerNodes.current,
       clock,
       loggerFactory,
       retryProvider,
@@ -357,7 +357,7 @@ class DomainMigrationInitializer(
             "mediator_up_to_date",
             "mediator synced topology",
             for {
-              sequencerTopology <- localSynchronizerNode.sequencerAdminConnection
+              sequencerTopology <- localSynchronizerNodes.current.sequencerAdminConnection
                 .listAllTransactions(
                   TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
                 )
@@ -402,17 +402,17 @@ class DomainMigrationInitializer(
                 s"Restoring sequencer topology from genesis state"
               )
               _ = waitForNodeReadyToInitialize(
-                localSynchronizerNode.sequencerAdminConnection,
+                localSynchronizerNodes.current.sequencerAdminConnection,
                 identity,
               )
               _ <- retryProvider.retry(
                 RetryFor.ClientCalls,
                 "init_sequencer_genesis",
                 s"Initialize sequencer ${identity.id} from genesis state",
-                localSynchronizerNode.sequencerAdminConnection
+                localSynchronizerNodes.current.sequencerAdminConnection
                   .initializeFromGenesisState(
                     genesisState,
-                    localSynchronizerNode.staticDomainParameters,
+                    localSynchronizerNodes.current.staticDomainParameters,
                   ),
                 logger,
               )
@@ -420,7 +420,7 @@ class DomainMigrationInitializer(
                 RetryFor.ClientCalls,
                 "sequencer_initialized",
                 "sequencer is initialized",
-                localSynchronizerNode.sequencerAdminConnection.getStatus.map {
+                localSynchronizerNodes.current.sequencerAdminConnection.getStatus.map {
                   _.successOption.fold(
                     throw Status.FAILED_PRECONDITION
                       .withDescription("Sequencer is not initialized")
@@ -440,7 +440,7 @@ class DomainMigrationInitializer(
             RetryFor.ClientCalls,
             "sequencer_initialized_id",
             "sequencer is initialized with restored id",
-            localSynchronizerNode.sequencerAdminConnection.getSequencerId.map { id =>
+            localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.map { id =>
               if (id != identity.id) {
                 throw Status.FAILED_PRECONDITION
                   .withDescription("Sequencer is not initialized with dump id")
@@ -508,8 +508,8 @@ class DomainMigrationInitializer(
               mediatorAdminConnection
                 .initialize(
                   synchronizerId,
-                  localSynchronizerNode.sequencerConnection,
-                  localSynchronizerNode.mediatorSequencerAmplification.toInternal,
+                  localSynchronizerNodes.current.sequencerConnection,
+                  localSynchronizerNodes.current.mediatorSequencerAmplification.toInternal,
                 ),
               logger,
             )

@@ -109,7 +109,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     // Increase the decentralized namespace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
     // do this by falsely adding the sequencer namespace to the decentralized namespace
     val sv1SequencerAdminConnection =
-      sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
+      sv1Backend.appState.localSynchronizerNodes.value.current.sequencerAdminConnection
     val sv1SequencerId = sv1SequencerAdminConnection.getSequencerId.futureValue
     val newDecentralizedNamespace = Seq(
       sv1SequencerAdminConnection,

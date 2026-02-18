@@ -88,7 +88,7 @@ class ValidatorProxyIntegrationTest
           ) shouldBe true
 
           val sequencerPort = Uri(
-            sv1Backend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+            sv1Backend.config.localSynchronizerNodes.current.value.sequencer.externalPublicApiUrl
           ).effectivePort
 
           eventuallySucceeds() {

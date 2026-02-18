@@ -43,6 +43,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -86,7 +87,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       dsoStore: SvDsoStore,
       ledgerClient: SpliceLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes],
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -104,7 +105,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       storage,
       ledgerClient,
       participantAdminConnection,
-      localSynchronizerNode,
+      localSynchronizerNodes,
       retryProvider,
       config.topologySnapshotConfig,
       loggerFactory,
@@ -135,7 +136,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def newSvDsoAutomationService(
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
       enabledFeatures: EnabledFeaturesConfig,
@@ -157,7 +158,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      localSynchronizerNode,
+      localSynchronizerNodes,
       upgradesConfig,
       spliceInstanceNamesConfig,
       loggerFactory,

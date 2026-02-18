@@ -137,7 +137,7 @@ class ParticipantAdminConnection(
     )
   }
 
-  private def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+  def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[PhysicalSynchronizerId] =
     // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make

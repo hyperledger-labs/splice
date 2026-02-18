@@ -3,7 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.sv.config
 
+import cats.syntax.either.*
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeInt,
@@ -12,11 +14,12 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
@@ -36,7 +39,6 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
@@ -292,11 +294,7 @@ case class SvAppBackendConfig(
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
-    // TODO(#564): read this from scan
-    currentPhysicalSynchronizerSerial: Option[PhysicalSynchronizerSerial] = Some(
-      NonNegativeInt.zero
-    ),
-    localSynchronizerNodes: Map[PhysicalSynchronizerSerial, SvSynchronizerNodeConfig],
+    localSynchronizerNodes: SvSynchronizerNodesConfig,
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -377,14 +375,6 @@ case class SvAppBackendConfig(
     dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig {
 
-  lazy val localSynchronizerNode: Option[SvSynchronizerNodeConfig] = {
-    localSynchronizerNodes
-      .find { case (index, _) =>
-        currentPhysicalSynchronizerSerial.contains(index)
-      }
-      .map(_._2)
-  }
-
   def shouldSkipSynchronizerInitialization: Boolean =
     skipSynchronizerInitialization &&
       onboarding.fold(true) {
@@ -420,7 +410,6 @@ object SvAppBackendConfig {
     NonNegativeFiniteDuration.ofSeconds(10),
   )
 
-  type PhysicalSynchronizerSerial = NonNegativeInt
 }
 
 case class SvCometBftConfig(
@@ -499,9 +488,22 @@ final case class SvScanConfig(
 final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
+    protocolVersion: ProtocolVersion = ProtocolVersion.v34,
+    serial: NonNegativeInt = NonNegativeInt.zero,
 ) {
-  val parameters: SynchronizerParametersConfig = SynchronizerParametersConfig()
+  val staticParameters: StaticSynchronizerParameters = SynchronizerParametersConfig()
+    .toStaticSynchronizerParameters(
+      CryptoConfig(provider = CryptoProvider.Jce),
+      protocolVersion,
+      serial,
+    )
+    .valueOr(err => throw new IllegalArgumentException(s"Invalid domain parameters config: $err"))
 }
+
+final case class SvSynchronizerNodesConfig(
+    current: Option[SvSynchronizerNodeConfig],
+    successor: Option[SvSynchronizerNodeConfig],
+)
 
 final case class SvCantonIdentifierConfig(
     participant: String,
