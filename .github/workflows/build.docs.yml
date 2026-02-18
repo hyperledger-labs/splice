@@ -40,7 +40,7 @@ jobs:
           cmd: "Test/compile docs/bundle"
 
       - name: Upload documentation artifacts
-        uses: actions/upload-pages-artifact@2d163be3ddce01512f3eea7ac5b7023b5d643ce1
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           path: docs/html/html
