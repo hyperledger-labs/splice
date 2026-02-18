@@ -189,6 +189,7 @@ class ScanApp(
         nodeMetrics.dbScanStore,
         config.automation.ingestion,
         initialRound.toLong,
+        config.parameters.defaultLimit,
         config.acsStoreDescriptorUserVersion,
         config.txLogStoreDescriptorUserVersion,
       )

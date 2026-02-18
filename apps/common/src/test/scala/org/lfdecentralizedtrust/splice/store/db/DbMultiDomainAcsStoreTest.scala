@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.migration.{DomainMigrationInfo, Migration
 import org.lfdecentralizedtrust.splice.store.StoreTestBase.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  Limit,
   MultiDomainAcsStore,
   MultiDomainAcsStoreTest,
   StoreTestBase,
@@ -803,6 +804,7 @@ class DbMultiDomainAcsStoreTest
       ),
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
   }
 

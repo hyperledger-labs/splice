@@ -83,6 +83,7 @@ class UserWalletService(
       domainMigrationInfo,
       participantId,
       automationConfig.ingestion,
+      params.defaultLimit,
     )
 
   val updateHistory: UpdateHistory =
