@@ -151,10 +151,9 @@ class DevelopmentFundCouponIntegrationTest
         )
       }
       eventually()(
-        sv1ValidatorBackend.scanProxy
-          .listUnclaimedDevelopmentFundCoupons()
-          .map(coupon => BigDecimal(coupon.contract.payload.amount))
-          .sum shouldBe unclaimedDevelopmentFundCouponTotal
+        getUnclaimedDevelopmentFundCouponTotal(
+          sv1ValidatorBackend
+        ) shouldBe unclaimedDevelopmentFundCouponTotal
       )
     }
 
@@ -314,13 +313,22 @@ class DevelopmentFundCouponIntegrationTest
         .futureValue
         .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
-    clue("Mint one unclaimed development fund coupon") {
-      createUnclaimedDevelopmentFundCoupon(
-        sv1ValidatorBackend.participantClientWithAdminToken,
-        sv1UserId,
-        initialUnclaimedDevelopmentFundCouponAmount,
-      )
-    }
+    actAndCheck(
+      "Mint one unclaimed development fund coupon", {
+        createUnclaimedDevelopmentFundCoupon(
+          sv1ValidatorBackend.participantClientWithAdminToken,
+          sv1UserId,
+          initialUnclaimedDevelopmentFundCouponAmount,
+        )
+      },
+    )(
+      "The unclaimed development fund coupon is created",
+      _ => {
+        getUnclaimedDevelopmentFundCouponTotal(
+          sv1ValidatorBackend
+        ) shouldBe initialUnclaimedDevelopmentFundCouponAmount
+      },
+    )
 
     val bobBalanceBefore = bobWalletClient.balance().unlockedQty
     val (_, unclaimedDevelopmentFundCouponTotalBeforeClaiming) = setTriggersWithin(
@@ -425,13 +433,22 @@ class DevelopmentFundCouponIntegrationTest
         _.dsoDelegateBasedAutomation.trigger[ExpiredDevelopmentFundCouponTrigger]
       )
 
-    clue("Mint one unclaimed development fund coupon") {
-      createUnclaimedDevelopmentFundCoupon(
-        sv1ValidatorBackend.participantClientWithAdminToken,
-        sv1UserId,
-        initialUnclaimedDevelopmentFundCouponAmount,
-      )
-    }
+    actAndCheck(
+      "Mint one unclaimed development fund coupon", {
+        createUnclaimedDevelopmentFundCoupon(
+          sv1ValidatorBackend.participantClientWithAdminToken,
+          sv1UserId,
+          initialUnclaimedDevelopmentFundCouponAmount,
+        )
+      },
+    )(
+      "The unclaimed development fund coupon is created",
+      _ => {
+        getUnclaimedDevelopmentFundCouponTotal(
+          sv1ValidatorBackend
+        ) shouldBe initialUnclaimedDevelopmentFundCouponAmount
+      },
+    )
 
     setTriggersWithin(
       triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
@@ -513,13 +530,22 @@ class DevelopmentFundCouponIntegrationTest
         .futureValue
         .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
-    clue("Mint one unclaimed development fund coupon") {
-      createUnclaimedDevelopmentFundCoupon(
-        sv1ValidatorBackend.participantClientWithAdminToken,
-        sv1UserId,
-        initialUnclaimedDevelopmentFundCouponAmount,
-      )
-    }
+    actAndCheck(
+      "Mint one unclaimed development fund coupon", {
+        createUnclaimedDevelopmentFundCoupon(
+          sv1ValidatorBackend.participantClientWithAdminToken,
+          sv1UserId,
+          initialUnclaimedDevelopmentFundCouponAmount,
+        )
+      },
+    )(
+      "The unclaimed development fund coupon is created",
+      _ => {
+        getUnclaimedDevelopmentFundCouponTotal(
+          sv1ValidatorBackend
+        ) shouldBe initialUnclaimedDevelopmentFundCouponAmount
+      },
+    )
 
     setTriggersWithin(
       triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
