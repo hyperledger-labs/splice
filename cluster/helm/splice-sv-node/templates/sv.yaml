@@ -169,7 +169,7 @@ spec:
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
               #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
-                canton.sv-apps.sv.local-synchronizer-nodes {
+                canton.sv-apps.sv.local-synchronizer-nodes.current {
                   sequencer {
                     {{- if .Values.domain.enableBftSequencer }}
                     is-bft-sequencer = true
@@ -197,12 +197,12 @@ spec:
                     }
                   }
                 }
-            {{- else if .Values.physicalSynchronizers }}
-            {{- range $idx, $sync := .Values.physicalSynchronizers }}
-            - name: ADDITIONAL_CONFIG_SV_DOMAIN_{{ $idx }}
+            {{- else if .Values.localSynchronizers }}
+            {{- range $syncName, $sync := .Values.localSynchronizers }}
+            - name: ADDITIONAL_CONFIG_SV_DOMAIN_{{ $syncName | upper }}
               #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
-                canton.sv-apps.sv.local-synchronizer-nodes.{{ $sync.physicalSynchronizerId }} {
+                canton.sv-apps.sv.local-synchronizer-nodes.{{ $syncName }} {
                   sequencer {
                     {{- if $sync.enableBftSequencer }}
                     is-bft-sequencer = true

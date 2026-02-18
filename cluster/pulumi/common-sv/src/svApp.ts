@@ -38,8 +38,7 @@ export function valuesForSvApp(
     ? [
         {
           name: 'ADDITIONAL_CONFIG_MEDIATOR_PRUNING',
-          // TODO(#564) - use actualy psid
-          value: `canton.sv-apps.sv.local-synchronizer-nodes.0.mediator.pruning {
+          value: `canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {
                     cron = "${config.pruning.mediator.cron}"
                     max-duration = "${config.pruning.mediator.maxDuration}"
                     retention = "${config.pruning.mediator.retentionPeriod}"

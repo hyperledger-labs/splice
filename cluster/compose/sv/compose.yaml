@@ -229,7 +229,7 @@ services:
       - |
         ADDITIONAL_CONFIG_SV_DOMAIN=
                 canton.sv-apps.sv.local-synchronizer-nodes {
-                  0 = {
+                  current = {
                      sequencer {
                        admin-api {
                        address = canton

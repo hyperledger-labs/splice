@@ -1,7 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-suite: "Validator values - physicalSynchronizers config"
+suite: "Validator values - localSynchronizers config"
 templates:
   - sv.yaml
 release:
@@ -12,10 +12,10 @@ chart:
   version: 0.1.1
   appVersion: 0.1.0
 
-# Things we need just to pass the schema - using physicalSynchronizers (new format)
+# Things we need just to pass the schema - using localSynchronizers (new format)
 set:
-  physicalSynchronizers:
-    - physicalSynchronizerId: "mock-sync"
+  localSynchronizers:
+    current:
       sequencerPublicUrl: "https://sequencer.mock.com"
       sequencerAddress: "sequencer-address"
       mediatorAddress: "mediator-address"
@@ -39,10 +39,10 @@ set:
     audience: "mock_audience"
 
 tests:
-  - it: "sets physicalSynchronizers configuration with single synchronizer"
+  - it: "sets localSynchronizers configuration with single synchronizer (current)"
     set:
-      physicalSynchronizers:
-        - physicalSynchronizerId: "sync-1"
+      localSynchronizers:
+        current:
           sequencerPublicUrl: "https://sequencer1.test.com"
           sequencerAddress: "sequencer1-address"
           mediatorAddress: "mediator1-address"
@@ -54,9 +54,9 @@ tests:
       value: Deployment
     asserts:
       - equal:
-          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_0')].value
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
           value: |
-            canton.sv-apps.sv.local-synchronizer-nodes.sync-1 {
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
               sequencer {
                 admin-api {
                   address = "sequencer1-address"
@@ -78,10 +78,10 @@ tests:
       - isNull:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')]
 
-  - it: "sets physicalSynchronizers configuration with multiple synchronizers"
+  - it: "sets localSynchronizers configuration with both current and successor"
     set:
-      physicalSynchronizers:
-        - physicalSynchronizerId: "sync-alpha"
+      localSynchronizers:
+        current:
           sequencerPublicUrl: "https://sequencer-alpha.test.com"
           sequencerAddress: "sequencer-alpha-address"
           mediatorAddress: "mediator-alpha-address"
@@ -90,7 +90,7 @@ tests:
             enabled: true
             pruningInterval: "2h"
             retentionPeriod: "14d"
-        - physicalSynchronizerId: "sync-beta"
+        successor:
           sequencerPublicUrl: "https://sequencer-beta.test.com"
           sequencerAddress: "sequencer-beta-address"
           mediatorAddress: "mediator-beta-address"
@@ -104,9 +104,9 @@ tests:
       value: Deployment
     asserts:
       - equal:
-          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_0')].value
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
           value: |
-            canton.sv-apps.sv.local-synchronizer-nodes.sync-alpha {
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
               sequencer {
                 is-bft-sequencer = true
                 admin-api {
@@ -131,9 +131,9 @@ tests:
               }
             }
       - equal:
-          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_1')].value
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_SUCCESSOR')].value
           value: |
-            canton.sv-apps.sv.local-synchronizer-nodes.sync-beta {
+            canton.sv-apps.sv.local-synchronizer-nodes.successor {
               sequencer {
                 admin-api {
                   address = "sequencer-beta-address"

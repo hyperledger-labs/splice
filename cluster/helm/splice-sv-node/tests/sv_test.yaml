@@ -156,7 +156,7 @@ tests:
       - equal:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')].value
           value: |
-            canton.sv-apps.sv.local-synchronizer-nodes {
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
               sequencer {
                 is-bft-sequencer = true
                 admin-api {
