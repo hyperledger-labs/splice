@@ -39,6 +39,7 @@ import Transfer from './routes/transfer';
 import { useConfigPollInterval, useWalletConfig } from './utils/config';
 import Allocations from './routes/allocations';
 import Delegations from './routes/delegations';
+import DevelopmentFund from './routes/developmentFund';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 const App: React.FC = () => {
@@ -96,6 +97,7 @@ const App: React.FC = () => {
           <Route path="transactions" element={<Transactions />} />
           <Route path="transfer" element={<Transfer />} />
           <Route path="allocations" element={<Allocations />} />
+          <Route path="development-fund" element={<DevelopmentFund />} />
           <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="delegations" element={<Delegations />} />
           <Route path="faqs" element={<Faqs />} />

@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
-import { AmuletPosition } from '@lfdecentralizedtrust/wallet-openapi';
+import {
+  AmuletPosition,
+  ArchivedDevelopmentFundCouponStatusEnum,
+} from '@lfdecentralizedtrust/wallet-openapi';
+
+export type { ArchivedDevelopmentFundCouponStatusEnum };
 
 import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';
 import {
@@ -130,4 +135,28 @@ export interface ListSubscriptionRequestsResponse {
 
 export interface ListSubscriptionsResponse {
   subscriptionsList: WalletSubscription[];
+}
+
+export interface DevelopmentFundCoupon {
+  id: string;
+  createdAt: Date;
+  fundManager: string;
+  beneficiary: string;
+  amount: BigNumber;
+  expiresAt: Date;
+  reason: string;
+  withdrawalReason?: string;
+}
+
+
+export interface CouponHistoryEvent {
+  id: string;
+  couponId: string;
+  eventType: ArchivedDevelopmentFundCouponStatusEnum;
+  timestamp: Date;
+  fundManager: string;
+  beneficiary: string;
+  amount: BigNumber;
+  allocationReason: string;
+  withdrawalReason?: string;
 }
