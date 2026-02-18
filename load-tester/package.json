@@ -16,15 +16,16 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^10.0.1",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@types/k6": "^1.2.0",
     "@types/node": "^20.9.0",
-    "@typescript-eslint/eslint-plugin": "^6.11.0",
-    "@typescript-eslint/parser": "^6.11.0",
     "esbuild": "^0.25.0",
     "eslint": "^10.0.0",
     "prettier": "^3.1.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "typescript-eslint": "^8.56.0"
   },
   "dependencies": {
     "bignumber.js": "^9.1.1",
