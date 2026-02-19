@@ -84,6 +84,11 @@ spec:
               value: {{ .Values.onboardingType }}
               {{- end }}
             {{- end }}
+            {{- if eq .Values.permissionedSynchronizer true }}
+            - name: ADDITIONAL_CONFIG_PERMISSIONED_SYNCHRONIZER
+              value: |
+                canton.sv-apps.sv.permissioned-synchronizer = true
+            {{- end }}
             {{- if .Values.onboardingName }}
             - name: SPLICE_APP_SV_ONBOARDING_NAME
               value: {{ .Values.onboardingName }}
