@@ -17,6 +17,7 @@ import io.circe.Json
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
+import slick.dbio.DBIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -197,19 +198,13 @@ class DbScanVerdictStore(
       """.asUpdate
   }
 
-  /** Insert multiple verdicts and their transaction views in a single transaction.
-    *
-    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
-    * update_id already exists. If it does, we assume this batch has been
-    * inserted already and skip all inserts.
+  /** Returns a DBIO action for inserting verdicts (for use in combined transactions).
+    * Unlike insertVerdictAndTransactionViews, this doesn't wrap in a transaction or Future.
     */
-  def insertVerdictAndTransactionViews(
+  def insertVerdictAndTransactionViewsDBIO(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
-  )(implicit tc: TraceContext): Future[Unit] = {
-    import slick.dbio.DBIO
-    import profile.api.jdbcActionExtensionMethods
-
-    if (items.isEmpty) Future.unit
+  )(implicit tc: TraceContext): DBIO[Unit] = {
+    if (items.isEmpty) DBIO.successful(())
     else {
       val checkExist = (sql"""
                select update_id
@@ -218,7 +213,7 @@ class DbScanVerdictStore(
                  and """ ++ inClause("update_id", items.map(t => lengthLimited(t._1.updateId))))
         .as[String]
 
-      val action: DBIO[Unit] = for {
+      for {
         alreadyExisting <- checkExist.map(_.toSet)
         nonExisting = items.filter(item => !alreadyExisting.contains(item._1.updateId))
         _ = logger.info(
@@ -244,17 +239,54 @@ class DbScanVerdictStore(
             DBIO.successful(())
           }
       } yield ()
+    }
+  }
 
+  /** Insert multiple verdicts and their transaction views in a single transaction.
+    *
+    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
+    * update_id already exists. If it does, we assume this batch has been
+    * inserted already and skip all inserts.
+    */
+  def insertVerdictAndTransactionViews(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    if (items.isEmpty) Future.unit
+    else {
       futureUnlessShutdownToFuture(
         storage
           .queryAndUpdate(
-            action.transactionally,
+            insertVerdictAndTransactionViewsDBIO(items).transactionally,
             "scanVerdict.insertVerdictAndTransactionViews.batch",
           )
       ).map { _ =>
         val maxRt = items.map(_._1.recordTime).maxOption
         maxRt.foreach(advanceLastIngestedRecordTime)
       }
+    }
+  }
+
+  /** Insert verdicts and run an additional DBIO action in a single transaction.
+    */
+  def insertVerdictAndTransactionViewsWith(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
+      additionalAction: DBIO[Unit] = DBIO.successful(()),
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    val combinedAction =
+      (insertVerdictAndTransactionViewsDBIO(items) andThen additionalAction).transactionally
+
+    futureUnlessShutdownToFuture(
+      storage.queryAndUpdate(
+        combinedAction,
+        "scanVerdict.insertVerdictAndTransactionViewsWith",
+      )
+    ).map { _ =>
+      val maxRt = items.map(_._1.recordTime).maxOption
+      maxRt.foreach(advanceLastIngestedRecordTime)
     }
   }
 
