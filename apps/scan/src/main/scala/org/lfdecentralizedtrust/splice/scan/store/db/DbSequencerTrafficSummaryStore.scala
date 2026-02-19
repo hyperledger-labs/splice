@@ -15,6 +15,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.dbio.DBIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -175,18 +176,13 @@ class DbSequencerTrafficSummaryStore(
     }
   }
 
-  /** Insert multiple traffic summaries and their envelopes in a single transaction.
-    *
-    * We check for existing sequencing_times first, then insert only non-existing items.
-    * The unique index on (history_id, sequencing_time) serves as a safety net.
+  /** Returns a DBIO action for inserting traffic summaries (for use in combined transactions).
+    * Unlike insertTrafficSummaries, this doesn't wrap in a transaction or Future.
     */
-  def insertTrafficSummaries(
+  def insertTrafficSummariesDBIO(
       items: Seq[TrafficSummaryT]
-  )(implicit tc: TraceContext): Future[Unit] = {
-    import slick.dbio.DBIO
-    import profile.api.jdbcActionExtensionMethods
-
-    if (items.isEmpty) Future.unit
+  )(implicit tc: TraceContext): DBIO[Unit] = {
+    if (items.isEmpty) DBIO.successful(())
     else {
       val checkExist = (sql"""
         select sequencing_time
@@ -195,7 +191,7 @@ class DbSequencerTrafficSummaryStore(
           and """ ++ inClause("sequencing_time", items.map(_.sequencingTime.toMicros)))
         .as[Long]
 
-      val action: DBIO[Unit] = for {
+      for {
         alreadyExisting <- checkExist.map(_.toSet)
         nonExisting = items.filter(item => !alreadyExisting.contains(item.sequencingTime.toMicros))
         _ = logger.info(
@@ -210,11 +206,25 @@ class DbSequencerTrafficSummaryStore(
             DBIO.successful(())
           }
       } yield ()
+    }
+  }
 
+  /** Insert multiple traffic summaries and their envelopes in a single transaction.
+    *
+    * We check for existing sequencing_times first, then insert only non-existing items.
+    * The unique index on (history_id, sequencing_time) serves as a safety net.
+    */
+  def insertTrafficSummaries(
+      items: Seq[TrafficSummaryT]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    if (items.isEmpty) Future.unit
+    else {
       futureUnlessShutdownToFuture(
         storage
           .queryAndUpdate(
-            action.transactionally,
+            insertTrafficSummariesDBIO(items).transactionally,
             "scanTraffic.insertTrafficSummaries.batch",
           )
       ).map { _ =>
