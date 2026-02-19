@@ -9,7 +9,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
 import com.digitalasset.canton.util.PekkoUtil.{RetrySourcePolicy, WithKillSwitch}
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.{KillSwitch, KillSwitches, OverflowStrategy}
+import org.apache.pekko.stream.{KillSwitch, KillSwitches}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
@@ -19,9 +19,7 @@ import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationI
 import scala.concurrent.Future
 import io.circe.syntax.*
 
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.FiniteDuration
 import Position.*
 import org.apache.pekko.{Done, NotUsed}
@@ -74,40 +72,22 @@ class SingleAcsSnapshotBulkStorage(
   }
 
   private def getSource: Source[TimestampWithMigrationId, NotUsed] = {
-    val idx = new AtomicInteger(0)
     Source
       .unfoldAsync(Start: Position) {
         case Start => getAcsSnapshotChunk(timestamp, None).map(Some(_))
         case Index(i) => getAcsSnapshotChunk(timestamp, Some(i)).map(Some(_))
         case End => Future.successful(None)
       }
-      .via(ZstdGroupedWeight(config.bulkMaxFileSize))
-      // Add a buffer so that the next object continues accumulating while we write the previous one
-      .buffer(
-        1,
-        OverflowStrategy.backpressure,
+      .via(
+        S3ZstdObjects(
+          config,
+          s3Connection,
+          { objIdx => s"$timestamp/ACS_$objIdx.zstd" },
+          loggerFactory,
+        )
       )
-      .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-        // TODO(#3429): use actual prefixes for segments, for now we just use the snapshot
-        val objectKeyPrefix = s"${timestamp.timestamp.toInstant.toString}"
-        val objectKey =
-          if (isLast) s"$objectKeyPrefix/snapshot_${idx}_last.zstd"
-          else s"$objectKeyPrefix/snapshot_$idx.zstd"
-        // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
-        //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
-        //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
-        //    partially written object.
-        for {
-          _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-        } yield {
-          idx.addAndGet(1)
-          objectKey
-        }
-      }
-      // emit a Unit upon completion of the write to s3
-      .fold(()) { case ((), _) => () }
       // emit back the timestamp w. migrationId upon completion
-      .map(_ => timestamp)
+      .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
 
   }
 
