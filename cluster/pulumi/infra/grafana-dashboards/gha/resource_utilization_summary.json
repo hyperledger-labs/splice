@@ -86,7 +86,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "percent"
+                "value": "percentunit"
               }
             ]
           },
@@ -98,7 +98,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "percent"
+                "value": "percentunit"
               }
             ]
           }
@@ -297,5 +297,5 @@
   "timezone": "UTC",
   "title": "Resource Utilization (Summary)",
   "uid": "01606be7-23f9-4136-97cd-1fc927a95ce5",
-  "version": 6
+  "version": 7
 }
