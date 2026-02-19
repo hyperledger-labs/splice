@@ -103,14 +103,14 @@ class UpdateHistoryBulkStorageTest
           probe.expectNext(20.seconds) should be(
             UpdateHistorySegmentBulkStorage.Output(
               segment,
-              "TimestampWithMigrationId(1970-01-01T00:00:00.100Z,0)-TimestampWithMigrationId(1970-01-01T00:00:02.300Z,0)/updates_0.zstd",
+              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
               isLastObjectInSegment = false,
             )
           )
           probe.expectNext(20.seconds) should be(
             UpdateHistorySegmentBulkStorage.Output(
               segment,
-              "TimestampWithMigrationId(1970-01-01T00:00:00.100Z,0)-TimestampWithMigrationId(1970-01-01T00:00:02.300Z,0)/updates_1.zstd",
+              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
               isLastObjectInSegment = true,
             )
           )

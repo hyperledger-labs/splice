@@ -142,7 +142,9 @@ class UpdateHistorySegmentBulkStorage(
         S3ZstdObjects(
           config,
           s3Connection,
-          { objIdx => s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_$objIdx.zstd" },
+          { objIdx =>
+            s"${config.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
+          },
           loggerFactory,
         )
       )
