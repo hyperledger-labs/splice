@@ -42,15 +42,15 @@ final class SequencerTrafficClient(
     * @param sequencingTimes The sequencing times to query
     * @return Traffic summaries for the requested times (may be fewer if some times have no data)
     */
-  def getConfirmationRequestTrafficSummaries(
+  def getTrafficSummaries(
       sequencingTimes: Seq[CantonTimestamp]
-  )(implicit tc: TraceContext): Future[Seq[v30.ConfirmationRequestTrafficSummary]] = {
-    val req = v30.GetConfirmationRequestTrafficSummariesRequest(
-      sequencingTimes = sequencingTimes.map(_.toProtoTimestamp)
+  )(implicit tc: TraceContext): Future[Seq[v30.TrafficSummary]] = {
+    val req = v30.GetTrafficSummariesRequest(
+      sequencingTimestamps = sequencingTimes.map(_.toProtoTimestamp)
     )
 
     val stub = TraceContextGrpc.addTraceContextToCallOptions(
-      v30.SequencerInspectionServiceGrpc
+      v30.SequencerTrafficInspectionServiceGrpc
         .stub(managedChannel.channel)
         .withInterceptors(
           TraceContextGrpc.clientInterceptor(None),
@@ -58,6 +58,6 @@ final class SequencerTrafficClient(
         )
     )
 
-    stub.getConfirmationRequestTrafficSummaries(req).map(_.summaries)
+    stub.getTrafficSummaries(req).map(_.summary)
   }
 }

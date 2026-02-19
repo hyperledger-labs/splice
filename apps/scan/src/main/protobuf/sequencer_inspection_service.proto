@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -7,62 +7,41 @@ package com.digitalasset.canton.sequencer.admin.v30;
 
 import "google/protobuf/timestamp.proto";
 
-
-// Service to inspect the sequenced messages and their traffic spends.
-service SequencerInspectionService {
-
-  // Batched, pointwise lookup of summaries of the traffic cost of confirmation requests.
-  //
-  // The purpose of this endpoint is to provide exactly the information
-  // necessary to compute traffic-based app activity records.
-  //
-  // Thus this endpoint does not return all sequenced messages, but only those
-  // that contain at least one envelope with a view hash, and could thus be
-  // a confirmation request.
-  rpc GetConfirmationRequestTrafficSummaries(GetConfirmationRequestTrafficSummariesRequest)
-    returns (GetConfirmationRequestTrafficSummariesResponse);
+// Service for inspecting traffic information of sequenced messages
+service SequencerTrafficInspectionService {
+  // Retrieve summaries of the traffic cost of sequenced events.
+  rpc GetTrafficSummaries(GetTrafficSummariesRequest) returns (GetTrafficSummariesResponse);
 }
 
-// Batched, pointwise lookup of summaries of the traffic cost of confirmation requests.
-message GetConfirmationRequestTrafficSummariesRequest {
-  // The sequencing times of the messages for which to return the summaries.
-  repeated google.protobuf.Timestamp sequencing_times = 1;
+message GetTrafficSummariesRequest {
+  // List of sequencing times for which to query traffic data
+  repeated google.protobuf.Timestamp sequencing_timestamps = 1;
 }
 
-message GetConfirmationRequestTrafficSummariesResponse {
-  // Summaries of the traffic cost of confirmation requests for the requested sequencing times.
-  //
-  // If there is no sequenced message for a requested sequencing time, then
-  // there will be no summary for that sequencing time in the response.
-  repeated ConfirmationRequestTrafficSummary summaries = 1;
+message GetTrafficSummariesResponse {
+  // Traffic summaries for the requested timestamps
+  // May contain FEWER summaries than the provided timestamps:
+  // Only timestamps with a corresponding sequenced event will produce a summary
+  repeated TrafficSummary summary = 1;
 }
 
-// Summarizes the data of sequenced messages that contain at least one envelope
-// with a view hash, and could thus be a confirmation request.
-message ConfirmationRequestTrafficSummary {
-
+// Summarizes the data of a sequenced event
+message TrafficSummary {
   // Time as of which the message was sequenced
   google.protobuf.Timestamp sequencing_time = 1;
 
-  // Total traffic cost of the message.
-  int64 total_traffic_cost = 4;
+  // Total traffic cost of the message which was paid by the sender.
+  int64 total_traffic_cost = 2;
 
-  // Summaries for the envelopes that contain (encrypted) views.
-  //
-  // Note: summaries for envelopes without views are filtered server-side and thus not included in the response.
-  //
-  // Must be non-empty.
-  repeated ViewEnvelopeTrafficSummary envelopes = 3;
-
+  // Summaries for the envelopes contained in the event
+  repeated EnvelopeTrafficSummary envelopes = 3;
 }
 
-// Summary of an envelope that contains (encrypted) views.
-message ViewEnvelopeTrafficSummary {
-
+// Summary of an envelope contained in a sequenced message.
+message EnvelopeTrafficSummary {
   // Traffic cost of the envelope
-  int64 envelope_traffic_cost = 3;
+  int64 envelope_traffic_cost = 1;
 
-  // Hashes of the views included in the envelope.
-  // Must be non-empty.
-  repeated string view_hashes = 4;
+  // View hashes of the views contained in the envelope.
+  repeated bytes view_hashes = 2;
 }

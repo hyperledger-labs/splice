@@ -149,7 +149,7 @@ class ScanVerdictStoreIngestion(
         (sequencerTrafficClientO, trafficSummaryStoreO) match {
           case (Some(sequencerTrafficClient), Some(_)) =>
             sequencerTrafficClient
-              .getConfirmationRequestTrafficSummaries(sequencingTimes)
+              .getTrafficSummaries(sequencingTimes)
               .map(_.map(protoToTrafficSummary))
           case _ =>
             Future.successful(Seq.empty)
@@ -189,7 +189,7 @@ class ScanVerdictStoreIngestion(
   }
 
   private def protoToTrafficSummary(
-      proto: seqv30.ConfirmationRequestTrafficSummary
+      proto: seqv30.TrafficSummary
   ): DbSequencerTrafficSummaryStore.TrafficSummaryT = {
     val sequencingTime = CantonTimestamp
       .fromProtoTimestamp(proto.getSequencingTime)
@@ -198,7 +198,7 @@ class ScanVerdictStoreIngestion(
     val envelopes = proto.envelopes.map { env =>
       DbSequencerTrafficSummaryStore.EnvelopeT(
         trafficCost = env.envelopeTrafficCost,
-        viewHashes = env.viewHashes,
+        viewHashes = env.viewHashes.map(_.toStringUtf8),
       )
     }
 
