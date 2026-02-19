@@ -66,7 +66,6 @@ class AcsSnapshotBulkStorageTest
         val ts = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
         val store = new MockAcsSnapshotStore(ts).store
         val metricsFactory = new InMemoryMetricsFactory
-        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
