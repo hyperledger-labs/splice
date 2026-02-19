@@ -46,6 +46,11 @@
       - The scan UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
         reduce maintenance overhead.
 
+    - SV UI
+
+      - Complete overhaul of the governance UI (formerly ``/governance-beta``, now ``/governance``).
+        The old UI is still accessible under ``/governance-old``.
+
 
 .. release-notes:: 0.5.11
 
