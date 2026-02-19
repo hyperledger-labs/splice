@@ -39,6 +39,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.sequencer.admin.{v30 as seqv30}
+import slick.dbio.DBIO
 
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
@@ -143,26 +144,28 @@ class ScanVerdictStoreIngestion(
         CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption
       }
 
-      val result = for {
-        // Insert verdicts first
-        _ <- store.insertVerdictAndTransactionViews(items)
-
-        // Fetch and insert traffic summaries if enabled
-        trafficSummaryCount <- (sequencerTrafficClientO, trafficSummaryStoreO) match {
-          case (Some(sequencerTrafficClient), Some(trafficSummaryStore)) =>
-            for {
-              trafficSummaries <- sequencerTrafficClient
-                .getConfirmationRequestTrafficSummaries(sequencingTimes)
-              _ <-
-                if (trafficSummaries.nonEmpty) {
-                  val summaryRows = trafficSummaries.map(protoToTrafficSummary)
-                  trafficSummaryStore.insertTrafficSummaries(summaryRows)
-                } else Future.unit
-            } yield trafficSummaries.size
+      // 1. Fetch traffic summaries FIRST (before any DB operations)
+      val trafficSummariesF: Future[Seq[DbSequencerTrafficSummaryStore.TrafficSummaryT]] =
+        (sequencerTrafficClientO, trafficSummaryStoreO) match {
+          case (Some(sequencerTrafficClient), Some(_)) =>
+            sequencerTrafficClient
+              .getConfirmationRequestTrafficSummaries(sequencingTimes)
+              .map(_.map(protoToTrafficSummary))
           case _ =>
-            Future.successful(0)
+            Future.successful(Seq.empty)
         }
-      } yield trafficSummaryCount
+
+      // 2. Insert verdicts and traffic summaries in a single transaction
+      val result = for {
+        trafficSummaries <- trafficSummariesF
+        trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
+          case Some(trafficStore) if trafficSummaries.nonEmpty =>
+            trafficStore.insertTrafficSummariesDBIO(trafficSummaries)
+          case _ =>
+            DBIO.successful(())
+        }
+        _ <- store.insertVerdictAndTransactionViewsWith(items, trafficAction)
+      } yield trafficSummaries.size
 
       result.transform {
         case Success(trafficSummaryCount) =>
