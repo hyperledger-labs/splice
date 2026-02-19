@@ -27,6 +27,7 @@ class LsuStateExporter(
     new NodeIdentitiesStore(mediatorAdminConnection, None, loggerFactory)
 
   def exportLSUState(upgradesAt: CantonTimestamp)(implicit tc: TraceContext): Future[LsuState] = {
+    logger.info(s"Exporting LSU state for upgrade at $upgradesAt")
     for {
       lsuState <- sequencerAdminConnection.getLsuState()
       sequencerIdentityDump <- sequencerIdentityStore.getNodeIdentitiesDump()

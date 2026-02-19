@@ -26,7 +26,6 @@ import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.lsu.LsuStateTransferTrigger.LsuTransferTask
 import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 class LsuStateTransferTrigger(
@@ -65,7 +64,7 @@ class LsuStateTransferTrigger(
     for {
       physicalSynchronizerId <- currentSynchronizerNode.sequencerAdminConnection
         .getPhysicalSynchronizerId()
-      announcements <- announcements(physicalSynchronizerId)
+      announcements <- announcements(now, physicalSynchronizerId)
     } yield {
       announcements
         .map(result => LsuTransferTask(result.mapping))
@@ -76,6 +75,7 @@ class LsuStateTransferTrigger(
   protected def completeTask(task: ScheduledTaskTrigger.ReadyTask[LsuTransferTask])(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
+    logger.info(s"Running LSU state transfer for $task")
     successorSynchronizerNode.sequencerAdminConnection.getStatus.flatMap {
       case NodeStatus.Failure(msg) =>
         val message = s"Failed to get successor status, will not transfer state: $msg"
@@ -84,12 +84,14 @@ class LsuStateTransferTrigger(
       case NodeStatus.NotInitialized(_, _) =>
         for {
           state <- exporter.exportLSUState(task.work.announcement.upgradeTime)
+          _ = logger.info("Initializing sequencer and mediators from the data of the old nodes")
           _ <- newMediatorInitializer.initializeFromDumpAndWait(state.nodeIdentities.sequencer)
           _ <- newSequencerIntializer.initializeFromDumpAndWait(state.nodeIdentities.sequencer)
           currentStaticParams <- currentSynchronizerNode.sequencerAdminConnection.getStaticParams()
           parameters = currentStaticParams.toInternal.copy(
             serial = currentStaticParams.serial + NonNegativeInt.one
           )
+          _ = logger.info(show"Initializing sequencer from predecessor with $parameters")
           _ <- successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
             state.synchronizerState,
             // TODO(#564) - configure the serial increment in the sv app to allow rollforward
@@ -111,12 +113,14 @@ class LsuStateTransferTrigger(
       tc: TraceContext
   ): Future[Boolean] = Future.successful(false)
 
-  private def announcements(synchronizerId: PhysicalSynchronizerId)(implicit tc: TraceContext) = {
+  private def announcements(now: CantonTimestamp, synchronizerId: PhysicalSynchronizerId)(implicit
+      tc: TraceContext
+  ) = {
     currentSynchronizerNode.sequencerAdminConnection
       .listLsuAnnouncements(synchronizerId.logical)
       .map(_.filter { announcement =>
         announcement.base.validFrom
-          .isAfter(Instant.now()) && announcement.mapping.successorSynchronizerId != synchronizerId
+          .isBefore(now.toInstant) && announcement.mapping.successorSynchronizerId != synchronizerId
       })
   }
 }
