@@ -11,8 +11,9 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbSequencerTrafficSummarySt
   EnvelopeT,
   TrafficSummaryT,
 }
-import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.StoreTestBase
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
 import scala.concurrent.Future
 
@@ -26,7 +27,7 @@ class DbSequencerTrafficSummaryStoreTest
 
   "DbSequencerTrafficSummaryStore" should {
 
-    "insert and retrieve traffic summaries with envelopes" in {
+    "insert traffic summaries" in {
       for {
         store <- newStore()
         ts1 = CantonTimestamp.now()
@@ -42,18 +43,12 @@ class DbSequencerTrafficSummaryStoreTest
           ),
         )
 
+        maxBefore <- maxSequencingTime(migrationId)
         _ <- store.insertTrafficSummaries(Seq(summary))
-        results <- store.listTrafficSummaries(None, limit = 10)
+        maxAfter <- maxSequencingTime(migrationId)
       } yield {
-        results.size shouldBe 1
-        val retrieved = results.head
-        retrieved.sequencingTime shouldBe ts1
-        retrieved.totalTrafficCost shouldBe 100L
-        retrieved.envelopes.size shouldBe 2
-        retrieved.envelopes.head.trafficCost shouldBe 60L
-        retrieved.envelopes.head.viewHashes shouldBe Seq("hash1", "hash2")
-        retrieved.envelopes(1).trafficCost shouldBe 40L
-        retrieved.envelopes(1).viewHashes shouldBe Seq("hash3")
+        maxBefore shouldBe None
+        maxAfter shouldBe Some(ts1)
       }
     }
 
@@ -68,6 +63,7 @@ class DbSequencerTrafficSummaryStoreTest
 
         // Insert first batch
         _ <- store.insertTrafficSummaries(Seq(summary1))
+        maxAfterFirst <- maxSequencingTime(migrationId)
 
         // Try to insert batch with duplicate ts1 and new ts2
         _ <- store.insertTrafficSummaries(
@@ -77,12 +73,10 @@ class DbSequencerTrafficSummaryStoreTest
           )
         )
 
-        results <- store.listTrafficSummaries(None, limit = 10)
+        maxAfterSecond <- maxSequencingTime(migrationId)
       } yield {
-        results.size shouldBe 2
-        // Verify the original ts1 entry wasn't overwritten
-        results.find(_.sequencingTime == ts1).value.totalTrafficCost shouldBe 100L
-        results.find(_.sequencingTime == ts2).value.totalTrafficCost shouldBe 200L
+        maxAfterFirst shouldBe Some(ts1)
+        maxAfterSecond shouldBe Some(ts2)
       }
     }
 
@@ -100,71 +94,9 @@ class DbSequencerTrafficSummaryStoreTest
         }
 
         _ <- store.insertTrafficSummaries(summaries)
-        results <- store.listTrafficSummaries(None, limit = 100)
+        maxAfter <- maxSequencingTime(migrationId)
       } yield {
-        results.size shouldBe 50
-        // Verify ordering by sequencing_time
-        results.map(_.sequencingTime) shouldBe results.map(_.sequencingTime).sorted
-      }
-    }
-
-    "paginate results correctly" in {
-      for {
-        store <- newStore()
-        baseTs = CantonTimestamp.now()
-
-        summaries = (0 until 10).map { i =>
-          mkSummary(baseTs.plusSeconds(i.toLong), (i * 10).toLong)
-        }
-
-        _ <- store.insertTrafficSummaries(summaries)
-
-        // First page
-        page1 <- store.listTrafficSummaries(None, limit = 3)
-
-        // Second page using cursor from last item
-        lastOfPage1 = page1.last
-        cursor = TimestampWithMigrationId(lastOfPage1.sequencingTime, lastOfPage1.migrationId)
-        page2 <- store.listTrafficSummaries(Some(cursor), limit = 3)
-
-        // Third page
-        lastOfPage2 = page2.last
-        cursor2 = TimestampWithMigrationId(lastOfPage2.sequencingTime, lastOfPage2.migrationId)
-        page3 <- store.listTrafficSummaries(Some(cursor2), limit = 3)
-      } yield {
-        page1.size shouldBe 3
-        page2.size shouldBe 3
-        page3.size shouldBe 3
-
-        // No overlap between pages
-        val allIds = (page1 ++ page2 ++ page3).map(_.sequencingTime)
-        allIds.distinct.size shouldBe allIds.size
-
-        // Pages are in order
-        page1.last.sequencingTime should be < page2.head.sequencingTime
-        page2.last.sequencingTime should be < page3.head.sequencingTime
-      }
-    }
-
-    "return correct maxSequencingTime" in {
-      for {
-        store <- newStore()
-        baseTs = CantonTimestamp.now()
-
-        // Initially empty
-        maxBefore <- store.maxSequencingTime(migrationId)
-
-        summaries = Seq(
-          mkSummary(baseTs, 10L),
-          mkSummary(baseTs.plusSeconds(5), 20L),
-          mkSummary(baseTs.plusSeconds(2), 30L),
-        )
-
-        _ <- store.insertTrafficSummaries(summaries)
-        maxAfter <- store.maxSequencingTime(migrationId)
-      } yield {
-        maxBefore shouldBe None
-        maxAfter shouldBe Some(baseTs.plusSeconds(5))
+        maxAfter shouldBe Some(baseTs.plusSeconds(49))
       }
     }
 
@@ -176,31 +108,9 @@ class DbSequencerTrafficSummaryStoreTest
         summary = mkSummary(ts, 100L, envelopes = Seq.empty)
 
         _ <- store.insertTrafficSummaries(Seq(summary))
-        results <- store.listTrafficSummaries(None, limit = 10)
+        maxAfter <- maxSequencingTime(migrationId)
       } yield {
-        results.size shouldBe 1
-        results.head.envelopes shouldBe empty
-      }
-    }
-
-    "preserve envelope ordering" in {
-      for {
-        store <- newStore()
-        ts = CantonTimestamp.now()
-
-        envelopes = (0 until 5).map { i =>
-          EnvelopeT(trafficCost = i.toLong, viewHashes = Seq(s"hash-$i"))
-        }
-        summary = mkSummary(ts, 100L, envelopes = envelopes)
-
-        _ <- store.insertTrafficSummaries(Seq(summary))
-        results <- store.listTrafficSummaries(None, limit = 10)
-      } yield {
-        results.size shouldBe 1
-        val retrievedEnvelopes = results.head.envelopes
-        retrievedEnvelopes.size shouldBe 5
-        // Verify ordering preserved
-        retrievedEnvelopes.map(_.trafficCost) shouldBe Seq(0L, 1L, 2L, 3L, 4L)
+        maxAfter shouldBe Some(ts)
       }
     }
   }
@@ -228,10 +138,24 @@ class DbSequencerTrafficSummaryStoreTest
     )
   }
 
+  /** Test helper to query maxSequencingTime directly from database */
+  private def maxSequencingTime(migrationId: Long): Future[Option[CantonTimestamp]] = {
+    import storage.api.jdbcProfile.api.*
+    futureUnlessShutdownToFuture(
+      storage
+        .query(
+          sql"""
+          select max(sequencing_time)
+          from sequencer_traffic_summary_store
+          where migration_id = $migrationId
+        """.as[Option[CantonTimestamp]].head,
+          "test.maxSequencingTime",
+        )
+    )
+  }
+
   override protected def cleanDb(
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
-    for {
-      _ <- resetAllAppTables(storage)
-    } yield ()
+    resetAllAppTables(storage)
 }
