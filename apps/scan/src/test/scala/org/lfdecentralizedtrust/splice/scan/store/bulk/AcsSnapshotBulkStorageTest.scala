@@ -66,20 +66,19 @@ class AcsSnapshotBulkStorageTest
         val ts = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
         val store = new MockAcsSnapshotStore(ts).store
         val metricsFactory = new InMemoryMetricsFactory
-        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
               TimestampWithMigrationId(ts, 0),
               bulkStorageTestConfig,
               store,
-              s3BucketConnection,
+              bucketConnection,
               new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
               loggerFactory,
             )
             .runWith(Sink.ignore)
 
-          s3Objects <- s3BucketConnection.listObjects
+          s3Objects <- bucketConnection.listObjects
           allContracts <- store
             .queryAcsSnapshot(
               0,
@@ -110,7 +109,7 @@ class AcsSnapshotBulkStorageTest
 
           val allContractsFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(
-              s3BucketConnection,
+              bucketConnection,
               io.circe.parser.decode[httpApi.CreatedEvent],
             )
           )

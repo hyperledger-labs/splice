@@ -6,11 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 import scala.concurrent.ExecutionContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
-import com.digitalasset.canton.util.PekkoUtil.{RetrySourcePolicy, WithKillSwitch}
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.{KillSwitch, KillSwitches}
-import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
+import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
@@ -20,9 +16,8 @@ import scala.concurrent.Future
 import io.circe.syntax.*
 
 import java.nio.charset.StandardCharsets
-import scala.concurrent.duration.FiniteDuration
 import Position.*
-import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.NotUsed
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
 object Position {
@@ -42,7 +37,7 @@ class SingleAcsSnapshotBulkStorage(
     s3Connection: S3BucketConnection,
     historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
+)(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
   private def getAcsSnapshotChunk(
@@ -92,54 +87,6 @@ class SingleAcsSnapshotBulkStorage(
       .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
 
   }
-
-  // TODO(#3429): I'm no longer sure the retrying source is actually useful,
-  //  we probably want to just rely on the of the full stream of ACS snapshot dumps (in AcsSnapshotBulkStorage),
-  //  but keeping it for now (and the corresponding unit test) until that is fully resolved
-  private def getRetryingSource
-      : Source[WithKillSwitch[TimestampWithMigrationId], (KillSwitch, Future[Done])] = {
-
-    def mksrc = {
-      val base = getSource
-      val withKs = base.viaMat(KillSwitches.single)(Keep.right)
-      withKs.watchTermination() { case (ks, done) =>
-        (
-          ks: KillSwitch,
-          done.map { done =>
-            logger.debug(
-              s"Finished dumping to bulk storage the ACS snapshot for migration ${timestamp.migrationId}, timestamp ${timestamp.timestamp}"
-            )
-            done
-          },
-        )
-      }
-    }
-
-    // TODO(#3429): tweak the retry parameters here
-    val delay = FiniteDuration(5, "seconds")
-    val policy = new RetrySourcePolicy[Unit, TimestampWithMigrationId] {
-      override def shouldRetry(
-          lastState: Unit,
-          lastEmittedElement: Option[TimestampWithMigrationId],
-          lastFailure: Option[Throwable],
-      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
-        lastFailure.map { t =>
-          logger.warn(s"Writing ACS snapshot to bulk storage failed with : ${ErrorUtil
-              .messageWithStacktrace(t)}, will retry after delay of ${delay}")
-          // Always retry (TODO(#3429): consider a max number of retries?)
-          delay -> ()
-        }
-      }
-    }
-
-    PekkoUtil
-      .restartSource(
-        name = "acs-snapshot-dump",
-        initial = (),
-        mkSource = (_: Unit) => mksrc,
-        policy = policy,
-      )
-  }
 }
 
 object SingleAcsSnapshotBulkStorage {
@@ -155,7 +102,6 @@ object SingleAcsSnapshotBulkStorage {
       historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
   ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] =
@@ -180,10 +126,9 @@ object SingleAcsSnapshotBulkStorage {
       historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Source[WithKillSwitch[TimestampWithMigrationId], (KillSwitch, Future[Done])] =
+  ): Source[TimestampWithMigrationId, NotUsed] =
     new SingleAcsSnapshotBulkStorage(
       timestamp,
       config,
@@ -191,6 +136,6 @@ object SingleAcsSnapshotBulkStorage {
       s3Connection,
       historyMetrics,
       loggerFactory,
-    ).getRetryingSource
+    ).getSource
 
 }

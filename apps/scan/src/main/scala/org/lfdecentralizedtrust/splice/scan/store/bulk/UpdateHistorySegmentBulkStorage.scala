@@ -27,8 +27,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
 
-// TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
-
 case class UpdatesSegment(
     fromTimestamp: TimestampWithMigrationId,
     toTimestamp: TimestampWithMigrationId,
