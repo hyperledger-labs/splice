@@ -12,7 +12,11 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbScanVerdictStore,
+  DbSequencerTrafficSummaryStore,
+}
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -36,6 +40,8 @@ class ScanVerdictAutomationService(
     migrationId: Long,
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
+    sequencerTrafficClientO: Option[SequencerTrafficClient],
+    trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -60,6 +66,8 @@ class ScanVerdictAutomationService(
       migrationId,
       synchronizerId,
       ingestionMetrics,
+      sequencerTrafficClientO,
+      trafficSummaryStoreO,
     )
   )
 }

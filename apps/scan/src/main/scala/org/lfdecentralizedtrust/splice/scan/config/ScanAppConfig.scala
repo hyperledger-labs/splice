@@ -48,6 +48,11 @@ final case class S3Config(
     secretAccessKey: String,
 )
 
+final case class SequencerTrafficIngestionConfig(
+    /** Whether sequencer traffic ingestion is enabled. */
+    enabled: Boolean = false
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -60,6 +65,7 @@ case class ScanAppBackendConfig(
     mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
+    sequencerTrafficIngestion: SequencerTrafficIngestionConfig = SequencerTrafficIngestionConfig(),
     isFirstSv: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     enableForcedAcsSnapshots: Boolean = false,
