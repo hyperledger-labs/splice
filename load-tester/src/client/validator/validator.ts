@@ -61,7 +61,9 @@ export class ValidatorClient {
           },
         );
       } catch (error) {
-        throw new Error(`Error registering validator: ${error}`);
+        throw new Error(`Error registering validator: ${error}`, {
+          cause: error,
+        });
       }
     },
 

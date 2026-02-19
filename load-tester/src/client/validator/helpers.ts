@@ -38,11 +38,10 @@ export function sendAndWaitForTransferOffer(
       const createdOfferTime = Date.now();
       createOfferLatency.add(createdOfferTime - startTime);
 
-      const receivingOffer = syncRetryUndefined(
-        () =>
-          receiver.v0.wallet
-            .listTransferOffers()
-            ?.transfers.find(o => o.contract_id === transferOffer.output.transfer_instruction_cid),
+      const receivingOffer = syncRetryUndefined(() =>
+        receiver.v0.wallet
+          .listTransferOffers()
+          ?.transfers.find(o => o.contract_id === transferOffer.output.transfer_instruction_cid),
       );
 
       const syncOfferTime = Date.now();
