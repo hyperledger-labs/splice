@@ -25,12 +25,11 @@ class S3BucketConnectionForUnitTests(
       s3Stream =>
         Using.resource(new DataInputStream(s3Stream.asInputStream())) { dataInput =>
           def readAll(): Vector[Array[Byte]] =
-            Vector.unfold(()){ _ =>
+            Vector.unfold(()) { _ =>
               Try {
                 PaddedData.readNext(dataInput)
-              }
-                .toOption
-                .map{d => (d.data.array(), ())}
+              }.toOption
+                .map { d => (d.data.array(), ()) }
             }
 
           def concatenate(chunks: Vector[Array[Byte]]): ByteBuffer = {
