@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.B
 import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
   MediatorVerdictIngestionConfig,
+  BulkStorageConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
@@ -464,6 +465,9 @@ object SpliceConfig {
     implicit val mediatorVerdictIngestionConfigReader
         : ConfigReader[MediatorVerdictIngestionConfig] =
       deriveReader[MediatorVerdictIngestionConfig]
+    implicit val bulkStorageConfigReader
+        : ConfigReader[BulkStorageConfig] =
+      deriveReader[BulkStorageConfig]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
@@ -913,6 +917,9 @@ object SpliceConfig {
     implicit val mediatorVerdictIngestionConfigWriter
         : ConfigWriter[MediatorVerdictIngestionConfig] =
       deriveWriter[MediatorVerdictIngestionConfig]
+    implicit val BulkStorageConfigWriter
+        : ConfigWriter[BulkStorageConfig] =
+      deriveWriter[BulkStorageConfig]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 

@@ -191,6 +191,7 @@ class UpdateHistoryBulkStorageTest
           ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
             new UpdateHistoryBulkStorage(
               bulkStorageTestConfig,
+              appConfig,
               mockStore.store,
               kvProvider,
               migrationId,
