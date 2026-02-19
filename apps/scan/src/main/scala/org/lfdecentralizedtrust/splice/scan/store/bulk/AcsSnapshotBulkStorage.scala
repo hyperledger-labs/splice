@@ -11,7 +11,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, TimestampWithMigrationId}
 
@@ -19,7 +19,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorage(
-    config: ScanStorageConfig,
+    storageConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
     acsSnapshotStore: AcsSnapshotStore,
     s3Connection: S3BucketConnection,
     kvProvider: ScanKeyValueProvider,
@@ -30,10 +31,6 @@ class AcsSnapshotBulkStorage(
 
   private def getStartTimestamp: Future[Option[TimestampWithMigrationId]] =
     kvProvider.getLatestAcsSnapshotInBulkStorage().value
-
-  // When new snapshot is not yet available, how long to wait for a new one.
-  // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
-  private val snapshotPollingInterval = 5.seconds
 
   private def getAcsSnapshotTimestampsAfter(
       start: TimestampWithMigrationId
@@ -55,7 +52,10 @@ class AcsSnapshotBulkStorage(
             )
           case None =>
             logger.debug("No new snapshot available, sleeping...")
-            after(snapshotPollingInterval, actorSystem.scheduler) {
+            after(
+              appConfig.snapshotPollingInterval.underlying,
+              actorSystem.scheduler,
+            ) {
               Future.successful(Some((last, None)))
             }
         }
@@ -82,19 +82,20 @@ class AcsSnapshotBulkStorage(
           getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
       }
       .filter { case TimestampWithMigrationId(ts, _) =>
-        val ret = config.shouldDumpSnapshotToBulkStorage(ts)
+        val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
         if (ret) {
           logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
         } else {
           logger.info(
-            s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${config.bulkAcsSnapshotPeriodHours}"
+            s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
           )
         }
         ret
       }
       .via(
         SingleAcsSnapshotBulkStorage.asFlow(
-          config,
+          storageConfig,
+          appConfig,
           acsSnapshotStore,
           s3Connection,
           historyMetrics,

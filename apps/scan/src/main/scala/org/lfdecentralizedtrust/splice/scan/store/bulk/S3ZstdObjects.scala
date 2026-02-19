@@ -8,7 +8,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Flow
 import org.apache.pekko.util.ByteString
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,17 +26,18 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 
 class S3ZstdObjects(
+    storatgeConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
     s3Connection: S3BucketConnection,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
   private def getFlow(
-      config: ScanStorageConfig,
-      getObjectKey: Int => String,
+      getObjectKey: Int => String
   ): Flow[ByteString, S3ZstdObjects.Output, NotUsed] =
     Flow[ByteString]
-      .via(ZstdGroupedWeight(config.bulkZstdFrameSize))
+      .via(ZstdGroupedWeight(storatgeConfig.bulkZstdFrameSize))
       .statefulMap(() =>
         State(
           s3Connection.newAppendWriteObject(
@@ -47,9 +48,9 @@ class S3ZstdObjects(
         )
       )(
         {
-          case (state, chunk) if state.s3ObjSize + chunk.bytes.length > config.bulkMaxFileSize =>
+          case (state, chunk) if state.s3ObjSize + chunk.bytes.length > storatgeConfig.bulkMaxFileSize =>
             logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${config.bulkMaxFileSize}, so this is the last chunk for the object"
+              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${storatgeConfig.bulkMaxFileSize}, so this is the last chunk for the object"
             )
             (
               State(
@@ -69,7 +70,7 @@ class S3ZstdObjects(
             )
           case (state, chunk) =>
             logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${config.bulkMaxFileSize}"
+              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${storatgeConfig.bulkMaxFileSize}"
             )
             (
               State(
@@ -92,7 +93,7 @@ class S3ZstdObjects(
           )
         },
       )
-      .mapAsync(4) { // TODO(#3429): make the parallelism (4) configurable
+      .mapAsync(appConfig.maxParallelPartUploads) {
         case chunk: ObjectChunk if chunk.partNumber >= 0 =>
           logger.debug(
             s"Uploading a chunk of size ${chunk.bytes.toArrayUnsafe().length} as partNumber ${chunk.partNumber} of ${chunk.obj.key}"
@@ -143,6 +144,7 @@ object S3ZstdObjects {
 
   def apply(
       config: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       s3Connection: S3BucketConnection,
       getObjectKey: Int => String,
       loggerFactory: NamedLoggerFactory,
@@ -150,5 +152,5 @@ object S3ZstdObjects {
       tc: TraceContext,
       ec: ExecutionContext,
   ): Flow[ByteString, Output, NotUsed] =
-    new S3ZstdObjects(s3Connection, loggerFactory).getFlow(config, getObjectKey)
+    new S3ZstdObjects(config, appConfig, s3Connection, loggerFactory).getFlow(getObjectKey)
 }

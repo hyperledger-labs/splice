@@ -18,7 +18,7 @@ import io.circe.syntax.*
 import java.nio.charset.StandardCharsets
 import Position.*
 import org.apache.pekko.NotUsed
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 
 object Position {
   sealed trait Position
@@ -32,7 +32,8 @@ object Position {
 
 class SingleAcsSnapshotBulkStorage(
     timestamp: TimestampWithMigrationId,
-    config: ScanStorageConfig,
+    storageConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
     acsSnapshotStore: AcsSnapshotStore,
     s3Connection: S3BucketConnection,
     historyMetrics: HistoryMetrics,
@@ -49,7 +50,7 @@ class SingleAcsSnapshotBulkStorage(
         timestamp.migrationId,
         snapshot = timestamp.timestamp,
         after,
-        HardLimit.tryCreate(config.bulkDbReadChunkSize),
+        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
         Seq.empty,
         Seq.empty,
       )
@@ -76,9 +77,10 @@ class SingleAcsSnapshotBulkStorage(
       }
       .via(
         S3ZstdObjects(
-          config,
+          storageConfig,
+          appConfig,
           s3Connection,
-          { objIdx => s"${config.getSegmentKeyPrefix(timestamp, None)}/ACS_$objIdx.zstd" },
+          { objIdx => s"${storageConfig.getSegmentKeyPrefix(timestamp, None)}/ACS_$objIdx.zstd" },
           loggerFactory,
         )
       )
@@ -96,7 +98,8 @@ object SingleAcsSnapshotBulkStorage {
     * pair, to indicate the last successfully dumped snapshot.
     */
   def asFlow(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
       s3Connection: S3BucketConnection,
       historyMetrics: HistoryMetrics,
@@ -108,7 +111,8 @@ object SingleAcsSnapshotBulkStorage {
     Flow[TimestampWithMigrationId].flatMapConcat {
       new SingleAcsSnapshotBulkStorage(
         _,
-        config,
+        storageConfig,
+        appConfig,
         acsSnapshotStore,
         s3Connection,
         historyMetrics,
@@ -120,7 +124,8 @@ object SingleAcsSnapshotBulkStorage {
     */
   def asSource(
       timestamp: TimestampWithMigrationId,
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
       s3Connection: S3BucketConnection,
       historyMetrics: HistoryMetrics,
@@ -131,7 +136,8 @@ object SingleAcsSnapshotBulkStorage {
   ): Source[TimestampWithMigrationId, NotUsed] =
     new SingleAcsSnapshotBulkStorage(
       timestamp,
-      config,
+      storageConfig,
+      appConfig,
       acsSnapshotStore,
       s3Connection,
       historyMetrics,
