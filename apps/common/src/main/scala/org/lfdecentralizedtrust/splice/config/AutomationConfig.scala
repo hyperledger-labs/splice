@@ -114,5 +114,6 @@ case class IngestionConfig(
     maxBatchSize: Int = 100,
     maxEntriesPerInsert: Int = 100,
     maxDeletesPerStatement: Int = 1000,
+    maxSoftDeletesPerStatement: Int = 1000,
     maxLookupsPerStatement: Int = 1000,
 )

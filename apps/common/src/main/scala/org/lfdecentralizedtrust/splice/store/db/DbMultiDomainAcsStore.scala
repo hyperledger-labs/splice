@@ -119,6 +119,9 @@ final class DbMultiDomainAcsStore[TXE](
 
   private val state = new AtomicReference[State](State.empty())
 
+  override protected def softDeleteFilter: SQLActionBuilder =
+    if (state.get().softDeleteEnabled) sql" and acs.archived_at is null " else sql""
+
   def acsStoreId: AcsStoreId =
     state
       .get()
@@ -224,7 +227,9 @@ final class DbMultiDomainAcsStore[TXE](
          from #$acsTableName acs
          where acs.store_id = $acsStoreId
            and acs.migration_id = $domainMigrationId
-           and acs.contract_id = ${lengthLimited(id.contractId)}""").toActionBuilder
+           and acs.contract_id = ${lengthLimited(
+            id.contractId
+          )}""" ++ softDeleteFilter).toActionBuilder
           .as[AcsQueries.SelectFromAcsTableWithStateResult]
           .headOption,
         "lookupContractStateById",
@@ -246,7 +251,7 @@ final class DbMultiDomainAcsStore[TXE](
          from #$acsTableName acs
          where acs.store_id = $acsStoreId
          and acs.migration_id = $domainMigrationId
-         and """ ++ inClause("acs.contract_id", ids) ++ sql"""
+         """ ++ softDeleteFilter ++ sql" and " ++ inClause("acs.contract_id", ids) ++ sql"""
          """).toActionBuilder
             .as[Int]
             .head,
@@ -680,7 +685,7 @@ final class DbMultiDomainAcsStore[TXE](
                    where acs.store_id = $acsStoreId
                      and acs.migration_id = $domainMigrationId
                      and state_number >= $fromNumber
-                     and """ ++ where ++ sql"""
+                     and """ ++ where ++ softDeleteFilter ++ sql"""
                    order by state_number limit ${sqlLimit(pageSize)}""").toActionBuilder
                   .as[AcsQueries.SelectFromAcsTableWithStateResult],
                 "streamContractsWithState",
@@ -726,7 +731,7 @@ final class DbMultiDomainAcsStore[TXE](
              from #$acsTableName acs
              where acs.store_id = $acsStoreId
                and acs.migration_id = $domainMigrationId
-               and acs.contract_id = $contractId""").toActionBuilder
+               and acs.contract_id = $contractId""" ++ softDeleteFilter).toActionBuilder
             .as[AcsQueries.SelectFromAcsTableWithStateResult]
             .headOption,
           "isReadyForAssign",
@@ -933,15 +938,27 @@ final class DbMultiDomainAcsStore[TXE](
           case _ => Future.unit
         }
 
+        hasSoftDelete <- storage
+          .querySingle(
+            sql"""SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = $acsTableName
+              AND column_name = 'archived_at'
+          )""".as[Boolean].headOption,
+            "initialize.detectSoftDelete",
+          )
+          .getOrElse(false)
+
         acsSizeInDb <- acsInitResult match {
           case StoreHasData(acsStoreId, _) =>
             storage
               .querySingle(
-                sql"""
+                (sql"""
                   select count(*)
-                  from #$acsTableName
-                  where store_id = ${acsStoreId} and migration_id = $domainMigrationId
-                  """.as[Int].headOption,
+                  from #$acsTableName acs
+                  where acs.store_id = ${acsStoreId} and acs.migration_id = $domainMigrationId
+                  """ ++ softDeleteFilter).toActionBuilder.as[Int].headOption,
                 "initialize.getAcsCount",
               )
               .getOrElse(0)
@@ -961,6 +978,7 @@ final class DbMultiDomainAcsStore[TXE](
               txLogStoreId = txLogStoreId,
               acsSizeInDb = acsSizeInDb,
               lastIngestedOffset = lastIngestedOffset,
+              softDeleteEnabled = hasSoftDelete,
             )
           )
           lastIngestedOffset.foreach(oldState.signalOffsetChanged)
@@ -1544,7 +1562,7 @@ final class DbMultiDomainAcsStore[TXE](
               },
               onExercise = (st, ev, _) => {
                 if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
-                  st + (ev.getContractId -> Delete(ev))
+                  st + (ev.getContractId -> Delete(ev, tree.tree.getRecordTime))
                 } else {
                   st
                 }
@@ -1554,7 +1572,7 @@ final class DbMultiDomainAcsStore[TXE](
         // optimization: a delete on a contract cancels-out with the corresponding insert
         .foldLeft(VectorMap.empty[String, OperationToDo]) { case (acc, treeOps) =>
           val (toRemove, toAdd) = treeOps.partition {
-            case (contractId, Delete(_)) if acc.contains(contractId) => true
+            case (contractId, Delete(_, _)) if acc.contains(contractId) => true
             case _ => false
           }
           (acc -- toRemove.keys) ++ toAdd
@@ -1602,8 +1620,8 @@ final class DbMultiDomainAcsStore[TXE](
             DBIO.successful(())
         }
         _ <- doDeleteContracts(
-          workTodo.collect { case Delete(exercisedEvent) =>
-            exercisedEvent
+          workTodo.collect { case Delete(exercisedEvent, recordTime) =>
+            (exercisedEvent, recordTime)
           },
           summary,
         )
@@ -1632,11 +1650,12 @@ final class DbMultiDomainAcsStore[TXE](
     }
 
     private def hasAcsEntry(contractId: String) = (sql"""
-           select count(*) from #$acsTableName
-           where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id = ${lengthLimited(
+           select count(*) from #$acsTableName acs
+           where acs.store_id = $acsStoreId and acs.migration_id = $domainMigrationId
+           """ ++ softDeleteFilter ++ sql""" and acs.contract_id = ${lengthLimited(
         contractId
       )}
-          """).as[Int].head.map(_ > 0)
+          """).toActionBuilder.as[Int].head.map(_ > 0)
 
     private def hasIncompleteReassignments(contractId: String) =
       checkIncompleteReassignments(Seq(contractId)).map(_.nonEmpty)
@@ -1849,26 +1868,54 @@ final class DbMultiDomainAcsStore[TXE](
               """ ++ indexColumnNameValues ++ sql")")
     }
 
-    private def doDeleteContracts(events: Seq[ExercisedEvent], summary: MutableIngestionSummary) = {
-      if (events.isEmpty) DBIO.successful(())
-      else {
-        DBIO.sequence(events.grouped(ingestionConfig.maxDeletesPerStatement).map { events =>
+    private def doDeleteContracts(
+        eventsWithRecordTime: Seq[(ExercisedEvent, Instant)],
+        summary: MutableIngestionSummary,
+    ) = {
+      if (eventsWithRecordTime.isEmpty) DBIO.successful(())
+      else if (state.get().softDeleteEnabled) {
+        // Soft-delete: perform UPDATE of 'archived_at'
+        DBIO.sequence(eventsWithRecordTime.groupBy(_._2).toSeq.flatMap { case (recordTime, group) =>
+          val events = group.map(_._1)
+          val archivedAtMicros = Timestamp.assertFromInstant(recordTime).micros
+          events.grouped(ingestionConfig.maxSoftDeletesPerStatement).map { batchEvents =>
+            (sql"""
+              UPDATE #$acsTableName
+              SET archived_at = $archivedAtMicros
+              WHERE store_id = $acsStoreId
+                AND migration_id = $domainMigrationId
+                AND """ ++ inClause(
+              "contract_id",
+              batchEvents.map(e => lengthLimited(e.getContractId)),
+            ) ++ sql" RETURNING contract_id").toActionBuilder.as[String].map { updatedCids =>
+              val updatedCidSet = updatedCids.toSet
+              val ingestedArchivedEvents =
+                batchEvents.filter(evt => updatedCidSet.contains(evt.getContractId))
+              summary.ingestedArchivedEvents.addAll(ingestedArchivedEvents)
+              summary.numFilteredArchivedEvents += (batchEvents.length - updatedCids.size)
+            }
+          }
+        })
+      } else {
+        // Hard-delete: DELETE
+        val events = eventsWithRecordTime.map(_._1)
+        DBIO.sequence(events.grouped(ingestionConfig.maxDeletesPerStatement).map { batchEvents =>
           (sql"""
             delete from #$acsTableName
             where store_id = $acsStoreId
               and migration_id = $domainMigrationId
               and """ ++ inClause(
             "contract_id",
-            events.map(e => lengthLimited(e.getContractId)),
+            batchEvents.map(e => lengthLimited(e.getContractId)),
           ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
             val deletedCidSet = deletedCids.toSet
             val ingestedArchivedEvents =
-              events.filter(evt => deletedCidSet.contains(evt.getContractId))
+              batchEvents.filter(evt => deletedCidSet.contains(evt.getContractId))
             summary.ingestedArchivedEvents.addAll(ingestedArchivedEvents)
             // there were no contracts with some id. This can happen because:
             // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
             // but that might still satisfy some other filter, so the contract was never inserted
-            summary.numFilteredArchivedEvents += (events.length - deletedCids.size)
+            summary.numFilteredArchivedEvents += (batchEvents.length - deletedCids.size)
           }
         })
       }
@@ -1989,7 +2036,7 @@ final class DbMultiDomainAcsStore[TXE](
 
     sealed trait OperationToDo
     case class Insert(evt: CreatedEvent, synchronizerId: SynchronizerId) extends OperationToDo
-    case class Delete(evt: ExercisedEvent) extends OperationToDo
+    case class Delete(evt: ExercisedEvent, recordTime: Instant) extends OperationToDo
   }
 
   private def getIndexColumnValues(
@@ -2188,6 +2235,84 @@ final class DbMultiDomainAcsStore[TXE](
     storage.query(readOffsetAction(), "readOffset")
   }
 
+  /** Lookup a contract by ID as it existed at the given record_time.
+    * Only available for stores with soft-delete enabled (archived_at column).
+    */
+  def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](
+      companion: C
+  )(id: ContractId[?], asOf: CantonTimestamp)(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TCid, T]]] = {
+    require(
+      state.get().softDeleteEnabled,
+      "Temporal queries require a store with archived_at column",
+    )
+    val asOfMicros = asOf.underlying.micros
+    waitUntilAcsIngested {
+      val packageQualifiedName = companionClass.packageQualifiedName(companion)
+      storage
+        .querySingle(
+          (sql"""
+           select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+           from #$acsTableName acs
+           where acs.store_id = $acsStoreId
+             and acs.migration_id = $domainMigrationId
+             and acs.package_name = ${packageQualifiedName.packageName}
+             and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
+             and acs.created_at <= $asOfMicros
+             and (acs.archived_at is null or acs.archived_at > $asOfMicros)
+             and acs.contract_id = ${lengthLimited(id.contractId)}
+          """).toActionBuilder
+            .as[AcsQueries.SelectFromAcsTableWithStateResult]
+            .headOption,
+          "lookupContractByIdAsOf",
+        )
+        .map(result => contractWithStateFromRow(companion)(result))
+        .value
+    }
+  }
+
+  /** List contracts of the given type as they existed at the given record_time.
+    * Only available for stores with soft-delete enabled (archived_at column).
+    */
+  def listContractsAsOf[C, TCid <: ContractId[?], T](
+      companion: C,
+      asOf: CantonTimestamp,
+      limit: Limit = defaultLimit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      tc: TraceContext,
+  ): Future[Seq[ContractWithState[TCid, T]]] = {
+    require(
+      state.get().softDeleteEnabled,
+      "Temporal queries require a store with archived_at column",
+    )
+    val asOfMicros = asOf.underlying.micros
+    waitUntilAcsIngested {
+      val templateId = companionClass.typeId(companion)
+      val packageQualifiedName = companionClass.packageQualifiedName(companion)
+      for {
+        result <- storage.query(
+          (sql"""
+           select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+           from #$acsTableName acs
+           where acs.store_id = $acsStoreId
+             and acs.migration_id = $domainMigrationId
+             and acs.package_name = ${packageQualifiedName.packageName}
+             and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
+             and acs.created_at <= $asOfMicros
+             and (acs.archived_at is null or acs.archived_at > $asOfMicros)
+           order by event_number limit ${sqlLimit(limit)}
+          """).toActionBuilder
+            .as[AcsQueries.SelectFromAcsTableWithStateResult],
+          s"listContractsAsOf:${templateId.getEntityName}",
+        )
+        limited = applyLimit("listContractsAsOf", limit, result)
+      } yield limited.map(contractWithStateFromRow(companion)(_))
+    }
+  }
+
   override def close(): Unit =
     metrics.close()
 }
@@ -2210,12 +2335,14 @@ object DbMultiDomainAcsStore {
       acsSize: Int,
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
+      softDeleteEnabled: Boolean,
   ) {
     def withInitialState(
         acsStoreId: AcsStoreId,
         txLogStoreId: Option[TxLogStoreId],
         acsSizeInDb: Int,
         lastIngestedOffset: Option[Long],
+        softDeleteEnabled: Boolean,
     ): State = {
       assert(
         !offset.exists(inMemoryOffset =>
@@ -2230,6 +2357,7 @@ object DbMultiDomainAcsStore {
         acsSize = acsSizeInDb,
         offset = lastIngestedOffset,
         offsetChanged = nextOffsetChanged,
+        softDeleteEnabled = softDeleteEnabled,
       )
     }
 
@@ -2284,6 +2412,7 @@ object DbMultiDomainAcsStore {
       acsSize = 0,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
+      softDeleteEnabled = false,
     )
   }
 

@@ -33,6 +33,10 @@ import scala.reflect.ClassTag
 
 trait AcsQueries extends AcsJdbcTypes {
 
+  /** Override for handling soft-deletion on ACS store
+    */
+  protected def softDeleteFilter: SQLActionBuilder = sql""
+
   /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
     *                  This is fine, as all calls to this method should use static string constants.
     */
@@ -52,7 +56,7 @@ trait AcsQueries extends AcsJdbcTypes {
          and acs.migration_id = $migrationId
          and acs.package_name = ${packageQualifiedName.packageName}
          and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-         and """ ++ where ++ sql"""
+         and """ ++ where ++ softDeleteFilter ++ sql"""
        """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableResult]
   }
 
@@ -94,7 +98,7 @@ trait AcsQueries extends AcsJdbcTypes {
          and acs.migration_id = $migrationId
          and acs.package_name = ${packageQualifiedName.packageName}
          and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-         """ ++ additionalWhere ++ sql"""
+         """ ++ softDeleteFilter ++ additionalWhere ++ sql"""
        """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult]
   }
 
@@ -155,7 +159,7 @@ trait AcsQueries extends AcsJdbcTypes {
                and o.migration_id = acs.migration_id
                and acs.package_name = ${packageQualifiedName.packageName}
                and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-               and (""" ++ where ++ sql""")
+               and (""" ++ where ++ sql")" ++ softDeleteFilter ++ sql"""
        where sd.id = $storeId and o.migration_id = $migrationId
        """ ++ orderLimit).toActionBuilder
       .as[AcsQueries.SelectFromAcsTableResultWithOffset]
@@ -225,7 +229,7 @@ trait AcsQueries extends AcsJdbcTypes {
                and o.migration_id = acs.migration_id
                and acs.package_name = ${packageQualifiedName.packageName}
                and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-               and """ ++ where ++ sql"""
+               and """ ++ where ++ softDeleteFilter ++ sql"""
        where sd.id = $storeId and o.migration_id = $migrationId
        """ ++ orderLimit).toActionBuilder
       .as[AcsQueries.SelectFromAcsTableResultWithStateAndOffset]
