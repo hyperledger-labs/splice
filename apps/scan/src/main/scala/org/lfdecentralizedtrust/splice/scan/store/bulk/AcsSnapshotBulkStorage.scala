@@ -13,16 +13,17 @@ import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, TimestampWithMigrationId}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorage(
-    val config: ScanStorageConfig,
-    val acsSnapshotStore: AcsSnapshotStore,
-    val s3Connection: S3BucketConnection,
-    val kvProvider: ScanKeyValueProvider,
+    config: ScanStorageConfig,
+    acsSnapshotStore: AcsSnapshotStore,
+    s3Connection: S3BucketConnection,
+    kvProvider: ScanKeyValueProvider,
+    historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -96,10 +97,12 @@ class AcsSnapshotBulkStorage(
           config,
           acsSnapshotStore,
           s3Connection,
+          historyMetrics,
           loggerFactory,
         )
       )
       .mapAsync(1) { (ts: TimestampWithMigrationId) =>
+        historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
         for {
           _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
         } yield {

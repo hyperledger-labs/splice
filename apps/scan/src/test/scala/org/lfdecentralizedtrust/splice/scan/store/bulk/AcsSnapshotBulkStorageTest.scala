@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -12,6 +14,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -24,6 +27,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HistoryMetrics,
   Limit,
   StoreTestBase,
   TimestampWithMigrationId,
@@ -61,6 +65,7 @@ class AcsSnapshotBulkStorageTest
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
         val ts = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
         val store = new MockAcsSnapshotStore(ts).store
+        val metricsFactory = new InMemoryMetricsFactory
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         for {
           _ <- SingleAcsSnapshotBulkStorage
@@ -69,6 +74,7 @@ class AcsSnapshotBulkStorageTest
               bulkStorageTestConfig,
               store,
               s3BucketConnection,
+              new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
               loggerFactory,
             )
             .runWith(Sink.ignore)
@@ -90,6 +96,17 @@ class AcsSnapshotBulkStorageTest
           objectKeys.foreach(
             _.key() should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
           )
+          val objectCountMetrics = metricsFactory.metrics.counters.get(
+            SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count"
+          )
+          val numObjectsFromMetric = objectCountMetrics.value
+            .get(MetricsContext.Empty)
+            .value
+            .markers
+            .get(MetricsContext("object_type" -> "ACS_snapshots"))
+            .value
+            .get()
+          numObjectsFromMetric shouldBe 7
 
           val allContractsFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(
@@ -111,6 +128,21 @@ class AcsSnapshotBulkStorageTest
         val ts3 = ts1.add(24.hours)
         val store = new MockAcsSnapshotStore(ts1)
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
+        val metricsFactory = new InMemoryMetricsFactory
+        def assertLatestSnapshotInMetrics(ts: CantonTimestamp) = {
+          val latestSnapshotMetrics = metricsFactory.metrics.gauges
+            .get(
+              SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "latest-acs-snapshot"
+            )
+            .value
+          latestSnapshotMetrics
+            .get(MetricsContext.Empty)
+            .value
+            .value
+            .get()
+            ._1 shouldBe ts.toEpochMilli * 1000
+        }
+
         for {
           kvProvider <- mkProvider
           (killSwitch, probe) = new AcsSnapshotBulkStorage(
@@ -118,6 +150,7 @@ class AcsSnapshotBulkStorageTest
             store.store,
             s3BucketConnection,
             kvProvider,
+            new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
             loggerFactory,
           ).getSource()
             .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.both)
@@ -130,23 +163,25 @@ class AcsSnapshotBulkStorageTest
           }
           persistedTs1 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
           _ = persistedTs1.value shouldBe TimestampWithMigrationId(ts1, 0)
+          _ = assertLatestSnapshotInMetrics(ts1)
 
           _ = clue(
             "Add another snapshot to the store, which is not yet dumped because of the longer period on bulk storage"
           ) {
             store.addSnapshot(ts2)
             probe.expectNoMessage(10.seconds)
+            assertLatestSnapshotInMetrics(ts1)
           }
 
           _ = clue("Add one more snapshot to the store, at the end of the period") {
             store.addSnapshot(ts3)
-            val next = probe.expectNext(2.minutes)
-            next shouldBe TimestampWithMigrationId(ts3, 0)
+            probe.expectNext(2.minutes) shouldBe TimestampWithMigrationId(ts3, 0)
             probe.expectNoMessage(10.seconds)
           }
           persistedTs3 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
         } yield {
           persistedTs3.value shouldBe TimestampWithMigrationId(ts3, 0)
+          assertLatestSnapshotInMetrics(ts3)
           killSwitch.shutdown()
           succeed
         }

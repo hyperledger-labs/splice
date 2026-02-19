@@ -12,7 +12,12 @@ import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
-import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  HistoryMetrics,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -23,6 +28,7 @@ class UpdateHistoryBulkStorage(
     val kvProvider: ScanKeyValueProvider,
     val currentMigrationId: Long,
     val s3Connection: S3BucketConnection,
+    val historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -120,6 +126,7 @@ class UpdateHistoryBulkStorage(
           config,
           updateHistory,
           s3Connection,
+          historyMetrics,
           loggerFactory,
         )
       )
@@ -127,6 +134,7 @@ class UpdateHistoryBulkStorage(
         case UpdateHistorySegmentBulkStorage.Output(segment, _, isLast) if isLast => segment
       }
       .mapAsync(1) { segment =>
+        historyMetrics.BulkStorage.latestUpdatesSegment.updateValue(segment.toTimestamp.timestamp)
         kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
       }
   }
