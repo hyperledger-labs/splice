@@ -55,6 +55,6 @@
     ],
     "dependencies": {
         "@google-cloud/sql": "^0.20.1",
-        "commander": "^13.0.0"
+        "commander": "^14.0.3"
     }
 }
