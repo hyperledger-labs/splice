@@ -48,7 +48,8 @@ class S3ZstdObjects(
         )
       )(
         {
-          case (state, chunk) if state.s3ObjSize + chunk.bytes.length > storatgeConfig.bulkMaxFileSize =>
+          case (state, chunk)
+              if state.s3ObjSize + chunk.bytes.length > storatgeConfig.bulkMaxFileSize =>
             logger.debug(
               s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${storatgeConfig.bulkMaxFileSize}, so this is the last chunk for the object"
             )

@@ -465,8 +465,7 @@ object SpliceConfig {
     implicit val mediatorVerdictIngestionConfigReader
         : ConfigReader[MediatorVerdictIngestionConfig] =
       deriveReader[MediatorVerdictIngestionConfig]
-    implicit val bulkStorageConfigReader
-        : ConfigReader[BulkStorageConfig] =
+    implicit val bulkStorageConfigReader: ConfigReader[BulkStorageConfig] =
       deriveReader[BulkStorageConfig]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
@@ -917,8 +916,7 @@ object SpliceConfig {
     implicit val mediatorVerdictIngestionConfigWriter
         : ConfigWriter[MediatorVerdictIngestionConfig] =
       deriveWriter[MediatorVerdictIngestionConfig]
-    implicit val BulkStorageConfigWriter
-        : ConfigWriter[BulkStorageConfig] =
+    implicit val BulkStorageConfigWriter: ConfigWriter[BulkStorageConfig] =
       deriveWriter[BulkStorageConfig]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]

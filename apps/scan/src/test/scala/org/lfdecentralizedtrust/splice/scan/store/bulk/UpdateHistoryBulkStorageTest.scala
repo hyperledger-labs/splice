@@ -47,7 +47,7 @@ class UpdateHistoryBulkStorageTest
     maxFileSize,
   )
   val appConfig = BulkStorageConfig(
-    updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+    updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
   )
 
   "UpdateHistoryBulkStorage" should {
