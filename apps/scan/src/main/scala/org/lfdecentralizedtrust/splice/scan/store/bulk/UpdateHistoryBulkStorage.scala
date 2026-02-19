@@ -12,7 +12,12 @@ import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
-import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  HistoryMetrics,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -23,6 +28,7 @@ class UpdateHistoryBulkStorage(
     val kvProvider: ScanKeyValueProvider,
     val currentMigrationId: Long,
     val s3Connection: S3BucketConnection,
+    val historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -120,19 +126,15 @@ class UpdateHistoryBulkStorage(
           config,
           updateHistory,
           s3Connection,
+          historyMetrics,
           loggerFactory,
         )
       )
-      .mapAsync(1) { case (segment, lastUpdate) =>
-        lastUpdate match {
-          case Some(ts) =>
-            logger.info(
-              s"Successfully completed dumping updates. Last update from the segment is from ${ts.migrationId}, ${ts.timestamp}"
-            )
-          case None =>
-            // This might happen e.g. due to a long migration, but we at least want to warn about it
-            logger.warn(s"Segment $segment contained no updates")
-        }
+      .collect {
+        case UpdateHistorySegmentBulkStorage.Output(segment, _, isLast) if isLast => segment
+      }
+      .mapAsync(1) { segment =>
+        historyMetrics.BulkStorage.latestUpdatesSegment.updateValue(segment.toTimestamp.timestamp)
         kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
       }
   }

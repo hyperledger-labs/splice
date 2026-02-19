@@ -27,7 +27,7 @@ jobs:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check out repository code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         if: inputs.commit_sha != ''
         with:
           ref: ${{ inputs.commit_sha }}

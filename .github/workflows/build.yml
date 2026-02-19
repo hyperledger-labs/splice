@@ -345,6 +345,7 @@ jobs:
     - scala_test_record_time_tolerance
     - scala_test_disaster_recovery
     - scala_test_with_cometbft
+    - scala_test_signatures
     - scala_test_wall_clock_time
     - scala_test_permissioned_canton
     - scala_test_frontend_wall_clock_time
