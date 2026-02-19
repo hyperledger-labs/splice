@@ -76,7 +76,7 @@ case class ScanStorageConfig(
    * happen soon). Once the end time will have passed, the migration ID will be
    * deterministic given the update history, so we do not lose any information or risk
    * inconsistency between instances of Scan.
-   * If end timestamp is not give, it will be computed from the start timestamp
+   * If end timestamp is not given, it will be computed from the start timestamp
    * based on the bulkAcsSnapshotPeriodHours period
    */
   def getSegmentKeyPrefix(
