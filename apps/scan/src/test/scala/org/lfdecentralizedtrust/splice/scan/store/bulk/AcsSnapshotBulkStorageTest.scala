@@ -59,7 +59,7 @@ class AcsSnapshotBulkStorageTest
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
-        val ts = CantonTimestamp.now()
+        val ts = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
         val store = new MockAcsSnapshotStore(ts).store
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         for {
@@ -86,11 +86,10 @@ class AcsSnapshotBulkStorageTest
             .map(_.createdEventsInPage)
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
-          objectKeys should have length 6
-          objectKeys.take(objectKeys.size - 1).forall {
-            !_.key().endsWith("_last.zstd")
-          }
-          objectKeys.last.key() should endWith("_last.zstd")
+          objectKeys should have length 7
+          objectKeys.foreach(
+            _.key() should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
+          )
 
           val allContractsFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(
