@@ -10,14 +10,24 @@ import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransfo
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 import software.amazon.awssdk.services.s3.model.{
+  CompleteMultipartUploadRequest,
+  CompletedMultipartUpload,
+  CompletedPart,
+  CreateMultipartUploadRequest,
   GetObjectRequest,
   GetObjectResponse,
+  ListObjectsRequest,
+  ListObjectsResponse,
   PutObjectRequest,
+  UploadPartRequest,
 }
 
 import scala.jdk.FutureConverters.*
+import scala.jdk.CollectionConverters.*
 import java.net.URI
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicInteger
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
 case class S3Config(
@@ -28,8 +38,8 @@ case class S3Config(
 )
 
 class S3BucketConnection(
-    val s3Client: S3AsyncClient,
-    val bucketName: String,
+    s3Client: S3AsyncClient,
+    bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
   // Reads the full content of an s3 object into a ByteBuffer.
@@ -61,6 +71,98 @@ class S3BucketConnection(
       .asScala
       // TODO(#3429): consider checking the checksum from the response
       .map(_ => ())
+  }
+
+  def newAppendWriteObject(
+      key: String
+  )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
+
+  def listObjects: Future[ListObjectsResponse] =
+    s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+
+  /** Wrapper around multi-part upload that simplifies uploading parts in order
+    */
+  class AppendWriteObject protected[S3BucketConnection] (val key: String)(implicit
+      ec: ExecutionContext
+  ) {
+    val createRequest = CreateMultipartUploadRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .build();
+
+    private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
+    private val numParts = new AtomicInteger(0)
+    private val parts = TrieMap.empty[Integer, CompletedPart]
+
+    /** Call this once before uploading a new part.
+      */
+    def prepareUploadNext(): Int = numParts.incrementAndGet()
+
+    /** Thread safe, may be called in parallel.
+      *       partNumber must be an index returned from prepareUploadNext()
+      */
+    def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
+      require(numParts.get() >= partNumber)
+      for {
+        id <- uploadId
+        partRequest = UploadPartRequest
+          .builder()
+          .bucket(bucketName)
+          .key(key)
+          .uploadId(id)
+          .partNumber(partNumber)
+          .build()
+        response <- s3Client
+          .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
+          .asScala
+        res <- parts
+          .put(
+            partNumber,
+            CompletedPart
+              .builder()
+              .partNumber(partNumber)
+              .eTag(response.eTag())
+              .build(),
+          )
+          .fold(
+            Future.successful(())
+          )(_ =>
+            Future.failed(new RuntimeException(s"Part number $partNumber uploaded more than once"))
+          )
+
+      } yield {
+        res
+      }
+    }
+
+    def finish(): Future[Unit] = {
+      require(numParts.get() > 0)
+      require(
+        parts.size == numParts.get(),
+        "finish may not be called before all parts have finished uploading",
+      )
+      for {
+        id <- uploadId
+        completedMultipartUpload = CompletedMultipartUpload
+          .builder()
+          .parts(parts.toSeq.sortBy(_._1).map(_._2).asJava)
+          .build();
+
+        completeRequest = CompleteMultipartUploadRequest
+          .builder()
+          .bucket(bucketName)
+          .key(key)
+          .uploadId(id)
+          .multipartUpload(completedMultipartUpload)
+          .build()
+
+        _ <- s3Client.completeMultipartUpload(completeRequest).asScala
+      } yield {
+        // TODO(#3429): consider checking the checksum from the response
+        ()
+      }
+    }
   }
 }
 

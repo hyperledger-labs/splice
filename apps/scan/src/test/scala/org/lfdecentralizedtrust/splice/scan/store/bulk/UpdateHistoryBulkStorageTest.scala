@@ -20,14 +20,13 @@ import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKey
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
 import scala.math.Ordering.Implicits.*
+import java.nio.ByteBuffer
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -35,15 +34,32 @@ class UpdateHistoryBulkStorageTest
     with HasActorSystem
     with HasS3Mock
     with SplicePostgresTest {
-  val maxFileSize = 30000L
+  val maxFileSize = 25000L
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
-    bulkDbReadChunkSize = 1000,
+    bulkDbReadChunkSize = 500,
+    bulkZstdFrameSize = 10000L,
     maxFileSize,
   )
 
   "UpdateHistoryBulkStorage" should {
+
+    "multipart upload works" in {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+        val o = bucketConnection.newAppendWriteObject("test")
+        o.prepareUploadNext()
+        o.prepareUploadNext()
+        for {
+          _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
+          _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
+          _ <- o.finish()
+          content <- bucketConnection.readFullObject("test")
+        } yield {
+          new String(content.array(), "UTF-8") shouldBe "helloworld"
+        }
+      }
+    }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
@@ -69,10 +85,10 @@ class UpdateHistoryBulkStorageTest
             segment,
             loggerFactory,
           )
-          .toMat(TestSink.probe[(UpdatesSegment, Option[TimestampWithMigrationId])])(Keep.right)
+          .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
           .run()
 
-        probe.request(2)
+        probe.request(3)
 
         clue(
           "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
@@ -85,18 +101,25 @@ class UpdateHistoryBulkStorageTest
         ) {
           mockStore.mockIngestion(1000)
           probe.expectNext(20.seconds) should be(
-            (segment, Some(TimestampWithMigrationId(toTimestamp, 0)))
+            UpdateHistorySegmentBulkStorage.Output(
+              segment,
+              "TimestampWithMigrationId(1970-01-01T00:00:00.100Z,0)-TimestampWithMigrationId(1970-01-01T00:00:02.300Z,0)/updates_0.zstd",
+              isLastObjectInSegment = false,
+            )
+          )
+          probe.expectNext(20.seconds) should be(
+            UpdateHistorySegmentBulkStorage.Output(
+              segment,
+              "TimestampWithMigrationId(1970-01-01T00:00:00.100Z,0)-TimestampWithMigrationId(1970-01-01T00:00:02.300Z,0)/updates_1.zstd",
+              isLastObjectInSegment = true,
+            )
           )
           probe.expectComplete()
         }
 
         clue("Check that the dumped content is correct") {
           for {
-            s3Objects <- bucketConnection.s3Client
-              .listObjects(
-                ListObjectsRequest.builder().bucket("bucket").build()
-              )
-              .asScala
+            s3Objects <- bucketConnection.listObjects
             allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
               None,
               HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
@@ -178,32 +201,36 @@ class UpdateHistoryBulkStorageTest
                 toMigration.toLong,
               ),
             )
-          probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
-          probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
-          // First 2000 events end up 08:07:10, so the last full segment is the one up to 08:00
-          probe.expectNoMessage(20.seconds)
 
-          mockStore.mockIngestion(2000)
-          probe.request(2)
-          probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
-          probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
-          // Last update is now from 13:14:30, so not enough to close the 12-2 segment
-          probe.expectNoMessage(20.seconds)
+          clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
+            probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
+            probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
+            probe.expectNoMessage(20.seconds)
+          }
+
+          clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
+            mockStore.mockIngestion(2000)
+            probe.request(2)
+            probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
+            probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
+            probe.expectNoMessage(20.seconds)
+          }
 
           // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
           // then start a new one with the new migration and ingest updates in the new migration
           killSwitch.shutdown()
           val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
           mockStore.mockMigration()
-          mockStore.mockIngestion(2000) // up to time 19:13:50
 
-          probe1.request(4)
-          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
-          probe1.expectNoMessage(20.seconds)
+          clue("2000 more updates in the new migration, up to 19:13:50") {
+            mockStore.mockIngestion(2000)
+            probe1.request(4)
+            probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
+            probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
+            probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
+            probe1.expectNoMessage(20.seconds)
+          }
           killSwitch1.shutdown()
-
           succeed
         }
       }

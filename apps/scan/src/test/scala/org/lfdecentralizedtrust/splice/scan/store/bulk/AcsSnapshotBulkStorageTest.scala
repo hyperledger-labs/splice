@@ -32,14 +32,12 @@ import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 import org.mockito.invocation.InvocationOnMock
-import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.nio.ByteBuffer
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
 import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorageTest
@@ -54,6 +52,7 @@ class AcsSnapshotBulkStorageTest
     dbAcsSnapshotPeriodHours = 3,
     bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
+    bulkZstdFrameSize = 10000L,
     bulkMaxFileSize = 50000L,
   )
 
@@ -74,11 +73,7 @@ class AcsSnapshotBulkStorageTest
             )
             .runWith(Sink.ignore)
 
-          s3Objects <- s3BucketConnection.s3Client
-            .listObjects(
-              ListObjectsRequest.builder().bucket("bucket").build()
-            )
-            .asScala
+          s3Objects <- s3BucketConnection.listObjects
           allContracts <- store
             .queryAcsSnapshot(
               0,

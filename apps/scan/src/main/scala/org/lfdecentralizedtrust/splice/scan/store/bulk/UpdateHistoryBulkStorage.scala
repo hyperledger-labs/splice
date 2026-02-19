@@ -123,16 +123,10 @@ class UpdateHistoryBulkStorage(
           loggerFactory,
         )
       )
-      .mapAsync(1) { case (segment, lastUpdate) =>
-        lastUpdate match {
-          case Some(ts) =>
-            logger.info(
-              s"Successfully completed dumping updates. Last update from the segment is from ${ts.migrationId}, ${ts.timestamp}"
-            )
-          case None =>
-            // This might happen e.g. due to a long migration, but we at least want to warn about it
-            logger.warn(s"Segment $segment contained no updates")
-        }
+      .collect {
+        case UpdateHistorySegmentBulkStorage.Output(segment, _, isLast) if isLast => segment
+      }
+      .mapAsync(1) { segment =>
         kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
       }
   }

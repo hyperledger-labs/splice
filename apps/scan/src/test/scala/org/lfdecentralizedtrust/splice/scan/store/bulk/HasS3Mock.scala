@@ -2,8 +2,8 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.{BaseTest, FutureHelpers}
-import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
-import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
+import com.github.luben.zstd.ZstdInputStream
+import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.scalatest.EitherValues
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -11,10 +11,12 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 
+import java.io.ByteArrayOutputStream
 import java.net.URI
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Using
 import scala.jdk.CollectionConverters.*
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
@@ -53,31 +55,35 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       Region.US_EAST_1,
       AwsBasicCredentials.create("mock_id", "mock_key"),
     )
-    S3BucketConnection(s3Config, "bucket", loggerFactory)
+    S3BucketConnectionForUnitTests(s3Config, "bucket", loggerFactory)
   }
 
   def readUncompressAndDecode[T](
       s3BucketConnection: S3BucketConnection,
       decoder: String => Either[io.circe.Error, T],
   )(s3obj: S3Object)(implicit ec: ExecutionContext, tag: reflect.ClassTag[T]): Array[T] = {
-    val bufferAllocator = PooledByteBufAllocator.DEFAULT
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
-    val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
-    // Empirically, our data is compressed by a factor of at most 200 (and is deterministic, so this is not expected to flake)
-    val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
-    try {
-      val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
-      compressedDirect.writeBytes(compressed)
-      Using(new ZstdDirectBufferDecompressingStream(compressedDirect.nioBuffer())) {
-        _.read(uncompressedNio)
+    val zis = new ZstdInputStream(new ByteBufInputStream(Unpooled.wrappedBuffer(compressed)))
+    val buffer = new Array[Byte](16384)
+    val out = new ByteArrayOutputStream()
+
+    @tailrec
+    def readAll(): Unit = {
+      val bytesRead = zis.read(buffer)
+      if (bytesRead != -1) {
+        out.write(buffer, 0, bytesRead)
+        readAll()
       }
-      uncompressedNio.flip()
-      val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
+    }
+
+    try {
+      readAll()
+      val uncompressed = ByteBuffer.wrap(out.toByteArray)
+      val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressed).toString
       val allContracts = allContractsStr.split("\n")
       allContracts.map(decoder(_).value)
     } finally {
-      compressedDirect.release()
-      uncompressedDirect.release()
+      zis.close()
     }
   }
 }

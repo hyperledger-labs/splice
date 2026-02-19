@@ -19,6 +19,7 @@ case class ScanStorageConfig(
     dbAcsSnapshotPeriodHours: Int, // Period between two consecutive acs snapshots to be computed and stored in the DB
     bulkAcsSnapshotPeriodHours: Int, // Period between two consecutive acs snapshots to be dumped to bulk storage (currently must be <=24 hr, and a multiple of dbAcsSnapshotPeriodHours)
     bulkDbReadChunkSize: Int, // Chunk size to read from the DB for copying to bulk storage
+    bulkZstdFrameSize: Long, // Size of each zstd frame. In prod, must be >= 5 MB as each frame is written as a part in multi-part upload, which are enforced by most s3 implementations to be >= 5MB each
     bulkMaxFileSize: Long, // Max file size (estimated, may end up being slightly bigger) for bulk storage objects
 ) {
   require(
@@ -76,6 +77,7 @@ object ScanStorageConfigs {
     dbAcsSnapshotPeriodHours = 3,
     bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
-    bulkMaxFileSize = 64L * 1024 * 1024,
+    bulkZstdFrameSize = 12L * 1024 * 1024,
+    bulkMaxFileSize = 128L * 1024 * 1024,
   )
 }
