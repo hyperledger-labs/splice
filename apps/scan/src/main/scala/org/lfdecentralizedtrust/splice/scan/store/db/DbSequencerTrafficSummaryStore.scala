@@ -33,8 +33,8 @@ object DbSequencerTrafficSummaryStore {
     def toJson(envelopes: Seq[EnvelopeT]): Json = Json.arr(
       envelopes.map { env =>
         Json.obj(
-          "traffic_cost" -> env.trafficCost.asJson,
-          "view_hashes" -> env.viewHashes.asJson,
+          "tc" -> env.trafficCost.asJson,
+          "vid" -> env.viewHashes.asJson,
         )
       }*
     )
@@ -42,8 +42,8 @@ object DbSequencerTrafficSummaryStore {
     def fromJson(json: Json): Seq[EnvelopeT] = {
       json.asArray.getOrElse(Vector.empty).flatMap { obj =>
         for {
-          trafficCost <- obj.hcursor.get[Long]("traffic_cost").toOption
-          viewHashes <- obj.hcursor.get[Seq[String]]("view_hashes").toOption
+          trafficCost <- obj.hcursor.get[Long]("tc").toOption
+          viewHashes <- obj.hcursor.get[Seq[String]]("vid").toOption
         } yield EnvelopeT(trafficCost, viewHashes)
       }
     }
