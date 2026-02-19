@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.lsu
 
 import cats.implicits.showInterpolator
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.admin.api.client.data.SequencerHealthStatus.implicitPrettyString
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.transaction.LsuAnnouncement
@@ -22,16 +22,17 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
   TriggerEnabledSynchronization,
 }
+import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.lsu.LsuStateTransferTrigger.LsuTransferTask
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class LsuStateTransferTrigger(
     baseContext: TriggerContext,
     currentSynchronizerNode: SynchronizerNode,
-    successorSynchronizerNode: SynchronizerNode,
+    successorSynchronizerNode: LocalSynchronizerNode,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -76,7 +77,7 @@ class LsuStateTransferTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     logger.info(s"Running LSU state transfer for $task")
-    successorSynchronizerNode.sequencerAdminConnection.getStatus.flatMap {
+    successorSynchronizerNode.mediatorAdminConnection.getStatus.flatMap {
       case NodeStatus.Failure(msg) =>
         val message = s"Failed to get successor status, will not transfer state: $msg"
         logger.error(message)
@@ -85,21 +86,56 @@ class LsuStateTransferTrigger(
         for {
           state <- exporter.exportLSUState(task.work.announcement.upgradeTime)
           _ = logger.info("Initializing sequencer and mediators from the data of the old nodes")
-          _ <- newMediatorInitializer.initializeFromDumpAndWait(state.nodeIdentities.sequencer)
-          _ <- newSequencerIntializer.initializeFromDumpAndWait(state.nodeIdentities.sequencer)
-          currentStaticParams <- currentSynchronizerNode.sequencerAdminConnection.getStaticParams()
-          parameters = currentStaticParams.toInternal.copy(
-            serial = currentStaticParams.serial + NonNegativeInt.one
+          _ <- newMediatorInitializer.initializeFromDump(state.nodeIdentities.mediator)
+          _ <- newSequencerIntializer.initializeFromDump(state.nodeIdentities.sequencer)
+          _ <- context.retryProvider.ensureThat(
+            RetryFor.InitializingClientCalls,
+            "init_sequencer_lsu",
+            "Initialize sequencer from the state of the predecessor",
+            successorSynchronizerNode.sequencerAdminConnection.getStatus.map {
+              case NodeStatus.Failure(msg) => Left(msg)
+              case NodeStatus.NotInitialized(_, _) => Left("Not initialized")
+              case NodeStatus.Success(_) =>
+                logger.info("Sequencer is already initialized")
+                Right(())
+            },
+            (_: String) => {
+              logger.info(
+                show"Initializing sequencer from predecessor with ${successorSynchronizerNode.staticSynchronizerParameters}"
+              )
+              successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
+                state.synchronizerState,
+                successorSynchronizerNode.staticSynchronizerParameters,
+              )
+            },
+            logger,
           )
-          _ = logger.info(show"Initializing sequencer from predecessor with $parameters")
-          _ <- successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
-            state.synchronizerState,
-            // TODO(#564) - configure the serial increment in the sv app to allow rollforward
-            // TODO(#564) - support different protocol versions
-            parameters,
+          psid <- successorSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
+          _ <- context.retryProvider.ensureThat(
+            RetryFor.InitializingClientCalls,
+            "init_mediator_lsu",
+            "Initialize mediator after the LSU",
+            successorSynchronizerNode.mediatorAdminConnection.getStatus.map {
+              case NodeStatus.Failure(msg) => Left(msg)
+              case NodeStatus.NotInitialized(_, _) => Left("Not initialized")
+              case NodeStatus.Success(_) =>
+                logger.info("Mediator is already initialized")
+                Right(())
+            },
+            (_: String) => {
+              logger.info(show"Initializing mediator")
+              successorSynchronizerNode.mediatorAdminConnection.initialize(
+                psid,
+                successorSynchronizerNode.sequencerConnection,
+                successorSynchronizerNode.mediatorSequencerAmplification.toInternal,
+              )
+            },
+            logger,
           )
         } yield {
-          TaskSuccess(show"Initialized new synchronizer with parameters $parameters")
+          TaskSuccess(
+            show"Initialized new synchronizer with parameters ${successorSynchronizerNode.staticSynchronizerParameters}"
+          )
         }
       case NodeStatus.Success(status) =>
         logger.info(

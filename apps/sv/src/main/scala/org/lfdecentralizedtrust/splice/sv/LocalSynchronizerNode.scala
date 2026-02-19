@@ -51,7 +51,7 @@ final class LocalSynchronizerNode(
     participantAdminConnection: ParticipantAdminConnection,
     override val sequencerAdminConnection: SequencerAdminConnection,
     override val mediatorAdminConnection: MediatorAdminConnection,
-    val staticDomainParameters: StaticSynchronizerParameters,
+    val staticSynchronizerParameters: StaticSynchronizerParameters,
     val sequencerInternalConfig: ClientConfig,
     override val sequencerExternalPublicUrl: String,
     override val sequencerAvailabilityDelay: Duration,

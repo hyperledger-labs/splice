@@ -565,7 +565,7 @@ class SV1Initializer(
                   )
               _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
                 StoredTopologyTransactions(bootstrapTransactions),
-                synchronizerNode.staticDomainParameters,
+                synchronizerNode.staticSynchronizerParameters,
               )
             } yield (),
             logger,

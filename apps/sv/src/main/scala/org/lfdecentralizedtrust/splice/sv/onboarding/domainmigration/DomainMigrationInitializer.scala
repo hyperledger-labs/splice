@@ -412,7 +412,7 @@ class DomainMigrationInitializer(
                 localSynchronizerNodes.current.sequencerAdminConnection
                   .initializeFromGenesisState(
                     genesisState,
-                    localSynchronizerNodes.current.staticDomainParameters,
+                    localSynchronizerNodes.current.staticSynchronizerParameters,
                   ),
                 logger,
               )

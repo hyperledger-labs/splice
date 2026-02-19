@@ -254,26 +254,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .futureValue
       )
 
-      clue("Announce new sequencer urls") {
-        allBackends.par.map { backend =>
-          backend.sequencerClient.topology.lsu.sequencer_successors
-            .propose_successor(
-              backend.sequencerClient.id,
-              NonEmpty(
-                Seq,
-                URI.create(
-                  backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
-                ),
-              ),
-              decentralizedSynchronizerId,
-            )
-        }
-      }
-
-      clue(s"wait for upgrade time ${upgradeTime}") {
-        Threading.sleep(Duration.between(Instant.now(), upgradeTimeInstant).toMillis.abs)
-      }
-
       clue("new nodes are initialized") {
         allBackends.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor)
@@ -296,6 +276,26 @@ class LogicalSynchronizerUpgradeIntegrationTest
             }
           }
         }
+      }
+
+      clue("Announce new sequencer urls") {
+        allBackends.par.map { backend =>
+          backend.sequencerClient.topology.lsu.sequencer_successors
+            .propose_successor(
+              backend.sequencerClient.id,
+              NonEmpty(
+                Seq,
+                URI.create(
+                  backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
+                ),
+              ),
+              decentralizedSynchronizerId,
+            )
+        }
+      }
+
+      clue(s"wait for upgrade time ${upgradeTime}") {
+        Threading.sleep(Duration.between(Instant.now(), upgradeTimeInstant).toMillis.abs)
       }
 
       clue("transfer traffic after upgrade") {

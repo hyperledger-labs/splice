@@ -9,11 +9,9 @@ import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   SequencerAdminCommands,
-  SequencerPublicCommands,
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
-import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -131,14 +129,6 @@ class SequencerAdminConnection(
         topologySnapshot,
         staticSynchronizerParameters,
       )
-    )
-  }
-
-  def getStaticParams()(implicit
-      traceContext: TraceContext
-  ): Future[data.StaticSynchronizerParameters] = {
-    runCmd(
-      SequencerPublicCommands.GetStaticSynchronizerParameters
     )
   }
 
