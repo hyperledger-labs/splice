@@ -26,7 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 
 class S3ZstdObjects(
-    storatgeConfig: ScanStorageConfig,
+    storageConfig: ScanStorageConfig,
     appConfig: BulkStorageConfig,
     s3Connection: S3BucketConnection,
     override val loggerFactory: NamedLoggerFactory,
@@ -37,7 +37,7 @@ class S3ZstdObjects(
       getObjectKey: Int => String
   ): Flow[ByteString, S3ZstdObjects.Output, NotUsed] =
     Flow[ByteString]
-      .via(ZstdGroupedWeight(storatgeConfig.bulkZstdFrameSize))
+      .via(ZstdGroupedWeight(storageConfig.bulkZstdFrameSize))
       .statefulMap(() =>
         State(
           s3Connection.newAppendWriteObject(
@@ -49,9 +49,9 @@ class S3ZstdObjects(
       )(
         {
           case (state, chunk)
-              if state.s3ObjSize + chunk.bytes.length > storatgeConfig.bulkMaxFileSize =>
+              if state.s3ObjSize + chunk.bytes.length > storageConfig.bulkMaxFileSize =>
             logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${storatgeConfig.bulkMaxFileSize}, so this is the last chunk for the object"
+              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${storageConfig.bulkMaxFileSize}, so this is the last chunk for the object"
             )
             (
               State(
@@ -71,7 +71,7 @@ class S3ZstdObjects(
             )
           case (state, chunk) =>
             logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${storatgeConfig.bulkMaxFileSize}"
+              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${storageConfig.bulkMaxFileSize}"
             )
             (
               State(

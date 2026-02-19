@@ -10,7 +10,18 @@ import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCrede
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, GetObjectRequest, GetObjectResponse, ListObjectsRequest, ListObjectsResponse, PutObjectRequest, UploadPartRequest}
+import software.amazon.awssdk.services.s3.model.{
+  CompleteMultipartUploadRequest,
+  CompletedMultipartUpload,
+  CompletedPart,
+  CreateMultipartUploadRequest,
+  GetObjectRequest,
+  GetObjectResponse,
+  ListObjectsRequest,
+  ListObjectsResponse,
+  PutObjectRequest,
+  UploadPartRequest,
+}
 
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
@@ -159,8 +170,14 @@ object S3BucketConnection {
       S3AsyncClient
         .builder()
         .endpointOverride(URI.create(s3Config.endpoint))
-        .region(Region.of(s3Config.region)) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
-        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)))
+        .region(
+          Region.of(s3Config.region)
+        ) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
+        .credentialsProvider(
+          StaticCredentialsProvider.create(
+            AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
+          )
+        )
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),
