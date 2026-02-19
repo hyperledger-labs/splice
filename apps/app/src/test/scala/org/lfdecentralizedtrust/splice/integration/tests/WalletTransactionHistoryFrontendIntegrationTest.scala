@@ -36,6 +36,11 @@ class WalletTransactionHistoryFrontendIntegrationTest
   override def walletAmuletPrice: java.math.BigDecimal =
     SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
+  // TODO(#3549): scan_txlog does not handle development fund coupons correctly, so this is currently disabled.
+  //  We should decide whether we want to fix scan_txlog for DevelopmentFundCoupons, or narrow its scope enough that we won't care
+  //  (i.e. don't try to be complete, don't use it to assert on scan's aggregates, etc)
+  override protected def runUpdateHistorySanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
@@ -418,6 +423,60 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedPartyDescription = Some("Automation"),
                 expectedAmountAmulet = -preapprovalFee,
               )
+            }
+          },
+        )
+      }
+    }
+
+    "show development fund coupon collected" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val beneficiary = aliceUserParty
+      val sv1Party = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+      val fundManager = sv1Party
+      val developmentFundCouponAmount = BigDecimal(SpliceUtil.damlDecimal(1000))
+      val expiresAt = CantonTimestamp.now().plus(Duration.ofDays(1))
+      val reason = "Alice has contributed to the Daml repo"
+      val sv1UserId = sv1WalletClient.config.ledgerApiUser
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+
+      actAndCheck(
+        "Mint one development fund coupon for Alice", {
+          createDevelopmentFundCoupon(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            beneficiary,
+            fundManager,
+            developmentFundCouponAmount,
+            expiresAt,
+            reason,
+          )
+        },
+      )(
+        "The coupon is created",
+        _ => {
+          aliceWalletClient
+            .listActiveDevelopmentFundCoupons() should have size 1
+        },
+      )
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        actAndCheck(
+          "Self Transfer the coupon from/to Alice",
+          p2pTransfer(
+            aliceWalletClient,
+            aliceWalletClient,
+            aliceUserParty,
+            developmentFundCouponAmount - 5.0,
+          ),
+        )(
+          "Alice sees a transaction with the development fund collected",
+          _ => {
+            val txs = findAll(className("tx-row")).toSeq
+            forExactly(1, txs) { transactionRow =>
+              val transaction = readTransactionFromRow(transactionRow)
+              transaction.developmentFundCouponsUsed shouldBe developmentFundCouponAmount
             }
           },
         )

@@ -465,6 +465,7 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
   const appRewards = BigNumber(transaction.appRewardsUsed || 0);
   const validatorRewards = BigNumber(transaction.validatorRewardsUsed || 0);
   const svRewards = BigNumber(transaction.svRewardsUsed || 0);
+  const developmentFundCoupons = BigNumber(transaction.developmentFundCouponsUsed || 0);
 
   const row = (type: string, label: string, amount: BigNumber) => [
     <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
@@ -477,6 +478,8 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
       {!appRewards.isZero() && row('app', 'App Rewards', appRewards)}
       {!validatorRewards.isZero() && row('validator', 'Validator Rewards', validatorRewards)}
       {!svRewards.isZero() && row('sv', 'SV Rewards', svRewards)}
+      {!developmentFundCoupons.isZero() &&
+        row('fund', 'Development Fund Coupons', developmentFundCoupons)}
     </Stack>
   );
 };
