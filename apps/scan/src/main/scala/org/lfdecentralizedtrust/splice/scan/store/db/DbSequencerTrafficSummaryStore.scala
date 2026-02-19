@@ -13,15 +13,11 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
-import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.dbio.DBIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
-import cats.data.NonEmptyList
-import slick.jdbc.canton.SQLActionBuilder
 import io.circe.Json
 import io.circe.syntax.*
 
@@ -145,17 +141,6 @@ class DbSequencerTrafficSummaryStore(
   type EnvelopeT = DbSequencerTrafficSummaryStore.EnvelopeT
   val EnvelopeT = DbSequencerTrafficSummaryStore.EnvelopeT
 
-  private implicit val GetResultTrafficSummaryRow: GetResult[TrafficSummaryT] = GetResult { prs =>
-    import prs.*
-    val rowId = <<[Long]
-    val migrationId = <<[Long]
-    val sequencingTime = <<[CantonTimestamp]
-    val totalTrafficCost = <<[Long]
-    val envelopesJson = <<[Json]
-    val envelopes = EnvelopeT.fromJson(envelopesJson)
-    TrafficSummaryT(rowId, migrationId, sequencingTime, totalTrafficCost, envelopes)
-  }
-
   /** Batch insert traffic summaries using multi-row INSERT. */
   private def batchInsertTrafficSummaries(items: Seq[TrafficSummaryT]) = {
     if (items.isEmpty) {
@@ -232,74 +217,5 @@ class DbSequencerTrafficSummaryStore(
         maxTs.foreach(advanceLastIngestedSequencingTime)
       }
     }
-  }
-
-  def listTrafficSummaries(
-      afterO: Option[TimestampWithMigrationId],
-      limit: Int,
-  )(implicit tc: TraceContext): Future[Seq[TrafficSummaryT]] = {
-    val filters = afterFilters(afterO)
-    val query = trafficSummariesQuery(filters, limit)
-    storage.query(query.toActionBuilder.as[TrafficSummaryT], "scanTraffic.listTrafficSummaries")
-  }
-
-  private def afterFilters(
-      afterO: Option[TimestampWithMigrationId]
-  ): NonEmptyList[SQLActionBuilder] = {
-    afterO match {
-      case None =>
-        NonEmptyList.of(sql"migration_id >= 0 and sequencing_time > ${CantonTimestamp.MinValue}")
-      case Some(TimestampWithMigrationId(afterSequencingTime, afterMigrationId)) =>
-        // Split into two queries for better index utilization (avoids OR causing seq scan)
-        NonEmptyList.of(
-          sql"migration_id = $afterMigrationId and sequencing_time > $afterSequencingTime",
-          sql"migration_id > $afterMigrationId and sequencing_time > ${CantonTimestamp.MinValue}",
-        )
-    }
-  }
-
-  private def trafficSummariesQuery(
-      filters: NonEmptyList[SQLActionBuilder],
-      limit: Int,
-  ) = {
-    def makeSubQuery(afterFilter: SQLActionBuilder) = {
-      sql"""
-      (select
-        row_id,
-        migration_id,
-        sequencing_time,
-        total_traffic_cost,
-        envelopes
-      from #${Tables.trafficSummaries}
-      where history_id = $historyId and """ ++ afterFilter ++
-        sql" order by migration_id, sequencing_time limit $limit)"
-    }
-
-    if (filters.size == 1) makeSubQuery(filters.head)
-    else {
-      // Using an OR in a query might cause the query planner to do a Seq scan,
-      // whereas using a union all makes it so that the individual queries use the right index,
-      // and are merged via Merge Append.
-      val unionAll = filters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
-      sql"select * from (" ++ unionAll ++ sql") all_queries " ++
-        sql"order by migration_id, sequencing_time limit $limit"
-    }
-  }
-
-  def maxSequencingTime(migrationId: Long)(implicit
-      tc: TraceContext
-  ): Future[Option[CantonTimestamp]] = {
-    storage
-      .query(
-        sql"""
-          select max(sequencing_time)
-          from   #${Tables.trafficSummaries}
-          where  history_id = $historyId
-          and    migration_id = $migrationId
-        """.toActionBuilder
-          .as[Option[CantonTimestamp]],
-        "scanTraffic.maxSequencingTime",
-      )
-      .map(_.headOption.flatten)
   }
 }
