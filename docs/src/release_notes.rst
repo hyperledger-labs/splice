@@ -20,22 +20,12 @@
 
 .. release-notes:: 0.5.12
 
-    - Wallet UI
-
-      - The wallet UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
-        reduce maintenance overhead.
-
     - Wallet backend
 
       - Fix a bug (`#3970 <https://github.com/hyperledger-labs/splice/issues/3970>`__) that caused transaction history
         for entries created by Splice versions prior to 0.5.11 to fail to decode in the backend and thus not show in the
         wallet UI.
         These entries are now shown again in the wallet UI.
-
-    - Scan UI
-
-      - The scan UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
-        reduce maintenance overhead.
 
     - Validator
 
@@ -45,6 +35,16 @@
         Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
         We recommend migrating to the new ``scanClient`` and ``synchronizer`` configuration options as soon as possible.
         Docker Compose-based deployments do not currently support the new custom configuration options.
+
+    - Wallet UI
+
+      - The wallet UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenance overhead.
+
+    - Scan UI
+
+      - The scan UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenance overhead.
 
 
 .. release-notes:: 0.5.11
