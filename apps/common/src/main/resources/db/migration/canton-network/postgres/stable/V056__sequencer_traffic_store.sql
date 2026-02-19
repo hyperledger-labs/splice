@@ -13,7 +13,7 @@ create table sequencer_traffic_summary_store
     sequencing_time             bigint not null,
     -- Total traffic cost of the message paid by the sender
     total_traffic_cost          bigint not null,
-    -- Envelope data as JSONB array: [{"traffic_cost": 123, "view_hashes": ["h1", "h2"]}, ...]
+    -- Envelope data as JSONB array: [{"tc": 123, "vid": ["h1", "h2"]}, ...]
     envelopes                   jsonb not null default '[]'::jsonb
 );
 
