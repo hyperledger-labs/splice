@@ -5,22 +5,12 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.scan.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import software.amazon.awssdk.services.s3.model.{
-  CompleteMultipartUploadRequest,
-  CompletedMultipartUpload,
-  CompletedPart,
-  CreateMultipartUploadRequest,
-  GetObjectRequest,
-  GetObjectResponse,
-  ListObjectsRequest,
-  ListObjectsResponse,
-  PutObjectRequest,
-  UploadPartRequest,
-}
+import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, GetObjectRequest, GetObjectResponse, ListObjectsRequest, ListObjectsResponse, PutObjectRequest, UploadPartRequest}
 
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
@@ -29,13 +19,6 @@ import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
-
-case class S3Config(
-    endpoint: URI,
-    bucketName: String,
-    region: Region,
-    credentials: AwsBasicCredentials,
-)
 
 class S3BucketConnection(
     s3Client: S3AsyncClient,
@@ -175,9 +158,9 @@ object S3BucketConnection {
     new S3BucketConnection(
       S3AsyncClient
         .builder()
-        .endpointOverride(s3Config.endpoint)
-        .region(s3Config.region)
-        .credentialsProvider(StaticCredentialsProvider.create(s3Config.credentials))
+        .endpointOverride(URI.create(s3Config.endpoint))
+        .region(Region.of(s3Config.region)) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
+        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)))
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),

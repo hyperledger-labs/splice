@@ -2,13 +2,16 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import org.lfdecentralizedtrust.splice.scan.config.S3Config
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
+import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 
 import java.io.DataInputStream
 import java.nio.ByteBuffer
+import java.net.URI
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 import scala.util.{Try, Using}
@@ -78,9 +81,9 @@ object S3BucketConnectionForUnitTests {
     new S3BucketConnectionForUnitTests(
       S3AsyncClient
         .builder()
-        .endpointOverride(s3Config.endpoint)
-        .region(s3Config.region)
-        .credentialsProvider(StaticCredentialsProvider.create(s3Config.credentials))
+        .endpointOverride(URI.create(s3Config.endpoint))
+        .region(Region.of(s3Config.region))
+        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)))
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),

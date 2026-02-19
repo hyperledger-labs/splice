@@ -11,45 +11,18 @@ import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import org.lfdecentralizedtrust.splice.scan.config.{
-  BftSequencerConfig,
-  MediatorVerdictIngestionConfig,
-  BulkStorageConfig,
-  ScanAppBackendConfig,
-  ScanAppClientConfig,
-  ScanCacheConfig,
-  ScanSynchronizerConfig,
-  CacheConfig as SpliceCacheConfig,
-}
-import org.lfdecentralizedtrust.splice.splitwell.config.{
-  SplitwellAppBackendConfig,
-  SplitwellAppClientConfig,
-  SplitwellDomains,
-  SplitwellSynchronizerConfig,
-}
+import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, BulkStorageConfig, MediatorVerdictIngestionConfig, S3Config, ScanAppBackendConfig, ScanAppClientConfig, ScanCacheConfig, ScanSynchronizerConfig, CacheConfig as SpliceCacheConfig}
+import org.lfdecentralizedtrust.splice.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig, SplitwellDomains, SplitwellSynchronizerConfig}
 import org.lfdecentralizedtrust.splice.sv.config.*
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.lfdecentralizedtrust.splice.util.{Codec, SpliceRateLimitConfig}
 import org.lfdecentralizedtrust.splice.validator.config.*
-import org.lfdecentralizedtrust.splice.wallet.config.{
-  AutoAcceptTransfersConfig,
-  TransferPreapprovalConfig,
-  TreasuryConfig,
-  WalletAppClientConfig,
-  WalletSweepConfig,
-  WalletSynchronizerConfig,
-  WalletValidatorAppClientConfig,
-}
+import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, TransferPreapprovalConfig, TreasuryConfig, WalletAppClientConfig, WalletSweepConfig, WalletSynchronizerConfig, WalletValidatorAppClientConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ConfigErrors.{
-  CantonConfigError,
-  GenericConfigError,
-  NoConfigFiles,
-  SubstitutionError,
-}
+import com.digitalasset.canton.config.ConfigErrors.{CantonConfigError, GenericConfigError, NoConfigFiles, SubstitutionError}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -77,10 +50,7 @@ import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeConfig, RemoteMediatorConfig}
-import com.digitalasset.canton.synchronizer.sequencer.config.{
-  RemoteSequencerConfig,
-  SequencerNodeConfig,
-}
+import com.digitalasset.canton.synchronizer.sequencer.config.{RemoteSequencerConfig, SequencerNodeConfig}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
@@ -467,6 +437,8 @@ object SpliceConfig {
       deriveReader[MediatorVerdictIngestionConfig]
     implicit val bulkStorageConfigReader: ConfigReader[BulkStorageConfig] =
       deriveReader[BulkStorageConfig]
+    implicit val S3ConfigReader: ConfigReader[S3Config] =
+      deriveReader[S3Config]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
@@ -918,6 +890,8 @@ object SpliceConfig {
       deriveWriter[MediatorVerdictIngestionConfig]
     implicit val BulkStorageConfigWriter: ConfigWriter[BulkStorageConfig] =
       deriveWriter[BulkStorageConfig]
+    implicit val S3ConfigWriter: ConfigWriter[S3Config] =
+      deriveWriter[S3Config]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 
