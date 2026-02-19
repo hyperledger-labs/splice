@@ -156,6 +156,7 @@ class ScanVerdictStoreIngestion(
         }
 
       // 2. Insert verdicts and traffic summaries in a single transaction
+      // TODO: revisit this: we must ensure that the SQL tx boundaries are set correctly
       val result = for {
         trafficSummaries <- trafficSummariesF
         trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
