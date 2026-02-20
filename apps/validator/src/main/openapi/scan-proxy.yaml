@@ -264,6 +264,22 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/ListUnclaimedDevelopmentFundCouponsResponse"
+
+  /v0/scan-proxy/development-fund-coupons:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "listActiveDevelopmentFundCoupons"
+      description: |
+        List all active development fund coupons.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/ListActiveDevelopmentFundCouponsResponse"
+
 components:
   schemas:
     # does not include the TTL, and the contracts are not-MaybeCached

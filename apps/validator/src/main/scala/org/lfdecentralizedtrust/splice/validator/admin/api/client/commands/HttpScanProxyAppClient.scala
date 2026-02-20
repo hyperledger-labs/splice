@@ -12,9 +12,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scanproxy as scanProxy}
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.{GetDsoPartyIdResponse, ScanproxyClient}
-import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  DevelopmentFundCoupon,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 
@@ -205,6 +213,29 @@ object HttpScanProxyAppClient {
         .traverse(coupon =>
           ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
         )
+        .leftMap(_.toString)
+    }
+  }
+
+  case object ListActiveDevelopmentFundCoupons
+      extends ScanProxyBaseCommand[
+        scanProxy.ListActiveDevelopmentFundCouponsResponse,
+        Seq[Contract[
+          DevelopmentFundCoupon.ContractId,
+          DevelopmentFundCoupon,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listActiveDevelopmentFundCoupons(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case scanProxy.ListActiveDevelopmentFundCouponsResponse.OK(response) =>
+      response.activeDevelopmentFundCoupons
+        .traverse(coupon => Contract.fromHttp(DevelopmentFundCoupon.COMPANION)(coupon))
         .leftMap(_.toString)
     }
   }

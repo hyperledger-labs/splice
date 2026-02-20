@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppRight,
+  DevelopmentFundCoupon,
   UnclaimedDevelopmentFundCoupon,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.*
@@ -277,6 +278,15 @@ trait ScanConnection
   ): Future[
     Seq[
       ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+    ]
+  ]
+
+  def listActiveDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[
+      Contract[DevelopmentFundCoupon.ContractId, DevelopmentFundCoupon]
     ]
   ]
 

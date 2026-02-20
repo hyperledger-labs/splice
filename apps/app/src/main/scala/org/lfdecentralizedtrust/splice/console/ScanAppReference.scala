@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.console
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  DevelopmentFundCoupon,
   FeaturedAppRight,
   UnclaimedDevelopmentFundCoupon,
 }
@@ -349,6 +350,14 @@ abstract class ScanAppReference(
   ] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons())
+    }
+
+  @Help.Summary("List all active development fund coupons")
+  def listActiveDevelopmentFundCoupons(): Seq[
+    Contract[DevelopmentFundCoupon.ContractId, DevelopmentFundCoupon]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListActiveDevelopmentFundCoupons())
     }
 
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem

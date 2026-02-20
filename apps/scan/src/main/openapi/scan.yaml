@@ -1617,6 +1617,23 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/development-fund-coupons:
+    get:
+      tags: [ external, scan ]
+      x-jvm-package: scan
+      operationId: "listActiveDevelopmentFundCoupons"
+      description: |
+        List all active development fund coupons.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListActiveDevelopmentFundCouponsResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -3863,3 +3880,14 @@ components:
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    ListActiveDevelopmentFundCouponsResponse:
+      type: object
+      required: [ "active-development-fund-coupons" ]
+      properties:
+        active-development-fund-coupons:
+          description: |
+            Contracts of the Daml template `Splice.Amulet:DevelopmentFundCoupon`.
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
