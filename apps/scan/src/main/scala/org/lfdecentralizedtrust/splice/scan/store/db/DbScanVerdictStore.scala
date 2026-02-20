@@ -137,14 +137,15 @@ object DbScanVerdictStore {
   def buildViewHashCorrelation(
       verdicts: Seq[v30.Verdict]
   ): (Seq[CantonTimestamp], Map[CantonTimestamp, Map[ByteString, Int]]) = {
-    val pairs = verdicts.flatMap { verdict =>
-      CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.map { recordTime =>
-        val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
-          case (viewId, txView) if !txView.viewHash.isEmpty =>
-            txView.viewHash -> viewId
-        }.toMap
-        (recordTime, viewHashMap)
-      }
+    val pairs = verdicts.map { verdict =>
+      val recordTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getRecordTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid record_time in verdict"))
+      val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
+        case (viewId, txView) if !txView.viewHash.isEmpty =>
+          txView.viewHash -> viewId
+      }.toMap
+      (recordTime, viewHashMap)
     }
     (pairs.map(_._1), pairs.toMap)
   }
