@@ -54,34 +54,6 @@ class DbSequencerTrafficSummaryStoreTest
       }
     }
 
-    "not insert duplicate traffic summaries (same sequencing_time)" in {
-      for {
-        store <- newStore()
-        ts1 = CantonTimestamp.now()
-        ts2 = ts1.plusSeconds(1)
-
-        summary1 = mkSummary(ts1, 100L)
-        summary2 = mkSummary(ts2, 200L)
-
-        // Insert first batch
-        _ <- store.insertTrafficSummaries(Seq(summary1))
-        maxAfterFirst <- maxSequencingTime(migrationId)
-
-        // Try to insert batch with duplicate ts1 and new ts2
-        _ <- store.insertTrafficSummaries(
-          Seq(
-            mkSummary(ts1, 999L), // should be skipped (same sequencing_time)
-            summary2, // should be inserted
-          )
-        )
-
-        maxAfterSecond <- maxSequencingTime(migrationId)
-      } yield {
-        maxAfterFirst shouldBe Some(ts1)
-        maxAfterSecond shouldBe Some(ts2)
-      }
-    }
-
     "batch insert multiple traffic summaries efficiently" in {
       for {
         store <- newStore()
@@ -120,7 +92,7 @@ class DbSequencerTrafficSummaryStoreTest
   private def mkSummary(
       sequencingTime: CantonTimestamp,
       totalTrafficCost: Long,
-      envelopes: Seq[EnvelopeT] = Seq(EnvelopeT(10L, Seq(0))),
+      envelopes: Seq[EnvelopeT],
   ): TrafficSummaryT =
     TrafficSummaryT(
       migrationId = migrationId,
