@@ -160,8 +160,6 @@ sv:
             fillInterval: 60s
 svs:
   default:
-    svApp:
-      permissionedSynchronizer: false  # will be removed once the permissioned synchronizer is the default
     logging:
       appsLogLevel: DEBUG
       appsAsync: false
