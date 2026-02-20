@@ -37,8 +37,8 @@ class DbSequencerTrafficSummaryStoreTest
           sequencingTime = ts1,
           totalTrafficCost = 100L,
           envelopes = Seq(
-            EnvelopeT(trafficCost = 60L, viewHashes = Seq("hash1", "hash2")),
-            EnvelopeT(trafficCost = 40L, viewHashes = Seq("hash3")),
+            EnvelopeT(trafficCost = 60L, viewIds = Seq(1, 2)),
+            EnvelopeT(trafficCost = 40L, viewIds = Seq(3)),
           ),
         )
 
@@ -88,7 +88,7 @@ class DbSequencerTrafficSummaryStoreTest
           mkSummary(
             baseTs.plusSeconds(i.toLong),
             (i * 10).toLong,
-            envelopes = Seq(EnvelopeT(i.toLong, Seq(s"hash-$i"))),
+            envelopes = Seq(EnvelopeT(i.toLong, Seq(i))),
           )
         }
 
@@ -117,7 +117,7 @@ class DbSequencerTrafficSummaryStoreTest
   private def mkSummary(
       sequencingTime: CantonTimestamp,
       totalTrafficCost: Long,
-      envelopes: Seq[EnvelopeT] = Seq(EnvelopeT(10L, Seq("default-hash"))),
+      envelopes: Seq[EnvelopeT] = Seq(EnvelopeT(10L, Seq(0))),
   ): TrafficSummaryT =
     TrafficSummaryT(
       migrationId = migrationId,
