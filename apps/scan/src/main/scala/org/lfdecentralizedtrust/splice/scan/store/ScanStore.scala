@@ -421,6 +421,9 @@ object ScanStore {
         )(
           ScanAcsStoreRowData(_)
         ),
+        mkFilter(splice.amulet.DevelopmentFundCoupon.COMPANION)(co => co.payload.dso == dso)(
+          ScanAcsStoreRowData(_)
+        ),
         mkFilter(splice.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,

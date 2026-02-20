@@ -626,20 +626,27 @@ class DevelopmentFundCouponIntegrationTest
 
   "Listing active development fund coupons" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
+    val now = CantonTimestamp.now()
     val developmentFundCouponExpirations = Seq(
-      CantonTimestamp.now().plus(Duration.ofDays(3)),
-      CantonTimestamp.now().plus(Duration.ofDays(2)),
-      CantonTimestamp.now().plus(Duration.ofDays(5)),
-      CantonTimestamp.now().plus(Duration.ofDays(1)),
-      CantonTimestamp.now().plus(Duration.ofDays(2)),
+      now.plus(Duration.ofDays(3)),
+      now.plus(Duration.ofDays(2)),
+      now.plus(Duration.ofDays(5)),
+      now.plus(Duration.ofDays(4)),
+      now.plus(Duration.ofDays(2)),
     )
     val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
-    val fundManager = aliceValidatorParty
+    val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    val bobValidatorParty = onboardWalletUser(bobValidatorWalletClient, bobValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-    val beneficiary = bobParty
     val developmentFundCouponAmount = BigDecimal(40.0)
     val reason = "Bob has contributed to the Daml repo"
 
+    val aliceUserName = aliceWalletClient.config.ledgerApiUser
+    val aliceMergeAmuletsTrigger =
+      aliceValidatorBackend
+        .userWalletAutomation(aliceUserName)
+        .futureValue
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
     val bobUserName = bobWalletClient.config.ledgerApiUser
     val bobMergeAmuletsTrigger =
       bobValidatorBackend
@@ -648,29 +655,51 @@ class DevelopmentFundCouponIntegrationTest
         .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
     setTriggersWithin(
-      triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
+      triggersToPauseAtStart = Seq(aliceMergeAmuletsTrigger, bobMergeAmuletsTrigger)
     ) {
       actAndCheck(
-        "Mint some development fund coupons", {
-          developmentFundCouponExpirations.foreach { expiresAt =>
-            createDevelopmentFundCoupon(
-              sv1ValidatorBackend.participantClientWithAdminToken,
-              sv1UserId,
-              beneficiary,
-              fundManager,
-              developmentFundCouponAmount,
-              expiresAt,
-              reason,
+        "Mint some development fund coupons for Alice and Bob", {
+          for {
+            expiresAt <- developmentFundCouponExpirations
+            (fundManager, beneficiary) <- Seq(
+              (aliceValidatorParty, aliceParty),
+              (bobValidatorParty, bobParty),
             )
-          }
+          } createDevelopmentFundCoupon(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            beneficiary,
+            fundManager,
+            developmentFundCouponAmount,
+            expiresAt,
+            reason,
+          )
         },
       )(
-        "Active coupons are listed with the earliest expiration date first",
+        "Active coupons are listed in Wallet API and Scan API",
         _ => {
-          aliceValidatorWalletClient
+          val aliceCoupons = aliceValidatorWalletClient
             .listActiveDevelopmentFundCoupons()
-            .map(_.payload.expiresAt)
-            .toList shouldBe developmentFundCouponExpirations.map(_.toInstant).sorted
+            .map(_.payload)
+            .toList
+          // Active coupons are listed with the earliest expiration date first
+          aliceCoupons shouldBe aliceCoupons.sortBy(_.expiresAt)
+          aliceCoupons should have size 5
+
+          val bobCoupons = bobValidatorWalletClient
+            .listActiveDevelopmentFundCoupons()
+            .map(_.payload)
+            .toList
+          bobCoupons should have size 5
+
+          // Scan listActiveDevelopmentFundCoupons provides all the coupons
+          val allCouponsFromScanAPI =
+            sv1ScanBackend.listActiveDevelopmentFundCoupons().map(_.payload).toSet
+          // Scan proxy listActiveDevelopmentFundCoupons provides all the coupons
+          val allCouponsFromScanProxyAPI =
+            aliceValidatorBackend.scanProxy.listActiveDevelopmentFundCoupons().map(_.payload).toSet
+          allCouponsFromScanAPI shouldBe (aliceCoupons ++ bobCoupons).toSet
+          allCouponsFromScanAPI shouldBe allCouponsFromScanProxyAPI
         },
       )
     }

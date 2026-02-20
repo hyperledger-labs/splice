@@ -2297,6 +2297,23 @@ class HttpScanHandler(
       }
     }
   }
+
+  override def listActiveDevelopmentFundCoupons(
+      respond: ScanResource.ListActiveDevelopmentFundCouponsResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ListActiveDevelopmentFundCouponsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { _ => _ =>
+      for {
+        coupons <- store.multiDomainAcsStore.listContracts(
+          amulet.DevelopmentFundCoupon.COMPANION
+        )
+      } yield {
+        definitions.ListActiveDevelopmentFundCouponsResponse(
+          coupons.map(_.contract.toHttp).toVector
+        )
+      }
+    }
+  }
 }
 
 object HttpScanHandler {

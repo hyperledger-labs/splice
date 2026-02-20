@@ -310,4 +310,23 @@ class HttpScanProxyHandler(
       }
     }
   }
+
+  override def listActiveDevelopmentFundCoupons(
+      respond: ScanproxyResource.ListActiveDevelopmentFundCouponsResponse.type
+  )()(
+      extracted: AuthenticatedRequest
+  ): Future[ScanproxyResource.ListActiveDevelopmentFundCouponsResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = extracted
+    withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { implicit traceContext => _ =>
+      for {
+        coupons <- scanConnection.listActiveDevelopmentFundCoupons()
+      } yield {
+        respond.OK(
+          definitions.ListActiveDevelopmentFundCouponsResponse(
+            coupons.map(_.toHttp).toVector
+          )
+        )
+      }
+    }
+  }
 }

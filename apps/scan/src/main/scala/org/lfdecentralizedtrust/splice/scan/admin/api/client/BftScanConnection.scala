@@ -8,6 +8,7 @@ import cats.implicits.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppRight,
+  DevelopmentFundCoupon,
   UnclaimedDevelopmentFundCoupon,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
@@ -686,6 +687,13 @@ class BftScanConnection(
   ): Future[Seq[
     ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
   ]] = bftCall(_.listUnclaimedDevelopmentFundCoupons())
+
+  override def listActiveDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[
+    Contract[DevelopmentFundCoupon.ContractId, DevelopmentFundCoupon]
+  ]] = bftCall(_.listActiveDevelopmentFundCoupons())
 }
 trait HasUrl {
   def url: Uri

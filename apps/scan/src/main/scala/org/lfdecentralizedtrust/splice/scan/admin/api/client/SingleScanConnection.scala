@@ -7,6 +7,7 @@ import cats.data.OptionT
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppRight,
+  DevelopmentFundCoupon,
   UnclaimedDevelopmentFundCoupon,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
@@ -531,6 +532,19 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons(),
+    )
+
+  override def listActiveDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[
+      Contract[DevelopmentFundCoupon.ContractId, DevelopmentFundCoupon]
+    ]
+  ] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListActiveDevelopmentFundCoupons(),
     )
 
   def getTransferInstructionAcceptContext(

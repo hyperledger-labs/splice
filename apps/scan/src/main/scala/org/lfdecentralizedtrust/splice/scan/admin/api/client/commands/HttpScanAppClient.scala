@@ -11,6 +11,7 @@ import com.daml.ledger.api.v2.CommandsOuterClass
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  DevelopmentFundCoupon,
   FeaturedAppRight,
   UnclaimedDevelopmentFundCoupon,
 }
@@ -2470,6 +2471,33 @@ object HttpScanAppClient {
         .traverse(coupon =>
           ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
         )
+        .leftMap(_.toString)
+    }
+  }
+
+  case class ListActiveDevelopmentFundCoupons()
+      extends InternalBaseCommand[
+        http.ListActiveDevelopmentFundCouponsResponse,
+        Seq[Contract[
+          DevelopmentFundCoupon.ContractId,
+          DevelopmentFundCoupon,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListActiveDevelopmentFundCouponsResponse] =
+      client.listActiveDevelopmentFundCoupons(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListActiveDevelopmentFundCouponsResponse.OK(response) =>
+      response.activeDevelopmentFundCoupons
+        .traverse(coupon => Contract.fromHttp(DevelopmentFundCoupon.COMPANION)(coupon))
         .leftMap(_.toString)
     }
   }
