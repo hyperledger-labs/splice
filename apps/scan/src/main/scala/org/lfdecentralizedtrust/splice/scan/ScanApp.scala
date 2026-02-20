@@ -296,18 +296,17 @@ class ScanApp(
             )
           )
         } else None
-      trafficSummaryStoreO <-
+      trafficSummaryStoreO =
         if (config.sequencerTrafficIngestion.enabled) {
-          appInitStep("Create traffic summary store") {
-            DbSequencerTrafficSummaryStore(
+          Some(
+            new DbSequencerTrafficSummaryStore(
               storage,
-              serviceUserPrimaryParty,
-              participantId,
+              updateHistory,
               synchronizerId,
               loggerFactory,
-            ).map(Some(_))
-          }
-        } else Future.successful(None)
+            )
+          )
+        } else None
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
