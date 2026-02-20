@@ -13,7 +13,7 @@ create table sequencer_traffic_summary_store
     total_traffic_cost          bigint not null,
     -- Envelope data as JSONB array: [{"tc": 123, "vid": [1, 2]}, ...]
     -- where "tc" is the traffic cost and "vid" is an array of view_ids from the verdict
-    envelopes                   jsonb not null default '[]'::jsonb,
+    envelopes                   jsonb not null,
     -- Primary key: (history_id, sequencing_time) uniquely identifies a traffic summary
     primary key (history_id, sequencing_time)
 );
