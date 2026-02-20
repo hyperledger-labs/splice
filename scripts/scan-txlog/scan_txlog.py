@@ -3,6 +3,10 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+#### Please note that this script is deprecated. It will not be maintained moving forward, and will be removed in a coming release.
+
+
+
 import aiohttp
 import asyncio
 import colorlog

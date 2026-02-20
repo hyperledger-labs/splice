@@ -30,7 +30,6 @@ class AmuletExpiryIntegrationTest
 
   // The direct creation of (Locked)Amulet is no appreciated by history parsers
   override protected def runTokenStandardCliSanityCheck: Boolean = false
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

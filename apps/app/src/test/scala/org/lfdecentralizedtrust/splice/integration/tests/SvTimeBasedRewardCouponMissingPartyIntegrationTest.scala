@@ -25,7 +25,6 @@ class SvTimeBasedRewardCouponMissingPartyIntegrationTest
     with WalletTxLogTestUtil
     with TriggerTestUtil {
 
-  override protected def runUpdateHistorySanityCheck: Boolean = false
   override protected def runTokenStandardCliSanityCheck: Boolean = false
   val badPartyHint = "badpartyhint"
 
