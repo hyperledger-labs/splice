@@ -12,8 +12,8 @@ import com.digitalasset.canton.admin.api.client.commands.{
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.lifecycle.LifeCycle.CloseableChannel
@@ -29,24 +29,27 @@ import com.digitalasset.canton.sequencing.protocol
 import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{Member, NodeIdentity, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
-import com.digitalasset.canton.topology.admin.v30.GenesisStateV2Response
+import com.digitalasset.canton.topology.admin.v30.{
+  GenesisStateV2Response,
+  LogicalUpgradeStateResponse,
+}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
 import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
-import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.ContentTypes
-import org.apache.pekko.stream.connectors.googlecloud.storage.StorageObject
-import org.apache.pekko.stream.connectors.googlecloud.storage.scaladsl.GCStorage
 import com.google.protobuf.ByteString
 import com.typesafe.config.ConfigFactory
+import io.grpc.Status
 import io.grpc.stub.StreamObserver
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.connectors.google.auth.Credentials
+import org.apache.pekko.http.scaladsl.model.ContentTypes
 import org.apache.pekko.stream.connectors.google.{GoogleAttributes, GoogleSettings}
+import org.apache.pekko.stream.connectors.google.auth.Credentials
+import org.apache.pekko.stream.connectors.googlecloud.storage.StorageObject
+import org.apache.pekko.stream.connectors.googlecloud.storage.scaladsl.GCStorage
 import org.apache.pekko.util.ByteString as PekkoByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.{BackupDumpConfig, GcpCredentialsConfig}
@@ -100,6 +103,49 @@ class SequencerAdminConnection(
           observer = responseObserver,
         )
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
+  }
+
+  def getLsuState()(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    val responseObserver = new ByteStringStreamObserver[LogicalUpgradeStateResponse](_.chunk)
+    runCmd(
+      TopologyAdminCommands.Read
+        .LogicalUpgradeState(
+          store = None,
+          observer = responseObserver,
+        )
+    ).flatMap(_ => responseObserver.resultBytes)
+  }
+
+  def initializeFromPredecessor(
+      topologySnapshot: ByteString,
+      staticSynchronizerParameters: StaticSynchronizerParameters,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    runCmd(
+      SequencerAdminCommands.InitializeFromSynchronizerPredecessor(
+        topologySnapshot,
+        staticSynchronizerParameters,
+      )
+    )
+  }
+
+  def getPhysicalSynchronizerId()(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] = {
+    runCmd(
+      SequencerAdminCommands.Health.SequencerStatusCommand()
+    ).map(
+      _.successOption
+        .map(_.synchronizerId)
+        .getOrElse(
+          throw Status.FAILED_PRECONDITION
+            .withDescription("Sequencer does not have a synchronizer ID in its status response")
+            .asRuntimeException()
+        )
+    )
   }
 
   def getTopologyTransactionsSummary(store: TopologyStoreId, now: CantonTimestamp)(implicit

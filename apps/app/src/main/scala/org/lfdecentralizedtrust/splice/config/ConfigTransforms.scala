@@ -31,7 +31,6 @@ import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 
 import scala.collection.mutable
 import scala.collection.parallel.CollectionConverters.ImmutableMapIsParallelizable
@@ -421,11 +420,11 @@ object ConfigTransforms {
     o.map(bumpUrl(bump, _))
   }
 
-  def bumpCantonPSyncPortsBy(psid: PhysicalSynchronizerSerial, bump: Int) = {
+  def bumpCantonSyncSuccessorPortsBy(bump: Int) = {
     updateAllSvAppConfigs((_, conf) =>
       conf
-        .focus(_.localSynchronizerNodes)
-        .index(psid)
+        .focus(_.localSynchronizerNodes.successor)
+        .some
         .modify(portTransform(bump, _))
     )
   }
@@ -440,8 +439,9 @@ object ConfigTransforms {
           conf
             .focus(_.domains.global.url)
             .modify(_.map(bumpUrl(bump, _)))
-            .focus(_.localSynchronizerNodes)
-            .modify(_.view.mapValues(portTransform(bump, _)).toMap)
+            .focus(_.localSynchronizerNodes.current)
+            .some
+            .modify(portTransform(bump, _))
         else conf
       ),
       updateAllScanAppConfigs((name, conf) =>
@@ -538,8 +538,9 @@ object ConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.participantClient.adminApi.port)
           .modify(setPortPrefix(range))
-          .focus(_.localSynchronizerNodes)
-          .modify(_.view.mapValues(c => setSvSynchronizerConfigPortsPrefix(range, c)).toMap)
+          .focus(_.localSynchronizerNodes.current)
+          .some
+          .modify(setSvSynchronizerConfigPortsPrefix(range, _))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
       } else {
@@ -688,17 +689,14 @@ object ConfigTransforms {
 
   def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
     config
-      .focus(_.localSynchronizerNodes)
+      .focus(_.localSynchronizerNodes.current)
+      .some
       .modify(
-        _.view
-          .mapValues(
-            _.focus(_.sequencer).modify(
-              _.copy(
-                isBftSequencer = true
-              )
-            )
+        _.focus(_.sequencer).modify(
+          _.copy(
+            isBftSequencer = true
           )
-          .toMap
+        )
       )
 
   def withBftSequencer(
@@ -718,7 +716,7 @@ object ConfigTransforms {
     )
 
   def withBftSequencers(): ConfigTransform = {
-    updateAllSvAppConfigs_(withBftSequencer(_)) compose {
+    updateAllSvAppConfigs_(withBftSequencer) compose {
       updateAllScanAppConfigs((scan, config) => withBftSequencer(scan, config))
     }
   }

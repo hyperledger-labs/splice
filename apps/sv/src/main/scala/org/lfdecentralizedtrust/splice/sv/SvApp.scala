@@ -10,14 +10,8 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout, RequireTypes}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{
-  CryptoConfig,
-  CryptoProvider,
-  NonNegativeFiniteDuration,
-  ProcessingTimeout,
-}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.DbStorage
@@ -25,7 +19,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.version.ProtocolVersion
 import io.circe.Json
 import io.circe.syntax.*
 import io.grpc.Status
@@ -43,8 +36,8 @@ import org.lfdecentralizedtrust.splice.auth.{
   AdminAuthExtractor,
   AuthConfig,
   HMACVerifier,
-  RSAVerifier,
   ParticipantUserRightsProvider,
+  RSAVerifier,
 }
 import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
@@ -56,15 +49,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource
-import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
 import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
+import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
 import org.lfdecentralizedtrust.splice.sv.admin.http.{
   HttpSvAdminHandler,
   HttpSvOperatorHandler,
@@ -85,6 +78,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
   SvCantonIdentifierConfig,
   SvOnboardingConfig,
+  SvSynchronizerNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.sv.metrics.SvAppMetrics
 import org.lfdecentralizedtrust.splice.sv.migration.DomainDataSnapshotGenerator
@@ -99,6 +93,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvUtil,
   ValidatorOnboardingSecret,
 }
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
 
 import java.time.Instant
@@ -206,59 +201,60 @@ class SvApp(
       retryProvider,
     )
 
-    val localSynchronizerNode = config.localSynchronizerNode
-      .map(svSynchronizerConfig =>
-        new LocalSynchronizerNode(
-          participantAdminConnection,
-          new SequencerAdminConnection(
-            svSynchronizerConfig.sequencer.adminApi,
-            amuletAppParameters.loggingConfig.api,
-            loggerFactory,
-            metrics.grpcClientMetrics,
-            retryProvider,
-          ),
-          new MediatorAdminConnection(
-            svSynchronizerConfig.mediator.adminApi,
-            amuletAppParameters.loggingConfig.api,
-            loggerFactory,
-            metrics.grpcClientMetrics,
-            retryProvider,
-          ),
-          svSynchronizerConfig.parameters
-            .toStaticSynchronizerParameters(
-              CryptoConfig(provider = CryptoProvider.Jce),
-              ProtocolVersion.v34,
-              // TODO(#456) Use the proper serial
-              NonNegativeInt.zero,
-            )
-            .valueOr(err =>
-              throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
-            )
-            .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal),
-          svSynchronizerConfig.sequencer.internalApi,
-          svSynchronizerConfig.sequencer.externalPublicApiUrl,
-          svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
-          svSynchronizerConfig.sequencer.pruning,
-          svSynchronizerConfig.mediator.sequencerRequestAmplification,
+    def localSyncNodeFromConfig(svSynchronizerConfig: SvSynchronizerNodeConfig) = {
+      new LocalSynchronizerNode(
+        participantAdminConnection,
+        new SequencerAdminConnection(
+          svSynchronizerConfig.sequencer.adminApi,
+          amuletAppParameters.loggingConfig.api,
           loggerFactory,
+          metrics.grpcClientMetrics,
           retryProvider,
-          SequencerConfig.fromConfig(
-            svSynchronizerConfig.sequencer,
-            cometBftConfig,
-          ),
-          svSynchronizerConfig.mediator.pruning,
-        )
+        ),
+        new MediatorAdminConnection(
+          svSynchronizerConfig.mediator.adminApi,
+          amuletAppParameters.loggingConfig.api,
+          loggerFactory,
+          metrics.grpcClientMetrics,
+          retryProvider,
+        ),
+        svSynchronizerConfig.staticParameters
+          .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal),
+        svSynchronizerConfig.sequencer.internalApi,
+        svSynchronizerConfig.sequencer.externalPublicApiUrl,
+        svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
+        svSynchronizerConfig.sequencer.pruning,
+        svSynchronizerConfig.mediator.sequencerRequestAmplification,
+        loggerFactory,
+        retryProvider,
+        SequencerConfig.fromConfig(
+          svSynchronizerConfig.sequencer,
+          cometBftConfig,
+        ),
+        svSynchronizerConfig.mediator.pruning,
       )
+    }
+
+    val localSynchronizerNodes = config.localSynchronizerNodes.current
+      .map { currentNodeConfig =>
+        LocalSynchronizerNodes(
+          localSyncNodeFromConfig(currentNodeConfig),
+          config.localSynchronizerNodes.successor.map(localSyncNodeFromConfig),
+        )
+      }
     initialize(
       participantAdminConnection,
       ledgerClient,
-      localSynchronizerNode,
+      localSynchronizerNodes,
     )
       .recoverWith { case err =>
         // TODO(#879) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
-        localSynchronizerNode.foreach(_.close())
+        localSynchronizerNodes.foreach { nodes =>
+          nodes.current.close()
+          nodes.successor.foreach(_.close())
+        }
         Future.failed(err)
       }
   }
@@ -266,7 +262,7 @@ class SvApp(
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: SpliceLedgerClient,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
 
@@ -301,7 +297,7 @@ class SvApp(
           cometBftNode: Option[CometBftNode],
       ) =>
         new JoiningNodeInitializer(
-          localSynchronizerNode,
+          localSynchronizerNodes,
           joiningConfig,
           participantId,
           config,
@@ -344,9 +340,10 @@ class SvApp(
             )
             res <- appInitStep("SV1Initializer bootstrapping Dso") {
               val initializer = new SV1Initializer(
-                localSynchronizerNode.getOrElse(
-                  sys.error("SV1 must always specify a domain config")
-                ),
+                localSynchronizerNodes
+                  .getOrElse(
+                    sys.error("SV1 must always specify a domain config")
+                  ),
                 sv1Config,
                 participantId,
                 config,
@@ -386,9 +383,10 @@ class SvApp(
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
             new DomainMigrationInitializer(
-              localSynchronizerNode.getOrElse(
-                sys.error("It must always specify a domain config for Domain Migration")
-              ),
+              localSynchronizerNodes
+                .getOrElse(
+                  sys.error("It must always specify a domain config for Domain Migration")
+                ),
               domainMigrationConfig,
               participantId,
               cometBftConfig,
@@ -493,7 +491,7 @@ class SvApp(
         appInitStep("Wait until configured onboarding contracts have been created") {
           waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
         },
-        localSynchronizerNode match {
+        localSynchronizerNodes.map(_.current) match {
           case Some(node) =>
             if (!config.shouldSkipSynchronizerInitialization) {
               for {
@@ -559,7 +557,7 @@ class SvApp(
         config,
         clock,
         participantAdminConnection,
-        localSynchronizerNode,
+        localSynchronizerNodes.map(_.current),
         retryProvider,
         new DsoPartyMigration(
           svAutomation,
@@ -571,7 +569,7 @@ class SvApp(
         ),
         cometBftClient,
         loggerFactory,
-        config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
+        config.localSynchronizerNodes.current.exists(_.sequencer.isBftSequencer),
         initialRound,
       )
 
@@ -580,7 +578,7 @@ class SvApp(
         dsoAutomation,
         config,
         clock,
-        localSynchronizerNode,
+        localSynchronizerNodes.map(_.current),
         retryProvider,
         cometBftClient,
         packageVersionSupport,
@@ -594,11 +592,12 @@ class SvApp(
         config.domainMigrationDumpPath,
         svAutomation,
         dsoAutomation,
-        localSynchronizerNode,
+        localSynchronizerNodes.map(_.current),
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
-          localSynchronizerNode
+          localSynchronizerNodes
+            .map(_.current)
             .getOrElse(
               sys.error("SV app should always have a sequencer connection for domain migrations")
             )
@@ -701,7 +700,7 @@ class SvApp(
     } yield {
       SvApp.State(
         participantAdminConnection,
-        localSynchronizerNode,
+        localSynchronizerNodes,
         storage,
         domainTimeAutomationService,
         domainParamsAutomationService,
@@ -719,7 +718,7 @@ class SvApp(
     }
   }
 
-  override lazy val ports = Map("admin" -> config.adminApi.port)
+  override lazy val ports: Map[String, RequireTypes.Port] = Map("admin" -> config.adminApi.port)
 
   protected[this] override def automationServices(st: SvApp.State) =
     Seq(DsoDelegateBasedAutomationService, st.svAutomation, st.dsoAutomation)
@@ -844,7 +843,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes],
       storage: DbStorage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
@@ -867,7 +866,10 @@ object SvApp {
       Seq(
         SyncCloseable(
           s"Domain connections",
-          localSynchronizerNode.foreach(_.close()),
+          localSynchronizerNodes.foreach { nodes =>
+            nodes.current.close()
+            nodes.successor.foreach(_.close())
+          },
         ),
         SyncCloseable(
           s"Participant Admin connection",

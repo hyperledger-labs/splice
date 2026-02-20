@@ -3,8 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
-import cats.implicits.catsSyntaxOptionId
 import cats.data.OptionT
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
@@ -21,9 +21,9 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
 }
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -40,19 +40,20 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
   ReconcileSequencerLimitWithMemberTrafficTrigger,
   SvPackageVettingTrigger,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
 import org.lfdecentralizedtrust.splice.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -64,14 +65,14 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvCantonIdentifierConfig,
   SvOnboardingConfig,
 }
+import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.{
   OnboardedAfterDelay,
   Onboarding,
 }
-import org.lfdecentralizedtrust.splice.sv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   PackageVetting,
@@ -85,7 +86,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
 class JoiningNodeInitializer(
-    localSynchronizerNode: Option[LocalSynchronizerNode],
+    localSynchronizerNodes: Option[LocalSynchronizerNodes],
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
@@ -215,7 +216,7 @@ class JoiningNodeInitializer(
         dsoStore,
         ledgerClient,
         participantAdminConnection,
-        localSynchronizerNode,
+        localSynchronizerNodes,
       )
       connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       _ <- DomainMigrationInfo.saveToUserMetadata(
@@ -270,7 +271,7 @@ class JoiningNodeInitializer(
               newSvDsoAutomationService(
                 svStore,
                 dsoStore,
-                localSynchronizerNode,
+                localSynchronizerNodes,
                 upgradesConfig,
                 packageVersionSupport,
                 config.parameters.enabledFeatures,
@@ -337,10 +338,10 @@ class JoiningNodeInitializer(
       )
       _ <-
         if (!config.shouldSkipSynchronizerInitialization) {
-          localSynchronizerNode.traverse(lsn =>
+          localSynchronizerNodes.traverse(lsn =>
             SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
               cantonIdentifierConfig,
-              lsn,
+              lsn.current,
               clock,
               loggerFactory,
               retryProvider,
@@ -355,7 +356,7 @@ class JoiningNodeInitializer(
       _ <- ensureCantonNodesOTKRotatedIfNeeded(
         config.skipSynchronizerInitialization,
         cantonIdentifierConfig,
-        localSynchronizerNode,
+        localSynchronizerNodes.map(_.current),
         clock,
         loggerFactory,
         retryProvider,
@@ -431,23 +432,23 @@ class JoiningNodeInitializer(
       ).tupled
       _ <-
         if (!config.shouldSkipSynchronizerInitialization) {
-          localSynchronizerNode.traverse_ { localSynchronizerNode =>
+          localSynchronizerNodes.traverse_ { localSynchronizerNodes =>
             for {
               // First, make sure the identity of the new domain nodes is known on the domain
               _ <-
                 (
-                  localSynchronizerNode.addLocalSequencerIdentityIfRequired(
+                  localSynchronizerNodes.current.addLocalSequencerIdentityIfRequired(
                     config.domains.global.alias,
                     decentralizedSynchronizer,
                   ),
-                  localSynchronizerNode.addLocalMediatorIdentityIfRequired(
+                  localSynchronizerNodes.current.addLocalMediatorIdentityIfRequired(
                     decentralizedSynchronizer
                   ),
                 ).tupled
               // Then, add the new local domain node to the DSO rules with an "onboarding" status
               // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
               _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
-                Some(localSynchronizerNode),
+                Some(localSynchronizerNodes),
                 decentralizedSynchronizer,
                 Onboarding,
                 config.domainMigrationId,
@@ -455,18 +456,18 @@ class JoiningNodeInitializer(
               )
               // Finally, fully onboard the sequencer and mediator
               physicalSynchronizerId <-
-                localSynchronizerNode.onboardLocalSequencerIfRequired(
+                localSynchronizerNodes.current.onboardLocalSequencerIfRequired(
                   svConnection.map(_._2)
                 )
               // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
               _ = if (!skipTrafficReconciliationTriggers)
                 dsoAutomationService.registerTrafficReconciliationTriggers()
-              _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
+              _ <- localSynchronizerNodes.current.initializeLocalMediatorIfRequired(
                 physicalSynchronizerId
               )
               _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
               _ <- waitForSvToObtainUnlimitedTraffic(
-                localSynchronizerNode,
+                localSynchronizerNodes.current,
                 decentralizedSynchronizer,
               )
             } yield ()
@@ -486,7 +487,7 @@ class JoiningNodeInitializer(
         if (!config.shouldSkipSynchronizerInitialization) {
           synchronizerNodeReconciler
             .reconcileSynchronizerNodeConfigIfRequired(
-              localSynchronizerNode,
+              localSynchronizerNodes,
               decentralizedSynchronizer,
               OnboardedAfterDelay,
               config.domainMigrationId,
@@ -598,7 +599,7 @@ class JoiningNodeInitializer(
   ): Unit = {
     // throws a RuntimeException if the trigger is not registered
     service.trigger[SvOnboardingUnlimitedTrafficTrigger]: Unit
-    service.trigger[ReconcileSequencerLimitWithMemberTrafficTrigger]: Unit
+    assert(service.triggers[ReconcileSequencerLimitWithMemberTrafficTrigger].nonEmpty)
   }
 
   private def waitForSvToObtainUnlimitedTraffic(
@@ -873,7 +874,7 @@ class JoiningNodeInitializer(
                 dsoAutomation = newSvDsoAutomationService(
                   svStore,
                   dsoStore,
-                  localSynchronizerNode,
+                  localSynchronizerNodes,
                   upgradesConfig,
                   packageVersionSupport,
                   config.parameters.enabledFeatures,

@@ -50,7 +50,7 @@ import com.digitalasset.canton.config.ConfigErrors.{
   SubstitutionError,
 }
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeNumeric}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
@@ -61,7 +61,6 @@ import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
-import pureconfig.configurable.{genericMapReader, genericMapWriter}
 import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.module.cats.{nonEmptyListReader, nonEmptyListWriter}
 import io.circe.parser.*
@@ -375,37 +374,6 @@ object SpliceConfig {
 
     import cantonConfigReaders.*
 
-    implicit def numericMapReader[K, V](implicit
-        numeric: Numeric[K],
-        valueReader: ConfigReader[V],
-    ): ConfigReader[Map[K, V]] =
-      genericMapReader[K, V](key =>
-        numeric
-          .parseString(key)
-          .toRight(
-            CannotConvert(
-              key,
-              s"Numeric type ${numeric.getClass.getSimpleName}",
-              "Key is not a valid number",
-            )
-          )
-      )
-
-    implicit def nonNegativeIntMapReader[V](implicit
-        valueReader: ConfigReader[V]
-    ): ConfigReader[Map[NonNegativeInt, V]] =
-      genericMapReader[NonNegativeInt, V](key =>
-        NonNegativeInt
-          .create(key.toInt)
-          .leftMap(violation =>
-            CannotConvert(
-              key,
-              s"NonNegativeInt",
-              s"Key is not a valid number: $violation",
-            )
-          )
-      )
-
     implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
       SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))
     )
@@ -591,6 +559,8 @@ object SpliceConfig {
       deriveReader[SvScanConfig]
     implicit val svSynchronizerNodeConfig: ConfigReader[SvSynchronizerNodeConfig] =
       deriveReader[SvSynchronizerNodeConfig]
+    implicit val svSynchronizerNodesConfig: ConfigReader[SvSynchronizerNodesConfig] =
+      deriveReader[SvSynchronizerNodesConfig]
     implicit val svDecentralizedSynchronizerConfigReader
         : ConfigReader[SvDecentralizedSynchronizerConfig] =
       deriveReader[SvDecentralizedSynchronizerConfig]
@@ -634,7 +604,7 @@ object SpliceConfig {
         // We support joining nodes without sequencers/mediators but
         // sv1 must alway configure one to bootstrap the domain.
         val sv1NodeHasSynchronizerConfig =
-          checkFoundDsoConfig((conf, _) => conf.localSynchronizerNode.isDefined)
+          checkFoundDsoConfig((conf, _) => conf.localSynchronizerNodes.current.isDefined)
         // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
         val sv1NodeHasNoSequencerUrl =
           checkFoundDsoConfig((conf, _) => conf.domains.global.url.isEmpty)
@@ -847,16 +817,6 @@ object SpliceConfig {
     import writers.*
     import DeprecatedConfigUtils.*
 
-    implicit def mapWriter[K: Numeric, V](implicit
-        valueWriter: ConfigWriter[V]
-    ): ConfigWriter[Map[K, V]] =
-      genericMapWriter[K, V](_.toString)
-
-    implicit def nonNegativeIntMapWriter[V](implicit
-        valueWriter: ConfigWriter[V]
-    ): ConfigWriter[Map[NonNegativeInt, V]] =
-      genericMapWriter[NonNegativeInt, V](key => key.value.toString)
-
     implicit val dbConfigWriter: ConfigWriter[DbConfig] = deriveWriter[DbConfig]
 
     implicit val configWriter: ConfigWriter[SynchronizerAlias] =
@@ -1037,6 +997,8 @@ object SpliceConfig {
       deriveWriter[SvScanConfig]
     implicit val svSynchronizerNodeConfig: ConfigWriter[SvSynchronizerNodeConfig] =
       deriveWriter[SvSynchronizerNodeConfig]
+    implicit val svSynchronizerNodesConfig: ConfigWriter[SvSynchronizerNodesConfig] =
+      deriveWriter[SvSynchronizerNodesConfig]
     implicit val spliceInstanceNamesConfigWriter: ConfigWriter[SpliceInstanceNamesConfig] =
       deriveWriter[SpliceInstanceNamesConfig]
     implicit val svDecentralizedSynchronizerConfigWriter

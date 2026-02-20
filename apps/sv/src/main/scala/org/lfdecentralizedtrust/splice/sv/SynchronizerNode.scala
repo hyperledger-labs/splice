@@ -18,6 +18,13 @@ abstract class SynchronizerNode(
     val mediatorSequencerAmplification: SubmissionRequestAmplification,
 ) {}
 
+object SynchronizerNode {
+  case class LocalSynchronizerNodes(
+      current: LocalSynchronizerNode,
+      successor: Option[LocalSynchronizerNode],
+  )
+}
+
 sealed trait SequencerConfig {}
 
 object SequencerConfig {

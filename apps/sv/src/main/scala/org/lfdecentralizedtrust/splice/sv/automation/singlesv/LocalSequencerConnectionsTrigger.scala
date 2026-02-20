@@ -3,6 +3,20 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnectionPoolDelays,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingTrigger,
   TriggerContext,
@@ -12,31 +26,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
-  SequencerConnections,
-  SubmissionRequestAmplification,
-}
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import com.digitalasset.canton.util.ShowUtil.*
 
 import java.time.Instant
-import scala.jdk.OptionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 
 class LocalSequencerConnectionsTrigger(
     baseContext: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
     decentralizedSynchronizerAlias: SynchronizerAlias,
     store: SvDsoStore,
-    sequencerInternalConfig: ClientConfig,
+    localSynchronizerNode: LocalSynchronizerNode,
     sequencerRequestAmplification: SubmissionRequestAmplification,
     migrationId: Long,
     newSequencerConnectionPool: Boolean,
@@ -51,35 +51,42 @@ class LocalSequencerConnectionsTrigger(
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      rulesAndState <- store.getDsoRulesWithSvNodeState(svParty)
-      // TODO(#998): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
-      synchronizerId <- participantAdminConnection.getSynchronizerId(decentralizedSynchronizerAlias)
-      domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
-        synchronizerId,
-        maxDomainTimeLag = context.config.pollingInterval,
+      sequencerPSId <- localSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
+      participantConnectedPSId <- participantAdminConnection.getPhysicalSynchronizerId(
+        decentralizedSynchronizerAlias
       )
-      decentralizedSynchronizerId <- store.getAmuletRulesDomain()(traceContext)
-      dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
-        decentralizedSynchronizerId,
-        domainTimeLb.timestamp.toInstant,
-        migrationId,
-      )
-      _ <- dsoRulesActiveSequencerConfig.fold {
-        logger.debug(
-          show"Sv info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
-        )
-        Future.unit
-      } { publishedSequencerInfo =>
-        participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
-          decentralizedSynchronizerAlias,
-          newSequencerConnectionPool,
-          setLocalSequencerConnection(
-            publishedSequencerInfo,
-            sequencerInternalConfig,
-            domainTimeLb.timestamp.toInstant,
-          ),
-        )
-      }
+      _ <-
+        if (sequencerPSId == participantConnectedPSId) {
+          for {
+            rulesAndState <- store.getDsoRulesWithSvNodeState(svParty)
+            domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
+              participantConnectedPSId,
+              maxDomainTimeLag = context.config.pollingInterval,
+            )
+            decentralizedSynchronizerId <- store.getAmuletRulesDomain()(traceContext)
+            dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
+              decentralizedSynchronizerId,
+              domainTimeLb.timestamp.toInstant,
+              migrationId,
+            )
+            _ <- dsoRulesActiveSequencerConfig.fold {
+              logger.debug(
+                show"Sv info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
+              )
+              Future.unit
+            } { publishedSequencerInfo =>
+              participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
+                decentralizedSynchronizerAlias,
+                newSequencerConnectionPool,
+                setLocalSequencerConnection(
+                  publishedSequencerInfo,
+                  localSynchronizerNode.sequencerInternalConfig,
+                  domainTimeLb.timestamp.toInstant,
+                ),
+              )
+            }
+          } yield false
+        } else Future.unit
     } yield false
   }
 

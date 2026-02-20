@@ -690,7 +690,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     val sequencer = bftSequencers.loneElement
     sequencer.url should be("http://testUrl:8081")
     sequencer.migrationId should be(0)
-    sequencer.id shouldBe sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
+    sequencer.id shouldBe sv1Backend.appState.localSynchronizerNodes.value.current.sequencerAdminConnection.getSequencerId.futureValue
   }
 
   "respect rate limit" in { implicit env =>

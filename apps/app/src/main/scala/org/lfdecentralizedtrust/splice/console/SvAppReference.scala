@@ -3,15 +3,19 @@
 
 package org.lfdecentralizedtrust.splice.console
 
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice as cp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.{
   BuildInfo,
@@ -30,20 +34,18 @@ import org.lfdecentralizedtrust.splice.sv.automation.{
   SvDsoAutomationService,
   SvSvAutomationService,
 }
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.config.{
+  SvAppBackendConfig,
+  SvSynchronizerNodeConfig,
+  SvSynchronizerNodesConfig,
+}
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig.PhysicalSynchronizerSerial
 
-import scala.jdk.OptionConverters.*
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.OptionConverters.*
 
 abstract class SvAppReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
@@ -411,33 +413,34 @@ class SvAppBackendReference(
       config.participantClient.participantClientConfigWithAdminToken,
     )
 
-  private def localSynchronizerNode(id: PhysicalSynchronizerSerial) =
-    config.localSynchronizerNodes.getOrElse(
-      id,
-      throw new RuntimeException("No synchronizer node configured for SV app"),
-    )
-
   lazy val sequencerClient: SequencerClientReference =
-    sequencerClientForPSId(config.currentPhysicalSynchronizerSerial.getOrElse(NonNegativeInt.zero))
+    sequencerClientFor(_.current)
 
-  def sequencerClientForPSId(psid: PhysicalSynchronizerSerial): SequencerClientReference = {
+  def sequencerClientFor(
+      node: SvSynchronizerNodesConfig => Option[SvSynchronizerNodeConfig]
+  ): SequencerClientReference = {
     new SequencerClientReference(
       consoleEnvironment,
       s"sequencer client for $name",
-      localSynchronizerNode(psid).sequencer.toCantonConfig,
+      node(config.localSynchronizerNodes)
+        .getOrElse(throw new RuntimeException("no current node config"))
+        .sequencer
+        .toCantonConfig,
     )
   }
 
   lazy val mediatorClient: MediatorClientReference =
-    mediatorClientForPSId(config.currentPhysicalSynchronizerSerial.getOrElse(NonNegativeInt.zero))
+    mediatorClientFor(_.current)
 
-  def mediatorClientForPSId(psid: PhysicalSynchronizerSerial): MediatorClientReference = {
+  def mediatorClientFor(
+      node: SvSynchronizerNodesConfig => Option[SvSynchronizerNodeConfig]
+  ): MediatorClientReference = {
     new MediatorClientReference(
       consoleEnvironment,
       s"mediator client for $name",
-      localSynchronizerNode(
-        psid
-      ).mediator.toCantonConfig,
+      node(
+        config.localSynchronizerNodes
+      ).getOrElse(throw new RuntimeException("no current node configured")).mediator.toCantonConfig,
     )
   }
 }

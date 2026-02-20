@@ -8,27 +8,27 @@ import cats.implicits.catsSyntaxOptionId
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   SynchronizerTimeCommands,
   TopologyAdminCommands,
   VaultAdminCommands,
 }
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.data.topology
 import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
-  ListOwnerToKeyMappingResult,
   ListNamespaceDelegationResult,
+  ListOwnerToKeyMappingResult,
   ListSynchronizerParametersStateResult,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   ClientConfig,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
 }
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   Fingerprint,
@@ -39,16 +39,16 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.{Clock, FetchTimeResponse}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.ExportTopologySnapshotResponse
-import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, TimeQuery}
+import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -60,13 +60,13 @@ import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.{
-  AuthorizedState,
-  ProposalSignedByOwnKey,
-}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyTransactionType,
+}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.{
+  AuthorizedState,
+  ProposalSignedByOwnKey,
 }
 
 import java.util.concurrent.atomic.AtomicReference
@@ -135,7 +135,7 @@ abstract class TopologyAdminConnection(
    *  fresh domain-time proof.
    */
   def getDomainTimeLowerBound(
-      synchronizerId: SynchronizerId,
+      synchronizerId: Synchronizer,
       maxDomainTimeLag: NonNegativeFiniteDuration,
       timeout: NonNegativeDuration = retryProvider.timeouts.default,
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
@@ -1439,6 +1439,22 @@ abstract class TopologyAdminConnection(
         ).map(_ => ()),
       logger,
     )
+
+  def listLsuAnnouncements(synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
+  ): Future[Seq[TopologyResult[LsuAnnouncement]]] = runCmd(
+    TopologyAdminCommands.Read.ListLsuAnnouncement(
+      BaseQuery(
+        TopologyStoreId.Synchronizer(synchronizerId),
+        proposals = false,
+        timeQuery = TimeQuery.HeadState,
+        ops = Some(TopologyChangeOp.Replace),
+        filterSigningKey = "",
+        protocolVersion = None,
+      ),
+      synchronizerId.filterString,
+    )
+  ).map(_.map(r => TopologyResult(r.context, r.item)))
 
   def ensurePartyUnhostedFromParticipant(
       retryFor: RetryFor,
