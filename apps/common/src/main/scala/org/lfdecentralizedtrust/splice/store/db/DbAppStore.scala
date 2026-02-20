@@ -23,6 +23,7 @@ abstract class DbTxLogAppStore[TXE](
     txLogStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     ingestionConfig: IngestionConfig,
+    acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -34,6 +35,7 @@ abstract class DbTxLogAppStore[TXE](
       acsStoreDescriptor = acsStoreDescriptor,
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig = ingestionConfig,
+      acsArchiveConfigOpt = acsArchiveConfigOpt,
     )
     with TxLogAppStore[TXE] {
 
@@ -53,6 +55,7 @@ abstract class DbTxLogAppStore[TXE](
       ingestionConfig,
       handleIngestionSummary,
       defaultLimit = defaultLimit,
+      acsArchiveConfigOpt = acsArchiveConfigOpt,
     )
 }
 
@@ -63,6 +66,7 @@ abstract class DbAppStore(
     acsStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     ingestionConfig: IngestionConfig,
+    acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = None,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -90,6 +94,7 @@ abstract class DbAppStore(
       ingestionConfig,
       handleIngestionSummary,
       defaultLimit,
+      acsArchiveConfigOpt = acsArchiveConfigOpt,
     )
 
   override lazy val storeName: String = multiDomainAcsStore.storeName
