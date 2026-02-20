@@ -302,6 +302,8 @@ async function installSvAndValidator(
     ...spliceInstanceNames,
     extraBeneficiaries,
     onboardingPollingInterval: svOnboardingPollingInterval,
+    permissionedSynchronizer:
+      commonSvAppValues.permissionedSynchronizer ?? valuesFromYamlFile.permissionedSynchronizer,
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice: initialAmuletPrice,

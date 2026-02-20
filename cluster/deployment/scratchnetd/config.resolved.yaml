@@ -180,6 +180,7 @@ svs:
           cpu: '1'
           memory: '2Gi'
     svApp:
+      permissionedSynchronizer: false
       resources:
         limits:
           cpu: '3'
