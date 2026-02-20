@@ -85,6 +85,10 @@ data AmuletConfig unit = AmuletConfig with
     dryRunRewardCalculationVersion : Optional RewardCalculationVersion
       -- ^ Which version of reward accounting to dry-run. Used to test-drive the off-ledger reward accounting
       -- changes before fully switching over.
+    rewardAccountingV2BatchSize : Optional Int
+      -- ^ The batch size to use for the off-ledger reward accounting. Default 100.
+
+    -- FIXME: move the reward configuration into its own record.
   deriving (Eq, Show)
 
 getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
@@ -172,6 +176,7 @@ instance Patchable (AmuletConfig USD) where
     externalPartyConfigStateTickDuration = patch new.externalPartyConfigStateTickDuration base.externalPartyConfigStateTickDuration current.externalPartyConfigStateTickDuration
     rewardCalculationVersion = patch new.rewardCalculationVersion base.rewardCalculationVersion current.rewardCalculationVersion
     dryRunRewardCalculationVersion = patch new.dryRunRewardCalculationVersion base.dryRunRewardCalculationVersion current.dryRunRewardCalculationVersion
+    rewardAccountingV2BatchSize = patch new.rewardAccountingV2BatchSize base.rewardAccountingV2BatchSize current.rewardAccountingV2BatchSize
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

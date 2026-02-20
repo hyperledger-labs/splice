@@ -93,6 +93,7 @@ defaultAmuletConfig = AmuletConfig with
 
   rewardCalculationVersion = None
   dryRunRewardCalculationVersion = None
+  rewardAccountingV2BatchSize = None
 
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)

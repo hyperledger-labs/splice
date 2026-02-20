@@ -72,7 +72,6 @@ Notes on design:
 template CalculateRewardsV2 with
     dso : Party
     round : Round
-    batchSize : Int -- ^ The number of minting allowances to include in each batch.
     rewardsTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
     dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
   where

@@ -470,13 +470,11 @@ template AmuletRules
 
         -- trigger off-ledger reward calculation if needed
         let configUsd = getValueAsOf now configSchedule
-        let batchSize = 100 -- FIXME: make configurable
         let rewardsTimeToLive = hours 48 -- (24h for batching + 24h submission delay) FIXME: make configurable
         when (useTrafficBasedAppRewards roundToArchive.rewardCalculationVersion) $ do
             void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
-                batchSize
                 rewardsTimeToLive
                 dryRun = False
 
@@ -484,7 +482,6 @@ template AmuletRules
             void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
-                batchSize
                 rewardsTimeToLive
                 dryRun = True
 
