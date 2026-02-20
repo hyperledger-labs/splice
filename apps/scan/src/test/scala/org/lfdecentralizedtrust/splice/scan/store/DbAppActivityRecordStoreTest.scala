@@ -8,10 +8,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore
-import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.{
-  AppActivityT,
-  AppActivityRecordT,
-}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
@@ -39,10 +36,8 @@ class DbAppActivityRecordStoreTest
           migrationId = migrationId,
           recordTime = ts1,
           roundNumber = 42L,
-          activities = Seq(
-            AppActivityT(partyId = "app1::provider", weight = 100L),
-            AppActivityT(partyId = "app2::provider", weight = 50L),
-          ),
+          appProviderParties = Seq("app1::provider", "app2::provider"),
+          appActivityWeights = Seq(100L, 50L),
         )
 
         maxBefore <- maxRecordTime(migrationId)
@@ -91,7 +86,8 @@ class DbAppActivityRecordStoreTest
           mkRecord(
             baseTs.plusSeconds(i.toLong),
             i.toLong,
-            activities = Seq(AppActivityT(s"app$i::provider", i.toLong * 10)),
+            appProviderParties = Seq(s"app$i::provider"),
+            appActivityWeights = Seq(i.toLong * 10),
           )
         }
 
@@ -108,7 +104,7 @@ class DbAppActivityRecordStoreTest
         ts = CantonTimestamp.now()
 
         countBefore <- countRecords()
-        record = mkRecord(ts, 100L, activities = Seq.empty)
+        record = mkRecord(ts, 100L, appProviderParties = Seq.empty, appActivityWeights = Seq.empty)
 
         _ <- store.insertAppActivityRecords(Seq(record))
         countAfter <- countRecords()
@@ -121,13 +117,15 @@ class DbAppActivityRecordStoreTest
   private def mkRecord(
       recordTime: CantonTimestamp,
       roundNumber: Long,
-      activities: Seq[AppActivityT] = Seq(AppActivityT("default::app", 100L)),
+      appProviderParties: Seq[String] = Seq("default::app"),
+      appActivityWeights: Seq[Long] = Seq(100L),
   ): AppActivityRecordT =
     AppActivityRecordT(
       migrationId = migrationId,
       recordTime = recordTime,
       roundNumber = roundNumber,
-      activities = activities,
+      appProviderParties = appProviderParties,
+      appActivityWeights = appActivityWeights,
     )
 
   private def newStore(): Future[DbAppActivityRecordStore] = {

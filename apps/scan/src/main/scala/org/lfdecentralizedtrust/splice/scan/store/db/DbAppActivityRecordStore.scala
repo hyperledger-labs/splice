@@ -18,53 +18,24 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import slick.dbio.DBIO
 
 import scala.concurrent.{ExecutionContext, Future}
-import io.circe.Json
-import io.circe.syntax.*
 
 object DbAppActivityRecordStore {
-
-  /** Represents a single app's activity within a record.
-    *
-    * @param partyId the featured app provider party
-    * @param weight the traffic weight attributed to this app
-    */
-  final case class AppActivityT(
-      partyId: String,
-      weight: Long,
-  )
-
-  object AppActivityT {
-    def toJson(activities: Seq[AppActivityT]): Json = Json.arr(
-      activities.map { act =>
-        Json.obj(
-          "p" -> act.partyId.asJson,
-          "w" -> act.weight.asJson,
-        )
-      }*
-    )
-
-    def fromJson(json: Json): Seq[AppActivityT] = {
-      json.asArray.getOrElse(Vector.empty).flatMap { obj =>
-        for {
-          partyId <- obj.hcursor.get[String]("p").toOption
-          weight <- obj.hcursor.get[Long]("w").toOption
-        } yield AppActivityT(partyId, weight)
-      }
-    }
-  }
 
   /** App activity record for a given record_time.
     *
     * @param migrationId migration identifier for domain migrations
     * @param recordTime the record_time (= sequencing_time) of the verdict/traffic summary
     * @param roundNumber the mining round that was open at this record_time
-    * @param activities the featured app activities with their traffic weights
+    * @param appProviderParties app providers for which app activity should be recorded
+    * @param appActivityWeights activity weight (in bytes of traffic) for each app provider,
+    *                           in one-to-one correspondence with appProviderParties
     */
   final case class AppActivityRecordT(
       migrationId: Long,
       recordTime: CantonTimestamp,
       roundNumber: Long,
-      activities: Seq[AppActivityT],
+      appProviderParties: Seq[String],
+      appActivityWeights: Seq[Long],
   )
 }
 
@@ -93,10 +64,7 @@ class DbAppActivityRecordStore(
     val appActivityRecords = "app_activity_record_store"
   }
 
-  type AppActivityT = DbAppActivityRecordStore.AppActivityT
-  val AppActivityT = DbAppActivityRecordStore.AppActivityT
   type AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
-  val AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
 
   /** Batch insert app activity records using multi-row INSERT. */
   private def batchInsertAppActivityRecords(items: Seq[AppActivityRecordT]) = {
@@ -105,15 +73,14 @@ class DbAppActivityRecordStore(
     } else {
       val values = sqlCommaSeparated(
         items.map { row =>
-          val activitiesJson = AppActivityT.toJson(row.activities)
           sql"""($historyId, ${row.migrationId}, ${row.recordTime},
-                ${row.roundNumber}, $activitiesJson)"""
+                ${row.roundNumber}, ${row.appProviderParties}, ${row.appActivityWeights})"""
         }
       )
 
       (sql"""
         insert into #${Tables.appActivityRecords}(
-          history_id, migration_id, record_time, round_number, activities
+          history_id, migration_id, record_time, round_number, app_provider_parties, app_activity_weights
         ) values """ ++ values).asUpdate
     }
   }

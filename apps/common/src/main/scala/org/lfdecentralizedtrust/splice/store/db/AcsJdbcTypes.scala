@@ -168,12 +168,18 @@ trait AcsJdbcTypes {
   protected implicit lazy val longArraySetParameter: SetParameter[Array[Long]] = (v, pp) =>
     pp.setObject(v, java.sql.Types.ARRAY)
 
-  private val stringArraySetParameter: SetParameter[Array[String]] =
+  protected implicit lazy val longSeqSetParameter: SetParameter[Seq[Long]] =
+    (longs: Seq[Long], pp: PositionedParameters) => longArraySetParameter(longs.toArray, pp)
+
+  protected implicit lazy val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>
       pp.setObject(
         pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
         JDBCType.ARRAY.getVendorTypeNumber,
       )
+
+  protected implicit lazy val stringSeqSetParameter: SetParameter[Seq[String]] =
+    (strings: Seq[String], pp: PositionedParameters) => stringArraySetParameter(strings.toArray, pp)
 
   protected implicit lazy val string3ArraySetParameter: SetParameter[Array[String3]] =
     (strings: Array[String3], pp: PositionedParameters) =>
