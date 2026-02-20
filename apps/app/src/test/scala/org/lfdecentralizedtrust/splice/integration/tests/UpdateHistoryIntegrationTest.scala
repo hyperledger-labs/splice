@@ -51,7 +51,8 @@ class UpdateHistoryIntegrationTest
       onboardExternalParty(aliceValidatorBackend, Some("externalParty1"))
     val ledgerBeginOffsetSv1 = sv1Backend.participantClient.ledger_api.state.end()
     val ledgerBeginOffsetAlice = aliceValidatorBackend.participantClient.ledger_api.state.end()
-    val tapAmountUsd = com.digitalasset.daml.lf.data.Numeric.assertFromString("33." + "3".repeat(10))
+    val tapAmountUsd =
+      com.digitalasset.daml.lf.data.Numeric.assertFromString("33." + "3".repeat(10))
     val transferAmount =
       com.digitalasset.daml.lf.data.Numeric.assertFromString("11." + "1".repeat(10))
 
@@ -186,7 +187,7 @@ class UpdateHistoryIntegrationTest
             .automation
             .updateHistory,
           ledgerBeginOffsetAlice,
-          true,
+          mustIncludeReassignments = true,
         )
       }
       eventually() {
