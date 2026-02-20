@@ -46,6 +46,7 @@ export interface Transfer {
   transferInstructionCid?: string;
   transferInstructionReceiver?: string;
   transferInstructionAmount?: BigNumber;
+  developmentFundCouponsUsed: BigNumber;
 }
 
 export interface BalanceChange {

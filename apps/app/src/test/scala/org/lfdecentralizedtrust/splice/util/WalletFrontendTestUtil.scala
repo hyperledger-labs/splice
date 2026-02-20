@@ -194,6 +194,14 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .getOrElse(s"0 $acronym"),
         unit = acronym,
       ),
+      developmentFundCouponsUsed = parseAmountText(
+        transactionRow
+          .childElement(className("tx-row-cell-rewards"))
+          .findChildElement(className("tx-reward-fund-amulet"))
+          .map(_.text)
+          .getOrElse(s"0 $acronym"),
+        unit = acronym,
+      ),
       updateId = transactionRow
         .findChildElement(className("update-id"))
         .map(seleniumText)
@@ -357,6 +365,7 @@ object WalletFrontendTestUtil {
       appRewardsUsed: BigDecimal,
       validatorRewardsUsed: BigDecimal,
       svRewardsUsed: BigDecimal,
+      developmentFundCouponsUsed: BigDecimal,
       updateId: String,
   )
 

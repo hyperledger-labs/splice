@@ -11,8 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregator,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.*
-import org.lfdecentralizedtrust.splice.store.StoreTestBase
-import org.lfdecentralizedtrust.splice.store.StoreErrors
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreErrors, StoreTestBase}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.ResourceTemplateDecoder
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
@@ -959,6 +958,7 @@ class ScanAggregatorTest
       ingestionConfig = IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
       initialRound = initialRound,
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

@@ -3,14 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.config
 
-import com.digitalasset.canton.config.{
-  BatchingConfig,
-  CachingConfigs,
-  LocalNodeParametersConfig,
-  NonNegativeFiniteDuration,
-  WatchdogConfig,
-}
-import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.*
+import org.lfdecentralizedtrust.splice.store.{ChoiceContextContractFetcher, HardLimit, Limit}
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
 
 final case class SpliceParametersConfig(
@@ -26,8 +21,12 @@ final case class SpliceParametersConfig(
     // Configuration for the circuit breaker for ledger API command submissions.
     circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
     enabledFeatures: EnabledFeaturesConfig = EnabledFeaturesConfig(),
+    databaseDefaultLimit: NonNegativeInt = NonNegativeInt.tryCreate(Limit.DefaultMaxPageSize),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 
   override def watchdog: Option[WatchdogConfig] = None
+
+  val defaultLimit: Limit =
+    HardLimit.tryCreate(databaseDefaultLimit.unwrap, databaseDefaultLimit.unwrap)
 }
