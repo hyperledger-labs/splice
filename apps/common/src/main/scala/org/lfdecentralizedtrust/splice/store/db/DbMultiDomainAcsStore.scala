@@ -104,7 +104,9 @@ final class DbMultiDomainAcsStore[TXE](
 ) extends MultiDomainAcsStore
     with AcsTables
     with AcsQueries
+    with TemporalAcsQueries
     with TxLogQueries[TXE]
+    with TemporalAcsStore
     with StoreErrors
     with NamedLogging
     with LimitHelpers {
@@ -187,6 +189,71 @@ final class DbMultiDomainAcsStore[TXE](
       )
       .map(result => contractWithStateFromRow(companion)(result))
       .value
+  }
+
+  private def requireArchiveConfig(methodName: String): DbMultiDomainAcsStore.AcsArchiveConfig =
+    acsArchiveConfigOpt.getOrElse(
+      throw new IllegalStateException(
+        s"$methodName requires an AcsArchiveConfig but none was provided for store $acsStoreDescriptor"
+      )
+    )
+
+  override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](companion: C)(
+      id: ContractId[?],
+      asOf: CantonTimestamp,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Option[ContractWithState[TCid, T]]] = {
+    val archiveConfig = requireArchiveConfig("lookupContractByIdAsOf")
+    waitUntilAcsIngested {
+      storage
+        .querySingle(
+          selectFromAcsTableWithStateAsOf(
+            acsTableName,
+            archiveConfig.archiveTableName,
+            acsStoreId,
+            domainMigrationId,
+            companion,
+            asOf,
+            additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
+          ).headOption,
+          "lookupContractByIdAsOf",
+        )
+        .map(result => contractWithStateFromRow(companion)(result))
+        .value
+    }
+  }
+
+  override def listContractsAsOf[C, TCid <: ContractId[?], T](
+      companion: C,
+      asOf: CantonTimestamp,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ContractWithState[TCid, T]]] = {
+    val archiveConfig = requireArchiveConfig("listContractsAsOf")
+    waitUntilAcsIngested {
+      val templateId = companionClass.typeId(companion)
+      val opName = s"listContractsAsOf:${templateId.getEntityName}"
+      for {
+        result <- storage.query(
+          selectFromAcsTableWithStateAsOf(
+            acsTableName,
+            archiveConfig.archiveTableName,
+            acsStoreId,
+            domainMigrationId,
+            companion,
+            asOf,
+            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
+          ),
+          opName,
+        )
+        limited = applyLimit(opName, limit, result)
+        withState = limited.map(contractWithStateFromRow(companion)(_))
+      } yield withState
+    }
   }
 
   /** Returns any contract of the same template as the passed companion.
