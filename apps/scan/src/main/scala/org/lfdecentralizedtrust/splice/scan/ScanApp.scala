@@ -34,6 +34,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpTokenStandardTransferInstructionHandler,
 }
 import org.lfdecentralizedtrust.splice.scan.automation.{
+  NoOpAppActivityComputation,
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
@@ -327,6 +328,7 @@ class ScanApp(
             )
           )
         } else None
+      appActivityComputation = NoOpAppActivityComputation
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
@@ -339,6 +341,7 @@ class ScanApp(
         nodeMetrics.verdictIngestion,
         sequencerTrafficClientO,
         trafficSummaryStoreO,
+        appActivityComputation,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
