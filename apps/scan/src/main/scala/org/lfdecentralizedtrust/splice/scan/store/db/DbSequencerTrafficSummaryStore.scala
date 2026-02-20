@@ -17,7 +17,6 @@ import slick.jdbc.PostgresProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.dbio.DBIO
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.Json
 import io.circe.syntax.*
@@ -156,20 +155,6 @@ class DbSequencerTrafficSummaryStore(
 
   override protected def timeouts = new ProcessingTimeout
 
-  private val lastIngestedSequencingTimeRef =
-    new AtomicReference[Option[CantonTimestamp]](None)
-
-  def lastIngestedSequencingTime: Option[CantonTimestamp] = lastIngestedSequencingTimeRef.get()
-
-  private def advanceLastIngestedSequencingTime(ts: CantonTimestamp): Unit = {
-    val _ = lastIngestedSequencingTimeRef.updateAndGet { curr =>
-      curr match {
-        case Some(c) if ts < c => curr
-        case _ => Some(ts)
-      }
-    }
-  }
-
   object Tables {
     val trafficSummaries = "sequencer_traffic_summary_store"
   }
@@ -250,10 +235,7 @@ class DbSequencerTrafficSummaryStore(
             insertTrafficSummariesDBIO(items).transactionally,
             "scanTraffic.insertTrafficSummaries.batch",
           )
-      ).map { _ =>
-        val maxTs = items.map(_.sequencingTime).maxOption
-        maxTs.foreach(advanceLastIngestedSequencingTime)
-      }
+      )
     }
   }
 }
