@@ -49,6 +49,7 @@ class ScanVerdictStoreIngestion(
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
     sequencerTrafficClientO: Option[SequencerTrafficClient],
     trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
+    appActivityComputation: AppActivityComputation,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -154,10 +155,25 @@ class ScanVerdictStoreIngestion(
             Future.successful(Seq.empty)
         }
 
-      // 2. Insert verdicts and traffic summaries in a single transaction
-      // TODO: revisit this: we must ensure that the SQL tx boundaries are set correctly
+      // 2. Insert verdicts, traffic summaries, and app activity records in a single transaction
       val result = for {
         trafficSummaries <- trafficSummariesF
+
+        // Pair traffic summaries with verdicts by sequencing time
+        summaryByTime = trafficSummaries.map(s => s.sequencingTime -> s).toMap
+        summariesWithVerdicts = batch.flatMap { verdict =>
+          CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.flatMap { recordTime =>
+            summaryByTime.get(recordTime).map(_ -> verdict)
+          }
+        }
+
+        // Compute app activity records (pure computation, before transaction)
+        appActivityRecords = appActivityComputation.computeActivities(
+          summariesWithVerdicts,
+          migrationId,
+        )
+
+        // Build combined DBIO action for traffic summaries and app activity
         trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
           // TODO(#4060): log an error and fail ingestion if trafficSummaries is empty
           case Some(trafficStore) if trafficSummaries.nonEmpty =>
@@ -165,11 +181,20 @@ class ScanVerdictStoreIngestion(
           case _ =>
             DBIO.successful(())
         }
-        _ <- store.insertVerdictAndTransactionViewsWith(items, trafficAction)
-      } yield trafficSummaries.size
+        appActivityAction: DBIO[Unit] = appActivityComputation.insertActivitiesDBIO(
+          appActivityRecords
+        )
+
+        combinedAction = for {
+          _ <- trafficAction
+          _ <- appActivityAction
+        } yield ()
+
+        _ <- store.insertVerdictAndTransactionViewsWith(items, combinedAction)
+      } yield (trafficSummaries.size, appActivityRecords.size)
 
       result.transform {
-        case Success(trafficSummaryCount) =>
+        case Success((trafficSummaryCount, appActivityCount)) =>
           val lastRecordTime = batch.lastOption
             .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
             .getOrElse(CantonTimestamp.MinValue)
@@ -177,7 +202,7 @@ class ScanVerdictStoreIngestion(
           ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
           Success(
             TaskSuccess(
-              s"Inserted ${batch.size} verdicts, $trafficSummaryCount traffic summaries. " +
+              s"Inserted ${batch.size} verdicts, $trafficSummaryCount traffic summaries, $appActivityCount app activity records. " +
                 s"Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. " +
                 s"Inserted verdicts: ${batch.map(_.updateId)}"
             )
