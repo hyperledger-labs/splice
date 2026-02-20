@@ -34,10 +34,10 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpTokenStandardTransferInstructionHandler,
 }
 import org.lfdecentralizedtrust.splice.scan.automation.{
-  NoOpAppActivityComputation,
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
+import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
