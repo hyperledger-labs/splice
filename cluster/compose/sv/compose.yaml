@@ -228,23 +228,25 @@ services:
       - ADDITIONAL_CONFIG_MIGRATION_ID=canton.sv-apps.sv.domain-migration-id = 0
       - |
         ADDITIONAL_CONFIG_SV_DOMAIN=
-           canton.sv-apps.sv.local-synchronizer-nodes.current {
-             sequencer {
-               admin-api {
-               address = canton
-               port = 5009
-              }
-              internal-api {
-                address = canton
-                port = 5008
-              }
-              external-public-api-url = "http://canton:5008"
-              mediator.admin-api {
-                address = canton
-                port = 5007
-             }
-           }
-          }
+                canton.sv-apps.sv.local-synchronizer-nodes.current {
+                  sequencer {
+                    admin-api {
+                      address = sequencer-mediator
+                      port = 5009
+                    }
+                    internal-api {
+                      address = sequencer-mediator
+                      port = 5008
+                    }
+                    external-public-api-url = "http://sequencer-mediator:5008"
+                  }
+                  mediator {
+                    admin-api {
+                      address = sequencer-mediator
+                      port = 5007
+                    }
+                  }
+                }
       - SPLICE_APP_SV_COMETBFT_ENABLED=false
       - SPLICE_APP_UI_NETWORK_NAME=${SPLICE_APP_UI_NETWORK_NAME}
       - SPLICE_APP_UI_NETWORK_FAVICON_URL=${SPLICE_APP_UI_NETWORK_FAVICON_URL}
@@ -345,7 +347,7 @@ services:
     networks:
       - splice-sv-private
     healthcheck:
-      test: [ "CMD", "service", "nginx", "status" ]
+      test: ["CMD", "service", "nginx", "status"]
       interval: 30s
       timeout: 10s
       retries: 3
