@@ -71,6 +71,7 @@ abstract class InStackDecentralizedSynchronizerNode
     version: CnChartVersion,
     logLevel?: LogLevel,
     logLevelStdout?: LogLevel,
+    logLevelApiRequest?: LogLevel,
     logAsyncFlush?: boolean,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
@@ -96,6 +97,7 @@ abstract class InStackDecentralizedSynchronizerNode
         ...{
           logLevel: logLevel,
           logLevelStdout: logLevelStdout,
+          logLevelApiRequest: logLevelApiRequest,
           logAsyncFlush: logAsyncFlush,
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
@@ -232,6 +234,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       version,
       svConfig.logging?.cantonLogLevel,
       svConfig.logging?.cantonStdoutLogLevel,
+      svConfig.logging?.apiRequestLogLevel,
       svConfig.logging?.cantonAsync,
       imagePullServiceAccountName,
       opts
@@ -266,6 +269,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       version,
       svConfig.logging?.cantonLogLevel,
       svConfig.logging?.cantonStdoutLogLevel,
+      svConfig.logging?.apiRequestLogLevel,
       svConfig.logging?.cantonAsync,
       imagePullServiceAccountName,
       opts
