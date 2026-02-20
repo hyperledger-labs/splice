@@ -38,8 +38,6 @@ import com.daml.metrics.api.MetricsContext
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import com.digitalasset.canton.mediator.admin.v30
-import com.digitalasset.canton.sequencer.admin.{v30 as seqv30}
-import com.google.protobuf.ByteString
 import slick.dbio.DBIO
 
 class ScanVerdictStoreIngestion(
@@ -150,7 +148,16 @@ class ScanVerdictStoreIngestion(
           case (Some(sequencerTrafficClient), Some(_)) =>
             sequencerTrafficClient
               .getTrafficSummaries(sequencingTimes)
-              .map(_.map(proto => protoToTrafficSummary(proto, viewHashToViewIdByTime)))
+              .map(_.map { proto =>
+                val sequencingTime = CantonTimestamp
+                  .fromProtoTimestamp(proto.getSequencingTime)
+                  .getOrElse(
+                    throw new IllegalArgumentException("Invalid sequencing_time in traffic summary")
+                  )
+                val viewHashToViewId = viewHashToViewIdByTime.getOrElse(sequencingTime, Map.empty)
+                DbSequencerTrafficSummaryStore
+                  .fromProto(proto, migrationId, sequencingTime, viewHashToViewId, logger)
+              })
           case _ =>
             Future.successful(Seq.empty)
         }
@@ -191,48 +198,6 @@ class ScanVerdictStoreIngestion(
         // Fix this to ensure ingestion always works reliably.
       }
     }
-  }
-
-  /** Convert a sequencer TrafficSummary proto to our storage type.
-    *
-    * @param proto the traffic summary from the sequencer
-    * @param viewHashToViewIdByTime map from sequencing_time to (view_hash -> view_id) for correlating
-    *                               envelope view_hashes with verdict view_ids
-    */
-  private def protoToTrafficSummary(
-      proto: seqv30.TrafficSummary,
-      viewHashToViewIdByTime: Map[CantonTimestamp, Map[ByteString, Int]],
-  )(implicit tc: TraceContext): DbSequencerTrafficSummaryStore.TrafficSummaryT = {
-    val sequencingTime = CantonTimestamp
-      .fromProtoTimestamp(proto.getSequencingTime)
-      .getOrElse(throw new IllegalArgumentException("Invalid sequencing_time in traffic summary"))
-
-    val viewHashToViewId = viewHashToViewIdByTime.getOrElse(sequencingTime, Map.empty)
-
-    val envelopes = proto.envelopes.map { env =>
-      val viewIds = env.viewHashes.flatMap { viewHash =>
-        viewHashToViewId.get(viewHash) match {
-          case Some(viewId) => Some(viewId)
-          case None =>
-            logger.warn(
-              s"View hash ${HexString.toHexString(viewHash)} from sequencer traffic summary " +
-                s"at $sequencingTime does not match any view in the verdict"
-            )
-            None
-        }
-      }
-      DbSequencerTrafficSummaryStore.EnvelopeT(
-        trafficCost = env.envelopeTrafficCost,
-        viewIds = viewIds,
-      )
-    }
-
-    DbSequencerTrafficSummaryStore.TrafficSummaryT(
-      migrationId = migrationId,
-      sequencingTime = sequencingTime,
-      totalTrafficCost = proto.totalTrafficCost,
-      envelopes = envelopes,
-    )
   }
 
   override protected def isStaleTask(batch: Seq[v30.Verdict])(implicit
