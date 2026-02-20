@@ -15,6 +15,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{SynchronizerAlias, HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 
 import scala.concurrent.duration.*
 
@@ -25,7 +26,8 @@ class UpdateHistoryIntegrationTest
     with TimeTestUtil
     with HasActorSystem
     with HasExecutionContext
-    with UpdateHistoryTestUtil {
+    with UpdateHistoryTestUtil
+    with ExternallySignedPartyTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -45,9 +47,11 @@ class UpdateHistoryIntegrationTest
       .withTrafficTopupsDisabled
 
   "update history can replicate update stream" in { implicit env =>
-    val ledgerBeginSv1 = sv1Backend.participantClient.ledger_api.state.end()
-    val ledgerBeginAlice = aliceValidatorBackend.participantClient.ledger_api.state.end()
-    val tapAmount = com.digitalasset.daml.lf.data.Numeric.assertFromString("33." + "3".repeat(10))
+    val externalPartyOnboardingResult =
+      onboardExternalParty(aliceValidatorBackend, Some("externalParty1"))
+    val ledgerBeginOffsetSv1 = sv1Backend.participantClient.ledger_api.state.end()
+    val ledgerBeginOffsetAlice = aliceValidatorBackend.participantClient.ledger_api.state.end()
+    val tapAmountUsd = com.digitalasset.daml.lf.data.Numeric.assertFromString("33." + "3".repeat(10))
     val transferAmount =
       com.digitalasset.daml.lf.data.Numeric.assertFromString("11." + "1".repeat(10))
 
@@ -60,8 +64,8 @@ class UpdateHistoryIntegrationTest
 
     actAndCheck(
       "Tap amulets for Alice and Bob", {
-        aliceWalletClient.tap(tapAmount)
-        bobWalletClient.tap(tapAmount)
+        aliceWalletClient.tap(tapAmountUsd)
+        bobWalletClient.tap(tapAmountUsd)
       },
     )(
       "Amulets should appear in Alice and Bob's wallet",
@@ -80,7 +84,7 @@ class UpdateHistoryIntegrationTest
     )(
       "Alice receives the transfer from bob and merges amulets",
       _ => {
-        val partitionAmount = walletUsdToAmulet(tapAmount) + transferAmount / 2
+        val partitionAmount = walletUsdToAmulet(tapAmountUsd) + transferAmount / 2
         aliceWalletClient.balance().unlockedQty should be > partitionAmount
         bobWalletClient.balance().unlockedQty should be < partitionAmount
 
@@ -155,13 +159,13 @@ class UpdateHistoryIntegrationTest
         compareHistory(
           sv1Backend.participantClient,
           sv1ScanBackend.appState.automation.updateHistory,
-          ledgerBeginSv1,
+          ledgerBeginOffsetSv1,
         )
       }
       eventually() {
         val scanClient = scancl("sv1ScanClient")
         compareHistoryViaScanApi(
-          ledgerBeginSv1,
+          ledgerBeginOffsetSv1,
           sv1Backend,
           scanClient,
         )
@@ -181,7 +185,7 @@ class UpdateHistoryIntegrationTest
             .getOrElse(throw new RuntimeException("Alice wallet should exist"))
             .automation
             .updateHistory,
-          ledgerBeginAlice,
+          ledgerBeginOffsetAlice,
           true,
         )
       }
@@ -189,12 +193,73 @@ class UpdateHistoryIntegrationTest
         compareHistory(
           aliceValidatorBackend.participantClient,
           aliceValidatorBackend.appState.automation.updateHistory,
-          ledgerBeginAlice,
+          ledgerBeginOffsetAlice,
         )
       }
 
       eventually() {
         checkUpdateHistoryMetrics(sv1ScanBackend, sv1ScanBackend.participantClient, dsoParty)
+      }
+    }
+
+    actAndCheck(
+      "Externally signed txn hash", {
+        aliceValidatorWalletClient.tap(200.0)
+        // Onboard external party
+        val externalPartyProposalContractId =
+          createExternalPartySetupProposal(aliceValidatorBackend, externalPartyOnboardingResult)
+        val externalPartySetupProposalResponse =
+          prepareAcceptExternalPartySetupProposal(
+            aliceValidatorBackend,
+            externalPartyOnboardingResult,
+            externalPartyProposalContractId,
+          )
+        // Submit externally signed transaction
+        val (_, updateId) =
+          submitExternalPartySetupProposal(
+            aliceValidatorBackend,
+            externalPartyOnboardingResult,
+            externalPartySetupProposalResponse,
+          )
+        eventuallySucceeds() {
+          sv1ScanBackend.getUpdate(updateId, encoding = CompactJson)
+        }
+
+        aliceValidatorWalletClient.transferPreapprovalSend(
+          externalPartyOnboardingResult.party,
+          100.0,
+          "",
+        )
+      },
+    )(
+      "External party 1 sees the transfer",
+      _ =>
+        eventually() {
+          aliceValidatorBackend
+            .getExternalPartyBalance(externalPartyOnboardingResult.party)
+            .totalUnlockedCoin shouldBe "100.0000000000"
+        },
+    )
+
+    clue("Update history is consistent with update stream after externally signed transaction") {
+      // Using eventually(), as we don't know when UpdateHistory has caught up with the updates
+      // and there must be at least one update with an external txn hash (the one related to the externally signed transaction)
+      eventually() {
+        compareHistory(
+          aliceValidatorBackend.participantClient,
+          aliceValidatorBackend.appState.automation.updateHistory,
+          ledgerBeginOffsetAlice,
+          mustCheckExternalTxnHash = true,
+        )
+      }
+
+      eventually() {
+        compareHistory(
+          sv1Backend.participantClient,
+          sv1ScanBackend.appState.automation.updateHistory,
+          ledgerBeginOffsetSv1,
+          mustCheckExternalTxnHash = true,
+        )
       }
     }
   }
