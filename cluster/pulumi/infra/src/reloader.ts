@@ -32,7 +32,6 @@ export function configureReloader(): k8s.helm.v3.Release {
           deployment: {
             ...infraAffinityAndTolerations,
           },
-          replicas: 2,
           containerSecurityContext: {
             capabilities: {
               drop: ['ALL']
