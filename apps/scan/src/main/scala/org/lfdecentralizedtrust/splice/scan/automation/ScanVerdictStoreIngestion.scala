@@ -22,7 +22,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
@@ -33,6 +33,8 @@ import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
+
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -170,7 +172,7 @@ class ScanVerdictStoreIngestion(
         // Compute app activity records (pure computation, before transaction)
         appActivityRecords = appActivityComputation.computeActivities(
           summariesWithVerdicts,
-          migrationId,
+          Set.empty[PartyId], // featuredAppProviders
         )
 
         // Build combined DBIO action for traffic summaries and app activity
