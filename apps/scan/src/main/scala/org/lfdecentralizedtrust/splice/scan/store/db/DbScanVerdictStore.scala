@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
+  import com.google.protobuf.ByteString
 
   final case class TransactionViewT(
       verdictRowId: Long,
@@ -66,6 +67,30 @@ object DbScanVerdictStore {
       case Unspecified => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
       case _ => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
     }
+  }
+
+  /** Build sequencing times and a map for correlating sequencer traffic data with verdict views.
+    *
+    * Returns a tuple of:
+    * - sequencing times (record_time) from the verdicts, preserving order
+    * - a map from sequencing_time to (view_hash -> view_id) mappings
+    *
+    * The sequencer provides view_hashes in its traffic summaries, which we map
+    * to view_ids from the verdict's transaction views.
+    */
+  def buildViewHashCorrelation(
+      verdicts: Seq[v30.Verdict]
+  ): (Seq[CantonTimestamp], Map[CantonTimestamp, Map[ByteString, Int]]) = {
+    val pairs = verdicts.flatMap { verdict =>
+      CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.map { recordTime =>
+        val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
+          case (viewId, txView) if !txView.viewHash.isEmpty =>
+            txView.viewHash -> viewId
+        }.toMap
+        (recordTime, viewHashMap)
+      }
+    }
+    (pairs.map(_._1), pairs.toMap)
   }
 
   def apply(

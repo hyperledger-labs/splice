@@ -140,23 +140,9 @@ class ScanVerdictStoreIngestion(
       val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
         batch.map(toDbRowAndViews)
 
-      // Extract sequencing times (record_time) from verdicts
-      val sequencingTimes: Seq[CantonTimestamp] = batch.flatMap { verdict =>
-        CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption
-      }
-
-      // Build a map from view_hash -> view_id for correlating sequencer traffic data with verdict views.
-      // Key: sequencing_time (record_time), Value: Map[view_hash -> view_id]
-      val viewHashToViewIdByTime: Map[CantonTimestamp, Map[ByteString, Int]] = batch.flatMap {
-        verdict =>
-          CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.map { recordTime =>
-            val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
-              case (viewId, txView) if !txView.viewHash.isEmpty =>
-                txView.viewHash -> viewId
-            }.toMap
-            recordTime -> viewHashMap
-          }
-      }.toMap
+      // Extract sequencing times and build view_hash -> view_id correlation map
+      val (sequencingTimes, viewHashToViewIdByTime) =
+        DbScanVerdictStore.buildViewHashCorrelation(batch)
 
       // 1. Fetch traffic summaries FIRST (before any DB operations)
       val trafficSummariesF: Future[Seq[DbSequencerTrafficSummaryStore.TrafficSummaryT]] =
