@@ -23,10 +23,15 @@ import io.circe.syntax.*
 
 object DbSequencerTrafficSummaryStore {
 
-  /** Represents an envelope within a traffic summary */
+  /** Represents an envelope within a traffic summary.
+    *
+    * @param trafficCost the traffic cost of the envelope
+    * @param viewIds view IDs from the verdict's TransactionViews that correspond to this envelope,
+    *                obtained by correlating the sequencer's view_hashes with the mediator's view data
+    */
   final case class EnvelopeT(
       trafficCost: Long,
-      viewHashes: Seq[String],
+      viewIds: Seq[Int],
   )
 
   object EnvelopeT {
@@ -34,7 +39,7 @@ object DbSequencerTrafficSummaryStore {
       envelopes.map { env =>
         Json.obj(
           "tc" -> env.trafficCost.asJson,
-          "vid" -> env.viewHashes.asJson,
+          "vid" -> env.viewIds.asJson,
         )
       }*
     )
@@ -43,8 +48,8 @@ object DbSequencerTrafficSummaryStore {
       json.asArray.getOrElse(Vector.empty).flatMap { obj =>
         for {
           trafficCost <- obj.hcursor.get[Long]("tc").toOption
-          viewHashes <- obj.hcursor.get[Seq[String]]("vid").toOption
-        } yield EnvelopeT(trafficCost, viewHashes)
+          viewIds <- obj.hcursor.get[Seq[Int]]("vid").toOption
+        } yield EnvelopeT(trafficCost, viewIds)
       }
     }
   }
