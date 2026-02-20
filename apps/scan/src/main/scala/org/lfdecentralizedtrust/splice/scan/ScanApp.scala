@@ -37,11 +37,14 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
+import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanVerdictStore,
+  DbSequencerTrafficSummaryStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
 }
@@ -282,6 +285,30 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
+      // Conditionally create traffic summary ingestion dependencies
+      sequencerTrafficClientO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new SequencerTrafficClient(
+              config.sequencerAdminClient,
+              ScanApp.this,
+              nodeMetrics.grpcClientMetrics,
+              loggerFactory,
+            )
+          )
+        } else None
+      trafficSummaryStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new DbSequencerTrafficSummaryStore(
+              storage,
+              updateHistory,
+              synchronizerId,
+              loggerFactory,
+            )
+          )
+        } else None
+      appActivityComputation = NoOpAppActivityComputation
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
@@ -292,6 +319,9 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         synchronizerId,
         nodeMetrics.verdictIngestion,
+        sequencerTrafficClientO,
+        trafficSummaryStoreO,
+        appActivityComputation,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,

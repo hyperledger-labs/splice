@@ -17,6 +17,7 @@ import io.circe.Json
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
+import slick.dbio.DBIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,6 +26,8 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
+  import com.digitalasset.canton.util.HexString
+  import com.google.protobuf.ByteString
 
   final case class TransactionViewT(
       verdictRowId: Long,
@@ -66,6 +69,86 @@ object DbScanVerdictStore {
       case Unspecified => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
       case _ => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
     }
+  }
+
+  /** Convert a mediator Verdict proto to our storage types.
+    *
+    * @param verdict the verdict from the mediator
+    * @param migrationId the current migration id
+    * @param synchronizerId the synchronizer id
+    * @return a tuple of (VerdictT, function to create TransactionViewT rows given a verdict row id)
+    */
+  def fromProto(
+      verdict: v30.Verdict,
+      migrationId: Long,
+      synchronizerId: SynchronizerId,
+  ): (VerdictT, Long => Seq[TransactionViewT]) = {
+    val transactionRootViews = verdict.getTransactionViews.rootViews
+    val resultShort: Short = VerdictResultDbValue.fromProto(verdict.verdict)
+    val row = VerdictT(
+      rowId = 0,
+      migrationId = migrationId,
+      domainId = synchronizerId,
+      recordTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getRecordTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
+      finalizationTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getFinalizationTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
+      submittingParticipantUid = verdict.submittingParticipantUid,
+      verdictResult = resultShort,
+      mediatorGroup = verdict.mediatorGroup,
+      updateId = verdict.updateId,
+      submittingParties = verdict.submittingParties,
+      transactionRootViews = transactionRootViews,
+    )
+
+    val mkViews: Long => Seq[TransactionViewT] = { rowId =>
+      verdict.getTransactionViews.views.map { case (viewId, txView) =>
+        val confirmingPartiesJson: Json = Json.fromValues(
+          txView.confirmingParties.map { q =>
+            Json.obj(
+              "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
+              "threshold" -> Json.fromInt(q.threshold),
+            )
+          }
+        )
+        TransactionViewT(
+          verdictRowId = rowId,
+          viewId = viewId,
+          informees = txView.informees,
+          confirmingParties = confirmingPartiesJson,
+          subViews = txView.subViews,
+          viewHash = Some(txView.viewHash).filter(!_.isEmpty).map(HexString.toHexString),
+        )
+      }.toSeq
+    }
+    (row, mkViews)
+  }
+
+  /** Build sequencing times and a map for correlating sequencer traffic data with verdict views.
+    *
+    * Returns a tuple of:
+    * - sequencing times (record_time) from the verdicts, preserving order
+    * - a map from sequencing_time to (view_hash -> view_id) mappings
+    *
+    * The sequencer provides view_hashes in its traffic summaries, which we map
+    * to view_ids from the verdict's transaction views.
+    */
+  def buildViewHashCorrelation(
+      verdicts: Seq[v30.Verdict]
+  ): (Seq[CantonTimestamp], Map[CantonTimestamp, Map[ByteString, Int]]) = {
+    val pairs = verdicts.map { verdict =>
+      val recordTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getRecordTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid record_time in verdict"))
+      val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
+        case (viewId, txView) if !txView.viewHash.isEmpty =>
+          txView.viewHash -> viewId
+      }.toMap
+      (recordTime, viewHashMap)
+    }
+    (pairs.map(_._1), pairs.toMap)
   }
 
   def apply(
@@ -201,19 +284,13 @@ class DbScanVerdictStore(
       """.asUpdate
   }
 
-  /** Insert multiple verdicts and their transaction views in a single transaction.
-    *
-    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
-    * update_id already exists. If it does, we assume this batch has been
-    * inserted already and skip all inserts.
+  /** Returns a DBIO action for inserting verdicts (for use in combined transactions).
+    * Unlike insertVerdictAndTransactionViews, this doesn't wrap in a transaction or Future.
     */
-  def insertVerdictAndTransactionViews(
+  def insertVerdictAndTransactionViewsDBIO(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
-  )(implicit tc: TraceContext): Future[Unit] = {
-    import slick.dbio.DBIO
-    import profile.api.jdbcActionExtensionMethods
-
-    if (items.isEmpty) Future.unit
+  )(implicit tc: TraceContext): DBIO[Unit] = {
+    if (items.isEmpty) DBIO.successful(())
     else {
       val checkExist = (sql"""
                select update_id
@@ -222,7 +299,7 @@ class DbScanVerdictStore(
                  and """ ++ inClause("update_id", items.map(t => lengthLimited(t._1.updateId))))
         .as[String]
 
-      val action: DBIO[Unit] = for {
+      for {
         alreadyExisting <- checkExist.map(_.toSet)
         nonExisting = items.filter(item => !alreadyExisting.contains(item._1.updateId))
         _ = logger.info(
@@ -248,17 +325,54 @@ class DbScanVerdictStore(
             DBIO.successful(())
           }
       } yield ()
+    }
+  }
 
+  /** Insert multiple verdicts and their transaction views in a single transaction.
+    *
+    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
+    * update_id already exists. If it does, we assume this batch has been
+    * inserted already and skip all inserts.
+    */
+  def insertVerdictAndTransactionViews(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    if (items.isEmpty) Future.unit
+    else {
       futureUnlessShutdownToFuture(
         storage
           .queryAndUpdate(
-            action.transactionally,
+            insertVerdictAndTransactionViewsDBIO(items).transactionally,
             "scanVerdict.insertVerdictAndTransactionViews.batch",
           )
       ).map { _ =>
         val maxRt = items.map(_._1.recordTime).maxOption
         maxRt.foreach(advanceLastIngestedRecordTime)
       }
+    }
+  }
+
+  /** Insert verdicts and run an additional DBIO action in a single transaction.
+    */
+  def insertVerdictAndTransactionViewsWith(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
+      additionalAction: DBIO[Unit] = DBIO.successful(()),
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    val combinedAction =
+      (insertVerdictAndTransactionViewsDBIO(items) andThen additionalAction).transactionally
+
+    futureUnlessShutdownToFuture(
+      storage.queryAndUpdate(
+        combinedAction,
+        "scanVerdict.insertVerdictAndTransactionViewsWith",
+      )
+    ).map { _ =>
+      val maxRt = items.map(_._1.recordTime).maxOption
+      maxRt.foreach(advanceLastIngestedRecordTime)
     }
   }
 

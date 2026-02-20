@@ -13,14 +13,17 @@ import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbScanVerdictStore,
+  DbSequencerTrafficSummaryStore,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
@@ -31,9 +34,12 @@ import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
 
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import com.digitalasset.canton.mediator.admin.v30
+import slick.dbio.DBIO
 
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
@@ -43,6 +49,9 @@ class ScanVerdictStoreIngestion(
     migrationId: Long,
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
+    sequencerTrafficClientO: Option[SequencerTrafficClient],
+    trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
+    appActivityComputation: AppActivityComputation,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -128,27 +137,85 @@ class ScanVerdictStoreIngestion(
   ): Future[TaskOutcome] = {
     if (batch.isEmpty) Future.successful(TaskSuccess("empty batch"))
     else {
-      val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
-        batch.map(toDbRowAndViews)
-      store
-        .insertVerdictAndTransactionViews(items)
-        .transform {
-          case Success(_) =>
-            val lastRecordTime = batch.lastOption
-              .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
-              .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
-            ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
-            Success(
-              TaskSuccess(
-                s"Inserted ${batch.size} verdicts. Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. Inserted verdicts: ${batch
-                    .map(_.updateId)}"
-              )
-            )
-          case Failure(ex) =>
-            ingestionMetrics.errors.mark()
-            Failure(ex)
+      val items = batch.map(v => DbScanVerdictStore.fromProto(v, migrationId, synchronizerId))
+
+      // Extract sequencing times and build view_hash -> view_id correlation map
+      val (sequencingTimes, viewHashToViewIdByTime) =
+        DbScanVerdictStore.buildViewHashCorrelation(batch)
+
+      // 1. Fetch traffic summaries FIRST (before any DB operations)
+      val trafficSummariesF: Future[Seq[DbSequencerTrafficSummaryStore.TrafficSummaryT]] =
+        (sequencerTrafficClientO, trafficSummaryStoreO) match {
+          case (Some(sequencerTrafficClient), Some(_)) =>
+            sequencerTrafficClient
+              .getTrafficSummaries(sequencingTimes)
+              .map(_.map { proto =>
+                DbSequencerTrafficSummaryStore
+                  .fromProtoWithCorrelation(proto, migrationId, viewHashToViewIdByTime, logger)
+              })
+          case _ =>
+            Future.successful(Seq.empty)
         }
+
+      // 2. Insert verdicts, traffic summaries, and app activity records in a single transaction
+      val result = for {
+        trafficSummaries <- trafficSummariesF
+
+        // Pair traffic summaries with verdicts by sequencing time
+        summaryByTime = trafficSummaries.map(s => s.sequencingTime -> s).toMap
+        summariesWithVerdicts = batch.flatMap { verdict =>
+          CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.flatMap { recordTime =>
+            summaryByTime.get(recordTime).map(_ -> verdict)
+          }
+        }
+
+        // Compute app activity records (pure computation, before transaction)
+        appActivityRecords = appActivityComputation.computeActivities(
+          summariesWithVerdicts,
+          Set.empty[PartyId], // featuredAppProviders
+        )
+
+        // Build combined DBIO action for traffic summaries and app activity
+        trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
+          // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
+          case Some(trafficStore) if trafficSummaries.nonEmpty =>
+            trafficStore.insertTrafficSummariesDBIO(trafficSummaries)
+          case _ =>
+            DBIO.successful(())
+        }
+        appActivityAction: DBIO[Unit] = appActivityComputation.insertActivitiesDBIO(
+          appActivityRecords
+        )
+
+        combinedAction = for {
+          _ <- trafficAction
+          _ <- appActivityAction
+        } yield ()
+
+        _ <- store.insertVerdictAndTransactionViewsWith(items, combinedAction)
+      } yield (trafficSummaries.size, appActivityRecords.size)
+
+      result.transform {
+        case Success((trafficSummaryCount, appActivityCount)) =>
+          val lastRecordTime = batch.lastOption
+            .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
+            .getOrElse(CantonTimestamp.MinValue)
+          ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
+          ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
+          Success(
+            TaskSuccess(
+              s"Inserted ${batch.size} verdicts, $trafficSummaryCount traffic summaries, $appActivityCount app activity records. " +
+                s"Last ingested verdict record_time is now ${store.lastIngestedRecordTime}. " +
+                s"Inserted verdicts: ${batch.map(_.updateId)}"
+            )
+          )
+        case Failure(ex) =>
+          ingestionMetrics.errors.mark()
+          Failure(ex)
+        // TODO(#2856): just failing here may result in skipping ingestion.
+        // This must be fixed as otherwise we loose determinism!
+        // Fix this to ensure ingestion always works reliably.
+      }
     }
   }
 
@@ -156,57 +223,20 @@ class ScanVerdictStoreIngestion(
       tc: TraceContext
   ): Future[Boolean] = Future.successful(false)
 
-  private def toDbRowAndViews(
-      verdict: v30.Verdict
-  ): (store.VerdictT, Long => Seq[store.TransactionViewT]) = {
-    val transactionRootViews = verdict.getTransactionViews.rootViews
-    val resultShort: Short = DbScanVerdictStore.VerdictResultDbValue.fromProto(verdict.verdict)
-    val row = new store.VerdictT(
-      rowId = 0,
-      migrationId = migrationId,
-      domainId = synchronizerId,
-      recordTime = CantonTimestamp
-        .fromProtoTimestamp(verdict.getRecordTime)
-        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
-      finalizationTime = CantonTimestamp
-        .fromProtoTimestamp(verdict.getFinalizationTime)
-        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
-      submittingParticipantUid = verdict.submittingParticipantUid,
-      verdictResult = resultShort,
-      mediatorGroup = verdict.mediatorGroup,
-      updateId = verdict.updateId,
-      submittingParties = verdict.submittingParties,
-      transactionRootViews = transactionRootViews,
-    )
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    val baseCloseables = super.closeAsync() :+
+      SyncCloseable("MediatorVerdictsClient", LifeCycle.close(mediatorClient)(logger))
 
-    val mkViews: Long => Seq[store.TransactionViewT] = { rowId =>
-      verdict.getTransactionViews.views.map { case (viewId, txView) =>
-        val confirmingPartiesJson: Json = Json.fromValues(
-          txView.confirmingParties.map { q =>
-            Json.obj(
-              "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
-              "threshold" -> Json.fromInt(q.threshold),
-            )
-          }
+    sequencerTrafficClientO match {
+      case Some(sequencerTrafficClient) =>
+        baseCloseables :+ SyncCloseable(
+          "SequencerTrafficClient",
+          LifeCycle.close(sequencerTrafficClient)(logger),
         )
-        new store.TransactionViewT(
-          verdictRowId = rowId,
-          viewId = viewId,
-          informees = txView.informees,
-          confirmingParties = confirmingPartiesJson,
-          subViews = txView.subViews,
-          viewHash = Some(txView.viewHash).filter(_.nonEmpty),
-        )
-      }.toSeq
+      case None =>
+        baseCloseables
     }
-    (row, mkViews)
   }
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    super.closeAsync() :+ SyncCloseable(
-      "MediatorVerdictsClient",
-      LifeCycle.close(mediatorClient)(logger),
-    )
 }
 
 object ScanVerdictStoreIngestion {
