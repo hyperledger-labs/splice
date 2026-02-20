@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -16,7 +17,7 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
   ScanKeyValueProvider,
@@ -59,6 +60,9 @@ class AcsSnapshotBulkStorageTest
     bulkZstdFrameSize = 10000L,
     bulkMaxFileSize = 50000L,
   )
+  val appConfig = BulkStorageConfig(
+    snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
+  )
 
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
@@ -71,6 +75,7 @@ class AcsSnapshotBulkStorageTest
             .asSource(
               TimestampWithMigrationId(ts, 0),
               bulkStorageTestConfig,
+              appConfig,
               store,
               bucketConnection,
               new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
@@ -146,6 +151,7 @@ class AcsSnapshotBulkStorageTest
           kvProvider <- mkProvider
           (killSwitch, probe) = new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
+            appConfig,
             store.store,
             s3BucketConnection,
             kvProvider,

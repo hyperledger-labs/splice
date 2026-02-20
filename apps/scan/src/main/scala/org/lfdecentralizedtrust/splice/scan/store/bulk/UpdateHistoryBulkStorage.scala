@@ -10,7 +10,7 @@ import org.apache.pekko.pattern.after
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
@@ -23,7 +23,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
 class UpdateHistoryBulkStorage(
-    val config: ScanStorageConfig,
+    val storageConfig: ScanStorageConfig,
+    val appConfig: BulkStorageConfig,
     val updateHistory: UpdateHistory,
     val kvProvider: ScanKeyValueProvider,
     val currentMigrationId: Long,
@@ -46,7 +47,7 @@ class UpdateHistoryBulkStorage(
   }
 
   private def getSegmentEndAfter(ts: TimestampWithMigrationId): Future[TimestampWithMigrationId] = {
-    val endTs = config.computeBulkSnapshotTimeAfter(ts.timestamp)
+    val endTs = storageConfig.computeBulkSnapshotTimeAfter(ts.timestamp)
     for {
       endMigration <-
         if (ts.migrationId < currentMigrationId) {
@@ -123,7 +124,8 @@ class UpdateHistoryBulkStorage(
       .collect { case Some(segment) => segment }
       .via(
         UpdateHistorySegmentBulkStorage.asFlow(
-          config,
+          storageConfig,
+          appConfig,
           updateHistory,
           s3Connection,
           historyMetrics,
