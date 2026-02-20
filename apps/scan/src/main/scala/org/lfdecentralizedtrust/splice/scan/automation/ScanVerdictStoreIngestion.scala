@@ -160,6 +160,7 @@ class ScanVerdictStoreIngestion(
       val result = for {
         trafficSummaries <- trafficSummariesF
         trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
+          // TODO(#4060): log an error and fail ingestion if trafficSummaries is empty
           case Some(trafficStore) if trafficSummaries.nonEmpty =>
             trafficStore.insertTrafficSummariesDBIO(trafficSummaries)
           case _ =>
