@@ -276,6 +276,8 @@ data DsoRules_ProcessRewardsV2_ProcessBatchResult = DsoRules_ProcessRewardsV2_Pr
 data DsoRules_UnhideRewardCouponsV2Result = DsoRules_UnhideRewardCouponsV2Result with
     result : AmuletRules_UnhideRewardCouponsV2Result
 
+data DsoRules_ArchiveDryRunRewardAccountingV2Result = DsoRules_ArchiveDryRunRewardAccountingV2Result {}
+
 data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
     unclaimedReward: ContractId UnclaimedReward
 
@@ -1409,6 +1411,23 @@ template DsoRules with
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_UnhideRewardCouponsV2Result with
           result
+
+    -- Choice to cleanup the state of stuck dry-runs in case getting them unstuck is too expensive.
+    nonconsuming choice DsoRules_ArchiveDryRunRewardAccountingV2 : DsoRules_ArchiveDryRunRewardAccountingV2Result
+      with
+        calculateRewardsCids : [ContractId RewardAccountingV2.CalculateRewardsV2]
+        processRewardsCids : [ContractId RewardAccountingV2.ProcessRewardsV2]
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        forA_ calculateRewardsCids $ \calculateRewardsCid -> do
+          state <- fetchAndArchive (ForDso with dso) calculateRewardsCid
+          require "CalculateRewardsV2 is in dry-run state" (state.dryRun)
+        forA_ processRewardsCids $ \processRewardsCid -> do
+          state <- fetchAndArchive (ForDso with dso) processRewardsCid
+          require "ProcessRewardsV2 is in dry-run state" (state.dryRun)
+        return DsoRules_ArchiveDryRunRewardAccountingV2Result {}
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice DsoRules_MergeUnclaimedRewards : DsoRules_MergeUnclaimedRewardsResult
