@@ -78,7 +78,7 @@ final class LocalSynchronizerNode(
     with FlagCloseable
     with NamedLogging {
 
-  val sequencerConnection: GrpcSequencerConnection =
+  val internalSequencerConnection: GrpcSequencerConnection =
     LocalSynchronizerNode.toSequencerConnection(sequencerInternalConfig)
 
   private def containsIdentityTransactions(
@@ -285,7 +285,7 @@ final class LocalSynchronizerNode(
           case NodeStatus.NotInitialized(_, _) =>
             mediatorAdminConnection.initialize(
               synchronizerId,
-              sequencerConnection,
+              internalSequencerConnection,
               mediatorSequencerAmplification.toInternal,
             )
           case NodeStatus.Success(_) =>
