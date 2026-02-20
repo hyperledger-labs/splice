@@ -221,6 +221,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             const appRewardsUsed = new BigNumber(item.app_rewards_used);
             const validatorRewardsUsed = new BigNumber(item.validator_rewards_used);
             const svRewardsUsed = new BigNumber(item.sv_rewards_used);
+            const developmentFundCouponsUsed = new BigNumber(item.development_fund_coupons_used);
             const transferInstructionAmount = item.transfer_instruction_amount
               ? new BigNumber(item.transfer_instruction_amount)
               : undefined;
@@ -240,6 +241,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               transferInstructionCid: item.transfer_instruction_cid,
               transferInstructionAmount: transferInstructionAmount,
               transferInstructionReceiver: item.transfer_instruction_receiver,
+              developmentFundCouponsUsed,
             };
             return [transfer];
           } else if (item.transaction_type === 'notification') {
