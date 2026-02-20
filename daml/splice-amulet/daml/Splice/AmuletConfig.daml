@@ -47,6 +47,22 @@ data TransferConfigV2 unit = TransferConfigV2 with
     maxNumLockHolders : Int
   deriving (Eq, Show)
 
+-- | Version of the scheme that is used to calculate rewards.
+-- FIXME: consider using an integer for a more seamless transition to future versions.
+data RewardCalculationVersion
+  = RCV_V1 -- ^ Purely on-ledger reward accounting as described in the whitepaper plus the CIPs before CIP-104.
+  | RCV_V2 -- ^ Use off-ledger accounting based on traffic for app rewards as described in CIP-104.
+  deriving (Eq, Show)
+
+useTrafficBasedAppRewards : Optional RewardCalculationVersion -> Bool
+useTrafficBasedAppRewards rav = case rav of
+  None -> False
+  Some RCV_V1 -> False
+  Some RCV_V2 -> True
+
+useFeaturedAppMarkers : Optional RewardCalculationVersion -> Bool
+useFeaturedAppMarkers = not . useTrafficBasedAppRewards
+
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --
 -- See Splice.Scripts.Parameters for concrete values.
@@ -64,6 +80,15 @@ data AmuletConfig unit = AmuletConfig with
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
     externalPartyConfigStateTickDuration : Optional RelTime -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts.
+    rewardCalculationVersion : Optional RewardCalculationVersion
+      -- ^ Which version of reward accounting to use. See docs for `RewardCalculationVersion` for details.
+    dryRunRewardCalculationVersion : Optional RewardCalculationVersion
+      -- ^ Which version of reward accounting to dry-run. Used to test-drive the off-ledger reward accounting
+      -- changes before fully switching over.
+    rewardAccountingV2BatchSize : Optional Int
+      -- ^ The batch size to use for the off-ledger reward accounting. Default 100.
+
+    -- FIXME: move the reward configuration into its own record.
   deriving (Eq, Show)
 
 getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
@@ -135,6 +160,9 @@ data PackageConfig = PackageConfig
 validPackageConfig : PackageConfig -> Bool
 validPackageConfig _ = True
 
+instance Patchable RewardCalculationVersion where
+  patch = patchScalar
+
 instance Patchable (AmuletConfig USD) where
   patch new base current = AmuletConfig with
     transferConfig = patch new.transferConfig base.transferConfig current.transferConfig
@@ -146,6 +174,9 @@ instance Patchable (AmuletConfig USD) where
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
     optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
     externalPartyConfigStateTickDuration = patch new.externalPartyConfigStateTickDuration base.externalPartyConfigStateTickDuration current.externalPartyConfigStateTickDuration
+    rewardCalculationVersion = patch new.rewardCalculationVersion base.rewardCalculationVersion current.rewardCalculationVersion
+    dryRunRewardCalculationVersion = patch new.dryRunRewardCalculationVersion base.dryRunRewardCalculationVersion current.dryRunRewardCalculationVersion
+    rewardAccountingV2BatchSize = patch new.rewardAccountingV2BatchSize base.rewardAccountingV2BatchSize current.rewardAccountingV2BatchSize
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

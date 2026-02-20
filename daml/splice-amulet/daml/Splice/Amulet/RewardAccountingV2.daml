@@ -1,0 +1,168 @@
+-- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Templates and support code for reward accounting based on off-ledger calculations, as initially
+-- described in CIP-104 for traffic-based app rewards.
+--
+-- It is a Version 2 compared to the previous reward accounting mechanism that is based on tracking
+-- all state on-ledger using App|Validator|SvRewardCoupon and IssuingMiningRound contracts.
+--
+-- The design is flexible to allow for extending it to other kinds of rewards
+-- that are based on off-ledger calculations, but the initial implementation is
+-- specialized to traffic-based app rewards.
+module Splice.Amulet.RewardAccountingV2 where
+
+import DA.Action (unless)
+import DA.Foldable (forA_)
+import DA.Set as Set
+import DA.Time
+
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.Amulet
+import Splice.Types
+import Splice.Util
+
+{- TODO
+
+overall:
+- separate the minting API and its implementation into its own PR
+
+
+api:
+- introduce api package: splice-api-reward-minting-v1
+  - take a note wrt integration with HoldingV2 interface introduced by token standard v2
+
+tests:
+- minting delegation of RewardCouponV2
+
+docs:
+- call out reward minting API
+
+release notes:
+- call out cycling of featured app rights; and markers created during switch-over time
+
+Notes for apps:
+
+- wallet:
+  - collect RewardCouponV2
+
+
+
+Notes on design:
+- roll-out
+  - enable dry-run of RAV_V2
+    ==> app reward calculation will be simulated, but no app reward coupons will be issued
+  - enable RAV_V2 for real
+    ==> all open rounds at this point will use RAV_V2
+    ==> activity markers will be dropped by trigger
+    ==> markers will stop being created by splice code with a delay of up to 48h
+        (some app providers might still create markers directly)
+
+  - create new splice version that deprecates marker creation via a failing choice
+    - roll it out once nobody creates markers anymore (verify this using Scan)
+
+
+
+-}
+
+
+
+
+-- | Reminder for DSO to calculate and confirm the app reward amounts for the given round.
+template CalculateRewardsV2 with
+    dso : Party
+    round : Round
+    rewardsTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
+    dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
+  where
+    signatory dso
+
+-- | A minting allowance for a beneficiary to mint Amulet.
+data MintingAllowance = MintingAllowance with
+    beneficiary : Party
+    amount : Decimal
+  deriving (Eq, Show)
+
+type MintingAllowances = [MintingAllowance]
+
+data Batch
+  = BatchOfBatches [CryptoHash.Hash]
+  | BatchOfMintingAllowances MintingAllowances
+  deriving (Eq, Show)
+
+data ProcessRewardsV2_ProcessBatchResult = ProcessRewardsV2_ProcessBatchResult {}
+  deriving (Eq, Show)
+
+template ProcessRewardsV2 with
+    dso : Party
+    round : Round
+    dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
+    rewardsTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
+    batchHash : CryptoHash.Hash
+  where
+    signatory dso
+
+    choice ProcessRewardsV2_ProcessBatch : ProcessRewardsV2_ProcessBatchResult
+      with
+        batch : Batch
+        beneficiariesWithWrongVettingState : Set Party
+          -- ^ Beneficiaries that do not have the correct vetting state for receiving rewards.
+      observer batchBeneficiaries beneficiariesWithWrongVettingState batch
+      controller dso
+      do
+        let actualHash = CryptoHash.hash batch
+        require "batch hash matches" (actualHash == batchHash)
+        case batch of
+          BatchOfBatches batchHashes -> do
+            forA_ batchHashes $ \newBatchHash ->
+              create ProcessRewardsV2 with
+                dso
+                round
+                rewardsTimeToLive
+                dryRun
+                batchHash = newBatchHash
+          BatchOfMintingAllowances mintingAllowances -> do
+            unless dryRun $ do
+              now <- getTime
+              forA_ mintingAllowances $ \MintingAllowance{..} ->
+                create RewardCouponV2 with
+                  dso
+                  round
+                  beneficiary
+                  amount
+                  expiresAt = now `addRelTime` rewardsTimeToLive
+                  beneficiaryIsObserver =
+                    not $ Set.member beneficiary beneficiariesWithWrongVettingState
+
+        -- intentationally not returning any information here to save computational overhead
+        return ProcessRewardsV2_ProcessBatchResult {}
+
+batchBeneficiaries : Set Party -> Batch -> [Party]
+batchBeneficiaries ignoredBeneficiaries batch = case batch of
+  BatchOfBatches _ -> []
+  BatchOfMintingAllowances mintingAllowances ->
+    [ beneficiary | MintingAllowance{..} <- mintingAllowances, not (Set.member beneficiary ignoredBeneficiaries) ]
+
+
+-- instances
+
+instance CryptoHash.Hashable MintingAllowance where
+  hash MintingAllowance{..} =
+    CryptoHash.hashRecord
+      [ CryptoHash.hash beneficiary
+      , CryptoHash.hash amount
+      ]
+
+instance CryptoHash.Hashable Batch where
+  hash batch = case batch of
+    BatchOfBatches batchHashes ->
+      CryptoHash.hashVariant "BatchOfBatches" [CryptoHash.hash batchHashes]
+    BatchOfMintingAllowances mintingAllowances ->
+      CryptoHash.hashVariant "BatchOfMintingAllowances" [CryptoHash.hash mintingAllowances]
+
+
+instance HasCheckedFetch CalculateRewardsV2 ForDso where
+  contractGroupId CalculateRewardsV2 with .. = ForDso with ..
+
+instance HasCheckedFetch ProcessRewardsV2 ForDso where
+  contractGroupId ProcessRewardsV2 with .. = ForDso with ..
