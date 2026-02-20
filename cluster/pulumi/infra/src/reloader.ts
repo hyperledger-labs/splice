@@ -26,7 +26,6 @@ export function configureReloader(): k8s.helm.v3.Release {
         },
         reloader: {
           logFormat: 'json',
-          enableHA: true,
           readOnlyRootFileSystem: true,
           enableMetricsByNamespace: true,
           deployment: {
