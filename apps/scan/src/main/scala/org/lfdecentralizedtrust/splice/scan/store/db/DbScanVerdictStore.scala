@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
+  import com.digitalasset.canton.util.HexString
   import com.google.protobuf.ByteString
 
   final case class TransactionViewT(
@@ -67,6 +68,61 @@ object DbScanVerdictStore {
       case Unspecified => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
       case _ => v30.VerdictResult.VERDICT_RESULT_UNSPECIFIED
     }
+  }
+
+  /** Convert a mediator Verdict proto to our storage types.
+    *
+    * @param verdict the verdict from the mediator
+    * @param migrationId the current migration id
+    * @param synchronizerId the synchronizer id
+    * @return a tuple of (VerdictT, function to create TransactionViewT rows given a verdict row id)
+    */
+  def fromProto(
+      verdict: v30.Verdict,
+      migrationId: Long,
+      synchronizerId: SynchronizerId,
+  ): (VerdictT, Long => Seq[TransactionViewT]) = {
+    val transactionRootViews = verdict.getTransactionViews.rootViews
+    val resultShort: Short = VerdictResultDbValue.fromProto(verdict.verdict)
+    val row = VerdictT(
+      rowId = 0,
+      migrationId = migrationId,
+      domainId = synchronizerId,
+      recordTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getRecordTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
+      finalizationTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getFinalizationTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
+      submittingParticipantUid = verdict.submittingParticipantUid,
+      verdictResult = resultShort,
+      mediatorGroup = verdict.mediatorGroup,
+      updateId = verdict.updateId,
+      submittingParties = verdict.submittingParties,
+      transactionRootViews = transactionRootViews,
+    )
+
+    val mkViews: Long => Seq[TransactionViewT] = { rowId =>
+      verdict.getTransactionViews.views.map { case (viewId, txView) =>
+        val confirmingPartiesJson: Json = Json.fromValues(
+          txView.confirmingParties.map { q =>
+            Json.obj(
+              "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
+              "threshold" -> Json.fromInt(q.threshold),
+            )
+          }
+        )
+        TransactionViewT(
+          verdictRowId = rowId,
+          viewId = viewId,
+          informees = txView.informees,
+          confirmingParties = confirmingPartiesJson,
+          subViews = txView.subViews,
+          viewHash = Some(txView.viewHash).filter(!_.isEmpty).map(HexString.toHexString),
+        )
+      }.toSeq
+    }
+    (row, mkViews)
   }
 
   /** Build sequencing times and a map for correlating sequencer traffic data with verdict views.
