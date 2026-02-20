@@ -18,21 +18,11 @@ import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.{
-  AcsSnapshotStore,
-  ScanKeyValueProvider,
-  ScanKeyValueStore,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  HistoryMetrics,
-  Limit,
-  StoreTestBase,
-  TimestampWithMigrationId,
-}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, Limit, StoreTestBase, TimestampWithMigrationId, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -131,6 +121,7 @@ class AcsSnapshotBulkStorageTest
         val ts2 = ts1.add(3.hours)
         val ts3 = ts1.add(24.hours)
         val store = new MockAcsSnapshotStore(ts1)
+        val updateHistory = mockUpdateHistory()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         val metricsFactory = new InMemoryMetricsFactory
         def assertLatestSnapshotInMetrics(ts: CantonTimestamp) = {
@@ -153,6 +144,7 @@ class AcsSnapshotBulkStorageTest
             bulkStorageTestConfig,
             appConfig,
             store.store,
+            updateHistory,
             s3BucketConnection,
             kvProvider,
             new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
@@ -192,6 +184,14 @@ class AcsSnapshotBulkStorageTest
         }
       }
     }
+  }
+
+  private def mockUpdateHistory() = {
+    val store = mock[UpdateHistory]
+    when(
+      store.isHistoryBackfilled(anyLong)(any[TraceContext])
+    ).thenAnswer {(_: Long) => Future.successful(true)}
+    store
   }
 
   class MockAcsSnapshotStore(val initialSnapshotTimestamp: CantonTimestamp) {

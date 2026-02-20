@@ -110,15 +110,27 @@ class UpdateHistoryBulkStorage(
   ) = {
     Source
       .unfoldAsync(Option.empty[UpdatesSegment]) { current =>
-        getNextSegment(current).flatMap {
-          case Some(next) =>
-            logger.info(s"Dumping next updates segment: $next")
-            Future.successful(Some((Some(next), Some(next))))
-          case None =>
-            logger.debug(s"Next segment after $current not known yet, scheduling next attempt...")
-            after(5.seconds, actorSystem.scheduler)(
+        updateHistory.isHistoryBackfilled(currentMigrationId).flatMap {backfilled =>
+          if (backfilled) {
+            getNextSegment(current).flatMap {
+              case Some(next) =>
+                logger.info(s"Dumping next updates segment: $next")
+                Future.successful(Some((Some(next), Some(next))))
+              case None =>
+                logger.debug(s"Next segment after $current not known yet, scheduling next attempt...")
+                after(appConfig.updatesPollingInterval.underlying, actorSystem.scheduler)(
+                  Future.successful(Some((current, None)))
+                )
+            }
+          } else {
+            logger.debug("Waiting for updates backfilling to complete before dumping to bulk storage...")
+            after(
+              appConfig.updatesPollingInterval.underlying,
+              actorSystem.scheduler,
+            ) {
               Future.successful(Some((current, None)))
-            )
+            }
+          }
         }
       }
       .collect { case Some(segment) => segment }

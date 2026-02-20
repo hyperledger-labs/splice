@@ -13,7 +13,7 @@ import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -22,6 +22,7 @@ class AcsSnapshotBulkStorage(
     storageConfig: ScanStorageConfig,
     appConfig: BulkStorageConfig,
     acsSnapshotStore: AcsSnapshotStore,
+    updateHistory: UpdateHistory,
     s3Connection: S3BucketConnection,
     kvProvider: ScanKeyValueProvider,
     historyMetrics: HistoryMetrics,
@@ -37,27 +38,39 @@ class AcsSnapshotBulkStorage(
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
       .unfoldAsync(start) { (last: TimestampWithMigrationId) =>
-        acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
-          case Some(snapshot) =>
-            logger.info(
-              s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
-            )
-            Future.successful(
-              Some(
-                (
-                  TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId),
-                  Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId)),
+        updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId).flatMap { backfilled =>
+          if (backfilled) {
+            acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
+              case Some(snapshot) =>
+                logger.info(
+                  s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
                 )
-              )
-            )
-          case None =>
-            logger.debug("No new snapshot available, sleeping...")
+                Future.successful(
+                  Some(
+                    (
+                      TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId),
+                      Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId)),
+                    )
+                  )
+                )
+              case None =>
+                logger.debug("No new snapshot available, sleeping...")
+                after(
+                  appConfig.snapshotPollingInterval.underlying,
+                  actorSystem.scheduler,
+                ) {
+                  Future.successful(Some((last, None)))
+                }
+            }
+          } else {
+            logger.debug("Waiting for updates backfilling to complete before dumping to bulk storage...")
             after(
               appConfig.snapshotPollingInterval.underlying,
               actorSystem.scheduler,
             ) {
               Future.successful(Some((last, None)))
             }
+          }
         }
       }
       .collect { case Some(ts) => ts }
