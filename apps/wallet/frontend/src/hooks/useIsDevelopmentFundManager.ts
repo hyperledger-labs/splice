@@ -18,5 +18,7 @@ export const useIsDevelopmentFundManager = (): UseIsDevelopmentFundManagerResult
   const isFundManager =
     !!primaryParty && !!optDevelopmentFundManager && primaryParty === optDevelopmentFundManager;
 
+    console.log('optDevelopmentFundManager', optDevelopmentFundManager);
+    console.log('primaryParty', primaryParty);
   return { isFundManager, isLoading };
 };

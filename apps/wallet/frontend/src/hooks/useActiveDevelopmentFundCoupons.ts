@@ -20,6 +20,7 @@ export const useActiveDevelopmentFundCoupons = (fundManager?: string) => {
   });
 
   const allCoupons = couponsQuery.data || [];
+  console.log('allCoupons', allCoupons);
   const filteredCoupons = React.useMemo(() => {
     if (!fundManager) return allCoupons;
     return allCoupons.filter((c: DevelopmentFundCoupon) => c.fundManager === fundManager);

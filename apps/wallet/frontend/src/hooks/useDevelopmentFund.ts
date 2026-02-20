@@ -23,6 +23,11 @@ export const useDevelopmentFund = () => {
     historyData.isLoadingHistory ||
     unclaimedTotalData.isLoading;
 
+  console.log('isLoading', isLoading);
+  console.log('isLoadingFundManager', isLoadingFundManager);
+  console.log('couponsData.isLoading', couponsData.isLoading);
+  console.log('historyData.isLoadingHistory', historyData.isLoadingHistory);
+  console.log('unclaimedTotalData.isLoading', unclaimedTotalData.isLoading);
   const invalidateAll = useCallback(() => {
     return invalidateAllDevelopmentFundQueries(queryClient);
   }, [queryClient]);

@@ -31,7 +31,7 @@ export const useDevelopmentFundCouponHistory = (
   const currentCursor = cursorStack[cursorStack.length - 1];
 
   const historyQuery = useQuery({
-    queryKey: [...DEVELOPMENT_FUND_QUERY_KEYS.couponHistory, currentCursor, PAGE_SIZE],
+    queryKey: [...DEVELOPMENT_FUND_QUERY_KEYS.couponHistory, currentCursor],
     queryFn: () => listCouponHistoryEvents(PAGE_SIZE, currentCursor),
   });
 
