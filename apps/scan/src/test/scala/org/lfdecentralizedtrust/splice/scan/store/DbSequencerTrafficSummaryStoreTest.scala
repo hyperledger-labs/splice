@@ -33,7 +33,6 @@ class DbSequencerTrafficSummaryStoreTest
         ts1 = CantonTimestamp.now()
 
         summary = TrafficSummaryT(
-          rowId = 0L,
           migrationId = migrationId,
           sequencingTime = ts1,
           totalTrafficCost = 100L,
@@ -121,7 +120,6 @@ class DbSequencerTrafficSummaryStoreTest
       envelopes: Seq[EnvelopeT] = Seq(EnvelopeT(10L, Seq("default-hash"))),
   ): TrafficSummaryT =
     TrafficSummaryT(
-      rowId = 0L,
       migrationId = migrationId,
       sequencingTime = sequencingTime,
       totalTrafficCost = totalTrafficCost,
