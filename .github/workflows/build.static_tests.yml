@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: ${{ inputs.commit_sha }}
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Nix
         uses: ./.github/actions/tests/common_test_setup
@@ -33,7 +35,7 @@ jobs:
           target: 'static_tests'
 
       - name: Run consistency check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
           additional_nix_args: "--keep PATH"
           cmd: |
