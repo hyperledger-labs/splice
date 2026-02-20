@@ -921,8 +921,9 @@ object SpliceConfig {
       deriveWriter[MediatorVerdictIngestionConfig]
     implicit val BulkStorageConfigWriter: ConfigWriter[BulkStorageConfig] =
       deriveWriter[BulkStorageConfig]
-    implicit val S3ConfigWriter: ConfigWriter[S3Config] =
-      deriveWriter[S3Config]
+    implicit val S3ConfigWriter: ConfigWriter[S3Config] = {
+      confidentialWriter[S3Config](S3Config.hideConfidential)
+    }
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 

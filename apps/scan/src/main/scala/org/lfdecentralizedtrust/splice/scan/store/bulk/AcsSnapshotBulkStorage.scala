@@ -7,13 +7,17 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{ActorSystem, Cancellable}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryMetrics,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -22,6 +26,7 @@ class AcsSnapshotBulkStorage(
     storageConfig: ScanStorageConfig,
     appConfig: BulkStorageConfig,
     acsSnapshotStore: AcsSnapshotStore,
+    updateHistory: UpdateHistory,
     s3Connection: S3BucketConnection,
     kvProvider: ScanKeyValueProvider,
     historyMetrics: HistoryMetrics,
@@ -68,51 +73,62 @@ class AcsSnapshotBulkStorage(
     *   is successfully dumped, it persists to the DB its timestamp, and emits that timestamp as an output.
     *   It is an infinite source that should never complete.
     */
-  private def mksrc() = {
-    Source
-      .future(getStartTimestamp)
-      .flatMapConcat {
-        case Some(start: TimestampWithMigrationId) =>
-          logger.info(
-            s"Latest dumped snapshot was from migration ${start.migrationId}, timestamp ${start.timestamp}"
-          )
-          getAcsSnapshotTimestampsAfter(start)
-        case None =>
-          logger.info("No dumped snapshots yet, starting from genesis")
-          getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
-      }
-      .filter { case TimestampWithMigrationId(ts, _) =>
-        val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
-        if (ret) {
-          logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
-        } else {
-          logger.info(
-            s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
-          )
+  private def mksrc(): Source[TimestampWithMigrationId, Cancellable] = {
+
+    // Wait for history backfilling to complete before starting bulk storage dumps
+    val backfillingCompleteGate =
+      Source
+        .tick(0.seconds, appConfig.snapshotPollingInterval.underlying, ())
+        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId))
+        .filter(identity)
+        .take(1)
+
+    backfillingCompleteGate.flatMap { _ =>
+      Source
+        .future(getStartTimestamp)
+        .flatMapConcat {
+          case Some(start: TimestampWithMigrationId) =>
+            logger.info(
+              s"Latest dumped snapshot was from migration ${start.migrationId}, timestamp ${start.timestamp}"
+            )
+            getAcsSnapshotTimestampsAfter(start)
+          case None =>
+            logger.info("No dumped snapshots yet, starting from genesis")
+            getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
         }
-        ret
-      }
-      .via(
-        SingleAcsSnapshotBulkStorage.asFlow(
-          storageConfig,
-          appConfig,
-          acsSnapshotStore,
-          s3Connection,
-          historyMetrics,
-          loggerFactory,
+        .filter { case TimestampWithMigrationId(ts, _) =>
+          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+          if (ret) {
+            logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+          } else {
+            logger.info(
+              s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+            )
+          }
+          ret
+        }
+        .via(
+          SingleAcsSnapshotBulkStorage.asFlow(
+            storageConfig,
+            appConfig,
+            acsSnapshotStore,
+            s3Connection,
+            historyMetrics,
+            loggerFactory,
+          )
         )
-      )
-      .mapAsync(1) { (ts: TimestampWithMigrationId) =>
-        historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
-        for {
-          _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
-        } yield {
-          logger.info(
-            s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
-          )
-          ts
+        .mapAsync(1) { (ts: TimestampWithMigrationId) =>
+          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
+          for {
+            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
+          } yield {
+            logger.info(
+              s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+            )
+            ts
+          }
         }
-      }
+    }
   }
 
   /**  wraps mksrc (where the main pipeline logic is implemented) in a retry loop, to retry upon failures.

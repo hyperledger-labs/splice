@@ -37,7 +37,7 @@ final case class BulkStorageConfig(
     updatesPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     // The maximum parallelization for uploading multiple parts of the same object
     maxParallelPartUploads: Int = 4,
-    s3config: Option[S3Config] = None,
+    s3: Option[S3Config] = None,
 )
 
 final case class S3Config(
@@ -47,6 +47,18 @@ final case class S3Config(
     accessKeyId: String,
     secretAccessKey: String,
 )
+object S3Config {
+  def hideConfidential(config: S3Config): S3Config = {
+    val hidden = "****"
+    S3Config(
+      config.endpoint,
+      config.bucketName,
+      config.region,
+      config.accessKeyId,
+      secretAccessKey = hidden,
+    )
+  }
+}
 
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
@@ -76,7 +88,7 @@ case class ScanAppBackendConfig(
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
-    bulkStorageConfig: BulkStorageConfig = BulkStorageConfig(),
+    bulkStorage: BulkStorageConfig = BulkStorageConfig(),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
