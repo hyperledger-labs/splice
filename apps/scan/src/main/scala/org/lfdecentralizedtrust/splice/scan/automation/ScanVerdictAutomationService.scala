@@ -28,6 +28,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.ExecutionContextExecutor
 import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion.prettyVerdictBatch
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 
 class ScanVerdictAutomationService(
