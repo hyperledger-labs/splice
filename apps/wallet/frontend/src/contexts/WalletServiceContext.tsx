@@ -502,6 +502,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           pageSize,
           cursor
         );
+        console.log('responseresponse', response)
         const events: CouponHistoryEvent[] =
           response.development_fund_coupon_history.map(
             (item: ArchivedDevelopmentFundCoupon, index: number) => ({

@@ -5,6 +5,7 @@ import BigNumber from 'bignumber.js';
 
 export * from './auth';
 export * from './amuletRules';
+export * from './extractApiErrorMessage';
 export * from './helpers';
 export * from './voteRequests';
 

@@ -48,6 +48,7 @@ const ActiveCouponsTable: React.FC = () => {
     invalidateAll,
   } = useDevelopmentFund();
 
+  console.log('coupons', coupons);
   const [selectedCoupon, setSelectedCoupon] = useState<string | null>(null);
   const [withdrawalReason, setWithdrawalReason] = useState('');
 
@@ -215,6 +216,7 @@ const CouponHistoryTable: React.FC = () => {
     );
   }
 
+  console.log('historyEvents', historyEvents);
   return (
     <Card variant="outlined">
       <CardContent>
@@ -222,12 +224,12 @@ const CouponHistoryTable: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Timestamp</TableCell>
+                <TableCell>Archived at</TableCell>
                 <TableCell>Event Type</TableCell>
                 <TableCell>Beneficiary</TableCell>
                 <TableCell>Amount</TableCell>
                 <TableCell>Allocation Reason</TableCell>
-                <TableCell>Withdrawal Reason</TableCell>
+                <TableCell>Archival Reason</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useState, useMemo } from 'react';
 import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query';
+import { extractApiErrorMessage } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useIsDevelopmentFundManager } from './useIsDevelopmentFundManager';
 import { useUnclaimedDevelopmentFundTotal } from './useUnclaimedDevelopmentFundTotal';
@@ -11,8 +12,7 @@ import dayjs, { Dayjs } from 'dayjs';
 
 export interface UseDevelopmentFundAllocationFormResult {
   formKey: number;
-  error: unknown;
-  setError: (error: unknown) => void;
+  error: string | null;
   beneficiary: string;
   setBeneficiary: (value: string) => void;
   amount: string;
@@ -47,7 +47,7 @@ export const useDevelopmentFundAllocationForm = (): UseDevelopmentFundAllocation
   const queryClient = useQueryClient();
 
   const [formKey, setFormKey] = useState(0);
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<string | null>(null);
   const [beneficiary, setBeneficiary] = useState('');
   const [amount, setAmount] = useState('');
   const [expiresAt, setExpiresAt] = useState<Dayjs | null>(null);
@@ -90,14 +90,13 @@ export const useDevelopmentFundAllocationForm = (): UseDevelopmentFundAllocation
     },
     onError: err => {
       console.error('Failed to allocate development fund coupon', err);
-      setError(err);
+      setError(extractApiErrorMessage(err));
     },
   });
 
   return {
     formKey,
     error,
-    setError,
     beneficiary,
     setBeneficiary,
     amount,
