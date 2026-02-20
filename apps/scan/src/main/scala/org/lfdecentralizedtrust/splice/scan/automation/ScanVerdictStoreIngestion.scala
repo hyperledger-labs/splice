@@ -24,12 +24,11 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
-import com.digitalasset.canton.util.{ErrorUtil, HexString, PekkoUtil}
+import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
 import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -135,8 +134,7 @@ class ScanVerdictStoreIngestion(
   ): Future[TaskOutcome] = {
     if (batch.isEmpty) Future.successful(TaskSuccess("empty batch"))
     else {
-      val items: Seq[(store.VerdictT, Long => Seq[store.TransactionViewT])] =
-        batch.map(toDbRowAndViews)
+      val items = batch.map(v => DbScanVerdictStore.fromProto(v, migrationId, synchronizerId))
 
       // Extract sequencing times and build view_hash -> view_id correlation map
       val (sequencingTimes, viewHashToViewIdByTime) =
@@ -203,52 +201,6 @@ class ScanVerdictStoreIngestion(
   override protected def isStaleTask(batch: Seq[v30.Verdict])(implicit
       tc: TraceContext
   ): Future[Boolean] = Future.successful(false)
-
-  private def toDbRowAndViews(
-      verdict: v30.Verdict
-  ): (store.VerdictT, Long => Seq[store.TransactionViewT]) = {
-    val transactionRootViews = verdict.getTransactionViews.rootViews
-    val resultShort: Short = DbScanVerdictStore.VerdictResultDbValue.fromProto(verdict.verdict)
-    val row = new store.VerdictT(
-      rowId = 0,
-      migrationId = migrationId,
-      domainId = synchronizerId,
-      recordTime = CantonTimestamp
-        .fromProtoTimestamp(verdict.getRecordTime)
-        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
-      finalizationTime = CantonTimestamp
-        .fromProtoTimestamp(verdict.getFinalizationTime)
-        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
-      submittingParticipantUid = verdict.submittingParticipantUid,
-      verdictResult = resultShort,
-      mediatorGroup = verdict.mediatorGroup,
-      updateId = verdict.updateId,
-      submittingParties = verdict.submittingParties,
-      transactionRootViews = transactionRootViews,
-    )
-
-    val mkViews: Long => Seq[store.TransactionViewT] = { rowId =>
-      verdict.getTransactionViews.views.map { case (viewId, txView) =>
-        val confirmingPartiesJson: Json = Json.fromValues(
-          txView.confirmingParties.map { q =>
-            Json.obj(
-              "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
-              "threshold" -> Json.fromInt(q.threshold),
-            )
-          }
-        )
-        new store.TransactionViewT(
-          verdictRowId = rowId,
-          viewId = viewId,
-          informees = txView.informees,
-          confirmingParties = confirmingPartiesJson,
-          subViews = txView.subViews,
-          viewHash = Some(txView.viewHash).filter(!_.isEmpty).map(HexString.toHexString),
-        )
-      }.toSeq
-    }
-    (row, mkViews)
-  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     val baseCloseables = super.closeAsync() :+
