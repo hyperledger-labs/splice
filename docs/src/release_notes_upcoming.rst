@@ -8,3 +8,11 @@
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
 .. release-notes:: Upcoming
+
+    - Scan
+
+      - Added a new endpoint ``GET /v0/development-fund-coupons`` to list all active development fund coupons.
+
+    - Validator
+
+      - Expose ``/v0/development-fund-coupons`` endpoint from scan proxy.
