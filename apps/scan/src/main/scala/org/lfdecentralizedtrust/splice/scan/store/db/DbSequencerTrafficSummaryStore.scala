@@ -192,28 +192,9 @@ class DbSequencerTrafficSummaryStore(
   )(implicit tc: TraceContext): DBIO[Unit] = {
     if (items.isEmpty) DBIO.successful(())
     else {
-      val checkExist = (sql"""
-        select sequencing_time
-        from #${Tables.trafficSummaries}
-        where history_id = $historyId
-          and """ ++ inClause("sequencing_time", items.map(_.sequencingTime.toMicros)))
-        .as[Long]
-
-      for {
-        alreadyExisting <- checkExist.map(_.toSet)
-        nonExisting = items.filter(item => !alreadyExisting.contains(item.sequencingTime.toMicros))
-        _ = logger.info(
-          s"Already ingested traffic summaries: ${alreadyExisting.size}. Non-existing: ${nonExisting.size}."
-        )
-        _ <-
-          if (nonExisting.nonEmpty) {
-            batchInsertTrafficSummaries(nonExisting).map { _ =>
-              logger.info(s"Inserted ${nonExisting.size} traffic summaries.")
-            }
-          } else {
-            DBIO.successful(())
-          }
-      } yield ()
+      batchInsertTrafficSummaries(items).map { _ =>
+        logger.info(s"Inserted ${items.size} traffic summaries.")
+      }
     }
   }
 
