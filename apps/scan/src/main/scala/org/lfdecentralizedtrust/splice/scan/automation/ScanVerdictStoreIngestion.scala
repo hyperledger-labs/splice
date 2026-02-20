@@ -147,14 +147,8 @@ class ScanVerdictStoreIngestion(
             sequencerTrafficClient
               .getTrafficSummaries(sequencingTimes)
               .map(_.map { proto =>
-                val sequencingTime = CantonTimestamp
-                  .fromProtoTimestamp(proto.getSequencingTime)
-                  .getOrElse(
-                    throw new IllegalArgumentException("Invalid sequencing_time in traffic summary")
-                  )
-                val viewHashToViewId = viewHashToViewIdByTime.getOrElse(sequencingTime, Map.empty)
                 DbSequencerTrafficSummaryStore
-                  .fromProto(proto, migrationId, sequencingTime, viewHashToViewId, logger)
+                  .fromProtoWithCorrelation(proto, migrationId, viewHashToViewIdByTime, logger)
               })
           case _ =>
             Future.successful(Seq.empty)
