@@ -66,6 +66,30 @@ object DbSequencerTrafficSummaryStore {
       envelopes: Seq[EnvelopeT],
   )
 
+  /** Convert a sequencer TrafficSummary proto to our storage type, with correlation map lookup.
+    *
+    * This is a convenience method that parses the sequencing time from the proto and looks up
+    * the view hash correlation map automatically.
+    *
+    * @param proto the traffic summary from the sequencer
+    * @param migrationId the current migration id
+    * @param viewHashToViewIdByTime map from sequencing_time to (view_hash -> view_id) for correlating
+    *                               envelope view_hashes with verdict view_ids
+    * @param logger for logging warnings about unmatched view hashes
+    */
+  def fromProtoWithCorrelation(
+      proto: seqv30.TrafficSummary,
+      migrationId: Long,
+      viewHashToViewIdByTime: Map[CantonTimestamp, Map[ByteString, Int]],
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): TrafficSummaryT = {
+    val sequencingTime = CantonTimestamp
+      .fromProtoTimestamp(proto.getSequencingTime)
+      .getOrElse(throw new IllegalArgumentException("Invalid sequencing_time in traffic summary"))
+    val viewHashToViewId = viewHashToViewIdByTime.getOrElse(sequencingTime, Map.empty)
+    fromProto(proto, migrationId, sequencingTime, viewHashToViewId, logger)
+  }
+
   /** Convert a sequencer TrafficSummary proto to our storage type.
     *
     * @param proto the traffic summary from the sequencer
