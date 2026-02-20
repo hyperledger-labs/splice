@@ -54,6 +54,7 @@ import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
+  DbMultiDomainAcsStore,
   DbTxLogAppStore,
   TxLogQueries,
 }
@@ -151,6 +152,12 @@ class DbScanStore(
       ),
       domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          ScanTables.archivedAcsTableName,
+          ScanTables.ScanAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with ScanStore
     with AcsTables

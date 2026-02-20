@@ -51,4 +51,5 @@ object ValidatorTables extends AcsTables {
   }
 
   val acsTableName = "validator_acs_store"
+  val archivedAcsTableName = "validator_acs_store_archived"
 }

@@ -167,4 +167,5 @@ object DsoTables extends AcsTables with NamedLogging {
   }
 
   val acsTableName = "dso_acs_store"
+  val archivedAcsTableName = "dso_acs_store_archived"
 }
