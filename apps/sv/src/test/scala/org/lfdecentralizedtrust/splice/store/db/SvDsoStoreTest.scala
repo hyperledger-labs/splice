@@ -51,7 +51,13 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTestBase}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  Limit,
+  MiningRoundsStore,
+  PageLimit,
+  StoreTestBase,
+}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{IdleAnsSubscription, RoundBatch}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore}
@@ -487,7 +493,11 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           _ <- MonadUtil.sequentialTraverse(inRoundOtherDomain)(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listAppRewardCouponsOnDomain(round = 3, dummyDomain, Limit.DefaultLimit)
+          result <- store.listAppRewardCouponsOnDomain(
+            round = 3,
+            dummyDomain,
+            PageLimit.tryCreate(Limit.DefaultMaxPageSize),
+          )
           sumResult <- store.sumAppRewardCouponsOnDomain(round = 3, dummyDomain)
         } yield {
           result should contain theSameElementsAs inRound
@@ -520,7 +530,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           result <- store.listValidatorRewardCouponsOnDomain(
             round = 3,
             dummyDomain,
-            Limit.DefaultLimit,
+            PageLimit.tryCreate(Limit.DefaultMaxPageSize),
           )
           sumResult <- store.sumValidatorRewardCouponsOnDomain(
             round = 3,
@@ -551,7 +561,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           result <- store.listValidatorFaucetCouponsOnDomain(
             round = 3,
             dummyDomain,
-            Limit.DefaultLimit,
+            PageLimit.tryCreate(Limit.DefaultMaxPageSize),
           )
           countResult <- store.countValidatorFaucetCouponsOnDomain(
             round = 3,
@@ -583,7 +593,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           result <- store.listValidatorLivenessActivityRecordsOnDomain(
             round = 3,
             dummyDomain,
-            Limit.DefaultLimit,
+            PageLimit.tryCreate(Limit.DefaultMaxPageSize),
           )
           countResult <- store.countValidatorLivenessActivityRecordsOnDomain(
             round = 3,
@@ -1240,8 +1250,14 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           _ <- MonadUtil.sequentialTraverse(Seq(sv1RewardState1, sv1RewardState2, sv2RewardState))(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          sv1RewardStates <- store.listSvRewardStates("sv1", Limit.DefaultLimit)
-          sv2RewardStates <- store.listSvRewardStates("sv2", Limit.DefaultLimit)
+          sv1RewardStates <- store.listSvRewardStates(
+            "sv1",
+            PageLimit.tryCreate(Limit.DefaultMaxPageSize),
+          )
+          sv2RewardStates <- store.listSvRewardStates(
+            "sv2",
+            PageLimit.tryCreate(Limit.DefaultMaxPageSize),
+          )
         } yield {
           sv1RewardStates.map(_.contractId).toSet shouldBe Set(
             sv1RewardState1.contractId,
@@ -1583,6 +1599,7 @@ class DbSvDsoStoreTest
       ),
       participantId = mkParticipantId("SvDsoStoreTest"),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

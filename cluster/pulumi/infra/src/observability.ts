@@ -821,7 +821,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$MEDIATOR_PRUNING_RETENTION_IN_HOURS',
                 (monitoringConfig.alerting.alerts.pruning.mediatorRetentionDays * 24).toString()
               ),
-            'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
+            'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml').replaceAll(
+              '$PENDING_PERIOD_IN_MINUTES',
+              monitoringConfig.alerting.alerts.deployment.pendingPeriodMinutes.toString()
+            ),
             'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml')
               .replace(
                 '$LOAD_TESTER_MIN_RATE',

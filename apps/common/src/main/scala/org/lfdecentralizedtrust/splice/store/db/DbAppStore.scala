@@ -52,6 +52,7 @@ abstract class DbTxLogAppStore[TXE](
       retryProvider,
       ingestionConfig,
       handleIngestionSummary,
+      defaultLimit = defaultLimit,
     )
 }
 
@@ -88,6 +89,7 @@ abstract class DbAppStore(
       retryProvider,
       ingestionConfig,
       handleIngestionSummary,
+      defaultLimit,
     )
 
   override lazy val storeName: String = multiDomainAcsStore.storeName

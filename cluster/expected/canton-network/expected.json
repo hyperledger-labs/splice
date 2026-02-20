@@ -2796,6 +2796,10 @@
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           },
           {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
+          },
+          {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
             "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
@@ -2984,6 +2988,10 @@
       "values": {
         "additionalEnvVars": [
           {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+          },
+          {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
             "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
           },
@@ -3087,6 +3095,10 @@
           "networkName": "Splice"
         },
         "svValidator": true,
+        "synchronizer": {
+          "connectionType": "trust-single",
+          "url": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",

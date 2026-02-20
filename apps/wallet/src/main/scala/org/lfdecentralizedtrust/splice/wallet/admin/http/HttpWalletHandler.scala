@@ -258,7 +258,6 @@ class HttpWalletHandler(
       for {
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
           userWallet.store,
-          Limit.DefaultLimit,
           None,
         )
       } yield d0.ListValidatorRewardCouponsResponse(

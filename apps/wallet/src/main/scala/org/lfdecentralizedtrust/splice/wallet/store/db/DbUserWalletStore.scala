@@ -78,6 +78,7 @@ class DbUserWalletStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -146,7 +147,7 @@ class DbUserWalletStore(
 
   def listSortedValidatorFaucets(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
@@ -164,7 +165,7 @@ class DbUserWalletStore(
 
   def listSortedLivenessActivityRecords(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
@@ -182,7 +183,7 @@ class DbUserWalletStore(
 
   override def listSortedSvRewardCoupons(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-      limit: Limit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
@@ -238,7 +239,7 @@ class DbUserWalletStore(
     }
   }
 
-  override def listAnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+  override def listAnsEntries(now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[UserWalletStore.AnsEntryWithPayData]] = for {
     _ <- waitUntilAcsIngested()
@@ -336,7 +337,7 @@ class DbUserWalletStore(
       )
     }
 
-  override def listSubscriptions(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+  override def listSubscriptions(now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[UserWalletStore.Subscription]] = waitUntilAcsIngested {

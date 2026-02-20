@@ -109,6 +109,8 @@ monitoring:
         minRate: 0.95
       mediators:
         acknowledgementLagSeconds: 900
+      deployment:
+        pendingPeriodMinutes: 5
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true

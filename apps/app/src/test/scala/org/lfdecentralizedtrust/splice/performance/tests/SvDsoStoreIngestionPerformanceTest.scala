@@ -13,7 +13,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.sv.store.SvStore
 import org.lfdecentralizedtrust.splice.sv.store.db.{DbSvDsoStore, DsoTables}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -67,6 +67,7 @@ class SvDsoStoreIngestionPerformanceTest(
       ),
       participantId = mkParticipantId("IngestionPerformanceIngestionTest"),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
   }
 

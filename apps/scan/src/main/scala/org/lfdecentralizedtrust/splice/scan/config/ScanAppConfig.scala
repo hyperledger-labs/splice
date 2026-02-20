@@ -30,6 +30,24 @@ final case class MediatorVerdictIngestionConfig(
     restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
 )
 
+final case class BulkStorageConfig(
+    /** When new snapshot is not yet available, how long to wait for a new one. */
+    snapshotPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    // When more updates are not yet available, how long to wait for more.
+    updatesPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    // The maximum parallelization for uploading multiple parts of the same object
+    maxParallelPartUploads: Int = 4,
+    s3config: Option[S3Config] = None,
+)
+
+final case class S3Config(
+    endpoint: String,
+    bucketName: String,
+    region: String,
+    accessKeyId: String,
+    secretAccessKey: String,
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -58,6 +76,7 @@ case class ScanAppBackendConfig(
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
+    bulkStorageConfig: BulkStorageConfig = BulkStorageConfig(),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {

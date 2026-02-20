@@ -262,8 +262,8 @@ class UserWalletManager(
   /** Lists the validator reward coupons collectable by the current user (i.e. where they are the validator). */
   def listValidatorRewardCouponsCollectableBy(
       validatorUserStore: UserWalletStore,
-      limit: Limit,
       activeIssuingRounds: Option[Set[Long]],
+      limit: Limit = params.defaultLimit,
   )(implicit tc: TraceContext): Future[
     Seq[
       Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]

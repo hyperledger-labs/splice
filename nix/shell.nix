@@ -132,6 +132,7 @@ let
     sbt
     scala_2_13
     shellcheck
+    skopeo
   ] ++ linuxOnly;
 
 in pkgs.mkShell {

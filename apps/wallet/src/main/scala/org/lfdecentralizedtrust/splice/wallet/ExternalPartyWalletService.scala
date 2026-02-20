@@ -62,6 +62,7 @@ class ExternalPartyWalletService(
       domainMigrationInfo,
       participantId,
       automationConfig.ingestion,
+      params.defaultLimit,
     )
 
   val updateHistory = new UpdateHistory(

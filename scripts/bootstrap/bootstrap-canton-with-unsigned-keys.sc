@@ -71,7 +71,7 @@ def bootstrapDomainWithUnsignedKeys(
   val synchronizerId = SynchronizerId(
     UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
   )
-  val physicalSynchronizerId = PhysicalSynchronizerId(synchronizerId, ProtocolVersion.v34, NonNegativeInt.zero)
+  val physicalSynchronizerId = PhysicalSynchronizerId(synchronizerId, NonNegativeInt.zero, ProtocolVersion.v34)
 
   val tempStoreForBootstrap = synchronizerOwners
     .map(

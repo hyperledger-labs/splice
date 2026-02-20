@@ -225,6 +225,7 @@ svs:
         maxDuration: "30m"
         retentionPeriod: "7d"
     participant:
+      bftSequencerConnection: false
       kms:
         keyRingId: sv-da-1_participant_mock
         locationId: us-central1

@@ -78,6 +78,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     domainMigrationInfo,
     participantId,
     config.automation.ingestion,
+    config.parameters.defaultLimit,
     acsStoreDescriptorUserVersion,
   )
 
@@ -128,6 +129,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       domainMigrationInfo,
       participantId,
       config.automation.ingestion,
+      config.parameters.defaultLimit,
       acsStoreDescriptorUserVersion,
     )
   }

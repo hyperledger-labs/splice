@@ -35,7 +35,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.Vali
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.mintingdelegation.MintingDelegation
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
@@ -85,7 +84,7 @@ class MintingDelegationCollectRewardsTrigger(
     for {
       delegations <- store.multiDomainAcsStore.listContracts(
         MintingDelegation.COMPANION,
-        Limit.DefaultLimit,
+        store.defaultLimit,
       )
 
       // In the steady state there is at most one active delegation per beneficiary.

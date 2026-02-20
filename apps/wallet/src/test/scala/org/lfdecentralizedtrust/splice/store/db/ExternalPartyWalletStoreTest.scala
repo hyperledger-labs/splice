@@ -10,7 +10,12 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, Synchronize
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{TransferInputStore, TransferInputStoreTest}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  Limit,
+  TransferInputStore,
+  TransferInputStoreTest,
+}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.wallet.store.*
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbExternalPartyWalletStore
@@ -157,6 +162,7 @@ class DbExternalPartyWalletStoreTest
       ),
       participantId = mkParticipantId("ExternalPartyWalletStoreTest"),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

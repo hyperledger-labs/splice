@@ -3,29 +3,29 @@
 
 package org.lfdecentralizedtrust.splice.splitwell.store
 
-import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger
-import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellSynchronizerConfig
-import org.lfdecentralizedtrust.splice.splitwell.store.db.DbSplitwellStore
-import org.lfdecentralizedtrust.splice.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
-import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  Contract,
-  ContractWithState,
-  TemplateJsonDecoder,
-}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger
+import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellSynchronizerConfig
+import org.lfdecentralizedtrust.splice.splitwell.store.db.DbSplitwellStore
+import org.lfdecentralizedtrust.splice.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
+import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
+import org.lfdecentralizedtrust.splice.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -193,6 +193,7 @@ object SplitwellStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -207,6 +208,7 @@ object SplitwellStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      defaultLimit,
     )
 
   case class Key(
