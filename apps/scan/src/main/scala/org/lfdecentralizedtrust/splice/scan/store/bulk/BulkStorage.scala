@@ -1,8 +1,10 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
@@ -16,38 +18,46 @@ class BulkStorage(
     acsSnapshotStore: AcsSnapshotStore,
     updateHistory: UpdateHistory,
     currentMigrationId: Long,
-    s3Connection: S3BucketConnection,
     kvProvider: ScanKeyValueProvider,
-    historyMetrics: HistoryMetrics,
+    metricsFactory: LabeledMetricsFactory,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
-    extends NamedLogging with AutoCloseable {
+    extends NamedLogging
+    with AutoCloseable {
 
-  private val acsSnapshotsKillSwitch = new AcsSnapshotBulkStorage(
-    storageConfig,
-    appConfig,
-    acsSnapshotStore,
-    updateHistory,
-    s3Connection,
-    kvProvider,
-    historyMetrics,
-    loggerFactory,
-  ).getSource().toMat(Sink.ignore)(Keep.left).run()
+  private val killSwitches = appConfig.s3config.fold {
+    logger.debug("s3 connection not configured, not dumping to bulk storage")
+    Seq.empty[UniqueKillSwitch]
+  } { s3Config =>
+    val s3Connection = S3BucketConnection(s3Config, loggerFactory)
+    val historyMetrics = HistoryMetrics(metricsFactory, currentMigrationId)
 
-  private val updatesKillSwitch = new UpdateHistoryBulkStorage(
-    storageConfig,
-    appConfig,
-    updateHistory,
-    kvProvider,
-    currentMigrationId,
-    s3Connection,
-    historyMetrics,
-    loggerFactory,
-  ).getSource().toMat(Sink.ignore)(Keep.left).run()
+    Seq(
+      new AcsSnapshotBulkStorage(
+        storageConfig,
+        appConfig,
+        acsSnapshotStore,
+        updateHistory,
+        s3Connection,
+        kvProvider,
+        historyMetrics,
+        loggerFactory,
+      ).getSource().toMat(Sink.ignore)(Keep.left).run(),
+      new UpdateHistoryBulkStorage(
+        storageConfig,
+        appConfig,
+        updateHistory,
+        kvProvider,
+        currentMigrationId,
+        s3Connection,
+        historyMetrics,
+        loggerFactory,
+      ).getSource().toMat(Sink.ignore)(Keep.left).run(),
+    )
 
+  }
   override def close(): Unit = {
-    acsSnapshotsKillSwitch.shutdown()
-    updatesKillSwitch.shutdown()
+    killSwitches.foreach(_.shutdown())
   }
 
 }

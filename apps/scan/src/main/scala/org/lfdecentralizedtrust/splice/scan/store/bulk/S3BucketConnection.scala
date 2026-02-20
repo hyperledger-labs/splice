@@ -163,7 +163,6 @@ class S3BucketConnection(
 object S3BucketConnection {
   def apply(
       s3Config: S3Config,
-      bucketName: String,
       loggerFactory: NamedLoggerFactory,
   ): S3BucketConnection = {
     new S3BucketConnection(
@@ -181,7 +180,7 @@ object S3BucketConnection {
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),
-      bucketName,
+      s3Config.bucketName,
       loggerFactory,
     )
   }

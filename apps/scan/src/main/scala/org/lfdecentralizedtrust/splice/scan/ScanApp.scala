@@ -10,47 +10,21 @@ import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTrac
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  DarResources,
-  Node,
-  PackageVersionSupport,
-  ParticipantAdminConnection,
-  RetryFor,
-  SequencerAdminConnection,
-  SpliceLedgerClient,
-}
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResources, Node, PackageVersionSupport, ParticipantAdminConnection, RetryFor, SequencerAdminConnection, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.admin.http.{
-  HttpScanHandler,
-  HttpTokenStandardAllocationHandler,
-  HttpTokenStandardAllocationInstructionHandler,
-  HttpTokenStandardMetadataHandler,
-  HttpTokenStandardTransferInstructionHandler,
-}
-import org.lfdecentralizedtrust.splice.scan.automation.{
-  ScanAutomationService,
-  ScanVerdictAutomationService,
-}
+import org.lfdecentralizedtrust.splice.scan.admin.http.{HttpScanHandler, HttpTokenStandardAllocationHandler, HttpTokenStandardAllocationInstructionHandler, HttpTokenStandardMetadataHandler, HttpTokenStandardTransferInstructionHandler}
+import org.lfdecentralizedtrust.splice.scan.automation.{ScanAutomationService, ScanVerdictAutomationService}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
-import org.lfdecentralizedtrust.splice.scan.store.db.{
-  DbScanVerdictStore,
-  ScanAggregatesReader,
-  ScanAggregatesReaderContext,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanKeyValueProvider, ScanKeyValueStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanVerdictStore, ScanAggregatesReader, ScanAggregatesReaderContext}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{
-  ChoiceContextContractFetcher,
-  PageLimit,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{ChoiceContextContractFetcher, PageLimit, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -69,6 +43,8 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 /** Class representing a Scan app instance.
@@ -233,6 +209,18 @@ class ScanApp(
         svName,
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
+      )
+      kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
+      kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
+      bulkStorage = new BulkStorage(
+        scanStorageConfigV1,
+        config.bulkStorageConfig,
+        acsSnapshotStore,
+        updateHistory,
+        currentMigrationId = migrationInfo.currentMigrationId,
+        kvProvider,
+        retryProvider.metricsFactory,
+        loggerFactory
       )
       scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
       scanEventStore = new ScanEventStore(
@@ -416,6 +404,7 @@ class ScanApp(
         storage,
         store,
         automation,
+        bulkStorage,
         verdictAutomation,
         scanEventStore,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
@@ -439,6 +428,7 @@ object ScanApp {
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
+      bulkStorage: BulkStorage,
       verdictAutomation: ScanVerdictAutomationService,
       eventStore: ScanEventStore,
       logger: TracedLogger,
@@ -454,6 +444,7 @@ object ScanApp {
       LifeCycle.close(bftSequencersAdminConnections*)(logger)
       LifeCycle.close(cleanups*)(logger)
       LifeCycle.close(
+        bulkStorage,
         automation,
         verdictAutomation,
         store,
