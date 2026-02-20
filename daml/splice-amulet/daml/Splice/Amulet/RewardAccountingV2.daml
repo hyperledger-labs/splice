@@ -15,6 +15,7 @@ module Splice.Amulet.RewardAccountingV2 where
 import DA.Action (unless)
 import DA.Foldable (forA_)
 import DA.Set as Set
+import DA.Time
 
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Amulet
@@ -72,6 +73,7 @@ template CalculateRewardsV2 with
     dso : Party
     round : Round
     batchSize : Int -- ^ The number of minting allowances to include in each batch.
+    rewardsTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
     dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
   where
     signatory dso
@@ -96,7 +98,7 @@ template ProcessRewardsV2 with
     dso : Party
     round : Round
     dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
-    rewardsExpireAt : Time
+    rewardsTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
     batchHash : CryptoHash.Hash
   where
     signatory dso
@@ -117,18 +119,19 @@ template ProcessRewardsV2 with
               create ProcessRewardsV2 with
                 dso
                 round
-                rewardsExpireAt
+                rewardsTimeToLive
                 dryRun
                 batchHash = newBatchHash
           BatchOfMintingAllowances mintingAllowances -> do
             unless dryRun $ do
+              now <- getTime
               forA_ mintingAllowances $ \MintingAllowance{..} ->
                 create RewardCouponV2 with
                   dso
                   round
                   beneficiary
                   amount
-                  expiresAt = rewardsExpireAt
+                  expiresAt = now `addRelTime` rewardsTimeToLive
                   beneficiaryIsObserver =
                     not $ Set.member beneficiary beneficiariesWithWrongVettingState
 

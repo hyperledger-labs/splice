@@ -471,18 +471,21 @@ template AmuletRules
         -- trigger off-ledger reward calculation if needed
         let configUsd = getValueAsOf now configSchedule
         let batchSize = 100 -- FIXME: make configurable
+        let rewardsTimeToLive = hours 48 -- (24h for batching + 24h submission delay) FIXME: make configurable
         when (useTrafficBasedAppRewards roundToArchive.rewardCalculationVersion) $ do
             void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
-                batchSize = batchSize
+                batchSize
+                rewardsTimeToLive
                 dryRun = False
 
         when (useTrafficBasedAppRewards configUsd.dryRunRewardCalculationVersion) $ do
             void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
-                batchSize = batchSize
+                batchSize
+                rewardsTimeToLive
                 dryRun = True
 
         -- create the new open round
@@ -677,13 +680,11 @@ template AmuletRules
       controller dso
       do
         calculateRewards <- fetchAndArchive (ForDso with dso) calculateRewardsCid
-        now <- getTime
-        let rewardsExpireAt = addRelTime now (hours 48) -- FIXME: make expiry duration configurable
         processRewardsCid <- create ProcessRewardsV2 with
           dso
           round = calculateRewards.round
           dryRun = calculateRewards.dryRun
-          rewardsExpireAt
+          rewardsTimeToLive = calculateRewards.rewardsTimeToLive
           batchHash
 
         return AmuletRules_StartProcessingRewardsV2Result with
@@ -702,7 +703,7 @@ template AmuletRules
         -- unhide coupons
         results <- forA rewardCouponCids $ \cid -> do
           coupon <- fetchAndArchive (ForDso with dso) cid
-          require "beneficiary is no observer on the coupon" (coupon.beneficiaryIsObserver == False)
+          require "beneficiary is no observer on the coupon" (not (coupon.beneficiaryIsObserver))
           cid <- create coupon with beneficiaryIsObserver = True
           pure (cid, coupon.beneficiary)
 
