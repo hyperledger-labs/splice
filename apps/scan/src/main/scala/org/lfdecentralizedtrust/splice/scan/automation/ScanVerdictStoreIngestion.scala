@@ -204,7 +204,6 @@ class ScanVerdictStoreIngestion(
     }
 
     DbSequencerTrafficSummaryStore.TrafficSummaryT(
-      rowId = 0L, // Will be assigned by DB
       migrationId = migrationId,
       sequencingTime = sequencingTime,
       totalTrafficCost = proto.totalTrafficCost,

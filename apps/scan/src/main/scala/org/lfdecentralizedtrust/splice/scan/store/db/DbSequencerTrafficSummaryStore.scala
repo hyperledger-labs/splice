@@ -51,7 +51,6 @@ object DbSequencerTrafficSummaryStore {
 
   /** Traffic summary (used for both inserts and reads) */
   final case class TrafficSummaryT(
-      rowId: Long,
       migrationId: Long,
       sequencingTime: CantonTimestamp,
       totalTrafficCost: Long,
