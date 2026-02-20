@@ -2031,6 +2031,7 @@
             "prefix": "mock/sv-1"
           }
         },
+        "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -2928,6 +2929,7 @@
         "onboardingName": "Digital-Asset-1",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-3",
+        "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_da_1",
           "port": 5432,
