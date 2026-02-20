@@ -21,14 +21,12 @@ updates:
     # major versions create PRs one by one (for easier resolution)
     groups: 
       production-dependencies:
-        IDENTIFIER: "pulumi-production-dependencies"
         dependency-type: "production"
         applies-to: version-updates
         update-types:
           - "minor"
           - "patch"
       development-dependencies:
-        IDENTIFIER: "pulumi-development-dependencies"
         dependency-type: "development"
         applies-to: version-updates
         update-types:
@@ -55,14 +53,12 @@ updates:
     # major versions create PRs one by one (for easier resolution)
     groups:
       production-dependencies:
-        IDENTIFIER: "load-tester-production-dependencies"
         dependency-type: "production"
         applies-to: version-updates
         update-types:
           - "minor"
           - "patch"
       development-dependencies:
-        IDENTIFIER: "load-tester-development-dependencies"
         dependency-type: "development"
         applies-to: version-updates
         update-types:
