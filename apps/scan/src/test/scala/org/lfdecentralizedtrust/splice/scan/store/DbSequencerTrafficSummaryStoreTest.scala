@@ -6,14 +6,17 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.DbSequencerTrafficSummaryStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbSequencerTrafficSummaryStore.{
   EnvelopeT,
   TrafficSummaryT,
 }
-import org.lfdecentralizedtrust.splice.store.StoreTestBase
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 
 import scala.concurrent.Future
 
@@ -127,13 +130,27 @@ class DbSequencerTrafficSummaryStoreTest
     )
 
   private def newStore(): Future[DbSequencerTrafficSummaryStore] = {
-    DbSequencerTrafficSummaryStore(
+    val participantId = mkParticipantId("traffic-test")
+    val updateHistory = new UpdateHistory(
       storage.underlying,
+      new DomainMigrationInfo(migrationId, None),
+      "traffic_summary_test",
+      participantId,
       dsoParty,
-      mkParticipantId("traffic-test"),
-      synchronizerId,
+      BackfillingRequirement.BackfillingNotRequired,
       loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = false,
+      HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
+    updateHistory.ingestionSink.initialize().map { _ =>
+      new DbSequencerTrafficSummaryStore(
+        storage.underlying,
+        updateHistory,
+        synchronizerId,
+        loggerFactory,
+      )
+    }
   }
 
   /** Test helper to query maxSequencingTime directly from database */

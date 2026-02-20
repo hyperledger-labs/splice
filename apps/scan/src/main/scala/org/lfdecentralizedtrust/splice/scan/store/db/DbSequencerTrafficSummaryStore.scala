@@ -9,8 +9,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.lifecycle.*
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -132,53 +133,11 @@ object DbSequencerTrafficSummaryStore {
       envelopes = envelopes,
     )
   }
-
-  def apply(
-      storage: DbStorage,
-      party: PartyId,
-      participantId: ParticipantId,
-      synchronizerId: SynchronizerId,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-      closeContext: CloseContext,
-  ): Future[DbSequencerTrafficSummaryStore] = {
-    // Use store_name to make history_id per-synchronizer
-    val storeName = s"sequencer-traffic-${synchronizerId.toProtoPrimitive}"
-    getOrCreateHistoryId(storage, party, participantId, storeName).map { historyId =>
-      new DbSequencerTrafficSummaryStore(storage, historyId, synchronizerId, loggerFactory)
-    }
-  }
-
-  private def getOrCreateHistoryId(
-      storage: DbStorage,
-      party: PartyId,
-      participantId: ParticipantId,
-      storeName: String,
-  )(implicit ec: ExecutionContext, tc: TraceContext, closeContext: CloseContext): Future[Long] = {
-    storage.queryAndUpdate(
-      for {
-        _ <- sql"""
-          insert into update_history_descriptors (party, participant_id, store_name)
-          values ($party, $participantId, $storeName)
-          on conflict do nothing
-        """.asUpdate
-        idOpt <- sql"""
-          select id from update_history_descriptors
-          where party = $party and participant_id = $participantId and store_name = $storeName
-        """.as[Long].headOption
-      } yield idOpt.getOrElse(
-        throw new RuntimeException(s"Failed to get or create history_id for store $storeName")
-      ),
-      "getOrCreateHistoryId",
-    )
-  }
 }
 
 class DbSequencerTrafficSummaryStore(
     storage: DbStorage,
-    historyId: Long,
+    updateHistory: UpdateHistory,
     val synchronizerId: SynchronizerId,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -188,6 +147,10 @@ class DbSequencerTrafficSummaryStore(
     with FlagCloseable
     with HasCloseContext
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
+
+  private def historyId = updateHistory.historyId
+
+  def waitUntilInitialized: Future[Unit] = updateHistory.waitUntilInitialized
 
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
