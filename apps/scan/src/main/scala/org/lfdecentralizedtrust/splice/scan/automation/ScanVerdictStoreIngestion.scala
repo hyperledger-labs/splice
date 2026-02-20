@@ -175,7 +175,7 @@ class ScanVerdictStoreIngestion(
 
         // Build combined DBIO action for traffic summaries and app activity
         trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
-          // TODO(#4060): log an error and fail ingestion if trafficSummaries is empty
+          // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
           case Some(trafficStore) if trafficSummaries.nonEmpty =>
             trafficStore.insertTrafficSummariesDBIO(trafficSummaries)
           case _ =>
