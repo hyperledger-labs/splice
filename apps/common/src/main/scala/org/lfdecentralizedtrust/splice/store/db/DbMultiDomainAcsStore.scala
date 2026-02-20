@@ -2239,6 +2239,16 @@ object DbMultiDomainAcsStore {
         "state_number, assigned_domain, reassignment_counter, " +
         "reassignment_target_domain, reassignment_source_domain, " +
         "reassignment_submitter, reassignment_unassign_id"
+
+    def withIndexColumns(
+        archiveTableName: String,
+        indexColumns: Seq[String],
+    ): AcsArchiveConfig =
+      AcsArchiveConfig(
+        archiveTableName,
+        if (indexColumns.isEmpty) defaultBaseColumns
+        else defaultBaseColumns + indexColumns.mkString(", ", ", ", ""),
+      )
   }
 
   /** @param acsStoreId The primary key of this stores ACS entry in the store_descriptors table

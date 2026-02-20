@@ -49,4 +49,5 @@ object SplitwellTables extends AcsTables {
   }
 
   val acsTableName = "splitwell_acs_store"
+  val archivedAcsTableName = "splitwell_acs_store_archived"
 }

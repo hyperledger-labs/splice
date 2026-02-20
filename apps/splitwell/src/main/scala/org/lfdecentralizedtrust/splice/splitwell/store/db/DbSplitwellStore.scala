@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
   DbAppStore,
+  DbMultiDomainAcsStore,
 }
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
@@ -67,6 +68,12 @@ class DbSplitwellStore(
       ),
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          SplitwellTables.archivedAcsTableName,
+          SplitwellTables.SplitwellAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with AcsTables
     with AcsQueries
