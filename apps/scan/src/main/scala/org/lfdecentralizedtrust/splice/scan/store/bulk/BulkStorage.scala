@@ -25,7 +25,7 @@ class BulkStorage(
     extends NamedLogging
     with AutoCloseable {
 
-  private val killSwitches = appConfig.s3config.fold {
+  private val killSwitches = appConfig.s3.fold {
     logger.debug("s3 connection not configured, not dumping to bulk storage")
     Seq.empty[UniqueKillSwitch]
   } { s3Config =>

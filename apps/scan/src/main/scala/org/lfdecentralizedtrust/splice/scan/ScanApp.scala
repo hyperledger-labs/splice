@@ -246,7 +246,7 @@ class ScanApp(
       kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
       bulkStorage = new BulkStorage(
         scanStorageConfigV1,
-        config.bulkStorageConfig,
+        config.bulkStorage,
         acsSnapshotStore,
         updateHistory,
         currentMigrationId = migrationInfo.currentMigrationId,
