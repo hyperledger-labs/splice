@@ -69,6 +69,56 @@ object DbScanVerdictStore {
     }
   }
 
+  /** Convert a mediator Verdict proto to our storage types.
+    *
+    * @param verdict the verdict from the mediator
+    * @param migrationId the current migration id
+    * @param synchronizerId the synchronizer id
+    * @return a tuple of (VerdictT, function to create TransactionViewT rows given a verdict row id)
+    */
+  def fromProto(
+      verdict: v30.Verdict,
+      migrationId: Long,
+      synchronizerId: SynchronizerId,
+  ): (VerdictT, Long => Seq[TransactionViewT]) = {
+    val transactionRootViews = verdict.getTransactionViews.rootViews
+    val resultShort: Short = VerdictResultDbValue.fromProto(verdict.verdict)
+    val row = VerdictT(
+      rowId = 0,
+      migrationId = migrationId,
+      domainId = synchronizerId,
+      recordTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getRecordTime),
+      finalizationTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getFinalizationTime),
+      submittingParticipantUid = verdict.submittingParticipantUid,
+      verdictResult = resultShort,
+      mediatorGroup = verdict.mediatorGroup,
+      updateId = verdict.updateId,
+      submittingParties = verdict.submittingParties,
+      transactionRootViews = transactionRootViews,
+    )
+
+    val mkViews: Long => Seq[TransactionViewT] = { rowId =>
+      verdict.getTransactionViews.views.map { case (viewId, txView) =>
+        val confirmingPartiesJson: Json = Json.fromValues(
+          txView.confirmingParties.map { q =>
+            Json.obj(
+              "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
+              "threshold" -> Json.fromInt(q.threshold),
+            )
+          }
+        )
+        TransactionViewT(
+          verdictRowId = rowId,
+          viewId = viewId,
+          informees = txView.informees,
+          confirmingParties = confirmingPartiesJson,
+          subViews = txView.subViews,
+        )
+      }.toSeq
+    }
+    (row, mkViews)
+  }
+
   /** Build sequencing times and a map for correlating sequencer traffic data with verdict views.
     *
     * Returns a tuple of:
