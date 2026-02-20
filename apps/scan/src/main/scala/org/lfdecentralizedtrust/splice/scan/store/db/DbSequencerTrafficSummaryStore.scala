@@ -20,6 +20,10 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.Json
 import io.circe.syntax.*
+import com.digitalasset.canton.sequencer.admin.{v30 as seqv30}
+import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.util.HexString
+import com.google.protobuf.ByteString
 
 object DbSequencerTrafficSummaryStore {
 
@@ -61,6 +65,49 @@ object DbSequencerTrafficSummaryStore {
       totalTrafficCost: Long,
       envelopes: Seq[EnvelopeT],
   )
+
+  /** Convert a sequencer TrafficSummary proto to our storage type.
+    *
+    * @param proto the traffic summary from the sequencer
+    * @param migrationId the current migration id
+    * @param sequencingTime the pre-parsed sequencing time from the proto
+    * @param viewHashToViewId map from view_hash to view_id for correlating envelope view_hashes
+    *                         with verdict view_ids (for this specific sequencing_time)
+    * @param logger for logging warnings about unmatched view hashes
+    */
+  def fromProto(
+      proto: seqv30.TrafficSummary,
+      migrationId: Long,
+      sequencingTime: CantonTimestamp,
+      viewHashToViewId: Map[ByteString, Int],
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): TrafficSummaryT = {
+
+    val envelopes = proto.envelopes.map { env =>
+      val viewIds = env.viewHashes.flatMap { viewHash =>
+        viewHashToViewId.get(viewHash) match {
+          case Some(viewId) => Some(viewId)
+          case None =>
+            logger.warn(
+              s"View hash ${HexString.toHexString(viewHash)} from sequencer traffic summary " +
+                s"at $sequencingTime does not match any view in the verdict"
+            )
+            None
+        }
+      }
+      EnvelopeT(
+        trafficCost = env.envelopeTrafficCost,
+        viewIds = viewIds,
+      )
+    }
+
+    TrafficSummaryT(
+      migrationId = migrationId,
+      sequencingTime = sequencingTime,
+      totalTrafficCost = proto.totalTrafficCost,
+      envelopes = envelopes,
+    )
+  }
 
   def apply(
       storage: DbStorage,
