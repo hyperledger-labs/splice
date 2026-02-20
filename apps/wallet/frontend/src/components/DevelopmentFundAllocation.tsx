@@ -56,7 +56,9 @@ const DevelopmentFundAllocation: React.FC = () => {
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack key={formKey} spacing={3}>
             {error ? (
-              <Alert severity="error">Failed to allocate: {JSON.stringify(error)}</Alert>
+              <Alert severity="error">
+                {error}
+              </Alert>
             ) : null}
 
             <Typography variant="h6">Beneficiary</Typography>
