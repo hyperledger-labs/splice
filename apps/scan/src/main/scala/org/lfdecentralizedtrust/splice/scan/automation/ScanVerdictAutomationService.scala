@@ -42,6 +42,7 @@ class ScanVerdictAutomationService(
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
     sequencerTrafficClientO: Option[SequencerTrafficClient],
     trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
+    appActivityComputation: AppActivityComputation,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -68,6 +69,7 @@ class ScanVerdictAutomationService(
       ingestionMetrics,
       sequencerTrafficClientO,
       trafficSummaryStoreO,
+      appActivityComputation,
     )
   )
 }
