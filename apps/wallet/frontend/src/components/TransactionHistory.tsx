@@ -479,7 +479,7 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
       {!validatorRewards.isZero() && row('validator', 'Validator Rewards', validatorRewards)}
       {!svRewards.isZero() && row('sv', 'SV Rewards', svRewards)}
       {!developmentFundCoupons.isZero() &&
-        row('fund', 'Development Fund Coupons', developmentFundCoupons)}
+        row('fund', 'Development Fund', developmentFundCoupons)}
     </Stack>
   );
 };
