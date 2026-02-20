@@ -201,7 +201,7 @@ class AcsSnapshotBulkStorageTest
     val store = mock[UpdateHistory]
     when(
       store.isHistoryBackfilled(anyLong)(any[TraceContext])
-    ).thenAnswer { (_: Long) => Future.successful(true) }
+    ).thenReturn(Future.successful(true))
     store
   }
 
