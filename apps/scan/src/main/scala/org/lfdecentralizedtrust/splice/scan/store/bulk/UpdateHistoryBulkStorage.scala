@@ -7,17 +7,12 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.pattern.after
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{ActorSystem, Cancellable}
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  HistoryMetrics,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -107,50 +102,49 @@ class UpdateHistoryBulkStorage(
   private def mksrc()(implicit
       ec: ExecutionContext,
       actorSystem: org.apache.pekko.actor.ActorSystem,
-  ) = {
-    Source
-      .unfoldAsync(Option.empty[UpdatesSegment]) { current =>
-        updateHistory.isHistoryBackfilled(currentMigrationId).flatMap {backfilled =>
-          if (backfilled) {
-            getNextSegment(current).flatMap {
-              case Some(next) =>
-                logger.info(s"Dumping next updates segment: $next")
-                Future.successful(Some((Some(next), Some(next))))
-              case None =>
-                logger.debug(s"Next segment after $current not known yet, scheduling next attempt...")
-                after(appConfig.updatesPollingInterval.underlying, actorSystem.scheduler)(
-                  Future.successful(Some((current, None)))
-                )
-            }
-          } else {
-            logger.debug("Waiting for updates backfilling to complete before dumping to bulk storage...")
-            after(
-              appConfig.updatesPollingInterval.underlying,
-              actorSystem.scheduler,
-            ) {
-              Future.successful(Some((current, None)))
-            }
+  ): Source[UpdatesSegment, Cancellable] = {
+
+    // Wait for history backfilling to complete before starting bulk storage dumps
+    val backfillingCompleteGate =
+      Source
+        .tick(0.seconds, appConfig.updatesPollingInterval.underlying, ())
+        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(currentMigrationId))
+        .filter(identity)
+        .take(1)
+
+    backfillingCompleteGate.flatMap { _ =>
+      Source
+        .unfoldAsync(Option.empty[UpdatesSegment]) { current =>
+          getNextSegment(current).flatMap {
+            case Some(next) =>
+              logger.info(s"Dumping next updates segment: $next")
+              Future.successful(Some((Some(next), Some(next))))
+            case None =>
+              logger.debug(s"Next segment after $current not known yet, scheduling next attempt...")
+              after(appConfig.updatesPollingInterval.underlying, actorSystem.scheduler)(
+                Future.successful(Some((current, None)))
+              )
           }
         }
-      }
-      .collect { case Some(segment) => segment }
-      .via(
-        UpdateHistorySegmentBulkStorage.asFlow(
-          storageConfig,
-          appConfig,
-          updateHistory,
-          s3Connection,
-          historyMetrics,
-          loggerFactory,
+        .collect { case Some(segment) => segment }
+        .via(
+          UpdateHistorySegmentBulkStorage.asFlow(
+            storageConfig,
+            appConfig,
+            updateHistory,
+            s3Connection,
+            historyMetrics,
+            loggerFactory,
+          )
         )
-      )
-      .collect {
-        case UpdateHistorySegmentBulkStorage.Output(segment, _, isLast) if isLast => segment
-      }
-      .mapAsync(1) { segment =>
-        historyMetrics.BulkStorage.latestUpdatesSegment.updateValue(segment.toTimestamp.timestamp)
-        kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
-      }
+        .collect {
+          case UpdateHistorySegmentBulkStorage.Output(segment, _, isLast) if isLast => segment
+        }
+        .mapAsync(1) { segment =>
+          historyMetrics.BulkStorage.latestUpdatesSegment.updateValue(segment.toTimestamp.timestamp)
+          kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
+        }
+    }
   }
 
   def getSource(): Source[UpdatesSegment, UniqueKillSwitch] = {
