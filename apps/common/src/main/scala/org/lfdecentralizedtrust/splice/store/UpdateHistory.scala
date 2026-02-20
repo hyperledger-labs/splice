@@ -2121,16 +2121,15 @@ class UpdateHistory(
   }
 
   /** @return True if the passed migration id was fully backfilled.
-   *         This applies to the current migration id, where it either didn't need to backfill,
-   *         or backfilled because it joined late.
-   *         And also for past migrations, whether the SV was present in them or not.
-   */
+    *         This applies to the current migration id, where it either didn't need to backfill,
+    *         or backfilled because it joined late.
+    *         And also for past migrations, whether the SV was present in them or not.
+    */
   def isHistoryBackfilled(migrationId: Long)(implicit tc: TraceContext) = {
     sourceHistory
       .migrationInfo(migrationId)
       .map(_.exists(i => i.complete && i.importUpdatesComplete))
   }
-
 
   lazy val sourceHistory: HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
     new HistoryBackfilling.SourceHistory[UpdateHistoryResponse] {
