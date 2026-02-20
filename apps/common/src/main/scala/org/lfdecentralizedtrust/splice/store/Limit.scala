@@ -17,7 +17,6 @@ sealed trait Limit {
 object Limit {
 
   val DefaultMaxPageSize: Int = 1000
-  val DefaultLimit: Limit = HardLimit.tryCreate(DefaultMaxPageSize)
 
   private[store] def validateLimit(limit: Int, maxPageSize: Int): Either[String, Int] = {
     if (limit > maxPageSize) Left(s"Exceeded limit maximum ($limit > $maxPageSize).")

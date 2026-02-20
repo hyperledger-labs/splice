@@ -214,8 +214,8 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(
-      implicit tc: TraceContext
+  def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
+      tc: TraceContext
   ): Future[
     Seq[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
@@ -309,6 +309,7 @@ object ScanStore {
       metrics: DbScanStoreMetrics,
       ingestionConfig: IngestionConfig,
       initialRound: Long,
+      defaultLimit: Limit,
       acsStoreDescriptorUserVersion: Option[Long] = None,
       txLogStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
@@ -331,6 +332,7 @@ object ScanStore {
         ingestionConfig,
         metrics,
         initialRound,
+        defaultLimit,
         acsStoreDescriptorUserVersion,
         txLogStoreDescriptorUserVersion,
       ),

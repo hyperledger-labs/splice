@@ -57,6 +57,8 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   protected def storeName: String
   def storeParty: PartyId
 
+  def defaultLimit: Limit
+
   protected implicit lazy val mc: MetricsContext = MetricsContext(
     "store_name" -> storeName,
     "store_party" -> storeParty.toString, // using .toString for historical reasons
@@ -149,7 +151,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   def listContracts[C, TCid <: ContractId[?], T](
       companion: C,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -157,7 +159,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   def listAssignedContracts[C, TCid <: ContractId[?], T](
       companion: C,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -172,7 +174,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   def listContractsOnDomain[C, TCid <: ContractId[?], T](
       companion: C,
       domain: SynchronizerId,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -219,7 +221,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   def listInterfaceViews[C, ICid <: ContractId[?], View <: DamlRecord[View]](
       companion: C,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, ICid, View],
       tc: TraceContext,

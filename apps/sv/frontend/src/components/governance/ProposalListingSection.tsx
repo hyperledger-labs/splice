@@ -194,7 +194,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
 
   return (
     <TableRow
-      onClick={() => navigate(`/governance-beta/proposals/${contractId}`)}
+      onClick={() => navigate(`/governance/proposals/${contractId}`)}
       sx={{
         display: 'grid',
         gridTemplateColumns: gridTemplate,

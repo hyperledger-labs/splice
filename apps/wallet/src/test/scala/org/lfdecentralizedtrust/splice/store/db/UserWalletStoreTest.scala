@@ -39,6 +39,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
   Limit,
   PageLimit,
   TransferInputStore,
@@ -2124,6 +2125,7 @@ class DbUserWalletStoreTest
       ),
       participantId = mkParticipantId("UserWalletStoreTest"),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

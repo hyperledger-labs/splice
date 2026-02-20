@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellSynchronizerConfig
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
 import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.{LimitHelpers, MultiDomainAcsStore}
+import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
   AcsQueries,
@@ -45,6 +45,7 @@ class DbSplitwellStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
