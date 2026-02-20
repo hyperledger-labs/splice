@@ -32,9 +32,12 @@ create table app_activity_record_store
     record_time                 bigint not null,
     -- The mining round number that was open at this record_time
     round_number                bigint not null,
-    -- App activity data as JSONB array: [{"p": "party_id", "w": 123}, ...]
-    -- where "p" is the featured app provider party_id and "w" is their traffic weight
-    activities                  jsonb not null,
+    -- App providers for which app activity should be recorded
+    app_provider_parties        text[] not null,
+    -- Activity weight assigned to the app providers.
+    -- Measured in bytes of traffic.
+    -- Values are in one-to-one correspondence with the values in the app_provider_parties array.
+    app_activity_weights        bigint[] not null,
     -- Primary key: (history_id, record_time) uniquely identifies an activity record
     primary key (history_id, record_time)
 );
