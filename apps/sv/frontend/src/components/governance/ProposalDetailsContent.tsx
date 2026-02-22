@@ -446,7 +446,7 @@ const VoteSection: React.FC<VoteSectionProps> = ({
   centered = false,
 }) => (
   <Box sx={{ width: '100%', maxWidth: '800px' }} data-testid={testId}>
-    <Typography component="h2" fontSize={18} fontWeight={700} fontFamily="lato" mb={3}>
+    <Typography component="h2" fontSize={18} fontWeight={700} mb={3}>
       {title}
     </Typography>
     <Box
