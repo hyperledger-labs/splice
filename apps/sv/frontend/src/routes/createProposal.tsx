@@ -11,31 +11,36 @@ import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
 import { createProposalActions } from '../utils/governance';
 import type { SupportedActionTag } from '../utils/types';
+import { Box } from '@mui/material';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
   const action = searchParams.get('action');
   const selectedAction = createProposalActions.find(a => a.value === action);
 
-  if (selectedAction) {
-    const a = selectedAction.value as SupportedActionTag;
-    switch (a) {
-      case 'SRARC_UpdateSvRewardWeight':
-        return <UpdateSvRewardWeightForm />;
-      case 'SRARC_OffboardSv':
-        return <OffboardSvForm />;
-      case 'SRARC_GrantFeaturedAppRight':
-        return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_GrantFeaturedAppRight'} />;
-      case 'SRARC_RevokeFeaturedAppRight':
-        return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_RevokeFeaturedAppRight'} />;
-      case 'SRARC_CreateUnallocatedUnclaimedActivityRecord':
-        return <CreateUnallocatedUnclaimedActivityRecordForm />;
-      case 'SRARC_SetConfig':
-        return <SetDsoConfigRulesForm />;
-      case 'CRARC_SetConfig':
-        return <SetAmuletConfigRulesForm />;
+  const getForm = () => {
+    if (selectedAction) {
+      const a = selectedAction.value as SupportedActionTag;
+      switch (a) {
+        case 'SRARC_UpdateSvRewardWeight':
+          return <UpdateSvRewardWeightForm />;
+        case 'SRARC_OffboardSv':
+          return <OffboardSvForm />;
+        case 'SRARC_GrantFeaturedAppRight':
+          return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_GrantFeaturedAppRight'} />;
+        case 'SRARC_RevokeFeaturedAppRight':
+          return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_RevokeFeaturedAppRight'} />;
+        case 'SRARC_CreateUnallocatedUnclaimedActivityRecord':
+          return <CreateUnallocatedUnclaimedActivityRecordForm />;
+        case 'SRARC_SetConfig':
+          return <SetDsoConfigRulesForm />;
+        case 'CRARC_SetConfig':
+          return <SetAmuletConfigRulesForm />;
+      }
+    } else {
+      return <SelectAction />;
     }
-  } else {
-    return <SelectAction />;
-  }
+  };
+
+  return <Box sx={{ p: 4 }}>{getForm()}</Box>;
 };
