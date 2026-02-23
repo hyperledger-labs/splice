@@ -111,6 +111,8 @@ monitoring:
         acknowledgementLagSeconds: 900
       deployment:
         pendingPeriodMinutes: 5
+      sequencerClientDelay:
+        seconds: 90
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true
