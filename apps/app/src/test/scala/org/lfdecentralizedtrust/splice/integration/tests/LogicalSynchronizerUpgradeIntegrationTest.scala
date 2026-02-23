@@ -218,7 +218,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
             .list(
               Some(Synchronizer(decentralizedSynchronizerId))
-            )
+            ) should not be empty
         }
       }
 
