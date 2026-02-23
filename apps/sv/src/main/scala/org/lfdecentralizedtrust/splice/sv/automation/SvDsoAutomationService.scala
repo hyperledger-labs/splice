@@ -564,5 +564,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[FollowAmuletConversionRateFeedTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
       aTrigger[LogicalSynchronizerUpgradeTrigger],
+      aTrigger[LogicalSynchronizerUpgradeAnnouncementTrigger],
     )
 }
