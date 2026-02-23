@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import better.files.File.apply
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
@@ -20,7 +19,6 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.sv.config.{
@@ -62,8 +60,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
   override lazy val skipAcsSnapshotChecks = true
 
   lazy val scheduledLsu = ScheduledLsuConfig(
-    Instant.now().plusSeconds(120).truncatedTo(ChronoUnit.SECONDS),
-    Instant.now().plusSeconds(180).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(200).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(240).truncatedTo(ChronoUnit.SECONDS),
     NonNegativeInt.one,
     ProtocolVersion.v34,
   )
@@ -72,14 +70,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransforms((_, config) => {
-        ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
-          config.copy(
-            domainMigrationDumpPath =
-              Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
-          )
-        }(config)
-      })
       .addConfigTransforms((_, config) => {
         ConfigTransforms
           .updateAllSvAppConfigs { (_, config) =>
