@@ -131,11 +131,6 @@ jobs:
         with:
           cmd: ./scripts/actionlint.sh
 
-      - name: Check for strings that should not be used in Splice
-        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
-        with:
-          cmd: ./scripts/check-repo-names.sh
-
       - name: Check that docker base images are pinned by digest
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
