@@ -1,7 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File.apply
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
@@ -32,7 +31,6 @@ import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerCo
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
-import java.net.URI
 import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
 import java.util.UUID
@@ -278,23 +276,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      clue("Announce new sequencer urls") {
-        allBackends.par.map { backend =>
-          backend.sequencerClient.topology.lsu.sequencer_successors
-            .propose_successor(
-              backend.sequencerClient.id,
-              NonEmpty(
-                Seq,
-                URI.create(
-                  backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
-                ),
-              ),
-              decentralizedSynchronizerId,
-            )
-        }
-      }
-
-      clue(s"wait for upgrade time ${upgradeTime}") {
+      clue(s"wait for upgrade time $upgradeTime") {
         Threading.sleep(Duration.between(Instant.now(), upgradeTimeInstant).toMillis.abs)
       }
 

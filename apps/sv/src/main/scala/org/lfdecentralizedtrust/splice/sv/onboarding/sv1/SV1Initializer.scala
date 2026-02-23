@@ -577,7 +577,7 @@ class SV1Initializer(
             synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             synchronizerNode.mediatorAdminConnection.initialize(
               physicalSynchronizerId,
-              synchronizerNode.sequencerConnection,
+              synchronizerNode.internalSequencerConnection,
               synchronizerNode.mediatorSequencerAmplification.toInternal,
             ),
             logger,
