@@ -95,6 +95,7 @@ final class DbMultiDomainAcsStore[TXE](
       * on ingestion of certain contracts.
       */
     handleIngestionSummary: IngestionSummary => Unit = _ => (),
+    override val defaultLimit: Limit,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,

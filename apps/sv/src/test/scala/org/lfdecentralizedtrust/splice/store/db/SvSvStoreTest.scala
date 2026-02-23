@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.U
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.StoreTestBase
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvSvStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -190,6 +190,7 @@ class DbSvSvStoreTest
       ),
       participantId = mkParticipantId("SvSvStoreTest"),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

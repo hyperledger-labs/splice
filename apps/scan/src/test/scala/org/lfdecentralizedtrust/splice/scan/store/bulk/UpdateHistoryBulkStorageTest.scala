@@ -3,6 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -13,21 +16,21 @@ import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.Keep
 import org.apache.pekko.stream.testkit.TestSubscriber
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
 import scala.math.Ordering.Implicits.*
+import java.nio.ByteBuffer
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -35,15 +38,35 @@ class UpdateHistoryBulkStorageTest
     with HasActorSystem
     with HasS3Mock
     with SplicePostgresTest {
-  val maxFileSize = 30000L
+  val maxFileSize = 25000L
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
-    bulkDbReadChunkSize = 1000,
+    bulkDbReadChunkSize = 500,
+    bulkZstdFrameSize = 10000L,
     maxFileSize,
+  )
+  val appConfig = BulkStorageConfig(
+    updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
   )
 
   "UpdateHistoryBulkStorage" should {
+
+    "multipart upload works" in {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+        val o = bucketConnection.newAppendWriteObject("test")
+        o.prepareUploadNext()
+        o.prepareUploadNext()
+        for {
+          _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
+          _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
+          _ <- o.finish()
+          content <- bucketConnection.readFullObject("test")
+        } yield {
+          new String(content.array(), "UTF-8") shouldBe "helloworld"
+        }
+      }
+    }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
@@ -61,18 +84,21 @@ class UpdateHistoryBulkStorageTest
           TimestampWithMigrationId(fromTimestamp, 0),
           TimestampWithMigrationId(toTimestamp, 0),
         )
+        val metricsFactory = new InMemoryMetricsFactory
         val probe = UpdateHistorySegmentBulkStorage
           .asSource(
             bulkStorageTestConfig,
+            appConfig,
             mockStore.store,
             bucketConnection,
             segment,
+            new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
             loggerFactory,
           )
-          .toMat(TestSink.probe[(UpdatesSegment, Option[TimestampWithMigrationId])])(Keep.right)
+          .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
           .run()
 
-        probe.request(2)
+        probe.request(3)
 
         clue(
           "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
@@ -85,18 +111,36 @@ class UpdateHistoryBulkStorageTest
         ) {
           mockStore.mockIngestion(1000)
           probe.expectNext(20.seconds) should be(
-            (segment, Some(TimestampWithMigrationId(toTimestamp, 0)))
+            UpdateHistorySegmentBulkStorage.Output(
+              segment,
+              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
+              isLastObjectInSegment = false,
+            )
+          )
+          probe.expectNext(20.seconds) should be(
+            UpdateHistorySegmentBulkStorage.Output(
+              segment,
+              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
+              isLastObjectInSegment = true,
+            )
           )
           probe.expectComplete()
+          val objectCountMetrics = metricsFactory.metrics.counters
+            .get(SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count")
+            .value
+          val numObjectsFromMetric = objectCountMetrics
+            .get(MetricsContext.Empty)
+            .value
+            .markers
+            .get(MetricsContext("object_type" -> "updates"))
+            .value
+            .get()
+          numObjectsFromMetric shouldBe 2
         }
 
         clue("Check that the dumped content is correct") {
           for {
-            s3Objects <- bucketConnection.s3Client
-              .listObjects(
-                ListObjectsRequest.builder().bucket("bucket").build()
-              )
-              .asScala
+            s3Objects <- bucketConnection.listObjects
             allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
               None,
               HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
@@ -127,7 +171,12 @@ class UpdateHistoryBulkStorageTest
         val initialStoreSize = 2000
         val genesisDate = LocalDate.of(2001, 1, 23)
         val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)
-        logger.info(s"Genesis instant is: ${genesisInstant}")
+        val metricsFactory = new InMemoryMetricsFactory
+        def latestSegmentMetrics = metricsFactory.metrics.gauges
+          .get(
+            SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "latest-updates-segment"
+          )
+          .value
 
         val mockStore = new MockUpdateHistoryStore(
           initialStoreSize,
@@ -142,10 +191,12 @@ class UpdateHistoryBulkStorageTest
           ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
             new UpdateHistoryBulkStorage(
               bulkStorageTestConfig,
+              appConfig,
               mockStore.store,
               kvProvider,
               migrationId,
               bucketConnection,
+              new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
               loggerFactory,
             ).getSource()
               .toMat(TestSink.probe[UpdatesSegment])(Keep.both)
@@ -178,32 +229,45 @@ class UpdateHistoryBulkStorageTest
                 toMigration.toLong,
               ),
             )
-          probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
-          probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
-          // First 2000 events end up 08:07:10, so the last full segment is the one up to 08:00
-          probe.expectNoMessage(20.seconds)
 
-          mockStore.mockIngestion(2000)
-          probe.request(2)
-          probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
-          probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
-          // Last update is now from 13:14:30, so not enough to close the 12-2 segment
-          probe.expectNoMessage(20.seconds)
+          def assertLatestSegmentInMetrics(hour: Int) =
+            latestSegmentMetrics.get(MetricsContext.Empty).value.value.get()._1 shouldBe genesisDate
+              .atTime(hour, 0)
+              .toInstant(ZoneOffset.UTC)
+              .toEpochMilli * 1000
+
+          clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
+            probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
+            probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
+            assertLatestSegmentInMetrics(8)
+            probe.expectNoMessage(20.seconds)
+          }
+
+          clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
+            mockStore.mockIngestion(2000)
+            probe.request(2)
+            probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
+            probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
+            assertLatestSegmentInMetrics(12)
+            probe.expectNoMessage(20.seconds)
+          }
 
           // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
           // then start a new one with the new migration and ingest updates in the new migration
           killSwitch.shutdown()
           val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
           mockStore.mockMigration()
-          mockStore.mockIngestion(2000) // up to time 19:13:50
 
-          probe1.request(4)
-          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
-          probe1.expectNoMessage(20.seconds)
+          clue("2000 more updates in the new migration, up to 19:13:50") {
+            mockStore.mockIngestion(2000)
+            probe1.request(4)
+            probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
+            probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
+            probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
+            assertLatestSegmentInMetrics(18)
+            probe1.expectNoMessage(20.seconds)
+          }
           killSwitch1.shutdown()
-
           succeed
         }
       }
@@ -266,6 +330,9 @@ class UpdateHistoryBulkStorageTest
           data.filter(_.update.update.recordTime > recordTime).map(_.migrationId).minOption
         )
       }
+      when(
+        store.isHistoryBackfilled(anyLong)(any[TraceContext])
+      ).thenReturn(Future.successful(true))
       store
     }
 

@@ -119,7 +119,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
   ): Future[QueryResult[Option[BuyTrafficRequestTxLogEntry]]]
 
   final def listAppPaymentRequests(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[
     Seq[
       ContractWithState[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
@@ -166,7 +166,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
         .take(limit.limit)
     }
 
-  def listSubscriptions(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+  def listSubscriptions(now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[Subscription]]
@@ -181,7 +181,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     )(cid)
   } yield contract.contract
 
-  final def listSubscriptionRequests(limit: Limit = Limit.DefaultLimit)(implicit
+  final def listSubscriptionRequests(limit: Limit = defaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[
@@ -285,7 +285,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     */
   def listSortedValidatorFaucets(
       issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
@@ -301,7 +301,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     */
   def listSortedLivenessActivityRecords(
       issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
@@ -317,7 +317,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     */
   def listSortedSvRewardCoupons(
       issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
@@ -330,7 +330,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
 
   /** Returns the list of unclaimed activity record. */
   def listUnclaimedActivityRecords(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[Seq[
     Contract[
       amuletCodegen.UnclaimedActivityRecord.ContractId,
@@ -351,7 +351,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
 
   /** Returns the list of development fund coupons. */
   def listDevelopmentFundCoupons(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[Seq[
     Contract[
       amuletCodegen.DevelopmentFundCoupon.ContractId,
@@ -427,7 +427,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
       limit: PageLimit,
   )(implicit lc: TraceContext): Future[Seq[TxLogEntry.TransactionHistoryTxLogEntry]]
 
-  def listAnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+  def listAnsEntries(now: CantonTimestamp, limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[UserWalletStore.AnsEntryWithPayData]]
 
@@ -577,6 +577,7 @@ object UserWalletStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -590,6 +591,7 @@ object UserWalletStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      defaultLimit,
     )
   }
 

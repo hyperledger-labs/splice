@@ -1094,6 +1094,25 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     created.contractId
   }
 
+  /** Directly archives an unclaimed development fund coupon. */
+  def archiveUnclaimedDevelopmentFundCoupon(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      unclaimedDevelopmentFundCouponCid: amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId,
+      synchronizerId: Option[SynchronizerId] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Unit = {
+    participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(dsoParty),
+        readAs = Seq(),
+        update = unclaimedDevelopmentFundCouponCid.exerciseArchive(),
+        synchronizerId = synchronizerId,
+      )
+  }
+
   /** Directly creates a new development fund coupon. */
   def createDevelopmentFundCoupon(
       participantClient: ParticipantClientReference,

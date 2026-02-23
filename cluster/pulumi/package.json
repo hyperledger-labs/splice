@@ -4,7 +4,7 @@
     "main": "src/index.ts",
     "devDependencies": {
         "@jest/globals": "^30.2.0",
-        "@trivago/prettier-plugin-sort-imports": "^4.3.0",
+        "@trivago/prettier-plugin-sort-imports": "^6.0.2",
         "@types/request": "^2.48.13",
         "@typescript-eslint/eslint-plugin": "^7.7.1",
         "@typescript-eslint/parser": "^7.7.1",
@@ -13,10 +13,10 @@
         "eslint-plugin-import": "^2.29.1",
         "eslint-plugin-promise": "^6.1.1",
         "jest": "^30.2.0",
-        "minimatch": "5.1.2",
+        "minimatch": "10.2.2",
         "prettier": "^3.4.2",
-        "ts-jest": "^29.4.5",
-        "typescript": "^5.4.5"
+        "ts-jest": "^29.4.6",
+        "typescript": "^5.9.3"
     },
     "scripts": {
         "fix": "npm run fix --workspaces --if-present",
@@ -55,6 +55,6 @@
     ],
     "dependencies": {
         "@google-cloud/sql": "^0.20.1",
-        "commander": "^13.0.0"
+        "commander": "^14.0.3"
     }
 }
