@@ -9,6 +9,12 @@
 
 .. release-notes:: Upcoming
 
+    .. important::
+
+       The validator APIs ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+       and ``/v0/admin/external-party/transfer-preapproval/submit-send`` are deprecated and will be removed in a future version.
+       Replace any usages you  by the :ref:`Token Standard APIs <token_standard>`.
+
     - Wallet UI
 
       - The wallet UI transaction hisory now uses the current amulet conversion rate to convert amounts instead of the historic one to
@@ -19,6 +25,14 @@
       - The scan UI transaction hisory now uses the current amulet conversion rate to convert amounts instead of the historic one to
         reduce maintenace overhead.
 
+    - Validator app
+
+       - The endpoints
+         ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+         and
+         ``/v0/admin/external-party/transfer-preapproval/submit-send``
+         are deprecated and will be removed in a future version. Use the token standard APIs for initiating transfers instead.
+
     - Daml:
 
        - Restrict ``AmuletConfig`` to not allow fees as part of CIP FIXME. This has no functional effect
@@ -27,7 +41,7 @@
          This also disables the choice ``AmuletRules_ComputeFees`` as it always returned 0. Application providers that statically
          link against ``splice-amulet`` will need to remove usages of this choice when recompiling against the new ``splice-amulet`` version.
 
-       - Support 24h signing delays for token standard CC transfers and allocations
+       - Support 24h signing delays for token standard CC transfers and allocations, see CIP FIXME
 
          - This change concern the CC implementation of the token standard APIs,
            so no change is required for clients of these APIs to make use of the
