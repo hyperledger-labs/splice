@@ -59,7 +59,7 @@ function check_patterns_locally() {
     'cluster/images/LICENSE'
     'expected.json'
     'README.md'
-    'splice-shared-gha'
+    'splice-shared-gha/\.github/actions/nix/run_bash_command_in_nix/action\.yml'
   )
 
   local exception exceptions_args=()
