@@ -3887,7 +3887,8 @@ components:
       properties:
         active-development-fund-coupons:
           description: |
-            Contracts of the Daml template `Splice.Amulet:DevelopmentFundCoupon`.
+            Contracts of the Daml template `Splice.Amulet:DevelopmentFundCoupon`
+            with the DSO party as the signatory.
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
