@@ -59,6 +59,7 @@ function check_patterns_locally() {
     'cluster/images/LICENSE'
     'expected.json'
     'README.md'
+    'splice-shared-gha'
   )
 
   local exception exceptions_args=()
