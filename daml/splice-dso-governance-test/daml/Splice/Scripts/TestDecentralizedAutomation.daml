@@ -28,7 +28,13 @@ import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
 import Splice.Scripts.TestTransferPreapproval
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
 import Splice.Wallet.Subscriptions
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.MetadataV1
+import Splice.Testing.Utils
 
 
 testUnclaimedRewardsMerging : Script ()
@@ -504,5 +510,45 @@ testTransferPreapprovalExpiry = do
   submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
     transferPreapprovalCid
     sv = Some sv1
+
+  pure ()
+
+testExpireAmuletTransferInstruction : Script ()
+testExpireAmuletTransferInstruction = do
+  (app, _, (_, _, _, _)) <- initDevNet
+  sender <- setupUser app "sender" app.dso
+  amuletCid <- tap app sender 100.0
+  let registry = AmuletRegistry.AmuletRegistry
+        with
+          dso = app.dso
+          instrumentId = InstrumentId
+            with
+              admin = app.dso
+              id = "Amulet"
+  receiver <- allocateParty "receiver"
+  now <- getTime
+  transfer <- RegistryApi.getTransferFactory registry TransferInstructionV1.TransferFactory_Transfer
+    with
+      expectedAdmin = app.dso
+      transfer = TransferInstructionV1.Transfer with
+        sender = sender.primaryParty
+        receiver
+        amount = 50.0
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` hours 1
+        inputHoldingCids = [toInterfaceContractId amuletCid]
+        meta = emptyMetadata
+      extraArgs = ExtraArgs with
+        context = emptyChoiceContext
+        meta = emptyMetadata
+
+  submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
+
+  passTime (hours 2)
+
+  -- TODO: exercise DsoRules_TransferInstruction_Expire
+
+
 
   pure ()
