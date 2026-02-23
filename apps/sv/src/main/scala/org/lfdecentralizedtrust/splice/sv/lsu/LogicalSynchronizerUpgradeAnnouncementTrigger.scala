@@ -48,7 +48,7 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
             TopologyTransactionType.AuthorizedState,
           )
         } yield {
-          if (psid.serial <= config.psid) { Seq.empty }
+          if (psid.serial >= config.psid) { Seq.empty }
           else {
             existingAnnouncement match {
               case Some(announcement)
