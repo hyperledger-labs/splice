@@ -44,6 +44,31 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     })
   }
 
+  def withS3MockSync[A](
+      loggerFactory: NamedLoggerFactory
+  )(test: S3BucketConnection => A)(implicit ec: ExecutionContext): A = {
+
+    val container = new S3MockContainer("4.11.0")
+      .withInitialBuckets("bucket")
+      .withEnv(
+        Map(
+          "debug" -> "true"
+        ).asJava
+      )
+
+    container.start()
+
+    container.followOutput { frame =>
+      logger.debug(s"[s3Mock] ${frame.getUtf8String}")
+    }
+
+    try {
+      test(getS3BucketConnection(loggerFactory, container))
+    } finally {
+      container.stop()
+    }
+  }
+
   private def getS3BucketConnection(
       loggerFactory: NamedLoggerFactory,
       container: S3MockContainer,
