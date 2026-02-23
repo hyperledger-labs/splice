@@ -479,7 +479,8 @@ object ScanHttpEncodings {
           informees = v.informees.toVector,
           confirmingParties = quorums,
           subViews = v.subViews.toVector,
-          viewHash = v.viewHash.getOrElse(""),
+          // TODO(#4091): view hashes were never populated in production, add them back here if required
+          viewHash = "",
         )
       }
 
