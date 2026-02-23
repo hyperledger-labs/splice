@@ -54,7 +54,7 @@
         "policies"
     ],
     "dependencies": {
-        "@google-cloud/sql": "^0.24.0",
+        "@google-cloud/sql": "^0.20.1",
         "commander": "^14.0.3"
     }
 }
