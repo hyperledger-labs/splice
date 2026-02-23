@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -62,10 +62,9 @@ message TransactionView {
   repeated string informees = 1;
   repeated Quorum confirming_parties = 2;
   repeated int32 sub_views = 3;
-
   // Hash of the view. Provided for correlation purposes; e.g., with the traffic
   // information on envelopes reported by the sequencer.
-  string view_hash = 4;
+  bytes view_hash = 4;
 }
 
 message Quorum {
