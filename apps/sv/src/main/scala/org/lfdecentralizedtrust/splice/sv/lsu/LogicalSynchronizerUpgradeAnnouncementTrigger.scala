@@ -8,6 +8,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.SynchronizerAlias
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
@@ -20,7 +21,6 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
 import org.lfdecentralizedtrust.splice.sv.config.ScheduledLsuConfig
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeAnnouncementTrigger.LsuAnnouncementTask
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,7 +28,7 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
     val context: TriggerContext,
     lsuAnnouncementConfig: Option[ScheduledLsuConfig],
     connection: ParticipantAdminConnection,
-    dsoStore: SvDsoStore,
+    syncAlias: SynchronizerAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -41,20 +41,22 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
     lsuAnnouncementConfig match {
       case Some(config) if !now.toInstant.isBefore(config.freezeTime) =>
         for {
-          synchronizerId <- dsoStore.getDsoRules().map(_.domain)
+          psid <- connection.getPhysicalSynchronizerId(syncAlias)
           existingAnnouncement <- connection.lookupSynchronizerLsuAnnouncement(
-            synchronizerId,
+            psid.logical,
             TimeQuery.HeadState,
             TopologyTransactionType.AuthorizedState,
           )
         } yield {
-          existingAnnouncement match {
-            case Some(announcement)
-                if announcement.mapping.successorSynchronizerId.serial == config.psid =>
-              Seq.empty
-            case _ =>
-              Seq(LsuAnnouncementTask(synchronizerId, config))
-          }
+          if (psid.serial <= config.psid) { Seq.empty }
+          else
+            existingAnnouncement match {
+              case Some(announcement)
+                  if announcement.mapping.successorSynchronizerId.serial == config.psid =>
+                Seq.empty
+              case _ =>
+                Seq(LsuAnnouncementTask(psid.logical, config))
+            }
         }
       case _ => Future.successful(Seq.empty)
     }

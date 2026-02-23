@@ -275,7 +275,7 @@ class SvDsoAutomationService(
             triggerContext,
             config.scheduledLsu,
             participantAdminConnection,
-            dsoStore,
+            config.domains.global.alias,
           )
         )
         current.sequencerConfig match {
