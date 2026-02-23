@@ -236,10 +236,9 @@ class UpdateHistoryIntegrationTest
         // Ensure the update related to the externally signed transaction is propagated to the SV1 scan backend.
         eventuallySucceeds() {
           val update = sv1ScanBackend.getUpdate(updateId, encoding = CompactJson)
-          inside(update) {
-            case UpdateHistoryTransaction(transaction) =>
-              transaction.updateId shouldBe updateId
-            // TODO(#3408): check transaction hash after we supported it in REST APIs
+          inside(update) { case UpdateHistoryTransaction(transaction) =>
+            transaction.updateId shouldBe updateId
+          // TODO(#3408): check transaction hash after we supported it in REST APIs
           }
         },
     )
