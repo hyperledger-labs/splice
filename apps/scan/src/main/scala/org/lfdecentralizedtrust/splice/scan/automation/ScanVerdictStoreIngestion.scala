@@ -3,12 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
-import org.lfdecentralizedtrust.splice.automation.{
-  SourceBasedTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
+import org.lfdecentralizedtrust.splice.automation.{SourceBasedTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
@@ -25,7 +20,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
-import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
+import com.digitalasset.canton.util.{ErrorUtil, HexString, PekkoUtil}
 import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -195,7 +190,7 @@ class ScanVerdictStoreIngestion(
           informees = txView.informees,
           confirmingParties = confirmingPartiesJson,
           subViews = txView.subViews,
-          viewHash = Some(txView.viewHash).filter(_.nonEmpty),
+          viewHash = Some(txView.viewHash).filter(!_.isEmpty).map(HexString.toHexString)
         )
       }.toSeq
     }
