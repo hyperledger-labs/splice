@@ -574,7 +574,7 @@ class SV1Initializer(
                   synchronizerParametersState,
                   sequencerState,
                   mediatorState,
-                ) ++ identityTransactions).sorted
+                ) ++ sv1PermissionTx.toList ++ identityTransactions).sorted
                   .mapFilter(_.selectOp[TopologyChangeOp.Replace])
                   .map(signed =>
                     StoredTopologyTransaction(
@@ -837,7 +837,8 @@ object SV1Initializer {
           case Code.NamespaceDelegation => 1
           case Code.OwnerToKeyMapping => 2
           case Code.DecentralizedNamespaceDefinition => 3
-          case _ => 4
+          case Code.ParticipantSynchronizerPermission => 4
+          case _ => 5
         }
       }
 
