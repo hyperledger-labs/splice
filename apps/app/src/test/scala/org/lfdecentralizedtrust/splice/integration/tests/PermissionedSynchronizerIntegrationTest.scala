@@ -31,9 +31,6 @@ class PermissionedSynchronizerIntegrationTest
 
     "onboard SV1 in RestrictedOpen mode" in { implicit env =>
       initDsoWithSv1Only()
-      sv2ScanBackend.startSync()
-      sv3ScanBackend.startSync()
-      sv4ScanBackend.startSync()
 
       val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
         .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
@@ -43,14 +40,14 @@ class PermissionedSynchronizerIntegrationTest
 
     "allow SV1 to authorize and start follower SVs 2-4 sequentially" in { implicit env =>
       val followerSvs = Seq(
-        (sv2ValidatorBackend, sv2Backend),
-        (sv3ValidatorBackend, sv3Backend),
-        (sv4ValidatorBackend, sv4Backend),
+        (sv2ValidatorBackend, sv2Backend, sv2ScanBackend),
+        (sv3ValidatorBackend, sv3Backend, sv3ScanBackend),
+        (sv4ValidatorBackend, sv4Backend, sv4ScanBackend),
       )
 
       var authorizedSvs = Seq(sv1ValidatorBackend)
 
-      for ((validator, sv) <- followerSvs) {
+      for ((validator, sv, scan) <- followerSvs) {
         for (submitter <- authorizedSvs) {
           clue(
             "Submitting participantSynchronizerPermission of " + validator.participantClient.id + " to SV" + submitter.participantClient.id
@@ -66,6 +63,7 @@ class PermissionedSynchronizerIntegrationTest
         clue("Starting SV" + validator.participantClient.id) {
           sv.startSync()
           validator.startSync()
+          scan.startSync()
         }
         authorizedSvs :+= validator
       }
