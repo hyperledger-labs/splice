@@ -294,7 +294,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Resource Utilization (Summary)",
   "uid": "01606be7-23f9-4136-97cd-1fc927a95ce5",
   "version": 7
