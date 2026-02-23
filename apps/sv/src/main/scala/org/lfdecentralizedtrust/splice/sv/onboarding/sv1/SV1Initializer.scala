@@ -89,8 +89,6 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyMapping,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
-
-com.digitalasset.canton.topology.transaction.ParticipantSynchronizerPermission
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
