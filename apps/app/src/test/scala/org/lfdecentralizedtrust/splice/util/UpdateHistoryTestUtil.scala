@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -105,10 +104,12 @@ trait UpdateHistoryTestUtil extends TestCommon {
       updateHistory: UpdateHistory,
       ledgerBegin: Long,
       mustIncludeReassignments: Boolean = false,
+      mustCheckExternalTxnHash: Boolean = false,
+      txnHashString: String = "external transaction hash",
   ): Assertion = {
-    val actualUpdates =
+    val actualUpdates = {
       updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
-
+    }
     val recordedUpdates = updateHistory
       .getAllUpdates(
         Some(
@@ -142,11 +143,68 @@ trait UpdateHistoryTestUtil extends TestCommon {
       actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInStoreIngestion))
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
     actualUpdatesWithoutLostData should have length recordedUpdatesWithoutLostData.size.longValue()
+
     actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
-      case (actual, recorded) => actual shouldBe recorded
+      case (actual, recorded) =>
+        actual shouldBe recorded
+    }
+
+    if (mustCheckExternalTxnHash) {
+      compareExternalTxnHashes(actualUpdates, recordedUpdates.map(_.update), txnHashString)
     }
     succeed
   }
+
+  private def compareExternalTxnHashes(
+      actualUpdates: Seq[UpdateHistoryResponse],
+      recordedUpdates: Seq[UpdateHistoryResponse],
+      txnHashString: String,
+  ): Assertion = {
+    // Ensure at least one transaction with external hash is available
+    actualUpdates.collect {
+      case UpdateHistoryResponse(TransactionTreeUpdate(tx), _)
+          if Option(tx.getExternalTransactionHash).exists(!_.isEmpty) =>
+        tx
+    } should not be empty
+
+    actualUpdates.zip(recordedUpdates).foreach { case (actual, recorded) =>
+      compareTxnHashPerUpdate(actual, recorded, txnHashString)
+    }
+    succeed
+  }
+
+  private def compareTxnHashPerUpdate(
+      actual: UpdateHistoryResponse,
+      recorded: UpdateHistoryResponse,
+      txnHashString: String,
+  ): Assertion =
+    (actual, recorded) match {
+      case (
+            UpdateHistoryResponse(TransactionTreeUpdate(actualTx), _),
+            UpdateHistoryResponse(TransactionTreeUpdate(recordedTx), _),
+          ) =>
+        val actualHashString =
+          Option(actualTx.getExternalTransactionHash)
+            .map(_.toByteArray)
+            .getOrElse(Array.emptyByteArray)
+            .map("%02x" format _)
+            .mkString
+        val recordedHashString =
+          Option(recordedTx.getExternalTransactionHash)
+            .map(_.toByteArray)
+            .getOrElse(Array.emptyByteArray)
+            .map("%02x" format _)
+            .mkString
+        actualHashString shouldBe recordedHashString
+        if (recordedHashString.nonEmpty) {
+          Set(actualHashString, recordedHashString, txnHashString) should have size 1
+        } else {
+          Set(actualHashString, recordedHashString) should have size 1
+        }
+      case _ =>
+        ()
+        succeed
+    }
 
   def compareHistoryViaLosslessScanApi(
       scanBackend: ScanAppBackendReference,
@@ -321,7 +379,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
-      ByteString.EMPTY,
+      t.getExternalTransactionHash,
     )
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =
