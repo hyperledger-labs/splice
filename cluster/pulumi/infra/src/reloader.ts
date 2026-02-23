@@ -21,8 +21,8 @@ export function configureReloader(): k8s.helm.v3.Release {
         repo: 'https://stakater.github.io/stakater-charts',
       },
       values: {
-        image:{
-          pullPolicy: "Always",
+        image: {
+          pullPolicy: 'Always',
         },
         reloader: {
           logFormat: 'json',
@@ -33,15 +33,15 @@ export function configureReloader(): k8s.helm.v3.Release {
           },
           containerSecurityContext: {
             capabilities: {
-              drop: ['ALL']
+              drop: ['ALL'],
             },
             allowPrivilegeEscalation: false,
             readOnlyRootFilesystem: true,
-          }
+          },
         },
         serviceMonitor: {
           enabled: true,
-        }
+        },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
