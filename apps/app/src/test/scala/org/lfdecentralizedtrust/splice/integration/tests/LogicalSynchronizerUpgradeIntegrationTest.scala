@@ -10,6 +10,7 @@ import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.util.HexString
+import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppFoundDsoConfigs_
 import org.lfdecentralizedtrust.splice.console.*
@@ -23,6 +24,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchroniz
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.sv.config.{
+  ScheduledLsuConfig,
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
@@ -59,6 +61,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
   // update history sanity plugin wil fail.
   override lazy val skipAcsSnapshotChecks = true
 
+  lazy val scheduledLsu = ScheduledLsuConfig(
+    Instant.now().plusSeconds(120).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(180).truncatedTo(ChronoUnit.SECONDS),
+    NonNegativeInt.one,
+    ProtocolVersion.v34,
+  )
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -77,7 +86,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes.copy(successor =
                 config.localSynchronizerNodes.current.map(_.copy(serial = NonNegativeInt.one))
-              )
+              ),
+              scheduledLsu = Some(
+                scheduledLsu
+              ),
             )
           }
           .andThen(ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000))(config)
@@ -197,15 +209,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-    val upgradeTimeInstant = Instant
-      .now()
-      .plusSeconds(60)
-      .truncatedTo(
-        ChronoUnit.SECONDS
-      )
-    val upgradeTime = CantonTimestamp.tryFromInstant(
-      upgradeTimeInstant
-    )
     withCantonSvNodes(
       (
         None,
@@ -216,22 +219,17 @@ class LogicalSynchronizerUpgradeIntegrationTest
       participants = false,
       logSuffix = "global-domain-migration",
       extraSequencerConfig = Seq(
-        s"""parameters.sequencing-time-lower-bound-exclusive=$upgradeTimeInstant"""
+        s"""parameters.sequencing-time-lower-bound-exclusive=${scheduledLsu.upgradeTime}"""
       ),
     )() {
 
-      clue(s"Announce upgrade at $upgradeTime") {
-        allBackends.par.map { backend =>
-          backend.participantClientWithAdminToken.topology.lsu.announcement
-            .propose(
-              successorPsid,
-              upgradeTime,
-              store = Some(Synchronizer(decentralizedSynchronizerId)),
+      clue(s"wait for lsu announcement") {
+        eventually(timeUntilSuccess = 2.minutes) {
+          sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
+            .list(
+              Some(Synchronizer(decentralizedSynchronizerId))
             )
         }
-        allBackends.head.participantClientWithAdminToken.topology.lsu.announcement
-          .list()
-          .head
       }
 
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
@@ -276,15 +274,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      clue(s"wait for upgrade time $upgradeTime") {
-        Threading.sleep(Duration.between(Instant.now(), upgradeTimeInstant).toMillis.abs)
+      clue(s"wait for upgrade time ${scheduledLsu.upgradeTime}") {
+        Threading.sleep(Duration.between(Instant.now(), scheduledLsu.upgradeTime).toMillis.abs)
       }
 
       clue("transfer traffic after upgrade") {
         allBackends.par.map { backend =>
           eventually(timeUntilSuccess = 2.minutes) {
             backend.mediatorClient.testing
-              .fetch_synchronizer_time(NonNegativeDuration.ofSeconds(10)) should be > upgradeTime
+              .fetch_synchronizer_time(
+                NonNegativeDuration.ofSeconds(10)
+              )
+              .toInstant should be > scheduledLsu.upgradeTime
           }
 
           clue(s"transfer traffic for  ${backend.name}") {

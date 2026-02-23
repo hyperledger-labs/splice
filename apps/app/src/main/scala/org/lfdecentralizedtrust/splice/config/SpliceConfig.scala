@@ -593,6 +593,8 @@ object SpliceConfig {
       deriveReader[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigReader[RangeConfig] =
       deriveReader[RangeConfig]
+    implicit val scheduledLsuConfigReader: ConfigReader[ScheduledLsuConfig] =
+      deriveReader[ScheduledLsuConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -1028,6 +1030,8 @@ object SpliceConfig {
       deriveWriter[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigWriter[RangeConfig] =
       deriveWriter[RangeConfig]
+    implicit val scheduledLsuConfigWriter: ConfigWriter[ScheduledLsuConfig] =
+      deriveWriter[ScheduledLsuConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

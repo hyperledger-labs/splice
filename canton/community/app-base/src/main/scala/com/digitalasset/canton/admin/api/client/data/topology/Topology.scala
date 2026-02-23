@@ -356,7 +356,7 @@ object ListSequencerSynchronizerStateResult {
 final case class ListLsuAnnouncementResult(
     context: BaseResult,
     item: LsuAnnouncement,
-)
+) extends TopologyResult[LsuAnnouncement]
 
 object ListLsuAnnouncementResult {
   def fromProtoV30(

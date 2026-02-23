@@ -89,6 +89,7 @@ abstract class TopologyAdminConnection(
       grpcClientMetrics,
     )
     with RetryProvider.Has
+    with LsuTopologyAdminConnection
     with Spanning {
   import TopologyAdminConnection.{RecreateOnAuthorizedStateChange, TopologyResult}
 
@@ -675,6 +676,39 @@ abstract class TopologyAdminConnection(
       )
     )
 
+  def ensureTopologyMapping[M <: TopologyMapping: ClassTag](
+      store: TopologyStoreId,
+      description: String,
+      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
+      update: M => Either[String, M],
+      retryFor: RetryFor,
+      isProposal: Boolean = false,
+      recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
+        RecreateOnAuthorizedStateChange.Recreate,
+      forceChanges: ForceFlags = ForceFlags.none,
+      waitForAuthorization: Boolean = true,
+      maxSubmissionDelay: Option[(Clock, NonNegativeFiniteDuration)] = None,
+  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
+    ensureTopologyMappingO(
+      store,
+      description,
+      check.andThen(_.leftMap(_.some)),
+      {
+        case Some(value) => update(value)
+        case None =>
+          throw Status.INTERNAL
+            .withDescription("Update was called without an existing state, should be impossible")
+            .asRuntimeException()
+      },
+      retryFor,
+      isProposal,
+      recreateOnAuthorizedStateChange,
+      forceChanges,
+      waitForAuthorization,
+      maxSubmissionDelay,
+    )
+  }
+
   /** Ensure that either the accepted state passes the check, or a topology mapping is created that passes the check
     *  - run the check to see if it holds
     *  - if not then create transaction with the updated mapping
@@ -683,11 +717,13 @@ abstract class TopologyAdminConnection(
     *
     *  This type of re-create of the topology transactions is required to ensure that updating the same topology state in parallel will eventually succeed for all the updates
     */
-  def ensureTopologyMapping[M <: TopologyMapping: ClassTag](
+  def ensureTopologyMappingO[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       description: String,
-      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
-      update: M => Either[String, M],
+      check: TopologyTransactionType => EitherT[Future, Option[TopologyResult[M]], TopologyResult[
+        M
+      ]],
+      update: Option[M] => Either[String, M],
       retryFor: RetryFor,
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
@@ -712,16 +748,18 @@ abstract class TopologyAdminConnection(
           "establish_topology_mapping_retry",
           description,
           check(AuthorizedState).foldF(
-            { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
+            { resultBeforeProposingChange =>
+              val existingSerial =
+                resultBeforeProposingChange.map(_.base.serial).getOrElse(PositiveInt.one)
               (recreateOnAuthorizedStateChange match {
                 case RecreateOnAuthorizedStateChange.Abort(expectedSerial)
-                    if expectedSerial != beforeEstablishedBaseResult.serial =>
-                  Future.failed(AuthorizedStateChanged(beforeEstablishedBaseResult.serial))
+                    if expectedSerial != existingSerial =>
+                  Future.failed(AuthorizedStateChanged(existingSerial))
                 case _ => Future.unit
               })
                 .flatMap { _ =>
                   def proposeNewTopologyTransaction = {
-                    val updatedMapping = update(mapping)
+                    val updatedMapping = update(resultBeforeProposingChange.map(_.mapping))
                     val sleep: Future[Unit] =
                       minSubmissionTimeO.fold(Future.unit) { case (clock, minSubmissionTime) =>
                         logger.info(
@@ -734,7 +772,9 @@ abstract class TopologyAdminConnection(
                       proposeMapping(
                         store,
                         updatedMapping,
-                        serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                        serial = resultBeforeProposingChange
+                          .map(_.base.serial + PositiveInt.one)
+                          .getOrElse(PositiveInt.one),
                         isProposal = isProposal,
                         forceChanges = forceChanges,
                       ).map { signed =>
@@ -779,35 +819,46 @@ abstract class TopologyAdminConnection(
                     "check_establish_topology_mapping",
                     s"check established $description",
                     check(TopologyTransactionType.AuthorizedState)
-                      .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
-                        if (
-                          currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial
-                        ) {
-                          if (isProposal && !waitForAuthorization) {
-                            check(TopologyTransactionType.ProposalSignedByOwnKey)
-                              .leftMap { res =>
+                      .leftFlatMap[TopologyResult[M], RuntimeException] {
+                        case Some(currentAuthorizedState) =>
+                          if (
+                            resultBeforeProposingChange
+                              .map(_.base.serial)
+                              .contains(currentAuthorizedState.base.serial)
+                          ) {
+                            if (isProposal && !waitForAuthorization) {
+                              check(TopologyTransactionType.ProposalSignedByOwnKey)
+                                .leftMap { res =>
+                                  Status.FAILED_PRECONDITION
+                                    .withDescription(
+                                      s"Condition is not yet observed. Waiting for proposal: $proposal, found: $res."
+                                    )
+                                    .asRuntimeException()
+                                }
+                            } else {
+                              EitherT.leftT(
                                 Status.FAILED_PRECONDITION
                                   .withDescription(
-                                    s"Condition is not yet observed. Waiting for proposal: $proposal, found: $res."
+                                    s"Condition is not yet observed. Proposed: $proposal, found: $currentAuthorizedState."
                                   )
                                   .asRuntimeException()
-                              }
+                              )
+                            }
                           } else {
-                            EitherT.leftT(
-                              Status.FAILED_PRECONDITION
-                                .withDescription(
-                                  s"Condition is not yet observed. Proposed: $proposal, found: $currentAuthorizedState."
-                                )
-                                .asRuntimeException()
+                            EitherT.leftT[Future, TopologyResult[M]](
+                              AuthorizedStateChanged(
+                                currentAuthorizedState.base.serial
+                              )
                             )
                           }
-                        } else {
-                          EitherT.leftT[Future, TopologyResult[M]](
-                            AuthorizedStateChanged(
-                              currentAuthorizedState.base.serial
-                            )
+                        case None =>
+                          EitherT.leftT(
+                            Status.FAILED_PRECONDITION
+                              .withDescription(
+                                s"Condition is not yet observed. Proposed: $proposal, found none."
+                              )
+                              .asRuntimeException()
                           )
-                        }
                       }
                       .rethrowT,
                     logger,
@@ -1455,57 +1506,6 @@ abstract class TopologyAdminConnection(
       synchronizerId.filterString,
     )
   ).map(_.map(r => TopologyResult(r.context, r.item)))
-
-  def lookupSequencerSuccessors(synchronizerId: SynchronizerId, sequencerId: SequencerId)(implicit
-      tc: TraceContext
-  ): Future[Option[TopologyResult[LsuSequencerConnectionSuccessor]]] = runCmd(
-    TopologyAdminCommands.Read.ListLsuSequencerConnectionSuccessor(
-      BaseQuery(
-        TopologyStoreId.Synchronizer(synchronizerId),
-        proposals = false,
-        timeQuery = TimeQuery.HeadState,
-        ops = Some(TopologyChangeOp.Replace),
-        filterSigningKey = "",
-        protocolVersion = None,
-      ),
-      sequencerId.filterString,
-    )
-  ).map(_.headOption.map(r => TopologyResult(r.context, r.item)))
-
-  def ensureSequencerSuccessor(
-      synchronizerId: SynchronizerId,
-      sequencerId: SequencerId,
-      connection: GrpcConnection,
-  )(implicit tc: TraceContext): Future[TopologyResult[LsuSequencerConnectionSuccessor]] = {
-    retryProvider.ensureThat(
-      RetryFor.Automation,
-      s"sequencer_successor_$sequencerId",
-      s"sequencer successor for $sequencerId is published with connection $connection",
-      lookupSequencerSuccessors(synchronizerId, sequencerId).map { result =>
-        result.filter(_.mapping.connection == connection).toRight(result)
-      },
-      (previous: Option[TopologyResult[LsuSequencerConnectionSuccessor]]) => {
-        logger.info(s"Adding sequencer $sequencerId successor with connection $connection")
-        (previous match {
-          case Some(successor) =>
-            proposeMapping(
-              synchronizerId,
-              successor.mapping.copy(connection = connection),
-              successor.base.serial + PositiveInt.one,
-              isProposal = false,
-            )
-          case None =>
-            proposeMapping(
-              synchronizerId,
-              LsuSequencerConnectionSuccessor(sequencerId, synchronizerId, connection),
-              PositiveInt.one,
-              isProposal = false,
-            )
-        }).map(_ => ())
-      },
-      logger,
-    )
-  }
 
   def ensurePartyUnhostedFromParticipant(
       retryFor: RetryFor,

@@ -43,6 +43,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
 import java.nio.file.Path
+import java.time.Instant
 
 case class ExpectedValidatorOnboardingConfig(
     secret: String,
@@ -295,6 +296,7 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNodes: SvSynchronizerNodesConfig,
+    scheduledLsu: Option[ScheduledLsuConfig],
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -531,4 +533,11 @@ final case class AmuletConversionRateFeedConfig(
 final case class RangeConfig(
     min: BigDecimal,
     max: BigDecimal,
+)
+
+final case class ScheduledLsuConfig(
+    freezeTime: Instant,
+    upgradeTime: Instant,
+    psid: NonNegativeInt,
+    protocolVersion: ProtocolVersion,
 )
