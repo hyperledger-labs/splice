@@ -60,6 +60,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, UnrestrictedOpen}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -73,7 +74,7 @@ import com.digitalasset.canton.time.{
   PositiveFiniteDuration,
   PositiveSeconds,
 }
-import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.{transaction, *}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -82,11 +83,14 @@ import com.digitalasset.canton.topology.store.{
 }
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
+  ParticipantPermission,
   SignedTopologyTransaction,
   TopologyChangeOp,
   TopologyMapping,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
+
+com.digitalasset.canton.topology.transaction.ParticipantSynchronizerPermission
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
@@ -489,6 +493,12 @@ class SV1Initializer(
             NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
+          onboardingRestriction = if (config.permissionedSynchronizer) {
+            logger.debug("Using RestrictedOpen onboarding restriction for the synchronizer")
+            RestrictedOpen
+          } else {
+            UnrestrictedOpen
+          },
         )
         for {
           physicalSynchronizerId <- retryProvider.ensureThatO(
@@ -505,6 +515,26 @@ class SV1Initializer(
                   NonEmpty.mk(Set, participantId.uid.namespace),
                   threshold = PositiveInt.one,
                 )
+              sv1PermissionTx <-
+                if (config.permissionedSynchronizer) {
+                  logger.debug(
+                    "Proposing ParticipantSynchronizerPermission topology transaction for the SV1"
+                  )
+                  participantAdminConnection
+                    .proposeMapping(
+                      TopologyStoreId.Authorized,
+                      transaction.ParticipantSynchronizerPermission(
+                        synchronizerId,
+                        participantId,
+                        ParticipantPermission.Submission,
+                        None,
+                        None,
+                      ),
+                      serial = PositiveInt.one,
+                      isProposal = false,
+                    )
+                    .map(Some(_))
+                } else Future.successful(None)
               (
                 identityTransactions,
                 synchronizerParametersState,
