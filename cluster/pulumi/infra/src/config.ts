@@ -65,6 +65,9 @@ const MonitoringConfigSchema = z
         deployment: z.object({
           pendingPeriodMinutes: z.number(),
         }),
+        sequencerClientDelay: z.object({
+          seconds: z.number(),
+        }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
     }),

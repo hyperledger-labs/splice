@@ -57,6 +57,8 @@ monitoring:
         mediatorRetentionDays: 30
         participantRetentionDays: 30
         sequencerRetentionDays: 30
+      sequencerClientDelay:
+        seconds: 90
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
