@@ -1353,28 +1353,9 @@ subcmd_export_to() {
 subcommand_whitelist[partial_upgrade]="Upgrades SV-1's sv-app and validator1's validator-app to the version passed"
 
 function subcmd_partial_upgrade() {
-    new_version=$1
-    original_versions_file=$2
-    json=$(cat "$original_versions_file")
-
-    json_paths=(
-        '["sv-1","splice-participant"]'
-        '["sv-1","splice-global-domain"]'
-        '["sv-1","splice-cometbft"]'
-        '["sv-1","splice-scan"]'
-        '["sv-1","splice-sv-node"]'
-        '["sv-1","splice-validator"]'
-        '["validator1","splice-validator"]'
-        '["validator1","splice-participant"]'
-        '["validator1","splice-splitwell-web-ui"]'
-    )
-    for json_path in "${json_paths[@]}"; do
-      json=$(jq "setpath($json_path; \"$new_version\")" <<< "$json")
-    done
-
-    _info "Upgrading sv-1 sv-app & validator1 validator-app to version $new_version"
     local -x IMAGE_VERSIONS_FILE="/tmp/partial_upgrade_versions.json"
-    echo "$json" > "$IMAGE_VERSIONS_FILE"
+    "${SPLICE_ROOT}/scripts/partially-upgrade-versions.ts" "$@" > "$IMAGE_VERSIONS_FILE"
+    _info "Upgrading ${3:-1} sv(s) & validator1 validator-app to version $1"
 
     _pulumi_automation_run_up
 }

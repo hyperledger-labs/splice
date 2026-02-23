@@ -984,6 +984,7 @@
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
         "participantAddress": "participant-3",
+        "permissionedSynchronizer": false,
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",

@@ -6,13 +6,12 @@ import com.github.luben.zstd.ZstdInputStream
 import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.scalatest.EitherValues
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
+import org.lfdecentralizedtrust.splice.scan.config.S3Config
 
 import java.io.ByteArrayOutputStream
-import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -50,10 +49,11 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       container: S3MockContainer,
   ): S3BucketConnection = {
     val s3Config = S3Config(
-      URI.create(container.getHttpEndpoint),
+      container.getHttpEndpoint,
       "bucket",
-      Region.US_EAST_1,
-      AwsBasicCredentials.create("mock_id", "mock_key"),
+      Region.US_EAST_1.toString,
+      "mock_id",
+      "mock_key",
     )
     S3BucketConnectionForUnitTests(s3Config, "bucket", loggerFactory)
   }

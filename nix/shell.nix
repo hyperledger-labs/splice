@@ -105,6 +105,7 @@ let
     tinyproxy
     tmux
     toxiproxy
+    deno
     unzip
     which
     zip

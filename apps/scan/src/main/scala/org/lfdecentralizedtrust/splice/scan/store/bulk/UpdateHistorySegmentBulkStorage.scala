@@ -7,13 +7,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HistoryMetrics,
   TimestampWithMigrationId,
   TreeUpdateWithMigrationId,
   UpdateHistory,
@@ -23,10 +24,7 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
-
-// TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
 case class UpdatesSegment(
     fromTimestamp: TimestampWithMigrationId,
@@ -47,17 +45,15 @@ case class UpdatesSegment(
   * know when each segment is complete).
   */
 class UpdateHistorySegmentBulkStorage(
-    val config: ScanStorageConfig,
-    val updateHistory: UpdateHistory,
-    val s3Connection: S3BucketConnection,
-    val segment: UpdatesSegment,
+    storageConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
+    updateHistory: UpdateHistory,
+    s3Connection: S3BucketConnection,
+    segment: UpdatesSegment,
+    historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
-
-  // When more updates are not yet available, how long to wait for more.
-  // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
-  private val updatesPollingInterval = 5.seconds
 
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
@@ -65,7 +61,7 @@ class UpdateHistorySegmentBulkStorage(
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
-        HardLimit.tryCreate(config.bulkDbReadChunkSize),
+        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
         TimestampWithMigrationId(
@@ -75,7 +71,7 @@ class UpdateHistorySegmentBulkStorage(
       )
       result <-
         if (
-          updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
+          updatesInSegment.length < updates.length || updates.length == storageConfig.bulkDbReadChunkSize
         ) {
           if (updatesInSegment.nonEmpty) {
             // Found enough updates to add
@@ -104,10 +100,13 @@ class UpdateHistorySegmentBulkStorage(
           }
         } else {
           logger.debug(
-            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
+            s"Not enough updates yet (queried for ${storageConfig.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
                 .map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
           )
-          after(updatesPollingInterval, actorSystem.scheduler) {
+          after(
+            appConfig.updatesPollingInterval.underlying,
+            actorSystem.scheduler,
+          ) {
             Future.successful(Some((afterTs, ByteString.empty)))
           }
         }
@@ -140,15 +139,19 @@ class UpdateHistorySegmentBulkStorage(
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(
         S3ZstdObjects(
-          config,
+          storageConfig,
+          appConfig,
           s3Connection,
-          { objIdx => s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_$objIdx.zstd" },
+          { objIdx =>
+            s"${storageConfig.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
+          },
           loggerFactory,
         )
       )
-      .map((o: S3ZstdObjects.Output) =>
+      .map((o: S3ZstdObjects.Output) => {
+        historyMetrics.BulkStorage.incUpdateObjects()
         UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
-      )
+      })
   }
 }
 object UpdateHistorySegmentBulkStorage {
@@ -160,9 +163,11 @@ object UpdateHistorySegmentBulkStorage {
   )
 
   def asFlow(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
@@ -171,19 +176,23 @@ object UpdateHistorySegmentBulkStorage {
   ): Flow[UpdatesSegment, Output, NotUsed] =
     Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
       new UpdateHistorySegmentBulkStorage(
-        config,
+        storageConfig,
+        appConfig,
         updateHistory,
         s3Connection,
         segment,
+        historyMetrics,
         loggerFactory,
       ).getSource
     }
 
   def asSource(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
       segment: UpdatesSegment,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
@@ -191,10 +200,12 @@ object UpdateHistorySegmentBulkStorage {
       actorSystem: ActorSystem,
   ): Source[Output, NotUsed] =
     new UpdateHistorySegmentBulkStorage(
-      config,
+      storageConfig,
+      appConfig,
       updateHistory,
       s3Connection,
       segment,
+      historyMetrics,
       loggerFactory,
     ).getSource
 
