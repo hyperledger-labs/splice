@@ -49,7 +49,7 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
           )
         } yield {
           if (psid.serial <= config.psid) { Seq.empty }
-          else
+          else {
             existingAnnouncement match {
               case Some(announcement)
                   if announcement.mapping.successorSynchronizerId.serial == config.psid =>
@@ -57,6 +57,7 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
               case _ =>
                 Seq(LsuAnnouncementTask(psid.logical, config))
             }
+          }
         }
       case _ => Future.successful(Seq.empty)
     }
