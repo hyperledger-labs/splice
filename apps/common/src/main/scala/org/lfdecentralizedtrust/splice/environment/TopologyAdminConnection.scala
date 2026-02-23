@@ -1456,7 +1456,7 @@ abstract class TopologyAdminConnection(
     )
   ).map(_.map(r => TopologyResult(r.context, r.item)))
 
-  def findSequencerSuccessors(synchronizerId: SynchronizerId, sequencerId: SequencerId)(implicit
+  def lookupSequencerSuccessors(synchronizerId: SynchronizerId, sequencerId: SequencerId)(implicit
       tc: TraceContext
   ): Future[Option[TopologyResult[LsuSequencerConnectionSuccessor]]] = runCmd(
     TopologyAdminCommands.Read.ListLsuSequencerConnectionSuccessor(
@@ -1481,7 +1481,7 @@ abstract class TopologyAdminConnection(
       RetryFor.Automation,
       s"sequencer_successor_$sequencerId",
       s"sequencer successor for $sequencerId is published with connection $connection",
-      findSequencerSuccessors(synchronizerId, sequencerId).map { result =>
+      lookupSequencerSuccessors(synchronizerId, sequencerId).map { result =>
         result.filter(_.mapping.connection == connection).toRight(result)
       },
       (previous: Option[TopologyResult[LsuSequencerConnectionSuccessor]]) => {
@@ -1490,7 +1490,7 @@ abstract class TopologyAdminConnection(
           case Some(successor) =>
             proposeMapping(
               synchronizerId,
-              successor.mapping,
+              successor.mapping.copy(connection = connection),
               successor.base.serial + PositiveInt.one,
               isProposal = false,
             )
