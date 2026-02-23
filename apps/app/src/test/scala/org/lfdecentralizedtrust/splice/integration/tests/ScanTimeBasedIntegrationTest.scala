@@ -2,26 +2,26 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, S3Config}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.bulk.HasS3Mock
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
+import software.amazon.awssdk.regions.Region
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
@@ -57,6 +57,23 @@ class ScanTimeBasedIntegrationTest
         // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
         advanceTimeForRewardAutomationToRunForCurrentRound
       }
+      .addConfigTransforms((_, config) => ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+        scanConfig.copy(
+          bulkStorage = BulkStorageConfig(
+            snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+            updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+            s3 = Some(S3Config(
+              endpoint = "http://localhost:9090",
+              bucketName = "bucket",
+              region = Region.US_EAST_1.toString,
+              accessKeyId = "mock",
+              secretAccessKey = "mock"
+            ))
+
+          )
+        )
+      )(config)
+      )
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
@@ -355,7 +372,6 @@ class ScanTimeBasedIntegrationTest
 
   "snapshotting" in { implicit env =>
     {
-      // TODO: doesn't work, we need to run the container before creating the config!
       withS3MockSync(loggerFactory) { s3Connection =>
         {
 

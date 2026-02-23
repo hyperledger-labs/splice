@@ -56,6 +56,10 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
         ).asJava
       )
 
+    // Fix port bindings, so that we can configure apps in the
+    // integration test env before actually starting the container
+    container.setPortBindings(Seq("9090:9090").asJava)
+
     container.start()
 
     container.followOutput { frame =>
