@@ -116,6 +116,21 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
+  // ignoreUnexpectedAmuletCreateArchive disables the warning when we
+  // hit a bare create/archive of an amulet contract.  We use this for
+  // parsing contracts that used to have a `AmuletRules_Transfer`
+  // child node but no longer do. This is in particular true for all
+  // token standard choices after the change to 24h submission delay
+  // change.  This allows us to parse the children of e.g. a token
+  // standard transfer with ignoreUnexpectedAmuletCreateArchive=true
+  // which then works for both the version with the
+  // AmuletRules_Transfer child and the one without.  If we get a
+  // transfer event as a child, we know we parsed the old version
+  // whereas if we get no transfer event child we need to construct
+  // one directly for the token standard choice but can make more
+  // assumptions, in particular, we know that there are no fees as
+  // those have been disabled before the 24h submission change takes
+  // effect.
   private def parseTree(
       tree: Transaction,
       root: Event,

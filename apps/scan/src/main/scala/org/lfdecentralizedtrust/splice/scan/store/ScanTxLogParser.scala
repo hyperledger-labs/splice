@@ -49,6 +49,21 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
+  // ignoreUnexpectedAmuletCreateArchive disables the warning when we
+  // hit a bare create/archive of an amulet contract.  We use this for
+  // parsing contracts that used to have a `AmuletRules_Transfer`
+  // child node but no longer do. This is in particular true for all
+  // token standard choices after the change to 24h submission delay
+  // change.  This allows us to parse the children of e.g. a token
+  // standard transfer with ignoreUnexpectedAmuletCreateArchive=true
+  // which then works for both the version with the
+  // AmuletRules_Transfer child and the one without.  If we get a
+  // transfer event as a child, we know we parsed the old version
+  // whereas if we get no transfer event child we need to construct
+  // one directly for the token standard choice but can make more
+  // assumptions, in particular, we know that there are no fees as
+  // those have been disabled before the 24h submission change takes
+  // effect.
   private def parseTree(
       tree: Transaction,
       synchronizerId: SynchronizerId,
@@ -74,18 +89,7 @@ class ScanTxLogParser(
               tree.getChildNodeIds(exercised).asScala.toList,
               ignoreUnexpectedAmuletCreateArchive,
             )
-            state.copy(
-              entries = state.entries.map {
-                case e: TransferTxLogEntry =>
-                  e.copy(
-                    description = node.argument.value.description.orElse(""),
-                    eventId =
-                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
-                    transferKind = TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND,
-                  )
-                case e => e
-              }
-            )
+            state.setTransferPreapprovalSendFields(tree, exercised, node.argument.value.description)
           case TransferPreapproval_SendV2(node) =>
             val receiver = (node.result.value.result.summary.balanceChanges.asScala.keySet
               .diff(Set(node.argument.value.sender)))
@@ -105,18 +109,7 @@ class ScanTxLogParser(
               outputs = Seq(output),
               result = node.result.value.result,
             )
-            state.copy(
-              entries = state.entries.map {
-                case e: TransferTxLogEntry =>
-                  e.copy(
-                    description = node.argument.value.description.orElse(""),
-                    eventId =
-                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
-                    transferKind = TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND,
-                  )
-                case e => e
-              }
-            )
+            state.setTransferPreapprovalSendFields(tree, exercised, node.argument.value.description)
           case CreateTokenStandardTransferInstruction(node) =>
             val cid: String = node.result.value.output match {
               case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending =>
@@ -574,6 +567,24 @@ object ScanTxLogParser {
         case _: TransferTxLogEntry => true
         case _ => false
       }
+
+    def setTransferPreapprovalSendFields(
+        tree: Transaction,
+        exercised: ExercisedEvent,
+        description: java.util.Optional[String],
+    ): State =
+      copy(
+        entries = entries.map {
+          case e: TransferTxLogEntry =>
+            e.copy(
+              description = description.orElse(""),
+              eventId =
+                EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+              transferKind = TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND,
+            )
+          case e => e
+        }
+      )
   }
 
   private object State {
