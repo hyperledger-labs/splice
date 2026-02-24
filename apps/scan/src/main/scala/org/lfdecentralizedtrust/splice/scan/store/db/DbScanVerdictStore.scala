@@ -23,6 +23,12 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
+  DbSequencerTrafficSummaryStore,
+}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT;
+import org.lfdecentralizedtrust.splice.scan.store.db.DbSequencerTrafficSummaryStore.TrafficSummaryT;
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
@@ -147,14 +153,24 @@ object DbScanVerdictStore {
   def apply(
       storage: com.digitalasset.canton.resource.DbStorage,
       updateHistory: UpdateHistory,
+      appActivityRecordStoreO: Option[DbAppActivityRecordStore],
+      trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): DbScanVerdictStore =
-    new DbScanVerdictStore(storage, updateHistory, loggerFactory)
+    new DbScanVerdictStore(
+      storage,
+      updateHistory,
+      appActivityRecordStoreO,
+      trafficSummaryStoreO,
+      loggerFactory,
+    )
 }
 
 class DbScanVerdictStore(
     storage: DbStorage,
     updateHistory: UpdateHistory,
+    appActivityRecordStoreO: Option[DbAppActivityRecordStore],
+    trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -366,6 +382,24 @@ class DbScanVerdictStore(
     }
   }
 
+  /** Insert multiple verdicts, their transaction views and additional data in a single transaction.
+    *
+    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
+    * update_id already exists. If it does, we assume this batch has been
+    * inserted already and skip all other inserts, including for the extra tables
+    */
+  def insertVerdictAndOtherData(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
+      trafficSummaries: Seq[TrafficSummaryT],
+      appActivityRecords: Seq[AppActivityRecordT],
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val combined = for {
+      _ <- insertTrafficSummariesDBIO(trafficSummaries)
+      _ <- insertAppActivityRecordsDBIO(appActivityRecords)
+    } yield ()
+    insertVerdictAndTransactionViewsWith(items, combined)
+  }
+
   def getVerdictByUpdateId(updateId: String)(implicit
       tc: TraceContext
   ): Future[Option[VerdictT]] = {
@@ -391,6 +425,24 @@ class DbScanVerdictStore(
         "scanVerdict.getVerdictByUpdateId",
       )
       .value
+  }
+
+  private def insertAppActivityRecordsDBIO(
+      items: Seq[AppActivityRecordT]
+  )(implicit tc: TraceContext): DBIO[Unit] = {
+    appActivityRecordStoreO match {
+      case None => DBIO.successful(())
+      case Some(s) => s.insertAppActivityRecordsDBIO(items)
+    }
+  }
+
+  private def insertTrafficSummariesDBIO(
+      items: Seq[TrafficSummaryT]
+  )(implicit tc: TraceContext): DBIO[Unit] = {
+    trafficSummaryStoreO match {
+      case None => DBIO.successful(())
+      case Some(s) => s.insertTrafficSummariesDBIO(items)
+    }
   }
 
   private def afterFilters(

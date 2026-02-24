@@ -39,7 +39,6 @@ import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import com.digitalasset.canton.mediator.admin.v30
-import slick.dbio.DBIO
 
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
@@ -50,7 +49,6 @@ class ScanVerdictStoreIngestion(
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
     sequencerTrafficClientO: Option[SequencerTrafficClient],
-    trafficSummaryStoreO: Option[DbSequencerTrafficSummaryStore],
     appActivityComputation: AppActivityComputation,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -145,8 +143,8 @@ class ScanVerdictStoreIngestion(
 
       // 1. Fetch traffic summaries FIRST (before any DB operations)
       val trafficSummariesF: Future[Seq[DbSequencerTrafficSummaryStore.TrafficSummaryT]] =
-        (sequencerTrafficClientO, trafficSummaryStoreO) match {
-          case (Some(sequencerTrafficClient), Some(_)) =>
+        sequencerTrafficClientO match {
+          case Some(sequencerTrafficClient) =>
             sequencerTrafficClient
               .getTrafficSummaries(sequencingTimes)
               .map(_.map { proto =>
@@ -162,6 +160,7 @@ class ScanVerdictStoreIngestion(
         trafficSummaries <- trafficSummariesF
 
         // Pair traffic summaries with verdicts by sequencing time
+        // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
         summaryByTime = trafficSummaries.map(s => s.sequencingTime -> s).toMap
         summariesWithVerdicts = batch.flatMap { verdict =>
           CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.flatMap { recordTime =>
@@ -175,24 +174,7 @@ class ScanVerdictStoreIngestion(
           Set.empty[PartyId], // featuredAppProviders
         )
 
-        // Build combined DBIO action for traffic summaries and app activity
-        trafficAction: DBIO[Unit] = trafficSummaryStoreO match {
-          // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
-          case Some(trafficStore) if trafficSummaries.nonEmpty =>
-            trafficStore.insertTrafficSummariesDBIO(trafficSummaries)
-          case _ =>
-            DBIO.successful(())
-        }
-        appActivityAction: DBIO[Unit] = appActivityComputation.insertActivitiesDBIO(
-          appActivityRecords
-        )
-
-        combinedAction = for {
-          _ <- trafficAction
-          _ <- appActivityAction
-        } yield ()
-
-        _ <- store.insertVerdictAndTransactionViewsWith(items, combinedAction)
+        _ <- store.insertVerdictAndOtherData(items, trafficSummaries, appActivityRecords)
       } yield (trafficSummaries.size, appActivityRecords.size)
 
       result.transform {

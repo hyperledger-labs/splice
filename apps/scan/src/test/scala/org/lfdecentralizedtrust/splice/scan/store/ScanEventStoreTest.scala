@@ -848,7 +848,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
   }
 
   private def newVerdictStore(updateHistory: UpdateHistory) =
-    new DbScanVerdictStore(storage.underlying, updateHistory, loggerFactory)
+    new DbScanVerdictStore(storage.underlying, updateHistory, None, None, loggerFactory)
 
   private def insertUpdate(
       updateHistory: UpdateHistory,
