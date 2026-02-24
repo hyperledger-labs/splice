@@ -61,7 +61,6 @@ class LogicalSyncUpgradeTransferTrafficTrigger(
   protected def completeTask(task: ScheduledTaskTrigger.ReadyTask[TrafficTransferTask])(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    logger.info(s"Running LSU traffic state transfer for $task")
     for {
       trafficState <-
         currentSynchronizerNode.sequencerAdminConnection.getLsuTrafficControlState()
