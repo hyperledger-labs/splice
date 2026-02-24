@@ -4,6 +4,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    {{- include "splice-util-lib.default-annotations" | nindent 4 }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
   name: {{ .Release.Name }}

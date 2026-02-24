@@ -6,6 +6,8 @@ kind: Deployment
 metadata:
   name: splitwell-web-ui
   namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- include "splice-util-lib.default-annotations" | nindent 4 }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" "splitwell-web-ui") | nindent 4 }}
 spec:

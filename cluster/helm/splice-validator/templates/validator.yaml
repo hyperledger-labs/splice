@@ -6,6 +6,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    {{- include "splice-util-lib.default-annotations" | nindent 4 }}
   name: {{ $validatorAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
