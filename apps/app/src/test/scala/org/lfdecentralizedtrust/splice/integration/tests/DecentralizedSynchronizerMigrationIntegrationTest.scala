@@ -323,6 +323,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           )
         )(config)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(enableForcedAcsSnapshots = true)
+        )(conf)
+      )
       .withManualStart
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)

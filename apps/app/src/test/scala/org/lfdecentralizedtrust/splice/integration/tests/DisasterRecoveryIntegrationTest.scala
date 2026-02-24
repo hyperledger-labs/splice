@@ -219,6 +219,11 @@ class DisasterRecoveryIntegrationTest
           } else validatorConfig
         )(conf)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(enableForcedAcsSnapshots = true)
+        )(conf)
+      )
       .withManualStart
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")

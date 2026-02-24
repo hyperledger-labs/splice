@@ -44,6 +44,11 @@ class TokenStandardMetadataTimeBasedIntegrationTest
           )
         )(config)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(enableForcedAcsSnapshots = true)
+        )(conf)
+      )
 
   "Scan implements token metadata API" in { implicit env =>
     val dso = sv1ScanBackend.getDsoPartyId().toProtoPrimitive

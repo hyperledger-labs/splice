@@ -6,10 +6,11 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.wallet.store.{BalanceChangeTxLogEntry, TxLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.metrics.MetricValue
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 
 class WalletMetricsTest
     extends IntegrationTest
@@ -20,6 +21,11 @@ class WalletMetricsTest
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(enableForcedAcsSnapshots = true)
+        )(conf)
+      )
   }
 
   "Unlocked coin metrics" should {

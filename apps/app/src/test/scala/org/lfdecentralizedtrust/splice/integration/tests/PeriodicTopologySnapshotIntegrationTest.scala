@@ -38,6 +38,11 @@ class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig]
           c.copy(topologySnapshotConfig = Some(topologySnapshotConfig))
         )(conf)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(enableForcedAcsSnapshots = true)
+        )(conf)
+      )
       .withManualStart
 
   "sv1" should {
