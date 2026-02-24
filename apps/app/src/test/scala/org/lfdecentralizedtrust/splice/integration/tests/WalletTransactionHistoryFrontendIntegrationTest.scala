@@ -36,11 +36,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
   override def walletAmuletPrice: java.math.BigDecimal =
     SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
-  // TODO(#3549): scan_txlog.py does not handle development fund coupons correctly, so this is currently disabled.
-  //  We should decide whether we want to fix scan_txlog for DevelopmentFundCoupons, or narrow its scope enough that we won't care
-  //  (i.e. don't try to be complete, don't use it to assert on scan's aggregates, etc)
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
