@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.unit.http.{
   SystemProperties,
@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.unit.http.{
 }
 
 class ValidatorProxyIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with WalletTestUtil
     with ProcessTestUtil
     with StandaloneCanton

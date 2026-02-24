@@ -40,8 +40,6 @@ class ExternalPartyWalletService(
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
     scanConnection: BftScanConnection,
 )(implicit
@@ -64,6 +62,7 @@ class ExternalPartyWalletService(
       domainMigrationInfo,
       participantId,
       automationConfig.ingestion,
+      params.defaultLimit,
     )
 
   val updateHistory = new UpdateHistory(
@@ -88,8 +87,6 @@ class ExternalPartyWalletService(
     domainTimeSync,
     domainUnpausedSync,
     retryProvider,
-    ingestFromParticipantBegin,
-    ingestUpdateHistoryFromParticipantBegin,
     params,
     scanConnection,
     loggerFactory,

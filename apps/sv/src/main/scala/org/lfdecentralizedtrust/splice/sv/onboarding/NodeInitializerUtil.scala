@@ -79,6 +79,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     domainMigrationInfo,
     participantId,
     config.automation.ingestion,
+    config.parameters.defaultLimit,
     acsStoreDescriptorUserVersion,
   )
 
@@ -129,6 +130,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       domainMigrationInfo,
       participantId,
       config.automation.ingestion,
+      config.parameters.defaultLimit,
       acsStoreDescriptorUserVersion,
     )
   }
@@ -251,33 +253,25 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     )
   } yield isInDsoRulesSvs
 
-  protected def checkIsInDecentralizedNamespaceAndStartTrigger(
-      dsoAutomation: SvDsoAutomationService,
-      dsoStore: SvDsoStore,
-      synchronizerId: SynchronizerId,
+  protected def checkIsInDecentralizedNamespace(
+      dsoStore: SvDsoStore
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
     retryProvider
-      .ensureThatB(
+      .waitUntil(
         RetryFor.WaitingOnInitDependency,
         "dso_onboard_namespace",
         s"the namespace of ${dsoStore.key.svParty} is part of the decentralized namespace",
-        isOnboardedInDecentralizedNamespace(dsoStore), {
-          for {
-            _ <- participantAdminConnection
-              .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-                synchronizerId,
-                dsoStore.key.dsoParty.uid.namespace,
-                dsoStore.key.svParty.uid.namespace,
-                RetryFor.WaitingOnInitDependency,
+        isOnboardedInDecentralizedNamespace(dsoStore).map(isOnboarded =>
+          if (!isOnboarded) {
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"The SV ${dsoStore.key.svParty} is not yet a member of the decentralized namespace"
               )
-          } yield ()
-        },
+              .asRuntimeException
+          }
+        ),
         logger,
       )
-      .map { _ =>
-        logger.info(s"Registering namespace membership trigger for ${dsoStore.key.svParty}")
-        dsoAutomation.registerSvNamespaceMembershipTrigger()
-      }
 
   protected def establishInitialRound(
       connection: BaseLedgerConnection,

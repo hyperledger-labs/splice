@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
@@ -57,7 +57,7 @@ import java.time.Instant
 import scala.util.Using
 
 class DisasterRecoveryIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ProcessTestUtil
     with DomainMigrationUtil
     with StandaloneCanton

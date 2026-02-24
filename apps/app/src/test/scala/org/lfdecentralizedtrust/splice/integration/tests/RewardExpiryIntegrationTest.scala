@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireRewardCouponsTrigger,
@@ -29,7 +29,9 @@ import scala.jdk.CollectionConverters.*
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 // This test simulates reward expiry after a Daml upgrade where the node hosting the parties that are informees
 // on the rewards has not vetted the new Daml versions.
-class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
+class RewardExpiryIntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
+    with TriggerTestUtil {
 
   // this test starts up on older version (see initialPackageConfig), which don't define token-standard interfaces
   // and thus everything will show up as raw create/archives.
@@ -105,6 +107,15 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
           .packages
           .map(_.packageId) should contain(DarResources.dsoGovernance.latest.packageId),
     )
+    clue("Wait for Alice to create the validator liveness activity record") {
+      eventually() {
+        aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+          .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+            aliceValidatorBackend.getValidatorPartyId(),
+            _.data.round.number == 0,
+          ) should have size (1)
+      }
+    }
     actAndCheck("Advance by one tick", advanceRoundsByOneTickViaAutomation())(
       "Round 0 is closed",
       _ => {
@@ -144,11 +155,6 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
         DarResources.amulet.latest.packageId should not be initialAmuletPackage.packageId
       },
     )
-    aliceValidatorBackend.participantClient.ledger_api_extensions.acs
-      .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
-        aliceValidatorBackend.getValidatorPartyId(),
-        _.data.round.number == 0,
-      ) should have size (1)
     actAndCheck(
       "Resume reward expiry trigger",
       sv1Backend.dsoDelegateBasedAutomation

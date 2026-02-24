@@ -7,14 +7,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
-import org.apache.pekko.stream.OverflowStrategy
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HistoryMetrics,
   TimestampWithMigrationId,
   TreeUpdateWithMigrationId,
   UpdateHistory,
@@ -22,28 +22,38 @@ import org.lfdecentralizedtrust.splice.store.{
 import io.circe.syntax.*
 import org.apache.pekko.actor.ActorSystem
 
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
 
-// TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
+case class UpdatesSegment(
+    fromTimestamp: TimestampWithMigrationId,
+    toTimestamp: TimestampWithMigrationId,
+)
 
+/** Pekko source for dumping all updates from a segment to S3 objects.
+  * Reads updates from the updateStore, encodes and compresses them
+  * into chunks of size >=config.bulkZstdFrameSize. Each chunk is a frame
+  * in zstd terms (i.e. a complete zstd object). The chunks are written into
+  * s3 objects of size >=config.bulkMaxFileSize (as multi-frame zstd objects, which
+  * are simply a concatenation of zstd objects), using multi-part upload (where
+  * each chunk/frame is a part in the upload).
+  * Whenever an object is fully written, the source emits an Output object
+  * with the segment details, the name of the object just written (useful for monitoring
+  * progress and testing), and a flag of whether this is the last object in this
+  * segment (useful when streaming a sequence of segments, so that we can easily
+  * know when each segment is complete).
+  */
 class UpdateHistorySegmentBulkStorage(
-    val config: ScanStorageConfig,
-    val updateHistory: UpdateHistory,
-    val s3Connection: S3BucketConnection,
-    val fromTimestamp: TimestampWithMigrationId,
-    val toTimestamp: TimestampWithMigrationId,
+    storageConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
+    updateHistory: UpdateHistory,
+    s3Connection: S3BucketConnection,
+    segment: UpdatesSegment,
+    historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
-
-  // When more updates are not yet available, how long to wait for more.
-  // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
-  private val updatesPollingInterval = 5.seconds
 
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
@@ -51,23 +61,27 @@ class UpdateHistorySegmentBulkStorage(
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
-        HardLimit.tryCreate(config.bulkDbReadChunkSize),
+        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
-        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) <= toTimestamp
+        TimestampWithMigrationId(
+          update.update.update.recordTime,
+          update.migrationId,
+        ) <= segment.toTimestamp
       )
       result <-
         if (
-          updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
+          updatesInSegment.length < updates.length || updates.length == storageConfig.bulkDbReadChunkSize
         ) {
           if (updatesInSegment.nonEmpty) {
             // Found enough updates to add
+            logger.debug(
+              s"Adding ${updatesInSegment.length} updates, between record time ${updatesInSegment.headOption
+                  .map(_.update.update.recordTime)} and ${updatesInSegment.lastOption.map(_.update.update.recordTime)}"
+            )
             val updatesBytes: ByteString = encodeUpdates(updatesInSegment)
             val last = updatesInSegment.lastOption.getOrElse(
               throw new RuntimeException("Unexpected failure")
-            )
-            lastEmitted.set(
-              Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId))
             )
             Future.successful(
               Some(
@@ -79,13 +93,20 @@ class UpdateHistorySegmentBulkStorage(
             )
           } else {
             // All updates are outside the segment, so we're done
+            logger.debug(
+              "No more updates inside the segment, done dumping updates from this segment"
+            )
             Future.successful(None)
           }
         } else {
           logger.debug(
-            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), sleeping..."
+            s"Not enough updates yet (queried for ${storageConfig.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
+                .map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
           )
-          after(updatesPollingInterval, actorSystem.scheduler) {
+          after(
+            appConfig.updatesPollingInterval.underlying,
+            actorSystem.scheduler,
+          ) {
             Future.successful(Some((afterTs, ByteString.empty)))
           }
         }
@@ -105,89 +126,86 @@ class UpdateHistorySegmentBulkStorage(
     val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
     val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
     logger.debug(
-      s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes"
+      s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption
+          .map(_.update.update.recordTime)} to ${updates.lastOption.map(_.update.update.recordTime)}"
     )
     updatesBytes
   }
 
-  private val s3ObjIdx = new AtomicInteger(0)
-  private val lastEmitted = new AtomicReference[Option[TimestampWithMigrationId]](None)
-
   private def getSource(implicit
       actorSystem: ActorSystem
-  ): Source[TimestampWithMigrationId, NotUsed] = {
+  ): Source[UpdateHistorySegmentBulkStorage.Output, NotUsed] = {
     Source
-      .unfoldAsync(fromTimestamp)(ts => getUpdatesChunk(ts))
-      .via(ZstdGroupedWeight(config.bulkMaxFileSize))
-      // Add a buffer so that the next object continues accumulating while we write the previous one
-      .buffer(
-        1,
-        OverflowStrategy.backpressure,
+      .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
+      .via(
+        S3ZstdObjects(
+          storageConfig,
+          appConfig,
+          s3Connection,
+          { objIdx =>
+            s"${storageConfig.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
+          },
+          loggerFactory,
+        )
       )
-      .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-        val objectKey = if (isLast) s"updates_${s3ObjIdx}_last.zstd" else s"updates_$s3ObjIdx.zstd"
-        // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
-        //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
-        //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
-        //    partially written object.
-        for {
-          _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-        } yield {
-          s3ObjIdx.addAndGet(1)
-          ()
-        }
-      }
-      // emit a Unit upon completion of the write to s3
-      .fold(()) { case ((), _) => () }
-      // emit the timestamp of the last update dumped upon completion.
-      .map(_ => lastEmitted.get().getOrElse(fromTimestamp))
-
+      .map((o: S3ZstdObjects.Output) => {
+        historyMetrics.BulkStorage.incUpdateObjects()
+        UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
+      })
   }
 }
 object UpdateHistorySegmentBulkStorage {
+
+  case class Output(
+      segment: UpdatesSegment,
+      objectKey: String,
+      isLastObjectInSegment: Boolean,
+  )
+
   def asFlow(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[(TimestampWithMigrationId, TimestampWithMigrationId), TimestampWithMigrationId, NotUsed] =
-    Flow[(TimestampWithMigrationId, TimestampWithMigrationId)].flatMapConcat {
-      case (
-            from: TimestampWithMigrationId,
-            to: TimestampWithMigrationId,
-          ) =>
-        new UpdateHistorySegmentBulkStorage(
-          config,
-          updateHistory,
-          s3Connection,
-          from,
-          to,
-          loggerFactory,
-        ).getSource
+  ): Flow[UpdatesSegment, Output, NotUsed] =
+    Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
+      new UpdateHistorySegmentBulkStorage(
+        storageConfig,
+        appConfig,
+        updateHistory,
+        s3Connection,
+        segment,
+        historyMetrics,
+        loggerFactory,
+      ).getSource
     }
 
   def asSource(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
-      from: TimestampWithMigrationId,
-      to: TimestampWithMigrationId,
+      segment: UpdatesSegment,
+      historyMetrics: HistoryMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Source[TimestampWithMigrationId, NotUsed] =
+  ): Source[Output, NotUsed] =
     new UpdateHistorySegmentBulkStorage(
-      config,
+      storageConfig,
+      appConfig,
       updateHistory,
       s3Connection,
-      from,
-      to,
+      segment,
+      historyMetrics,
       loggerFactory,
     ).getSource
 

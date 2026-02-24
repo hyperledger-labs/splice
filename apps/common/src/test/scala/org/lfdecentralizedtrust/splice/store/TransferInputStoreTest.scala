@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
 
 import scala.concurrent.Future
 
-abstract class TransferInputStoreTest extends StoreTest {
+abstract class TransferInputStoreTest extends StoreTestBase {
 
   "listSortedAmuletsAndQuantity" should {
     "return correct results" in {

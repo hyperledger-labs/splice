@@ -15,6 +15,9 @@ DEFAULT_AUDIENCE="https://canton.network.global"
 VALIDATOR_DIR="${SPLICE_ROOT}/cluster/compose/validator"
 SV_DIR="${SPLICE_ROOT}/cluster/compose/sv"
 
+# we want DEBUG logs for our tests
+export LOG_LEVEL=DEBUG
+
 function _export_auth0_env_vars {
 
   if [ -z "$GCP_CLUSTER_BASENAME" ]; then

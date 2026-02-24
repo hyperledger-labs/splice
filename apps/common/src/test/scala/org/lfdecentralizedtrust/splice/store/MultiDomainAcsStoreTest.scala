@@ -38,7 +38,7 @@ import scala.jdk.CollectionConverters.*
 
 abstract class MultiDomainAcsStoreTest[
     S <: MultiDomainAcsStore
-] extends StoreTest { this: HasActorSystem =>
+] extends StoreTestBase { this: HasActorSystem =>
 
   import MultiDomainAcsStore.*
 
@@ -375,7 +375,7 @@ abstract class MultiDomainAcsStoreTest[
     "ingestion can be restarted at any time" in {
       implicit val store = mkStore()
       for {
-        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ <- store.ingestionSink.initialize()
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -404,7 +404,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(
-          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L))
+          activeContracts = Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -419,8 +419,8 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           Seq(
-            StoreTest.AcsImportEntry(c(1), d1, 0L),
-            StoreTest.AcsImportEntry(cFeatured(2), d1, 0L),
+            StoreTestBase.AcsImportEntry(c(1), d1, 0L),
+            StoreTestBase.AcsImportEntry(cFeatured(2), d1, 0L),
           )
         )
         _ <- assertList(c(1) -> Some(d1))
@@ -628,7 +628,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteOut = Seq(
-            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
+            StoreTestBase.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> None)
@@ -645,7 +645,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteIn = Seq(
-            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
+            StoreTestBase.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> Some(d2))
@@ -689,7 +689,7 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextReassignmentId
       for {
         _ <- initWithAcs(
-          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(cFeatured(1), d1, d2, tf0, 1L))
+          incompleteOut = Seq(StoreTestBase.AcsImportIncompleteEntry(cFeatured(1), d1, d2, tf0, 1L))
         )
         _ <- assertIncompleteReassignments()
       } yield succeed
@@ -705,7 +705,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
@@ -725,7 +725,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -754,7 +754,7 @@ abstract class MultiDomainAcsStoreTest[
         // incomplete unassign
         _ <- initWithAcs(
           incompleteOut = Seq(
-            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
+            StoreTestBase.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ = eventually()(transfers.get should have length 1)
@@ -796,8 +796,8 @@ abstract class MultiDomainAcsStoreTest[
       }
       for {
         _ <- initWithAcs(
-          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)),
-          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(c(2), d1, d2, tf2, 3L)),
+          activeContracts = Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)),
+          incompleteOut = Seq(StoreTestBase.AcsImportIncompleteEntry(c(2), d1, d2, tf2, 3L)),
         )
         _ = assertSize("Initial", 1)
         // unassign before assign
@@ -831,8 +831,8 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           Seq(
-            StoreTest.AcsImportEntry(c(1), d1, 0L),
-            StoreTest.AcsImportEntry(cUpgraded(2), d1, 0L),
+            StoreTestBase.AcsImportEntry(c(1), d1, 0L),
+            StoreTestBase.AcsImportEntry(cUpgraded(2), d1, 0L),
           )
         )
         _ <- d1.create(c(3))
@@ -1294,7 +1294,7 @@ abstract class MultiDomainAcsStoreTest[
           holdingView(owner, BigDecimal(n), dsoParty, "AMT")
       )
       val acs = Seq(
-        StoreTest.AcsImportEntry(
+        StoreTestBase.AcsImportEntry(
           aHolding._1,
           d1,
           0L,
@@ -1302,7 +1302,7 @@ abstract class MultiDomainAcsStoreTest[
             holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> aHolding._2.toValue
           ),
         ),
-        StoreTest.AcsImportEntry(
+        StoreTestBase.AcsImportEntry(
           aTwoInterfaces._1,
           d1,
           0L,
@@ -1311,7 +1311,7 @@ abstract class MultiDomainAcsStoreTest[
             allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> aTwoInterfaces._3.toValue,
           ),
         ),
-        StoreTest.AcsImportEntry(
+        StoreTestBase.AcsImportEntry(
           anExcludedHolding._1,
           d1,
           0L,
@@ -1324,7 +1324,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- initWithAcs(
           acs,
           incompleteOut = incompleteOutHoldings.map { case (contract, holdingView) =>
-            StoreTest.AcsImportIncompleteEntry(
+            StoreTestBase.AcsImportIncompleteEntry(
               contract,
               d1,
               d2,
@@ -1336,7 +1336,7 @@ abstract class MultiDomainAcsStoreTest[
             )
           },
           incompleteIn = incompleteInHolding.map { case (contract, holdingView) =>
-            StoreTest.AcsImportIncompleteEntry(
+            StoreTestBase.AcsImportIncompleteEntry(
               contract,
               d2,
               d1,

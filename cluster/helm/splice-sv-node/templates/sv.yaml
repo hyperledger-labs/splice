@@ -84,6 +84,11 @@ spec:
               value: {{ .Values.onboardingType }}
               {{- end }}
             {{- end }}
+            {{- if eq .Values.permissionedSynchronizer true }}
+            - name: ADDITIONAL_CONFIG_PERMISSIONED_SYNCHRONIZER
+              value: |
+                canton.sv-apps.sv.permissioned-synchronizer = true
+            {{- end }}
             {{- if .Values.onboardingName }}
             - name: SPLICE_APP_SV_ONBOARDING_NAME
               value: {{ .Values.onboardingName }}
@@ -123,11 +128,6 @@ spec:
             {{ if (.Values.auth.jwks).readTimeout }}
             - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
               value: {{ .Values.auth.jwks.readTimeout | quote }}
-            {{ end }}
-            {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
-            - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
-              value: |
-                canton.sv-apps.sv.ingest-update-history-from-participant-begin = false
             {{ end }}
             {{- with .Values.persistence }}
             - name: ADDITIONAL_CONFIG_PERSISTENCE

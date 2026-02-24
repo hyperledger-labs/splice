@@ -138,6 +138,17 @@ tests:
               }
               backup-interval = "24h"
             }
+  - it: "enables permissioned synchronizer flag"
+    set:
+      permissionedSynchronizer: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_PERMISSIONED_SYNCHRONIZER')].value
+          value: |
+            canton.sv-apps.sv.permissioned-synchronizer = true
   - it: "sets domain configuration (backwards compatible)"
     set:
       domain:

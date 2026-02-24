@@ -326,21 +326,9 @@ class SvOnboardingAddlIntegrationTest
       }
 
       clue("Start SV2") {
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
-          startAllSync(
-            sv2ScanBackend,
-            sv2Backend,
-            sv2ValidatorBackend,
-          ),
-          lines => {
-            forAll(lines)(line => line.message should include("Unexpected amulet create event"))
-            // Similar to above, but this time due to TxLogBackfillingTrigger backfilling entries.
-            // Only scan processes the coin owned by sv1UserParty.
-            lines should have size 1
-            forExactly(1, lines)(line => line.loggerName should include("sv2Scan"))
-          },
-          timeUntilSuccess = 60.seconds,
-        )
+        // we don't start scan and validator here as they are not useful for this test
+        // but scan (required by validator) could emit errors that we'd then need to deal with
+        sv2Backend.startSync()
       }
       sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
 

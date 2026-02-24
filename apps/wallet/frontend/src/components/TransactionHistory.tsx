@@ -53,7 +53,8 @@ const TransactionHistory: React.FC = () => {
   const primaryPartyId = usePrimaryParty();
 
   const isLoading = amuletPriceQuery.isLoading || txQuery.isLoading;
-  const isError = amuletPriceQuery.isError || txQuery.isError || !primaryPartyId;
+  const isError =
+    amuletPriceQuery.isError || txQuery.isError || !primaryPartyId || !amuletPriceQuery.data;
 
   const hasNoTransactions = (pagedTxs: Transaction[][]): boolean => {
     return (
@@ -99,6 +100,7 @@ const TransactionHistory: React.FC = () => {
                       key={'tx-row-' + tx.id}
                       transaction={tx}
                       primaryPartyId={primaryPartyId}
+                      amuletPrice={amuletPriceQuery.data}
                     />
                   ))
               )}
@@ -125,11 +127,13 @@ const TransactionHistory: React.FC = () => {
 interface TransactionHistoryRowProps {
   transaction: Transaction;
   primaryPartyId: Party;
+  amuletPrice: BigNumber;
 }
 
 const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
   transaction,
   primaryPartyId,
+  amuletPrice,
 }) => {
   const updateId =
     transaction.transactionType === 'notification' ? (
@@ -155,7 +159,11 @@ const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
         <RewardCollectedInfo transaction={transaction} />
       </TableCell>
       <TableCell className="tx-row-cell-balance-change">
-        <TransactionAmount transaction={transaction} primaryPartyId={primaryPartyId} />
+        <TransactionAmount
+          amuletPrice={amuletPrice}
+          transaction={transaction}
+          primaryPartyId={primaryPartyId}
+        />
       </TableCell>
       {updateId}
     </TableRow>
@@ -445,10 +453,6 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
   return (
     <Stack direction="column" className="tx-party">
       {senderOrReceiver}
-      <Stack direction="row" alignItems="center" spacing={1}>
-        <Typography variant="caption">via </Typography>
-        <BftAnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
-      </Stack>
     </Stack>
   );
 };
@@ -461,6 +465,7 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
   const appRewards = BigNumber(transaction.appRewardsUsed || 0);
   const validatorRewards = BigNumber(transaction.validatorRewardsUsed || 0);
   const svRewards = BigNumber(transaction.svRewardsUsed || 0);
+  const developmentFundCoupons = BigNumber(transaction.developmentFundCouponsUsed || 0);
 
   const row = (type: string, label: string, amount: BigNumber) => [
     <Typography key={`tx-reward-${type}-label`}>{label}:</Typography>,
@@ -473,6 +478,7 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
       {!appRewards.isZero() && row('app', 'App Rewards', appRewards)}
       {!validatorRewards.isZero() && row('validator', 'Validator Rewards', validatorRewards)}
       {!svRewards.isZero() && row('sv', 'SV Rewards', svRewards)}
+      {!developmentFundCoupons.isZero() && row('fund', 'Development Fund', developmentFundCoupons)}
     </Stack>
   );
 };
@@ -480,9 +486,14 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
 interface TransactionAmountProps {
   transaction: Transaction;
   primaryPartyId: Party;
+  amuletPrice: BigNumber;
 }
 
-const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, primaryPartyId }) => {
+const TransactionAmount: React.FC<TransactionAmountProps> = ({
+  amuletPrice,
+  transaction,
+  primaryPartyId,
+}) => {
   if (transaction.transactionType === 'notification' || transaction.transactionType === 'unknown') {
     return <></>;
   }
@@ -505,8 +516,6 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
   // If the balance change is negative, the number already contains the minus sign.
   const sign = amountAmulet.isPositive() ? '+' : '';
 
-  const amuletPriceAtTimeOfTransaction = transaction.amuletPrice;
-
   return (
     <Stack direction="column">
       <Typography className="tx-amount-amulet">
@@ -520,18 +529,14 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
             amount={amountAmulet}
             currency="AmuletUnit"
             convert="CCtoUSD"
-            amuletPrice={amuletPriceAtTimeOfTransaction}
+            amuletPrice={amuletPrice}
           />
         </Typography>
-        {!amuletPriceAtTimeOfTransaction.isZero() && (
+        {!amuletPrice.isZero() && (
           <>
             <Typography variant="caption">@</Typography>
             <Typography variant="caption" className="tx-amount-rate">
-              <RateDisplay
-                base="AmuletUnit"
-                quote="USDUnit"
-                amuletPrice={amuletPriceAtTimeOfTransaction}
-              />
+              <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={amuletPrice} />
             </Typography>
           </>
         )}

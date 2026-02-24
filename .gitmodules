@@ -1,3 +1,6 @@
 [submodule ".github/runners/runner-container-hooks"]
 	path = .github/runners/runner-container-hooks
 	url = ../../hyperledger-labs/splice-runner-container-hooks.git
+[submodule "splice-shared-gha"]
+	path = splice-shared-gha
+	url = https://github.com/hyperledger-labs/splice-shared-gha

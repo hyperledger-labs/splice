@@ -79,10 +79,25 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
+import slick.jdbc.canton.SQLActionBuilder
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+
+class DbScanTxLogStoreConfig(loggerFactory: NamedLoggerFactory)
+    extends TxLogStore.Config[TxLogEntry] {
+  override val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser =
+    new ScanTxLogParser(
+      loggerFactory
+    )
+  override def entryToRow: org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => Option[
+    org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData
+  ] =
+    ScanTables.ScanTxLogRowData.fromTxLogEntry
+  override def encodeEntry = TxLogEntry.encode
+  override def decodeEntry = TxLogEntry.decode
+}
 
 object DbScanStore {
   type CacheKey = java.lang.Long // caffeine metrics function demands AnyRefs
@@ -100,6 +115,7 @@ class DbScanStore(
     ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
+    override val defaultLimit: Limit,
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
@@ -151,21 +167,7 @@ class DbScanStore(
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
     org.lfdecentralizedtrust.splice.scan.store.TxLogEntry
-  ] {
-    val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser;
-    def entryToRow
-        : org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData
-  } = new TxLogStore.Config[TxLogEntry] {
-    override val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser =
-      new ScanTxLogParser(
-        loggerFactory
-      )
-    override def entryToRow
-        : org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData =
-      ScanTables.ScanTxLogRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
+  ] = new DbScanTxLogStoreConfig(loggerFactory)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty
@@ -300,7 +302,7 @@ class DbScanStore(
   override def listEntries(
       namePrefix: String,
       now: CantonTimestamp,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
@@ -440,12 +442,15 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionTxLogEntry]] =
     waitUntilAcsIngested {
-      val entryTypeCondition = sql"""entry_type in (
-                  ${EntryType.TransferTxLogEntry},
-                  ${EntryType.TapTxLogEntry},
-                  ${EntryType.MintTxLogEntry},
-                  ${EntryType.AbortTransferInstructionTxLogEntry}
-                )"""
+      val entryTypeCondition: SQLActionBuilder = inClause(
+        "entry_type",
+        List(
+          EntryType.TransferTxLogEntry,
+          EntryType.TapTxLogEntry,
+          EntryType.MintTxLogEntry,
+          EntryType.AbortTransferInstructionTxLogEntry,
+        ),
+      )
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {
         case SortOrder.Ascending =>
@@ -740,7 +745,7 @@ class DbScanStore(
   override def getValidatorLicenseByValidator(validators: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
-    val validatorPartyIds = inClause(validators)
+    val validatorPartyIds = inClause("validator", validators)
     for {
       rows <- storage
         .query(
@@ -749,7 +754,7 @@ class DbScanStore(
             acsStoreId,
             domainMigrationId,
             ValidatorLicense.COMPANION,
-            where = (sql"""validator in """ ++ validatorPartyIds).toActionBuilder,
+            where = validatorPartyIds,
           ),
           "getValidatorLicenseByValidator",
         )

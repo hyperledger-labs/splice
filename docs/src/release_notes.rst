@@ -18,6 +18,130 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.5.12
+
+    - Wallet backend
+
+      - Fix a bug (`#3970 <https://github.com/hyperledger-labs/splice/issues/3970>`__) that caused transaction history
+        for entries created by Splice versions prior to 0.5.11 to fail to decode in the backend and thus not show in the
+        wallet UI.
+        These entries are now shown again in the wallet UI.
+
+    - Validator
+
+      - Add support for custom fault-tolerance configurations for **scan** and **sequencer** connections.
+        Please see the updated :ref:`documentation for Helm-based deployments <helm-validator-install>`.
+        This introduces the new configuration keys ``scanClient`` and ``synchronizer`` as the new recommended way to configure **scan** and **sequencer** connections.
+        Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
+        We recommend migrating to the new ``scanClient`` and ``synchronizer`` configuration options as soon as possible.
+        Docker Compose-based deployments do not currently support the new custom configuration options.
+
+    - Wallet UI
+
+      - The wallet UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenance overhead.
+
+    - Scan UI
+
+      - The scan UI transaction history now uses the current amulet conversion rate to convert amounts instead of the historic one to
+        reduce maintenance overhead.
+
+    - SV UI
+
+      - Complete overhaul of the governance UI (formerly ``/governance-beta``, now ``/governance``).
+        The old UI is still accessible under ``/governance-old``.
+
+
+.. release-notes:: 0.5.11
+
+
+    .. important::
+
+        **SV node operators must only deploy this release on networks where
+        all other SV nodes run Splice 0.5.10 or higher!**
+        Otherwise the sequencers will disagree on the traffic cost of confirmation responses and fork the ledger.
+
+        The reason for this is that sequencer nodes running code prior to Splice 0.5.10
+        do not parse the new dynamic domain parameter that is used to perform a coordinated update
+        of the traffic cost of confirmation responses across all SV nodes. These sequencers would thus
+        ignore the change in the traffic cost computation.
+
+        Validator node operators are not affected by this requirement, as the change only affects sequencer nodes.
+
+    - SV app
+
+      - Add a new config parameter to control whether the SV app should enable free confirmation responses
+        in the dynamic domain parameters.
+        This new parameter is set to ``true`` by default, so that no manual config changes
+        by SV operators are required to enable free confirmation responses on networks running this version of Splice.
+
+        This change implements Increment 1 "Make confirmation responses free using the heuristic implementation" from
+        `CIP-104 - Traffic-Based App Rewards <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md#incremental-roll-out>`__.
+
+    - Validator and SV app
+
+       - The ``splice-util-batched-markers`` dar is now uploaded automatically.
+
+    - Daml
+
+      - Optimize the number of views in the automation run by the SV app
+        to convert ``FeaturedAppActivityMarker`` contracts into
+        ``AppRewardCoupon`` contracts.
+
+      - Support weighting of featured app markers. This can be used
+        through the new ``BatchedMarkersProxy_CreateMarkersV2`` or
+        ``FeaturedAppRight_CreateActivityMarkerV2`` choice in the new
+        ``splice-api-featured-app-v2`` package. Note that this is intended
+        for creating markers proportional to the burn of applications not for
+        increasing the weight of markers created from regular app activity
+        e.g. to increase the weight of markers created as part of a transfer.
+        Refer to the tokenomics
+        committee for detailed guidelines on usage.
+
+
+        This requires a Daml upgrade to
+
+          ================== =======
+          name               version
+          ================== =======
+          amulet             0.1.16
+          amuletNameService  0.1.17
+          dsoGovernance      0.1.22
+          validatorLifecycle 0.1.6
+          wallet             0.1.17
+          walletPayments     0.1.16
+          ================== =======
+
+.. release-notes:: 0.5.10
+
+  - Deployment
+
+    - postgres-exporter: disabled exporting the settings table, to workaround `an issue of postgres-exporter <https://github.com/prometheus-community/postgres_exporter/issues/1240>`__.
+
+    - Splice apps and Canton components deployed via Docker compose now log at ``INFO`` level by default instead of ``DEBUG``.
+      In case you do want to change this, export the ``LOG_LEVEL`` environment variable before running ``./start.sh``. e.g., ``export LOG_LEVEL="DEBUG"; ./start.sh``.
+
+  - SV app
+
+    - Add a new trigger, ``ExpiredDevelopmentFundCouponTrigger`` for expiring development fund coupons.
+
+  - Wallet UI
+
+    - Remove the provider field from transaction history.
+
+  - Scan UI
+
+    - Remove the provider field from transaction history. The updates API continues to expose it.
+
+  - Daml
+
+    - Add a ``splice-util-batched-markers`` package that provides support for creating
+      a batch of ``FeaturedAppActivityMarkers`` in a transaction with a single view,
+      which is more efficient to process. Note that this package is not yet uploaded
+      automatically to validator (or super validator) nodes.
+      See the :ref:`package docs <package-batched-markers>` for more details.
+
+
 .. release-notes:: 0.5.9
 
   - Scan

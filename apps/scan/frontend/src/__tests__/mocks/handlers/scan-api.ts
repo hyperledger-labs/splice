@@ -370,11 +370,8 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
               date: new Date(),
               domain_id:
                 'global-domain::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
-              amulet_price: '1.0000000000',
               round: 1,
               transfer: {
-                provider:
-                  'alice__validator__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',
                 sender: {
                   party:
                     'charlie__wallet__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',

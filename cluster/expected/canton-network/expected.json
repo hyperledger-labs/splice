@@ -1341,6 +1341,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2027,6 +2031,7 @@
             "prefix": "mock/sv-1"
           }
         },
+        "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -2089,6 +2094,10 @@
           {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
             "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 /10 * * * ?\"\n                    max-duration = \"5m\"\n                    retention = \"30d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -2268,6 +2277,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2788,6 +2801,10 @@
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           },
           {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
+          },
+          {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
             "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
@@ -2916,6 +2933,7 @@
         "onboardingName": "Digital-Asset-1",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-3",
+        "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_da_1",
           "port": 5432,
@@ -2975,6 +2993,10 @@
       "timeout": 600,
       "values": {
         "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+          },
           {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
             "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
@@ -3079,6 +3101,10 @@
           "networkName": "Splice"
         },
         "svValidator": true,
+        "synchronizer": {
+          "connectionType": "trust-single",
+          "url": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",

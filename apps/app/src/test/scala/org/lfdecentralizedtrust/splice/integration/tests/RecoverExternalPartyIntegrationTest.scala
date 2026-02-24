@@ -5,7 +5,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
+  IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
@@ -26,7 +26,7 @@ import scala.concurrent.duration.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class RecoverExternalPartyIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with ExternallySignedPartyTestUtil
     with TokenStandardTest
     with WalletTestUtil {

@@ -37,10 +37,8 @@ export interface Transfer {
   transactionSubtype: TransactionSubtype;
   receivers: TransactionReceiver[]; // will be empty for e.g. mergers & self-transfers
   senderId: Party;
-  providerId: Party;
   senderAmountCC: BigNumber; // this includes all amounts of receivers + fees
   date: Date;
-  amuletPrice: BigNumber;
   appRewardsUsed: BigNumber;
   validatorRewardsUsed: BigNumber;
   svRewardsUsed: BigNumber;
@@ -48,6 +46,7 @@ export interface Transfer {
   transferInstructionCid?: string;
   transferInstructionReceiver?: string;
   transferInstructionAmount?: BigNumber;
+  developmentFundCouponsUsed: BigNumber;
 }
 
 export interface BalanceChange {
@@ -56,7 +55,6 @@ export interface BalanceChange {
   transactionSubtype: TransactionSubtype;
   receivers: TransactionReceiver[];
   date: Date;
-  amuletPrice: BigNumber;
   transferInstructionCid?: string;
 }
 

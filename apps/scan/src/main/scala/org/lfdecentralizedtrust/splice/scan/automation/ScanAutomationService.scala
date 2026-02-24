@@ -41,8 +41,6 @@ class ScanAutomationService(
     val updateHistory: UpdateHistory,
     storage: DbStorage,
     snapshotStore: AcsSnapshotStore,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     svParty: PartyId,
     svName: String,
     upgradesConfig: UpgradesConfig,
@@ -62,7 +60,6 @@ class ScanAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
       config.parameters,
     ) {
   override def companion
@@ -74,10 +71,7 @@ class ScanAutomationService(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
   )
 
-  registerUpdateHistoryIngestion(
-    updateHistory,
-    ingestUpdateHistoryFromParticipantBegin,
-  )
+  registerUpdateHistoryIngestion(updateHistory)
 
   if (config.updateHistoryBackfillEnabled) {
     registerTrigger(

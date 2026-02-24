@@ -47,8 +47,10 @@ export function pulumiOptsWithPrefix(
   signal: AbortSignal;
   color: 'always';
   policyPacks: string[];
+  diff: boolean;
 } {
   return {
+    diff: true,
     parallel: 128,
     onOutput: (output: string) => {
       // do not output empty lines or lines containing just '.'

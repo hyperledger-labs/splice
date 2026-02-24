@@ -198,7 +198,7 @@ trait SvDsoStore
 
   def listConfirmations(
       action: splice.dsorules.ActionRequiringConfirmation,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]]
@@ -206,7 +206,7 @@ trait SvDsoStore
   def listConfirmationsByActionConfirmer(
       action: splice.dsorules.ActionRequiringConfirmation,
       confirmer: PartyId,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]]
@@ -475,7 +475,7 @@ trait SvDsoStore
   }
 
   def listOldestSummarizingMiningRounds(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[
     splice.round.SummarizingMiningRound.ContractId,
     splice.round.SummarizingMiningRound,
@@ -491,7 +491,7 @@ trait SvDsoStore
     * and the offset from the query for the confirmation contract.
     */
   final def listArchivableClosedMiningRounds(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[
     Seq[QueryResult[
       AssignedContract[
@@ -633,7 +633,7 @@ trait SvDsoStore
 
   def listExpiredAnsSubscriptions(
       now: CantonTimestamp,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleAnsSubscription]]
 
   def listExpiredUnallocatedUnclaimedActivityRecord: ListExpiredContracts[
@@ -659,7 +659,7 @@ trait SvDsoStore
     )
 
   def listSvOnboardingConfirmed(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[
     Seq[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ]
@@ -680,7 +680,7 @@ trait SvDsoStore
   def listSvOnboardingConfirmations(
       svOnboarding: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest],
       weight: Long,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
@@ -702,7 +702,7 @@ trait SvDsoStore
 
   def listSvOnboardingRequestsBySvs(
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
@@ -744,7 +744,7 @@ trait SvDsoStore
 
   /** List all the current amulet price votes. */
   final def listAllAmuletPriceVotes(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
       splice.dso.amuletprice.AmuletPriceVote.ContractId,
@@ -759,7 +759,7 @@ trait SvDsoStore
     } yield votes map (_.contract)
 
   /** List the current amulet price votes by the SVs. */
-  def listSvAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
+  def listSvAmuletPriceVotes(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[
@@ -853,7 +853,7 @@ trait SvDsoStore
   def listInitialPaymentConfirmationByAnsName(
       confirmer: PartyId,
       name: String,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = defaultLimit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
@@ -1016,6 +1016,7 @@ object SvDsoStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
       acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
@@ -1031,6 +1032,7 @@ object SvDsoStore {
       participantId,
       ingestionConfig,
       acsStoreDescriptorUserVersion,
+      defaultLimit = defaultLimit,
     )
   }
 

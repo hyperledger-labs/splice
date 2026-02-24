@@ -48,7 +48,7 @@ class AcsSnapshotTrigger(
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
     } else {
-      isHistoryBackfilled(currentMigrationId).flatMap { backfilled =>
+      updateHistory.isHistoryBackfilled(currentMigrationId).flatMap { backfilled =>
         if (backfilled) {
           retrieveTask().value.map(_.toList)
         } else {
@@ -56,17 +56,6 @@ class AcsSnapshotTrigger(
         }
       }
     }
-  }
-
-  /** @return True if the passed migration id was fully backfilled.
-    *         This applies to the current migration id, where it either didn't need to backfill,
-    *         or backfilled because it joined late.
-    *         And also for past migrations, whether the SV was present in them or not.
-    */
-  private def isHistoryBackfilled(migrationId: Long)(implicit tc: TraceContext) = {
-    updateHistory.sourceHistory
-      .migrationInfo(migrationId)
-      .map(_.exists(i => i.complete && i.importUpdatesComplete))
   }
 
   private def retrieveTask()(implicit
@@ -143,7 +132,7 @@ class AcsSnapshotTrigger(
             lastCompleteBackfilledMigrationId.set(Left(Done))
             Future.successful(None)
           case Some(migrationIdToBackfill) =>
-            isHistoryBackfilled(migrationIdToBackfill).flatMap { historyBackfilled =>
+            updateHistory.isHistoryBackfilled(migrationIdToBackfill).flatMap { historyBackfilled =>
               if (historyBackfilled) {
                 retrieveTaskForPastMigrationId(migrationIdToBackfill)
               } else {
@@ -178,7 +167,7 @@ class AcsSnapshotTrigger(
             s"SynchronizerId with no data in $migrationRecordTimeRange"
           )
         )
-      firstSnapshotTime = storageConfig.computeSnapshotTimeAfter(minTime)
+      firstSnapshotTime = storageConfig.computeDbSnapshotTimeAfter(minTime)
       migrationLastedLongEnough = firstSnapshotTime
         .plus(Duration.ofHours(storageConfig.dbAcsSnapshotPeriodHours.toLong))
         .isBefore(maxTime)
@@ -271,7 +260,7 @@ class AcsSnapshotTrigger(
           Some(
             AcsSnapshotTrigger
               .Task(
-                storageConfig.computeSnapshotTimeAfter(firstNonAcsImportRecordTime),
+                storageConfig.computeDbSnapshotTimeAfter(firstNonAcsImportRecordTime),
                 migrationId,
                 None,
               )

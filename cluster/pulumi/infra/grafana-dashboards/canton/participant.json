@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4651,
+  "id": 1031,
   "links": [],
   "panels": [
     {
@@ -83,7 +83,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -115,10 +116,7 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
+                  "dash": [10, 10],
                   "fill": "dash"
                 }
               }
@@ -135,9 +133,7 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -150,7 +146,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -234,7 +230,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -255,9 +252,7 @@
       "id": 10,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -270,7 +265,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -278,13 +273,13 @@
             "uid": "${DS}"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "daml_sequencer_client_submissions_in_flight{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "editorMode": "builder",
+          "expr": "sum by(synchronizer, type, namespace, job, node) (daml_sequencer_client_submissions_in_flight{namespace=~\"$namespace\", component=\"participant\", job=~\"$job\", node=~\"$participant\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{namespace}} {{job}} {{node}}",
+          "legendFormat": "{{namespace}} {{job}} {{node}} {{sync}} {{type}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -342,7 +337,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -363,9 +359,7 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -378,7 +372,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -449,7 +443,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -480,7 +475,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "editorMode": "code",
@@ -556,7 +551,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -577,9 +573,7 @@
       "id": 13,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -592,7 +586,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -616,7 +610,7 @@
       "type": "timeseries"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -624,118 +618,116 @@
         "y": 31
       },
       "id": 8,
-      "panels": [
+      "panels": [],
+      "title": "Commands",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Daml commands through the synchronous CommandService currently in flight",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "submissions"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS}"
           },
-          "description": "Daml commands through the synchronous CommandService currently in flight",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "submissions"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 10,
-            "w": 12,
-            "x": 0,
-            "y": 32
-          },
-          "id": 11,
-          "options": {
-            "legend": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true,
-              "sortBy": "Last *",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "pluginVersion": "12.0.2",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS}"
-              },
-              "disableTextWrap": false,
-              "editorMode": "code",
-              "expr": "daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
-              "fullMetaSearch": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "interval": "1m",
-              "legendFormat": "{{namespace}} {{job}} {{node}}",
-              "range": true,
-              "refId": "A",
-              "useBackend": false
-            }
-          ],
-          "title": "In Flight Commands",
-          "type": "timeseries"
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "interval": "1m",
+          "legendFormat": "{{namespace}} {{job}} {{node}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "Commands",
-      "type": "row"
+      "title": "In Flight Commands",
+      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -743,7 +735,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 42
       },
       "id": 5,
       "panels": [],
@@ -778,7 +770,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -798,7 +791,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 43
       },
       "id": 4,
       "options": {
@@ -817,7 +810,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -826,11 +819,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_health_status{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "expr": "daml_health_status{namespace=~\"$namespace\",job=~\"$job\", node=~\"$participant\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{namespace}} {{job}} {{node}}",
+          "legendFormat": "{{namespace}} {{job}} {{node}} {{component}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -848,25 +841,21 @@
     "list": [
       {
         "current": {
-          "text": [
-            "sv-8"
-          ],
-          "value": [
-            "sv-8"
-          ]
+          "text": ["sv-1"],
+          "value": ["sv-1"]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_health_status{component=\"participant\"},namespace)",
+        "definition": "label_values(daml_participant_api_commands_max_in_flight_length,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_health_status{component=\"participant\"},namespace)",
+          "query": "label_values(daml_participant_api_commands_max_in_flight_length,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -877,23 +866,21 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_health_status{namespace=~\"$namespace\", component=\"participant\"},job)",
+        "definition": "label_values(daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\"},job)",
         "includeAll": true,
         "multi": true,
         "name": "job",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_health_status{namespace=~\"$namespace\", component=\"participant\"},job)",
+          "query": "label_values(daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\"},job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -904,23 +891,21 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_health_status{namespace=~\"$namespace\", job=~\"$job\"},node)",
+        "definition": "label_values(daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\", job=~\"$job\"},node)",
         "includeAll": true,
         "multi": true,
         "name": "participant",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_health_status{namespace=~\"$namespace\", job=~\"$job\"},node)",
+          "query": "label_values(daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\", job=~\"$job\"},node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -931,12 +916,12 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Participant",
   "uid": "edkzo5ukgeqyoc",
-  "version": 2
+  "version": 1
 }

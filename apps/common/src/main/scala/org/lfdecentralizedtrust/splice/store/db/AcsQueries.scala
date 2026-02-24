@@ -29,6 +29,8 @@ import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 import slick.dbio.Effect
 import slick.sql.SqlStreamingAction
 
+import scala.reflect.ClassTag
+
 trait AcsQueries extends AcsJdbcTypes {
 
   /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
@@ -266,7 +268,7 @@ trait AcsQueries extends AcsJdbcTypes {
   }
 
   /** Constructions like `seq.mkString("(", ",", ")")` are dangerous because they can lead to SQL injection.
-    * Prefer using this instead, or [[inClause]] when in a `WHERE x IN`.
+    * Prefer using this instead.
     */
   protected def sqlCommaSeparated(
       seq: Iterable[SQLActionBuilder]
@@ -279,8 +281,24 @@ trait AcsQueries extends AcsJdbcTypes {
       .getOrElse(SQLActionBuilderChain(sql""))
   }
 
-  protected def inClause[V: SetParameter](seq: Iterable[V]): SQLActionBuilderChain =
-    sql"(" ++ sqlCommaSeparated(seq.map(v => sql"$v")) ++ sql")"
+  /*
+   * TODO(#3900) move to use toInClause when canton fork has it: https://github.com/hyperledger-labs/splice/issues/3900
+   */
+  protected def inClause[V: ClassTag](
+      field: String,
+      seq: Iterable[V],
+  )(implicit
+      arraySetParameter: SetParameter[Array[V]]
+  ): SQLActionBuilder =
+    sql" #$field = ANY(${seq.toArray[V]})"
+
+  protected def notInClause[V: ClassTag](
+      field: String,
+      seq: Iterable[V],
+  )(implicit
+      arraySetParameter: SetParameter[Array[V]]
+  ): SQLActionBuilder =
+    sql" NOT (#$field = ANY(${seq.toArray[V]}))"
 
   protected def contractFromRow[C, TCId <: ContractId[?], T](companion: C)(
       row: AcsQueries.SelectFromAcsTableResult

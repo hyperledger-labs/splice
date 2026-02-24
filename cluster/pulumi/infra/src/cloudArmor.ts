@@ -34,6 +34,12 @@ export interface PredefinedWafRule {
   sensitivityLevel?: 'off' | 'low' | 'medium' | 'high';
 }
 
+// Regional and Global policies and rules use different types/constructors; most
+// of our pulumi code doesn't care about the difference so can use this alias
+export type CloudArmorPolicy = gcp.compute.RegionSecurityPolicy;
+const CloudArmorPolicy = gcp.compute.RegionSecurityPolicy;
+const PolicyRule = gcp.compute.RegionSecurityPolicyRule;
+
 /**
  * Creates a Cloud Armor security policy
  * @param cac loaded configuration
@@ -43,14 +49,14 @@ export interface PredefinedWafRule {
 export function configureCloudArmorPolicy(
   cac: CloudArmorConfig,
   opts?: pulumi.ComponentResourceOptions
-): gcp.compute.SecurityPolicy | undefined {
+): CloudArmorPolicy | undefined {
   if (!cac.enabled) {
     return undefined;
   }
 
   // Step 1: Create the security policy
   const name = `waf-whitelist-throttle-ban-${CLUSTER_BASENAME}`;
-  const securityPolicy = new gcp.compute.SecurityPolicy(
+  const securityPolicy = new CloudArmorPolicy(
     name,
     {
       name,
@@ -89,7 +95,7 @@ export function configureCloudArmorPolicy(
  */
 function addPredefinedWafRules(): void {
   /*
-  securityPolicy: gcp.compute.SecurityPolicy,
+  securityPolicy: Policy,
   rules: PredefinedWafRule[],
   preview: boolean,
   opts: pulumi.ResourceOptions
@@ -102,7 +108,7 @@ function addPredefinedWafRules(): void {
  */
 function addIpWhitelistRules(): void {
   /*
-  securityPolicy: gcp.compute.SecurityPolicy,
+  securityPolicy: Policy,
   preview: boolean,
   opts: pulumi.ResourceOptions
      */
@@ -113,7 +119,7 @@ function addIpWhitelistRules(): void {
  * Adds throttle and ban rules for API endpoints to a security policy
  */
 function addThrottleAndBanRules(
-  securityPolicy: gcp.compute.SecurityPolicy,
+  securityPolicy: CloudArmorPolicy,
   throttles: ThrottleConfig,
   preview: boolean,
   opts: pulumi.ResourceOptions
@@ -137,10 +143,11 @@ function addThrottleAndBanRules(
         const hostExpr = `request.headers['host'].matches(R"^${_.escapeRegExp(hostname)}(?::[0-9]+)?$")`;
         const matchExpr = `${pathExpr} && ${hostExpr}`;
 
-        new gcp.compute.SecurityPolicyRule(
+        new PolicyRule(
           ruleName,
           {
             securityPolicy: securityPolicy.name,
+            region: securityPolicy.region,
             description: `Throttle rule for all ${confEntryHead} API endpoints`,
             priority,
             preview: preview || singleServiceThrottle.rulePreviewOnly,
@@ -173,7 +180,7 @@ function addThrottleAndBanRules(
  * Adds a default deny rule to a security policy
  */
 function addDefaultDenyRule(
-  securityPolicy: gcp.compute.SecurityPolicy,
+  securityPolicy: CloudArmorPolicy,
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
@@ -183,10 +190,11 @@ function addDefaultDenyRule(
   if (preview) {
     return;
   }
-  new gcp.compute.SecurityPolicyRule(
+  new PolicyRule(
     'default-deny',
     {
       securityPolicy: securityPolicy.name,
+      region: securityPolicy.region,
       description: 'Default rule to deny all other traffic',
       priority: DEFAULT_DENY_RULE_NUMBER,
       // default rule cannot be in preview mode; google API gives 400 if you try

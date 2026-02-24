@@ -404,4 +404,6 @@ class CachingScanStore(
       SyncCloseable("db_scan_store_metrics", storeMetrics.close()),
     )
   }
+
+  def defaultLimit: Limit = store.defaultLimit
 }

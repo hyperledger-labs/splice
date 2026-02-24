@@ -25,11 +25,11 @@ inputs:
   target:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
     default: 'default'
-    type: choice
-    options:
-      - oss
-      - default
-      - static_tests
+#    type: choice
+#    options:
+#      - oss
+#      - default
+#      - static_tests
     required: false
   upload_workload_identity_provider:
     description: "The workload identity provider to use for uploading the cache"
@@ -65,7 +65,7 @@ runs:
       run: ./.github/actions/scripts/common_setup.sh
 
     - name: Set up Nix (Self hosted)
-      uses: ./.github/actions/nix/setup_nix
+      uses: ./splice-shared-gha/.github/actions/nix/setup_nix
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
@@ -79,6 +79,6 @@ runs:
     - name: Set up SBT
       if: inputs.with_sbt == 'true'
       id: setup_sbt
-      uses: ./.github/actions/sbt/setup_sbt
+      uses: ./splice-shared-gha/.github/actions/sbt/setup_sbt
       with:
         cache_version: 7

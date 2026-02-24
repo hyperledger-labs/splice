@@ -571,7 +571,9 @@ class AcsSnapshotTriggerTest
   ) {
     final def storageConfig = ScanStorageConfig(
       dbAcsSnapshotPeriodHours = 1,
+      1, // ignored in this test
       0, // ignored in this test
+      0L, // ignored in this test
       0L, // ignored in this test
     )
     final def snapshotPeriodHours: Int = 1
@@ -616,6 +618,12 @@ class AcsSnapshotTriggerTest
     val updateHistory: UpdateHistory = mock[UpdateHistory]
     when(updateHistory.isReady).thenReturn(true)
     val sourceHistory = mock[HistoryBackfilling.SourceHistory[UpdateHistoryResponse]]
+    when(updateHistory.isHistoryBackfilled(anyLong)(any[TraceContext]))
+      .thenAnswer { (migrationId: Long) =>
+        sourceHistory
+          .migrationInfo(migrationId)
+          .map(_.exists(i => i.complete && i.importUpdatesComplete))
+      }
     // migrationInfo() is only used to check whether backfilling is complete
     when(sourceHistory.migrationInfo(anyLong)(any[TraceContext]))
       .thenReturn(
