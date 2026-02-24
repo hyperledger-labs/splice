@@ -9,7 +9,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.lifecycle.*
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -137,7 +136,6 @@ object DbSequencerTrafficSummaryStore {
 class DbSequencerTrafficSummaryStore(
     storage: DbStorage,
     updateHistory: UpdateHistory,
-    val synchronizerId: SynchronizerId,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext

@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -23,7 +22,6 @@ class DbAppActivityRecordStoreTest
     with SplicePostgresTest {
 
   private val migrationId = 0L
-  private val synchronizerId = SynchronizerId.tryFromString("activity-test::synchronizer")
 
   "DbAppActivityRecordStore" should {
 
@@ -146,7 +144,6 @@ class DbAppActivityRecordStoreTest
       new DbAppActivityRecordStore(
         storage.underlying,
         updateHistory,
-        synchronizerId,
         loggerFactory,
       )
     }
