@@ -6,6 +6,8 @@ kind: Deployment
 metadata:
   name: load-tester
   namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- include "splice-util-lib.default-annotations" | nindent 4 }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
 spec:

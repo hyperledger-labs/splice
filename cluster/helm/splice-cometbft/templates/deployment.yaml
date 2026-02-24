@@ -22,6 +22,7 @@ spec:
   template:
     metadata:
       annotations:
+        {{- include "splice-util-lib.default-annotations" | nindent 8 }}
         {{- toYaml $.Values.pod.annotations | nindent 8 }}
       labels:
         {{- include "splice-util-lib.default-labels" (set $ "app" $.Values.node.identifier) | nindent 8 }}
