@@ -113,7 +113,7 @@ class RewardExpiryIntegrationTest
           .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
             aliceValidatorBackend.getValidatorPartyId(),
             _.data.round.number == 0,
-          ) should have size (1)
+          ) should have size (1) withClue "ValidatorLivenessActivityRecords"
       }
     }
     actAndCheck("Advance by one tick", advanceRoundsByOneTickViaAutomation())(
@@ -167,7 +167,7 @@ class RewardExpiryIntegrationTest
           .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
             aliceValidatorBackend.getValidatorPartyId(),
             _.data.round.number == 0,
-          ) shouldBe empty,
+          ) shouldBe empty withClue "ValidatorLivenessActivityRecords",
     )
   }
 }

@@ -552,7 +552,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ) = {
     find(tagName("h1")) should not be None
     find(tagName("h1")).value.text shouldBe "Welcome"
-    find(cssSelector("div.password")) should not be empty
+    find(cssSelector("div.password")) should not be empty withClue "password div"
   }
 
   private def assertAuth0AuthorizationFormVisible()(implicit
@@ -584,7 +584,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
               Seq(
                 find(id("logout-button")),
                 find(id("oidc-login-button")),
-              ).flatten should have size 1,
+              ).flatten should have size 1 withClue "Login/logout buttons",
           )
 
           if (find(id("logout-button")).isDefined) {
@@ -593,7 +593,10 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
               eventuallyClickOn(id("logout-button")),
             )(
               "Auth0 login: Login button is visible",
-              _ => find(id("oidc-login-button")) should not be empty,
+              _ =>
+                find(
+                  id("oidc-login-button")
+                ) should not be empty withClue "'Log In with OAuth2' button",
             )
           }
 
