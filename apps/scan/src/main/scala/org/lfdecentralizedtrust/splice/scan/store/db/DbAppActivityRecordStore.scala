@@ -22,7 +22,6 @@ object DbAppActivityRecordStore {
 
   /** App activity record for a given record_time.
     *
-    * @param migrationId migration identifier for domain migrations
     * @param recordTime the record_time (= sequencing_time) of the verdict/traffic summary
     * @param roundNumber the mining round that was open at this record_time
     * @param appProviderParties app providers for which app activity should be recorded
@@ -30,7 +29,6 @@ object DbAppActivityRecordStore {
     *                           in one-to-one correspondence with appProviderParties
     */
   final case class AppActivityRecordT(
-      migrationId: Long,
       recordTime: CantonTimestamp,
       roundNumber: Long,
       appProviderParties: Seq[String],
@@ -71,14 +69,14 @@ class DbAppActivityRecordStore(
     } else {
       val values = sqlCommaSeparated(
         items.map { row =>
-          sql"""($historyId, ${row.migrationId}, ${row.recordTime},
+          sql"""($historyId, ${row.recordTime},
                 ${row.roundNumber}, ${row.appProviderParties}, ${row.appActivityWeights})"""
         }
       )
 
       (sql"""
         insert into #${Tables.appActivityRecords}(
-          history_id, migration_id, record_time, round_number, app_provider_parties, app_activity_weights
+          history_id, record_time, round_number, app_provider_parties, app_activity_weights
         ) values """ ++ values).asUpdate
     }
   }
@@ -91,28 +89,9 @@ class DbAppActivityRecordStore(
   )(implicit tc: TraceContext): DBIO[Unit] = {
     if (items.isEmpty) DBIO.successful(())
     else {
-      val checkExist = (sql"""
-        select record_time
-        from #${Tables.appActivityRecords}
-        where history_id = $historyId
-          and """ ++ inClause("record_time", items.map(_.recordTime.toMicros)))
-        .as[Long]
-
-      for {
-        alreadyExisting <- checkExist.map(_.toSet)
-        nonExisting = items.filter(item => !alreadyExisting.contains(item.recordTime.toMicros))
-        _ = logger.info(
-          s"Already ingested app activity records: ${alreadyExisting.size}. Non-existing: ${nonExisting.size}."
-        )
-        _ <-
-          if (nonExisting.nonEmpty) {
-            batchInsertAppActivityRecords(nonExisting).map { _ =>
-              logger.info(s"Inserted ${nonExisting.size} app activity records.")
-            }
-          } else {
-            DBIO.successful(())
-          }
-      } yield ()
+      batchInsertAppActivityRecords(items).map { _ =>
+        logger.info(s"Inserted ${items.size} app activity records.")
+      }
     }
   }
 

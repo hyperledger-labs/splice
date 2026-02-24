@@ -22,6 +22,7 @@ class DbAppActivityRecordStoreTest
     with SplicePostgresTest {
 
   private val migrationId = 0L
+  private val roundNumber = 42L
 
   "DbAppActivityRecordStore" should {
 
@@ -31,47 +32,18 @@ class DbAppActivityRecordStoreTest
         ts1 = CantonTimestamp.now()
 
         record = AppActivityRecordT(
-          migrationId = migrationId,
           recordTime = ts1,
-          roundNumber = 42L,
+          roundNumber = roundNumber,
           appProviderParties = Seq("app1::provider", "app2::provider"),
           appActivityWeights = Seq(100L, 50L),
         )
 
-        maxBefore <- maxRecordTime(migrationId)
+        maxBefore <- maxRecordTime(roundNumber)
         _ <- store.insertAppActivityRecords(Seq(record))
-        maxAfter <- maxRecordTime(migrationId)
+        maxAfter <- maxRecordTime(roundNumber)
       } yield {
         maxBefore shouldBe None
         maxAfter shouldBe Some(ts1)
-      }
-    }
-
-    "not insert duplicate app activity records (same record_time)" in {
-      for {
-        store <- newStore()
-        ts1 = CantonTimestamp.now()
-        ts2 = ts1.plusSeconds(1)
-
-        record1 = mkRecord(ts1, 10L)
-        record2 = mkRecord(ts2, 20L)
-
-        // Insert first batch
-        _ <- store.insertAppActivityRecords(Seq(record1))
-        maxAfterFirst <- maxRecordTime(migrationId)
-
-        // Try to insert batch with duplicate ts1 and new ts2
-        _ <- store.insertAppActivityRecords(
-          Seq(
-            mkRecord(ts1, 99L), // should be skipped (same record_time)
-            record2, // should be inserted
-          )
-        )
-
-        maxAfterSecond <- maxRecordTime(migrationId)
-      } yield {
-        maxAfterFirst shouldBe Some(ts1)
-        maxAfterSecond shouldBe Some(ts2)
       }
     }
 
@@ -83,14 +55,14 @@ class DbAppActivityRecordStoreTest
         records = (0 until 50).map { i =>
           mkRecord(
             baseTs.plusSeconds(i.toLong),
-            i.toLong,
+            roundNumber + i.toLong,
             appProviderParties = Seq(s"app$i::provider"),
             appActivityWeights = Seq(i.toLong * 10),
           )
         }
 
         _ <- store.insertAppActivityRecords(records)
-        maxAfter <- maxRecordTime(migrationId)
+        maxAfter <- maxRecordTime(roundNumber + 49)
       } yield {
         maxAfter shouldBe Some(baseTs.plusSeconds(49))
       }
@@ -115,11 +87,10 @@ class DbAppActivityRecordStoreTest
   private def mkRecord(
       recordTime: CantonTimestamp,
       roundNumber: Long,
-      appProviderParties: Seq[String] = Seq("default::app"),
-      appActivityWeights: Seq[Long] = Seq(100L),
+      appProviderParties: Seq[String],
+      appActivityWeights: Seq[Long],
   ): AppActivityRecordT =
     AppActivityRecordT(
-      migrationId = migrationId,
       recordTime = recordTime,
       roundNumber = roundNumber,
       appProviderParties = appProviderParties,
@@ -150,7 +121,7 @@ class DbAppActivityRecordStoreTest
   }
 
   /** Test helper to query maxRecordTime directly from database */
-  private def maxRecordTime(migrationId: Long): Future[Option[CantonTimestamp]] = {
+  private def maxRecordTime(roundNumber: Long): Future[Option[CantonTimestamp]] = {
     import storage.api.jdbcProfile.api.*
     futureUnlessShutdownToFuture(
       storage
@@ -158,7 +129,7 @@ class DbAppActivityRecordStoreTest
           sql"""
           select max(record_time)
           from app_activity_record_store
-          where migration_id = $migrationId
+          where round_number = $roundNumber
         """.as[Option[CantonTimestamp]].head,
           "test.maxRecordTime",
         )
