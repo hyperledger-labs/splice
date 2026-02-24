@@ -303,7 +303,6 @@ class ScanApp(
             new DbSequencerTrafficSummaryStore(
               storage,
               updateHistory,
-              synchronizerId,
               loggerFactory,
             )
           )
