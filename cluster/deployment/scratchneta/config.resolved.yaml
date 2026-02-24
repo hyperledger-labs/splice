@@ -154,6 +154,9 @@ svs:
           cpu: '1'
           memory: '2Gi'
     participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
       bftSequencerConnection: true
       resources:
         limits:
@@ -164,6 +167,11 @@ svs:
     pruning:
       cometbft:
         retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
       sequencer:
         enabled: false
     scanApp:

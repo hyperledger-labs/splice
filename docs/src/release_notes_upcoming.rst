@@ -9,6 +9,13 @@
 
 .. release-notes:: Upcoming
 
+    - SV Participant
+
+      - Participant pruning for super validators is now supported and
+        recommended. Follow the :ref:`documentation
+        <sv_participant_pruning>` for instructions on how to enable
+        it.
+
     - Canton
 
       - JSON Ledger API OpenAPI/AsyncAPI Specification Updates
