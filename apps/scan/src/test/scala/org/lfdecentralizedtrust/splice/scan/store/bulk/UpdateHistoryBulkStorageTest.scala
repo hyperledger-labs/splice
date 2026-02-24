@@ -53,7 +53,8 @@ class UpdateHistoryBulkStorageTest
   "UpdateHistoryBulkStorage" should {
 
     "multipart upload works" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val o = bucketConnection.newAppendWriteObject("test")
         o.prepareUploadNext()
         o.prepareUploadNext()
@@ -69,7 +70,8 @@ class UpdateHistoryBulkStorageTest
     }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val initialStoreSize = 1500
         val segmentSize = 2200L
         val segmentFromTimestamp = 100L
@@ -167,7 +169,8 @@ class UpdateHistoryBulkStorageTest
     }
 
     "successfully dump all segments" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val initialStoreSize = 2000
         val genesisDate = LocalDate.of(2001, 1, 23)
         val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)

@@ -12,12 +12,7 @@ import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  HistoryMetrics,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, S3BucketConnection, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*

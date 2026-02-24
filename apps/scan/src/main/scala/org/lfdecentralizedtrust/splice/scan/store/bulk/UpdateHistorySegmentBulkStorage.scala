@@ -12,13 +12,7 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  HistoryMetrics,
-  TimestampWithMigrationId,
-  TreeUpdateWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, S3BucketConnection, TimestampWithMigrationId, TreeUpdateWithMigrationId, UpdateHistory}
 import io.circe.syntax.*
 import org.apache.pekko.actor.ActorSystem
 

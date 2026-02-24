@@ -8,7 +8,7 @@ import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection, UpdateHistory}
 
 import scala.concurrent.ExecutionContext
 

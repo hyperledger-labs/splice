@@ -4,15 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.*
-import org.lfdecentralizedtrust.splice.config.{
-  AutomationConfig,
-  HttpClientConfig,
-  NetworkAppClientConfig,
-  ParticipantClientConfig,
-  SpliceBackendConfig,
-  SpliceInstanceNamesConfig,
-  SpliceParametersConfig,
-}
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, HttpClientConfig, NetworkAppClientConfig, ParticipantClientConfig, S3Config, SpliceBackendConfig, SpliceInstanceNamesConfig, SpliceParametersConfig}
 
 trait BaseScanAppConfig {}
 
@@ -40,25 +32,25 @@ final case class BulkStorageConfig(
     s3: Option[S3Config] = None,
 )
 
-final case class S3Config(
-    endpoint: String,
-    bucketName: String,
-    region: String,
-    accessKeyId: String,
-    secretAccessKey: String,
-)
-object S3Config {
-  def hideConfidential(config: S3Config): S3Config = {
-    val hidden = "****"
-    S3Config(
-      config.endpoint,
-      config.bucketName,
-      config.region,
-      config.accessKeyId,
-      secretAccessKey = hidden,
-    )
-  }
-}
+//final case class S3Config(
+//    endpoint: String,
+//    bucketName: String,
+//    region: String,
+//    accessKeyId: String,
+//    secretAccessKey: String,
+//)
+//object S3Config {
+//  def hideConfidential(config: S3Config): S3Config = {
+//    val hidden = "****"
+//    S3Config(
+//      config.endpoint,
+//      config.bucketName,
+//      config.region,
+//      config.accessKeyId,
+//      secretAccessKey = hidden,
+//    )
+//  }
+//}
 
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.

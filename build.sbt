@@ -987,6 +987,8 @@ lazy val `apps-common` =
         Dependencies.parallel_collections,
         pekko_connectors_google_cloud_storage,
       ),
+      libraryDependencies += aws_s3,
+      libraryDependencies += s3mock_testcontainers,
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
         BuildInfoKey(
@@ -2000,6 +2002,8 @@ lazy val `apps-app`: Project =
       libraryDependencies +=
         "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
       libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
+      libraryDependencies += aws_s3,
+      libraryDependencies += s3mock_testcontainers,
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,

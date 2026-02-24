@@ -18,22 +18,11 @@ import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.{
-  AcsSnapshotStore,
-  ScanKeyValueProvider,
-  ScanKeyValueStore,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  HistoryMetrics,
-  Limit,
-  StoreTestBase,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, Limit, S3BucketConnection, StoreTestBase, TimestampWithMigrationId, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -67,7 +56,8 @@ class AcsSnapshotBulkStorageTest
 
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val ts = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
         val store = new MockAcsSnapshotStore(ts).store
         val metricsFactory = new InMemoryMetricsFactory
@@ -127,7 +117,8 @@ class AcsSnapshotBulkStorageTest
     }
 
     "correctly process multiple ACS snapshots" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val ts1 = CantonTimestamp.tryFromInstant(Instant.now().truncatedTo(ChronoUnit.DAYS))
         val ts2 = ts1.add(3.hours)
         val ts3 = ts1.add(24.hours)

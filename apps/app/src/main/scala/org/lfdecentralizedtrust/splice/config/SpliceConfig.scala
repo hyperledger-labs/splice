@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
   BulkStorageConfig,
   MediatorVerdictIngestionConfig,
-  S3Config,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,

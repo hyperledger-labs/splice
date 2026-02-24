@@ -14,14 +14,12 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
-import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, S3Config}
+import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
-import org.lfdecentralizedtrust.splice.scan.store.bulk.HasS3Mock
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
-import software.amazon.awssdk.regions.Region
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
@@ -31,8 +29,8 @@ class ScanTimeBasedIntegrationTest
     with AmuletConfigUtil
     with WalletTestUtil
     with TimeTestUtil
-    with HasS3Mock
-    with HasExecutionContext {
+    with HasExecutionContext
+    with HasS3Mock {
 
   val initialRound = 4815L
 
@@ -62,14 +60,7 @@ class ScanTimeBasedIntegrationTest
           bulkStorage = BulkStorageConfig(
             snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
             updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
-            s3 = Some(S3Config(
-              endpoint = "http://localhost:9090",
-              bucketName = "bucket",
-              region = Region.US_EAST_1.toString,
-              accessKeyId = "mock",
-              secretAccessKey = "mock"
-            ))
-
+            s3 = Some(s3ConfigMock)
           )
         )
       )(config)
@@ -372,8 +363,6 @@ class ScanTimeBasedIntegrationTest
 
   "snapshotting" in { implicit env =>
     {
-      withS3MockSync(loggerFactory) { s3Connection =>
-        {
 
           sv1ScanBackend.config
 
@@ -563,6 +552,4 @@ class ScanTimeBasedIntegrationTest
           }
         }
       }
-    }
-  }
 }

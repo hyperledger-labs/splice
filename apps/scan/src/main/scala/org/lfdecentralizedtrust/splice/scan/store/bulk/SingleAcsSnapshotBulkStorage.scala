@@ -10,7 +10,7 @@ import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
-import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, S3BucketConnection, TimestampWithMigrationId}
 
 import scala.concurrent.Future
 import io.circe.syntax.*
