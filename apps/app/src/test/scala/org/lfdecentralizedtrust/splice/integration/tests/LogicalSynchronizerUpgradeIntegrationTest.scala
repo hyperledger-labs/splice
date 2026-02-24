@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -60,8 +60,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
   override lazy val skipAcsSnapshotChecks = true
 
   lazy val scheduledLsu = ScheduledLsuConfig(
-    Instant.now().plusSeconds(200).truncatedTo(ChronoUnit.SECONDS),
-    Instant.now().plusSeconds(240).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(150).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(180).truncatedTo(ChronoUnit.SECONDS),
     NonNegativeInt.one,
     ProtocolVersion.v34,
   )
@@ -266,25 +266,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue(s"wait for upgrade time ${scheduledLsu.upgradeTime}") {
         Threading.sleep(Duration.between(Instant.now(), scheduledLsu.upgradeTime).toMillis.abs)
-      }
-
-      clue("transfer traffic after upgrade") {
-        allBackends.par.map { backend =>
-          eventually(timeUntilSuccess = 2.minutes) {
-            backend.mediatorClient.testing
-              .fetch_synchronizer_time(
-                NonNegativeDuration.ofSeconds(10)
-              )
-              .toInstant should be > scheduledLsu.upgradeTime
-          }
-
-          clue(s"transfer traffic for  ${backend.name}") {
-            backend
-              .sequencerClientFor(_.successor)
-              .traffic_control
-              .set_lsu_state(backend.sequencerClient.traffic_control.get_lsu_state())
-          }
-        }
       }
 
       val newSequencerUrls = allBackends.map { backend =>

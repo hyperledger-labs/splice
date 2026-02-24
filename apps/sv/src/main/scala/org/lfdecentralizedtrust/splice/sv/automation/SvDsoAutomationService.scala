@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppB
 import org.lfdecentralizedtrust.splice.sv.lsu.{
   LogicalSynchronizerUpgradeAnnouncementTrigger,
   LogicalSynchronizerUpgradeTrigger,
+  LogicalSyncUpgradeTransferTrafficTrigger,
 }
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
@@ -241,6 +242,13 @@ class SvDsoAutomationService(
       case (Some(currentSynchronizerNode), Some(successorSynchronizerNode)) =>
         registerTrigger(
           new LogicalSynchronizerUpgradeTrigger(
+            triggerContext,
+            currentSynchronizerNode,
+            successorSynchronizerNode,
+          )
+        )
+        registerTrigger(
+          new LogicalSyncUpgradeTransferTrafficTrigger(
             triggerContext,
             currentSynchronizerNode,
             successorSynchronizerNode,
@@ -565,5 +573,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[AmuletPriceMetricsTrigger],
       aTrigger[LogicalSynchronizerUpgradeTrigger],
       aTrigger[LogicalSynchronizerUpgradeAnnouncementTrigger],
+      aTrigger[LogicalSyncUpgradeTransferTrafficTrigger],
     )
 }

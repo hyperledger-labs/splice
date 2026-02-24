@@ -481,6 +481,18 @@ class SequencerAdminConnection(
     SequencerAdminCommands.DisableMember(member)
   )
 
+  def getLsuTrafficControlState()(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = runCmd(
+    SequencerAdminCommands.GetLsuTrafficControlState
+  )
+
+  def setLsuTrafficControlState(memberTraffic: ByteString)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = runCmd(
+    SequencerAdminCommands.SetLsuTrafficControlState(memberTraffic)
+  )
+
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
     getSequencerId
 
