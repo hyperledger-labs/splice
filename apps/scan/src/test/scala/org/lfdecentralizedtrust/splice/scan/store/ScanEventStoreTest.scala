@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.store.{
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{TrafficSummaryT, EnvelopeT}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -24,6 +25,7 @@ import scala.concurrent.Future
 class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with SplicePostgresTest {
 
   "ScanEventStore" should {
+
     "combine verdict and update events by update_id" in {
       for {
         ctx <- newEventStore()
@@ -46,6 +48,27 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       }
     }
 
+    "combine a verdict that has a summary with update events by update_id" in {
+      for {
+        ctx <- newEventStore()
+        recordTs = CantonTimestamp.now()
+        tx <- insertUpdate(ctx.updateHistory, recordTs, "update1")
+        updateId = tx.getUpdateId
+
+        _ <- insertVerdict(ctx.verdictStore, updateId, recordTs, withSummary = true)
+
+        eventOpt <- ctx.eventStore.getEventByUpdateId(updateId, domainMigrationId)
+        histUpdateOpt <- ctx.updateHistory.getUpdate(updateId)
+      } yield {
+        val (verdictOpt, updateOpt) = eventOpt.value
+        verdictOpt.value._2.size shouldBe 1
+        val view = verdictOpt.value._2.head
+        view.verdictRowId shouldBe verdictOpt.value._1.rowId
+        verdictOpt.value._1.recordTime shouldBe updateOpt.value.update.update.recordTime
+        // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdate
+        updateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
+      }
+    }
     "not insert the same update's verdict twice" in {
       for {
         ctx <- newEventStore()
@@ -848,7 +871,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
   }
 
   private def newVerdictStore(updateHistory: UpdateHistory) =
-    new DbScanVerdictStore(storage.underlying, updateHistory, None, None, loggerFactory)
+    new DbScanVerdictStore(storage.underlying, updateHistory, None, loggerFactory)
 
   private def insertUpdate(
       updateHistory: UpdateHistory,
@@ -921,9 +944,19 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       informees: Seq[PartyId] = Seq(dsoParty),
       viewId: Int = 0,
       migrationId: Long = domainMigrationId,
+      withSummary: Boolean = false,
   ): Future[Unit] = {
     val verdict =
-      mkVerdict(verdictStore, updateId, recordTs, participantId, informees, viewId, migrationId)
+      mkVerdict(
+        verdictStore,
+        updateId,
+        recordTs,
+        participantId,
+        informees,
+        viewId,
+        migrationId,
+        withSummary,
+      )
     val mkViews: Long => Seq[verdictStore.TransactionViewT] = { rowId =>
       Seq(
         new verdictStore.TransactionViewT(
@@ -948,7 +981,21 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       informees: Seq[PartyId] = Seq(dsoParty),
       viewId: Int = 0,
       migrationId: Long = domainMigrationId,
+      withSummary: Boolean = false,
   ) = {
+    val summary =
+      if (!withSummary) None
+      else
+        Some(
+          TrafficSummaryT(
+            sequencingTime = recordTs,
+            totalTrafficCost = 100L,
+            envelopes = Seq(
+              EnvelopeT(trafficCost = 60L, viewIds = Seq(1, 2)),
+              EnvelopeT(trafficCost = 40L, viewIds = Seq(3)),
+            ),
+          )
+        )
     new verdictStore.VerdictT(
       0L,
       migrationId,
@@ -961,6 +1008,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       updateId,
       informees.map(_.toProtoPrimitive),
       Seq(viewId),
+      summary,
     )
   }
 
