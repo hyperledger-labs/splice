@@ -64,7 +64,9 @@ class DsoPartyMigration(
       _ = logger.info(
         s"DSO party was authorized on $participantId, downloading snapshot at time $authorizedAt."
       )
-      acsBytes <- EitherT.liftF(downloadSnapshotFromTime(authorizedAt, dsoRules.domain))
+      acsBytes <- EitherT.liftF(
+        downloadSnapshotFromTime(participantId, authorizedAt, dsoRules.domain)
+      )
     } yield {
       acsBytes
     }
@@ -72,6 +74,7 @@ class DsoPartyMigration(
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
+      targetParticipantId: ParticipantId,
       authorizedAt: Instant,
       decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
@@ -101,9 +104,10 @@ class DsoPartyMigration(
           "download_acs_snapshot",
           show"Download ACS snapshot for DSO at $authorizedAt",
           participantAdminConnection
-            .downloadAcsSnapshotNonChunked(
-              Set(dsoParty),
-              filterSynchronizerId = decentralizedSynchronizer,
+            .exportPartyAcs(
+              dsoParty,
+              synchronizerId = decentralizedSynchronizer,
+              targetParticipantId = targetParticipantId,
               timestampOrOffset = Left(authorizedAt),
             )
             .recoverWith { case ex: StatusRuntimeException =>

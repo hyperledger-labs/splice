@@ -17,7 +17,11 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
+import com.digitalasset.canton.admin.participant.v30.{
+  ExportAcsResponse,
+  ExportPartyAcsResponse,
+  PruningServiceGrpc,
+}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -346,16 +350,7 @@ class ParticipantAdminConnection(
     val observer = new SeqAccumulatingObserver[ExportAcsResponse]
 
     for {
-      offset <- timestampOrOffset match {
-        case Right(offset) => Future.successful(offset)
-        case Left(timestamp) =>
-          offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
-            logger.debug(
-              s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
-            )
-            offset
-          }
-      }
+      offset <- resolveOffset(timestampOrOffset, synchronizerId, force)
       _ <- runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
           parties = parties,
@@ -368,6 +363,52 @@ class ParticipantAdminConnection(
       )
       responses <- observer.resultFuture
     } yield responses.map(_.chunk)
+  }
+
+  private def resolveOffset(
+      timestampOrOffset: Either[Instant, NonNegativeLong],
+      synchronizerId: SynchronizerId,
+      force: Boolean,
+  )(implicit tc: TraceContext) = {
+    timestampOrOffset match {
+      case Right(offset) => Future.successful(offset)
+      case Left(timestamp) =>
+        offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
+          logger.debug(
+            s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
+          )
+          offset
+        }
+    }
+  }
+
+  def exportPartyAcs(
+      party: PartyId,
+      synchronizerId: SynchronizerId,
+      targetParticipantId: ParticipantId,
+      timestampOrOffset: Either[Instant, NonNegativeLong],
+  )(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    logger.info(
+      show"Exporting ACS snapshot for party $party from domain $synchronizerId at $timestampOrOffset"
+    )
+    val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
+
+    for {
+      offset <- resolveOffset(timestampOrOffset, synchronizerId, force = false)
+      _ <- runCmd(
+        ParticipantAdminCommands.PartyManagement.ExportPartyAcs(
+          party,
+          synchronizerId,
+          targetParticipantId,
+          offset,
+          waitForActivationTimeout = None, // i.e., default
+          observer,
+        )
+      )
+      chunks <- observer.resultFuture
+    } yield ByteString.copyFrom(chunks.map(_.chunk).asJava)
   }
 
   def downloadAcsSnapshotNonChunked(
