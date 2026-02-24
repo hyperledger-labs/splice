@@ -14,10 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
-import org.lfdecentralizedtrust.splice.scan.store.db.{
-  DbScanVerdictStore,
-  DbSequencerTrafficSummaryStore,
-}
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanVerdictStore}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -135,21 +132,19 @@ class ScanVerdictStoreIngestion(
   ): Future[TaskOutcome] = {
     if (batch.isEmpty) Future.successful(TaskSuccess("empty batch"))
     else {
-      val items = batch.map(v => DbScanVerdictStore.fromProto(v, migrationId, synchronizerId))
-
       // Extract sequencing times and build view_hash -> view_id correlation map
       val (sequencingTimes, viewHashToViewIdByTime) =
         DbScanVerdictStore.buildViewHashCorrelation(batch)
 
       // 1. Fetch traffic summaries FIRST (before any DB operations)
-      val trafficSummariesF: Future[Seq[DbSequencerTrafficSummaryStore.TrafficSummaryT]] =
+      val trafficSummariesF: Future[Seq[DbScanVerdictStore.TrafficSummaryT]] =
         sequencerTrafficClientO match {
           case Some(sequencerTrafficClient) =>
             sequencerTrafficClient
               .getTrafficSummaries(sequencingTimes)
               .map(_.map { proto =>
-                DbSequencerTrafficSummaryStore
-                  .fromProtoWithCorrelation(proto, migrationId, viewHashToViewIdByTime, logger)
+                DbScanVerdictStore
+                  .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
               })
           case _ =>
             Future.successful(Seq.empty)
@@ -160,11 +155,18 @@ class ScanVerdictStoreIngestion(
         trafficSummaries <- trafficSummariesF
 
         // Pair traffic summaries with verdicts by sequencing time
-        // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
         summaryByTime = trafficSummaries.map(s => s.sequencingTime -> s).toMap
-        summariesWithVerdicts = batch.flatMap { verdict =>
-          CantonTimestamp.fromProtoTimestamp(verdict.getRecordTime).toOption.flatMap { recordTime =>
-            summaryByTime.get(recordTime).map(_ -> verdict)
+        items = batch.map(v =>
+          DbScanVerdictStore.fromProto(v, migrationId, synchronizerId, summaryByTime)
+        )
+
+        // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
+        //
+        // Once #4060 is confirmed, this should simplify, as 'items' will fail
+        // construction if any verdicts did not have a trafficSummary
+        summariesWithVerdicts = batch.flatMap { v =>
+          CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption.flatMap { recordTime =>
+            summaryByTime.get(recordTime).map(_ -> v)
           }
         }
 
@@ -174,7 +176,7 @@ class ScanVerdictStoreIngestion(
           Set.empty[PartyId], // featuredAppProviders
         )
 
-        _ <- store.insertVerdictAndOtherData(items, trafficSummaries, appActivityRecords)
+        _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
       } yield (trafficSummaries.size, appActivityRecords.size)
 
       result.transform {

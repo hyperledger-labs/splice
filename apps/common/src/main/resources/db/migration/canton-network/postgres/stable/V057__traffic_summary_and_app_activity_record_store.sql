@@ -18,6 +18,19 @@ create table sequencer_traffic_summary_store
     primary key (history_id, sequencing_time)
 );
 
+-- Add columns for storing total_traffic_cost and envelopes to the scan_verdict_store table
+--
+-- This is done as the traffic summary data is treated as extra data attached to
+-- the mediator verdict
+-- They are declared null as their addition does not require a hard migration
+alter table scan_verdict_store
+    -- Total traffic cost of the message paid by the sender
+    add column total_traffic_cost          bigint null,
+    -- Envelope data as JSONB array: [{"tc": 123, "vid": [1, 2]}, ...]
+    -- where "tc" is the traffic cost and "vid" is an array of view_ids from the verdict
+    add column envelopes                   jsonb null;
+
+
 -- Stores computed app activity records derived from verdicts and traffic summaries.
 -- Each row represents the traffic-weighted activity of featured app providers at a given record_time.
 -- and is derived from a computation involving the data in it's parent table, scan_event_store
