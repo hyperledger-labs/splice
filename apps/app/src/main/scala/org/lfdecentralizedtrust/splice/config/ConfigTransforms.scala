@@ -462,7 +462,14 @@ object ConfigTransforms {
             .focus(_.synchronizerNodes)
             .modify(portTransform(bump, _))
             .focus(_.bftSequencers)
-            .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
+            .modify(
+              _.map(
+                _.focus(_.sequencerAdminClient)
+                  .modify(portTransform(bump, _))
+                  .focus(_.p2pUrl)
+                  .modify(bumpUrl(bump, _))
+              )
+            )
         else conf
       ),
       updateAllValidatorConfigs((name, conf) =>
