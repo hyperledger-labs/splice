@@ -105,10 +105,14 @@ class SvFrontendIntegrationTest
         )(
           "We see a button for creating onboarding secret",
           _ => {
-            find(className("onboarding-secret-table")) should not be empty
+            find(
+              className("onboarding-secret-table")
+            ) should not be empty withClue "'Validator Onboarding Secrets' table"
             val rows = findAll(className("onboarding-secret-table-row")).toSeq
-            find(id("create-party-hint")) should not be empty
-            find(id("create-validator-onboarding-secret")) should not be empty
+            find(id("create-party-hint")) should not be empty withClue "'Party Hint' textfield"
+            find(
+              id("create-validator-onboarding-secret")
+            ) should not be empty withClue "'Create a validator onboarding secret' button"
             rows.size
           },
         )
@@ -137,7 +141,7 @@ class SvFrontendIntegrationTest
             val secrets = findAll(
               className("onboarding-secret-table-secret")
             ).toSeq
-            secrets should have size (rowSize + 1L)
+            secrets should have size (rowSize + 1L) withClue "rows in 'Validator Onboarding Secrets' table"
             secrets.head.text
           },
         )
