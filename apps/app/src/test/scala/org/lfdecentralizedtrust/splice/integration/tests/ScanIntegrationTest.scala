@@ -212,7 +212,9 @@ class ScanIntegrationTest
       val desc = TransactionHistoryRequest.SortOrder.Desc
       val allPagesAsc = collectAllTapPagesForAlice(asc)
       val allPagesDesc = collectAllTapPagesForAlice(desc)
-      allPagesAsc.map(_.round) should contain only Some(latestRound) withClue "alice tap pages' rounds"
+      allPagesAsc.map(_.round) should contain only Some(
+        latestRound
+      ) withClue "alice tap pages' rounds"
 
       val tapsFirstPageAscending = allPagesAsc.take(pageSize)
 
@@ -616,7 +618,7 @@ class ScanIntegrationTest
     clue("Checking app and validator reward and faucet amounts") {
       eventually() {
         bobValidatorWalletClient
-          .listAppRewardCoupons() should have size 0
+          .listAppRewardCoupons() should have size 0 withClue "bob AppRewardCoupons"
         // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
         //        bobValidatorWalletClient
         //          .listValidatorRewardCoupons() should have size 0

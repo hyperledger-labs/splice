@@ -75,7 +75,7 @@ class SplitwellUpgradeFrontendIntegrationTest
               .filterJava(splitwellCodegen.SplitwellInstallRequest.COMPANION)(
                 splitwellBackend.getProviderPartyId()
               )
-            contracts shouldBe empty
+            contracts shouldBe empty withClue "SplitwellInstallRequests"
           }
         }
       }

@@ -50,7 +50,9 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
       _ => {
         splitwellBackend
           .getConnectedDomains(ensurePartyIsOnNewDomain)
-          .map(_.uid.identifier.str) should contain("splitwellUpgrade")
+          .map(_.uid.identifier.str) should contain(
+          "splitwellUpgrade"
+        ) withClue "connected domains"
       },
     )
   }
@@ -72,7 +74,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
         splitwell.ledgerApi.ledger_api_extensions.acs
           .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(
             party
-          ) should have size requests.size.toLong
+          ) should have size requests.size.toLong withClue "SplitwellInstalls"
       },
     )
   }
@@ -102,7 +104,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
 
     actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
       "Alice sees 'group1'",
-      _ => aliceSplitwellClient.listGroups() should have size 1,
+      _ => aliceSplitwellClient.listGroups() should have size 1 withClue "alice Groups",
     )
 
     // Wait for the group contract to be visible to Alice's Ledger API
@@ -121,7 +123,10 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
 
     actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
       "Alice sees the accepted invite",
-      _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
+      _ =>
+        aliceSplitwellClient.listAcceptedGroupInvites(
+          group
+        ) should not be empty withClue "alice group1 AcceptedGroupInvites",
     )
 
     actAndCheck(
@@ -132,8 +137,10 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
     )(
       "bob is in 'group1'",
       _ => {
-        bobSplitwellClient.listGroups() should have size 1
-        aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
+        bobSplitwellClient.listGroups() should have size 1 withClue "bob Groups"
+        aliceSplitwellClient.listAcceptedGroupInvites(group) should be(
+          empty
+        ) withClue "alice group1 AcceptedGroupInvites"
       },
     )
 
