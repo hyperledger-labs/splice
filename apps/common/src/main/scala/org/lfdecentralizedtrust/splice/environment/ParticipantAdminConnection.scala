@@ -330,8 +330,8 @@ class ParticipantAdminConnection(
     )
   }
 
-  private def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(
-      implicit tc: TraceContext
+  def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(implicit
+      tc: TraceContext
   ): Future[NonNegativeLong] =
     runCmd(
       ParticipantAdminCommands.PartyManagement
@@ -386,23 +386,22 @@ class ParticipantAdminConnection(
       party: PartyId,
       synchronizerId: SynchronizerId,
       targetParticipantId: ParticipantId,
-      timestampOrOffset: Either[Instant, NonNegativeLong],
+      beforeActivationOffset: NonNegativeLong,
   )(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
     logger.info(
-      show"Exporting ACS snapshot for party $party from domain $synchronizerId at $timestampOrOffset"
+      show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
     )
     val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
 
     for {
-      offset <- resolveOffset(timestampOrOffset, synchronizerId, force = false)
       _ <- runCmd(
         ParticipantAdminCommands.PartyManagement.ExportPartyAcs(
           party,
           synchronizerId,
           targetParticipantId,
-          offset,
+          beforeActivationOffset,
           waitForActivationTimeout = None, // i.e., default
           observer,
         )
@@ -675,7 +674,7 @@ class ParticipantAdminConnection(
       // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
       // See SvOnboardingPromoteToSubmitterTrigger.
       val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermission.Observation)
+        HostingParticipant(newParticipant, ParticipantPermission.Observation, onboarding = true)
       if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
         participants
       } else {
@@ -721,6 +720,7 @@ class ParticipantAdminConnection(
           HostingParticipant(
             newParticipant,
             ParticipantPermission.Observation,
+            onboarding = true,
           )
         )
         Right(

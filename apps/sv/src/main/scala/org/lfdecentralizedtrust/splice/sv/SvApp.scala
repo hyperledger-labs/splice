@@ -565,6 +565,11 @@ class SvApp(
           svAutomation,
           dsoAutomation,
           participantAdminConnection,
+          ledgerClient
+            .readOnlyConnection(
+              this.getClass.getSimpleName,
+              loggerFactory,
+            ),
           retryProvider,
           dsoPartyHosting,
           loggerFactory,

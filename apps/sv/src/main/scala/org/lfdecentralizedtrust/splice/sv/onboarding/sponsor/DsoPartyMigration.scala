@@ -5,8 +5,10 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.EitherT
 import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
@@ -25,13 +27,13 @@ import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class DsoPartyMigration(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     participantAdminConnection: ParticipantAdminConnection,
+    ledgerConnection: BaseLedgerConnection,
     retryProvider: RetryProvider,
     dsoPartyHosting: DsoPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -56,16 +58,21 @@ class DsoPartyMigration(
     for {
       dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
       // this will wait until the PartyToParticipant state change completed
-      authorizedAt <- partyHosting
+      beforeActivationOffset <- EitherT.liftF(ledgerConnection.ledgerEnd())
+      _ <- partyHosting
         .authorizeDsoPartyToParticipant(
           dsoRules.domain,
           participantId,
         )
       _ = logger.info(
-        s"DSO party was authorized on $participantId, downloading snapshot at time $authorizedAt."
+        s"DSO party was authorized on $participantId, downloading snapshot at offset $beforeActivationOffset."
       )
       acsBytes <- EitherT.liftF(
-        downloadSnapshotFromTime(participantId, authorizedAt, dsoRules.domain)
+        downloadSnapshotFromTime(
+          participantId,
+          NonNegativeLong.tryCreate(beforeActivationOffset),
+          dsoRules.domain,
+        )
       )
     } yield {
       acsBytes
@@ -75,7 +82,7 @@ class DsoPartyMigration(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
       targetParticipantId: ParticipantId,
-      authorizedAt: Instant,
+      beforeActivationOffset: NonNegativeLong,
       decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
     def submitDummyTransaction(): Future[Unit] =
@@ -102,13 +109,13 @@ class DsoPartyMigration(
         retryProvider.retry(
           RetryFor.ClientCalls,
           "download_acs_snapshot",
-          show"Download ACS snapshot for DSO at $authorizedAt",
+          show"Download ACS snapshot for DSO at $beforeActivationOffset",
           participantAdminConnection
             .exportPartyAcs(
               dsoParty,
               synchronizerId = decentralizedSynchronizer,
               targetParticipantId = targetParticipantId,
-              timestampOrOffset = Left(authorizedAt),
+              beforeActivationOffset = beforeActivationOffset,
             )
             .recoverWith { case ex: StatusRuntimeException =>
               val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
@@ -118,7 +125,7 @@ class DsoPartyMigration(
                   case ErrorDetails
                         .ErrorInfoDetail(RepairServiceError.UnavailableAcsSnapshot.id, metadata) =>
                     val msg =
-                      s"Requested record time $authorizedAt has been pruned: $metadata, make sure that journal-garbage-collection-delay is configured sufficiently high"
+                      s"Requested offset $beforeActivationOffset has been pruned: $metadata, make sure that journal-garbage-collection-delay is configured sufficiently high"
                     logger.warn(msg)
                     Future.failed(Status.INVALID_ARGUMENT.withDescription(msg).asRuntimeException())
                   case ErrorDetails.ErrorInfoDetail(
@@ -126,7 +133,7 @@ class DsoPartyMigration(
                         metadata,
                       ) =>
                     logger.info(
-                      s"Requested record time $authorizedAt is not yet clean: $metadata, submitting dummy transaction"
+                      s"Requested offset $beforeActivationOffset is not yet clean: $metadata, submitting dummy transaction"
                     )
                     submitDummyTransaction()
                   case _ => Future.unit
