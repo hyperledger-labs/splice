@@ -643,7 +643,8 @@ class AcsSnapshotTriggerTest
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 1, // ignored in this test
     bulkDbReadChunkSize = 1, // ignored in this test
-    bulkMaxFileSize = 1L, // ignored in this test
+    bulkZstdFrameSize = 0L, // ignored in this test
+    bulkMaxFileSize = 0L, // ignored in this test
   )
 
   private def unused0[T]: () => Future[T] = () => fail("This argument should not be used")

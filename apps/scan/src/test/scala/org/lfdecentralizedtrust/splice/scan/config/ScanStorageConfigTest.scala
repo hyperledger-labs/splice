@@ -16,8 +16,9 @@ class ScanStorageConfigTest
         val config = ScanStorageConfig(
           dbAcsSnapshotPeriodHours = 2,
           bulkAcsSnapshotPeriodHours = 4,
-          1,
-          1L,
+          bulkDbReadChunkSize = 1,
+          bulkZstdFrameSize = 0L,
+          bulkMaxFileSize = 0L,
         )
         val prev = cantonTimestamp("2007-12-03T11:30:00.00Z")
         val next = cantonTimestamp("2007-12-03T12:00:00.00Z")
@@ -27,8 +28,9 @@ class ScanStorageConfigTest
         val config = ScanStorageConfig(
           dbAcsSnapshotPeriodHours = 2,
           bulkAcsSnapshotPeriodHours = 4,
-          1,
-          1L,
+          bulkDbReadChunkSize = 1,
+          bulkZstdFrameSize = 0L,
+          bulkMaxFileSize = 0L,
         )
         val prev = cantonTimestamp("2007-12-03T12:00:00.00Z")
         val next = cantonTimestamp("2007-12-03T14:00:00.00Z")
@@ -38,8 +40,9 @@ class ScanStorageConfigTest
         val config = ScanStorageConfig(
           dbAcsSnapshotPeriodHours = 4,
           bulkAcsSnapshotPeriodHours = 8,
-          1,
-          1L,
+          bulkDbReadChunkSize = 1,
+          bulkZstdFrameSize = 0L,
+          bulkMaxFileSize = 0L,
         )
         val prev = cantonTimestamp("2007-12-03T21:00:00.00Z")
         val next = cantonTimestamp("2007-12-04T00:00:00.00Z")
