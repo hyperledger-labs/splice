@@ -10,13 +10,13 @@ import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
-  aTrigger,
-  TriggerClass,
-}
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+}
+import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
+  aTrigger,
+  TriggerClass,
 }
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
@@ -25,11 +25,12 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
@@ -45,10 +46,12 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSynchronizerUpgradeAnnouncementTrigger,
+  LogicalSynchronizerUpgradeTrigger,
+}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
 import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
@@ -267,6 +270,14 @@ class SvDsoAutomationService(
     // TODO(#564) - add check for sequencer status in the triggers
     localSynchronizerNodes.foreach {
       def registerTriggersForSynchronizers(current: LocalSynchronizerNode): Unit = {
+        registerTrigger(
+          new LogicalSynchronizerUpgradeAnnouncementTrigger(
+            triggerContext,
+            config.scheduledLsu,
+            participantAdminConnection,
+            config.domains.global.alias,
+          )
+        )
         current.sequencerConfig match {
           case BftSequencerConfig() =>
             registerTrigger(
@@ -553,5 +564,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[FollowAmuletConversionRateFeedTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
       aTrigger[LogicalSynchronizerUpgradeTrigger],
+      aTrigger[LogicalSynchronizerUpgradeAnnouncementTrigger],
     )
 }
