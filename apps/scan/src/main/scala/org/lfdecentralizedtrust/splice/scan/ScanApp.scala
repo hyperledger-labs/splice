@@ -43,6 +43,7 @@ import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
   DbScanVerdictStore,
   DbSequencerTrafficSummaryStore,
   ScanAggregatesReader,
@@ -237,7 +238,45 @@ class ScanApp(
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
       )
-      scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
+      // Conditionally create traffic summary ingestion dependencies
+      sequencerTrafficClientO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new SequencerTrafficClient(
+              config.sequencerAdminClient,
+              ScanApp.this,
+              nodeMetrics.grpcClientMetrics,
+              loggerFactory,
+            )
+          )
+        } else None
+      trafficSummaryStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new DbSequencerTrafficSummaryStore(
+              storage,
+              updateHistory,
+              loggerFactory,
+            )
+          )
+        } else None
+      appActivityRecordStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new DbAppActivityRecordStore(
+              storage,
+              updateHistory,
+              loggerFactory,
+            )
+          )
+        } else None
+      scanVerdictStore = DbScanVerdictStore(
+        storage,
+        updateHistory,
+        appActivityRecordStoreO,
+        trafficSummaryStoreO,
+        loggerFactory,
+      )(ec)
       scanEventStore = new ScanEventStore(
         scanVerdictStore,
         updateHistory,
@@ -285,28 +324,6 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
-      // Conditionally create traffic summary ingestion dependencies
-      sequencerTrafficClientO =
-        if (config.sequencerTrafficIngestion.enabled) {
-          Some(
-            new SequencerTrafficClient(
-              config.sequencerAdminClient,
-              ScanApp.this,
-              nodeMetrics.grpcClientMetrics,
-              loggerFactory,
-            )
-          )
-        } else None
-      trafficSummaryStoreO =
-        if (config.sequencerTrafficIngestion.enabled) {
-          Some(
-            new DbSequencerTrafficSummaryStore(
-              storage,
-              updateHistory,
-              loggerFactory,
-            )
-          )
-        } else None
       appActivityComputation = NoOpAppActivityComputation
       verdictAutomation = new ScanVerdictAutomationService(
         config,
@@ -319,7 +336,6 @@ class ScanApp(
         synchronizerId,
         nodeMetrics.verdictIngestion,
         sequencerTrafficClientO,
-        trafficSummaryStoreO,
         appActivityComputation,
       )
       scanHandler = new HttpScanHandler(
