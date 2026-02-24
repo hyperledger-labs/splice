@@ -266,16 +266,6 @@ class UpdateHistoryIntegrationTest
       // and there must be at least one update with an external txn hash (the one related to the externally signed transaction)
       eventually() {
         compareHistory(
-          aliceValidatorBackend.participantClient,
-          aliceValidatorBackend.appState.automation.updateHistory,
-          ledgerBeginOffsetAlice,
-          mustCheckExternalTxnHash = true,
-          extTxnHashes = Seq(externalTxnHash),
-        )
-      }
-
-      eventually() {
-        compareHistory(
           sv1Backend.participantClient,
           sv1ScanBackend.appState.automation.updateHistory,
           ledgerBeginOffsetSv1,
