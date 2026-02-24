@@ -20,14 +20,14 @@ create table sequencer_traffic_summary_store
 
 -- Stores computed app activity records derived from verdicts and traffic summaries.
 -- Each row represents the traffic-weighted activity of featured app providers at a given record_time.
+-- and is derived from a computation involving the data in it's parent table, scan_event_store
+--
+-- The history_id and record_time are denormalized from scan_event_store as they form a key and allow
+-- this data to be served without joining on it
 create table app_activity_record_store
 (
-    -- The time when this row was inserted, used for debugging and monitoring
-    ingested_at                 timestamptz not null default now(),
     -- History identifier for update history partitioning (same as sequencer_traffic_summary_store)
     history_id                  bigint not null,
-    -- Migration identifier for domain migrations
-    migration_id                bigint not null,
     -- The record_time (= sequencing_time) of the verdict/traffic summary
     record_time                 bigint not null,
     -- The mining round number that was open at this record_time
@@ -41,4 +41,3 @@ create table app_activity_record_store
     -- Primary key: (history_id, record_time) uniquely identifies an activity record
     primary key (history_id, record_time)
 );
-
