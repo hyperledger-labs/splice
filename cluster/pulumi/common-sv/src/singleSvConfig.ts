@@ -89,6 +89,7 @@ const SvAppConfigSchema = z
     svIdKeyGcpSecret: z.string().optional(),
     // defaults to {svName}-cometbft-governance-key if not set
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
+    permissionedSynchronizer: z.boolean().optional(),
     resources: K8sResourceSchema,
   })
   .strict();

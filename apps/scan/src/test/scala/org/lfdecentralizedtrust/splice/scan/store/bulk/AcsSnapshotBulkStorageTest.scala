@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -16,7 +17,7 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
   ScanKeyValueProvider,
@@ -31,6 +32,7 @@ import org.lfdecentralizedtrust.splice.store.{
   Limit,
   StoreTestBase,
   TimestampWithMigrationId,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
@@ -59,6 +61,9 @@ class AcsSnapshotBulkStorageTest
     bulkZstdFrameSize = 10000L,
     bulkMaxFileSize = 50000L,
   )
+  val appConfig = BulkStorageConfig(
+    snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
+  )
 
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
@@ -71,6 +76,7 @@ class AcsSnapshotBulkStorageTest
             .asSource(
               TimestampWithMigrationId(ts, 0),
               bulkStorageTestConfig,
+              appConfig,
               store,
               bucketConnection,
               new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
@@ -126,6 +132,7 @@ class AcsSnapshotBulkStorageTest
         val ts2 = ts1.add(3.hours)
         val ts3 = ts1.add(24.hours)
         val store = new MockAcsSnapshotStore(ts1)
+        val updateHistory = mockUpdateHistory()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         val metricsFactory = new InMemoryMetricsFactory
         def assertLatestSnapshotInMetrics(ts: CantonTimestamp) = {
@@ -146,7 +153,9 @@ class AcsSnapshotBulkStorageTest
           kvProvider <- mkProvider
           (killSwitch, probe) = new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
+            appConfig,
             store.store,
+            updateHistory,
             s3BucketConnection,
             kvProvider,
             new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
@@ -186,6 +195,14 @@ class AcsSnapshotBulkStorageTest
         }
       }
     }
+  }
+
+  private def mockUpdateHistory() = {
+    val store = mock[UpdateHistory]
+    when(
+      store.isHistoryBackfilled(anyLong)(any[TraceContext])
+    ).thenReturn(Future.successful(true))
+    store
   }
 
   class MockAcsSnapshotStore(val initialSnapshotTimestamp: CantonTimestamp) {

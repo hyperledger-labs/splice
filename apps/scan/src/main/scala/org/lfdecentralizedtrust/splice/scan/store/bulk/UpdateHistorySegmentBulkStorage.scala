@@ -7,7 +7,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
@@ -24,7 +24,6 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
 
 case class UpdatesSegment(
@@ -46,7 +45,8 @@ case class UpdatesSegment(
   * know when each segment is complete).
   */
 class UpdateHistorySegmentBulkStorage(
-    config: ScanStorageConfig,
+    storageConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
     updateHistory: UpdateHistory,
     s3Connection: S3BucketConnection,
     segment: UpdatesSegment,
@@ -55,17 +55,13 @@ class UpdateHistorySegmentBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  // When more updates are not yet available, how long to wait for more.
-  // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
-  private val updatesPollingInterval = 5.seconds
-
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
   )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, ByteString)]] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
-        HardLimit.tryCreate(config.bulkDbReadChunkSize),
+        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
         TimestampWithMigrationId(
@@ -75,7 +71,7 @@ class UpdateHistorySegmentBulkStorage(
       )
       result <-
         if (
-          updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
+          updatesInSegment.length < updates.length || updates.length == storageConfig.bulkDbReadChunkSize
         ) {
           if (updatesInSegment.nonEmpty) {
             // Found enough updates to add
@@ -104,10 +100,13 @@ class UpdateHistorySegmentBulkStorage(
           }
         } else {
           logger.debug(
-            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
+            s"Not enough updates yet (queried for ${storageConfig.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
                 .map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
           )
-          after(updatesPollingInterval, actorSystem.scheduler) {
+          after(
+            appConfig.updatesPollingInterval.underlying,
+            actorSystem.scheduler,
+          ) {
             Future.successful(Some((afterTs, ByteString.empty)))
           }
         }
@@ -140,10 +139,11 @@ class UpdateHistorySegmentBulkStorage(
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(
         S3ZstdObjects(
-          config,
+          storageConfig,
+          appConfig,
           s3Connection,
           { objIdx =>
-            s"${config.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
+            s"${storageConfig.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
           },
           loggerFactory,
         )
@@ -163,7 +163,8 @@ object UpdateHistorySegmentBulkStorage {
   )
 
   def asFlow(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
       historyMetrics: HistoryMetrics,
@@ -175,7 +176,8 @@ object UpdateHistorySegmentBulkStorage {
   ): Flow[UpdatesSegment, Output, NotUsed] =
     Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
       new UpdateHistorySegmentBulkStorage(
-        config,
+        storageConfig,
+        appConfig,
         updateHistory,
         s3Connection,
         segment,
@@ -185,7 +187,8 @@ object UpdateHistorySegmentBulkStorage {
     }
 
   def asSource(
-      config: ScanStorageConfig,
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
       segment: UpdatesSegment,
@@ -197,7 +200,8 @@ object UpdateHistorySegmentBulkStorage {
       actorSystem: ActorSystem,
   ): Source[Output, NotUsed] =
     new UpdateHistorySegmentBulkStorage(
-      config,
+      storageConfig,
+      appConfig,
       updateHistory,
       s3Connection,
       segment,

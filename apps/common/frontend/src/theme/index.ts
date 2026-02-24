@@ -22,6 +22,10 @@ declare module '@mui/material/styles' {
     };
   }
 
+  interface TypeText {
+    light: string;
+  }
+
   interface Palette {
     colors: {
       neutral: Record<string, string>;
@@ -118,6 +122,9 @@ theme = createTheme(theme, {
     },
     background: {
       default: theme.palette.colors.neutral[10],
+    },
+    text: {
+      light: '#E2E2E2',
     },
   },
 });
@@ -222,13 +229,16 @@ theme = createTheme(theme, {
           },
         },
         // primary pill button
-        stylePillButton({
-          bgColor: theme.palette.primary.main,
-          bgHoverColor: theme.palette.primary.light,
-          bgDisableColor: theme.palette.colors.neutral[25],
-          borderFocus: `2px solid ${theme.palette.primary.main}`,
-          textColor: 'black',
-        }),
+        stylePillButton(
+          {
+            bgColor: theme.palette.primary.main,
+            bgHoverColor: theme.palette.primary.light,
+            bgDisableColor: theme.palette.colors.neutral[25],
+            borderFocus: `2px solid ${theme.palette.primary.main}`,
+            textColor: 'black',
+          },
+          { textTransform: 'none', fontSize: '16px' }
+        ),
         // secondary pill button (border style)
         stylePillButton({
           props: { color: 'secondary' },
@@ -275,7 +285,7 @@ theme = createTheme(theme, {
     MuiChip: {
       styleOverrides: {
         root: {
-          backgroundColor: theme.palette.primary.main,
+          backgroundColor: theme.palette.grey,
         },
       },
     },
@@ -292,10 +302,10 @@ theme = createTheme(theme, {
       styleOverrides: {
         root: {
           borderColor: theme.palette.colors.neutral[15],
+          borderBottom: 'none',
         },
         head: {
-          ...theme.fonts.monospace,
-          fontSize: '0.8125rem',
+          fontSize: '12px',
           fontWeight: 700,
           textTransform: 'uppercase',
         },
@@ -346,6 +356,14 @@ theme = createTheme(theme, {
           },
         },
       },
+    },
+  },
+});
+
+theme = createTheme(theme, {
+  breakpoints: {
+    values: {
+      xl: 1880,
     },
   },
 });

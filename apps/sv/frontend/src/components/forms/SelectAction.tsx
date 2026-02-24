@@ -33,7 +33,7 @@ export const SelectAction: React.FC = () => {
   };
 
   return (
-    <Box sx={{ mt: 10 }}>
+    <Box>
       <Paper
         sx={{
           bgcolor: 'background.paper',

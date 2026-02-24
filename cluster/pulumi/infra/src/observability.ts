@@ -890,6 +890,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$MEDIATOR_ACKNOWLEDGEMENT_LAG_SECONDS',
               monitoringConfig.alerting.alerts.mediators.acknowledgementLagSeconds.toString()
             ),
+            'sequencer_client_delay_alerts.yaml': readGrafanaAlertingFile(
+              'sequencer_client_delay_alerts.yaml'
+            ).replace(
+              '$SEQUENCER_CLIENT_DELAY_THRESHOLD_SECONDS',
+              monitoringConfig.alerting.alerts.sequencerClientDelay.seconds.toString()
+            ),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(

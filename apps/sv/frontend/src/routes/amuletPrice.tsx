@@ -13,7 +13,7 @@ const AmuletPrice: React.FC = () => {
   const config = useSvConfig();
 
   return (
-    <Box>
+    <Box sx={{ p: 4 }}>
       <MedianAmuletPrice amuletName={config.spliceInstanceNames.amuletName} />
       <DesiredAmuletPrice canEditVote />
       <OpenMiningRounds />

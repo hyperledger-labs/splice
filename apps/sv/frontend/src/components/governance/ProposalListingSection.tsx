@@ -303,7 +303,6 @@ const AllVotes: React.FC<AllVotesProps> = ({
 };
 
 const tableBodyTypography: TypographyProps = {
-  fontFamily: 'lato',
   fontSize: 14,
   lineHeight: 2,
   color: 'text.light',

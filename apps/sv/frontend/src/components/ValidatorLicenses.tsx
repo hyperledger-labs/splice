@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { ValidatorLicenses } from '@lfdecentralizedtrust/splice-common-frontend';
 import React from 'react';
+import { Box } from '@mui/material';
 
 import { useDsoInfos } from '../contexts/SvContext';
 import { useValidatorLicenses } from '../hooks/useValidatorLicenses';
@@ -15,10 +16,12 @@ const ValidatorLicensesWithQueries: React.FC = () => {
   const dsoInfosQuery = useDsoInfos();
 
   return (
-    <ValidatorLicenses
-      validatorLicensesQuery={validatorLicensesQuery}
-      dsoInfosQuery={dsoInfosQuery}
-    />
+    <Box mt={4}>
+      <ValidatorLicenses
+        validatorLicensesQuery={validatorLicensesQuery}
+        dsoInfosQuery={dsoInfosQuery}
+      />
+    </Box>
   );
 };
 

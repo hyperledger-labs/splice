@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
@@ -18,7 +19,7 @@ import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
@@ -44,6 +45,9 @@ class UpdateHistoryBulkStorageTest
     bulkDbReadChunkSize = 500,
     bulkZstdFrameSize = 10000L,
     maxFileSize,
+  )
+  val appConfig = BulkStorageConfig(
+    updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
   )
 
   "UpdateHistoryBulkStorage" should {
@@ -84,6 +88,7 @@ class UpdateHistoryBulkStorageTest
         val probe = UpdateHistorySegmentBulkStorage
           .asSource(
             bulkStorageTestConfig,
+            appConfig,
             mockStore.store,
             bucketConnection,
             segment,
@@ -186,6 +191,7 @@ class UpdateHistoryBulkStorageTest
           ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
             new UpdateHistoryBulkStorage(
               bulkStorageTestConfig,
+              appConfig,
               mockStore.store,
               kvProvider,
               migrationId,
@@ -324,6 +330,9 @@ class UpdateHistoryBulkStorageTest
           data.filter(_.update.update.recordTime > recordTime).map(_.migrationId).minOption
         )
       }
+      when(
+        store.isHistoryBackfilled(anyLong)(any[TraceContext])
+      ).thenReturn(Future.successful(true))
       store
     }
 

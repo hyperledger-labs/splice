@@ -18,9 +18,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.commit_sha }}
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if static only
-        uses: ./.github/actions/tests/skip_on_static
+        uses: ./splice-shared-gha/.github/actions/tests/skip_on_static
         id: skip
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
@@ -28,14 +30,14 @@ jobs:
       - name: Setup
         if: steps.skip.outputs.skip != 'true'
         id: setup
-        uses: ./.github/actions/tests/common_test_setup
+        uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
           test_name: daml_test
           target: 'oss'
 
       - name: Run Daml tests
         if: steps.skip.outputs.skip != 'true'
-        uses: ./.github/actions/sbt/execute_sbt_command
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         with:
           cmd: "damlTest"
           extra_env_vars: DAML_DEBUG=1
@@ -47,7 +49,7 @@ jobs:
 
       - name: Report Failures on Slack & Github
         if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
-        uses: ./.github/actions/tests/failure_notifications
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
         with:
           workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
           service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
