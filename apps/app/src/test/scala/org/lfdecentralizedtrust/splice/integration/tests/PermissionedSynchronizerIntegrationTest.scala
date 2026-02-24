@@ -27,9 +27,9 @@ class PermissionedSynchronizerIntegrationTest
       )
       .withManualStart
 
-  "A permissioned synchronizer" should {
+  "onboard validator in permissioned mode" in { implicit env =>
 
-    "onboard SV1 in RestrictedOpen mode" in { implicit env =>
+    withClue("onboard SV1 in RestrictedOpen mode") {
       initDsoWithSv1Only()
 
       val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
@@ -38,7 +38,7 @@ class PermissionedSynchronizerIntegrationTest
       currentParams.onboardingRestriction shouldBe RestrictedOpen
     }
 
-    "allow SV1 to authorize and start follower SVs 2-4 sequentially" in { implicit env =>
+    withClue("allow SV1 to authorize and start follower SVs 2-4 sequentially") {
       val followerSvs = Seq(
         (sv2ValidatorBackend, sv2Backend, sv2ScanBackend),
         (sv3ValidatorBackend, sv3Backend, sv3ScanBackend),
@@ -61,15 +61,13 @@ class PermissionedSynchronizerIntegrationTest
           }
         }
         clue("Starting SV" + validator.participantClient.id) {
-          sv.startSync()
-          validator.startSync()
-          scan.startSync()
+          startAllSync(sv, scan, validator)
         }
         authorizedSvs :+= validator
       }
     }
 
-    "require a 2f+1 majority of SVs to authorize the Alice validator" in { implicit env =>
+    withClue("require a 2f+1 majority of SVs to authorize the Alice validator") {
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
       val quorumSvs = Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend)
 
@@ -83,16 +81,15 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
-    "allow Alice to join and onboard users once authorized" in { implicit env =>
-      actAndCheck(
-        "Start Alice validator",
-        aliceValidatorBackend.startSync(),
-      )(
-        "Onboard Alice test user",
-        _ => {
-          aliceValidatorBackend.onboardUser("TestUser")
-        },
-      )
-    }
+    actAndCheck(
+      "Start Alice validator",
+      aliceValidatorBackend.startSync(),
+    )(
+      "Onboard Alice test user",
+      _ => {
+        aliceValidatorBackend.onboardUser("TestUser")
+      },
+    )
+
   }
 }
