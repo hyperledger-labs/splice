@@ -6,10 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.rewards
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.mediator.admin.v30
-import org.lfdecentralizedtrust.splice.scan.store.db.{
-  DbAppActivityRecordStore,
-  DbSequencerTrafficSummaryStore,
-}
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 import slick.dbio.DBIO
 
 /** Trait for computing and inserting app activity records. */
@@ -22,7 +19,7 @@ trait AppActivityComputation {
     * @return the computed app activity records
     */
   def computeActivities(
-      summariesWithVerdicts: Seq[(DbSequencerTrafficSummaryStore.TrafficSummaryT, v30.Verdict)],
+      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
       featuredAppProviders: Set[PartyId],
   ): Seq[DbAppActivityRecordStore.AppActivityRecordT]
 
@@ -37,7 +34,7 @@ trait AppActivityComputation {
 object NoOpAppActivityComputation extends AppActivityComputation {
 
   override def computeActivities(
-      summariesWithVerdicts: Seq[(DbSequencerTrafficSummaryStore.TrafficSummaryT, v30.Verdict)],
+      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
       featuredAppProviders: Set[PartyId],
   ): Seq[DbAppActivityRecordStore.AppActivityRecordT] =
     Seq.empty

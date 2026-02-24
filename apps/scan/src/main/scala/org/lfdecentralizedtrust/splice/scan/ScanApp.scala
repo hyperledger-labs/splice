@@ -45,7 +45,6 @@ import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
   DbScanVerdictStore,
-  DbSequencerTrafficSummaryStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
 }
@@ -250,16 +249,6 @@ class ScanApp(
             )
           )
         } else None
-      trafficSummaryStoreO =
-        if (config.sequencerTrafficIngestion.enabled) {
-          Some(
-            new DbSequencerTrafficSummaryStore(
-              storage,
-              updateHistory,
-              loggerFactory,
-            )
-          )
-        } else None
       appActivityRecordStoreO =
         if (config.sequencerTrafficIngestion.enabled) {
           Some(
@@ -274,7 +263,6 @@ class ScanApp(
         storage,
         updateHistory,
         appActivityRecordStoreO,
-        trafficSummaryStoreO,
         loggerFactory,
       )(ec)
       scanEventStore = new ScanEventStore(
