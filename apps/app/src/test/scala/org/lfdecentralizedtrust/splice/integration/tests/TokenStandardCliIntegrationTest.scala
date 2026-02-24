@@ -48,7 +48,7 @@ class TokenStandardCliIntegrationTest
       val (bobPublicKeyPath, bobPrivateKeyPath) =
         writeKeysToTempFile("bob", bobPublicKey, bobPrivateKey)
 
-      var extTxnHashes: Seq[String] = Seq.empty[String];
+      var extTxnHashes: Seq[String] = Seq.empty[String]
 
       aliceValidatorWalletClient.tap(5000.0)
 

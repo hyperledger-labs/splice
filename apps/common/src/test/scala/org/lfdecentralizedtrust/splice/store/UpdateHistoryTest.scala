@@ -988,34 +988,34 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
         }
       }
-    }
 
-    "return stored external transaction hash when not empty" in {
-      val store = mkStore(storeName = "store")
-      val externalTransactionHash = ByteString.copyFromUtf8("someExternalHash")
-      for {
-        _ <- initStore(store)
-        expectedUpdate <- domain1.ingest(offset => {
-          mkTx(
-            offset = offset,
-            events = Seq(),
-            synchronizerId = domain1,
-            externalTransactionHash = externalTransactionHash,
+      "return stored external transaction hash when not empty" in {
+        val store = mkStore(storeName = "store")
+        val externalTransactionHash = ByteString.copyFromUtf8("someExternalHash")
+        for {
+          _ <- initStore(store)
+          expectedUpdate <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(),
+              synchronizerId = domain1,
+              externalTransactionHash = externalTransactionHash,
+            )
+          })(store)
+          updates <- store.getAllUpdates(
+            None,
+            PageLimit.Max,
           )
-        })(store)
-        updates <- store.getAllUpdates(
-          None,
-          PageLimit.Max,
-        )
-      } yield {
-        updates should have size 1
-        externalTransactionHash should not be ByteString.EMPTY
-        val storedTransaction =
-          updates.loneElement.update.update.asInstanceOf[TransactionTreeUpdate].tree
-        storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
-        storedTransaction.getExternalTransactionHash should be(
-          expectedUpdate.getExternalTransactionHash
-        )
+        } yield {
+          updates should have size 1
+          externalTransactionHash should not be ByteString.EMPTY
+          val storedTransaction =
+            updates.loneElement.update.update.asInstanceOf[TransactionTreeUpdate].tree
+          storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
+          storedTransaction.getExternalTransactionHash should be(
+            expectedUpdate.getExternalTransactionHash
+          )
+        }
       }
     }
   }

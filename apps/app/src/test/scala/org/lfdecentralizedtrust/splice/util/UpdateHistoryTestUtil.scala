@@ -204,7 +204,6 @@ trait UpdateHistoryTestUtil extends TestCommon {
             .mkString
         actualExtTxnHash shouldBe recordedExtTxnHash
       case _ =>
-        ()
         succeed
     }
 
