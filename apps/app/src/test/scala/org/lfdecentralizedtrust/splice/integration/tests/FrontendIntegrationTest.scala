@@ -317,7 +317,10 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           if (currentUrl != "about:blank") {
             webDriver.getSessionStorage().clear()
             eventually() {
-              webDriver.getSessionStorage().keySet.asScala shouldBe empty
+              webDriver
+                .getSessionStorage()
+                .keySet
+                .asScala shouldBe empty withClue "webDriver sessionStorage"
             }
           }
         }
