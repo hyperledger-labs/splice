@@ -25,7 +25,6 @@ Template for a bigger topic
 
 
 ### Minor Improvements
-
 - JSON Ledger API OpenAPI/AsyncAPI spec corrections
   - Fields not marked as required in the Ledger API `.proto` specification are now also optional in the OpenAPI/AsyncAPI specifications.
     If your client code is using code generated using previous versions of these specifications, it may not compile or function correctly with the new version. To migrate:
@@ -212,6 +211,3 @@ Canton has been tested against the following versions of its dependencies:
 |----------------------------|----------------------------|
 | Java Runtime               | JAVA_VERSION               |
 | Postgres                   | POSTGRES_VERSION           |
-
-
-

@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound, SynchronizerSuccessor}
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
@@ -104,7 +104,7 @@ class SequencerRuntime(
     @VisibleForTesting val client: SequencerClient,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     localNodeParameters: SequencerNodeParameters,
-    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
+    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
     val timeTracker: SynchronizerTimeTracker,
     val metrics: SequencerMetrics,
     physicalIndexedSynchronizer: IndexedPhysicalSynchronizer,
@@ -358,19 +358,19 @@ class SequencerRuntime(
     )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
       val removeO = transactions
         .find(tx =>
-          tx.operation == TopologyChangeOp.Remove && tx.mapping.code == Code.SynchronizerUpgradeAnnouncement
+          tx.operation == TopologyChangeOp.Remove && tx.mapping.code == Code.LsuAnnouncement
         )
         .map(_ => Option.empty[SynchronizerSuccessor])
       val replaceO = transactions.collectFirst {
         case tx
-            if tx.operation == TopologyChangeOp.Replace && tx.mapping.code == Code.SynchronizerUpgradeAnnouncement =>
+            if tx.operation == TopologyChangeOp.Replace && tx.mapping.code == Code.LsuAnnouncement =>
           tx.mapping.select[LsuAnnouncement].map(_.successor)
       }
       // Some(Some(successor)) - replacement, otherwise Some(None) - removal, otherwise None - noop
       // Replace op takes precedence over Remove op
       replaceO
         .orElse(removeO)
-        .foreach(sequencer.updateSynchronizerSuccessor(_, effectiveTimestamp))
+        .foreach(sequencer.updateLsuSuccessor(_, effectiveTimestamp))
       FutureUnlessShutdown.unit
     }
   })
@@ -443,10 +443,6 @@ class SequencerRuntime(
       loggerFactory,
     )
 
-  @VisibleForTesting
-  def setSequencingTimeLowerBoundExclusive(lowerBound: Option[CantonTimestamp]): Unit =
-    sequencingTimeLowerBoundExclusive.set(lowerBound)
-
   def initializeAll()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] =
@@ -474,7 +470,7 @@ class SequencerRuntime(
       )
     } yield {
       synchronizerUpgradeO.foreach { case (successor, effectiveTime) =>
-        sequencer.updateSynchronizerSuccessor(Some(successor), effectiveTime)
+        sequencer.updateLsuSuccessor(Some(successor), effectiveTime)
       }
       logger.info("Sequencer runtime initialized")
       runtimeReadyPromise.outcome_(())

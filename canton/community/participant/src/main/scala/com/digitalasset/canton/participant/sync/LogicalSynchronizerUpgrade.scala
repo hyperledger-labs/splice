@@ -314,7 +314,7 @@ class AutomaticLogicalSynchronizerUpgrade(
             asOf = synchronizerSuccessor.upgradeTime,
             asOfInclusive = false,
             isProposal = false,
-            types = Seq(TopologyMapping.Code.SynchronizerUpgradeAnnouncement),
+            types = Seq(TopologyMapping.Code.LsuAnnouncement),
             filterUid = None,
             filterNamespace = None,
           )

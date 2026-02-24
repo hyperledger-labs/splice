@@ -453,8 +453,6 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
         protocol = CantonNodeParameterConverter.protocol(this, sequencerNodeConfig.parameters),
         maxConfirmationRequestsBurstFactor =
           sequencerNodeConfig.parameters.maxConfirmationRequestsBurstFactor,
-        sequencingTimeLowerBoundExclusive =
-          sequencerNodeConfig.parameters.sequencingTimeLowerBoundExclusive,
         asyncWriter = sequencerNodeConfig.parameters.asyncWriter.toParameters,
         timeAdvancingTopology = sequencerNodeConfig.parameters.timeAdvancingTopology,
         unsafeEnableOnlinePartyReplication =
