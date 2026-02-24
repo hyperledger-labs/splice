@@ -105,7 +105,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       ledgerBegin: Long,
       mustIncludeReassignments: Boolean = false,
       mustCheckExternalTxnHash: Boolean = false,
-      txnHashString: String = "external transaction hash",
+      extTxnHashes: Seq[String] = Seq.empty,
   ): Assertion = {
     val actualUpdates = {
       updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
@@ -150,7 +150,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     }
 
     if (mustCheckExternalTxnHash) {
-      compareExternalTxnHashes(actualUpdates, recordedUpdates.map(_.update), txnHashString)
+      compareExternalTxnHashes(actualUpdates, recordedUpdates.map(_.update), extTxnHashes)
     }
     succeed
   }
@@ -158,49 +158,51 @@ trait UpdateHistoryTestUtil extends TestCommon {
   private def compareExternalTxnHashes(
       actualUpdates: Seq[UpdateHistoryResponse],
       recordedUpdates: Seq[UpdateHistoryResponse],
-      txnHashString: String,
+      extTxnHashes: Seq[String],
   ): Assertion = {
     // Ensure at least one transaction with external hash is available
-    actualUpdates.collect {
+    // and that all expected hashes are present in the recorded updates
+    val recordedExtTxnHashes = recordedUpdates.collect {
       case UpdateHistoryResponse(TransactionTreeUpdate(tx), _)
           if Option(tx.getExternalTransactionHash).exists(!_.isEmpty) =>
-        tx
-    } should not be empty
+        Option(tx.getExternalTransactionHash)
+          .map(_.toByteArray)
+          .getOrElse(Array.emptyByteArray)
+          .map("%02x" format _)
+          .mkString
+    }
+
+    recordedExtTxnHashes should not be empty
+    recordedExtTxnHashes should contain allElementsOf extTxnHashes
 
     actualUpdates.zip(recordedUpdates).foreach { case (actual, recorded) =>
-      compareTxnHashPerUpdate(actual, recorded, txnHashString)
+      compareExtTxnHashPerUpdate(actual, recorded)
     }
     succeed
   }
 
-  private def compareTxnHashPerUpdate(
+  private def compareExtTxnHashPerUpdate(
       actual: UpdateHistoryResponse,
       recorded: UpdateHistoryResponse,
-      txnHashString: String,
   ): Assertion =
     (actual, recorded) match {
       case (
             UpdateHistoryResponse(TransactionTreeUpdate(actualTx), _),
             UpdateHistoryResponse(TransactionTreeUpdate(recordedTx), _),
           ) =>
-        val actualHashString =
+        val actualExtTxnHash =
           Option(actualTx.getExternalTransactionHash)
             .map(_.toByteArray)
             .getOrElse(Array.emptyByteArray)
             .map("%02x" format _)
             .mkString
-        val recordedHashString =
+        val recordedExtTxnHash =
           Option(recordedTx.getExternalTransactionHash)
             .map(_.toByteArray)
             .getOrElse(Array.emptyByteArray)
             .map("%02x" format _)
             .mkString
-        actualHashString shouldBe recordedHashString
-        if (recordedHashString.nonEmpty) {
-          Set(actualHashString, recordedHashString, txnHashString) should have size 1
-        } else {
-          Set(actualHashString, recordedHashString) should have size 1
-        }
+        actualExtTxnHash shouldBe recordedExtTxnHash
       case _ =>
         ()
         succeed
