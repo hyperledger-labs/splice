@@ -270,7 +270,7 @@ class UpdateHistoryIntegrationTest
           aliceValidatorBackend.appState.automation.updateHistory,
           ledgerBeginOffsetAlice,
           mustCheckExternalTxnHash = true,
-          txnHashString = externalTxnHash,
+          extTxnHashes = Seq(externalTxnHash),
         )
       }
 
@@ -280,7 +280,7 @@ class UpdateHistoryIntegrationTest
           sv1ScanBackend.appState.automation.updateHistory,
           ledgerBeginOffsetSv1,
           mustCheckExternalTxnHash = true,
-          txnHashString = externalTxnHash,
+          extTxnHashes = Seq(externalTxnHash),
         )
       }
     }
