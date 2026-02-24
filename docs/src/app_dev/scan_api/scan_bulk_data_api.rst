@@ -39,7 +39,7 @@ Since the API exposes the underlying Daml transactions directly, there are a cou
   This means that you get direct access to all information in the transactions, and you need to familiarize yourself
   with the Daml code that underlies these events.
   Please see `Reference Documentation`_ for a refresher on how the Ledger changes through actions grouped in transactions,
-  and how UTXO contract states are created, exercised and archived in general. We'll discuss the specifics of the Daml models in more detail in the `Scan TxLog Script`_ section.
+  and how UTXO contract states are created, exercised and archived in general.
 
 * The events need to be parsed in a flexible manner. Choices and optional fields can be added over time, and new templates and data types can be introduced.
   A parser should be able to ignore these kinds of changes, and not fail when they occur.
@@ -429,7 +429,7 @@ The :ref:`scan_openapi` describes the relevant APIs for ACS Snapshots in detail,
 
 The ACS snapshots are periodically taken and stored in the Scan App. This endpoint only provides the snapshots that have been periodically taken.
 You can compute the state at any point in time by starting from a periodic snapshot and
-then stream updates from the timestamp of that snapshot. We'll discuss this in more detail in the `Scan TxLog Script`_ section.
+then stream updates from the timestamp of that snapshot.
 
 .. _v0_state_acs_snapshot-timestamp:
 
