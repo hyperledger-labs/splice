@@ -183,7 +183,7 @@ class ExternalPartySetupProposalIntegrationTest
       bobValidatorBackend.participantClient.parties
         .hosted(filterParty = bobParty.filterString) should not be empty
       bobValidatorWalletClient.tap(50.0)
-      val (cidBob, _) =
+      val (cidBob, _, _) =
         createAndAcceptExternalPartySetupProposal(
           bobValidatorBackend,
           onboardingBob,

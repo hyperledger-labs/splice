@@ -1300,6 +1300,7 @@ abstract class StoreTestBase
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
       updateId: String = nextUpdateId(),
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
@@ -1314,7 +1315,7 @@ abstract class StoreTestBase
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
-      ByteString.EMPTY,
+      externalTransactionHash,
     )
   }
 
