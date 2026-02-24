@@ -217,7 +217,7 @@ class BftScanConnectionIntegrationTest
     )
 
     withClue("Persisted state should contain the expected internal scan configurations") {
-      persistedState.value.futureValue.value should contain theSameElementsAs expectedConfigs
+      persistedState.value.futureValue.value should contain theSameElementsAs expectedConfigs withClue "ScanUrlInternalConfig"
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(

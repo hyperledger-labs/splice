@@ -115,8 +115,8 @@ class AmuletExpiryIntegrationTest
     )(
       "Check that dust amulet gets expired",
       _ => {
-        sv1WalletClient.list().amulets shouldBe empty
-        sv1WalletClient.list().lockedAmulets shouldBe empty
+        sv1WalletClient.list().amulets shouldBe empty withClue "dust amulets"
+        sv1WalletClient.list().lockedAmulets shouldBe empty withClue "dust lockedAmulets"
       },
     )
   }

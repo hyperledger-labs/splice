@@ -129,12 +129,12 @@ class ExternalPartySetupProposalIntegrationTest
   "listExternalPartySetupProposals returns an empty array if no contracts exist" in {
     implicit env =>
       aliceValidatorBackend
-        .listExternalPartySetupProposals() shouldBe empty
+        .listExternalPartySetupProposals() shouldBe empty withClue "ExternalPartySetupProposals"
   }
 
   "listTransferPreapprovals returns an empty array if no contracts exist" in { implicit env =>
     aliceValidatorBackend
-      .listTransferPreapprovals() shouldBe empty
+      .listTransferPreapprovals() shouldBe empty withClue "TransferPreapprovals"
   }
 
   "lookupTransferPreapprovalByParty returns None if no contracts exist" in { implicit env =>
