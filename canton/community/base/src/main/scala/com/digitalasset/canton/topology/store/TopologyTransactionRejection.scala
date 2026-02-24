@@ -293,26 +293,26 @@ object TopologyTransactionRejection {
         TopologyManagerError.MediatorsAlreadyInOtherGroups.Reject(group, mediators)
     }
 
-    final case class OngoingSynchronizerUpgrade(synchronizerId: SynchronizerId)
+    final case class AnnouncedLsuTopologyFreeze(synchronizerId: SynchronizerId)
         extends TopologyTransactionRejection {
       override def asString: String =
-        s"The topology state of synchronizer $synchronizerId is frozen due to an ongoing synchronizer migration and no more topology changes are allowed."
+        s"The topology state of synchronizer $synchronizerId is frozen due to an announced LSU and no more topology changes are allowed."
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.OngoingSynchronizerUpgrade.Reject(synchronizerId)
+        TopologyManagerError.AnnouncedLsuTopologyFreeze.Reject(synchronizerId)
     }
 
     final case class InvalidSynchronizerSuccessor(
-        currentSynchronizerId: PhysicalSynchronizerId,
         successorSynchronizerId: PhysicalSynchronizerId,
+        inStoreSuccessorSynchronizerId: PhysicalSynchronizerId,
     ) extends TopologyTransactionRejection {
       override def asString: String =
-        s"The declared successor $successorSynchronizerId of synchronizer $currentSynchronizerId is not valid."
+        s"The declared successor $successorSynchronizerId is not greater than prior synchronizer $inStoreSuccessorSynchronizerId."
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.InvalidSynchronizerSuccessor.Reject.conflictWithCurrentPSId(
-          currentSynchronizerId,
+        TopologyManagerError.InvalidSynchronizerSuccessor.Reject.conflictWithPreviousAnnouncement(
           successorSynchronizerId,
+          inStoreSuccessorSynchronizerId,
         )
     }
 

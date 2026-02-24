@@ -43,7 +43,9 @@ import org.scalatest.Assertion
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
-final class LsuTopologyIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
+final class LsuAnnouncementTopologyIntegrationTest
+    extends CommunityIntegrationTest
+    with SharedEnvironment {
 
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
@@ -71,6 +73,33 @@ final class LsuTopologyIntegrationTest extends CommunityIntegrationTest with Sha
     }.value
 
   private lazy val upgradeTime = CantonTimestamp.now().plusSeconds(3600)
+
+  "upgrade announcement doesn't allow changing upgrade time" in { implicit env =>
+    import env.*
+
+    // Note: this test case documents the behavior. Changing upgrade time might be a useful UX feature, but it complicates a few things.
+
+    val successorPSId = allocateSuccessorPSId()
+    synchronizerOwners1.foreach { owner =>
+      owner.topology.lsu.announcement.propose(
+        successorPhysicalSynchronizerId = successorPSId,
+        upgradeTime = upgradeTime,
+      )
+    }
+
+    loggerFactory.assertThrowsAndLogs[CommandFailure](
+      synchronizerOwners1.foreach { owner =>
+        owner.topology.lsu.announcement.propose(
+          successorPhysicalSynchronizerId = successorPSId,
+          upgradeTime = upgradeTime.plusSeconds(3600),
+        )
+      },
+      log => {
+        log.shouldBeCantonErrorCode(InvalidSynchronizerSuccessor)
+        log.message should (include("Changing the announcement") and include("upgrade time"))
+      },
+    )
+  }
 
   "upgrade announcement does not permit further topology transactions" in { implicit env =>
     import env.*

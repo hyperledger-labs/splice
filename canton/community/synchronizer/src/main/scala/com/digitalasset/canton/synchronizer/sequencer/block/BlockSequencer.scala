@@ -13,7 +13,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{Signature, SyncCryptoClient, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound, SynchronizerSuccessor}
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
@@ -37,7 +37,7 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.PruningError.UnsafePruningPoint
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
-import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.OngoingSynchronizerUpgrade
+import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.AnnouncedLsu
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
@@ -96,7 +96,7 @@ class BlockSequencer(
     clock: Clock,
     blockRateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
-    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
+    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
     processingTimeouts: ProcessingTimeout,
     logEventDetails: Boolean,
     prettyPrinter: CantonPrettyPrinter,
@@ -156,8 +156,7 @@ class BlockSequencer(
     }
   // If the lower bound is not set (this sequencer is not an LSU successor),
   // we don't need to wait for traffic initialization.
-  // TODO(#26983): Rather use the topology state with the older synchronizer LSU announcement
-  sequencingTimeLowerBoundExclusive.get match {
+  sequencingTimeLowerBoundExclusive match {
     case None =>
       logger.info(
         s"Sequencer $sequencerId is not an LSU successor; traffic data initialization is not required."
@@ -207,7 +206,7 @@ class BlockSequencer(
     new TrafficPurchasedSubmissionHandler(clock, loggerFactory)
 
   override protected def resetWatermarkTo: SequencerWriter.ResetWatermark =
-    sequencingTimeLowerBoundExclusive.get match {
+    sequencingTimeLowerBoundExclusive match {
       case Some(boundExclusive) =>
         SequencerWriter.ResetWatermarkToTimestamp(
           stateManager.getHeadState.block.lastTs.max(boundExclusive)
@@ -365,16 +364,12 @@ class BlockSequencer(
         // current block can be reflected in the traffic state used to validate the request
         {
           val headChunkLastTs = stateManager.getHeadState.chunk.lastTs
-          // For LSU successor sequencer, bound from below by the sequencing time lower bound
-          // TODO(#26983): Use the topology state with the older synchronizer LSU announcement
-          sequencingTimeLowerBoundExclusive.get
+          sequencingTimeLowerBoundExclusive
             .getOrElse(headChunkLastTs)
             .max(headChunkLastTs)
         },
         stateManager.getHeadState.chunk.latestSequencerEventTimestamp.orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
+          sequencingTimeLowerBoundExclusive
         ),
       )
       .leftMap {
@@ -428,7 +423,7 @@ class BlockSequencer(
       : EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] = {
     val currentTime = clock.now
 
-    sequencingTimeLowerBoundExclusive.get match {
+    sequencingTimeLowerBoundExclusive match {
       case Some(boundExclusive) =>
         EitherTUtil.condUnitET[FutureUnlessShutdown](
           currentTime > boundExclusive,
@@ -808,9 +803,7 @@ class BlockSequencer(
         requestedMembers,
         timestamp,
         stateManager.getHeadState.block.latestSequencerEventTimestamp.orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
+          sequencingTimeLowerBoundExclusive
         ),
         // TODO(#18401) set warnIfApproximate to true and check that we don't get warnings
         // Warn on approximate topology or traffic purchased when getting exact traffic states only (so when selector is not LatestApproximate)
@@ -884,9 +877,7 @@ class BlockSequencer(
     EitherT.right(lsuTrafficInitialized.futureUS).flatMap { _ =>
       val latestSequencerEventTimestamp =
         stateManager.getHeadState.block.latestSequencerEventTimestamp.orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
+          sequencingTimeLowerBoundExclusive
         )
       blockRateLimitManager.getTrafficStateForMemberAt(
         member,
@@ -902,21 +893,21 @@ class BlockSequencer(
 
   override private[canton] def orderer: Some[BlockOrderer] = Some(blockOrderer)
 
-  private val ongoingSynchronizerUpgrade: AtomicReference[Option[OngoingSynchronizerUpgrade]] =
+  private val ongoingSynchronizerUpgrade: AtomicReference[Option[AnnouncedLsu]] =
     new AtomicReference(None)
 
-  override private[sequencer] def updateSynchronizerSuccessor(
+  override private[sequencer] def updateLsuSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit = {
     successorO match {
       case Some(successor) =>
         ongoingSynchronizerUpgrade.set(
-          Some(OngoingSynchronizerUpgrade(successor, announcementEffectiveTime, loggerFactory))
+          Some(AnnouncedLsu(successor, announcementEffectiveTime, loggerFactory))
         )
       case None => ongoingSynchronizerUpgrade.set(None)
     }
-    super.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
+    super.updateLsuSuccessor(successorO, announcementEffectiveTime)
   }
 
   @nowarn("cat=deprecation")
@@ -951,9 +942,7 @@ class BlockSequencer(
       )
       latestSequencerEventTimestamp = stateManager.getHeadState.block.latestSequencerEventTimestamp
         .orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
+          sequencingTimeLowerBoundExclusive
         )
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
         latestPersistedBlockTimeO.exists(_ >= upgrade.successor.upgradeTime),
@@ -1001,8 +990,7 @@ class BlockSequencer(
     for {
       // - Check that there's an LSU predecessor
       upgradeTime <- EitherT.fromOption[FutureUnlessShutdown](
-        // TODO(#26983): Rather use the topology state for older synchronizer LSU announcement
-        sequencingTimeLowerBoundExclusive.get,
+        sequencingTimeLowerBoundExclusive,
         MissingSynchronizerPredecessor.Error(cryptoApi.psid, sequencerId),
       )
       // - Check that the node has not progressed beyond the upgrade time

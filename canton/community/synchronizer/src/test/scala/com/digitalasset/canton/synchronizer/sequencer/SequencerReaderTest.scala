@@ -11,7 +11,7 @@ import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.SuppressionRule.FullSuppression
@@ -154,7 +154,7 @@ class SequencerReaderTest
       cryptoD,
       eventSignaller,
       topologyClientMember,
-      SequencingTimeBound(None),
+      sequencingTimeBoundExclusiveO = None,
       sequencerMetrics,
       timeouts,
       loggerFactory,

@@ -4,7 +4,7 @@
 package com.digitalasset.canton.integration.tests.upgrade.lsu
 
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.console.InstanceReference
+import com.digitalasset.canton.console.{CommandFailure, InstanceReference}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.EnvironmentDefinition.S1M1
@@ -12,23 +12,24 @@ import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.TopologyManagerError
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.store.db.DbTopologyStore
-import com.digitalasset.canton.topology.transaction.TopologyMapping
+import com.digitalasset.canton.topology.transaction.{LsuAnnouncement, TopologyMapping}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, TopologyManagerError}
+import com.digitalasset.canton.version.ProtocolVersion
 import org.slf4j.event.Level
 
 /*
  * This test is used to test topology related aspects of LSU.
  */
-final class LsuTopologyIntegrationTest extends LsuBase {
+final class LsuTopologyExportImportIntegrationTest extends LsuBase {
 
   override protected def testName: String = "lsu-topology"
 
   registerPlugin(
     new UseBftSequencer(
       loggerFactory,
-      MultiSynchronizer.tryCreate(Set("sequencer1"), Set("sequencer2")),
+      MultiSynchronizer.tryCreate(Set("sequencer1"), Set("sequencer2"), Set("sequencer3")),
     )
   )
   registerPlugin(new UsePostgres(loggerFactory))
@@ -39,8 +40,13 @@ final class LsuTopologyIntegrationTest extends LsuBase {
 
   override protected lazy val upgradeTime: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(30)
 
+  override def configTransforms: Seq[ConfigTransform] =
+    super.configTransforms ++ List(
+      ConfigTransforms.disableAutoInit(Set("sequencer3", "mediator3"))
+    )
+
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P1S2M2_Config
+    EnvironmentDefinition.P1S3M3_Config
       .withNetworkBootstrap { implicit env =>
         new NetworkBootstrapper(S1M1)
       }
@@ -86,7 +92,7 @@ final class LsuTopologyIntegrationTest extends LsuBase {
 
       // perform the synchronizer node upgrade.
       // this also announces the sequencer successors, which the participants will use
-      // as the oportunity to initialize the successor synchronizer's topology ahead of the ugprade time.
+      // as the opportunity to initialize the successor synchronizer's topology ahead of the upgrade time.
       // the assertion below verifies that the topology state was indeed copied locally.
       // unfortunately, the least effort way of doing this is to assert on the log message
       // emitted by the local copy process.
@@ -106,27 +112,57 @@ final class LsuTopologyIntegrationTest extends LsuBase {
       )
 
       // validate the successor sequencer's topology state
-      sequencer2.synchronizer_parameters.static.get() shouldBe newStaticSynchronizerParameters
-      val allProposals = sequencer2.topology.transactions.list(
-        newPSId,
-        proposals = true,
-        timeQuery = TimeQuery.Range(None, None),
-      )
-      forAll(allProposals.result)(proposal => proposal.validUntil shouldBe empty)
 
-      val allLsuMappings = sequencer2.topology.transactions.list(
-        newPSId,
-        filterMappings = TopologyMapping.Code.lsuMappings.toSeq,
-        timeQuery = TimeQuery.Range(None, None),
-      )
-      allLsuMappings.result shouldBe empty
+      // We keep the announcement to check its presence on the new synchronizer
+      val oldSynchronizerAnnouncement = sequencer1.topology.lsu.announcement.list().map(_.item)
+      oldSynchronizerAnnouncement should have size 1
+
+      sequencer2.synchronizer_parameters.static.get() shouldBe newStaticSynchronizerParameters
+
+      clue("New synchronizer should filter out proposals") {
+        val allProposals = sequencer2.topology.transactions.list(
+          newPSId,
+          proposals = true,
+          timeQuery = TimeQuery.Range(None, None),
+        )
+        forAll(allProposals.result)(proposal => proposal.validUntil shouldBe empty)
+      }
+
+      clue(
+        "New synchronizer should filter out LSU topology mappings, except for the announcement"
+      ) {
+        val allLsuMappings = sequencer2.topology.transactions.list(
+          newPSId,
+          filterMappings = TopologyMapping.Code.lsuMappings.toSeq,
+          timeQuery = TimeQuery.Range(None, None),
+        )
+        allLsuMappings.result.map(_.mapping.code).toSet shouldBe Set(
+          LsuAnnouncement.code
+        )
+        allLsuMappings.result.map(
+          _.selectMapping[LsuAnnouncement].value.mapping
+        ) shouldBe oldSynchronizerAnnouncement
+        sequencer2.topology.lsu.announcement.list().map(_.item) shouldBe oldSynchronizerAnnouncement
+      }
 
       // fetch the upgrade state from the predecessor sequencer
       val upgradeStateFromPredecessorSequencer =
         sequencer1.topology.transactions.logical_upgrade_state()
 
-      // fetch the participant's upgrade state for the predecessor synchronizer for a later comparison
-      val firstUpgradeState =
+      // fetch the participant's topology export for a later comparison
+      def topologyStateThatShouldShouldSurviveTheUpgrade(psid: PhysicalSynchronizerId) =
+        participant1.topology.transactions.list(
+          psid,
+          filterMappings = TopologyMapping.Code.mappingsIncludedInUpgrade.toSeq,
+          timeQuery = TimeQuery.Range(None, None),
+        )
+
+      // we fetch both:
+      // - the topology state (excluding what will be filtered in the upgrade state) via export endpoint (to compare before/after)
+      // - the upgrade state before the upgrade from the participant via the upgrade endpoint (to compare with sequencer's upgrade state)
+
+      val firstUpgradeState = topologyStateThatShouldShouldSurviveTheUpgrade(fixture.currentPSId)
+      val firstUpgradeStateLsuEndpoint =
         participant1.topology.transactions.logical_upgrade_state(synchronizer1Id)
 
       // advance the time past the upgrade time, so that the participant connects to the new physical synchronizer
@@ -135,36 +171,47 @@ final class LsuTopologyIntegrationTest extends LsuBase {
       eventually() {
         participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
       }
-      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
 
-      // propose another upgrade, so that we can fetch the logical upgrade state after the upgrade.
-      val temporaryPsid =
-        fixture.newPSId.copy(serial = fixture.newPSId.serial.increment.toNonNegative)
-      val temporaryUpgradeTime = environment.simClock.value.now.plusSeconds(10)
-
-      Seq[InstanceReference](sequencer2, mediator2).foreach(
-        _.topology.lsu.announcement.propose(
-          temporaryPsid,
-          temporaryUpgradeTime,
-        )
-      )
-
-      // fetching the logical upgrade state after the upgrade should contain exactly the same state
+      // fetching the topology state after the upgrade should contain exactly the same state
       // as the upgrade state before the migration
-      val secondUpgradeState =
-        participant1.topology.transactions.logical_upgrade_state(fixture.newPSId)
+      val secondUpgradeState = topologyStateThatShouldShouldSurviveTheUpgrade(fixture.newPSId)
 
       // compare the predecessor sequencer's upgrade state with the participant's predecessor upgrade state.
       // this shows that both the predecessor sequencer and the participant export the same upgrade state for fixture.currentPSId
-      upgradeStateFromPredecessorSequencer shouldBe firstUpgradeState
+      upgradeStateFromPredecessorSequencer shouldBe firstUpgradeStateLsuEndpoint
 
-      // now compare the participant's "temporary" update state with the participant's predecessor upgrade state.
       // since no topology changes were made, they should be the same, from which follows that it must also be the same the sequencer's, and therefore the local copy was correct.
       firstUpgradeState shouldBe secondUpgradeState
 
-      // revoke the temporary upgrade announcement
-      Seq[InstanceReference](sequencer2, mediator2).foreach(
-        _.topology.lsu.announcement.revoke(temporaryPsid, temporaryUpgradeTime)
+      sequencer1.stop()
+      mediator1.stop()
+    }
+
+    "prevent startup of misconfigured upgrade successor sequencers" in { implicit env =>
+      import env.*
+
+      val currentPSId =
+        env.daId.copy(protocolVersion = ProtocolVersion.dev, serial = NonNegativeInt.one)
+
+      val badFixture = Fixture(
+        currentPSId = currentPSId,
+        upgradeTime = upgradeTime.plusSeconds(3600),
+        oldSynchronizerNodes = SynchronizerNodes(Seq(sequencer2), Seq(mediator2)),
+        newSynchronizerNodes = SynchronizerNodes(Seq(sequencer3), Seq(mediator3)),
+        newOldNodesResolution = Map("sequencer3" -> "sequencer2", "mediator3" -> "mediator2"),
+        oldSynchronizerOwners = Set[InstanceReference](sequencer2, mediator2),
+        newPV = ProtocolVersion.dev,
+        newSerial = currentPSId.serial.increment.toNonNegative,
+        overridePSId = Some(currentPSId.copy(serial = NonNegativeInt.tryCreate(3))),
+      )
+
+      // Attempt an LSU upgrade with a wrong PSId (::dev-2), which is not the one announced (::dev-3).
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        performSynchronizerNodesLsu(badFixture),
+        log => {
+          log.shouldBeCantonErrorCode(TopologyManagerError.InconsistentTopologySnapshot)
+          log.message should include("not matching the announced upgrade successor")
+        },
       )
     }
   }

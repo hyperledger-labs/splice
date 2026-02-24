@@ -208,9 +208,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
       ),
       participants = false,
       logSuffix = "global-domain-migration",
-      extraSequencerConfig = Seq(
-        s"""parameters.sequencing-time-lower-bound-exclusive=${scheduledLsu.upgradeTime}"""
-      ),
     )() {
 
       clue(s"wait for lsu announcement") {
@@ -225,7 +222,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
         .list(store = Synchronizer(decentralizedSynchronizerId))
         .result
-        .size - 1 // minus 1 for the logical upgrade transaction
+        .size
 
       Seq(
         sv1ValidatorBackend,

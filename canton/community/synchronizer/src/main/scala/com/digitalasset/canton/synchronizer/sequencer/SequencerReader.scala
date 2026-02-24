@@ -15,12 +15,7 @@ import com.digitalasset.canton.config
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.SyncCryptoError.KeyNotAvailable
 import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SyncCryptoClient}
-import com.digitalasset.canton.data.{
-  CantonTimestamp,
-  LogicalUpgradeTime,
-  SequencingTimeBound,
-  SynchronizerSuccessor,
-}
+import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime, SynchronizerSuccessor}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -36,10 +31,7 @@ import com.digitalasset.canton.sequencing.{GroupAddressResolver, SequencedSerial
 import com.digitalasset.canton.store.SequencedEventStore.SequencedEventWithTraceContext
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.{
-  OngoingSynchronizerUpgrade,
-  ReadState,
-}
+import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.{AnnouncedLsu, ReadState}
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.synchronizer.sequencer.store.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -116,7 +108,7 @@ class SequencerReader(
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
     eventSignaller: EventSignaller,
     topologyClientMember: Member,
-    sequencingTimeBoundExclusiveO: SequencingTimeBound,
+    sequencingTimeBoundExclusiveO: Option[CantonTimestamp],
     metrics: SequencerMetrics,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -129,23 +121,22 @@ class SequencerReader(
   private val psid = syncCryptoApi.psid
   private val protocolVersion: ProtocolVersion = psid.protocolVersion
 
-  private val ongoingSynchronizerUpgrade: AtomicReference[Option[OngoingSynchronizerUpgrade]] =
+  private val announcedLsu: AtomicReference[Option[AnnouncedLsu]] =
     new AtomicReference(None)
 
-  def updateSynchronizerSuccessor(
+  def updateLsuSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit = {
     logger.info(
-      s"Updating synchronizer upgrade information, setting new successor from ${ongoingSynchronizerUpgrade
-          .get()} to $successorO"
+      s"Updating LSU information, setting new successor from ${announcedLsu.get()} to $successorO"
     )
     successorO match {
       case Some(successor) =>
-        ongoingSynchronizerUpgrade.set(
-          Some(OngoingSynchronizerUpgrade(successor, announcementEffectiveTime, loggerFactory))
+        announcedLsu.set(
+          Some(AnnouncedLsu(successor, announcementEffectiveTime, loggerFactory))
         )
-      case None => ongoingSynchronizerUpgrade.set(None)
+      case None => announcedLsu.set(None)
     }
   }
 
@@ -197,7 +188,7 @@ class SequencerReader(
             requestedTimestampInclusive
           }
         val predecessorSequencingTimeUpperBoundExclusive =
-          sequencingTimeBoundExclusiveO.get.map(_.immediateSuccessor)
+          sequencingTimeBoundExclusiveO.map(_.immediateSuccessor)
 
         readFromTimestampInclusive.max(predecessorSequencingTimeUpperBoundExclusive)
       }
@@ -224,11 +215,11 @@ class SequencerReader(
                 lowerBoundTopologyClientAddressedTimestamp
               }
             }
-            if (fromStoreOrLowerBound < sequencingTimeBoundExclusiveO.get) {
+            if (fromStoreOrLowerBound < sequencingTimeBoundExclusiveO) {
               logger.debug(
                 s"The latest topology client timesetamp from store or the lower bound $fromStoreOrLowerBound is before the predecessor's upgrade time $sequencingTimeBoundExclusiveO.get. Will commence with the upgrade time."
               )
-              sequencingTimeBoundExclusiveO.get
+              sequencingTimeBoundExclusiveO
             } else {
               fromStoreOrLowerBound
             }
@@ -795,7 +786,7 @@ class SequencerReader(
           val groupRecipients = batch.allRecipients.collect { case x: GroupRecipient =>
             x
           }
-          val synchronizerUpgradeO = ongoingSynchronizerUpgrade.get()
+          val synchronizerUpgradeO = announcedLsu.get()
           for {
             topologySnapshot <- topologySnapshotO.fold(
               SyncCryptoClient
@@ -981,7 +972,7 @@ object SequencerReader {
       eventTraceContext: TraceContext,
   )
 
-  private[sequencer] final case class OngoingSynchronizerUpgrade(
+  private[sequencer] final case class AnnouncedLsu(
       successor: SynchronizerSuccessor,
       announcementEffectiveTime: EffectiveTime,
       override val loggerFactory: NamedLoggerFactory,

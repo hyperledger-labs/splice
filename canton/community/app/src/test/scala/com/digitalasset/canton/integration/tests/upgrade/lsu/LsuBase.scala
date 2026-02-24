@@ -28,7 +28,6 @@ import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, config}
-import monocle.macros.syntax.lens.*
 
 /** This trait provides helpers for the logical synchronizer upgrade tests. The main goal is to
   * improve readability of each tests by focusing on the behavior we want to test and make it easier

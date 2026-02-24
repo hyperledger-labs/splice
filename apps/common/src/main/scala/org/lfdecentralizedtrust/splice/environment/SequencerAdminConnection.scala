@@ -33,7 +33,7 @@ import com.digitalasset.canton.topology.{Member, NodeIdentity, PhysicalSynchroni
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.{
   GenesisStateV2Response,
-  LogicalUpgradeStateResponse,
+  SequencerLsuStateResponse,
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
@@ -108,10 +108,10 @@ class SequencerAdminConnection(
   def getLsuState()(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
-    val responseObserver = new ByteStringStreamObserver[LogicalUpgradeStateResponse](_.chunk)
+    val responseObserver = new ByteStringStreamObserver[SequencerLsuStateResponse](_.chunk)
     runCmd(
       TopologyAdminCommands.Read
-        .LogicalUpgradeState(
+        .SequencerLsuState(
           store = None,
           observer = responseObserver,
         )
@@ -125,7 +125,7 @@ class SequencerAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(
-      SequencerAdminCommands.InitializeFromSynchronizerPredecessor(
+      SequencerAdminCommands.InitializeFromLsuPredecessor(
         topologySnapshot,
         staticSynchronizerParameters,
       )
