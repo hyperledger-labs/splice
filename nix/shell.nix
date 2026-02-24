@@ -134,6 +134,7 @@ let
     scala_2_13
     shellcheck
     skopeo
+    which
   ] ++ linuxOnly;
 
 in pkgs.mkShell {
