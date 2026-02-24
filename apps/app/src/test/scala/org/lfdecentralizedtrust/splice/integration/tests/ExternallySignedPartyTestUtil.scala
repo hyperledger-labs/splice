@@ -140,7 +140,9 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       verboseHashing: Boolean = false,
-  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String, String) = {
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): (TransferPreapproval.ContractId, String, String) = {
     val proposal = createExternalPartySetupProposal(provider, externalPartyOnboarding)
     acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
   }
@@ -188,7 +190,9 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       externalPartyOnboarding: OnboardingResult,
       proposal: ExternalPartySetupProposal.ContractId,
       verboseHashing: Boolean = false,
-  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String, String) = {
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): (TransferPreapproval.ContractId, String, String) = {
     val preparedTx =
       prepareAcceptExternalPartySetupProposal(
         provider,
@@ -196,7 +200,8 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         proposal,
         verboseHashing,
       )
-    val (cid, updateId) = submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
+    val (cid, updateId) =
+      submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
     (cid, updateId, preparedTx.txHash)
   }
 
