@@ -7,7 +7,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -56,15 +59,16 @@ class ScanTimeBasedIntegrationTest
         // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
         advanceTimeForRewardAutomationToRunForCurrentRound
       }
-      .addConfigTransforms((_, config) => ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
-        scanConfig.copy(
-          bulkStorage = BulkStorageConfig(
-            snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
-            updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
-            s3 = Some(s3ConfigMock)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(
+            bulkStorage = BulkStorageConfig(
+              snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+              updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+              s3 = Some(s3ConfigMock),
+            )
           )
-        )
-      )(config)
+        )(config)
       )
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
@@ -363,194 +367,194 @@ class ScanTimeBasedIntegrationTest
   }
 
   "snapshotting" in { implicit env =>
-    {
+    withS3MockSync {
 
-          sv1ScanBackend.config
+      val (aliceUserParty, _) = onboardAliceAndBob()
+      val migrationId = sv1ScanBackend.config.domainMigrationId
 
-          val (aliceUserParty, _) = onboardAliceAndBob()
-          val migrationId = sv1ScanBackend.config.domainMigrationId
-
-          clue(
-            "Wait for backfilling to complete, as the ACS snapshot trigger is paused until then"
-          ) {
-            eventually() {
-              sv1ScanBackend.automation.updateHistory
-                .getBackfillingState()
-                .futureValue should be(BackfillingState.Complete)
-              advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)
-            }
-          }
-
-          val startTime = getLedgerTime
-
-          advanceTime(
-            java.time.Duration
-              .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
-              .plusSeconds(1L)
-          )
-
-          val snapshot1 = eventually() {
-            val snapshot1 = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
-              getLedgerTime,
-              migrationId,
-            )
-            snapshot1 should not be None
-            snapshot1.value.toInstant shouldBe >(startTime.toInstant)
-            snapshot1
-          }
-
-          createAnsEntry(
-            aliceAnsExternalClient,
-            perTestCaseName("snapshot"),
-            aliceWalletClient,
-            tapAmount = 5000,
-          )
-
-          advanceTime(
-            java.time.Duration
-              .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
-              .plusSeconds(1L)
-          )
-
-          val snapshotAfter = eventually() {
-            val snapshotAfter = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
-              getLedgerTime,
-              migrationId,
-            )
-            snapshot1 should not(be(snapshotAfter))
-            snapshotAfter
-          }
-
-          sv1ScanBackend.getDateOfFirstSnapshotAfter(startTime, 0).value shouldBe snapshot1.value
-          sv1ScanBackend
-            .getDateOfFirstSnapshotAfter(
-              CantonTimestamp.tryFromInstant(snapshot1.value.toInstant),
-              0,
-            )
-            .value shouldBe snapshotAfter.value
-
-          val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
-            CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
-            migrationId,
-            templates = Some(
-              Vector(
-                PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
-                PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
-              )
-            ),
-            partyIds = Some(Vector(aliceUserParty)),
-          )
-
-          advanceTime(java.time.Duration.ofMinutes(10))
-
-          val atOrBefore = getLedgerTime
-
-          // afOrBefore should return the same ACS snapshot as the exact time given by snapshotAfter
-          val snapshotAtOrBeforeAfterData = sv1ScanBackend.getAcsSnapshotAt(
-            CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
-            migrationId,
-            recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.AtOrBefore),
-            templates = Some(
-              Vector(
-                PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
-                PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
-              )
-            ),
-            partyIds = Some(Vector(aliceUserParty)),
-          )
-
-          snapshotAfterData shouldBe snapshotAtOrBeforeAfterData
-          snapshotAtOrBeforeAfterData.value.recordTime shouldBe snapshotAfter.value
-
-          sv1ScanBackend.getAcsSnapshotAt(
-            CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
-            migrationId,
-            recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.Exact),
-            templates = Some(
-              Vector(
-                PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
-                PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
-              )
-            ),
-            partyIds = Some(Vector(aliceUserParty)),
-          ) shouldBe None
-
-          inside(snapshotAfterData) { case Some(data) =>
-            val (entries, coins) =
-              data.createdEvents.partition(
-                _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID).toString)
-              )
-            val entry = AnsEntry
-              .jsonDecoder()
-              .decode(new JsonLfReader(entries.loneElement.createArguments.noSpaces))
-            entry.name shouldBe perTestCaseName("snapshot")
-            forAll(coins) { createdEvent =>
-              Amulet
-                .jsonDecoder()
-                .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
-                .owner should be(aliceUserParty.toProtoPrimitive)
-            }
-            val snapshotAfterCts = CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant)
-            val holdingsState = sv1ScanBackend.getHoldingsStateAt(
-              snapshotAfterCts,
-              migrationId,
-              partyIds = Vector(aliceUserParty),
-            )
-            inside(holdingsState) { case Some(holdings) =>
-              holdings.createdEvents should be(coins)
-            }
-
-            val holdingsSummary = sv1ScanBackend.getHoldingsSummaryAt(
-              snapshotAfterCts,
-              migrationId,
-              ownerPartyIds = Vector(aliceUserParty),
-            )
-
-            inside(holdingsSummary) { case Some(res) =>
-              res.migrationId should be(migrationId)
-              res.recordTime should be(snapshotAfter.value)
-              res.summaries.map(_.partyId).distinct shouldBe (Vector(
-                aliceUserParty.toProtoPrimitive
-              ))
-            }
-
-            // afOrBefore should return the same holdingsState and holdingsSummary as the exact time given by snapshotAfter
-            advanceTime(java.time.Duration.ofMinutes(10))
-            val atOrBefore = getLedgerTime
-            val atOrBeforeCts = CantonTimestamp.assertFromInstant(atOrBefore.toInstant)
-            val holdingsStateAtOrBefore = sv1ScanBackend.getHoldingsStateAt(
-              atOrBeforeCts,
-              migrationId,
-              partyIds = Vector(aliceUserParty),
-              recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.AtOrBefore),
-            )
-            inside(holdingsStateAtOrBefore) { case Some(holdings) =>
-              holdings.createdEvents should be(coins)
-              holdings.recordTime shouldBe snapshotAfter.value
-            }
-
-            sv1ScanBackend.getHoldingsStateAt(
-              atOrBeforeCts,
-              migrationId,
-              partyIds = Vector(aliceUserParty),
-              recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.Exact),
-            ) shouldBe None
-
-            val holdingsSummaryAtOrBefore = sv1ScanBackend.getHoldingsSummaryAt(
-              atOrBeforeCts,
-              migrationId,
-              ownerPartyIds = Vector(aliceUserParty),
-              recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.AtOrBefore),
-            )
-            holdingsSummaryAtOrBefore shouldBe holdingsSummary
-
-            sv1ScanBackend.getHoldingsSummaryAt(
-              atOrBeforeCts,
-              migrationId,
-              ownerPartyIds = Vector(aliceUserParty),
-              recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact),
-            ) shouldBe None
-          }
+      clue(
+        "Wait for backfilling to complete, as the ACS snapshot trigger is paused until then"
+      ) {
+        eventually() {
+          sv1ScanBackend.automation.updateHistory
+            .getBackfillingState()
+            .futureValue should be(BackfillingState.Complete)
+          advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)
         }
       }
+
+      val startTime = getLedgerTime
+      println(s"StartTime: $startTime")
+
+      advanceTime(
+        java.time.Duration
+          .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
+          .plusSeconds(1L)
+      )
+      println(s"Moved time by an hour, to: $getLedgerTime")
+
+      val snapshot1 = eventually() {
+        val snapshot1 = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+          getLedgerTime,
+          migrationId,
+        )
+        snapshot1 should not be None
+        snapshot1.value.toInstant shouldBe >(startTime.toInstant)
+        snapshot1
+      }
+
+      createAnsEntry(
+        aliceAnsExternalClient,
+        perTestCaseName("snapshot"),
+        aliceWalletClient,
+        tapAmount = 5000,
+      )
+
+      advanceTime(
+        java.time.Duration
+          .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
+          .plusSeconds(1L)
+      )
+
+      val snapshotAfter = eventually() {
+        val snapshotAfter = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+          getLedgerTime,
+          migrationId,
+        )
+        snapshot1 should not(be(snapshotAfter))
+        snapshotAfter
+      }
+
+      sv1ScanBackend.getDateOfFirstSnapshotAfter(startTime, 0).value shouldBe snapshot1.value
+      sv1ScanBackend
+        .getDateOfFirstSnapshotAfter(
+          CantonTimestamp.tryFromInstant(snapshot1.value.toInstant),
+          0,
+        )
+        .value shouldBe snapshotAfter.value
+
+      val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
+        CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
+        migrationId,
+        templates = Some(
+          Vector(
+            PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+            PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
+          )
+        ),
+        partyIds = Some(Vector(aliceUserParty)),
+      )
+
+      advanceTime(java.time.Duration.ofMinutes(10))
+
+      val atOrBefore = getLedgerTime
+
+      // afOrBefore should return the same ACS snapshot as the exact time given by snapshotAfter
+      val snapshotAtOrBeforeAfterData = sv1ScanBackend.getAcsSnapshotAt(
+        CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
+        migrationId,
+        recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.AtOrBefore),
+        templates = Some(
+          Vector(
+            PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+            PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
+          )
+        ),
+        partyIds = Some(Vector(aliceUserParty)),
+      )
+
+      snapshotAfterData shouldBe snapshotAtOrBeforeAfterData
+      snapshotAtOrBeforeAfterData.value.recordTime shouldBe snapshotAfter.value
+
+      sv1ScanBackend.getAcsSnapshotAt(
+        CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
+        migrationId,
+        recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.Exact),
+        templates = Some(
+          Vector(
+            PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+            PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
+          )
+        ),
+        partyIds = Some(Vector(aliceUserParty)),
+      ) shouldBe None
+
+      inside(snapshotAfterData) { case Some(data) =>
+        val (entries, coins) =
+          data.createdEvents.partition(
+            _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID).toString)
+          )
+        val entry = AnsEntry
+          .jsonDecoder()
+          .decode(new JsonLfReader(entries.loneElement.createArguments.noSpaces))
+        entry.name shouldBe perTestCaseName("snapshot")
+        forAll(coins) { createdEvent =>
+          Amulet
+            .jsonDecoder()
+            .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+            .owner should be(aliceUserParty.toProtoPrimitive)
+        }
+        val snapshotAfterCts = CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant)
+        val holdingsState = sv1ScanBackend.getHoldingsStateAt(
+          snapshotAfterCts,
+          migrationId,
+          partyIds = Vector(aliceUserParty),
+        )
+        inside(holdingsState) { case Some(holdings) =>
+          holdings.createdEvents should be(coins)
+        }
+
+        val holdingsSummary = sv1ScanBackend.getHoldingsSummaryAt(
+          snapshotAfterCts,
+          migrationId,
+          ownerPartyIds = Vector(aliceUserParty),
+        )
+
+        inside(holdingsSummary) { case Some(res) =>
+          res.migrationId should be(migrationId)
+          res.recordTime should be(snapshotAfter.value)
+          res.summaries.map(_.partyId).distinct shouldBe (Vector(
+            aliceUserParty.toProtoPrimitive
+          ))
+        }
+
+        // afOrBefore should return the same holdingsState and holdingsSummary as the exact time given by snapshotAfter
+        advanceTime(java.time.Duration.ofMinutes(10))
+        val atOrBefore = getLedgerTime
+        val atOrBeforeCts = CantonTimestamp.assertFromInstant(atOrBefore.toInstant)
+        val holdingsStateAtOrBefore = sv1ScanBackend.getHoldingsStateAt(
+          atOrBeforeCts,
+          migrationId,
+          partyIds = Vector(aliceUserParty),
+          recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.AtOrBefore),
+        )
+        inside(holdingsStateAtOrBefore) { case Some(holdings) =>
+          holdings.createdEvents should be(coins)
+          holdings.recordTime shouldBe snapshotAfter.value
+        }
+
+        sv1ScanBackend.getHoldingsStateAt(
+          atOrBeforeCts,
+          migrationId,
+          partyIds = Vector(aliceUserParty),
+          recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.Exact),
+        ) shouldBe None
+
+        val holdingsSummaryAtOrBefore = sv1ScanBackend.getHoldingsSummaryAt(
+          atOrBeforeCts,
+          migrationId,
+          ownerPartyIds = Vector(aliceUserParty),
+          recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.AtOrBefore),
+        )
+        holdingsSummaryAtOrBefore shouldBe holdingsSummary
+
+        sv1ScanBackend.getHoldingsSummaryAt(
+          atOrBeforeCts,
+          migrationId,
+          ownerPartyIds = Vector(aliceUserParty),
+          recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact),
+        ) shouldBe None
+      }
+    }
+  }
 }

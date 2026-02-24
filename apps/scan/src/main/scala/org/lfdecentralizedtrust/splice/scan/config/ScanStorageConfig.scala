@@ -93,8 +93,8 @@ case class ScanStorageConfig(
 
 object ScanStorageConfigs {
   val scanStorageConfigV1 = ScanStorageConfig(
-    dbAcsSnapshotPeriodHours = 1, // FIXME
-    bulkAcsSnapshotPeriodHours = 2, // FIXME
+    dbAcsSnapshotPeriodHours = 3,
+    bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
     bulkZstdFrameSize = 12L * 1024 * 1024,
     bulkMaxFileSize = 128L * 1024 * 1024,
