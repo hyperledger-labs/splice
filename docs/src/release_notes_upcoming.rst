@@ -43,3 +43,7 @@
 
         - Switched the gRPC service ``SequencerService.subscribe`` and ``SequencerService.downloadTopologyStateForInit`` to manual
           control flow, so that the sequencer doesn't crash with an ``OutOfMemoryError`` when responding to slow clients.
+
+    - Scan txlog script
+
+      - scan_txlog.py script has been deprecated. It will not be maintained moving forward, and will be removed completely in a future release.
