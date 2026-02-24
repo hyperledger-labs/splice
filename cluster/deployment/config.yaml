@@ -171,6 +171,11 @@ svs:
     pruning:
       sequencer:
         enabled: false
+      participant:
+        enabled: true
+        cron: '0 /10 * * * ?'
+        maxDuration: 5m
+        retentionPeriod: 30d
     participant:
       bftSequencerConnection: true
       resources:
@@ -178,6 +183,10 @@ svs:
           memory: '12Gi'
         limits:
           memory: '18Gi'
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
+          value: |
+            canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"
     validatorApp:
       additionalEnvVars:
         # enable https://github.com/hyperledger-labs/splice/pull/2499
