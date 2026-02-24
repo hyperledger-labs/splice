@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
@@ -17,68 +18,59 @@ class PermissionedSynchronizerIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs {
+          case (name, c) if name == "sv1" =>
+            c.copy(permissionedSynchronizer = true)
+          case (_, c) => c
+        }(config)
+      )
       .withManualStart
 
   "onboard validator in permissioned mode" in { implicit env =>
-    initDso()
+    withClue("onboard SV1 in RestrictedOpen mode") {
+      initDsoWithSv1Only()
 
-    withClue("Stop all SVs") {
-      sv1Backend.stop()
-      sv2Backend.stop()
-      sv3Backend.stop()
-      sv4Backend.stop()
+      val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+        .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+
+      currentParams.onboardingRestriction shouldBe RestrictedOpen
     }
 
-    val allSvValidators =
-      Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend, sv4ValidatorBackend)
+    withClue("allow SV1 to authorize and start follower SVs 2-4 sequentially") {
+      val followerSvs = Seq(
+        (sv2ValidatorBackend, sv2Backend, sv2ScanBackend),
+        (sv3ValidatorBackend, sv3Backend, sv3ScanBackend),
+        (sv4ValidatorBackend, sv4Backend, sv4ScanBackend),
+      )
 
-    withClue("Submit ParticipantSynchronizerPermission for all SVs across all SV participants") {
-      for {
-        submitter <- allSvValidators
-        target <- allSvValidators
-      } {
-        submitter.participantClient.topology.participant_synchronizer_permissions
-          .propose(
-            decentralizedSynchronizerId,
-            target.participantClientWithAdminToken.id,
-            permission = ParticipantPermission.Submission,
-          )
+      var authorizedSvs = Seq(sv1ValidatorBackend)
+
+      for ((validator, sv, scan) <- followerSvs) {
+        for (submitter <- authorizedSvs) {
+          clue(
+            "Submitting participantSynchronizerPermission of " + validator.participantClient.id + " to SV" + submitter.participantClient.id
+          ) {
+            submitter.participantClient.topology.participant_synchronizer_permissions
+              .propose(
+                decentralizedSynchronizerId,
+                validator.participantClientWithAdminToken.id,
+                permission = ParticipantPermission.Submission,
+              )
+          }
+        }
+        clue("Starting SV" + validator.participantClient.id) {
+          startAllSync(sv, scan, validator)
+        }
+        authorizedSvs :+= validator
       }
     }
 
-    withClue("change onboarding restriction to RestrictedOpen") {
-      actAndCheck(
-        "Propose RestrictedOpen onboarding restriction",
-        for (sv <- allSvValidators) {
-          sv.participantClient.topology.synchronizer_parameters.propose_update(
-            decentralizedSynchronizerId,
-            _.update(onboardingRestriction = RestrictedOpen),
-          )
-        },
-      )(
-        "Verify parameters are updated to RestrictedOpen",
-        _ => {
-          val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
-            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-
-          currentParams.onboardingRestriction shouldBe RestrictedOpen
-        },
-      )
-    }
-
-    withClue("Restart all SVs") {
-      sv1Backend.startSync()
-      sv2Backend.startSync()
-      sv3Backend.startSync()
-      sv4Backend.startSync()
-    }
-
-    withClue("Submit a ParticipantSynchronizerPermission for the alice participant") {
+    withClue("require a 2f+1 majority of SVs to authorize the Alice validator") {
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
+      val quorumSvs = Seq(sv1ValidatorBackend, sv2ValidatorBackend, sv3ValidatorBackend)
 
-      val firstThreeSvs = allSvValidators.take(3) // we just need 2f+1 SVs to submit this.
-
-      for (sv <- firstThreeSvs) {
+      for (sv <- quorumSvs) {
         sv.participantClient.topology.participant_synchronizer_permissions
           .propose(
             decentralizedSynchronizerId,
@@ -88,16 +80,15 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
-    withClue("Start the alice validator participant") {
-      actAndCheck(
-        "Start Alice validator",
-        aliceValidatorBackend.startSync(),
-      )(
-        "Onboard Alice test user",
-        _ => {
-          aliceValidatorBackend.onboardUser("TestUser")
-        },
-      )
-    }
+    actAndCheck(
+      "Start Alice validator",
+      aliceValidatorBackend.startSync(),
+    )(
+      "Onboard Alice test user",
+      _ => {
+        aliceValidatorBackend.onboardUser("TestUser")
+      },
+    )
+
   }
 }
