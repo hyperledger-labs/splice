@@ -28,7 +28,6 @@ class PermissionedSynchronizerIntegrationTest
       .withManualStart
 
   "onboard validator in permissioned mode" in { implicit env =>
-
     withClue("onboard SV1 in RestrictedOpen mode") {
       initDsoWithSv1Only()
 
