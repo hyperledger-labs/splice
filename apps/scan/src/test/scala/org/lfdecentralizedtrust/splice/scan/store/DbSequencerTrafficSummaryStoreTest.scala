@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -26,7 +25,6 @@ class DbSequencerTrafficSummaryStoreTest
     with SplicePostgresTest {
 
   private val migrationId = 0L
-  private val synchronizerId = SynchronizerId.tryFromString("traffic-test::synchronizer")
 
   "DbSequencerTrafficSummaryStore" should {
 
@@ -119,7 +117,6 @@ class DbSequencerTrafficSummaryStoreTest
       new DbSequencerTrafficSummaryStore(
         storage.underlying,
         updateHistory,
-        synchronizerId,
         loggerFactory,
       )
     }
