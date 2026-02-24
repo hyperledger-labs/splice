@@ -449,6 +449,24 @@ class ParticipantAdminConnection(
     )
   }
 
+  def importPartyAcs(acsBytes: ByteString)(implicit tc: TraceContext): Future[Unit] = {
+    retryProvider.retryForClientCalls(
+      "import_party_acs",
+      "Imports the acs in the participant",
+      runCmd(
+        ParticipantAdminCommands.PartyManagement
+          .ImportPartyAcs(
+            acsBytes,
+            IMPORT_ACS_WORKFLOW_ID_PREFIX,
+            contractImportMode = ContractImportMode.Validation,
+            representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+          ),
+        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
+      ).map(_ => ()),
+      logger,
+    )
+  }
+
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
 
