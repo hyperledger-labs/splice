@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.I
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   TriggerTestUtil,
@@ -18,7 +18,7 @@ import java.time.Instant
 import java.util.{Optional, UUID}
 
 class TokenStandardFetchFallbackIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with WalletTestUtil
     with WalletTxLogTestUtil
     with TriggerTestUtil

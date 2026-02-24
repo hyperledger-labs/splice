@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as wal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TapRequest
 import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletClient
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.integration.tests.WalletTxLogTestUtil
@@ -45,7 +45,7 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import scala.jdk.OptionConverters.*
 
 class WalletIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil {

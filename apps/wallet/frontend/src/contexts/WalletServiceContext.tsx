@@ -208,22 +208,20 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           const { date, transaction_subtype } = item;
 
           if (item.transaction_type === 'balance_change') {
-            const amuletPrice = new BigNumber(item.amulet_price!);
             const balanceChange: BalanceChange = {
               transactionType: 'balance_change',
               transactionSubtype: transaction_subtype,
               id,
               date,
               receivers,
-              amuletPrice,
               transferInstructionCid: item.transfer_instruction_cid,
             };
             return [balanceChange];
           } else if (item.transaction_type === 'transfer') {
-            const amuletPrice = new BigNumber(item.amulet_price!);
             const appRewardsUsed = new BigNumber(item.app_rewards_used);
             const validatorRewardsUsed = new BigNumber(item.validator_rewards_used);
             const svRewardsUsed = new BigNumber(item.sv_rewards_used);
+            const developmentFundCouponsUsed = new BigNumber(item.development_fund_coupons_used);
             const transferInstructionAmount = item.transfer_instruction_amount
               ? new BigNumber(item.transfer_instruction_amount)
               : undefined;
@@ -233,11 +231,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               id,
               date,
               receivers,
-              // sender and provider MUST be available for transfer
-              providerId: item.provider!,
+              // sender MUST be available for transfer
               senderId: item.sender!.party,
               senderAmountCC: new BigNumber(item.sender!.amount),
-              amuletPrice,
               appRewardsUsed,
               validatorRewardsUsed,
               svRewardsUsed,
@@ -245,6 +241,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               transferInstructionCid: item.transfer_instruction_cid,
               transferInstructionAmount: transferInstructionAmount,
               transferInstructionReceiver: item.transfer_instruction_receiver,
+              developmentFundCouponsUsed,
             };
             return [transfer];
           } else if (item.transaction_type === 'notification') {

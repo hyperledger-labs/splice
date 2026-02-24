@@ -617,7 +617,8 @@ object RetryProvider {
               case _
                   if retryableStatusCodes.contains(statusCode) ||
                     (
-                      // TODO(DACH-NY/canton-network-node#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
+                      // TODO(#3938) This could happen when submit transactions during topology change.
+                      // Probably outdated at this point.
                       statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                         "An error occurred. Please contact the operator and inquire about the request"
                       ) ||

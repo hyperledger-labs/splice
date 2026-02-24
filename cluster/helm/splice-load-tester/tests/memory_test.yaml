@@ -1,0 +1,12 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: test memory resources
+templates:
+  - load-tester.yaml
+tests:
+  - it: should have correct memory limits
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 8Gi

@@ -887,8 +887,8 @@ class TreasuryService(
       validatorRewardCoupons <- walletManager
         .listValidatorRewardCouponsCollectableBy(
           userStore,
-          limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
           Some(issuingRoundsMap.keySet.map(_.number)),
+          limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
         )
       validatorRewardCouponUsers = validatorRewardCoupons
         .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))

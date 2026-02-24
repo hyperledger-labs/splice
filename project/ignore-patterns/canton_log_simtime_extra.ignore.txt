@@ -16,6 +16,7 @@ Detected late processing.*of batch with timestamp
 The payload to event time bound.*has been been exceeded by payload time
 # Canton GenericStepsError(SequencerTimeoutError) errors and failures caused by it
 Failed to submit submission due to GenericStepsError.*SequencerTimeoutError
+Sequencing timeout for submission
 
 # advancing time can result in the sequencer subscriptions being expired (See #7980)
 SEQUENCER_SUBSCRIPTION_LOST.*: Lost subscription to domain .* Will try to recover automatically.

@@ -258,7 +258,6 @@ class HttpWalletHandler(
       for {
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
           userWallet.store,
-          Limit.DefaultLimit,
           None,
         )
       } yield d0.ListValidatorRewardCouponsResponse(
@@ -1697,6 +1696,31 @@ class HttpWalletHandler(
         } yield WalletResource.RejectMintingDelegationResponseOK,
         logger,
       )
+    }
+  }
+
+  override def listDevelopmentFundCouponHistory(
+      respond: WalletResource.ListDevelopmentFundCouponHistoryResponse.type
+  )(after: Option[Long], limit: Int)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.ListDevelopmentFundCouponHistoryResponse] = {
+    implicit val WalletUserRequest(_, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.listDevelopmentFundCouponHistory") { implicit traceContext => _ =>
+      val pageLimit = PageLimit.tryCreate(limit)
+      for {
+        page <- userWallet.store.listDevelopmentFundCouponHistory(after, pageLimit)
+      } yield {
+        val developmentFundCouponHistory = page.resultsInPage.map {
+          case (archivedEntry, createdEntry) =>
+            TxLogEntry.Http.toArchivedDevelopmentFundCoupon(createdEntry, archivedEntry)
+        }.toVector
+        WalletResource.ListDevelopmentFundCouponHistoryResponseOK(
+          d0.ListDevelopmentFundCouponHistoryResponse(
+            developmentFundCouponHistory,
+            page.nextPageToken,
+          )
+        )
+      }
     }
   }
 }

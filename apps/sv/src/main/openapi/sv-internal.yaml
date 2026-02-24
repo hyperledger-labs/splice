@@ -590,6 +590,31 @@ paths:
         "200":
           description: ok
 
+  /v0/admin/sv/party-to-participant/{party_id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "getPartyToParticipant"
+      parameters:
+        - name: "party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Party is hosted on a participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetPartyToParticipantResponse"
+        "404":
+          description: Party not found
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+
   /v0/admin/feature-support:
     get:
       tags: [ sv ]
@@ -1159,3 +1184,11 @@ components:
           $ref: "#/components/schemas/DomainDataSnapshot"
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
+
+    GetPartyToParticipantResponse:
+      type: object
+      required:
+        - participant_id
+      properties:
+        participant_id:
+          type: string

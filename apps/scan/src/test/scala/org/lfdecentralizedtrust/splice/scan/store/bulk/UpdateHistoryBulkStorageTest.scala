@@ -3,71 +3,102 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.Keep
+import org.apache.pekko.stream.testkit.TestSubscriber
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
+import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
-import software.amazon.awssdk.services.s3.model.ListObjectsRequest
+import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 
-import java.time.Instant
+import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
+import scala.math.Ordering.Implicits.*
+import java.nio.ByteBuffer
 
 class UpdateHistoryBulkStorageTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with HasActorSystem
-    with HasS3Mock {
-  val maxFileSize = 30000L
+    with HasS3Mock
+    with SplicePostgresTest {
+  val maxFileSize = 25000L
   val bulkStorageTestConfig = ScanStorageConfig(
-    dbAcsSnapshotPeriodHours = 3,
-    bulkDbReadChunkSize = 1000,
+    dbAcsSnapshotPeriodHours = 1,
+    bulkAcsSnapshotPeriodHours = 2,
+    bulkDbReadChunkSize = 500,
+    bulkZstdFrameSize = 10000L,
     maxFileSize,
+  )
+  val appConfig = BulkStorageConfig(
+    updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
   )
 
   "UpdateHistoryBulkStorage" should {
+
+    "multipart upload works" in {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+        val o = bucketConnection.newAppendWriteObject("test")
+        o.prepareUploadNext()
+        o.prepareUploadNext()
+        for {
+          _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
+          _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
+          _ <- o.finish()
+          content <- bucketConnection.readFullObject("test")
+        } yield {
+          new String(content.array(), "UTF-8") shouldBe "helloworld"
+        }
+      }
+    }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
         val initialStoreSize = 1500
         val segmentSize = 2200L
         val segmentFromTimestamp = 100L
-        val mockStore = new MockUpdateHistoryStore(initialStoreSize)
+        val mockStore =
+          new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli)
         val fromTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
         val toTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
 
-        clue("Wait for the store to be ready by getting the first update from it") {
-          eventually(2.minutes) {
-            mockStore.store
-              .getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
-              .futureValue should not be Seq.empty
-          }
-        }
-
+        val segment = UpdatesSegment(
+          TimestampWithMigrationId(fromTimestamp, 0),
+          TimestampWithMigrationId(toTimestamp, 0),
+        )
+        val metricsFactory = new InMemoryMetricsFactory
         val probe = UpdateHistorySegmentBulkStorage
           .asSource(
             bulkStorageTestConfig,
+            appConfig,
             mockStore.store,
             bucketConnection,
-            TimestampWithMigrationId(fromTimestamp, 0),
-            TimestampWithMigrationId(toTimestamp, 0),
+            segment,
+            new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
             loggerFactory,
           )
-          .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.right)
+          .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
           .run()
 
-        probe.request(2)
+        probe.request(3)
 
         clue(
           "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
@@ -79,16 +110,37 @@ class UpdateHistoryBulkStorageTest
           "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
         ) {
           mockStore.mockIngestion(1000)
-          probe.expectNext(20.seconds) should be(TimestampWithMigrationId(toTimestamp, 0))
+          probe.expectNext(20.seconds) should be(
+            UpdateHistorySegmentBulkStorage.Output(
+              segment,
+              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
+              isLastObjectInSegment = false,
+            )
+          )
+          probe.expectNext(20.seconds) should be(
+            UpdateHistorySegmentBulkStorage.Output(
+              segment,
+              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
+              isLastObjectInSegment = true,
+            )
+          )
+          probe.expectComplete()
+          val objectCountMetrics = metricsFactory.metrics.counters
+            .get(SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count")
+            .value
+          val numObjectsFromMetric = objectCountMetrics
+            .get(MetricsContext.Empty)
+            .value
+            .markers
+            .get(MetricsContext("object_type" -> "updates"))
+            .value
+            .get()
+          numObjectsFromMetric shouldBe 2
         }
 
         clue("Check that the dumped content is correct") {
           for {
-            s3Objects <- bucketConnection.s3Client
-              .listObjects(
-                ListObjectsRequest.builder().bucket("bucket").build()
-              )
-              .asScala
+            s3Objects <- bucketConnection.listObjects
             allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
               None,
               HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
@@ -113,20 +165,138 @@ class UpdateHistoryBulkStorageTest
         }
       }
     }
+
+    "successfully dump all segments" in {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+        val initialStoreSize = 2000
+        val genesisDate = LocalDate.of(2001, 1, 23)
+        val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)
+        val metricsFactory = new InMemoryMetricsFactory
+        def latestSegmentMetrics = metricsFactory.metrics.gauges
+          .get(
+            SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "latest-updates-segment"
+          )
+          .value
+
+        val mockStore = new MockUpdateHistoryStore(
+          initialStoreSize,
+          i => genesisInstant.plusSeconds(i * 10),
+        )
+
+        for {
+          kvProvider <- mkProvider
+        } yield {
+          def newUpdatesBulkStorageFlow(
+              migrationId: Long
+          ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
+            new UpdateHistoryBulkStorage(
+              bulkStorageTestConfig,
+              appConfig,
+              mockStore.store,
+              kvProvider,
+              migrationId,
+              bucketConnection,
+              new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+              loggerFactory,
+            ).getSource()
+              .toMat(TestSink.probe[UpdatesSegment])(Keep.both)
+              .run()
+          }
+
+          val (killSwitch, probe) = newUpdatesBulkStorageFlow(0L)
+
+          probe.request(4)
+          val seg1 = UpdatesSegment(
+            TimestampWithMigrationId(CantonTimestamp.MinValue, 0),
+            TimestampWithMigrationId(
+              CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
+              0,
+            ),
+          )
+          probe.expectNext(20.seconds) shouldBe seg1
+          def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) =
+            UpdatesSegment(
+              TimestampWithMigrationId(
+                CantonTimestamp.tryFromInstant(
+                  genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
+                ),
+                fromMigration.toLong,
+              ),
+              TimestampWithMigrationId(
+                CantonTimestamp.tryFromInstant(
+                  genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
+                ),
+                toMigration.toLong,
+              ),
+            )
+
+          def assertLatestSegmentInMetrics(hour: Int) =
+            latestSegmentMetrics.get(MetricsContext.Empty).value.value.get()._1 shouldBe genesisDate
+              .atTime(hour, 0)
+              .toInstant(ZoneOffset.UTC)
+              .toEpochMilli * 1000
+
+          clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
+            probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
+            probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
+            assertLatestSegmentInMetrics(8)
+            probe.expectNoMessage(20.seconds)
+          }
+
+          clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
+            mockStore.mockIngestion(2000)
+            probe.request(2)
+            probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
+            probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
+            assertLatestSegmentInMetrics(12)
+            probe.expectNoMessage(20.seconds)
+          }
+
+          // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
+          // then start a new one with the new migration and ingest updates in the new migration
+          killSwitch.shutdown()
+          val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
+          mockStore.mockMigration()
+
+          clue("2000 more updates in the new migration, up to 19:13:50") {
+            mockStore.mockIngestion(2000)
+            probe1.request(4)
+            probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
+            probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
+            probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
+            assertLatestSegmentInMetrics(18)
+            probe1.expectNoMessage(20.seconds)
+          }
+          killSwitch1.shutdown()
+          succeed
+        }
+      }
+    }
   }
 
-  class MockUpdateHistoryStore(val initialStoreSize: Int) {
+  class MockUpdateHistoryStore(
+      val initialStoreSize: Int,
+      val idxToTimestamp: Long => Instant,
+  ) {
 
-    private var storeSize = initialStoreSize
     val store = mockUpdateHistoryStore()
 
-    def mockIngestion(extraUpdates: Int) = { storeSize = storeSize + extraUpdates }
+    val alicePartyId = mkPartyId("alice")
+    val bobPartyId = mkPartyId("bob")
+    val charliePartyId = mkPartyId("charlie")
+
+    private var data: Seq[TreeUpdateWithMigrationId] =
+      Seq.range(0, initialStoreSize).map(_.toLong).map(genElement)
+    private var currentMigration = 0
+
+    def mockIngestion(extraUpdates: Int): Unit = {
+      val curSize = data.size
+      data = data ++ Seq.range(curSize, curSize + extraUpdates).map(_.toLong).map(genElement)
+    }
+    def mockMigration(): Unit = currentMigration = currentMigration + 1
 
     def mockUpdateHistoryStore(): UpdateHistory = {
       val store = mock[UpdateHistory]
-      val alicePartyId = mkPartyId("alice")
-      val bobPartyId = mkPartyId("bob")
-      val charliePartyId = mkPartyId("charlie")
       when(
         store.getUpdatesWithoutImportUpdates(
           any[Option[(Long, CantonTimestamp)]],
@@ -137,41 +307,71 @@ class UpdateHistoryBulkStorageTest
             afterO: Option[(Long, CantonTimestamp)],
             limit: Limit,
         ) =>
-          Future {
-            val fromIdx = afterO.map { case (_, t) => t.toEpochMilli }.getOrElse(0L) + 1
-            val remaining = storeSize - fromIdx
-            val numElems = math.min(limit.limit.toLong, remaining)
-            Seq
-              .range(0, numElems)
-              .map(i => {
-                val idx = i + fromIdx
-                val contract = amulet(
-                  alicePartyId,
-                  BigDecimal(idx),
-                  0L,
-                  BigDecimal(0.1),
-                  contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
-                )
-                val tx = mkCreateTx(
-                  1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
-                  Seq(contract),
-                  Instant.ofEpochMilli(idx),
-                  Seq(alicePartyId, bobPartyId),
-                  dummyDomain,
-                  "",
-                  Instant.ofEpochMilli(idx),
-                  Seq(charliePartyId),
-                  updateId = idx.toString,
-                )
-                new TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(TransactionTreeUpdate(tx), dummyDomain),
-                  0,
-                )
-              })
-          }
+          val after = afterO
+            .map(a => TimestampWithMigrationId(a._2, a._1))
+            .getOrElse(TimestampWithMigrationId(CantonTimestamp.MinValue, 0L))
+          Future.successful(
+            data
+              .filter(update =>
+                TimestampWithMigrationId(
+                  update.update.update.recordTime,
+                  update.migrationId,
+                ) > after
+              )
+              .take(limit.limit)
+          )
       }
+      when(
+        store.getLowestMigrationForRecordTime(
+          any[CantonTimestamp]
+        )(any[TraceContext])
+      ).thenAnswer { (recordTime: CantonTimestamp) =>
+        Future.successful(
+          data.filter(_.update.update.recordTime > recordTime).map(_.migrationId).minOption
+        )
+      }
+      when(
+        store.isHistoryBackfilled(anyLong)(any[TraceContext])
+      ).thenReturn(Future.successful(true))
       store
     }
 
+    private def genElement(idx: Long) = {
+      val contract = amulet(
+        alicePartyId,
+        BigDecimal(idx),
+        0L,
+        BigDecimal(0.1),
+        contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
+      )
+      val tx = mkCreateTx(
+        1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
+        Seq(contract),
+        idxToTimestamp(idx),
+        Seq(alicePartyId, bobPartyId),
+        dummyDomain,
+        "",
+        idxToTimestamp(idx),
+        Seq(charliePartyId),
+        updateId = idx.toString,
+      )
+      new TreeUpdateWithMigrationId(
+        UpdateHistoryResponse(TransactionTreeUpdate(tx), dummyDomain),
+        currentMigration.toLong,
+      )
+    }
   }
+
+  def mkProvider: Future[ScanKeyValueProvider] = {
+    ScanKeyValueStore(
+      dsoParty = dsoParty,
+      participantId = mkParticipantId("participant"),
+      storage,
+      loggerFactory,
+    ).map(new ScanKeyValueProvider(_, loggerFactory))
+  }
+
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
 }

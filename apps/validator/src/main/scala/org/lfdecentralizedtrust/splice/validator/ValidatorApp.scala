@@ -800,6 +800,7 @@ class ValidatorApp(
         domainMigrationInfo,
         participantId,
         config.automation.ingestion,
+        config.parameters.defaultLimit,
         config.acsStoreDescriptorUserVersion,
       )
       validatorUpdateHistory = new UpdateHistory(
@@ -871,8 +872,6 @@ class ValidatorApp(
             loggerFactory,
             domainMigrationInfo,
             participantId,
-            config.ingestFromParticipantBegin,
-            config.ingestUpdateHistoryFromParticipantBegin,
             config.parameters,
             scanConnection,
           )
@@ -893,8 +892,6 @@ class ValidatorApp(
             loggerFactory,
             domainMigrationInfo,
             participantId,
-            config.ingestFromParticipantBegin,
-            config.ingestUpdateHistoryFromParticipantBegin,
             validatorTopupConfig,
             config.walletSweep,
             config.autoAcceptTransfers,
@@ -938,8 +935,6 @@ class ValidatorApp(
         config.domainMigrationDumpPath,
         config.domainMigrationId,
         retryProvider,
-        config.ingestFromParticipantBegin,
-        config.ingestUpdateHistoryFromParticipantBegin,
         config.svValidator,
         config.sequencerRequestAmplificationPatience.toInternal,
         config.contactPoint,

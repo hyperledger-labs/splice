@@ -79,7 +79,7 @@ trait ValidatorStore extends WalletStore with AppStore {
   ]
 
   def listUsers(
-      limit: Limit = Limit.DefaultLimit
+      limit: Limit = defaultLimit
   )(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
       installs <- multiDomainAcsStore.listContracts(
@@ -161,6 +161,7 @@ object ValidatorStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
       acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
@@ -176,6 +177,7 @@ object ValidatorStore {
       participantId,
       ingestionConfig,
       acsStoreDescriptorUserVersion,
+      defaultLimit,
     )
 
   case class Key(

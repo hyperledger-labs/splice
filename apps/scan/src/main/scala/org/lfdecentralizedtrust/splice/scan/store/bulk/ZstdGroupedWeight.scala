@@ -69,10 +69,10 @@ case class ZstdGroupedWeight(minSize: Long)
     }
 
     def zstdFinish(): ByteString = {
+      compressingStream.close()
       tmpNioBuffer.flip()
       val result = ByteString.fromByteBuffer(tmpNioBuffer)
       tmpNioBuffer.clear()
-      compressingStream.close()
       result
     }
 

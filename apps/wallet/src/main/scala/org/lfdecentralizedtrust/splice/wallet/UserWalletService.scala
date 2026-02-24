@@ -54,8 +54,6 @@ class UserWalletService(
     packageVersionSupport: PackageVersionSupport,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     validatorTopupConfigO: Option[ValidatorTopupConfig],
     walletSweep: Option[WalletSweepConfig],
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
@@ -85,6 +83,7 @@ class UserWalletService(
       domainMigrationInfo,
       participantId,
       automationConfig.ingestion,
+      params.defaultLimit,
     )
 
   val updateHistory: UpdateHistory =
@@ -134,8 +133,6 @@ class UserWalletService(
     scanConnection,
     retryProvider,
     packageVersionSupport,
-    ingestFromParticipantBegin,
-    ingestUpdateHistoryFromParticipantBegin,
     loggerFactory,
     validatorTopupConfigO,
     walletSweep,

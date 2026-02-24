@@ -67,7 +67,7 @@ trait SvSvStore extends AppStore {
   ] =
     lookupUsedSecretWithOffset(secret).map(_.value)
 
-  def listValidatorOnboardings(limit: Limit = Limit.DefaultLimit)(implicit
+  def listValidatorOnboardings(limit: Limit = defaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[?, vo.ValidatorOnboarding]]] =
     multiDomainAcsStore
@@ -100,6 +100,7 @@ object SvSvStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
       acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
@@ -115,6 +116,7 @@ object SvSvStore {
       participantId,
       ingestionConfig,
       acsStoreDescriptorUserVersion,
+      defaultLimit = defaultLimit,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */

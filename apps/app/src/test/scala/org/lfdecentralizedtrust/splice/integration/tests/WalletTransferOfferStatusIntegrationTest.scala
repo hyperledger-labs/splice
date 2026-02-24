@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.history.AmuletCreate
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.*
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.AcceptedTransferOfferTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
@@ -31,7 +31,7 @@ import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class WalletTransferOfferStatusIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil {

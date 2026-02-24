@@ -4,22 +4,26 @@ import com.daml.ledger.javaapi.data.{DamlRecord, Identifier, OffsetCheckpoint}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
-import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
+  DarResources,
+  RetryProvider,
+}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.migration.{DomainMigrationInfo, MigrationTimeInfo}
-import org.lfdecentralizedtrust.splice.store.StoreTest.testTxLogConfig
+import org.lfdecentralizedtrust.splice.store.StoreTestBase.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  Limit,
   MultiDomainAcsStore,
   MultiDomainAcsStoreTest,
-  StoreTest,
+  StoreTestBase,
   TestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -40,9 +44,10 @@ import org.slf4j.event.Level
 import slick.jdbc.JdbcProfile
 
 import java.time.Instant
-import scala.concurrent.Future
-import StoreTest.*
+import scala.concurrent.{Future, Promise}
+import StoreTestBase.*
 import cats.data.NonEmptyList
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -51,7 +56,6 @@ class DbMultiDomainAcsStoreTest
       DbMultiDomainAcsStore[TestTxLogEntry]
     ]
     with SplicePostgresTest
-    with HasActorSystem
     with AcsJdbcTypes {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
@@ -156,9 +160,37 @@ class DbMultiDomainAcsStoreTest
         val store = mkStore(acsId = 0, txLogId = Some(0))
         for {
           _ <- store.ingestionSink.initialize()
-          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store)
-          error <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store).failed
+          _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store)
+          error <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store).failed
           _ = error.getMessage should include("already ingested")
+        } yield succeed
+      }
+      "does not report the ACS as ingested until all batches are ingested" in {
+        val store = mkStore(txLogId = Some(0))
+        val ingestedOneItem = Promise[Unit]()
+        val continueIngesting = Promise[Unit]()
+        for {
+          _ <- store.ingestionSink.initialize()
+          _ = store.hasFinishedAcsIngestion should be(false)
+          ingestionCompletedFuture = store.ingestionSink.ingestAcsStreamInBatches(
+            Source
+              .single(StoreTestBase.AcsImportEntry(c(1), d1, 0L))
+              .map { e =>
+                ingestedOneItem.trySuccess(())
+                e
+              }
+              .concat(Source.future(continueIngesting.future.map { _ =>
+                StoreTestBase.AcsImportEntry(c(2), d1, 0L)
+              }))
+              .map(acsImportEntryToActiveContract)
+              .map(c => Seq(BaseLedgerConnection.ActiveContractsItem.ActiveContract(c))),
+            123L,
+          )
+          _ <- ingestedOneItem.future
+          _ = store.hasFinishedAcsIngestion should be(false)
+          _ = continueIngesting.success(())
+          _ <- ingestionCompletedFuture // which will complete once element 2 is finally ingested
+          _ <- assertList(c(1) -> Some(d1), c(2) -> Some(d1))(store)
         } yield succeed
       }
       "initialize empty stores with equal descriptors" in {
@@ -228,7 +260,7 @@ class DbMultiDomainAcsStoreTest
         val store1 = mkStore(acsId = 0, txLogId = Some(0))
         for {
           _ <- store0.ingestionSink.initialize()
-          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -250,7 +282,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store0)
           _ <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -273,7 +305,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -296,7 +328,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -318,7 +350,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store0)
           _ <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -772,6 +804,7 @@ class DbMultiDomainAcsStoreTest
       ),
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       IngestionConfig(),
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
   }
 

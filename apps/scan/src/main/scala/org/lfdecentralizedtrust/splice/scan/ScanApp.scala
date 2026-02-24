@@ -189,6 +189,7 @@ class ScanApp(
         nodeMetrics.dbScanStore,
         config.automation.ingestion,
         initialRound.toLong,
+        config.parameters.defaultLimit,
         config.acsStoreDescriptorUserVersion,
         config.txLogStoreDescriptorUserVersion,
       )
@@ -228,8 +229,6 @@ class ScanApp(
         updateHistory,
         storage,
         acsSnapshotStore,
-        config.ingestFromParticipantBegin,
-        config.ingestUpdateHistoryFromParticipantBegin,
         serviceUserPrimaryParty,
         svName,
         amuletAppParameters.upgradesConfig,

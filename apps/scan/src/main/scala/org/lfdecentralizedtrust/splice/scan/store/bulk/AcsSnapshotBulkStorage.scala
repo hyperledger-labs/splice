@@ -7,61 +7,65 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{ActorSystem, Cancellable}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
-import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryMetrics,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorage(
-    val config: ScanStorageConfig,
-    val acsSnapshotStore: AcsSnapshotStore,
-    val s3Connection: S3BucketConnection,
-    val kvProvider: ScanKeyValueProvider,
+    storageConfig: ScanStorageConfig,
+    appConfig: BulkStorageConfig,
+    acsSnapshotStore: AcsSnapshotStore,
+    updateHistory: UpdateHistory,
+    s3Connection: S3BucketConnection,
+    kvProvider: ScanKeyValueProvider,
+    historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  // TODO(#3429): persist progress (or conclude it from the S3 storage), and start from latest successfully dumped snapshot upon restart
-  private def getStartTimestamp: Future[Option[(Long, CantonTimestamp)]] =
+  private def getStartTimestamp: Future[Option[TimestampWithMigrationId]] =
     kvProvider.getLatestAcsSnapshotInBulkStorage().value
 
-  // When new snapshot is not yet available, how long to wait for a new one.
-  // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
-  private val snapshotPollingInterval = 5.seconds
-
   private def getAcsSnapshotTimestampsAfter(
-      startMigrationId: Long,
-      startTimestamp: CantonTimestamp,
-  ): Source[(Long, CantonTimestamp), NotUsed] = {
+      start: TimestampWithMigrationId
+  ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync((startMigrationId, startTimestamp)) {
-        case (lastMigrationId: Long, lastTimestamp: CantonTimestamp) =>
-          acsSnapshotStore.lookupSnapshotAfter(lastMigrationId, lastTimestamp).flatMap {
-            case Some(snapshot) =>
-              logger.info(
-                s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
-              )
-              Future.successful(
-                Some(
-                  (
-                    (snapshot.migrationId, snapshot.snapshotRecordTime),
-                    Some((snapshot.migrationId, snapshot.snapshotRecordTime)),
-                  )
+      .unfoldAsync(start) { (last: TimestampWithMigrationId) =>
+        acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
+          case Some(snapshot) =>
+            logger.info(
+              s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
+            )
+            Future.successful(
+              Some(
+                (
+                  TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId),
+                  Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId)),
                 )
               )
-            case None =>
-              logger.debug("No new snapshot available, sleeping...")
-              after(snapshotPollingInterval, actorSystem.scheduler) {
-                Future.successful(Some(((lastMigrationId, lastTimestamp), None)))
-              }
-          }
+            )
+          case None =>
+            logger.debug("No new snapshot available, sleeping...")
+            after(
+              appConfig.snapshotPollingInterval.underlying,
+              actorSystem.scheduler,
+            ) {
+              Future.successful(Some((last, None)))
+            }
+        }
       }
-      .collect { case Some((migrationId, timestamp)) => (migrationId, timestamp) }
+      .collect { case Some(ts) => ts }
   }
 
   /**  This is the main implementation of the pipeline. It is a Pekko Source that reads a `start` timestamp
@@ -69,42 +73,67 @@ class AcsSnapshotBulkStorage(
     *   is successfully dumped, it persists to the DB its timestamp, and emits that timestamp as an output.
     *   It is an infinite source that should never complete.
     */
-  private def mksrc() = {
-    Source
-      .future(getStartTimestamp)
-      .flatMapConcat {
-        case Some((startMigrationId, startAfterTimestamp)) =>
-          logger.info(
-            s"Latest dumped snapshot was from migration $startMigrationId, timestamp $startAfterTimestamp"
-          )
-          getAcsSnapshotTimestampsAfter(startMigrationId, startAfterTimestamp)
-        case None =>
-          logger.info("Not dumped snapshots yet, starting from genesis")
-          getAcsSnapshotTimestampsAfter(0, CantonTimestamp.MinValue)
-      }
-      .via(
-        SingleAcsSnapshotBulkStorage.asFlow(
-          config,
-          acsSnapshotStore,
-          s3Connection,
-          loggerFactory,
-        )
-      )
-      .mapAsync(1) { case (migrationId, timestamp) =>
-        for {
-          _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(migrationId, timestamp)
-        } yield {
-          logger.info(
-            s"Successfully completed dumping snapshots from migration $migrationId, timestamp $timestamp"
-          )
-          (migrationId, timestamp)
+  private def mksrc(): Source[TimestampWithMigrationId, Cancellable] = {
+
+    // Wait for history backfilling to complete before starting bulk storage dumps
+    val backfillingCompleteGate =
+      Source
+        .tick(0.seconds, appConfig.snapshotPollingInterval.underlying, ())
+        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId))
+        .filter(identity)
+        .take(1)
+
+    backfillingCompleteGate.flatMap { _ =>
+      Source
+        .future(getStartTimestamp)
+        .flatMapConcat {
+          case Some(start: TimestampWithMigrationId) =>
+            logger.info(
+              s"Latest dumped snapshot was from migration ${start.migrationId}, timestamp ${start.timestamp}"
+            )
+            getAcsSnapshotTimestampsAfter(start)
+          case None =>
+            logger.info("No dumped snapshots yet, starting from genesis")
+            getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
         }
-      }
+        .filter { case TimestampWithMigrationId(ts, _) =>
+          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+          if (ret) {
+            logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+          } else {
+            logger.info(
+              s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+            )
+          }
+          ret
+        }
+        .via(
+          SingleAcsSnapshotBulkStorage.asFlow(
+            storageConfig,
+            appConfig,
+            acsSnapshotStore,
+            s3Connection,
+            historyMetrics,
+            loggerFactory,
+          )
+        )
+        .mapAsync(1) { (ts: TimestampWithMigrationId) =>
+          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
+          for {
+            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
+          } yield {
+            logger.info(
+              s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+            )
+            ts
+          }
+        }
+    }
   }
 
   /**  wraps mksrc (where the main pipeline logic is implemented) in a retry loop, to retry upon failures.
     */
-  def getSource(): Source[(Long, CantonTimestamp), UniqueKillSwitch] = {
+  def getSource(): Source[TimestampWithMigrationId, UniqueKillSwitch] = {
     val restartSettings = RestartSettings(
       minBackoff = 3.seconds,
       maxBackoff = 30.seconds,

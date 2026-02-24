@@ -13,17 +13,12 @@
 
 ## Bumping Canton
 
-1. Generate a patch file of the JSON API v2 OpenAPI definition by running `diff-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
-2. Choose the Canton version you wish to upgrade to. The currently published versions on
+1. Choose the Canton version you wish to upgrade to. The currently published versions on
    Artifactory can be found [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
-3. Update the hashes in `nix/canton-sources.json` by running: `build-tools/bump-canton.sh <version>`
-4. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
+2. Update the hashes in `nix/canton-sources.json` by running: `build-tools/bump-canton.sh <version>`
+3. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
    changes on scratchnet first.
-5. Update the OpenAPI definitions from step 1 by running `update-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
-6. Cleanup the `openapi.patch` file.
-   Check `token-standard/dependencies/canton-json-api-v2/openapi/CHANGES.md` and apply any changes manually if CI breaks due to
-   token standard CLI issues that look caused by bad OpenAPI definitions.
 
 ## Bumping Daml Compiler version
 

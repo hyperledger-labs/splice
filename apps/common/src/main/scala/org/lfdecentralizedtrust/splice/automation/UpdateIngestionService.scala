@@ -4,20 +4,22 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import cats.data.NonEmptyList
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{
-  RetryProvider,
-  SpliceLedgerConnection,
-  SpliceLedgerSubscription,
-}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import org.lfdecentralizedtrust.splice.environment.{
+  RetryProvider,
+  SpliceLedgerConnection,
+  SpliceLedgerSubscription,
+}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
@@ -35,7 +37,6 @@ class UpdateIngestionService(
     backoffClock: Clock,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
-    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -61,35 +62,31 @@ class UpdateIngestionService(
           for {
             _ <- ingestAcsAndInFlight(offset)
           } yield offset
+        case IngestionStart.UpdateHistoryInitAtLatestPrunedOffset =>
+          for {
+            participantBegin <- connection.latestPrunedOffset()
+            _ = logger.debug(
+              s"Starting ingestion from participant begin at $participantBegin"
+            )
+            /** * This only applies to UpdateHistory. Does not load any ACS. Anything before the latest pruned offset:
+              * - Scan: it will be backfilled.
+              * - Wallet: won't miss any updates, because all updates visible to the wallet party only appear
+              *           after you onboard that party through the wallet app. Does not backfill.
+              */
+            _ <- ingestionSink.ingestAcsStreamInBatches(
+              Source.empty,
+              participantBegin,
+            )
+          } yield participantBegin
         case IngestionStart.InitializeAcsAtLatestOffset =>
           for {
-            offset <-
-              if (ingestFromParticipantBegin) {
-                for {
-                  participantBegin <- connection.latestPrunedOffset()
-                  _ = logger.debug(
-                    s"Starting ingestion from participant begin at $participantBegin"
-                  )
-                  _ <- ingestionSink
-                    .ingestAcs(
-                      participantBegin,
-                      Seq.empty,
-                      Seq.empty,
-                      Seq.empty,
-                    )
-                } yield participantBegin
-              } else
-                for {
-                  acsOffset <- connection.ledgerEnd()
-                  _ = logger.debug(s"Starting ingestion from ledger end at $acsOffset")
-                  _ <- ingestAcsAndInFlight(acsOffset)
-                } yield acsOffset
-          } yield offset
+            acsOffset <- connection.ledgerEnd()
+            _ = logger.debug(s"Starting ingestion from ledger end at $acsOffset")
+            _ <- ingestAcsAndInFlight(acsOffset)
+          } yield acsOffset
       }
     } yield new SpliceLedgerSubscription(
-      source = connection
-        .updates(subscribeFrom, filter)
-        .batch(config.ingestion.maxBatchSize.toLong, Vector(_))(_ :+ _),
+      source = batchSource(connection.updates(subscribeFrom, filter)),
       map = process,
       retryProvider = retryProvider,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),
@@ -116,17 +113,14 @@ class UpdateIngestionService(
   private def ingestAcsAndInFlight(
       offset: Long
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
-      // TODO(#863): stream contracts instead of ingesting them as a single Seq
-      (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, offset)
-      _ <- ingestionSink.ingestAcs(
-        offset,
-        acs,
-        incompleteOut,
-        incompleteIn,
-      )
-    } yield ()
+    ingestionSink.ingestAcsStreamInBatches(
+      batchSource(connection.activeContracts(filter, offset)),
+      offset,
+    )
   }
+
+  private def batchSource[T](source: Source[T, NotUsed]): Source[Vector[T], NotUsed] =
+    source.batch(config.ingestion.maxBatchSize.toLong, Vector(_))(_ :+ _)
 
   // Kick-off the ingestion
   startIngestion()

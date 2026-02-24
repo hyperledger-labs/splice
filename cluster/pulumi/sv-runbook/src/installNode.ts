@@ -302,6 +302,8 @@ async function installSvAndValidator(
     ...spliceInstanceNames,
     extraBeneficiaries,
     onboardingPollingInterval: svOnboardingPollingInterval,
+    permissionedSynchronizer:
+      commonSvAppValues.permissionedSynchronizer ?? valuesFromYamlFile.permissionedSynchronizer,
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice: initialAmuletPrice,
@@ -415,7 +417,6 @@ async function installSvAndValidator(
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
-      TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       YOUR_CONTACT_POINT: daContactPoint,
     }),
     ...loadYamlFromFile(
@@ -424,6 +425,7 @@ async function installSvAndValidator(
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
         YOUR_SV_NAME: onboardingName,
+        TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       }
     ),
     metrics: {
@@ -465,6 +467,7 @@ async function installSvAndValidator(
     {
       ...validatorValuesWithMaybeTopups,
       additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
+      scanClient: svConfig.validatorApp?.scanClient ?? validatorValues.scanClient,
     },
     activeVersion,
     {

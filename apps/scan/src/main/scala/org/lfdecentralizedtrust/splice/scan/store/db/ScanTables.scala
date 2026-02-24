@@ -175,112 +175,114 @@ object ScanTables extends AcsTables {
 
   object ScanTxLogRowData extends StoreErrors {
 
-    def fromTxLogEntry(record: TxLogEntry): ScanTxLogRowData = {
+    def fromTxLogEntry(record: TxLogEntry): Option[ScanTxLogRowData] = {
+      def fromEntry(record: TxLogEntry): ScanTxLogRowData = {
+        record match {
+          case err: ErrorTxLogEntry =>
+            ScanTxLogRowData(
+              entry = err
+            )
+          case omr: OpenMiningRoundTxLogEntry =>
+            ScanTxLogRowData(
+              entry = omr,
+              round = Some(omr.round),
+            )
+          case cmr: ClosedMiningRoundTxLogEntry =>
+            ScanTxLogRowData(
+              entry = cmr,
+              round = Some(cmr.round),
+              closedRoundEffectiveAt = cmr.effectiveAt.map(CantonTimestamp.assertFromInstant),
+            )
+          case are: AppRewardTxLogEntry =>
+            ScanTxLogRowData(
+              entry = are,
+              round = Some(are.round),
+              rewardAmount = Some(are.amount),
+              rewardedParty = Some(are.party),
+            )
+          case vre: ValidatorRewardTxLogEntry =>
+            ScanTxLogRowData(
+              entry = vre,
+              round = Some(vre.round),
+              rewardAmount = Some(vre.amount),
+              rewardedParty = Some(vre.party),
+            )
+          case sre: SvRewardTxLogEntry =>
+            ScanTxLogRowData(
+              entry = sre,
+              round = Some(sre.round),
+              rewardAmount = Some(sre.amount),
+              rewardedParty = Some(sre.party),
+            )
+          case etp: ExtraTrafficPurchaseTxLogEntry =>
+            ScanTxLogRowData(
+              entry = etp,
+              round = Some(etp.round),
+              extraTrafficValidator = Some(etp.validator),
+              extraTrafficPurchaseTrafficPurchase = Some(etp.trafficPurchased),
+              extraTrafficPurchaseCcSpent = Some(etp.ccSpent),
+            )
+          case rar: TransferTxLogEntry =>
+            ScanTxLogRowData(
+              entry = rar,
+              round = Some(rar.round),
+            )
+          case entry: TapTxLogEntry =>
+            ScanTxLogRowData(
+              entry = entry,
+              round = Some(entry.round),
+            )
+          case entry: MintTxLogEntry =>
+            ScanTxLogRowData(
+              entry = entry,
+              round = Some(entry.round),
+            )
+          case vr: VoteRequestTxLogEntry =>
+            val result = vr.result.getOrElse(throw txMissingField())
+            val parsedOutcome = VoteRequestOutcome.parse(result.outcome)
+            ScanTxLogRowData(
+              entry = vr,
+              voteActionName = Some(mapActionName(result.request.action)),
+              voteAccepted = Some(parsedOutcome match {
+                case _: Accepted => true
+                case _ => false
+              }),
+              voteRequesterName = Some(result.request.requester),
+              voteEffectiveAt = parsedOutcome.effectiveAt match {
+                case Some(effectiveAt) => Some(effectiveAt.toString)
+                case None => None
+              },
+            )
+          case entry: TransferCommandTxLogEntry =>
+            ScanTxLogRowData(
+              entry = entry,
+              transferCommandContractId = Some(
+                new TransferCommand.ContractId(
+                  entry.contractId
+                )
+              ),
+              transferCommandSender = Some(
+                entry.sender
+              ),
+              transferCommandNonce = Some(
+                entry.nonce
+              ),
+            )
+          case entry: AbortTransferInstructionTxLogEntry =>
+            ScanTxLogRowData(
+              entry = entry
+            )
+          case _ =>
+            throw txEncodingFailed()
+        }
+      }
+
       record match {
-        case err: ErrorTxLogEntry =>
-          ScanTxLogRowData(
-            entry = err
-          )
-        case omr: OpenMiningRoundTxLogEntry =>
-          ScanTxLogRowData(
-            entry = omr,
-            round = Some(omr.round),
-          )
-        case cmr: ClosedMiningRoundTxLogEntry =>
-          ScanTxLogRowData(
-            entry = cmr,
-            round = Some(cmr.round),
-            closedRoundEffectiveAt = cmr.effectiveAt.map(CantonTimestamp.assertFromInstant),
-          )
-        case are: AppRewardTxLogEntry =>
-          ScanTxLogRowData(
-            entry = are,
-            round = Some(are.round),
-            rewardAmount = Some(are.amount),
-            rewardedParty = Some(are.party),
-          )
-        case vre: ValidatorRewardTxLogEntry =>
-          ScanTxLogRowData(
-            entry = vre,
-            round = Some(vre.round),
-            rewardAmount = Some(vre.amount),
-            rewardedParty = Some(vre.party),
-          )
-        case sre: SvRewardTxLogEntry =>
-          ScanTxLogRowData(
-            entry = sre,
-            round = Some(sre.round),
-            rewardAmount = Some(sre.amount),
-            rewardedParty = Some(sre.party),
-          )
-        case etp: ExtraTrafficPurchaseTxLogEntry =>
-          ScanTxLogRowData(
-            entry = etp,
-            round = Some(etp.round),
-            extraTrafficValidator = Some(etp.validator),
-            extraTrafficPurchaseTrafficPurchase = Some(etp.trafficPurchased),
-            extraTrafficPurchaseCcSpent = Some(etp.ccSpent),
-          )
-        case bac: BalanceChangeTxLogEntry =>
-          ScanTxLogRowData(
-            entry = bac,
-            round = Some(bac.round),
-            balanceChangeToInitialAmountAsOfRoundZero =
-              Some(bac.changeToInitialAmountAsOfRoundZero),
-            balanceChangeChangeToHoldingFeesRate = Some(bac.changeToHoldingFeesRate),
-          )
-        case rar: TransferTxLogEntry =>
-          ScanTxLogRowData(
-            entry = rar,
-            round = Some(rar.round),
-          )
-        case entry: TapTxLogEntry =>
-          ScanTxLogRowData(
-            entry = entry,
-            round = Some(entry.round),
-          )
-        case entry: MintTxLogEntry =>
-          ScanTxLogRowData(
-            entry = entry,
-            round = Some(entry.round),
-          )
-        case vr: VoteRequestTxLogEntry =>
-          val result = vr.result.getOrElse(throw txMissingField())
-          val parsedOutcome = VoteRequestOutcome.parse(result.outcome)
-          ScanTxLogRowData(
-            entry = vr,
-            voteActionName = Some(mapActionName(result.request.action)),
-            voteAccepted = Some(parsedOutcome match {
-              case _: Accepted => true
-              case _ => false
-            }),
-            voteRequesterName = Some(result.request.requester),
-            voteEffectiveAt = parsedOutcome.effectiveAt match {
-              case Some(effectiveAt) => Some(effectiveAt.toString)
-              case None => None
-            },
-          )
-        case entry: TransferCommandTxLogEntry =>
-          ScanTxLogRowData(
-            entry = entry,
-            transferCommandContractId = Some(
-              new TransferCommand.ContractId(
-                entry.contractId
-              )
-            ),
-            transferCommandSender = Some(
-              entry.sender
-            ),
-            transferCommandNonce = Some(
-              entry.nonce
-            ),
-          )
-        case entry: AbortTransferInstructionTxLogEntry =>
-          ScanTxLogRowData(
-            entry = entry
-          )
-        case _ =>
-          throw txEncodingFailed()
+        case _: BalanceChangeTxLogEntry =>
+          // the balance changes are no longer indexed, or written, to the tx log table,
+          // See https://github.com/hyperledger-labs/splice/pull/3734
+          None
+        case entry => Some(fromEntry(entry))
       }
     }
 

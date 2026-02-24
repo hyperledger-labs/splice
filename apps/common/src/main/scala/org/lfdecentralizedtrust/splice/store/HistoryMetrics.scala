@@ -231,6 +231,49 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 
   }
 
+  object BulkStorage {
+    private val bulkStoragePrefix: MetricName = prefix :+ "bulk-storage"
+
+    val latestUpdatesSegment: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = bulkStoragePrefix :+ "latest-updates-segment",
+          summary =
+            "The end timestamp of the latest segment for which all updates have been dumped to bulk storage",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    val latestAcsSnapshot: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = bulkStoragePrefix :+ "latest-acs-snapshot",
+          summary =
+            "The timestamp of the latest ACS snapshot which has been fully dumped to bulk storage",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    val objectsCount: Counter =
+      metricsFactory.counter(
+        MetricInfo(
+          name = bulkStoragePrefix :+ "object-count",
+          summary = "The number of S3 objects created",
+          Traffic,
+        )
+      )(metricsContext)
+
+    def incAcsSnapshotObjects(): Unit =
+      objectsCount.inc()(MetricsContext("object_type" -> "ACS_snapshots"))
+
+    def incUpdateObjects(): Unit =
+      objectsCount.inc()(MetricsContext("object_type" -> "updates"))
+  }
+
   def metricsContextFromUpdate(
       treeUpdateOrOffsetCheckpoint: TreeUpdateOrOffsetCheckpoint,
       backfilling: Boolean,

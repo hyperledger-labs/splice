@@ -11,7 +11,7 @@ import {
   UpdateId,
   updateIdFromEventId,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { useActivity } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
+import { useActivity, useAmuletPrice } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import BigNumber from 'bignumber.js';
 import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
@@ -42,6 +42,7 @@ export const ActivityTable: React.FC = () => {
     hasNextPage,
     isFetchingNextPage,
   } = useActivity();
+  const amuletPriceQuery = useAmuletPrice();
 
   const { ref, inView } = useInView();
 
@@ -63,12 +64,14 @@ export const ActivityTable: React.FC = () => {
 
   return (
     <Stack spacing={4} direction="column" data-testid="activity-table">
-      {isLoading ? (
+      {isLoading || amuletPriceQuery.isLoading ? (
         <Loading />
       ) : isError ? (
         <ErrorDisplay message={'Error while fetching recent activity.'} />
       ) : hasNoActivities(pagedActivities) ? (
         <Typography variant="h6">No recent activity available yet</Typography>
+      ) : amuletPriceQuery.isError ? (
+        <ErrorDisplay message={'Error while fetching amulet price.'} />
       ) : (
         <TitledTable title="Recent Activity">
           <TableHead>
@@ -95,6 +98,7 @@ export const ActivityTable: React.FC = () => {
                     <ActivityRow
                       key={activity.eventId + activity.activityType}
                       activity={activity}
+                      amuletPrice={amuletPriceQuery.data!}
                     />
                   ))
             )}
@@ -121,13 +125,11 @@ type RewardsCollected = { app?: BigNumber; validator?: BigNumber; sv?: BigNumber
 
 interface ActivityView {
   activityType: string;
-  provider: string;
   sender: string;
   receiver: string | 'Multiple' | 'None';
   feesBurnt: BigNumber;
   transferAmount: BigNumber;
   rewardsCollected: RewardsCollected;
-  amuletPrice: BigNumber;
   eventId: string;
 }
 
@@ -181,8 +183,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       rewardsCollected.sv = svRewards;
     }
 
-    const provider = transfer.provider;
-
     const nrReceivers = receivers.length;
     if (nrReceivers === 0) {
       receiver = 'None';
@@ -203,13 +203,11 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
 
     return {
       activityType: activityType,
-      provider: provider,
       sender: transfer.sender.party,
       receiver: receiver,
       feesBurnt: feesBurnt,
       transferAmount: transferAmount,
       rewardsCollected: rewardsCollected,
-      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -217,13 +215,11 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
   function getActivityFromMint(mint: AmuletAmount): ActivityView {
     return {
       activityType: 'Mint',
-      provider: mint.amulet_owner,
       sender: mint.amulet_owner,
       receiver: mint.amulet_owner,
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(mint.amulet_amount),
       rewardsCollected: {},
-      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -231,13 +227,11 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
   function getActivityFromTap(tap: AmuletAmount): ActivityView {
     return {
       activityType: 'Tap',
-      provider: tap.amulet_owner,
       sender: tap.amulet_owner,
       receiver: tap.amulet_owner,
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(tap.amulet_amount),
       rewardsCollected: {},
-      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -247,18 +241,16 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
 
 interface ActivityRowProps {
   activity: ActivityView;
+  amuletPrice: BigNumber;
 }
 
-const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
+const ActivityRow: React.FC<ActivityRowProps> = ({ activity, amuletPrice }) => {
   return (
     <TableRow className="activity-row">
       <TableCell>
         <Typography className="activity_type" variant="body1">
           {activity.activityType}
         </Typography>
-      </TableCell>
-      <TableCell>
-        <AnsEntry partyId={activity.provider} />
       </TableCell>
       <TableCell>
         <AnsEntry partyId={activity.sender} />
@@ -280,22 +272,16 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         })()}
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay
-          amountAmulet={activity.transferAmount}
-          amuletPrice={activity.amuletPrice}
-        />
+        <ActivityAmountDisplay amountAmulet={activity.transferAmount} amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell align="right">
         <ActivityRewardDisplay rewards={activity.rewardsCollected} />
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay
-          amountAmulet={activity.feesBurnt}
-          amuletPrice={activity.amuletPrice}
-        />
+        <ActivityAmountDisplay amountAmulet={activity.feesBurnt} amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell align="right">
-        <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={activity.amuletPrice} />
+        <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell>
         <UpdateId updateId={updateIdFromEventId(activity.eventId)} />

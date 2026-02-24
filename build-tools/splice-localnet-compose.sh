@@ -49,7 +49,7 @@ case $ACTION in
             exit 1
         fi
         services_to_log=( canton splice postgres nginx )
-        docker events -f type=container \
+        docker system events -f type=container \
                       -f event=start \
                       -f event=stop \
                       -f event=restart \
@@ -58,7 +58,7 @@ case $ACTION in
                       -f event=destroy \
                       -f event=health_status \
                       -f event=oom \
-                      --format '{{.ID}} {{.Time}} {{.Actor.Attributes.name}} {{.Status}}' | while read -r cid time service_name status; do
+                      --format '{{.Actor.ID}} {{.Time}} {{.Actor.Attributes.name}} {{.Action}}' | while read -r cid time service_name status; do
           if [[ -n "$service_name" ]]; then
               for svc in "${services_to_log[@]}"; do
                   if [[ "$svc" == "$service_name" ]]; then

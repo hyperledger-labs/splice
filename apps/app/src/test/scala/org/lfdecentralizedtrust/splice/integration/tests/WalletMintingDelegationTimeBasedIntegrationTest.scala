@@ -25,13 +25,14 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.store.Limit
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit}
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceWallet_0_1_16
 class WalletMintingDelegationTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
@@ -587,7 +588,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       // Test merge behavior at 2x limit
       def getAmuletCount() = {
         externalPartyWallet.store.multiDomainAcsStore
-          .listContracts(Amulet.COMPANION, Limit.DefaultLimit)
+          .listContracts(Amulet.COMPANION, HardLimit.tryCreate(Limit.DefaultMaxPageSize))
           .futureValue
           .size
       }

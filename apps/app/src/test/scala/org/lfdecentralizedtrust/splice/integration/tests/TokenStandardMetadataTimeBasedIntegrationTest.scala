@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.util.{Codec, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
@@ -18,7 +18,7 @@ import java.time.{Duration, ZoneOffset}
 import java.time.temporal.ChronoUnit
 
 class TokenStandardMetadataTimeBasedIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
+    extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 

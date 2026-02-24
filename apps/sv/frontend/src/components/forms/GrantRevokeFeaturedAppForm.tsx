@@ -9,14 +9,15 @@ import { createProposalActions, getInitialExpiration } from '../../utils/governa
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useAppForm } from '../../hooks/form';
 import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
-import { CommonProposalFormData, SupportedActionTag } from '../../utils/types';
+import { CommonProposalFormData } from '../../utils/types';
 import { ContractId } from '@daml/types';
 import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet';
 import {
   validateEffectiveDate,
   validateExpiration,
   validateExpiryEffectiveDate,
-  validateGrantRevokeFeaturedAppRight,
+  validateRevokeFeaturedAppRight,
+  validatePartyId,
   validateSummary,
   validateUrl,
 } from './formValidators';
@@ -26,6 +27,7 @@ import { useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
+import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -36,17 +38,28 @@ interface ExtraFormField {
 
 export type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormField;
 
+const GRANT_REVOKE_FEATURED_APP_CONFIG = {
+  SRARC_GrantFeaturedAppRight: {
+    idValueFieldTitle: 'Provider',
+    testIdPrefix: 'grant-featured-app',
+    reviewFormKey: 'grant-right' as const,
+  },
+  SRARC_RevokeFeaturedAppRight: {
+    idValueFieldTitle: 'Featured Application Right Contract Id',
+    testIdPrefix: 'revoke-featured-app',
+    reviewFormKey: 'revoke-right' as const,
+  },
+} as const;
+
+export type GrantRevokeFeaturedAppActions = keyof typeof GRANT_REVOKE_FEATURED_APP_CONFIG;
+
 export interface GrantRevokeFeaturedAppFormProps {
   selectedAction: GrantRevokeFeaturedAppActions;
 }
 
-export type GrantRevokeFeaturedAppActions = Extract<
-  SupportedActionTag,
-  'SRARC_GrantFeaturedAppRight' | 'SRARC_RevokeFeaturedAppRight'
->;
-
 export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProps> = props => {
   const { selectedAction } = props;
+  const svAdminClient = useSvAdminClient();
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
@@ -56,21 +69,27 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   // TODO(#1819): use either search params or props and not both.
   const formAction: GrantRevokeFeaturedAppActions =
     (useSearchParams()[0]?.get('action') as GrantRevokeFeaturedAppActions) || selectedAction;
-  const keysMap = {
-    SRARC_GrantFeaturedAppRight: {
-      idValueFieldTitle: 'Provider',
-      testIdPrefix: 'grant-featured-app',
-      reviewFormKey: 'grant-right' as const,
-    },
-    SRARC_RevokeFeaturedAppRight: {
-      idValueFieldTitle: 'Featured Application Right Contract Id',
-      testIdPrefix: 'revoke-featured-app',
-      reviewFormKey: 'revoke-right' as const,
-    },
-  };
 
-  const { idValueFieldTitle, testIdPrefix, reviewFormKey } = keysMap[formAction];
+  const { idValueFieldTitle, testIdPrefix, reviewFormKey } =
+    GRANT_REVOKE_FEATURED_APP_CONFIG[formAction];
   const createProposalAction = createProposalActions.find(a => a.value === formAction);
+
+  const validateIdValue = (value: string) =>
+    formAction === 'SRARC_GrantFeaturedAppRight'
+      ? validatePartyId(value)
+      : validateRevokeFeaturedAppRight(value);
+
+  const validateProviderExists = async (value: string) => {
+    if (formAction !== 'SRARC_GrantFeaturedAppRight') return undefined;
+    if (validatePartyId(value)) return undefined;
+
+    try {
+      await svAdminClient.getPartyToParticipant(value);
+      return undefined;
+    } catch {
+      return 'Provider party not found on ledger';
+    }
+  };
 
   const defaultValues: GrantRevokeFeaturedAppFormData = {
     action: createProposalAction?.name || '',
@@ -89,7 +108,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
 
     onSubmit: async ({ value }) => {
       const actionMap: Record<
-        'SRARC_GrantFeaturedAppRight' | 'SRARC_RevokeFeaturedAppRight',
+        GrantRevokeFeaturedAppActions,
         (idValue: string) => ActionRequiringConfirmation
       > = {
         SRARC_GrantFeaturedAppRight: (idValue: string) => ({
@@ -214,12 +233,19 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
             <form.AppField
               name="idValue"
               validators={{
-                onBlur: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
-                onChange: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
+                onBlur: ({ value }) => validateIdValue(value),
+                onChange: ({ value }) => validateIdValue(value),
+                onChangeAsyncDebounceMs: 500,
+                onChangeAsync: ({ value }) => validateProviderExists(value),
+                onBlurAsync: ({ value }) => validateProviderExists(value),
               }}
             >
               {field => (
-                <field.TextField title={idValueFieldTitle} id={`${testIdPrefix}-idValue`} />
+                <field.TextField
+                  title={idValueFieldTitle}
+                  id={`${testIdPrefix}-idValue`}
+                  subtitle={field.state.meta.isValidating ? 'Validating provider...' : undefined}
+                />
               )}
             </form.AppField>
           </>

@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.sv.config.{
   ScheduledLsuConfig,
@@ -38,7 +38,7 @@ import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
 
 class LogicalSynchronizerUpgradeIntegrationTest
-    extends IntegrationTest
+    extends IntegrationTestWithIsolatedEnvironment
     with ExternallySignedPartyTestUtil
     with ProcessTestUtil
     with SvTestUtil

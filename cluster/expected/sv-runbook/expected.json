@@ -984,6 +984,7 @@
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
         "participantAddress": "participant-3",
+        "permissionedSynchronizer": false,
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
@@ -1259,6 +1260,10 @@
           {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
             "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 /10 * * * ?\"\n                    max-duration = \"5m\"\n                    retention = \"30d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -1290,7 +1295,6 @@
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -1315,6 +1319,11 @@
             "prefix": "mock/sv"
           }
         },
+        "participantPruningSchedule": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
@@ -1328,7 +1337,10 @@
             "memory": "2Gi"
           }
         },
-        "scanAddress": "http://scan-app.sv:5012",
+        "scanClient": {
+          "scanAddress": "http://scan-app.sv:5012",
+          "scanType": "trust-single"
+        },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -1338,6 +1350,10 @@
           "networkName": "Splice"
         },
         "svValidator": true,
+        "synchronizer": {
+          "connectionType": "trust-single",
+          "url": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1350,7 +1366,6 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
-        "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64553aa683015a9687d9cc2e"

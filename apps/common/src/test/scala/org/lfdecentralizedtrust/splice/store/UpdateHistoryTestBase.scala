@@ -31,7 +31,7 @@ import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 
 abstract class UpdateHistoryTestBase
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with HasActorSystem

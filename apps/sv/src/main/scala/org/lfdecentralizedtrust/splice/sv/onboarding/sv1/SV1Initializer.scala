@@ -61,6 +61,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, UnrestrictedOpen}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -74,7 +75,7 @@ import com.digitalasset.canton.time.{
   PositiveFiniteDuration,
   PositiveSeconds,
 }
-import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.{transaction, *}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -83,6 +84,7 @@ import com.digitalasset.canton.topology.store.{
 }
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
+  ParticipantPermission,
   SignedTopologyTransaction,
   TopologyChangeOp,
   TopologyMapping,
@@ -381,10 +383,8 @@ class SV1Initializer(
       _ = dsoAutomation.registerPostOnboardingTriggers()
       _ = dsoAutomation.registerTrafficReconciliationTriggers()
       _ = dsoAutomation.registerPostUnlimitedTrafficTriggers()
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-        dsoAutomation,
-        dsoStore,
-        synchronizerId,
+      _ <- checkIsOnboardedAndInDecentralizedNamespace(
+        dsoStore
       )
       // The previous foundDso step will set the domain node config if DsoRules is not yet bootstrapped.
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
@@ -411,10 +411,8 @@ class SV1Initializer(
     )
   }
 
-  private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-      dsoAutomation: SvDsoAutomationService,
-      dsoStore: SvDsoStore,
-      synchronizerId: SynchronizerId,
+  private def checkIsOnboardedAndInDecentralizedNamespace(
+      dsoStore: SvDsoStore
   )(implicit traceContext: TraceContext) =
     retryProvider
       .ensureThatB(
@@ -426,10 +424,8 @@ class SV1Initializer(
         logger,
       )
       .flatMap { _ =>
-        checkIsInDecentralizedNamespaceAndStartTrigger(
-          dsoAutomation,
-          dsoStore,
-          synchronizerId,
+        checkIsInDecentralizedNamespace(
+          dsoStore
         )
       }
 
@@ -463,6 +459,7 @@ class SV1Initializer(
       PositiveFiniteDuration.tryOfSeconds(
         sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toSeconds
       ),
+      freeConfirmationResponses = config.enableFreeConfirmationResponses,
     )
   }
 
@@ -495,6 +492,12 @@ class SV1Initializer(
             NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
+          onboardingRestriction = if (config.permissionedSynchronizer) {
+            logger.debug("Using RestrictedOpen onboarding restriction for the synchronizer")
+            RestrictedOpen
+          } else {
+            UnrestrictedOpen
+          },
         )
         for {
           physicalSynchronizerId <- retryProvider.ensureThatO(
@@ -511,6 +514,26 @@ class SV1Initializer(
                   NonEmpty.mk(Set, participantId.uid.namespace),
                   threshold = PositiveInt.one,
                 )
+              sv1PermissionTx <-
+                if (config.permissionedSynchronizer) {
+                  logger.debug(
+                    "Proposing ParticipantSynchronizerPermission topology transaction for the SV1"
+                  )
+                  participantAdminConnection
+                    .proposeMapping(
+                      TopologyStoreId.Authorized,
+                      transaction.ParticipantSynchronizerPermission(
+                        synchronizerId,
+                        participantId,
+                        ParticipantPermission.Submission,
+                        None,
+                        None,
+                      ),
+                      serial = PositiveInt.one,
+                      isProposal = false,
+                    )
+                    .map(Some(_))
+                } else Future.successful(None)
               (
                 identityTransactions,
                 synchronizerParametersState,
@@ -552,7 +575,7 @@ class SV1Initializer(
                   synchronizerParametersState,
                   sequencerState,
                   mediatorState,
-                ) ++ identityTransactions).sorted
+                ) ++ sv1PermissionTx.toList ++ identityTransactions).sorted
                   .mapFilter(_.selectOp[TopologyChangeOp.Replace])
                   .map(signed =>
                     StoredTopologyTransaction(
@@ -815,7 +838,8 @@ object SV1Initializer {
           case Code.NamespaceDelegation => 1
           case Code.OwnerToKeyMapping => 2
           case Code.DecentralizedNamespaceDefinition => 3
-          case _ => 4
+          case Code.ParticipantSynchronizerPermission => 4
+          case _ => 5
         }
       }
 

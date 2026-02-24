@@ -66,11 +66,12 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart.{
   InitializeAcsAtLatestOffset,
   InitializeAcsAtOffset,
+  UpdateHistoryInitAtLatestPrunedOffset,
   ResumeAtOffset,
 }
 
 abstract class ScanStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with AmuletTransferUtil {
@@ -691,7 +692,6 @@ abstract class ScanStoreTest
             eventId = s"$i",
             domainId = dummyDomain,
             date = Some(now),
-            provider = user1,
             sender = Some(
               SenderAmount(
                 user1,
@@ -709,7 +709,6 @@ abstract class ScanStoreTest
             balanceChanges = Seq(),
             receivers = Seq(ReceiverAmount(user2, BigDecimal(i), zero)),
             round = round,
-            amuletPrice = BigDecimal(1.0),
           )
         }.toList
         def stripEventIdAndOffset(tx: TransferTxLogEntry) =
@@ -750,7 +749,7 @@ abstract class ScanStoreTest
                 inputValidatorRewardAmount = sender.inputValidatorRewardAmount.toDouble,
                 inputSvRewardAmount = sender.inputSvRewardAmount.fold(0.0)(_.toDouble),
                 balanceChanges = Map(),
-                amuletPrice = tx.amuletPrice.toDouble,
+                amuletPrice = 1.0,
               ),
             )(
               store.multiDomainAcsStore
@@ -1546,7 +1545,7 @@ abstract class ScanStoreTest
     }
   }
 }
-trait AmuletTransferUtil { self: StoreTest =>
+trait AmuletTransferUtil { self: StoreTestBase =>
   def mkInputAmulet() = {
     new splice.amuletrules.transferinput.InputAmulet(
       new splice.amulet.Amulet.ContractId(nextCid())
@@ -1985,6 +1984,7 @@ class DbScanStoreTest
       IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
+      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
       acsStoreDescriptorUserVersion,
       txLogStoreDescriptorUserVersion,
     )(parallelExecutionContext, implicitly, implicitly)
@@ -1992,7 +1992,7 @@ class DbScanStoreTest
     for {
       initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- initializeResult match {
-        case ResumeAtOffset(_) => Future.unit
+        case ResumeAtOffset(_) | UpdateHistoryInitAtLatestPrunedOffset => Future.unit
         case InitializeAcsAtLatestOffset =>
           store.multiDomainAcsStore.testIngestionSink.ingestAcs(
             nextOffset(),

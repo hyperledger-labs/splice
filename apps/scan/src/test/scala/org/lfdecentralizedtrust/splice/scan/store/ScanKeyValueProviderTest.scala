@@ -8,7 +8,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.StoreTest
+import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TimestampWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.scalatest.matchers.should.Matchers
 
@@ -16,22 +16,21 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 class ScanKeyValueProviderTest
-    extends StoreTest
+    extends StoreTestBase
     with Matchers
     with HasExecutionContext
     with SplicePostgresTest {
   "ScanKeyValueProvider" should {
     "set and get acs snapshots timestamps" in {
-      val ts = CantonTimestamp.now()
-      val ts2 = ts.add(1.minute)
-      val migrationId = 7L
+      val ts = TimestampWithMigrationId(CantonTimestamp.now(), 7L)
+      val ts2 = TimestampWithMigrationId(ts.timestamp.add(1.minute), 7L)
       for {
         provider <- mkProvider
-        _ <- provider.setLatestAcsSnapshotsInBulkStorage(migrationId, ts)
-        _ <- provider.setLatestAcsSnapshotsInBulkStorage(migrationId, ts2)
+        _ <- provider.setLatestAcsSnapshotsInBulkStorage(ts)
+        _ <- provider.setLatestAcsSnapshotsInBulkStorage(ts2)
         readBack <- provider.getLatestAcsSnapshotInBulkStorage().value
       } yield {
-        readBack.value shouldBe (migrationId, ts2)
+        readBack.value shouldBe ts2
       }
     }
   }

@@ -278,17 +278,18 @@ class AcsSnapshotStore(
       partyIdsFilter = partyIds match {
         case Nil => sql""
         case partyIds =>
-          (sql" and stakeholder in " ++ inClause(partyIds)).toActionBuilder
+          (sql" and " ++ inClause("stakeholder", partyIds)).toActionBuilder
       }
       templatesFilter = templates match {
         case Nil => sql""
         case _ =>
-          (sql" and template_id in " ++ inClause(
+          (sql" and " ++ inClause(
+            "template_id",
             templates.map(t =>
               lengthLimited(
                 s"${t.packageName}:${t.qualifiedName.moduleName}:${t.qualifiedName.entityName}"
               )
-            )
+            ),
           )).toActionBuilder
       }
       events <- storage

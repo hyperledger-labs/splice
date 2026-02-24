@@ -34,8 +34,6 @@ class ExternalPartyWalletAutomationService(
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean,
-    ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
     scanConnection: BftScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -51,17 +49,13 @@ class ExternalPartyWalletAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin,
       params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =
     ExternalPartyWalletAutomationService
 
-  registerUpdateHistoryIngestion(
-    updateHistory,
-    ingestUpdateHistoryFromParticipantBegin,
-  )
+  registerUpdateHistoryIngestion(updateHistory)
 
   registerTrigger(
     new MintingDelegationCollectRewardsTrigger(

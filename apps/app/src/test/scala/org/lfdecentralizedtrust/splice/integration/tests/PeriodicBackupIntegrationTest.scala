@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.GcpBucket
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
@@ -18,7 +18,8 @@ import org.slf4j.event.Level
 
 import java.nio.file.{Path, Paths}
 
-abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig] extends IntegrationTest {
+abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
+    extends IntegrationTestWithIsolatedEnvironment {
 
   protected val backupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10)
 

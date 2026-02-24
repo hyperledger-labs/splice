@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
   PageLimit,
   StoreErrors,
-  StoreTest,
+  StoreTestBase,
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
@@ -32,10 +32,10 @@ import org.scalatest.Succeeded
 import java.time.Instant
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import StoreTest.*
+import StoreTestBase.*
 
 class AcsSnapshotStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with HasActorSystem
