@@ -1134,8 +1134,6 @@ lazy val `apps-scan` =
         scalapb_runtime_grpc,
         scalapb_runtime,
         zstd,
-        aws_s3,
-        s3mock_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -2002,8 +2000,6 @@ lazy val `apps-app`: Project =
       libraryDependencies +=
         "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
       libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
-      libraryDependencies += aws_s3,
-      libraryDependencies += s3mock_testcontainers,
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,

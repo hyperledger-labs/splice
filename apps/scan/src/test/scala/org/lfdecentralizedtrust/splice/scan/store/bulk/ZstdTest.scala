@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpd
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{HasS3Mock, StoreTestBase, TreeUpdateWithMigrationId}
 
 import java.nio.charset.StandardCharsets
 import java.time.Instant

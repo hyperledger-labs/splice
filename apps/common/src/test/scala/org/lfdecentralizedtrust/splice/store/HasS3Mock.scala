@@ -1,15 +1,13 @@
-package org.lfdecentralizedtrust.splice.scan.store.bulk
+package org.lfdecentralizedtrust.splice.store
 
+import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 import com.digitalasset.canton.{BaseTest, FutureHelpers}
-import com.github.luben.zstd.ZstdInputStream
+import coursierapi.shaded.zstd.ZstdInputStream
 import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
-import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
+import org.lfdecentralizedtrust.splice.config.S3Config
 import org.scalatest.EitherValues
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
-import com.adobe.testing.s3mock.testcontainers.S3MockContainer
-import org.lfdecentralizedtrust.splice.config.S3Config
-import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -79,9 +77,9 @@ trait HasS3Mock extends FutureHelpers with EitherValues with BaseTest {
   }
 
   def readUncompressAndDecode[T](
-                                  s3BucketConnection: S3BucketConnection,
-                                  decoder: String => Either[io.circe.Error, T],
-                                )(s3obj: S3Object)(implicit ec: ExecutionContext, tag: reflect.ClassTag[T]): Array[T] = {
+      s3BucketConnection: S3BucketConnection,
+      decoder: String => Either[io.circe.Error, T],
+  )(s3obj: S3Object)(implicit ec: ExecutionContext, tag: reflect.ClassTag[T]): Array[T] = {
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
     val zis = new ZstdInputStream(new ByteBufInputStream(Unpooled.wrappedBuffer(compressed)))
     val buffer = new Array[Byte](16384)
@@ -108,6 +106,6 @@ trait HasS3Mock extends FutureHelpers with EitherValues with BaseTest {
   }
 }
 
-object CompactJsonScanHttpEncodingsWithFieldLabels {
-  def apply() = new CompactJsonScanHttpEncodings(identity, identity)
-}
+//object CompactJsonScanHttpEncodingsWithFieldLabels {
+//  def apply() = new CompactJsonScanHttpEncodings(identity, identity)
+//}

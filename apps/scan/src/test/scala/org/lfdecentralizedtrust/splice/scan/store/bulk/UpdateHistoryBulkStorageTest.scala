@@ -19,6 +19,7 @@ import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
+import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -161,7 +162,7 @@ class UpdateHistoryBulkStorageTest
             allUpdatesFromS3.length shouldBe segmentUpdates.length
             allUpdatesFromS3
               .map(
-                CompactJsonScanHttpEncodingsWithFieldLabels().httpToLapiUpdate
+                new CompactJsonScanHttpEncodings(identity, identity).httpToLapiUpdate
               ) should contain theSameElementsInOrderAs segmentUpdates
           }
         }
