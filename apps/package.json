@@ -4,7 +4,6 @@
     "common/frontend-test-handlers",
     "common/frontend-test-vite-utils",
     "common/frontend-typeface-termina",
-    "common/frontend-typeface-lato",
     "common/frontend",
     "common/frontend/utils",
     "ans/frontend",

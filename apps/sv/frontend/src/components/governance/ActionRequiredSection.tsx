@@ -205,7 +205,6 @@ const ActionCardSegment: React.FC<ActionCardSegmentProps> = ({
     <Typography
       fontSize={12}
       lineHeight={2}
-      fontFamily="lato"
       fontWeight={700}
       variant="subtitle2"
       color="text.light"
