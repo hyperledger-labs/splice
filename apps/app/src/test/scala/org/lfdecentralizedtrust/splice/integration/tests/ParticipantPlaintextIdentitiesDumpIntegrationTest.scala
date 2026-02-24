@@ -85,8 +85,6 @@ class ParticipantPlaintextIdentitiesIntegrationTest
               c
             }
           }(config),
-        // A short polling interval is required by UpdateHistorySanityCheckPlugin
-        (_, config) => ConfigTransforms.reducePollingInterval(config),
       )
       .withAllocatedUsers()
       .withManualStart
