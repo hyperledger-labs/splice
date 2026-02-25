@@ -157,6 +157,24 @@ final class DbMultiDomainAcsStore[TXE](
 
   def lastIngestedRecordTime: Option[CantonTimestamp] = state.get().lastIngestedRecordTime
 
+  def waitUntilRecordTimeReached(asOf: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    val s = state.get()
+    if (s.lastIngestedRecordTime.exists(_ >= asOf)) Future.unit
+    else
+      retryProvider
+        .waitUnlessShutdown(s.offsetChanged.future)
+        .failOnShutdownTo {
+          io.grpc.Status.UNAVAILABLE
+            .withDescription(
+              s"Aborted waitUntilRecordTimeReached($asOf), as RetryProvider(${retryProvider.loggerFactory.properties}) is shutting down in store $acsStoreDescriptor"
+            )
+            .asRuntimeException()
+        }
+        .flatMap(_ => waitUntilRecordTimeReached(asOf))
+  }
+
   def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
     waitUntilAcsIngested().flatMap(_ => f)
 
@@ -207,21 +225,23 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Option[ContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("lookupContractByIdAsOf")
     waitUntilAcsIngested {
-      storage
-        .querySingle(
-          selectFromAcsTableWithStateAsOf(
-            acsTableName,
-            archiveConfig.archiveTableName,
-            acsStoreId,
-            domainMigrationId,
-            companion,
-            asOf,
-            additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
-          ).headOption,
-          "lookupContractByIdAsOf",
-        )
-        .map(result => contractWithStateFromRow(companion)(result))
-        .value
+      waitUntilRecordTimeReached(asOf).flatMap { _ =>
+        storage
+          .querySingle(
+            selectFromAcsTableWithStateAsOf(
+              acsTableName,
+              archiveConfig.archiveTableName,
+              acsStoreId,
+              domainMigrationId,
+              companion,
+              asOf,
+              additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
+            ).headOption,
+            "lookupContractByIdAsOf",
+          )
+          .map(result => contractWithStateFromRow(companion)(result))
+          .value
+      }
     }
   }
 
@@ -235,24 +255,26 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("listContractsAsOf")
     waitUntilAcsIngested {
-      val templateId = companionClass.typeId(companion)
-      val opName = s"listContractsAsOf:${templateId.getEntityName}"
-      for {
-        result <- storage.query(
-          selectFromAcsTableWithStateAsOf(
-            acsTableName,
-            archiveConfig.archiveTableName,
-            acsStoreId,
-            domainMigrationId,
-            companion,
-            asOf,
-            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
-          ),
-          opName,
-        )
-        limited = applyLimit(opName, limit, result)
-        withState = limited.map(contractWithStateFromRow(companion)(_))
-      } yield withState
+      waitUntilRecordTimeReached(asOf).flatMap { _ =>
+        val templateId = companionClass.typeId(companion)
+        val opName = s"listContractsAsOf:${templateId.getEntityName}"
+        for {
+          result <- storage.query(
+            selectFromAcsTableWithStateAsOf(
+              acsTableName,
+              archiveConfig.archiveTableName,
+              acsStoreId,
+              domainMigrationId,
+              companion,
+              asOf,
+              orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
+            ),
+            opName,
+          )
+          limited = applyLimit(opName, limit, result)
+          withState = limited.map(contractWithStateFromRow(companion)(_))
+        } yield withState
+      }
     }
   }
 
