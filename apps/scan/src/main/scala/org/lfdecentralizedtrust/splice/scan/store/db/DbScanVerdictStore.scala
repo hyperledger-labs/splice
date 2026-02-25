@@ -37,11 +37,11 @@ object DbScanVerdictStore {
   /** Represents a traffic summary.
     *
     * @param totalTrafficCost the total traffic cost
-    * @param envelope the envelopes being summarized
+    * @param envelopeTrafficSummarys the per-envelope traffic summaries
     */
   final case class TrafficSummaryT(
       totalTrafficCost: Long,
-      envelopes: Seq[EnvelopeT],
+      envelopeTrafficSummarys: Seq[EnvelopeT],
       sequencingTime: CantonTimestamp, // not written, used in computations, read from VerdictT
   )
 
@@ -95,7 +95,7 @@ object DbScanVerdictStore {
       logger: TracedLogger,
   )(implicit tc: TraceContext): TrafficSummaryT = {
 
-    val envelopes = proto.envelopes.map { env =>
+    val envelopeTrafficSummarys = proto.envelopes.map { env =>
       val viewIds = env.viewHashes.flatMap { viewHash =>
         viewHashToViewId.get(viewHash) match {
           case Some(viewId) => Some(viewId)
@@ -116,7 +116,7 @@ object DbScanVerdictStore {
     TrafficSummaryT(
       totalTrafficCost = proto.totalTrafficCost,
       sequencingTime = sequencingTime,
-      envelopes = envelopes,
+      envelopeTrafficSummarys = envelopeTrafficSummarys,
     )
   }
 
@@ -382,7 +382,7 @@ class DbScanVerdictStore(
   }
 
   private def sqlInsertVerdictReturningId(rowT: VerdictT) = {
-    val envelopesO = rowT.trafficSummaryO.map(_.envelopes)
+    val envelopesO = rowT.trafficSummaryO.map(_.envelopeTrafficSummarys)
     sql"""
       insert into #${Tables.verdicts}(
         history_id,
@@ -397,7 +397,7 @@ class DbScanVerdictStore(
         submitting_parties,
         transaction_root_views,
         total_traffic_cost,
-        envelopes
+        envelope_traffic_costs
       ) values (
         $historyId,
         ${rowT.migrationId},
@@ -561,7 +561,7 @@ class DbScanVerdictStore(
               submitting_parties,
               transaction_root_views,
               total_traffic_cost,
-              envelopes
+              envelope_traffic_costs
             from #${Tables.verdicts}
             where history_id = $historyId and update_id = $updateId
             limit 1
@@ -616,7 +616,7 @@ class DbScanVerdictStore(
         submitting_parties,
         transaction_root_views,
         total_traffic_cost,
-        envelopes
+        envelope_traffic_costs
       from #${Tables.verdicts}
       where history_id = $historyId and """ ++ afterFilter ++
         sql" order by " ++ orderBy ++ sql" limit $limit)"

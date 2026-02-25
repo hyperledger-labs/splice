@@ -1,14 +1,14 @@
--- Add columns for storing total_traffic_cost and envelopes to the scan_verdict_store table
+-- Add columns for storing total_traffic_cost and envelope traffic cost data to the scan_verdict_store table
 --
 -- This is done as the traffic summary data is treated as extra data attached to
 -- the mediator verdict
--- They are declared null as their addition does not require a hard migration
+-- They are declared null so their addition does not require a hard migration
 alter table scan_verdict_store
     -- Total traffic cost of the message paid by the sender
     add column total_traffic_cost          bigint null,
     -- Envelope data as JSONB array: [{"tc": 123, "vid": [1, 2]}, ...]
     -- where "tc" is the traffic cost and "vid" is an array of view_ids from the verdict
-    add column envelopes                   jsonb null;
+    add column envelope_traffic_costs       jsonb null;
 
 
 -- Stores computed app activity records derived from verdicts and traffic summaries.
@@ -23,7 +23,7 @@ create table app_activity_record_store
     history_id                  bigint not null,
     -- The record_time (= sequencing_time) of the verdict/traffic summary
     record_time                 bigint not null,
-    -- The mining round number that was open at this record_time
+    -- The mining round number to which this activity is assigned
     round_number                bigint not null,
     -- App providers for which app activity should be recorded
     app_provider_parties        text[] not null,
@@ -34,3 +34,8 @@ create table app_activity_record_store
     -- Primary key: (history_id, record_time) uniquely identifies an activity record
     primary key (history_id, record_time)
 );
+
+
+-- Used to compute the per-party totals for a round
+create index app_activity_record_store_round_nr_idx on
+  app_activity_record_store (history_id, round_number);

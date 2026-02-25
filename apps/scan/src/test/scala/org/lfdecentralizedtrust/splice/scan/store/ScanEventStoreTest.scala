@@ -74,11 +74,11 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         val summary = verdict.trafficSummaryO.value
         summary.sequencingTime shouldBe recordTs
         summary.totalTrafficCost shouldBe 100L
-        summary.envelopes.size shouldBe 2
-        summary.envelopes(0).trafficCost shouldBe 60L
-        summary.envelopes(0).viewIds shouldBe Seq(1, 2)
-        summary.envelopes(1).trafficCost shouldBe 40L
-        summary.envelopes(1).viewIds shouldBe Seq(3)
+        summary.envelopeTrafficSummarys.size shouldBe 2
+        summary.envelopeTrafficSummarys(0).trafficCost shouldBe 60L
+        summary.envelopeTrafficSummarys(0).viewIds shouldBe Seq(1, 2)
+        summary.envelopeTrafficSummarys(1).trafficCost shouldBe 40L
+        summary.envelopeTrafficSummarys(1).viewIds shouldBe Seq(3)
       }
     }
 
@@ -1003,7 +1003,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
           TrafficSummaryT(
             sequencingTime = recordTs,
             totalTrafficCost = 100L,
-            envelopes = Seq(
+            envelopeTrafficSummarys = Seq(
               EnvelopeT(trafficCost = 60L, viewIds = Seq(1, 2)),
               EnvelopeT(trafficCost = 40L, viewIds = Seq(3)),
             ),
