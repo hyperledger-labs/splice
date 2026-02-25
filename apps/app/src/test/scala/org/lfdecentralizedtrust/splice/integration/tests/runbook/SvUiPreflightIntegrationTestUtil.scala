@@ -51,7 +51,10 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
 
       actAndCheck("Go to general information tab", eventuallyClickOn(id("navlink-dso")))(
         "button for domain status appears",
-        _ => find(id("information-tab-canton-domain-status")) should not be empty,
+        _ =>
+          find(
+            id("information-tab-canton-domain-status")
+          ) should not be empty withClue "domain status tab",
       )
 
       actAndCheck(

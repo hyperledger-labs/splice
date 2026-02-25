@@ -34,7 +34,10 @@ abstract class ValidatorNonDevNetPreflightIntegrationTestBase
           validatorUserName,
           validatorUserPassword,
           // Notably, we expect that the service user is always already onboarded.
-          () => find(id("wallet-balance-amulet")) should not be empty,
+          () =>
+            find(
+              id("wallet-balance-amulet")
+            ) should not be empty withClue "'Total Available Balance' display",
         )
       }
       clue("Checking that balance is visible") {

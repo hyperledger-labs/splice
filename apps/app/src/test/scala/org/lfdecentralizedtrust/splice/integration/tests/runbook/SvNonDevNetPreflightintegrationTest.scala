@@ -65,7 +65,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
         // if id("ans-entries") is visible, that implies:
         // 1) the logout button is visible
         // 2) the DirectoryInstall has been created (and therefore the request won't be aborted and thus flake)
-        () => find(id("ans-entries")) should not be empty,
+        () => find(id("ans-entries")) should not be empty withClue "ANS Entries",
       )
     }
   }

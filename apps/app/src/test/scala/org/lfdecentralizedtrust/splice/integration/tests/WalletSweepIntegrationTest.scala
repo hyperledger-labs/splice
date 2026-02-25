@@ -114,7 +114,8 @@ abstract class WalletSweepIntegrationTest
                     sv1Balance() shouldBe >(maxBalanceUsd)
                     val txOffers = walletClient.listTransferOffers()
                     txOffers should have size 1 withClue "TransferOffers"
-                    walletClient.listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
+                    walletClient
+                      .listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
                     ccToDollars(
                       txOffers.headOption.value.payload.amount.amount,
                       amuletPrice.bigDecimal,

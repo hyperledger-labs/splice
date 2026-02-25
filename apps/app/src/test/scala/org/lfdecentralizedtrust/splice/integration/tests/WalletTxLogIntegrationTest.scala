@@ -1327,7 +1327,9 @@ class WalletTxLogIntegrationTest
       eventually() {
         val txs = aliceWalletClient.listTransactions(None, pageSize = offerCids.size)
         // mapping to make it readable
-        txs.map(_.eventId) should have size offerCids.size.toLong withClue "alice Transaction event IDs"
+        txs.map(
+          _.eventId
+        ) should have size offerCids.size.toLong withClue "alice Transaction event IDs"
         forAll(txs) {
           case logEntry: NotificationTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.DirectTransferFailed.toProto

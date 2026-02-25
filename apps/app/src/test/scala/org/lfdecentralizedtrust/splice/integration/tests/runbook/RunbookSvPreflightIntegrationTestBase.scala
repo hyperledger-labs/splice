@@ -142,7 +142,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
               val svRewardEntries = txs.filter(_.svRewardsUsed > 0)
-              svRewardEntries should not be empty
+              svRewardEntries should not be empty withClue "SvReward txs"
               svRewardEntries
             },
           )
@@ -163,7 +163,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
               val svRewardEntries = txs.filter(_.svRewardsUsed > 0)
-              svRewardEntries should not be empty
+              svRewardEntries should not be empty withClue "SvReward txs"
               svRewardEntries
             },
           )
