@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
+  S3BucketConnection,
   TimestampWithMigrationId,
   UpdateHistory,
 }

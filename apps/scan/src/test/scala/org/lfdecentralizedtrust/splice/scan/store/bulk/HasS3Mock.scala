@@ -9,6 +9,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 import org.lfdecentralizedtrust.splice.config.S3Config
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer

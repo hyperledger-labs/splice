@@ -19,11 +19,23 @@ import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider, ScanKeyValueStore}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanKeyValueProvider,
+  ScanKeyValueStore,
+}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, Limit, StoreTestBase, TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  HistoryMetrics,
+  Limit,
+  S3BucketConnection,
+  StoreTestBase,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito

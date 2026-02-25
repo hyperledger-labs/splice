@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   HistoryMetrics,
+  S3BucketConnection,
   TimestampWithMigrationId,
   UpdateHistory,
 }

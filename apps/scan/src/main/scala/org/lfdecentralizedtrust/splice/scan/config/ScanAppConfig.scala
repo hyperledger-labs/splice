@@ -4,7 +4,16 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.*
-import org.lfdecentralizedtrust.splice.config.{AutomationConfig, HttpClientConfig, NetworkAppClientConfig, ParticipantClientConfig, S3Config, SpliceBackendConfig, SpliceInstanceNamesConfig, SpliceParametersConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  AutomationConfig,
+  HttpClientConfig,
+  NetworkAppClientConfig,
+  ParticipantClientConfig,
+  S3Config,
+  SpliceBackendConfig,
+  SpliceInstanceNamesConfig,
+  SpliceParametersConfig,
+}
 
 trait BaseScanAppConfig {}
 
