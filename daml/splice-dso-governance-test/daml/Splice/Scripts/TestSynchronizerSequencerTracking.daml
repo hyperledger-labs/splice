@@ -7,7 +7,6 @@ import DA.Assert
 import DA.Foldable (forA_)
 import qualified DA.Map as Map
 import Daml.Script
-import DA.Time
 
 import Splice.CometBft
 import Splice.DSO.DecentralizedSynchronizer
