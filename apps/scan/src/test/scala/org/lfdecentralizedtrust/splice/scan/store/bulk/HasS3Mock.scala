@@ -87,7 +87,3 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     }
   }
 }
-
-object CompactJsonScanHttpEncodingsWithFieldLabels {
-  def apply() = new CompactJsonScanHttpEncodings(identity, identity)
-}
