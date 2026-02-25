@@ -24,7 +24,7 @@ create table scan_tcs_store_active
     -- index columns
     ----------------
 
-    -- the round of the OpenMiningRound/ClosedMiningRound/IssuingMiningRound/SummarizingMiningRound contract
+    -- the round of the OpenMiningRound
     round                       bigint,
 
     -- the provider partyid of a FeaturedAppRight contract
