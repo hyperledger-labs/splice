@@ -10,3 +10,15 @@ final case class S3Config(
     accessKeyId: String,
     secretAccessKey: String,
 )
+object S3Config {
+  def hideConfidential(config: S3Config): S3Config = {
+    val hidden = "****"
+    S3Config(
+      config.endpoint,
+      config.bucketName,
+      config.region,
+      config.accessKeyId,
+      secretAccessKey = hidden,
+    )
+  }
+}
