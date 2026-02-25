@@ -32,18 +32,12 @@
               <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
             </matcher>
             <matcher>
-              <Name>requestlogger_logger</Name>
-              <regex>ApiRequestLogger</regex>
-            </matcher>
-            <matcher>
               <Name>requestlogger_message</Name>
               <regex>StateService/GetConnectedDomains</regex>
             </matcher>
             <expression>
                 level &lt;= INFO &amp;&amp;
-                ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
-                  requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
-                )
+                ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) )
             </expression>
           </evaluator>
           <OnMismatch>NEUTRAL</OnMismatch>
@@ -134,18 +128,12 @@
                       <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
                     </matcher>
                     <matcher>
-                      <Name>requestlogger_logger</Name>
-                      <regex>ApiRequestLogger</regex>
-                    </matcher>
-                    <matcher>
                       <Name>requestlogger_message</Name>
                       <regex>StateService/GetConnectedDomains</regex>
                     </matcher>
                     <expression>
                         level &lt;= INFO &amp;&amp;
-                        ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
-                          requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
-                        )
+                        ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) )
                     </expression>
                   </evaluator>
                   <OnMismatch>NEUTRAL</OnMismatch>
@@ -213,6 +201,7 @@
     </then>
     <else>
       <logger name="com.digitalasset" level="${LOG_LEVEL_CANTON:-INFO}"/>
+      <logger name="com.digitalasset.canton.networking.grpc" level="${LOG_LEVEL_API_REQUEST:-DEBUG}" />
       <logger name="com.daml" level="${LOG_LEVEL_CANTON:-INFO}"/>
       <logger name="org.lfdecentralizedtrust.splice" level="${LOG_LEVEL_CANTON:-INFO}"/>
     </else>
