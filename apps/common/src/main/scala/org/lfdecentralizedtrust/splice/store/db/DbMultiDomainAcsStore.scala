@@ -153,6 +153,8 @@ final class DbMultiDomainAcsStore[TXE](
   // The former is slightly more asynchronous due to RetryProvider/FutureUnlessShutdown.
   def hasFinishedAcsIngestion: Boolean = finishedAcsIngestion.isCompleted
 
+  def lastIngestedRecordTime: Option[CantonTimestamp] = state.get().lastIngestedRecordTime
+
   def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
     waitUntilAcsIngested().flatMap(_ => f)
 
@@ -1334,11 +1336,13 @@ final class DbMultiDomainAcsStore[TXE](
                   .mapValues(trees =>
                     CantonTimestamp.assertFromInstant(trees.last.tree.getRecordTime)
                   )
+                val maxRecordTime = synchronizerIdToRecordTime.values.maxOption
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       lastTree.getOffset,
+                      maxRecordTime,
                     )
                   )
                   .signalOffsetChanged(lastTree.getOffset)
@@ -1366,6 +1370,7 @@ final class DbMultiDomainAcsStore[TXE](
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       reassignment.offset,
+                      Some(reassignment.recordTime),
                     )
                   )
                   .signalOffsetChanged(reassignment.offset)
@@ -2266,6 +2271,7 @@ object DbMultiDomainAcsStore {
       acsSize: Int,
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
+      lastIngestedRecordTime: Option[CantonTimestamp],
   ) {
     def withInitialState(
         acsStoreId: AcsStoreId,
@@ -2289,7 +2295,11 @@ object DbMultiDomainAcsStore {
       )
     }
 
-    def withUpdate(newAcsSize: Int, newOffset: Long): State = {
+    def withUpdate(
+        newAcsSize: Int,
+        newOffset: Long,
+        recordTime: Option[CantonTimestamp] = None,
+    ): State = {
       val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
       this.copy(
         acsSize = newAcsSize,
@@ -2298,6 +2308,9 @@ object DbMultiDomainAcsStore {
         offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
           offsetToSignal > newOffset
         },
+        lastIngestedRecordTime = recordTime
+          .map(rt => lastIngestedRecordTime.fold(rt)(_.max(rt)))
+          .orElse(lastIngestedRecordTime),
       )
     }
 
@@ -2340,6 +2353,7 @@ object DbMultiDomainAcsStore {
       acsSize = 0,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
+      lastIngestedRecordTime = None,
     )
   }
 
