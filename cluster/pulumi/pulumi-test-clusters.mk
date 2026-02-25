@@ -12,12 +12,15 @@ $(dir)/test.json: $(dir $(dir)).build
 		env -i PATH="$$PATH" HOME="$$HOME" SPLICE_ROOT="$$SPLICE_ROOT" GCP_CLUSTER_BASENAME="mock" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" DEPLOYMENT_DIR="$$DEPLOYMENT_DIR" PRIVATE_CONFIGS_PATH="$$PRIVATE_CONFIGS_PATH" PUBLIC_CONFIGS_PATH="$$PUBLIC_CONFIGS_PATH" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
+cluster/expected/$(notdir $(dir)):
+	mkdir -p $@
+
 .PHONY: $(dir)/update-expected
-$(dir)/update-expected: $(dir)/test.json
+$(dir)/update-expected: $(dir)/test.json | cluster/expected/$(notdir $(dir))
 	@cp -v $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected.json
 
 .PHONY: $(dir)/test-config
-$(dir)/test-config: $(dir)/test.json $(EXPECTED_FILES_DIR)/$(notdir $(dir))/expected.json
+$(dir)/test-config: $(dir)/test.json | cluster/expected/$(notdir $(dir))
 	diff -u $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected.json $(@D)/test.json; \
 	EXIT=$$?; \
 	cp $(@D)/test.json $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected.json; \
