@@ -31,7 +31,6 @@ const ProjectFilterSchema = z.union([
   // the name of the actual Pulumi project is used.
   z.literal('validator-runbook'),
   z.literal('validator1'),
-  z.literal('sv'),
 ]);
 
 export type ProjectFilter = z.infer<typeof ProjectFilterSchema>;

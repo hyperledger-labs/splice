@@ -1,4 +1,0 @@
----
-name: sv
-description: 'Provision an SV excluding the logical synchronizer'
-runtime: nodejs

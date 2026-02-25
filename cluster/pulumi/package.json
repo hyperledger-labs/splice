@@ -51,8 +51,7 @@
         "splitwell",
         "circleci",
         "gha",
-        "policies",
-        "sv"
+        "policies"
     ],
     "dependencies": {
         "@google-cloud/sql": "^0.20.1",
