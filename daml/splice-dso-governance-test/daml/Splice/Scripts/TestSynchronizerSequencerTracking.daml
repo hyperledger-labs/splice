@@ -5,7 +5,6 @@ module Splice.Scripts.TestSynchronizerSequencerTracking where
 
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
 
