@@ -12,7 +12,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
-import slick.jdbc.PostgresProfile
+import slick.jdbc.{GetResult, PostgresProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.dbio.DBIO
 
@@ -61,6 +61,34 @@ class DbAppActivityRecordStore(
   }
 
   type AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
+
+  private implicit val getResultAppActivityRecord: GetResult[AppActivityRecordT] = GetResult {
+    prs =>
+      DbAppActivityRecordStore.AppActivityRecordT(
+        recordTime = prs.<<[CantonTimestamp],
+        roundNumber = prs.<<[Long],
+        appProviderParties = stringArrayGetResult(prs).toSeq,
+        appActivityWeights = longArrayGetResult(prs).toSeq,
+      )
+  }
+
+  def getRecordByRecordTime(recordTime: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Option[AppActivityRecordT]] = {
+    futureUnlessShutdownToFuture(
+      storage
+        .querySingle(
+          sql"""
+            select record_time, round_number, app_provider_parties, app_activity_weights
+            from #${Tables.appActivityRecords}
+            where history_id = $historyId and record_time = $recordTime
+            limit 1
+          """.as[AppActivityRecordT].headOption,
+          "appActivity.getRecordByRecordTime",
+        )
+        .value
+    )
+  }
 
   /** Batch insert app activity records using multi-row INSERT. */
   private def batchInsertAppActivityRecords(items: Seq[AppActivityRecordT]) = {
