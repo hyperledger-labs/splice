@@ -65,8 +65,7 @@ class ScanTxLogOwnerExpireLockIntegrationTest
         .submitJava(
           Seq(aliceParty),
           commands = locked.contract.contractId
-            .exerciseLockedAmulet_OwnerExpireLock(
-              openRound.contractId
+            .exerciseLockedAmulet_OwnerExpireLockV2(
             )
             .commands()
             .asScala

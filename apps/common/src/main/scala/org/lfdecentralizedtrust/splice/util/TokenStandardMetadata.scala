@@ -7,4 +7,5 @@ object TokenStandardMetadata {
   val splicePrefix = "splice.lfdecentralizedtrust.org"
 
   val reasonMetaKey = s"$splicePrefix/reason"
+  val senderMetaKey = s"$splicePrefix/sender"
 }

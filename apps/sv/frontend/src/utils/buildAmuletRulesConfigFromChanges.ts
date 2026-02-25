@@ -84,12 +84,16 @@ export function buildAmuletRulesConfigFromChanges(
   const initialOptDevelopmentFundPercentage = getValue(
     'issuanceCurveInitialValueOptDevelopmentFundPercentage'
   );
+  const externalPartyConfigStateTickDuration = getValue('externalPartyConfigStateTickDuration');
   const amuletConfig: AmuletConfig<'USD'> = {
     tickDuration: { microseconds: getValue('tickDuration') },
     transferPreapprovalFee: transferPreapprovalFee === '' ? null : transferPreapprovalFee,
     featuredAppActivityMarkerAmount: getValue('featuredAppActivityMarkerAmount'),
     optDevelopmentFundManager: optDevelopmentFundManager === '' ? null : optDevelopmentFundManager,
-
+    externalPartyConfigStateTickDuration:
+      externalPartyConfigStateTickDuration === ''
+        ? null
+        : { microseconds: externalPartyConfigStateTickDuration },
     transferConfig: {
       createFee: { fee: getValue('transferConfigCreateFee') },
       holdingFee: { rate: getValue('transferConfigHoldingFeeRate') },

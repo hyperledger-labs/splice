@@ -6,7 +6,10 @@ import org.lfdecentralizedtrust.splice.automation.{Trigger, UpdateIngestionServi
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition.sv1Backend
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  UpdateExternalPartyConfigStateTrigger,
+}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
@@ -28,11 +31,23 @@ trait TriggerTestUtil { self: BaseTest =>
     sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 
+  private def updateExternalPartyConfigStateTrigger(implicit env: SpliceTestConsoleEnvironment) =
+    sv1Backend.dsoDelegateBasedAutomation
+      .trigger[UpdateExternalPartyConfigStateTrigger]
+
   def advanceRoundsByOneTickViaAutomation(
       timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     eventually(timeUntilSuccess) {
       advanceOpenMiningRoundTrigger.runOnce().futureValue should be(true)
+    }
+  }
+
+  def updateExternalPartyConfigStatesViaAutomation(
+      timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    eventually(timeUntilSuccess) {
+      updateExternalPartyConfigStateTrigger.runOnce().futureValue should be(true)
     }
   }
 

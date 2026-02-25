@@ -12,6 +12,7 @@ import Splice.Amulet
 import Splice.Scripts.Util
 import Splice.ValidatorLicense
 import Splice.Util
+import Splice.Testing.Registries.AmuletRegistry (getActiveOpenRoundsSorted)
 
 test_ValidatorFaucet: Script ()
 test_ValidatorFaucet = do
@@ -34,7 +35,7 @@ test_ValidatorFaucet = do
           [(_, amulet)] <- query @Amulet aliceValidator.primaryParty
           require ("alice's validator has >= " <> show amount <> " amulet") (amulet.amount.initialAmount >= amount)
 
-    [round0, round1, _round2] <- getActiveOpenRoundsSorted app
+    [round0, round1, _round2] <- getActiveOpenRoundsSorted app.dso
 
     -- round0 can be received
     passTime (hours 1)
@@ -79,7 +80,7 @@ test_ValidatorFaucet = do
     -------------------
 
     -- get the new active rounds
-    [round2, round3, _] <- getActiveOpenRoundsSorted app
+    [round2, round3, _] <- getActiveOpenRoundsSorted app.dso
 
     -- skip one day
     passTime (days 1)
