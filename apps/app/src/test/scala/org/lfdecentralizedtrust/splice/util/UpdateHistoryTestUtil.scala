@@ -175,7 +175,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     recordedExtTxnHashes should not be empty
     recordedExtTxnHashes should contain allElementsOf extTxnHashes
 
-    actualUpdates.zip(recordedUpdates).foreach { case (actual, recorded) =>
+    forAll(actualUpdates.zip(recordedUpdates)) { case (actual, recorded) =>
       compareExtTxnHashPerUpdate(actual, recorded)
     }
     succeed

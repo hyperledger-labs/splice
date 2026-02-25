@@ -48,10 +48,7 @@ class TokenStandardCliIntegrationTest
       val (bobPublicKeyPath, bobPrivateKeyPath) =
         writeKeysToTempFile("bob", bobPublicKey, bobPrivateKey)
 
-      var extTxnHashes: Seq[String] = Seq.empty[String]
-
       aliceValidatorWalletClient.tap(5000.0)
-
       // only alice will have a transfer preapproval
       aliceValidatorBackend.participantClient.parties
         .hosted(filterParty = onboardingAlice.party.filterString) should not be empty
@@ -61,8 +58,6 @@ class TokenStandardCliIntegrationTest
         onboardingAlice,
         verboseHashing = true,
       )
-
-      extTxnHashes = extTxnHashes :+ onboardingAliceExternalTxnHash
 
       eventually() {
         aliceValidatorBackend.lookupTransferPreapprovalByParty(
@@ -193,8 +188,6 @@ class TokenStandardCliIntegrationTest
           verboseHashing = true,
         )
 
-      extTxnHashes = extTxnHashes :+ onboardingBobExternalTxnHash
-
       clue("Bob's balance has been updated") {
         eventually() {
           aliceValidatorBackend
@@ -218,7 +211,7 @@ class TokenStandardCliIntegrationTest
             sv1ScanBackend.appState.automation.updateHistory,
             sv1LedgerBeginOffset,
             mustCheckExternalTxnHash = true,
-            extTxnHashes = extTxnHashes,
+            extTxnHashes = Seq(onboardingAliceExternalTxnHash, onboardingBobExternalTxnHash),
           )
         }
       }

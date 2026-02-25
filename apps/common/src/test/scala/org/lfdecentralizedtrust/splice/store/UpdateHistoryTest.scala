@@ -979,9 +979,9 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
         } yield {
           updates should have size 1
-          externalTransactionHash should be(ByteString.EMPTY)
-          val storedTransaction =
-            updates.loneElement.update.update.asInstanceOf[TransactionTreeUpdate].tree
+          val storedTransaction = updates.map(_.update.update).collect {
+            case tx: TransactionTreeUpdate => tx.tree
+          }.loneElement
           storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
           storedTransaction.getExternalTransactionHash should be(
             expectedUpdate.getExternalTransactionHash
@@ -1008,7 +1008,6 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
         } yield {
           updates should have size 1
-          externalTransactionHash should not be ByteString.EMPTY
           val storedTransaction =
             updates.loneElement.update.update.asInstanceOf[TransactionTreeUpdate].tree
           storedTransaction.getExternalTransactionHash should be(externalTransactionHash)

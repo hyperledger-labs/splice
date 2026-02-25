@@ -339,6 +339,9 @@ trait AcsJdbcTypes {
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
 
+  protected def lengthLimitedByteString(bs: ByteString, maxLength: Int = 1024): ByteString =
+    if (bs.size() > maxLength) bs.substring(0, maxLength) else bs
+
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],
       createdEvent: CreatedEvent,
