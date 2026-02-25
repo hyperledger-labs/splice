@@ -40,6 +40,8 @@ import Splice.CometBft()
 import Splice.AmuletTransferInstruction
 import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.MetadataV1
+import qualified DA.TextMap as TextMap
+import Splice.Amulet.TokenApiUtils (expireLockKey, ToAnyValue(toAnyValue))
 
 
 -- Types
@@ -1138,7 +1140,8 @@ template DsoRules with
           extraActors = []
           extraArgs = ExtraArgs with
             meta = emptyMetadata
-            context = emptyChoiceContext
+            context = ChoiceContext with
+              values = TextMap.fromList [(expireLockKey, toAnyValue True)]
 
         return DsoRules_Amulet_ExpireTransferInstructionResult with
           transferInstructionResult = result

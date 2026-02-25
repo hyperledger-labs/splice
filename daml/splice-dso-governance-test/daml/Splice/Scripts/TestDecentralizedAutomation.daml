@@ -35,6 +35,7 @@ import Splice.Api.Token.HoldingV1 (InstrumentId(..))
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.MetadataV1
 import Splice.Testing.Utils
+import Splice.AmuletTransferInstruction
 
 
 testUnclaimedRewardsMerging : Script ()
@@ -515,7 +516,7 @@ testTransferPreapprovalExpiry = do
 
 testExpireAmuletTransferInstruction : Script ()
 testExpireAmuletTransferInstruction = do
-  (app, _, (_, _, _, _)) <- initDevNet
+  (app, _, (sv1, _, _, _)) <- initDevNet
   sender <- setupUser app "sender" app.dso
   amuletCid <- tap app sender 100.0
   let registry = AmuletRegistry.AmuletRegistry
@@ -548,7 +549,18 @@ testExpireAmuletTransferInstruction = do
   passTime (hours 2)
 
   -- TODO: exercise DsoRules_TransferInstruction_Expire
+ 
+  [(instrCid, _)] <- query @AmuletTransferInstruction app.dso
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstruction with
+    amuletTransferInstructionCid = instrCid
+    sv = Some sv1
 
+  instructions <- query @AmuletTransferInstruction app.dso
+  instructions === [] 
+
+  senderAmulets <- query @Amulet sender.primaryParty
+  assertMsg "Sender should have their amulets back" (not $ null senderAmulets) 
 
   pure ()
