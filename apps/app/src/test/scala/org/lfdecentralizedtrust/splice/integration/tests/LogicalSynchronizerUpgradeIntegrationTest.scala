@@ -4,7 +4,7 @@ import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeInt}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
@@ -18,9 +18,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
+import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
+import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.lfdecentralizedtrust.splice.sv.config.{
   ScheduledLsuConfig,
   SvSynchronizerNodeConfig,
@@ -45,6 +47,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     with WalletTestUtil
     with StandaloneCanton
     with HasExecutionContext
+    with SynchronizerFeesTestUtil
     with TryValues {
 
   override protected def runEventHistorySanityCheck: Boolean = false
@@ -60,8 +63,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
   override lazy val skipAcsSnapshotChecks = true
 
   lazy val scheduledLsu = ScheduledLsuConfig(
-    Instant.now().plusSeconds(150).truncatedTo(ChronoUnit.SECONDS),
-    Instant.now().plusSeconds(180).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(250).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(450).truncatedTo(ChronoUnit.SECONDS),
     NonNegativeInt.one,
     ProtocolVersion.v34,
   )
@@ -211,7 +214,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     )() {
 
       clue(s"wait for lsu announcement") {
-        eventually(timeUntilSuccess = 2.minutes) {
+        eventually(timeUntilSuccess = 5.minutes) {
           sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
             .list(
               Some(Synchronizer(decentralizedSynchronizerId))
@@ -347,6 +350,46 @@ class LogicalSynchronizerUpgradeIntegrationTest
         )
       }
       // new sync nodes are started in process so to avoid log noise we stop everything before the test ends
+      clue("Alice can purchase traffic") {
+        val aliceParty = aliceValidatorBackend.getValidatorPartyId()
+        val aliceParticipant = aliceValidatorBackend.participantClient.id.toProtoPrimitive
+        val trackingId = java.util.UUID.randomUUID.toString
+        val trafficPurchaseAmount = 1000000L
+        val trafficStateBefore = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
+        clue("Alice creates traffic request") {
+          createBuyTrafficRequest(
+            aliceValidatorBackend,
+            aliceParty,
+            aliceParticipant,
+            trafficPurchaseAmount,
+            trackingId,
+          )
+        }
+        clue("Traffic request is ingested into wallet tx log") {
+          eventuallySucceeds() {
+            aliceValidatorWalletClient.getTrafficRequestStatus(trackingId)
+          }
+        }
+        clue("Wallet automation completes the request") {
+          eventually() {
+            inside(aliceValidatorWalletClient.getTrafficRequestStatus(trackingId)) {
+              case definitions.GetBuyTrafficRequestStatusResponse.members
+                    .BuyTrafficRequestCompletedResponse(
+                      definitions.BuyTrafficRequestCompletedResponse(status, _)
+                    ) =>
+                status shouldBe BuyTrafficRequestStatus.Completed
+            }
+          }
+        }
+        clue("Sequencer updates traffic state") {
+          eventually() {
+            val trafficStateAfter = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
+            trafficStateAfter.extraTrafficPurchased shouldBe trafficStateBefore.extraTrafficPurchased + NonNegativeLong
+              .tryCreate(trafficPurchaseAmount)
+          }
+        }
+      }
+
       stopAllAsync(aliceValidatorBackend).futureValue
       aliceValidatorBackend.participantClientWithAdminToken.synchronizers.disconnect_all()
       stopAllAsync(allNodes*).futureValue
