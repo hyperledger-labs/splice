@@ -979,9 +979,12 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
         } yield {
           updates should have size 1
-          val storedTransaction = updates.map(_.update.update).collect {
-            case tx: TransactionTreeUpdate => tx.tree
-          }.loneElement
+          val storedTransaction = updates
+            .map(_.update.update)
+            .collect { case tx: TransactionTreeUpdate =>
+              tx.tree
+            }
+            .loneElement
           storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
           storedTransaction.getExternalTransactionHash should be(
             expectedUpdate.getExternalTransactionHash

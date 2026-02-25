@@ -99,13 +99,38 @@ trait UpdateHistoryTestUtil extends TestCommon {
       }
   }
 
+  def compareHistoryIncludingHashes(
+      participant: ParticipantClientReference,
+      updateHistory: UpdateHistory,
+      ledgerBegin: Long,
+      mustIncludeReassignments: Boolean = false,
+      extTxnHashes: Seq[String] = Seq.empty,
+  ): Assertion = {
+    compareHistory(participant, updateHistory, ledgerBegin, mustIncludeReassignments)
+    val actualUpdates = {
+      updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
+    }
+    val recordedUpdates = updateHistory
+      .getAllUpdates(
+        Some(
+          (
+            0L,
+            // The after0 argument to getUpdates() is exclusive, so we need to subtract a small value
+            // to include the first element
+            actualUpdates.head.update.recordTime.addMicros(-1L),
+          )
+        ),
+        PageLimit.tryCreate(actualUpdates.size),
+      )
+      .futureValue
+    compareExternalTxnHashes(actualUpdates, recordedUpdates.map(_.update), extTxnHashes)
+  }
+
   def compareHistory(
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
       ledgerBegin: Long,
       mustIncludeReassignments: Boolean = false,
-      mustCheckExternalTxnHash: Boolean = false,
-      extTxnHashes: Seq[String] = Seq.empty,
   ): Assertion = {
     val actualUpdates = {
       updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
@@ -147,10 +172,6 @@ trait UpdateHistoryTestUtil extends TestCommon {
     actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
       case (actual, recorded) =>
         actual shouldBe recorded
-    }
-
-    if (mustCheckExternalTxnHash) {
-      compareExternalTxnHashes(actualUpdates, recordedUpdates.map(_.update), extTxnHashes)
     }
     succeed
   }

@@ -206,11 +206,10 @@ class TokenStandardCliIntegrationTest
 
       clue("SV1 scan backend should see the updates with external txn hashes") {
         eventually() {
-          compareHistory(
+          compareHistoryIncludingHashes(
             sv1Backend.participantClient,
             sv1ScanBackend.appState.automation.updateHistory,
             sv1LedgerBeginOffset,
-            mustCheckExternalTxnHash = true,
             extTxnHashes = Seq(onboardingAliceExternalTxnHash, onboardingBobExternalTxnHash),
           )
         }
