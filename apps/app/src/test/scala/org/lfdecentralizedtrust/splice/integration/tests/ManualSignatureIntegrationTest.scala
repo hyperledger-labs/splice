@@ -44,7 +44,7 @@ class ManualSignatureIntegrationTest
         .map(_.id)
         .distinct
       val signatures = otksForNs.flatMap(_.context.signedBy).distinct
-      latestKeys.diff(signatures) shouldBe empty
+      latestKeys.diff(signatures) shouldBe empty withClue "keys without signatures"
     }
 
     "rotate SV' OTK mapping keys that are not signed." in { implicit env =>

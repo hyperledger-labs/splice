@@ -212,7 +212,7 @@ class ParticipantKmsIdentitiesEnterpriseIntegrationTest
     }
     clue("keys are correctly registered") {
       val keys = participant.keys.secret.list()
-      keys should have size dump.keys.size.toLong
+      keys should have size dump.keys.size.toLong withClue "participant keys"
 
       def checkKmsKeyId(keyName: String) = {
         val key = keys.find(_.name.exists(_.unwrap == keyName)).value
