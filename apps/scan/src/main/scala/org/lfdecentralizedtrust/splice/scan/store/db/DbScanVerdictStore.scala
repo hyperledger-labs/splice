@@ -559,7 +559,9 @@ class DbScanVerdictStore(
               mediator_group,
               update_id,
               submitting_parties,
-              transaction_root_views
+              transaction_root_views,
+              total_traffic_cost,
+              envelopes
             from #${Tables.verdicts}
             where history_id = $historyId and update_id = $updateId
             limit 1
@@ -612,7 +614,9 @@ class DbScanVerdictStore(
         mediator_group,
         update_id,
         submitting_parties,
-        transaction_root_views
+        transaction_root_views,
+        total_traffic_cost,
+        envelopes
       from #${Tables.verdicts}
       where history_id = $historyId and """ ++ afterFilter ++
         sql" order by " ++ orderBy ++ sql" limit $limit)"
