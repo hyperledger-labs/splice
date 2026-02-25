@@ -56,7 +56,7 @@ class SplitwellIntegrationTest
               .filterJava(splitwellCodegen.GroupRequest.COMPANION)(
                 aliceUserParty,
                 (request: splitwellCodegen.GroupRequest.Contract) => request.id == groupRequest,
-              ) shouldBe empty
+              ) shouldBe empty withClue "GroupRequest group1"
           }
         }
 
@@ -76,7 +76,7 @@ class SplitwellIntegrationTest
         val groups =
           aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
             .filterJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
-        groups should have size 1
+        groups should have size 1 withClue "alice Groups"
     }
 
     "use its own app domain" in { implicit env =>
@@ -138,7 +138,7 @@ class SplitwellIntegrationTest
       createSplitwellInstalls(aliceSplitwellClient, alice)
       actAndCheck("alice creates group1", aliceSplitwellClient.requestGroup("group1"))(
         "alice observes group",
-        _ => aliceSplitwellClient.listGroups() should have size 1,
+        _ => aliceSplitwellClient.listGroups() should have size 1 withClue "alice Groups",
       )
       try {
         splitwellBackend.participantClient.synchronizers
@@ -150,7 +150,7 @@ class SplitwellIntegrationTest
       }
       actAndCheck("alice creates group2", aliceSplitwellClient.requestGroup("group2"))(
         "alice observes group",
-        _ => aliceSplitwellClient.listGroups() should have size 2,
+        _ => aliceSplitwellClient.listGroups() should have size 2 withClue "alice Groups",
       )
     }
 
@@ -179,7 +179,7 @@ class SplitwellIntegrationTest
       aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
         .filterJava(splitwellCodegen.TransferInProgress.COMPANION)(
           aliceUserParty
-        ) should have size 1
+        ) should have size 1 withClue "alice TransferInProgress"
 
       actAndCheck(
         "alice reject payment request",
@@ -190,7 +190,7 @@ class SplitwellIntegrationTest
           aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
             .filterJava(splitwellCodegen.TransferInProgress.COMPANION)(
               aliceUserParty
-            ) should have size 0,
+            ) should have size 0 withClue "alice TransferInProgress",
       )
     }
 
@@ -214,17 +214,21 @@ class SplitwellIntegrationTest
       )
 
       eventually() {
-        bobSplitwellClient.listBalanceUpdates(key) should have size 2
+        bobSplitwellClient.listBalanceUpdates(key) should have size 2 withClue "bob BalanceUpdates"
       }
       bobSplitwellClient.listBalances(key) shouldBe Seq(aliceUserParty -> -1100).toMap
 
-      aliceSplitwellClient.listBalanceUpdates(key) should have size 2
+      aliceSplitwellClient.listBalanceUpdates(
+        key
+      ) should have size 2 withClue "alice BalanceUpdates"
       aliceSplitwellClient.listBalances(key) shouldBe Seq(bobUserParty -> 1100).toMap
 
       charlieSplitwellClient.acceptInvite(invite)
 
       eventually() {
-        aliceSplitwellClient.listAcceptedGroupInvites("group1") should have size 1
+        aliceSplitwellClient.listAcceptedGroupInvites(
+          "group1"
+        ) should have size 1 withClue "group1 AcceptedGroupInvites"
       }
       inside(aliceSplitwellClient.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
         aliceSplitwellClient.joinGroup(accepted.contractId)
@@ -245,7 +249,11 @@ class SplitwellIntegrationTest
         )
       }
 
-      eventually()(aliceSplitwellClient.listBalanceUpdates(key) should have size 3)
+      eventually()(
+        aliceSplitwellClient.listBalanceUpdates(
+          key
+        ) should have size 3 withClue "alice BalanceUpdates"
+      )
       aliceSplitwellClient.listBalances(key) shouldBe Map(
         bobUserParty -> 1100,
         charlieUserParty -> -1100,
@@ -310,11 +318,16 @@ class SplitwellIntegrationTest
           triggersToResumeAtStart = Seq(),
         ) {
           bobWalletClient.acceptAppPaymentRequest(request.contractId)
-          eventually()(bobWalletClient.listAppPaymentRequests() shouldBe empty)
+          eventually()(
+            bobWalletClient
+              .listAppPaymentRequests() shouldBe empty withClue "bob AppPaymentRequests"
+          )
         }
       }
       eventually() {
-        aliceSplitwellClient.listBalanceUpdates(key) should have size 2
+        aliceSplitwellClient.listBalanceUpdates(
+          key
+        ) should have size 2 withClue "alice BalanceUpdates"
       }
       aliceSplitwellClient.listBalances(key) shouldBe Seq(bobUserParty -> 0).toMap
     }

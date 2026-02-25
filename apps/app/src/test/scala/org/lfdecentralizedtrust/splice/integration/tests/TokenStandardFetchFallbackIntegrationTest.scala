@@ -51,7 +51,7 @@ class TokenStandardFetchFallbackIntegrationTest
             "Alice and Bob see it",
             _ => {
               Seq(aliceWalletClient, bobWalletClient).foreach(
-                _.listTokenStandardTransfers() should have size 1
+                _.listTokenStandardTransfers() should have size 1 withClue "TokenStandardTransfers"
               )
             },
           )._1

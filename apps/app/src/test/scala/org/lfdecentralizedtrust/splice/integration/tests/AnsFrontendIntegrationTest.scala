@@ -26,7 +26,8 @@ class AnsFrontendIntegrationTest
       val entryName = s"mycool_entry.unverified.$ansAcronym"
       val entryNameWithoutSufffix = "mycool_entry"
 
-      aliceWalletClient.listSubscriptionRequests() shouldBe empty
+      aliceWalletClient
+        .listSubscriptionRequests() shouldBe empty withClue "alice SubscriptionRequests"
 
       withFrontEnd("alice") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
@@ -61,7 +62,8 @@ class AnsFrontendIntegrationTest
       val suffix = s".unverified.$ansAcronym"
       val entryNameJustReachesLimit = "a" * (60 - suffix.length) + suffix
 
-      aliceWalletClient.listSubscriptionRequests() shouldBe empty
+      aliceWalletClient
+        .listSubscriptionRequests() shouldBe empty withClue "alice SubscriptionRequests"
 
       withFrontEnd("alice") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
