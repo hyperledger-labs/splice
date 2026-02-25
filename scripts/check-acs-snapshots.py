@@ -47,6 +47,7 @@ console.print(f"Trusted scan URL: [cyan]{trusted_scan}[/cyan]")
 console.print(f"All pages: [cyan]{all_pages}[/cyan]")
 console.print(separator)
 
+console.print("")
 console.print("Fetching list of all scans...")
 console.print(separator)
 dso = requests.get(f"{trusted_scan}/api/scan/v0/dso").json()
@@ -98,7 +99,6 @@ console.print("")
 console.print("Checking import updates...")
 console.print(separator)
 def fetch_import_updates(url, task_id, progress):
-    import_updates=set()
     import_update_ids=set()
     next_page_token=""
     try:
@@ -127,12 +127,10 @@ def fetch_import_updates(url, task_id, progress):
 
             if result.status_code == 200:
                 j=result.json()
-                new_transactions=[json.dumps(t) for t in j["transactions"]]
                 new_transactions_ids=[t["update_id"] for t in j["transactions"]]
-                if len(new_transactions) > 0:
-                    import_updates.update(new_transactions)
+                if len(new_transactions_ids) > 0:
                     import_update_ids.update(new_transactions_ids)
-                    progress.update(task_id, advance=len(new_transactions), count=len(import_updates))
+                    progress.update(task_id, advance=len(new_transactions_ids), count=len(import_update_ids))
                     if all_pages:
                         next_page_token = j["transactions"][-1]["update_id"]
                     else:
@@ -142,14 +140,13 @@ def fetch_import_updates(url, task_id, progress):
             else:
                 break
         progress.update(task_id, status=f"[green]Done")
-        return url, import_updates, import_update_ids
+        return url, import_update_ids
     except Exception as e:
         console.print_exception() # Prints a VERY fancy stack trace of the last exception
         progress.update(task_id, status=f"[red]Error")
         return url, None, None
 
 
-import_updates={}
 import_update_ids={}
 with Progress(
     TextColumn("[progress.description]{task.description}"),
@@ -176,20 +173,19 @@ with Progress(
             tasks[url] = task_id
             futures.append(executor.submit(fetch_import_updates, url, task_id, progress))
         for future in as_completed(futures):
-            url, updates, update_ids = future.result()
-            import_updates[url] = updates
+            url, update_ids = future.result()
             import_update_ids[url] = update_ids
 
 console.print("")
-console.print("Trusted response (examples):")
-if import_updates[trusted_scan] is not None:
-    for item in list(import_updates[trusted_scan])[:num_examples]:
-        console.print_json(item)
+console.print("Trusted response (example contract ids):")
+if import_update_ids[trusted_scan] is not None:
+    for item in list(import_update_ids[trusted_scan])[:num_examples]:
+        console.print(item)
 else:
     console.print(f"{trusted_scan} failed to fetch import updates!")
 
 console.print("")
-console.print("Other responses (update ids only):")
+console.print("Other responses:")
 for url in [url for url in import_update_ids if url != trusted_scan]:
     if import_update_ids[url] is None:
         console.print(f"✖ {url} failed to fetch import updates!")
@@ -211,32 +207,6 @@ for url in [url for url in import_update_ids if url != trusted_scan]:
             console.print(f"  Examples:")
             for item in list(diff2)[:num_examples]:
                 console.print(item)
-    else:
-        console.print(f"✔ {url} agrees.")
-
-console.print("")
-console.print("Other responses (with payloads):")
-for url in [url for url in import_updates if url != trusted_scan]:
-    if import_updates[url] is None:
-        console.print(f"✖ {url} failed to fetch import updates!")
-        continue
-    if import_updates[trusted_scan] is None:
-        console.print(f"? {url}: trusted scan failed to fetch import updates!")
-        continue
-    diff1=import_updates[url].difference(import_updates[trusted_scan])
-    diff2=import_updates[trusted_scan].difference(import_updates[url])
-    if len(diff1) > 0 or len(diff2) > 0:
-        console.print(f"✖ {url} differs!")
-        if len(diff1) > 0:
-            console.print(f"  {len(diff1)} updates exist in {url} but not {trusted_scan}")
-            console.print(f"  Examples:")
-            for item in list(diff1)[:num_examples]:
-                console.print_json(item)
-        if len(diff2) > 0:
-            console.print(f"  {len(diff2)} updates exist in {trusted_scan} but not {url}")
-            console.print(f"  Examples:")
-            for item in list(diff2)[:num_examples]:
-                console.print_json(item)
     else:
         console.print(f"✔ {url} agrees.")
 
@@ -275,7 +245,6 @@ def fetch_acs_snapshots(url, task_id, progress):
                 "page_size": 1000,
                 "after": next_page_token
             }
-
             # For some reason `request.post` tends to sometimes fail with a `ConnectionError/NameResolutionError`
             # even though the URL is correct. This is mitigated by retries here, plus a limit to the number
             # of concurrently processed scan URLs.
