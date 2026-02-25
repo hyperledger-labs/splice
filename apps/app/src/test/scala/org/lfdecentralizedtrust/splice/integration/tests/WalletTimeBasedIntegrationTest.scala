@@ -205,7 +205,9 @@ class WalletTimeBasedIntegrationTest
           activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         clue("Check wallet after advancing to next 2 rounds") {
-          eventually()(aliceWalletClient.list().lockedAmulets shouldBe empty)
+          eventually()(
+            aliceWalletClient.list().lockedAmulets shouldBe empty withClue "lockedAmulets"
+          )
         }
       }
     }

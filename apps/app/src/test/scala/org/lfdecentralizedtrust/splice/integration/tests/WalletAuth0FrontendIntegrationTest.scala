@@ -63,7 +63,10 @@ class WalletAuth0FrontendIntegrationTest
               },
             )(
               "The user sees the login screen again",
-              _ => find(id("oidc-login-button")) should not be empty,
+              _ =>
+                find(
+                  id("oidc-login-button")
+                ) should not be empty withClue "'Log In with OAuth2' button",
             )
         }
     }

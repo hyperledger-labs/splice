@@ -464,7 +464,7 @@ class WalletPaymentFrontendIntegrationTest
     )(
       "The payment is processed",
       _ => {
-        aliceWalletClient.listAppPaymentRequests() shouldBe empty
+        aliceWalletClient.listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests"
         val acceptedPayments = aliceWalletClient.listAcceptedAppPayments()
         acceptedPayments should have size 1
         acceptedPayments.head

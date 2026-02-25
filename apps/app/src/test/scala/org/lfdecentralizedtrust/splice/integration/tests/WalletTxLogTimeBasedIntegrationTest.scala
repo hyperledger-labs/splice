@@ -257,7 +257,7 @@ class WalletTxLogTimeBasedIntegrationTest
         aliceWalletClient.tap(0.000005),
       )(
         "Wait for amulet to appear",
-        _ => aliceWalletClient.list().amulets should have size (1),
+        _ => aliceWalletClient.list().amulets should have size (1) withClue "amulets",
       )
 
       setTriggersWithin(
@@ -270,7 +270,7 @@ class WalletTxLogTimeBasedIntegrationTest
           Range(0, 4).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "Wait for amulet to disappear",
-          _ => aliceWalletClient.list().amulets should have size (0),
+          _ => aliceWalletClient.list().amulets should have size (0) withClue "amulets",
         )
       }
 
@@ -297,7 +297,7 @@ class WalletTxLogTimeBasedIntegrationTest
         aliceWalletClient.tap(100),
       )(
         "Wait for amulet to appear",
-        _ => aliceWalletClient.list().amulets should have size (1),
+        _ => aliceWalletClient.list().amulets should have size (1) withClue "amulets",
       )
 
       actAndCheck(
@@ -314,7 +314,7 @@ class WalletTxLogTimeBasedIntegrationTest
         ),
       )(
         "Wait for locked amulet to appear",
-        _ => aliceWalletClient.list().lockedAmulets should have size (1),
+        _ => aliceWalletClient.list().lockedAmulets should have size (1) withClue "lockedAmulets",
       )
 
       setTriggersWithin(
@@ -327,7 +327,7 @@ class WalletTxLogTimeBasedIntegrationTest
           Range(0, 4).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "Wait for locked amulet to disappear",
-          _ => aliceWalletClient.list().lockedAmulets should have size (0),
+          _ => aliceWalletClient.list().lockedAmulets should have size (0) withClue "lockedAmulets",
         )
       }
 
@@ -385,7 +385,7 @@ class WalletTxLogTimeBasedIntegrationTest
           )(
             "Wait for locked amulet to appear",
             _ => {
-              aliceWalletClient.list().lockedAmulets should have size (1)
+              aliceWalletClient.list().lockedAmulets should have size (1) withClue "lockedAmulets"
             },
           )
 
@@ -412,10 +412,10 @@ class WalletTxLogTimeBasedIntegrationTest
             eventually() {
               val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
               // tap + lock + transfer instruction
-              aliceTxs should have size 3
+              aliceTxs should have size 3 withClue "aliceTxs"
               val bobTxs = bobWalletClient.listTransactions(None, 1000)
               // transfer instruction
-              bobTxs should have size 1
+              bobTxs should have size 1 withClue "bobTxs"
               (aliceTxs, bobTxs)
             }
           }
@@ -431,7 +431,7 @@ class WalletTxLogTimeBasedIntegrationTest
                 logEntry.transferInstructionAmount shouldBe Some(BigDecimal(transferAmount))
                 logEntry.description shouldBe "transfer offer description"
                 // No balance is transferred here so receivers is empty
-                logEntry.receivers shouldBe empty
+                logEntry.receivers shouldBe empty withClue "receivers"
                 val expectedExtraLock = BigDecimal(transferAmount - lockAmount)
                 logEntry.sender.value.amount should beWithin(
                   -expectedExtraLock * 1.25,
@@ -447,7 +447,7 @@ class WalletTxLogTimeBasedIntegrationTest
                 logEntry.transferInstructionAmount shouldBe None
                 logEntry.description shouldBe ""
                 // No balance is transferred here so receivers is empty
-                logEntry.receivers shouldBe empty
+                logEntry.receivers shouldBe empty withClue "receivers"
                 logEntry.sender.value.amount should beWithin(
                   -(lockAmount + smallAmount),
                   -lockAmount,

@@ -211,7 +211,7 @@ class WalletTxLogIntegrationTest
               selfPaymentAmount - smallAmount,
               selfPaymentAmount,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: TransferTxLogEntry =>
@@ -223,7 +223,7 @@ class WalletTxLogIntegrationTest
               -selfPaymentAmount - smallAmount,
               -selfPaymentAmount,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -301,7 +301,7 @@ class WalletTxLogIntegrationTest
               -selfPaymentAmount - smallAmount,
               -selfPaymentAmount,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -406,7 +406,7 @@ class WalletTxLogIntegrationTest
               -BigDecimal(transferAmountTotalCC) - smallAmount,
               -BigDecimal(transferAmountTotalCC),
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -565,7 +565,7 @@ class WalletTxLogIntegrationTest
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.AppPaymentAccepted.toProto
             logEntry.sender.value.party shouldBe aliceUserParty.toProtoPrimitive
             logEntry.sender.value.amount should beWithin(-50 - smallAmount, -50)
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -712,7 +712,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           checkSubscriptionPaymentTransfer(
@@ -727,7 +727,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -823,7 +823,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -969,7 +969,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             // Depending on timing we may have incurred holding fees at this point.
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
@@ -985,7 +985,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -1092,7 +1092,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: TransferTxLogEntry =>
@@ -1115,7 +1115,7 @@ class WalletTxLogIntegrationTest
               -subscriptionPrice - smallAmount,
               -subscriptionPrice,
             )
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
           },
           { case logEntry: BalanceChangeTxLogEntry =>
@@ -1146,7 +1146,7 @@ class WalletTxLogIntegrationTest
           -preapprovalFee - smallAmount,
           -preapprovalFee,
         )
-        logEntry.receivers shouldBe empty
+        logEntry.receivers shouldBe empty withClue "receivers"
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
       }
       val tapTxLog: CheckTxHistoryFn = { case logEntry: BalanceChangeTxLogEntry =>
@@ -1185,7 +1185,7 @@ class WalletTxLogIntegrationTest
           -preapprovalFee - smallAmount,
           -preapprovalFee,
         )
-        logEntry.receivers shouldBe empty
+        logEntry.receivers shouldBe empty withClue "receivers"
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
       }
       val expectedTxLogEntries = Seq(renewTxLog, creationTxLog, tapTxLog)

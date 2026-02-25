@@ -91,7 +91,7 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
               .getValidatorPartyId()
               .toProtoPrimitive
             logEntry.sender.value.amount should be(balanceAfter - balanceBefore)
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             logEntry.appRewardsUsed shouldBe appRewardAmount
             logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
           }

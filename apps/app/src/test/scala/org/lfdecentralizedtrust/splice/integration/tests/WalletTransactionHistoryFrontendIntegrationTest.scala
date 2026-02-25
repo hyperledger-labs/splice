@@ -187,7 +187,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         txs
           .map(row => {
             val updateId = readTransactionFromRow(row).updateId
-            updateId should not be empty
+            updateId should not be empty withClue "updateId"
             updateId
           })
           // remove the balance change tx for scan comparison

@@ -72,7 +72,9 @@ class WalletPaymentIntegrationTest extends IntegrationTest with WalletTestUtil {
         aliceWalletClient.rejectAppPaymentRequest(reqFound.contractId),
       )(
         "Rejected request disappears from list",
-        _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
+        _ =>
+          aliceWalletClient
+            .listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests",
       )
     }
 
@@ -93,7 +95,7 @@ class WalletPaymentIntegrationTest extends IntegrationTest with WalletTestUtil {
       clue("Tap 50 amulets") {
         aliceWalletClient.tap(50)
         eventually() {
-          aliceWalletClient.list().amulets should not be empty
+          aliceWalletClient.list().amulets should not be empty withClue "amulets"
         }
       }
 
@@ -104,7 +106,9 @@ class WalletPaymentIntegrationTest extends IntegrationTest with WalletTestUtil {
             aliceWalletClient.acceptAppPaymentRequest(cid),
           )(
             "Payment request disappears from list",
-            _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
+            _ =>
+              aliceWalletClient
+                .listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests",
           )
         inside(aliceWalletClient.listAcceptedAppPayments()) { case Seq(r) =>
           r.contractId shouldBe acceptedPaymentId

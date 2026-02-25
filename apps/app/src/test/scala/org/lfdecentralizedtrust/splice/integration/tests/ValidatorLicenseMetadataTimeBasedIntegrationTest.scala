@@ -179,7 +179,7 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
               .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
                 dsoParty
               )
-          allValidatorLivenessActivityRecord shouldBe empty
+          allValidatorLivenessActivityRecord shouldBe empty withClue "ValidatorLivenessActivityRecord"
 
           // assuming this value is the same in that of round 0 and 1
           val issuancePerValidatorFaucetCoupon =
