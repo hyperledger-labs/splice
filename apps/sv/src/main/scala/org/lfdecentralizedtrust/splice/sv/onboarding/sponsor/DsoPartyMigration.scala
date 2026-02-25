@@ -8,10 +8,10 @@ import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
@@ -33,7 +33,7 @@ class DsoPartyMigration(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     participantAdminConnection: ParticipantAdminConnection,
-    ledgerConnection: BaseLedgerConnection,
+    ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     dsoPartyHosting: DsoPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -50,6 +50,10 @@ class DsoPartyMigration(
     dsoPartyHosting,
     loggerFactory,
   )
+  private val readOnlyConnection = ledgerClient.readOnlyConnection(
+    this.getClass.getSimpleName,
+    loggerFactory,
+  )
 
   def authorizeParticipantForHostingDsoParty(
       participantId: ParticipantId
@@ -57,8 +61,8 @@ class DsoPartyMigration(
     logger.info(s"Sponsor SV authorizing DSO party to participant $participantId")
     for {
       dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
+      beforeActivationOffset <- EitherT.liftF(readOnlyConnection.ledgerEnd())
       // this will wait until the PartyToParticipant state change completed
-      beforeActivationOffset <- EitherT.liftF(ledgerConnection.ledgerEnd())
       _ <- partyHosting
         .authorizeDsoPartyToParticipant(
           dsoRules.domain,
