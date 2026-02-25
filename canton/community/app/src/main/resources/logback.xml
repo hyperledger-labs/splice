@@ -282,7 +282,6 @@
     </then>
     <else>
       <logger name="com.digitalasset" level="${LOG_LEVEL_CANTON:-INFO}"/>
-      <logger name="com.digitalasset.canton.networking.grpc" level="${LOG_LEVEL_API_REQUEST:-DEBUG}" />
       <logger name="com.daml" level="${LOG_LEVEL_CANTON:-INFO}"/>
     </else>
   </if>

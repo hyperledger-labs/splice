@@ -142,13 +142,10 @@ svs:
           memory: '2Gi'
     logging:
       appsAsync: false
-      appsLogLevel: 'DEBUG'
+      appsLogLevel: 'INFO'
       cantonAsync: false
-      cantonLogLevel: 'DEBUG'
+      cantonLogLevel: 'INFO'
       cometbftLogLevel: 'debug'
-      logging:
-        appsLogLevel: 'INFO'
-        cantonLogLevel: 'INFO'
     mediator:
       resources:
         limits:
