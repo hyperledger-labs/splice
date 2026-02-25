@@ -146,6 +146,9 @@ svs:
       cantonAsync: false
       cantonLogLevel: 'DEBUG'
       cometbftLogLevel: 'debug'
+      logging:
+        appsLogLevel: 'INFO'
+        cantonLogLevel: 'INFO'
     mediator:
       resources:
         limits:
