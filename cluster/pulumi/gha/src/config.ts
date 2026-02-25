@@ -5,21 +5,26 @@ import util from 'node:util';
 import { z } from 'zod';
 
 const GhaConfigSchema = z.object({
-  gha: z.object({
+    namespace: z.string(),
+    gcpSecretName: z.string(),
     githubRepo: z.string(),
     // these a Splice versions
     runnerVersion: z.string(),
     runnerHookVersion: z.string(),
     // this is a https://github.com/actions/actions-runner-controller version
     runnerScaleSetVersion: z.string(),
-  }),
+  })
+
+const ConfigSchema = z.object({
+  gha: z.array(GhaConfigSchema),
 });
 
-export type Config = z.infer<typeof GhaConfigSchema>;
+export type GhaConfig = z.infer<typeof GhaConfigSchema>;
+export type Config = z.infer<typeof ConfigSchema>;
 
 // eslint-disable-next-line
 // @ts-ignore
-const fullConfig = GhaConfigSchema.parse(clusterYamlConfig);
+const fullConfig = ConfigSchema.parse(clusterYamlConfig);
 
 console.error(
   `Loaded GHA config: ${util.inspect(fullConfig, {
@@ -28,4 +33,4 @@ console.error(
   })}`
 );
 
-export const ghaConfig = fullConfig.gha;
+export const ghaConfigs = fullConfig.gha;
