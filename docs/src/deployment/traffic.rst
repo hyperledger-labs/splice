@@ -144,6 +144,25 @@ To give an overview here:
 Like all parts of the ``AmuletRulesConfig``, the ``SynchronizerFeesConfig`` is set by SVs via on-ledger voting, as part of DSO governance.
 The :ref:`SV operations docs <sv-determining-traffic-parameters>` contain pointers for determining good values for some of these parameters.
 
+How traffic balance interacts with transaction submission
+---------------------------------------------------------
+
+Here's an example of traffic accounting in practice for submitting a transaction:
+
+1. Transaction submitted.
+2. The traffic manager (on the sequencer) checks your node's base rate (i.e. free) traffic balance and the traffic that you have purchased.
+3. Included in your base rate traffic is that accrued since your last submission. This accrual is time-linear, calculated to reach ``burstAmount`` after ``burstWindow`` time.
+4. If you have enough base rate traffic, your submission is sequenced.
+   Your base rate traffic balance is drawn down for the transaction and your extra traffic balance is unchanged.
+5. If you do not have enough base rate traffic, but your extra traffic is enough to pay the difference, your submission is sequenced.
+   Your base rate traffic balance is depleted and your extra traffic balance is drawn down for the remainder.
+6. If neither of the above applies, the submission will fail.
+7. Regardless of any situation, if you don't submit transactions for ``burstWindow``, your base rate traffic balance will be fully replenished to ``burstAmount``.
+   This will, at minimum, allow you to buy traffic again to avoid getting stuck in the situation where you don't have enough traffic to top up your extra traffic.
+
+A successful sequencing does not necessarily mean the transaction is fully accepted.
+See :ref:`traffic_wasted` below for explanation of these cases and how best to avoid them.
+
 .. _traffic_topup:
 
 Traffic top-ups; how does one "buy" traffic?
