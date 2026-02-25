@@ -178,10 +178,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )(
         "Bob's preapproval is visible",
         bob => {
-          bobValidatorBackend.lookupTransferPreapprovalByParty(bob.partyId) should not be empty
+          bobValidatorBackend.lookupTransferPreapprovalByParty(
+            bob.partyId
+          ) should not be empty withClue "bob preapproval"
           bobValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
             bob.partyId
-          ) should not be empty
+          ) should not be empty withClue "bob scan preapproval"
         },
       )
 
@@ -202,7 +204,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         bobValidatorBackend.cancelTransferPreapprovalByParty(bob.partyId),
       )(
         "Bob's preapproval is no longer visible",
-        _ => bobValidatorBackend.lookupTransferPreapprovalByParty(bob.partyId) shouldBe empty,
+        _ =>
+          bobValidatorBackend.lookupTransferPreapprovalByParty(
+            bob.partyId
+          ) shouldBe empty withClue "bob TransferPreapproval",
       )
 
       // Onboard alice as a local party
@@ -307,7 +312,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob.partyId,
                 )
-                instructions should have size 5
+                instructions should have size 5 withClue "TransferInstructions"
                 instructions.map(_._1)
               },
             )
@@ -352,7 +357,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob.partyId,
                 )
-                instructions should have size 2
+                instructions should have size 2 withClue "TransferInstructions"
                 getBobPartyBalance().unlockedQty should beAround(BigDecimal("1000.0"))
                 inside(aliceWalletClient.balance()) { aliceBalance =>
                   aliceBalance.unlockedQty should beWithin(

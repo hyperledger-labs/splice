@@ -211,14 +211,14 @@ class SvOnboardingAddlIntegrationTest
         val synchronizerNode = nodeState.state.synchronizerNodes.values.loneElement
         val localSequencerUrl: String = synchronizerNode.sequencer.toScala.value.url
         localSequencerUrls should contain(localSequencerUrl)
-        synchronizerNode.mediator.toScala.value.mediatorId should not be empty
+        synchronizerNode.mediator.toScala.value.mediatorId should not be empty withClue "mediatorId"
 
         clue("published sequencer information can be seen via scan") {
           inside(sv1ScanBackend.listDsoSequencers()) { case Seq(domainSequencers) =>
-            domainSequencers.sequencers should have size 4
+            domainSequencers.sequencers should have size 4 withClue "dsoSequencers.sequencers"
             domainSequencers.sequencers.find(s =>
               s.svName == nodeState.svName && s.url == localSequencerUrl.toString
-            ) should not be empty
+            ) should not be empty withClue "matching localSequencer"
           }
         }
       }
@@ -231,7 +231,7 @@ class SvOnboardingAddlIntegrationTest
       // only 1 SV => slightly faster test
       clue("Initialize DSO with 1 SV") {
         startAllSync(sv1ScanBackend, sv1Backend)
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1 withClue "dsoRules.svs"
       }
       // SV two’s party hasn't been allocated at this point because the SV app isn't running so we allocate it here.
       val (sv2Party, _) = actAndCheck(
@@ -243,7 +243,7 @@ class SvOnboardingAddlIntegrationTest
         "sv1 sees sv2 party",
         party =>
           sv1Backend.participantClientWithAdminToken.parties
-            .list(filterParty = party.toProtoPrimitive) should not be empty,
+            .list(filterParty = party.toProtoPrimitive) should not be empty withClue "sv2 party",
       )
 
       clue("Unknown parties have unknown SV onboarding status") {
@@ -292,7 +292,7 @@ class SvOnboardingAddlIntegrationTest
       startAllSync(
         sv1Nodes*
       )
-      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1
+      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1 withClue "dsoRules.svs"
 
       val sv1UserId = sv1WalletClient.config.ledgerApiUser
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
@@ -320,7 +320,7 @@ class SvOnboardingAddlIntegrationTest
             forAll(lines)(line => line.message should include("Unexpected amulet create event"))
             // Error emitted by every ScanTxLogParser plus the one UserWalletTxLogParser
             // associated with the owner of the coin.
-            lines should have size 2
+            lines should have size 2 withClue "ScanTxLogParser + UserWalletTxLogParser error"
             forExactly(1, lines)(line => line.loggerName should include("sv1Scan"))
             forExactly(1, lines)(line => line.loggerName should include("sv1Validator"))
           },
@@ -332,7 +332,7 @@ class SvOnboardingAddlIntegrationTest
         // but scan (required by validator) could emit errors that we'd then need to deal with
         sv2Backend.startSync()
       }
-      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
+      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2 withClue "dsoRules.svs"
 
       inside(
         sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(

@@ -145,7 +145,7 @@ class TokenStandardAllocationIntegrationTest
       show"There exists an allocation from $senderParty",
       _ => {
         val allocations = walletClient.listAmuletAllocations()
-        allocations should have size 1
+        allocations should have size 1 withClue "AmuletAllocations"
         allocations.head
       },
     )
@@ -311,14 +311,14 @@ class TokenStandardAllocationIntegrationTest
               templateId.getEntityName,
             )
           ),
-        ) shouldBe empty,
+        ) shouldBe empty withClue "Allocations",
     )
   }
 
   "Withdraw an allocation" in { implicit env =>
     val allocatedOtcTrade = setupAllocatedOtcTrade()
     // sanity check
-    aliceWalletClient.listAmuletAllocations() should have size (1)
+    aliceWalletClient.listAmuletAllocations() should have size (1) withClue "AmuletAllocations"
     actAndCheck(
       "Settlement venue withdraw the trade", {
         aliceWalletClient.withdrawAmuletAllocation(
@@ -329,15 +329,17 @@ class TokenStandardAllocationIntegrationTest
       },
     )(
       "Allocation is archived",
-      _ => aliceWalletClient.listAmuletAllocations() shouldBe empty,
+      _ => aliceWalletClient.listAmuletAllocations() shouldBe empty withClue "AmuletAllocations",
     )
   }
 
   "Reject an allocation request" in { implicit env =>
     val allocatedOtcTrade = setupAllocatedOtcTrade()
     // sanity checks
-    aliceWalletClient.listAllocationRequests() should have size (1)
-    bobWalletClient.listAllocationRequests() should have size (1)
+    aliceWalletClient
+      .listAllocationRequests() should have size (1) withClue "alice AllocationRequests"
+    bobWalletClient
+      .listAllocationRequests() should have size (1) withClue "bob AllocationRequests"
 
     actAndCheck(
       "Alice rejects the allocation request", {
@@ -349,9 +351,9 @@ class TokenStandardAllocationIntegrationTest
       "Allocation request is archived",
       _ => {
         val aliceRequests = aliceWalletClient.listAllocationRequests()
-        aliceRequests shouldBe empty
+        aliceRequests shouldBe empty withClue "alice Requests"
         val bobRequests = bobWalletClient.listAllocationRequests()
-        bobRequests shouldBe empty
+        bobRequests shouldBe empty withClue "bob Requests"
       },
     )
   }

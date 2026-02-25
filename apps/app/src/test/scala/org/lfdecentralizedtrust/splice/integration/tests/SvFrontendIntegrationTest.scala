@@ -1085,8 +1085,12 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the create vote request button",
             _ => {
-              find(id("create-voterequest-submit-button")) should not be empty
-              find(id("display-actions")) should not be empty
+              find(
+                id("create-voterequest-submit-button")
+              ) should not be empty withClue "'Send Request to Super Validators' button"
+              find(
+                id("display-actions")
+              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
             },
           )
 
@@ -1225,8 +1229,12 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the create vote request button",
             _ => {
-              find(id("create-voterequest-submit-button")) should not be empty
-              find(id("display-actions")) should not be empty
+              find(
+                id("create-voterequest-submit-button")
+              ) should not be empty withClue "'Send Request to Super Validators' button"
+              find(
+                id("display-actions")
+              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
             },
           )
 
@@ -1290,7 +1298,7 @@ class SvFrontendIntegrationTest
               rows.size shouldBe previousVoteRequestsInProgress
             }
             eventually() {
-              find(id("vote-request-modal-root")) shouldBe empty
+              find(id("vote-request-modal-root")) shouldBe empty withClue "'Vote Request' modal"
             }
             eventuallyClickOn(id("tab-panel-rejected"))
             eventually() {
