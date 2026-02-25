@@ -90,7 +90,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
           .asScala
           .toMap
 
-        svs should have size 3
+        svs should have size 3 withClue "svs"
         val sv3PartyId = sv3Backend.getDsoInfo().svParty
         inside(svs.get(sv3PartyId.toProtoPrimitive)) { case Some(svInfo) =>
           svInfo.name shouldBe getSvName(3)
@@ -150,8 +150,8 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
             .asScala
             .toMap
 
-          newSvs should have size 3
-          newSvs.get(sv3PartyId.toProtoPrimitive) shouldBe empty
+          newSvs should have size 3 withClue "newSvs"
+          newSvs.get(sv3PartyId.toProtoPrimitive) shouldBe empty withClue "newSvs(sv3)"
 
           inside(
             newSvs

@@ -62,7 +62,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             svUiUrl,
             svUsername,
             svPassword,
-            () => find(id("logout-button")) should not be empty,
+            () => find(id("logout-button")) should not be empty withClue "'Logout' button",
           )
 
           eventuallyClickOn(id("information-tab-cometBft-debug"))
@@ -94,7 +94,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             walletUrl,
             svUsername,
             svPassword,
-            () => find(id("logout-button")) should not be empty,
+            () => find(id("logout-button")) should not be empty withClue "'Logout' button",
           )
         },
       )(
@@ -133,7 +133,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
                 walletUrl,
                 svUsername,
                 svPassword,
-                () => find(id("logout-button")) should not be empty,
+                () => find(id("logout-button")) should not be empty withClue "'Logout' button",
               )
             },
           )(
@@ -142,7 +142,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
               val svRewardEntries = txs.filter(_.svRewardsUsed > 0)
-              svRewardEntries should not be empty
+              svRewardEntries should not be empty withClue "SvReward txs"
               svRewardEntries
             },
           )
@@ -154,7 +154,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
                 validator1WalletUrl,
                 "admin@validator1.com",
                 validatorUserPassword,
-                () => find(id("logout-button")) should not be empty,
+                () => find(id("logout-button")) should not be empty withClue "'Logout' button",
               )
             },
           )(
@@ -163,7 +163,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
               val svRewardEntries = txs.filter(_.svRewardsUsed > 0)
-              svRewardEntries should not be empty
+              svRewardEntries should not be empty withClue "SvReward txs"
               svRewardEntries
             },
           )
@@ -216,7 +216,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               ansUrl,
               svUsername,
               svPassword,
-              () => find(id("logout-button")) should not be empty,
+              () => find(id("logout-button")) should not be empty withClue "'Logout' button",
             )
           },
         )(

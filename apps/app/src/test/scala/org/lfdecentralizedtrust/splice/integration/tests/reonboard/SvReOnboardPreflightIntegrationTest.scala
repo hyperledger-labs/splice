@@ -58,7 +58,7 @@ class SvReOnboardPreflightIntegrationTest
             validatorWalletUrl,
             validatorUsername,
             validatorPassword,
-            () => find(id("logout-button")) should not be empty,
+            () => find(id("logout-button")) should not be empty withClue "'Logout' button",
           )
         },
       )(
@@ -89,7 +89,7 @@ class SvReOnboardPreflightIntegrationTest
             svWalletUrl,
             svUsername,
             svPassword,
-            () => find(id("logout-button")) should not be empty,
+            () => find(id("logout-button")) should not be empty withClue "'Logout' button",
           )
         },
       )(
