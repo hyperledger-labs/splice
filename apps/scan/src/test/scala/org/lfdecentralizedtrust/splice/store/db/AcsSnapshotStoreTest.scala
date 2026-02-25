@@ -1265,6 +1265,8 @@ class AcsSnapshotStoreTest
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
 
+          _ <- ingestCreate(updateHistory, amuletRules(), CantonTimestamp.MinValue)
+
           _ <- store.initializeIncrementalSnapshotFromImportUpdates(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
             timestamp2,
