@@ -56,7 +56,7 @@ class SvOnboardingAddlIntegrationTest
         sv2ValidatorBackend,
         sv3ValidatorBackend,
       )
-      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
+      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3 withClue "dsoRules.svs"
     }
     clue("Stop SV2 so that SV4 can't gather enough confirmations just yet") {
       sv2Backend.stop()
@@ -142,7 +142,7 @@ class SvOnboardingAddlIntegrationTest
         .dsoRules
         .payload
         .svs
-        .keySet should not contain sv4Party.toProtoPrimitive
+        .keySet should not contain sv4Party.toProtoPrimitive withClue "dsoRules.svs"
     }
     clue("SV4's onboarding status is reported correctly.") {
       eventually()(inside(sv1Backend.getSvOnboardingStatus(sv4Party)) {
@@ -164,7 +164,9 @@ class SvOnboardingAddlIntegrationTest
       "SV4's onboarding gathers sufficient confirmations and is completed",
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty
+          .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(
+            dsoParty
+          ) shouldBe empty withClue "SvOnboardingRequests"
         sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet should contain(
           sv4Party.toProtoPrimitive
         )

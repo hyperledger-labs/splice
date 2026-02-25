@@ -187,13 +187,13 @@ class SvFrontendIntegrationTest
               e.text shouldBe shownAmuletPrice
             }
             val rows = findAll(className("amulet-price-table-row")).toSeq
-            rows should have size 3
+            rows should have size 3 withClue "'Desired AMT Prices of Other Super Validators' table rows"
             svAmuletPriceShouldMatch(rows, sv2Backend.getDsoInfo().svParty, shownAmuletPrice)
             svAmuletPriceShouldMatch(rows, sv3Backend.getDsoInfo().svParty, "Not Set")
             svAmuletPriceShouldMatch(rows, sv4Backend.getDsoInfo().svParty, "Not Set")
 
             val roundRows = findAll(className("open-mining-round-row")).toSeq
-            roundRows should have size 3
+            roundRows should have size 3 withClue "'Open Mining Rounds' table rows"
             forEvery(roundRows) {
               _.childElement(className("amulet-price")).text shouldBe shownAmuletPrice
             }
@@ -210,7 +210,7 @@ class SvFrontendIntegrationTest
             e.text shouldBe s"${showBigDecimal(desiredPrice)} USD"
           }
           val rows = findAll(className("amulet-price-table-row")).toSeq
-          rows should have size 3
+          rows should have size 3 withClue "'Desired AMT Prices of Other Super Validators' table rows"
           forEvery(
             Table(
               ("backend", "other value row"),
@@ -327,7 +327,9 @@ class SvFrontendIntegrationTest
         "can see the beta governance page",
         _ =>
           eventuallySucceeds() {
-            find(id("initiate-proposal-button")) should not be empty
+            find(
+              id("initiate-proposal-button")
+            ) should not be empty withClue "'Initiate Proposal' button"
           },
       )
 
@@ -367,7 +369,10 @@ class SvFrontendIntegrationTest
         },
       )(
         "sv1 can see the create proposal form",
-        _ => find(id(s"$formPrefix-summary")) should not be empty,
+        _ =>
+          find(
+            id(s"$formPrefix-summary")
+          ) should not be empty withClue s"$formPrefix create proposal form",
       )
 
     def fillAndSubmitProposalForm(
@@ -422,7 +427,9 @@ class SvFrontendIntegrationTest
         "sv1 is redirected to the governance page after successful submission",
         _ => {
           eventuallySucceeds() {
-            find(id("initiate-proposal-button")) should not be empty
+            find(
+              id("initiate-proposal-button")
+            ) should not be empty withClue "'Initiate Proposal' button"
             val proposals = getInflightProposals()
             proposals.size should be > 0
           }
@@ -455,7 +462,9 @@ class SvFrontendIntegrationTest
         "sv2 can see the action required section with at least one item",
         _ =>
           eventuallySucceeds() {
-            find(testId("action-required-section")) should not be empty
+            find(
+              testId("action-required-section")
+            ) should not be empty withClue "'Action Required' Box"
             getActionRequiredElems().size should be > 0
           },
       )
@@ -469,7 +478,9 @@ class SvFrontendIntegrationTest
         "sv2 can see the vote request and cast a vote",
         _ => {
           eventuallySucceeds() {
-            find(testId("your-vote-reason-input")) should not be empty
+            find(
+              testId("your-vote-reason-input")
+            ) should not be empty withClue "vote 'Reason' textfield"
           }
 
           inside(find(testId("your-vote-reason-input"))) { case Some(element) =>
@@ -577,8 +588,12 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the create vote request button",
             _ => {
-              find(id("create-voterequest-submit-button")) should not be empty
-              find(id("display-actions")) should not be empty
+              find(
+                id("create-voterequest-submit-button")
+              ) should not be empty withClue "'Send Request to Super Validators' button"
+              find(
+                id("display-actions")
+              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
             },
           )
 
@@ -647,7 +662,7 @@ class SvFrontendIntegrationTest
             val tbody = find(id("sv-voting-action-needed-table-body"))
             inside(tbody) { case Some(tb) =>
               val rows = getAllVoteRows("sv-voting-action-needed-table-body")
-              rows should not be empty
+              rows should not be empty withClue "'Action Needed' vote request rows"
 
               rows.head.text should matchText(
                 createdVoteRequestAction
@@ -874,8 +889,12 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the create vote request button",
             _ => {
-              find(id("create-voterequest-submit-button")) should not be empty
-              find(id("display-actions")) should not be empty
+              find(
+                id("create-voterequest-submit-button")
+              ) should not be empty withClue "'Send Request to Super Validators' button"
+              find(
+                id("display-actions")
+              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
             },
           )
 
@@ -1132,12 +1151,12 @@ class SvFrontendIntegrationTest
               rows.size shouldBe previousVoteRequestsInProgress
             }
             eventually() {
-              find(id("vote-request-modal-root")) shouldBe empty
+              find(id("vote-request-modal-root")) shouldBe empty withClue "'Vote Request' modal"
             }
             eventuallyClickOn(id("tab-panel-rejected"))
             eventually() {
               val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
-              rows.size shouldBe 2
+              rows.size shouldBe 2 withClue "'Rejected' votes tab table rows"
             }
           }
         }
@@ -1298,8 +1317,12 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the create vote request button",
             _ => {
-              find(id("create-voterequest-submit-button")) should not be empty
-              find(id("display-actions")) should not be empty
+              find(
+                id("create-voterequest-submit-button")
+              ) should not be empty withClue "'Send Request to Super Validators' button"
+              find(
+                id("display-actions")
+              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
             },
           )
 
@@ -1456,7 +1479,11 @@ class SvFrontendIntegrationTest
   }
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
-    eventually() { find(id("display-actions")) should not be empty }
+    eventually() {
+      find(
+        id("display-actions")
+      ) should not be empty withClue "Create Vote Request 'Action' dropdown"
+    }
     val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
     val existingAction: String = dropDownAction.getFirstSelectedOption().getAttribute("value")
     dropDownAction.selectByValue(actionName)

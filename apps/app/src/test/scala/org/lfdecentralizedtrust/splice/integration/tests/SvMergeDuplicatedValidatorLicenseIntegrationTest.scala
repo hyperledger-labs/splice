@@ -50,7 +50,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
         .filter(_.data.validator == aliceValidator.toProtoPrimitive)
 
     val validatorLicenses = getValidatorLicenses()
-    validatorLicenses should have size 1
+    validatorLicenses should have size 1 withClue "alice ValidatorLicenses"
 
     val validatorLicense = inside(validatorLicenses) { case Seq(validatorLicense) =>
       validatorLicense
@@ -65,7 +65,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
       "A second validator license gets created",
       _ => {
         val newValidatorLicenses = getValidatorLicenses()
-        newValidatorLicenses should have size 2
+        newValidatorLicenses should have size 2 withClue "alice ValidatorLicenses"
       },
     )
     // The trigger can process both validator licenses in parallel so we might get multiple log messages.
@@ -75,7 +75,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
         clue("Trigger merges the duplicated validator licenses contracts") {
           eventually() {
             val newValidatorLicenses = getValidatorLicenses()
-            newValidatorLicenses should have size 1
+            newValidatorLicenses should have size 1 withClue "alice ValidatorLicenses"
           }
         }
         // Pause to make sure we don't get more log messages.
