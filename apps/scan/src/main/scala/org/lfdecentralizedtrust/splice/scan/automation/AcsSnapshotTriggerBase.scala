@@ -110,19 +110,6 @@ abstract class AcsSnapshotTriggerBase(
       currentSnapshot.isEmpty
   }
 
-  /** @return True if the passed migration id was fully backfilled.
-    *         This applies to the current migration id, where it either didn't need to backfill,
-    *         or backfilled because it joined late.
-    *         And also for past migrations, whether the SV was present in them or not.
-    */
-  protected def isHistoryBackfilled(
-      migrationId: Long
-  )(implicit tc: TraceContext): Future[Boolean] = {
-    updateHistory.sourceHistory
-      .migrationInfo(migrationId)
-      .map(_.exists(i => i.complete && i.importUpdatesComplete))
-  }
-
   protected def getLatestSnapshot(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[AcsSnapshot]] = {
