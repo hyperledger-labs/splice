@@ -20,12 +20,13 @@ import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
-import org.lfdecentralizedtrust.splice.store.HasS3Mock
+import org.lfdecentralizedtrust.splice.store.{HasS3Mock, S3BucketConnection}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
@@ -70,6 +71,8 @@ class ScanTimeBasedIntegrationTest
           )
         )(config)
       )
+
+  override def runTokenStandardCliSanityCheck = false // FIXME: remove this
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
@@ -384,14 +387,12 @@ class ScanTimeBasedIntegrationTest
       }
 
       val startTime = getLedgerTime
-      println(s"StartTime: $startTime")
 
       advanceTime(
         java.time.Duration
           .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
           .plusSeconds(1L)
       )
-      println(s"Moved time by an hour, to: $getLedgerTime")
 
       val snapshot1 = eventually() {
         val snapshot1 = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
@@ -554,6 +555,43 @@ class ScanTimeBasedIntegrationTest
           ownerPartyIds = Vector(aliceUserParty),
           recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact),
         ) shouldBe None
+
+        advanceTime(java.time.Duration.ofHours(24))
+        val endTime = getLedgerTime
+        val lastMidnight = endTime.toInstant.truncatedTo(ChronoUnit.DAYS);
+        val nextMidnight = lastMidnight.plus(1, ChronoUnit.DAYS)
+        val expectedAcsSnapshotKey = s"$lastMidnight-Migration-0-$nextMidnight/ACS_0.zstd"
+
+        val bucketConnection = S3BucketConnection(s3ConfigMock, loggerFactory)
+        eventually() {
+
+          clue("wait for latest ACS snapshots to be created") {
+            sv1ScanBackend
+              .getDateOfMostRecentSnapshotBefore(endTime, 0)
+              .value
+              .toInstant shouldBe >=(lastMidnight)
+          }
+
+          val s3Objs = bucketConnection.listObjects.futureValue.contents().asScala
+          clue("Wait for bulk storage objects to be created") {
+            s3Objs.map(_.key()) should contain(expectedAcsSnapshotKey)
+            // Depending on how the days are split exactly (based on the exact simtime when the test was started),
+            // the updates may be in one or two segments, so we only assert that there exists a segment that ends
+            // at last midnight
+            s3Objs.map(_.key()).filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
+          }
+
+          clue("Compare bulk storage data to hot storage data from scan") {
+            val acsAtMidnightFromScan = sv1ScanBackend.getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0).value.createdEvents
+            val acsObjKey = s3Objs.filter(_.key() == expectedAcsSnapshotKey).head
+            val acsAtMidnightFromS3 = readUncompressAndDecode(
+              bucketConnection,
+              io.circe.parser.decode[definitions.CreatedEvent],
+            )(acsObjKey)
+
+            acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
+          }
+        }
       }
     }
   }

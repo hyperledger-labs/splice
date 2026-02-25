@@ -71,7 +71,7 @@ class ZstdTest extends StoreTestBase with HasS3Mock {
 
       val (pub, sub) = TestSource
         .probe[ByteString]
-        .via(ZstdGroupedWeight(zstdChunkSize))
+        .via(ZstdGroupedWeight(zstdChunkSize, loggerFactory))
         .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
         .run()
 

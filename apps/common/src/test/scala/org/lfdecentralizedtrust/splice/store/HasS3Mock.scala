@@ -36,7 +36,9 @@ trait HasS3Mock extends FutureHelpers with EitherValues with BaseTest {
           "debug" -> "true"
         ).asJava
       )
-
+      .withFileSystemBind("log/s3mock", "/tmp/s3mock")
+      .withEnv("retainFilesOnExit", "true")
+    
     container.setPortBindings(Seq("9090:9090").asJava)
     container.start()
 
@@ -80,6 +82,11 @@ trait HasS3Mock extends FutureHelpers with EitherValues with BaseTest {
       s3BucketConnection: S3BucketConnection,
       decoder: String => Either[io.circe.Error, T],
   )(s3obj: S3Object)(implicit ec: ExecutionContext, tag: reflect.ClassTag[T]): Array[T] = {
+    val c = s3BucketConnection.readFullObject(s3obj.key()).futureValue
+    val path = java.nio.file.Paths.get(s"log/${s3obj.key().replaceAll("/", "_")}")
+    c.rewind()
+    java.nio.file.Files.write(path, new Array[Byte](c.remaining()))
+
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
     val zis = new ZstdInputStream(new ByteBufInputStream(Unpooled.wrappedBuffer(compressed)))
     val buffer = new Array[Byte](16384)

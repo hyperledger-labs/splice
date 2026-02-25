@@ -38,7 +38,7 @@ class S3ZstdObjects(
       getObjectKey: Int => String
   ): Flow[ByteString, S3ZstdObjects.Output, NotUsed] =
     Flow[ByteString]
-      .via(ZstdGroupedWeight(storageConfig.bulkZstdFrameSize))
+      .via(ZstdGroupedWeight(storageConfig.bulkZstdFrameSize, loggerFactory))
       .statefulMap(() =>
         State(
           s3Connection.newAppendWriteObject(

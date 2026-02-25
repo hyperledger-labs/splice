@@ -64,7 +64,7 @@ class S3BucketConnectionForUnitTests(
   )(implicit
       ec: ExecutionContext
   ) extends AppendWriteObject(key) {
-    override def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
+    override def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
       // We pad all parts with 5MB of zeros, to guarantee we're above the 5MB
       // minimum per part (technically, the minimum is "except the last" part,
       // but we don't really know that a part is last in this API)

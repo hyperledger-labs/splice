@@ -85,8 +85,12 @@ class S3BucketConnection(
     /** Thread safe, may be called in parallel.
       *       partNumber must be an index returned from prepareUploadNext()
       */
-    def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
+    def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
       require(numParts.get() >= partNumber)
+//      val hexString = (0 until content.remaining()).map { i =>
+//        f"${content.get(i)}%02X"
+//      }.mkString(" ")
+//      logger.debug(s"Uploading ${content.remaining()} bytes: $hexString")
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -96,8 +100,11 @@ class S3BucketConnection(
           .uploadId(id)
           .partNumber(partNumber)
           .build()
+        body = AsyncRequestBody.fromByteBuffer(content)
+        _ = logger.debug(s"Content length of the body: ${body.contentLength()}")
+
         response <- s3Client
-          .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
+          .uploadPart(partRequest, body)
           .asScala
         res <- parts
           .put(
