@@ -258,23 +258,29 @@ abstract class RunbookSvPreflightIntegrationTestBase
     val svScanClient = scancl("svTestScan")
     val sv1ScanClient = scancl("sv1Scan")
     val participantId = clue("Can dump participant identities from SV validator") {
-      svValidatorClient.dumpParticipantIdentities().id
+      // retry to guard against badly timed restarts
+      eventuallySucceeds() {
+        svValidatorClient.dumpParticipantIdentities().id
+      }
     }
     val activeSynchronizer = clue("Can get active domain from Scan") {
-      val svActiveDomain = SynchronizerId.tryFromString(
-        svScanClient
-          .getAmuletConfigAsOf(env.environment.clock.now)
-          .decentralizedSynchronizer
-          .activeSynchronizer
-      )
-      val sv1ActiveDomain = SynchronizerId.tryFromString(
-        sv1ScanClient
-          .getAmuletConfigAsOf(env.environment.clock.now)
-          .decentralizedSynchronizer
-          .activeSynchronizer
-      )
-      svActiveDomain shouldBe sv1ActiveDomain
-      svActiveDomain
+      // retry to guard against badly timed restarts
+      eventuallySucceeds() {
+        val svActiveDomain = SynchronizerId.tryFromString(
+          svScanClient
+            .getAmuletConfigAsOf(env.environment.clock.now)
+            .decentralizedSynchronizer
+            .activeSynchronizer
+        )
+        val sv1ActiveDomain = SynchronizerId.tryFromString(
+          sv1ScanClient
+            .getAmuletConfigAsOf(env.environment.clock.now)
+            .decentralizedSynchronizer
+            .activeSynchronizer
+        )
+        svActiveDomain shouldBe sv1ActiveDomain
+        svActiveDomain
+      }
     }
     clue("Can get hosting participant id for a party from Scan") {
       eventually() {

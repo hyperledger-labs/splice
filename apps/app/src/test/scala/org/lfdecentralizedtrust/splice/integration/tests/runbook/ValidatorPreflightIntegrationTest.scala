@@ -264,9 +264,11 @@ abstract class ValidatorPreflightIntegrationTestBase
     if (isAuth0) {
       val charlieUser = auth0Users.get("charlie").value
       clue("Onboard charlie manually to share a party with Bob") {
-        validatorClient().onboardUser(
-          charlieUser.id,
-          Some(PartyId.tryFromProtoPrimitive(bobPartyId)),
+        eventuallySucceeds()(
+          validatorClient().onboardUser(
+            charlieUser.id,
+            Some(PartyId.tryFromProtoPrimitive(bobPartyId)),
+          )
         )
       }
 
@@ -467,7 +469,8 @@ abstract class ValidatorPreflightIntegrationTestBase
             .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
             .value
 
-        val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
+        val domainConnectionConfig =
+          eventuallySucceeds()(validatorClient().decentralizedSynchronizerConnectionConfig())
         val connectedEndpointSet =
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
 
@@ -618,7 +621,8 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
         val (svSequencerEndpoint, _) = Endpoint
           .fromUris(NonEmpty.from(Seq(new URI(domainConfig.sequencer.toScala.value.url))).value)
           .value
-        val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
+        val domainConnectionConfig =
+          eventuallySucceeds()(validatorClient().decentralizedSynchronizerConnectionConfig())
         val connectedEndpointSet =
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
         connectedEndpointSet should contain(svSequencerEndpoint.forgetNE.loneElement.toString)
