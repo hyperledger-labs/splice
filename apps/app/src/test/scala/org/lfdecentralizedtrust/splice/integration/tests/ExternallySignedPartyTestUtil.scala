@@ -136,13 +136,19 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       )
   }
 
+  case class ExternalPartySetupResult(
+      transferPreapprovalCid: TransferPreapproval.ContractId,
+      updateId: String,
+      txHash: String,
+  )
+
   protected def createAndAcceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       verboseHashing: Boolean = false,
   )(implicit
       env: SpliceTestConsoleEnvironment
-  ): (TransferPreapproval.ContractId, String, String) = {
+  ): ExternalPartySetupResult = {
     val proposal = createExternalPartySetupProposal(provider, externalPartyOnboarding)
     acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
   }
@@ -192,7 +198,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       verboseHashing: Boolean = false,
   )(implicit
       env: SpliceTestConsoleEnvironment
-  ): (TransferPreapproval.ContractId, String, String) = {
+  ): ExternalPartySetupResult = {
     val preparedTx =
       prepareAcceptExternalPartySetupProposal(
         provider,
@@ -202,7 +208,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       )
     val (cid, updateId) =
       submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
-    (cid, updateId, preparedTx.txHash)
+    ExternalPartySetupResult(cid, updateId, preparedTx.txHash)
   }
 
   protected def prepareAcceptExternalPartySetupProposal(

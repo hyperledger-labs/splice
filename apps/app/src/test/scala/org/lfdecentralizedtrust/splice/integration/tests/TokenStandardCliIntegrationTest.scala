@@ -53,7 +53,7 @@ class TokenStandardCliIntegrationTest
       aliceValidatorBackend.participantClient.parties
         .hosted(filterParty = onboardingAlice.party.filterString) should not be empty
 
-      val (_, _, onboardingAliceExternalTxnHash) = createAndAcceptExternalPartySetupProposal(
+      val onboardingAliceExtPartySetupResult = createAndAcceptExternalPartySetupProposal(
         aliceValidatorBackend,
         onboardingAlice,
         verboseHashing = true,
@@ -181,7 +181,7 @@ class TokenStandardCliIntegrationTest
       )
 
       // necessary to call the balance endpoint after
-      val (_, _, onboardingBobExternalTxnHash) =
+      val onboardingBobExtPartySetupResult =
         createAndAcceptExternalPartySetupProposal(
           aliceValidatorBackend,
           onboardingBob,
@@ -210,7 +210,10 @@ class TokenStandardCliIntegrationTest
             sv1Backend.participantClient,
             sv1ScanBackend.appState.automation.updateHistory,
             sv1LedgerBeginOffset,
-            extTxnHashes = Seq(onboardingAliceExternalTxnHash, onboardingBobExternalTxnHash),
+            extTxnHashes = Seq(
+              onboardingAliceExtPartySetupResult.txHash,
+              onboardingBobExtPartySetupResult.txHash,
+            ),
           )
         }
       }
