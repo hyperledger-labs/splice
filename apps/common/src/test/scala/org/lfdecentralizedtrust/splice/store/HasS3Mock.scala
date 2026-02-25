@@ -1,9 +1,10 @@
-package org.lfdecentralizedtrust.splice.scan.store.bulk
+package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.github.luben.zstd.ZstdInputStream
 import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
+import org.lfdecentralizedtrust.splice.config.S3Config
 import org.scalatest.EitherValues
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object

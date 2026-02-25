@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
+  HasS3Mock,
   HistoryMetrics,
   Limit,
   S3BucketConnection,
