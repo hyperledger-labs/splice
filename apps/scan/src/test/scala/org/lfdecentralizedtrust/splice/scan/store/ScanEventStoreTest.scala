@@ -45,17 +45,19 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         verdictOpt.value._1.recordTime shouldBe updateOpt.value.update.update.recordTime
         // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdate
         updateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
+        // Verdict without a summary should have no traffic summary
+        verdictOpt.value._1.trafficSummaryO shouldBe None
       }
     }
 
-    "combine a verdict that has a summary with update events by update_id" in {
+    "combine a verdict that has a traffic summary with update events by update_id" in {
       for {
         ctx <- newEventStore()
         recordTs = CantonTimestamp.now()
         tx <- insertUpdate(ctx.updateHistory, recordTs, "update1")
         updateId = tx.getUpdateId
 
-        _ <- insertVerdict(ctx.verdictStore, updateId, recordTs, withSummary = true)
+        _ <- insertVerdict(ctx.verdictStore, updateId, recordTs, withTrafficSummary = true)
 
         eventOpt <- ctx.eventStore.getEventByUpdateId(updateId, domainMigrationId)
         histUpdateOpt <- ctx.updateHistory.getUpdate(updateId)
@@ -67,8 +69,19 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         verdictOpt.value._1.recordTime shouldBe updateOpt.value.update.update.recordTime
         // Confirm the update returned by ScanEventStore matches UpdateHistory.getUpdate
         updateOpt.map(_.update.update) shouldBe histUpdateOpt.map(_.update.update)
+        // Verify the traffic summary is loaded back correctly
+        val verdict = verdictOpt.value._1
+        val summary = verdict.trafficSummaryO.value
+        summary.sequencingTime shouldBe recordTs
+        summary.totalTrafficCost shouldBe 100L
+        summary.envelopes.size shouldBe 2
+        summary.envelopes(0).trafficCost shouldBe 60L
+        summary.envelopes(0).viewIds shouldBe Seq(1, 2)
+        summary.envelopes(1).trafficCost shouldBe 40L
+        summary.envelopes(1).viewIds shouldBe Seq(3)
       }
     }
+
     "not insert the same update's verdict twice" in {
       for {
         ctx <- newEventStore()
@@ -944,7 +957,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       informees: Seq[PartyId] = Seq(dsoParty),
       viewId: Int = 0,
       migrationId: Long = domainMigrationId,
-      withSummary: Boolean = false,
+      withTrafficSummary: Boolean = false,
   ): Future[Unit] = {
     val verdict =
       mkVerdict(
@@ -955,7 +968,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         informees,
         viewId,
         migrationId,
-        withSummary,
+        withTrafficSummary,
       )
     val mkViews: Long => Seq[verdictStore.TransactionViewT] = { rowId =>
       Seq(
@@ -981,10 +994,10 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       informees: Seq[PartyId] = Seq(dsoParty),
       viewId: Int = 0,
       migrationId: Long = domainMigrationId,
-      withSummary: Boolean = false,
+      withTrafficSummary: Boolean = false,
   ) = {
     val summary =
-      if (!withSummary) None
+      if (!withTrafficSummary) None
       else
         Some(
           TrafficSummaryT(
