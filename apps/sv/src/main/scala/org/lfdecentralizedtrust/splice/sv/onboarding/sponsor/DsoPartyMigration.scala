@@ -27,13 +27,14 @@ import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
+import scala.annotation.unused
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class DsoPartyMigration(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     participantAdminConnection: ParticipantAdminConnection,
-    ledgerClient: SpliceLedgerClient,
+    @unused ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     dsoPartyHosting: DsoPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -50,18 +51,14 @@ class DsoPartyMigration(
     dsoPartyHosting,
     loggerFactory,
   )
-  private val readOnlyConnection = ledgerClient.readOnlyConnection(
-    this.getClass.getSimpleName,
-    loggerFactory,
-  )
 
   def authorizeParticipantForHostingDsoParty(
-      participantId: ParticipantId
+      participantId: ParticipantId,
+      beforeActivationOffset: NonNegativeLong,
   )(implicit tc: TraceContext): EitherT[Future, DsoPartyMigrationFailure, ByteString] = {
     logger.info(s"Sponsor SV authorizing DSO party to participant $participantId")
     for {
       dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
-      beforeActivationOffset <- EitherT.liftF(readOnlyConnection.ledgerEnd())
       // this will wait until the PartyToParticipant state change completed
       _ <- partyHosting
         .authorizeDsoPartyToParticipant(
@@ -74,7 +71,7 @@ class DsoPartyMigration(
       acsBytes <- EitherT.liftF(
         downloadSnapshotFromTime(
           participantId,
-          NonNegativeLong.tryCreate(beforeActivationOffset),
+          beforeActivationOffset,
           dsoRules.domain,
         )
       )

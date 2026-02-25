@@ -213,14 +213,16 @@ class DbSvDsoStore(
       } yield limited.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_))
     }
 
-  override def lookupSvOnboardingConfirmedByParty(svParty: PartyId)(implicit
+  override def lookupSvOnboardingConfirmedByPartyWithOffset(svParty: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =
+  ): Future[MultiDomainAcsStore.QueryResult[Option[
+    Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]
+  ]]] =
     waitUntilAcsIngested {
-      for {
+      (for {
         result <- storage
           .querySingle(
-            selectFromAcsTable(
+            selectFromAcsTableWithOffset(
               DsoTables.acsTableName,
               acsStoreId,
               domainMigrationId,
@@ -228,10 +230,12 @@ class DbSvDsoStore(
               where = sql"""sv_candidate_party = $svParty""",
               orderLimit = sql"limit 1",
             ).headOption,
-            "lookupSvOnboardingConfirmedByParty",
+            "lookupSvOnboardingConfirmedByPartyWithOffset",
           )
-          .value
-      } yield result.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_))
+      } yield MultiDomainAcsStore.QueryResult(
+        result.offset,
+        result.row.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_)),
+      )).getOrRaise(offsetExpectedError())
     }
 
   override def listConfirmations(action: ActionRequiringConfirmation, limit: Limit)(implicit
