@@ -144,7 +144,7 @@ data SynchronizerNodeConfig = SynchronizerNodeConfig with
     legacySequencerConfig: Optional LegacySequencerConfig
       -- ^ The legacy sequencer config for the prior migration id that is still up. We store this so it can be published on scan and validators can catchup.
 
-    physicalSynchronizers: PhysicalSynchronizerNodeConfigMap
+    physicalSynchronizers: Optional PhysicalSynchronizerNodeConfigMap
       -- ^ The synchronizer node configs for the currently running physical synchronizers.
 
   deriving (Eq, Show)
@@ -161,7 +161,7 @@ data SynchronizerNodeConfigLimits = SynchronizerNodeConfigLimits with
 -----------------
 
 emptySynchronizerNodeConfig : SynchronizerNodeConfig
-emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None Map.empty
+emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None None
 
 
 -- helper functions

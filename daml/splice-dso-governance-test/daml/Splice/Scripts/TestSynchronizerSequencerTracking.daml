@@ -5,6 +5,7 @@ module Splice.Scripts.TestSynchronizerSequencerTracking where
 
 import DA.Assert
 import DA.Foldable (forA_)
+import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
 
@@ -40,7 +41,7 @@ testSynchronizerMigration = do
         migrationId = 0
         url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
         sequencerId = "legacy-sequencer-id-" <> partyToText sv
-      physicalSynchronizers = Map.empty
+      physicalSynchronizers = None
 
   -- sequencer info are published to DsoRules and AmuletRules
   forA_ svs $ \sv -> do
@@ -76,7 +77,7 @@ testPhysicalSynchronizersOnlyConfig = do
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
       legacySequencerConfig = None
-      physicalSynchronizers = Map.fromList
+      physicalSynchronizers = Some (Map.fromList
         [ (0, PhysicalSynchronizerNodeConfig with
             sequencer = Some SequencerNodeConfig with
               sequencerId = "sequencer-id-" <> partyToText sv
@@ -85,7 +86,7 @@ testPhysicalSynchronizersOnlyConfig = do
             mediator = Some MediatorConfig with
               mediatorId = "mediator-id-" <> partyToText sv
           )
-        ]
+        ])
 
   -- verify the config was set correctly
   forA_ svs $ \sv -> do
@@ -95,7 +96,8 @@ testPhysicalSynchronizersOnlyConfig = do
     synchronizerConfig.sequencer === None
     synchronizerConfig.mediator === None
     -- physicalSynchronizers should have the config
-    let Some physicalConfig = Map.lookup 0 synchronizerConfig.physicalSynchronizers
+    let Some physicalSynchronizersMap = synchronizerConfig.physicalSynchronizers
+    let Some physicalConfig = Map.lookup 0 physicalSynchronizersMap
     physicalConfig.sequencer === Some SequencerNodeConfig with
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"
@@ -122,7 +124,7 @@ testPhysicalSynchronizersMultipleEntries = do
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
       legacySequencerConfig = None
-      physicalSynchronizers = Map.fromList
+      physicalSynchronizers = Some (Map.fromList
         [ (0, PhysicalSynchronizerNodeConfig with
             sequencer = Some SequencerNodeConfig with
               sequencerId = "sequencer-0-id-" <> partyToText sv
@@ -139,7 +141,7 @@ testPhysicalSynchronizersMultipleEntries = do
             mediator = Some MediatorConfig with
               mediatorId = "mediator-1-id-" <> partyToText sv
           )
-        ]
+        ])
 
   -- verify the config was set correctly
   forA_ svs $ \sv -> do
@@ -149,14 +151,15 @@ testPhysicalSynchronizersMultipleEntries = do
     synchronizerConfig.sequencer === None
     synchronizerConfig.mediator === None
     -- physicalSynchronizers should have both configs
-    let Some physicalConfig0 = Map.lookup 0 synchronizerConfig.physicalSynchronizers
+    let Some physicalSynchronizersMap = synchronizerConfig.physicalSynchronizers
+    let Some physicalConfig0 = Map.lookup 0 physicalSynchronizersMap
     physicalConfig0.sequencer === Some SequencerNodeConfig with
       sequencerId = "sequencer-0-id-" <> partyToText sv
       url = "sequencer-0-" <> partyToText sv <> ".address:1234"
       availableAfter = Some now
     physicalConfig0.mediator === Some MediatorConfig with
       mediatorId = "mediator-0-id-" <> partyToText sv
-    let Some physicalConfig1 = Map.lookup 1 synchronizerConfig.physicalSynchronizers
+    let Some physicalConfig1 = Map.lookup 1 physicalSynchronizersMap
     physicalConfig1.sequencer === Some SequencerNodeConfig with
       sequencerId = "sequencer-1-id-" <> partyToText sv
       url = "sequencer-1-" <> partyToText sv <> ".address:1234"

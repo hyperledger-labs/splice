@@ -154,8 +154,8 @@ object PublishScanConfigTrigger {
         Some(scanConfig).toJava,
         synchronizerNodeConfig.flatMap(_.legacySequencerConfig.toScala).toJava,
         synchronizerNodeConfig
-          .map(_.physicalSynchronizers)
-          .getOrElse(java.util.Map.of()),
+          .flatMap(_.physicalSynchronizers.toScala)
+          .toJava,
       )
   }
 }

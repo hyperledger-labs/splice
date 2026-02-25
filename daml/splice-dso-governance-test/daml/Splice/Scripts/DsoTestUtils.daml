@@ -114,7 +114,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
                 scan = Some ScanConfig with
                   publicUrl = "https://sv1.example.com"
                 legacySequencerConfig = None
-                physicalSynchronizers = Map.empty
+                physicalSynchronizers = None
         )]
       amuletConfig
       amuletPrice

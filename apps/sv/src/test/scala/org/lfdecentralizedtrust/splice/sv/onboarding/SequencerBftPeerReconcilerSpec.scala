@@ -328,7 +328,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       None.asJava,
       None.asJava,
       None.asJava,
-      java.util.Map.of(),
+      java.util.Optional.empty(),
     )
   }
 
