@@ -43,3 +43,7 @@
 
         - Switched the gRPC service ``SequencerService.subscribe`` and ``SequencerService.downloadTopologyStateForInit`` to manual
           control flow, so that the sequencer doesn't crash with an ``OutOfMemoryError`` when responding to slow clients.
+
+        - Fixed a bug in asynchronous mediator processing.
+          If you have an override for the `canton.mediators.mediator.mediator.asynchronous-processing` setting,
+          please remove it now.
