@@ -20,7 +20,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     steps:
       - name: Connection check
-        shell: bash
-        run: |
-          echo "Checking connection to Splice services..."
-          PGPASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD" psql -h"$PERFORMANCE_TESTS_DB_HOST" -U"$PERFORMANCE_TESTS_DB_USER" -dcantonnet -c '\l' || (echo "Connection to DB failed" && exit 1)
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
+        with:
+          additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
+          cmd: ./scripts/check-cloudsql-conn.sh
