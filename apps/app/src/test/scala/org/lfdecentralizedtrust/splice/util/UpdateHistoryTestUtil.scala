@@ -215,14 +215,12 @@ trait UpdateHistoryTestUtil extends TestCommon {
           Option(actualTx.getExternalTransactionHash)
             .map(_.toByteArray)
             .getOrElse(Array.emptyByteArray)
-            .map("%02x" format _)
-            .mkString
+
         val recordedExtTxnHash =
           Option(recordedTx.getExternalTransactionHash)
             .map(_.toByteArray)
             .getOrElse(Array.emptyByteArray)
-            .map("%02x" format _)
-            .mkString
+
         actualExtTxnHash shouldBe recordedExtTxnHash
       case _ =>
         succeed
