@@ -195,7 +195,7 @@ class ScanHistoryBackfillingIntegrationTest
     val sv1updatesBeforeBackfill = clue(s"SV1 scan has ingested the latest update") {
       eventually() {
         val updates = allUpdatesFromScanBackend(sv1ScanBackend)
-        updates should not be empty
+        updates should not be empty withClue "scan updates"
         containsCreateEvent(updates, latestAmuletCid) should be(true)
         updates
       }
@@ -203,7 +203,7 @@ class ScanHistoryBackfillingIntegrationTest
     val sv2updatesBeforeBackfill = clue(s"SV2 scan has ingested the latest update") {
       eventually() {
         val updates = allUpdatesFromScanBackend(sv2ScanBackend)
-        updates should not be empty
+        updates should not be empty withClue "scan updates"
         containsCreateEvent(updates, latestAmuletCid) should be(true)
         updates
       }
@@ -216,7 +216,7 @@ class ScanHistoryBackfillingIntegrationTest
       val N = 10
       val sv1times = sv1updatesBeforeBackfill.take(N).map(itemTime).toSet
       val sv2times = sv2updatesBeforeBackfill.map(itemTime).toSet
-      sv1times.foreach(sv1time => sv2times should not contain sv1time)
+      sv1times.foreach(sv1time => sv2times should not contain sv1time withClue "SV2 history times")
     }
 
     clue(
@@ -313,7 +313,9 @@ class ScanHistoryBackfillingIntegrationTest
         // Update history is complete at this point, but the status endpoint only reports
         // as complete if the txlog is also backfilled
         sv1ScanBackend.getBackfillingStatus().complete shouldBe false
-        readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
+        readUpdateHistoryFromScan(
+          sv1ScanBackend
+        ) should not be empty withClue "sv1 scan update history"
 
         sv2ScanBackend.appState.automation.updateHistory
           .getBackfillingState()
@@ -387,7 +389,7 @@ class ScanHistoryBackfillingIntegrationTest
       // Again we can't compare using strict equality, as the items contain offsets which are participant-local.
       val sv1Times = sv1updatesBeforeBackfill.map(itemTime)
       val sv2Times = sv2updatesAfterBackfill.take(sv1Times.length).map(itemTime)
-      sv1Times should contain theSameElementsInOrderAs sv2Times
+      sv1Times should contain theSameElementsInOrderAs sv2Times withClue "SV1/2 history times"
     }
 
     clue("Compare scan histories with each other using the v0 HTTP endpoint") {
@@ -406,7 +408,7 @@ class ScanHistoryBackfillingIntegrationTest
       // Responses are not consistent across SVs, only compare record times
       val sv1ItemTimes = sv1HttpUpdates.take(commonLength).map(httpItemTime)
       val sv2ItemTimes = sv2HttpUpdates.take(commonLength).map(httpItemTime)
-      sv1ItemTimes should contain theSameElementsInOrderAs sv2ItemTimes
+      sv1ItemTimes should contain theSameElementsInOrderAs sv2ItemTimes withClue "SV1/2 update times"
     }
 
     clue("Compare scan histories with each other using the v1 HTTP endpoint") {
@@ -424,7 +426,7 @@ class ScanHistoryBackfillingIntegrationTest
       commonLength should be > 10
       val sv1Items = sv1HttpUpdates.take(commonLength)
       val sv2Items = sv2HttpUpdates.take(commonLength)
-      sv1Items should contain theSameElementsInOrderAs sv2Items
+      sv1Items should contain theSameElementsInOrderAs sv2Items withClue "SV1/2 update times"
     }
 
     clue("Compare scan histories with each other using the v2 HTTP endpoint") {
@@ -438,7 +440,7 @@ class ScanHistoryBackfillingIntegrationTest
       commonLength should be > 10
       val sv1Items = sv1HttpUpdates.take(commonLength)
       val sv2Items = sv2HttpUpdates.take(commonLength)
-      sv1Items should contain theSameElementsInOrderAs sv2Items
+      sv1Items should contain theSameElementsInOrderAs sv2Items withClue "SV1/2 update times"
     }
 
     clue("Compare scan history with participant update stream") {
@@ -471,11 +473,11 @@ class ScanHistoryBackfillingIntegrationTest
         sv2ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
 
       // We tapped 4 times before SV2 joined, and once after
-      sv1Transactions.size should be >= 5
-      sv2Transactions.size should be >= 1
-      sv1Transactions.size should be > sv2Transactions.size
-      sv1Transactions should contain allElementsOf sv2Transactions
-      sv2Transactions should not contain sv1Transactions.headOption.value
+      sv1Transactions.size should be >= 5 withClue "SV1 txns"
+      sv2Transactions.size should be >= 1 withClue "SV2 txns"
+      sv1Transactions.size should be > sv2Transactions.size withClue "SV1 txns"
+      sv1Transactions should contain allElementsOf sv2Transactions withClue "sv1 transactions"
+      sv2Transactions should not contain sv1Transactions.headOption.value withClue "sv2 transactions"
     }
 
     actAndCheck(
@@ -529,7 +531,7 @@ class ScanHistoryBackfillingIntegrationTest
         sv2ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
 
       // TODO(#666): switch to theSameElementsInOrderAs once the endpoint sorts by record time instead of row id.
-      sv1Transactions should contain theSameElementsAs sv2Transactions
+      sv1Transactions should contain theSameElementsAs sv2Transactions withClue "SV1/2 txns"
     }
 
   }

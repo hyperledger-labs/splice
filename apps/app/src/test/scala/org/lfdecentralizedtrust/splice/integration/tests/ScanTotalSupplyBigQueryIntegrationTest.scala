@@ -322,7 +322,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
             .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
               aliceValidatorBackend.getValidatorPartyId(),
               _.data.round.number == (expectRound - 2),
-            ) should have size (1)
+            ) should have size (1) withClue s"ValidatorLivenessActivityRecords round ${expectRound - 2}"
         }
       }
       actAndCheck(timeUntilSuccess = 30.seconds)(
