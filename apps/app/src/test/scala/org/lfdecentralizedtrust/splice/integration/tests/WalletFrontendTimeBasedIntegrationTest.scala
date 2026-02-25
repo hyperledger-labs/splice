@@ -64,7 +64,10 @@ class WalletFrontendTimeBasedIntegrationTest
           "Alice logs out", {
             eventuallyClickOn(id("logout-button"))
           },
-        )("Alice sees the login screen again", _ => find(id("login-button")) should not be empty)
+        )(
+          "Alice sees the login screen again",
+          _ => find(id("login-button")) should not be empty withClue "'Log In' button",
+        )
       }
     }
 

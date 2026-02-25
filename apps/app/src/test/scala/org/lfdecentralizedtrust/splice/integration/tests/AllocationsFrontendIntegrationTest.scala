@@ -221,7 +221,8 @@ class AllocationsFrontendIntegrationTest
         }
 
         clue("sanity check: alice has no allocations yet") {
-          aliceWalletClient.listAmuletAllocations() shouldBe empty
+          aliceWalletClient
+            .listAmuletAllocations() shouldBe empty withClue "alice AmuletAllocations"
         }
 
         val (_, allocationElement) = actAndCheck(
@@ -261,7 +262,7 @@ class AllocationsFrontendIntegrationTest
         )(
           "the allocation is not shown anymore",
           _ => {
-            findAll(className("allocation")).toSeq shouldBe empty
+            findAll(className("allocation")).toSeq shouldBe empty withClue "Allocation Cards"
           },
         )
 
@@ -274,7 +275,9 @@ class AllocationsFrontendIntegrationTest
         )(
           "the allocation request is not shown anymore",
           _ => {
-            findAll(className("allocation-request")).toSeq shouldBe empty
+            findAll(
+              className("allocation-request")
+            ).toSeq shouldBe empty withClue "Allocation Request Cards"
           },
         )
       }

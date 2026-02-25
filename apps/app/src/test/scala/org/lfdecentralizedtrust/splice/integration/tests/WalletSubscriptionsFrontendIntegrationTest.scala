@@ -65,7 +65,7 @@ class WalletSubscriptionsFrontendIntegrationTest
           "Alice sees her subscriptions",
           _ => {
             val subscriptionRows = findAll(className("subscription-row")).toSeq
-            subscriptionRows should have size 2
+            subscriptionRows should have size 2 withClue "'Your Subscriptions' rows"
             matchSubscription(subscriptionRows.head)(
               expectedReceiver = dsoEntry,
               expectedProvider = dsoEntry,
@@ -89,7 +89,7 @@ class WalletSubscriptionsFrontendIntegrationTest
           "Alice sees only one subscription",
           _ => {
             val subscriptionRowsAfterCancel = findAll(className("subscription-row")).toSeq
-            subscriptionRowsAfterCancel should have size 1
+            subscriptionRowsAfterCancel should have size 1 withClue "'Your Subscriptions' rows after cancel"
             matchSecondSubscription(subscriptionRowsAfterCancel.head)
           },
         )
@@ -118,7 +118,7 @@ class WalletSubscriptionsFrontendIntegrationTest
           "Alice sees the subscription, but cannot cancel it",
           _ => {
             val subscriptionRows = findAll(className("subscription-row")).toSeq
-            subscriptionRows should have size 1
+            subscriptionRows should have size 1 withClue "'Your Subscriptions' rows"
             cancelIsEnabled(subscriptionRows.head, expectedButtonEnabled = false)
           },
         )

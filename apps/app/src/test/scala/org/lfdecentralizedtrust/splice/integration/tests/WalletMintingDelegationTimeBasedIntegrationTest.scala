@@ -75,8 +75,12 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary2Party)
 
           // Verify initial state
-          aliceValidatorWalletClient.listMintingDelegationProposals().proposals shouldBe empty
-          aliceValidatorWalletClient.listMintingDelegations().delegations shouldBe empty
+          aliceValidatorWalletClient
+            .listMintingDelegationProposals()
+            .proposals shouldBe empty withClue "MintingDelegationProposals"
+          aliceValidatorWalletClient
+            .listMintingDelegations()
+            .delegations shouldBe empty withClue "MintingDelegations"
 
           val (_, proposal0Cid) = actAndCheck(
             "Create minting delegation proposal for beneficiary2",
@@ -85,7 +89,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible to validator",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 1
+              proposals.proposals should have size 1 withClue "proposals"
               proposals.proposals.head.contract.contractId
             },
           )
@@ -97,7 +101,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Delegation is created",
             _ => {
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
-              delegations.delegations should have size 1
+              delegations.delegations should have size 1 withClue "delegations"
             },
           )
 
@@ -108,7 +112,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible to validator",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 1
+              proposals.proposals should have size 1 withClue "proposals"
             },
           )
         }
@@ -122,7 +126,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible with beneficiaryHosted = false",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 2
+              proposals.proposals should have size 2 withClue "proposals"
               val beneficiaryProposal = proposals.proposals
                 .find(
                   _.contract.payload.hcursor
@@ -144,7 +148,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Delegation is visible with beneficiaryHosted = false",
             _ => {
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
-              delegations.delegations should have size 2
+              delegations.delegations should have size 2 withClue "delegations"
               val beneficiaryDelegation = delegations.delegations
                 .find(
                   _.contract.payload.hcursor
@@ -181,7 +185,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible to validator",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 2
+              proposals.proposals should have size 2 withClue "proposals"
               proposals.proposals
                 .find(
                   _.contract.payload.hcursor
@@ -203,7 +207,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             _ =>
               aliceValidatorWalletClient
                 .listMintingDelegationProposals()
-                .proposals should have size 1,
+                .proposals should have size 1 withClue "proposals",
           )
         }
 
@@ -216,7 +220,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible to validator",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 2
+              proposals.proposals should have size 2 withClue "proposals"
               proposals.proposals
                 .find(
                   _.contract.payload.hcursor
@@ -238,9 +242,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             delegationCid => {
               aliceValidatorWalletClient
                 .listMintingDelegationProposals()
-                .proposals should have size 1
+                .proposals should have size 1 withClue "proposals"
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
-              delegations.delegations should have size 2
+              delegations.delegations should have size 2 withClue "delegations"
               delegationCid
             },
           )
@@ -255,7 +259,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible to validator",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 2
+              proposals.proposals should have size 2 withClue "proposals"
               proposals.proposals
                 .find(
                   _.contract.payload.hcursor
@@ -277,9 +281,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             newDelegationCid => {
               aliceValidatorWalletClient
                 .listMintingDelegationProposals()
-                .proposals should have size 1
+                .proposals should have size 1 withClue "proposals"
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
-              delegations.delegations should have size 2
+              delegations.delegations should have size 2 withClue "delegations"
               val beneficiaryDelegation = delegations.delegations
                 .find(
                   _.contract.payload.hcursor
@@ -310,7 +314,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Proposal is visible",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 2
+              proposals.proposals should have size 2 withClue "proposals"
               proposals.proposals
                 .find(
                   _.contract.payload.hcursor
@@ -331,7 +335,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Delegation is created",
             _ => {
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
-              delegations.delegations should have size 3
+              delegations.delegations should have size 3 withClue "delegations"
             },
           )
 
@@ -343,7 +347,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             "Second proposal is visible",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-              proposals.proposals should have size 2
+              proposals.proposals should have size 2 withClue "proposals"
             },
           )
 
@@ -360,7 +364,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           clue("Expired proposal should be auto-rejected") {
             eventually() {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals().proposals
-              proposals should have size 1
+              proposals should have size 1 withClue "proposals"
             }
           }
         }
@@ -392,7 +396,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         "Proposal is visible",
         _ => {
           val proposals = aliceWalletClient.listMintingDelegationProposals()
-          proposals.proposals should have size 1
+          proposals.proposals should have size 1 withClue "proposals"
           proposals.proposals.head.contract.contractId
         },
       )
@@ -405,7 +409,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         "Delegation is created",
         _ => {
           val delegations = aliceWalletClient.listMintingDelegations()
-          delegations.delegations should have size 1
+          delegations.delegations should have size 1 withClue "delegations"
         },
       )
 
@@ -553,19 +557,21 @@ class WalletMintingDelegationTimeBasedIntegrationTest
 
         clue("All reward contracts should be consumed") {
           eventually() {
-            externalPartyWallet.store.listUnclaimedActivityRecords().futureValue shouldBe empty
+            externalPartyWallet.store
+              .listUnclaimedActivityRecords()
+              .futureValue shouldBe empty withClue "UnclaimedActivityRecord"
             externalPartyWallet.store
               .listSortedAppRewards(issuingRoundsMap)
-              .futureValue shouldBe empty
+              .futureValue shouldBe empty withClue "AppReward"
             externalPartyWallet.store
               .listSortedValidatorRewards(Some(issuingRoundsMap.keySet.map(_.number)))
-              .futureValue shouldBe empty
+              .futureValue shouldBe empty withClue "ValidatorReward"
             externalPartyWallet.store
               .listSortedLivenessActivityRecords(issuingRoundsMap)
-              .futureValue shouldBe empty
+              .futureValue shouldBe empty withClue "LivenessActivityRecord"
             externalPartyWallet.store
               .listDevelopmentFundCoupons()
-              .futureValue shouldBe empty
+              .futureValue shouldBe empty withClue "DevelopmentFundCoupon"
           }
         }
       }
