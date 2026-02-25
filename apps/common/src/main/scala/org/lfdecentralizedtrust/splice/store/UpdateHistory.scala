@@ -1885,7 +1885,7 @@ class UpdateHistory(
         from #$table
         where history_id = $historyId
         and migration_id = $migrationId
-        and record_time > ${CantonTimestamp.MinValue})
+        and record_time > ${CantonTimestamp.MinValue}
       """
     }
     storage
@@ -1893,11 +1893,11 @@ class UpdateHistory(
         (sql"""
           select min(min_record_time) as min_record_time, max(max_record_time) as max_record_time
           from (
-            """ ++ rangeForTable("update_history_transactions") ++ sql"""
+            (""" ++ rangeForTable("update_history_transactions") ++ sql""")
             union all
-            """ ++ rangeForTable("update_history_asignments") ++ sql"""
+            (""" ++ rangeForTable("update_history_assignments") ++ sql""")
             union all
-            """ ++ rangeForTable("update_history_unassignments") ++ sql"""
+            (""" ++ rangeForTable("update_history_unassignments") ++ sql""")
           ) all_ranges
         """).toActionBuilder
           .as[(Option[CantonTimestamp], Option[CantonTimestamp])]
