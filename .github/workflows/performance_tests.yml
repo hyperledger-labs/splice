@@ -15,7 +15,7 @@ jobs:
   performance_tests:
     runs-on: self-hosted-k8s-small
     container:
-      image: alpine/psql:18.2
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     name: Performance Tests
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     steps:
