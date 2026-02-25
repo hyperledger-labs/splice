@@ -76,6 +76,7 @@ export function installSvParticipant(
         svConfig.participant?.additionalEnvVars || []
       ),
       logLevel: svConfig.logging?.cantonLogLevel,
+      apiRequestLogLevel: svConfig.logging?.apiRequestLogLevel,
       logLevelStdout: svConfig.logging?.cantonStdoutLogLevel,
       logAsyncFlush: svConfig.logging?.cantonAsync,
       participantAdminUserNameFrom,

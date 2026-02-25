@@ -21,6 +21,7 @@ export const MultiValidatorConfigSchema = z.object({
       extraValidatorEnvVars: z.array(EnvironmentVariableSchema).default([]),
       extraParticipantEnvVars: z.array(EnvironmentVariableSchema).default([]),
       logLevel: LogLevelSchema.optional().default('INFO'),
+      apiRequestLogLevel: LogLevelSchema.optional().default('DEBUG'),
       resources: z
         .object({
           postgres: K8sResourceSchema,
