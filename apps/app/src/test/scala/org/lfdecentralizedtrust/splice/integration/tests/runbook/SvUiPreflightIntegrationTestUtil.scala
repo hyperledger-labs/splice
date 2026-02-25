@@ -33,7 +33,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
             svUiUrl,
             svUsername,
             svPassword,
-            () => find(id("logout-button")) should not be empty,
+            () => find(id("logout-button")) should not be empty withClue "'Logout' button",
           )
         },
       )(
@@ -180,7 +180,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
           svUiUrl,
           svUsername,
           svPassword,
-          () => find(id("logout-button")) should not be empty,
+          () => find(id("logout-button")) should not be empty withClue "'Logout' button",
         )
       }
       f(webDriver)

@@ -83,7 +83,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "Alice sees no transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 0
+            txs should have size 0 withClue "txs"
           },
         )
 
@@ -127,7 +127,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "Alice sees the transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 6
+            txs should have size 6 withClue "txs"
             txs
           },
         )
@@ -269,7 +269,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         )(
           "Alice sees no transactions",
           _ => {
-            txRows should have size 0
+            txRows should have size 0 withClue "txs"
           },
         )
 
