@@ -51,7 +51,7 @@ class AcsSnapshotTrigger(
       AcsSnapshotTrigger
         .retrieveTaskForCurrentMigration(
           migrationId = store.currentMigrationId,
-          isHistoryBackfilled = isHistoryBackfilled,
+          isHistoryBackfilled = updateHistory.isHistoryBackfilled,
           lastIngestedRecordTime = updateHistory.lastIngestedRecordTime,
           getIncrementalSnapshot = () => getIncrementalSnapshot(),
           getLatestSnapshot = getLatestSnapshot,

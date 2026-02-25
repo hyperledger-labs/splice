@@ -60,7 +60,7 @@ class AcsSnapshotBackfillingTrigger(
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
           earliestKnownBackfilledMigrationId = store.currentMigrationId,
-          isHistoryBackfilled = isHistoryBackfilled,
+          isHistoryBackfilled = updateHistory.isHistoryBackfilled,
           getIncrementalSnapshot = () => getIncrementalSnapshot(),
           getLatestSnapshot = getLatestSnapshot,
           getRecordTimeRange = getRecordTimeRange,
