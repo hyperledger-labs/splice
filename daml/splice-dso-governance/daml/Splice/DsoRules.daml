@@ -1122,6 +1122,27 @@ template DsoRules with
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
 
+    -- | Cleanup choice for expired Amulet transfer instructions.
+    
+    nonconsuming choice DsoRules_Amulet_ExpireTransferInstruction : DsoRules_Amulet_ExpireTransferInstructionResult
+      with
+        amuletTransferInstructionCid : ContractId AmuletTransferInstruction
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        
+        let transferInstructionCid = toInterfaceContractId @TransferInstruction amuletTransferInstructionCid
+
+        result <- exercise transferInstructionCid TransferInstruction_Update with
+          extraActors = []
+          extraArgs = ExtraArgs with
+            meta = emptyMetadata
+            context = emptyChoiceContext
+
+        return DsoRules_Amulet_ExpireTransferInstructionResult with
+          transferInstructionResult = result
+    
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with
         cid : ContractId Amulet
