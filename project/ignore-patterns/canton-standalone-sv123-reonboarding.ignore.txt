@@ -21,5 +21,4 @@ Sequencing result message timed out
 
 Could not send a time-advancing message
 
-# TODO(#3324): Remove once integration test logging issues are resolved see 2589
 Request failed for sequencer.* Is the server running.*Causes: finishConnect.*
