@@ -33,7 +33,7 @@ import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgre
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 
-const getSequencerRateLimitConfig = (): string | undefined =>{
+const getSequencerRateLimitConfig = (): string | undefined => {
   const rateLimitsFile = getPathToPrivateConfigFile('sequencer-rate-limits.json');
   if (!rateLimitsFile) {
     return undefined;
@@ -48,13 +48,12 @@ const getSequencerRateLimitConfig = (): string | undefined =>{
       `  global-kbps-cap = ${config.globalKbpsCap}`,
       `  per-client-kbps-cap = ${config.perClientKbpsCap}`,
       '}',
-    ].join("\n");
+    ].join('\n');
   return [
     limitsForMessageType('confirmation-request', rateLimits.messages.confirmationRequest),
     limitsForMessageType('topology', rateLimits.messages.topology),
-  ].join("\n");
-}
-
+  ].join('\n');
+};
 
 abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource
@@ -135,7 +134,10 @@ abstract class InStackDecentralizedSynchronizerNode
             },
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
-            additionalEnvVars: (rateLimitConfig ? [{name: "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS", value: rateLimitConfig}] : []).concat(svConfig.sequencer?.additionalEnvVars || []),
+            additionalEnvVars: (rateLimitConfig
+              ? [{ name: 'ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS', value: rateLimitConfig }]
+              : []
+            ).concat(svConfig.sequencer?.additionalEnvVars || []),
             resources: svConfig.sequencer?.resources,
           },
           mediator: {
