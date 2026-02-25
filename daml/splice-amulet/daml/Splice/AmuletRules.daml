@@ -31,7 +31,7 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig
   ( transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig
   , defaultTransferPreapprovalFee, getExternalPartyConfigStateTickDuration, useTrafficBasedAppRewards
-  , RewardCalculationVersion, useFeaturedAppMarkers
+  , RewardVersion(..), useFeaturedAppMarkers
   )
 import qualified Splice.AmuletConfig as Unit
 import Splice.ExternalPartyConfigState
@@ -396,7 +396,7 @@ template AmuletRules
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let rewardCalculationVersion = configUsd.rewardCalculationVersion
+        let rewardCalculationVersion = (.mintingVersion) <$> configUsd.rewardConfig
         let nr0 = fromOptional 0 initialRound
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
@@ -478,7 +478,10 @@ template AmuletRules
                 rewardsTimeToLive
                 dryRun = False
 
-        when (useTrafficBasedAppRewards configUsd.dryRunRewardCalculationVersion) $ do
+        let dryRun = useTrafficBasedAppRewards $ do
+              rc <- configUsd.rewardConfig
+              rc.dryRunVersion
+        when dryRun $
             void $ create CalculateRewardsV2 with
                 dso
                 round = roundToArchive.round
@@ -504,7 +507,7 @@ template AmuletRules
               transferConfigUsd = configUsd.transferConfig
               issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
               tickDuration
-              rewardCalculationVersion = configUsd.rewardCalculationVersion
+              rewardCalculationVersion = (.mintingVersion) <$> configUsd.rewardConfig
         return AmuletRules_AdvanceOpenMiningRoundsResult with
           summarizingRoundCid = newSummarizingRound
           openRoundCid = newOpenRound
@@ -1051,7 +1054,7 @@ data TransferContextSummaryV2 = TransferContextSummaryV2 with
     amuletPrice : Decimal
     issuingMiningRounds : Map Round IssuingMiningRound
     validatorRights : Map Party (ContractId ValidatorRight)
-    rewardCalculationVersion : Optional RewardCalculationVersion
+    rewardCalculationVersion : Optional RewardVersion
   deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with

@@ -29,13 +29,21 @@ import Splice.Scripts.DsoTestUtils
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
 
+-- TODO:
+-- - test dry-run
+-- - ... determine other missing tests ...
 
 -- | Tests that reward accounting works.
 test_reward_accounting_v2 : Script ()
 test_reward_accounting_v2 = do
     -- enable traffic based app rewards, which are the first use-case for reward accounting v2
   let amuletConfig = defaultAmuletConfig with
-        rewardCalculationVersion = Some RCV_V2
+        rewardConfig = Some $ RewardConfig with
+          mintingVersion = RewardVersion_TrafficBasedAppRewards
+          dryRunVersion = None
+          batchSize = 100
+          rewardCouponTimeToLive = hours 36
+
   (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
 
   alice <- allocateParty "Alice"
