@@ -57,7 +57,8 @@ class AcsSnapshotBulkStorageTest
 
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val ts = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
         val store = new MockAcsSnapshotStore(ts).store
         val metricsFactory = new InMemoryMetricsFactory
@@ -117,7 +118,8 @@ class AcsSnapshotBulkStorageTest
     }
 
     "correctly process multiple ACS snapshots" in {
-      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+      withS3Mock {
+        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
         val ts1 = CantonTimestamp.tryFromInstant(Instant.now().truncatedTo(ChronoUnit.DAYS))
         val ts2 = ts1.add(3.hours)
         val ts3 = ts1.add(24.hours)
