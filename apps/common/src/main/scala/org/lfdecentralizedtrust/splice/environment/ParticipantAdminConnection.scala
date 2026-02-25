@@ -671,10 +671,9 @@ class ParticipantAdminConnection(
       newParticipant: ParticipantId,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
-      // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
-      // See SvOnboardingPromoteToSubmitterTrigger.
+      // onboarding flag is cleared in SvOnboardingPromoteToSubmitterTrigger
       val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermission.Observation, onboarding = true)
+        HostingParticipant(newParticipant, ParticipantPermission.Submission, onboarding = true)
       if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
         participants
       } else {
@@ -719,7 +718,7 @@ class ParticipantAdminConnection(
         val newHostingParticipants = previous.participants.appended(
           HostingParticipant(
             newParticipant,
-            ParticipantPermission.Observation,
+            ParticipantPermission.Submission,
             onboarding = true,
           )
         )

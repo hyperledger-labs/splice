@@ -132,7 +132,9 @@ class SponsorDsoPartyHosting(
       )
       .toRightF {
         partyToParticipantAcceptedState.map { partyToParticipant =>
-          logger.debug(s"Required proposal not found, found accepted state: $partyToParticipant")
+          logger.debug(
+            s"Required proposal for participant ${participantId} not found, found accepted state: $partyToParticipant"
+          )
           RequiredProposalNotFound(
             partyToParticipant.base.serial
           )
