@@ -1,0 +1,174 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: sequencer connection pool
+    folder: canton
+    interval: 1m
+    rules:
+      - uid: dfeb9wma1dk3kc
+        title: Health of a connection
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 21600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              adhocFilters: []
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: max by (connection, namespace, job) (daml_sequencer_client_sequencer_connection_pool_connection_health{namespace=~".*", job=~".*"})
+              instant: true
+              interval: ""
+              intervalMs: 30000
+              legendFormat: '{{namespace}}:{{job}}:{{connection}}'
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 2
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: 50503893-d05f-4ece-9ebf-36fd20ffb06f
+        panelId: 6
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          __dashboardUid__: 50503893-d05f-4ece-9ebf-36fd20ffb06f
+          __panelId__: "6"
+          description: A failed connection is periodically retried for availability. A fatal subscription is considered invalid and will never be retried.
+          summary: The sequencer connection of job {{ $labels.job }} in namespace {{ $labels.namespace }} is not validated.
+        isPaused: false
+      - uid: dfebau7w2r7cwa
+        title: Number of active subscriptions in the subscription pool
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 21600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              adhocFilters: []
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: max by (namespace, job) (daml_sequencer_client_sequencer_connection_pool_active_subscriptions{namespace=~".*",job=~".*"})
+              instant: true
+              interval: ""
+              intervalMs: 30000
+              legendFormat: '{{namespace}}:{{job}}'
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: max by (namespace, job) (daml_sequencer_client_sequencer_connection_pool_subscription_threshold{namespace=~".*",job=~".*"})
+              hide: false
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: $A-$B
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: C
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: D
+              type: threshold
+        dashboardUid: 50503893-d05f-4ece-9ebf-36fd20ffb06f
+        panelId: 5
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: 50503893-d05f-4ece-9ebf-36fd20ffb06f
+          __panelId__: "5"
+          description: The liveness margin determines how many subscriptions on different sequencers are continuously maintained, beyond the minimum number defined by the trust threshold. In other words, the subscription pool will strive to maintain at all times (trust threshold + liveness margin)-many subscriptions active. This provides tolerance to subscriptions falling, enabling the node to continue operating while some sequencers are down.
+          summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} has less active subscriptions than the sum of trust threshold in the subscription pool
+          severity: critical
+        labels: {}
+        isPaused: false
