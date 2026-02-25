@@ -5,7 +5,7 @@ dir := $(call current_dir)
 
 target-logback := $(dir)/target/logback.xml
 
-$(dir)/$(docker-build): build_arg := --build-arg canton_version=${CANTON_VERSION} --build-arg image_sha256=${CANTON_SEQUENCER_IMAGE_SHA256} $(target-logback)
+$(dir)/$(docker-build): build_arg := --build-arg canton_version=${CANTON_VERSION} --build-arg image_sha256=${CANTON_SEQUENCER_IMAGE_SHA256}
 $(dir)/$(docker-build): $(target-logback)
 
 $(target-logback): ${SPLICE_ROOT}/scripts/canton-logback.xml | $(dir)/target
