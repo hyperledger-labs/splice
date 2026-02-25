@@ -8,7 +8,7 @@ import org.scalatest.EitherValues
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
-import org.lfdecentralizedtrust.splice.scan.config.S3Config
+import org.lfdecentralizedtrust.splice.config.S3Config
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer

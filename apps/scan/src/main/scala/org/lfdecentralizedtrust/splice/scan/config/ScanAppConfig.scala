@@ -4,15 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.*
-import org.lfdecentralizedtrust.splice.config.{
-  AutomationConfig,
-  HttpClientConfig,
-  NetworkAppClientConfig,
-  ParticipantClientConfig,
-  SpliceBackendConfig,
-  SpliceInstanceNamesConfig,
-  SpliceParametersConfig,
-}
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, HttpClientConfig, NetworkAppClientConfig, ParticipantClientConfig, S3Config, SpliceBackendConfig, SpliceInstanceNamesConfig, SpliceParametersConfig}
 
 trait BaseScanAppConfig {}
 
@@ -38,14 +30,6 @@ final case class BulkStorageConfig(
     // The maximum parallelization for uploading multiple parts of the same object
     maxParallelPartUploads: Int = 4,
     s3config: Option[S3Config] = None,
-)
-
-final case class S3Config(
-    endpoint: String,
-    bucketName: String,
-    region: String,
-    accessKeyId: String,
-    secretAccessKey: String,
 )
 
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!

@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.scan.config.S3Config
+import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
