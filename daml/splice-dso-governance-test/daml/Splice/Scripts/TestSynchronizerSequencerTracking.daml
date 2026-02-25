@@ -7,6 +7,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import qualified DA.Map as Map
 import Daml.Script
+import DA.Time
 
 import Splice.CometBft
 import Splice.DSO.DecentralizedSynchronizer
@@ -40,6 +41,7 @@ testSynchronizerMigration = do
         migrationId = 0
         url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
         sequencerId = "legacy-sequencer-id-" <> partyToText sv
+      physicalSynchronizers = Map.empty
 
   -- sequencer info are published to DsoRules and AmuletRules
   forA_ svs $ \sv -> do
@@ -54,3 +56,111 @@ testSynchronizerMigration = do
       migrationId = 0
       url = "legacy-sequencer-" <> partyToText sv <> ".address:1234"
       sequencerId = "legacy-sequencer-id-" <> partyToText sv
+
+-- | Test that SVs can set their node config using only physicalSynchronizers
+-- when the old sequencer and mediator fields are not set.
+testPhysicalSynchronizersOnlyConfig : Script ()
+testPhysicalSynchronizersOnlyConfig = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+      synchronizerId = "synchronizer-id"
+
+  now <- getTime
+  forA_ svs $ \sv -> do
+    setSynchronizerNodeConfig app sv synchronizerId $ SynchronizerNodeConfig with
+      cometBft = CometBftConfig with
+        nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+        sequencingKeys = []
+        governanceKeys = []
+      sequencer = None
+      mediator = None
+      scan = Some ScanConfig with
+        publicUrl = "https://" <> partyToText sv <> ".example.com"
+      legacySequencerConfig = None
+      physicalSynchronizers = Map.fromList
+        [ (0, PhysicalSynchronizerNodeConfig with
+            sequencer = Some SequencerNodeConfig with
+              sequencerId = "sequencer-id-" <> partyToText sv
+              url = "sequencer-" <> partyToText sv <> ".address:1234"
+              availableAfter = Some now
+            mediator = Some MediatorConfig with
+              mediatorId = "mediator-id-" <> partyToText sv
+          )
+        ]
+
+  -- verify the config was set correctly
+  forA_ svs $ \sv -> do
+    (_, nodeState) <- getSvNodeState app sv
+    let Some synchronizerConfig = Map.lookup synchronizerId nodeState.state.synchronizerNodes
+    -- old sequencer and mediator fields should be None
+    synchronizerConfig.sequencer === None
+    synchronizerConfig.mediator === None
+    -- physicalSynchronizers should have the config
+    let Some physicalConfig = Map.lookup 0 synchronizerConfig.physicalSynchronizers
+    physicalConfig.sequencer === Some SequencerNodeConfig with
+      sequencerId = "sequencer-id-" <> partyToText sv
+      url = "sequencer-" <> partyToText sv <> ".address:1234"
+      availableAfter = Some now
+    physicalConfig.mediator === Some MediatorConfig with
+      mediatorId = "mediator-id-" <> partyToText sv
+
+-- | Test that SVs can set physicalSynchronizers config for multiple physical synchronizers.
+testPhysicalSynchronizersMultipleEntries : Script ()
+testPhysicalSynchronizersMultipleEntries = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+      synchronizerId = "synchronizer-id"
+
+  now <- getTime
+  forA_ svs $ \sv -> do
+    setSynchronizerNodeConfig app sv synchronizerId $ SynchronizerNodeConfig with
+      cometBft = CometBftConfig with
+        nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+        sequencingKeys = []
+        governanceKeys = []
+      sequencer = None
+      mediator = None
+      scan = Some ScanConfig with
+        publicUrl = "https://" <> partyToText sv <> ".example.com"
+      legacySequencerConfig = None
+      physicalSynchronizers = Map.fromList
+        [ (0, PhysicalSynchronizerNodeConfig with
+            sequencer = Some SequencerNodeConfig with
+              sequencerId = "sequencer-0-id-" <> partyToText sv
+              url = "sequencer-0-" <> partyToText sv <> ".address:1234"
+              availableAfter = Some now
+            mediator = Some MediatorConfig with
+              mediatorId = "mediator-0-id-" <> partyToText sv
+          )
+        , (1, PhysicalSynchronizerNodeConfig with
+            sequencer = Some SequencerNodeConfig with
+              sequencerId = "sequencer-1-id-" <> partyToText sv
+              url = "sequencer-1-" <> partyToText sv <> ".address:1234"
+              availableAfter = None
+            mediator = Some MediatorConfig with
+              mediatorId = "mediator-1-id-" <> partyToText sv
+          )
+        ]
+
+  -- verify the config was set correctly
+  forA_ svs $ \sv -> do
+    (_, nodeState) <- getSvNodeState app sv
+    let Some synchronizerConfig = Map.lookup synchronizerId nodeState.state.synchronizerNodes
+    -- old sequencer and mediator fields should be None
+    synchronizerConfig.sequencer === None
+    synchronizerConfig.mediator === None
+    -- physicalSynchronizers should have both configs
+    let Some physicalConfig0 = Map.lookup 0 synchronizerConfig.physicalSynchronizers
+    physicalConfig0.sequencer === Some SequencerNodeConfig with
+      sequencerId = "sequencer-0-id-" <> partyToText sv
+      url = "sequencer-0-" <> partyToText sv <> ".address:1234"
+      availableAfter = Some now
+    physicalConfig0.mediator === Some MediatorConfig with
+      mediatorId = "mediator-0-id-" <> partyToText sv
+    let Some physicalConfig1 = Map.lookup 1 synchronizerConfig.physicalSynchronizers
+    physicalConfig1.sequencer === Some SequencerNodeConfig with
+      sequencerId = "sequencer-1-id-" <> partyToText sv
+      url = "sequencer-1-" <> partyToText sv <> ".address:1234"
+      availableAfter = None
+    physicalConfig1.mediator === Some MediatorConfig with
+      mediatorId = "mediator-1-id-" <> partyToText sv
