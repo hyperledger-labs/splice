@@ -53,8 +53,10 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       )(
         "Bob's validator will receive some rewards",
         _ => {
-          bobValidatorWalletClient.listAppRewardCoupons() should have size 1
-          bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+          bobValidatorWalletClient
+            .listAppRewardCoupons() should have size 1 withClue "AppRewardCoupons"
+          bobValidatorWalletClient
+            .listValidatorRewardCoupons() should have size 1 withClue "ValidatorRewardCoupons"
         },
       )
 
@@ -71,8 +73,10 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       )(
         "Bob's validator collects rewards",
         _ => {
-          bobValidatorWalletClient.listAppRewardCoupons() should have size 0
-          bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
+          bobValidatorWalletClient
+            .listAppRewardCoupons() should have size 0 withClue "AppRewardCoupons"
+          bobValidatorWalletClient
+            .listValidatorRewardCoupons() should have size 0 withClue "ValidatorRewardCoupons"
           val balanceAfter = bobValidatorWalletClient.balance().unlockedQty
           balanceAfter should be > balanceBefore
           balanceAfter

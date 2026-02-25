@@ -456,7 +456,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         "The coupon is created",
         _ => {
           aliceWalletClient
-            .listActiveDevelopmentFundCoupons() should have size 1
+            .listActiveDevelopmentFundCoupons() should have size 1 withClue "ActiveDevelopmentFundCoupons"
         },
       )
 

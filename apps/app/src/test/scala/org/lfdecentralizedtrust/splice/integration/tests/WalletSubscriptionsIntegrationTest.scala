@@ -40,7 +40,8 @@ class WalletSubscriptionsIntegrationTest extends IntegrationTest with WalletTest
     "allow a user to get, list and reject subscription requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      aliceWalletClient.listSubscriptionRequests() shouldBe empty
+      aliceWalletClient
+        .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
 
       val description = "this will be rejected"
       val request = createSelfSubscriptionRequest(
@@ -70,7 +71,9 @@ class WalletSubscriptionsIntegrationTest extends IntegrationTest with WalletTest
         aliceWalletClient.rejectSubscriptionRequest(requestId),
       )(
         "alice sees empty list of subscription requests",
-        _ => aliceWalletClient.listSubscriptionRequests() shouldBe empty,
+        _ =>
+          aliceWalletClient
+            .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests",
       )
     }
 
@@ -82,8 +85,9 @@ class WalletSubscriptionsIntegrationTest extends IntegrationTest with WalletTest
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
-        aliceWalletClient.listSubscriptionRequests() shouldBe empty
-        aliceWalletClient.listSubscriptions() shouldBe empty
+        aliceWalletClient
+          .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
+        aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions"
 
         val description = "this will be accepted"
         val (request, requestId) = actAndCheck(
@@ -114,7 +118,8 @@ class WalletSubscriptionsIntegrationTest extends IntegrationTest with WalletTest
         )(
           "initial subscription payment is listed correctly",
           initialPaymentId => {
-            aliceWalletClient.listSubscriptionRequests() shouldBe empty
+            aliceWalletClient
+              .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
             inside(aliceWalletClient.listSubscriptionInitialPayments()) { case Seq(r) =>
               r.contractId shouldBe initialPaymentId
               r.payload.subscriptionData should equal(request.subscriptionData)
@@ -216,7 +221,10 @@ class WalletSubscriptionsIntegrationTest extends IntegrationTest with WalletTest
         actAndCheck(
           "Cancel the subscription",
           aliceWalletClient.cancelSubscription(subscriptionStateId2),
-        )("no more subscriptions exist", _ => aliceWalletClient.listSubscriptions() shouldBe empty)
+        )(
+          "no more subscriptions exist",
+          _ => aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions",
+        )
       }
   }
 }

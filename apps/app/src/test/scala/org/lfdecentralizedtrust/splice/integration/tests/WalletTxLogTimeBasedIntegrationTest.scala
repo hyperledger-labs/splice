@@ -85,8 +85,10 @@ class WalletTxLogTimeBasedIntegrationTest
 
         clue("Everyone still has their reward coupons") {
           eventually() {
-            aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
-            aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+            aliceValidatorWalletClient
+              .listAppRewardCoupons() should have size 1 withClue "AppRewardCoupons"
+            aliceValidatorWalletClient
+              .listValidatorRewardCoupons() should have size 1 withClue "ValidatorRewardCoupons"
           }
         }
 

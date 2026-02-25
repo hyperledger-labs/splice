@@ -113,8 +113,8 @@ abstract class WalletSweepIntegrationTest
                   eventually() {
                     sv1Balance() shouldBe >(maxBalanceUsd)
                     val txOffers = walletClient.listTransferOffers()
-                    txOffers should have size 1
-                    walletClient.listAcceptedTransferOffers() shouldBe empty
+                    txOffers should have size 1 withClue "TransferOffers"
+                    walletClient.listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
                     ccToDollars(
                       txOffers.headOption.value.payload.amount.amount,
                       amuletPrice.bigDecimal,
@@ -139,16 +139,18 @@ abstract class WalletSweepIntegrationTest
             { _ =>
               sv1Balance() - firstTransferAmountUsd shouldBe >(maxBalanceUsd)
               eventually() {
-                walletClient.listTransferOffers() should have size 2
-                walletClient.listAcceptedTransferOffers() shouldBe empty
+                walletClient.listTransferOffers() should have size 2 withClue "TransferOffers"
+                walletClient
+                  .listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
               }
             },
           )
         }
         clue("After resuming auto-accept, SV1 is drained and Alice receives funds") {
           eventually(40.seconds) {
-            walletClient.listTransferOffers() shouldBe empty
-            walletClient.listAcceptedTransferOffers() shouldBe empty
+            walletClient.listTransferOffers() shouldBe empty withClue "TransferOffers"
+            walletClient
+              .listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
 
             assertSweepCompleted()
             walletClient
@@ -175,8 +177,9 @@ abstract class WalletSweepIntegrationTest
         "Alice sees exactly one transfer offer",
         { _ =>
           eventually() {
-            walletClient.listTransferOffers() should have size 1
-            walletClient.listAcceptedTransferOffers() shouldBe empty
+            walletClient.listTransferOffers() should have size 1 withClue "TransferOffers"
+            walletClient
+              .listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
           }
         },
       )
@@ -188,8 +191,9 @@ abstract class WalletSweepIntegrationTest
     }
     clue("After resuming auto-accept, SV1 is drained and Alice receives funds") {
       eventually(40.seconds) {
-        walletClient.listTransferOffers() shouldBe empty
-        walletClient.listAcceptedTransferOffers() shouldBe empty
+        walletClient.listTransferOffers() shouldBe empty withClue "TransferOffers"
+        walletClient
+          .listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
         assertSweepCompleted()
         walletClient
           .balance()
@@ -280,8 +284,9 @@ abstract class WalletSweepIntegrationTest
     clue("There are no outstanding transfer offers to accept or complete") {
       eventually() {
         sv1Balance() shouldBe <(maxBalanceUsd)
-        walletClient.listTransferOffers() shouldBe empty
-        walletClient.listAcceptedTransferOffers() shouldBe empty
+        walletClient.listTransferOffers() shouldBe empty withClue "TransferOffers"
+        walletClient
+          .listAcceptedTransferOffers() shouldBe empty withClue "AcceptedTransferOffers"
       }
     }
 

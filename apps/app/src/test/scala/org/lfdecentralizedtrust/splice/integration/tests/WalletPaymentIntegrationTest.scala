@@ -38,7 +38,7 @@ class WalletPaymentIntegrationTest extends IntegrationTest with WalletTestUtil {
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Check that no payment requests exist") {
-        aliceWalletClient.listAppPaymentRequests() shouldBe empty
+        aliceWalletClient.listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests"
       }
 
       val description = "a payment for cool stuff"

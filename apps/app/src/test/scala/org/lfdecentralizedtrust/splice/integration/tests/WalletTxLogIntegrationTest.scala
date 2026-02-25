@@ -173,7 +173,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice sees the self-payment request",
-        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
+        _ =>
+          aliceWalletClient
+            .listAppPaymentRequests() should not be empty withClue "AppPaymentRequests",
       )
 
       val (_, acceptedPayment) = actAndCheck(
@@ -182,7 +184,8 @@ class WalletTxLogIntegrationTest
       )(
         "Payment request disappears from list",
         acceptedPaymentCid => {
-          aliceWalletClient.listAppPaymentRequests() shouldBe empty
+          aliceWalletClient
+            .listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests"
           aliceWalletClient.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
         },
       )
@@ -197,7 +200,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Accepted app payment disappears",
-        _ => aliceWalletClient.listAcceptedAppPayments() shouldBe empty,
+        _ =>
+          aliceWalletClient
+            .listAcceptedAppPayments() shouldBe empty withClue "AcceptedAppPayments",
       )
 
       checkTxHistory(
@@ -260,7 +265,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice sees the self-payment request",
-        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
+        _ =>
+          aliceWalletClient
+            .listAppPaymentRequests() should not be empty withClue "AppPaymentRequests",
       )
 
       val (acceptedPaymentCid, _) = actAndCheck(
@@ -268,7 +275,9 @@ class WalletTxLogIntegrationTest
         aliceWalletClient.acceptAppPaymentRequest(reqCid),
       )(
         "Payment request disappears from list",
-        _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
+        _ =>
+          aliceWalletClient
+            .listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests",
       )
 
       actAndCheck(
@@ -281,7 +290,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Accepted app payment disappears",
-        _ => aliceWalletClient.listAcceptedAppPayments() shouldBe empty,
+        _ =>
+          aliceWalletClient
+            .listAcceptedAppPayments() shouldBe empty withClue "AcceptedAppPayments",
       )
 
       checkTxHistory(
@@ -350,7 +361,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice sees the payment request",
-        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
+        _ =>
+          aliceWalletClient
+            .listAppPaymentRequests() should not be empty withClue "AppPaymentRequests",
       )
 
       val (_, acceptedPayment) = actAndCheck(
@@ -359,7 +372,8 @@ class WalletTxLogIntegrationTest
       )(
         "Payment request disappears from list",
         acceptedPaymentCid => {
-          aliceWalletClient.listAppPaymentRequests() shouldBe empty
+          aliceWalletClient
+            .listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests"
           aliceWalletClient.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
         },
       )
@@ -374,7 +388,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Accepted app payment disappears",
-        _ => aliceWalletClient.listAcceptedAppPayments() shouldBe empty,
+        _ =>
+          aliceWalletClient
+            .listAcceptedAppPayments() shouldBe empty withClue "AcceptedAppPayments",
       )
 
       checkTxHistory(
@@ -441,7 +457,7 @@ class WalletTxLogIntegrationTest
 
       actAndCheck("Bob accepts transfer offer", bobWalletClient.acceptTransferOffer(offerCid))(
         "Alice does not see transfer offer anymore",
-        _ => aliceWalletClient.listTransferOffers() shouldBe empty,
+        _ => aliceWalletClient.listTransferOffers() shouldBe empty withClue "TransferOffers",
       )
 
       // Both Alice and Bob see the same representation of the transfer
@@ -489,7 +505,10 @@ class WalletTxLogIntegrationTest
         charlieSplitwellClient.acceptInvite(invite),
       )(
         "Alice sees the accepted invite",
-        _ => aliceSplitwellClient.listAcceptedGroupInvites(key.id) should not be empty,
+        _ =>
+          aliceSplitwellClient.listAcceptedGroupInvites(
+            key.id
+          ) should not be empty withClue "AcceptedGroupInvites",
       )
 
       actAndCheck(
@@ -500,8 +519,10 @@ class WalletTxLogIntegrationTest
       )(
         "Charlie sees the group and Alice doesn't see any accepted invite",
         _ => {
-          charlieSplitwellClient.listGroups() should have size 1
-          aliceSplitwellClient.listAcceptedGroupInvites(key.id) should be(empty)
+          charlieSplitwellClient.listGroups() should have size 1 withClue "Groups"
+          aliceSplitwellClient.listAcceptedGroupInvites(key.id) should be(
+            empty
+          ) withClue "AcceptedGroupInvites"
         },
       )
 
@@ -530,7 +551,8 @@ class WalletTxLogIntegrationTest
       )(
         "All parties see the new balances",
         _ => {
-          aliceWalletClient.listAcceptedAppPayments() shouldBe empty
+          aliceWalletClient
+            .listAcceptedAppPayments() shouldBe empty withClue "AcceptedAppPayments"
           bobWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
           charlieWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
         },
@@ -624,7 +646,8 @@ class WalletTxLogIntegrationTest
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
-          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
           aliceWalletClient
             .listSubscriptionInitialPayments()
             .find(_.contractId == initPaymentCid)
@@ -789,7 +812,8 @@ class WalletTxLogIntegrationTest
         "Request disappears from Alice's list",
         _ => {
           charlieWalletClient.listSubscriptionInitialPayments()
-          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
         },
       )
 
@@ -877,7 +901,8 @@ class WalletTxLogIntegrationTest
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
-          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
           aliceWalletClient
             .listSubscriptionInitialPayments()
             .find(_.contractId == initPaymentCid)
@@ -1038,7 +1063,8 @@ class WalletTxLogIntegrationTest
         )(
           "Request disappears from Alice's list",
           _ => {
-            aliceWalletClient.listSubscriptionRequests() shouldBe empty
+            aliceWalletClient
+              .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
             aliceWalletClient
               .listSubscriptions()
               .find(
@@ -1324,7 +1350,9 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice sees the self-payment request",
-        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
+        _ =>
+          aliceWalletClient
+            .listAppPaymentRequests() should not be empty withClue "AppPaymentRequests",
       )
 
       clue("Alice tries to accept the self-payment request and fails") {
@@ -1412,7 +1440,8 @@ class WalletTxLogIntegrationTest
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
-          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptionRequests() shouldBe empty withClue "SubscriptionRequests"
           inside(
             aliceWalletClient.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid)
           ) { case Some(initPayment) =>
@@ -1463,7 +1492,7 @@ class WalletTxLogIntegrationTest
             ),
           )(
             "Alice doesn't see any subscription",
-            _ => aliceWalletClient.listSubscriptions() shouldBe empty,
+            _ => aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions",
           )
 
           eventually() {
@@ -1626,7 +1655,10 @@ class WalletTxLogIntegrationTest
           )
         )
 
-        aliceWalletClient.listTransactions(None, Limit.DefaultMaxPageSize) shouldBe empty
+        aliceWalletClient.listTransactions(
+          None,
+          Limit.DefaultMaxPageSize,
+        ) shouldBe empty withClue "Transactions"
       }
     }
 

@@ -60,7 +60,7 @@ class WalletTimeBasedIntegrationTest
       clue("Alice gets some amulets") {
         aliceWalletClient.tap(50)
       }
-      aliceWalletClient.listSubscriptions() shouldBe empty
+      aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions"
 
       bracket(
         clue("Creating 3 subscriptions, 10 days apart") {
