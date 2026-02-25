@@ -30,8 +30,8 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
-          test_name: default
-          target: 'default'
+          test_name: oss
+          target: 'oss'
 
       - name: Connection check
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
