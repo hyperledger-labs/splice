@@ -151,6 +151,9 @@ class SynchronizerNodeReconciler(
               .toJava,
             localScanConfig,
             updatedSequencerConfigUpdate.getOrElse(existingLegacySequencerConfig).toJava,
+            synchronizerNodeConfig
+              .map(_.physicalSynchronizers)
+              .getOrElse(java.util.Map.of()),
           )
           setConfig(synchronizerId, rulesAndState, nodeConfig)
         } else {

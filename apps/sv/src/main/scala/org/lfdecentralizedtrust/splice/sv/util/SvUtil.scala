@@ -240,6 +240,7 @@ object SvUtil {
           mediatorConfig.toJava,
           Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
+          java.util.Map.of(),
         )
       ).asJava
     }

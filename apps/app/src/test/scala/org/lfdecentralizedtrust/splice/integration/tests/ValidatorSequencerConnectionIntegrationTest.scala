@@ -213,6 +213,7 @@ class ValidatorSequencerConnectionIntegrationTest
         synchronizerNodeConfig.mediator.toScala.toJava,
         synchronizerNodeConfig.scan.toScala.toJava,
         synchronizerNodeConfig.legacySequencerConfig.toScala.toJava,
+        synchronizerNodeConfig.physicalSynchronizers,
       )
 
       cmd = rulesAndState.dsoRules.exercise(
