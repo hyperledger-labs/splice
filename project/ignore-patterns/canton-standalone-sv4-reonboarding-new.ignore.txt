@@ -1,4 +1,4 @@
 # This does party migration
 ACS_COMMITMENT_MISMATCH
-# TODO(#3314): remove once 3.4-related integration tests do not require workaround for logs anymore, see 2589
+# not fully clear why we get this but as long as the test works it doesn't seem wortwhile to dig deeper
 'sequencer-client' is now in state Failed.*The sequencer client's healthy subscriptions count is under the configured BFT threshold.*
