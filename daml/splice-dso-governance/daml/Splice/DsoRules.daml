@@ -38,6 +38,7 @@ import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
 import Splice.AmuletTransferInstruction
+import Splice.Api.Token.TransferInstructionV1
 
 
 -- Types
