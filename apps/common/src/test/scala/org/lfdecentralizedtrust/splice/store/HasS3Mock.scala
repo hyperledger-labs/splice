@@ -17,7 +17,27 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
+<<<<<<< HEAD
 import scala.jdk.CollectionConverters.*
+=======
+import org.gaul.s3proxy.S3Proxy
+
+import java.util.Properties
+import org.jclouds.ContextBuilder
+import org.jclouds.blobstore.BlobStoreContext
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
+import software.amazon.awssdk.services.s3.S3AsyncClient
+
+import scala.jdk.FutureConverters.*
+import java.net.URI
+>>>>>>> b0018e53e ([ci] with integration test)
+
+/**  Note: we used Adobe s3mock before. It worked well in a container, but that adds a docker dependency,
+  * and it doesn't work well in-process (restarts are a pain).
+  * We therefore transitioned for now to s3Proxy with a "transient" (i.e. in-memory) backend. It is unfortunately
+  * significantly slower than s3mock though, so if in the future runtime of tests that use s3 mocks becomes an issue,
+  * we should reconsider again.
+  */
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
@@ -29,29 +49,41 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     "mock_key",
   )
 
-  // Note: we used Adobe s3mock before. It worked well in a container, but that adds a docker dependency,
-  // and it doesn't work well in-process (restarts are a pain).
-  // We therefore transitioned for now to s3Proxy with a "transient" (i.e. in-memory) backend. It is unfortunately
-  // significantly slower than s3mock though, so if in the future runtime of tests that use s3 mocks becomes an issue,
-  // we should reconsider again.
-  def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
-
-    val container = new S3MockContainer("4.11.0")
+  def startContainer() = {
+    new S3MockContainer("4.11.0")
       .withInitialBuckets("bucket")
       .withEnv(
         Map(
           "debug" -> "true"
         ).asJava
 
-    container.start()
+          container.start()
 
     container.followOutput { frame =>
       logger.debug(s"[s3Mock] ${frame.getUtf8String}")
     }
+    container
+  }
 
-    test.andThen({ case _ =>
-      container.stop()
+  def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
+
+    val container = startContainer()
+
+    test.andThen({
+      case _ =>
+        container.stop()
     })
+  }
+
+  def withS3MockSync[A](test: => A): A = {
+
+    val container = startContainer()
+
+    try {
+      test
+    } finally {
+      container.stop()
+    }
   }
 
   def readUncompressAndDecode[T](
