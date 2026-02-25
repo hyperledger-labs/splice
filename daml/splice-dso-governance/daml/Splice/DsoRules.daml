@@ -37,6 +37,7 @@ import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
+import Splice.AmuletTransferInstruction
 
 
 -- Types
