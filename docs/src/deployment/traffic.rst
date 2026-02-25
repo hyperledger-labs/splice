@@ -161,10 +161,18 @@ Traffic top-ups; how does one "buy" traffic?
    Sequencers also update the in-sequencer traffic state themselves, whenever traffic is consumed (see :ref:`traffic_accounting`).
 
 The validator app contains built-in top-up automation that automatically buys traffic to meet preconfigured throughput needs.
-In a nutshell, operators can configure a target throughput (per minimum top-up interval)
-and the validator app will automatically buy extra traffic ensuring that
-(1) sufficient traffic balance is available to sustain the configured target throughput, and
-(2) exceeding the target throughput will not incur additional charges.
+Operators configure a target throughput (bytes per second) and a minimum top-up interval (seconds);
+the automation buys ``target throughput × minimum top-up interval`` bytes whenever both of the following conditions are met:
+
+- the extra traffic balance has fallen below that total top-up amount, and
+- at least the minimum top-up interval has elapsed since the last top-up.
+
+The latter condition is a safeguard: it gives the operator a chance to intervene before CC is rapidly spent down in the case of a bug or attack causing runaway submissions.
+This is a tradeoff for the operator to manage:
+a shorter interval reduces the risk of traffic running out between top-ups, but increases the risk of CC being spent quickly before the operator has time to notice it;
+a longer interval gives the operator more time to notice problems, but increases the risk of running out of traffic.
+Both failure modes occur in practice: a node can stop transacting either because it ran out of traffic, or because it ran out of CC to purchase more.
+
 Additionally, to prevent top-up transactions from failing due to an already depleted traffic balance,
 the validator app will
 :ref:`abort ledger submissions if the balance has fallen below a predefined amount<error-below-reserved-traffic-amount>`.
