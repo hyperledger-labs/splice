@@ -41,9 +41,12 @@ class DbAppActivityRecordStoreTest
         maxBefore <- maxRecordTime(roundNumber)
         _ <- store.insertAppActivityRecords(Seq(record))
         maxAfter <- maxRecordTime(roundNumber)
+        loaded <- store.getRecordByRecordTime(ts1)
       } yield {
         maxBefore shouldBe None
         maxAfter shouldBe Some(ts1)
+        // Verify the row decoders return the inserted data
+        loaded.value shouldBe record
       }
     }
 
@@ -63,8 +66,15 @@ class DbAppActivityRecordStoreTest
 
         _ <- store.insertAppActivityRecords(records)
         maxAfter <- maxRecordTime(roundNumber + 49)
+        // Spot-check first, last and a middle record via row decoders
+        first <- store.getRecordByRecordTime(baseTs)
+        middle <- store.getRecordByRecordTime(baseTs.plusSeconds(25))
+        last <- store.getRecordByRecordTime(baseTs.plusSeconds(49))
       } yield {
         maxAfter shouldBe Some(baseTs.plusSeconds(49))
+        first.value shouldBe records(0)
+        middle.value shouldBe records(25)
+        last.value shouldBe records(49)
       }
     }
 
