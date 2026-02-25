@@ -3,7 +3,10 @@
 import { installController } from './controller';
 import { installDockerRegistryMirror } from './dockerMirror';
 import { installRunnerScaleSets } from './runners';
+import { ghaConfigs } from './config';
 
 installDockerRegistryMirror();
 const controller = installController();
-installRunnerScaleSets(controller);
+ghaConfigs.forEach(config => {
+    installRunnerScaleSets(controller, config);
+});

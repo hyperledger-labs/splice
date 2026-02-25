@@ -4,17 +4,18 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { expect, jest, test } from '@jest/globals';
 import { collectResources } from '@lfdecentralizedtrust/splice-pulumi-common/src/test';
+import {GhaConfig} from './config'
 import { z } from 'zod';
 
 import { installRunnerScaleSets } from './runners';
 
 jest.mock('./config', () => ({
   __esModule: true,
-  ghaConfig: {
+  ghaConfig: [{
     githubRepo: 'https://dummy-gh-repo.com',
     runnerVersion: '1.2',
     runnerHookVersion: '1.1',
-  },
+  }],
 }));
 jest.mock('@lfdecentralizedtrust/splice-pulumi-common', () => ({
   __esModule: true,
@@ -65,7 +66,14 @@ test('GHA runner k8s resources are in the gha-runners namespace', async () => {
   } as unknown as k8s.helm.v3.Release;
 
   const [, resources] = await collectResources(() => {
-    installRunnerScaleSets(mockController);
+    const config = {
+      namespace: 'gha-runners',
+      githubRepo: 'https://dummy-gh-repo.com',
+      runnerVersion: '1.2',
+      runnerHookVersion: '1.1',
+      runnerScaleSetVersion: '1.2.3'
+    } as GhaConfig;
+    installRunnerScaleSets(mockController, config);
   });
 
   // check that each k8s resource is in the gha-runners namespace

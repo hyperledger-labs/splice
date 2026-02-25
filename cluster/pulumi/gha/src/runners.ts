@@ -18,7 +18,7 @@ import { Resource } from '@pulumi/pulumi';
 import yaml from 'js-yaml';
 
 import { createCachePvc } from './cache';
-import { ghaConfig } from './config';
+import { GhaConfig } from './config';
 import { createCloudSQLInstanceForPerformanceTests, PerformanceTestDb } from './performanceTests';
 
 type ResourcesSpec = {
@@ -150,7 +150,8 @@ function installDockerRunnerScaleSet(
   dockerConfigSecret: Secret,
   resources: ResourcesSpec,
   serviceAccountName: string,
-  dependsOn: Resource[]
+  dependsOn: Resource[],
+  ghaConfig: GhaConfig
 ): k8s.helm.v3.Release {
   const repo = ghaConfig.githubRepo;
   return new k8s.helm.v3.Release(
@@ -334,7 +335,8 @@ function installDockerRunnerScaleSets(
   runnersNamespace: Namespace,
   tokenSecret: Secret,
   cachePvc: PersistentVolumeClaim,
-  serviceAccountName: string
+  serviceAccountName: string,
+  ghaConfig: GhaConfig,
 ): void {
   const configMap = new k8s.core.v1.ConfigMap(
     'gha-runner-config',
@@ -387,7 +389,8 @@ function installDockerRunnerScaleSets(
         dockerClientConfigSecret,
         spec.resources,
         serviceAccountName,
-        dependsOn
+        dependsOn,
+        ghaConfig
       );
     });
 }
@@ -406,7 +409,8 @@ function installK8sRunnerScaleSet(
   resources: ResourcesSpec,
   serviceAccountName: string,
   dependsOn: Resource[],
-  performanceTestsDb: PerformanceTestDb
+  performanceTestsDb: PerformanceTestDb,
+  ghaConfig: GhaConfig
 ): Release {
   const podConfigMapName = `${name}-pod-config`;
   // A configMap that will be mounted to runner pods and provide additional pod spec for the workflow pods
@@ -722,7 +726,8 @@ function installK8sRunnerScaleSets(
   tokenSecret: Secret,
   cachePvcName: string,
   serviceAccountName: string,
-  performanceTestsDb: PerformanceTestDb
+  performanceTestsDb: PerformanceTestDb,
+  ghaConfig: GhaConfig
 ): void {
   const dependsOn = [controller, runnersNamespace, tokenSecret, performanceTestsDb.db];
 
@@ -737,7 +742,8 @@ function installK8sRunnerScaleSets(
         spec.resources,
         serviceAccountName,
         dependsOn,
-        performanceTestsDb
+        performanceTestsDb,
+        ghaConfig
       );
     });
 }
@@ -776,16 +782,15 @@ function installPodMonitor(runnersNamespace: Namespace) {
   );
 }
 
-const GHA_NAMESPACE_NAME = 'gha-runners';
-export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
-  const runnersNamespace = new Namespace(GHA_NAMESPACE_NAME, {
+export function installRunnerScaleSets(controller: k8s.helm.v3.Release, ghaConfig: GhaConfig): void {
+  const runnersNamespace = new Namespace(ghaConfig.namespace, {
     metadata: {
-      name: GHA_NAMESPACE_NAME,
+      name: ghaConfig.namespace,
     },
   });
   const exactNs: ExactNamespace = {
     ns: runnersNamespace,
-    logicalName: GHA_NAMESPACE_NAME,
+    logicalName: ghaConfig.namespace,
   };
 
   const tokenSecret = new k8s.core.v1.Secret(
@@ -803,7 +808,7 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         // for registration, and this endpoint seems to require admin rights.
         // TODO(DACH-NY/canton-network-node#17842): The recommended thing to do is use a GitHub App. See here for a guide
         // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
-        github_token: getSecretVersionOutput({ secret: 'gh-runners-access-token' }).apply(
+        github_token: getSecretVersionOutput({ secret: ghaConfig.gcpSecretName }).apply(
           k => k.secretData
         ),
       },
@@ -819,14 +824,15 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
   installRunnersServiceAccount(runnersNamespace, saName);
 
   const performanceTestsDb = createCloudSQLInstanceForPerformanceTests(exactNs);
-  installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc, saName);
+  installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc, saName, ghaConfig);
   installK8sRunnerScaleSets(
     controller,
     runnersNamespace,
     tokenSecret,
     cachePvcName,
     saName,
-    performanceTestsDb
+    performanceTestsDb,
+    ghaConfig
   );
   installPodMonitor(runnersNamespace);
 }
