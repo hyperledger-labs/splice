@@ -547,8 +547,6 @@ testExpireAmuletTransferInstruction = do
   submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
 
   passTime (hours 2)
-
-  -- TODO: exercise DsoRules_TransferInstruction_Expire
  
   [(instrCid, _)] <- query @AmuletTransferInstruction app.dso
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
