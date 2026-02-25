@@ -7,8 +7,7 @@ import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.scalatest.EitherValues
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.S3Object
-import com.adobe.testing.s3mock.testcontainers.S3MockContainer
+import software.amazon.awssdk.services.s3.model.{CreateBucketRequest, S3Object}
 import org.lfdecentralizedtrust.splice.scan.config.S3Config
 
 import java.io.ByteArrayOutputStream
@@ -16,45 +15,73 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
+import org.gaul.s3proxy.S3Proxy
+
+import java.util.Properties
+import org.jclouds.ContextBuilder
+import org.jclouds.blobstore.BlobStoreContext
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
+import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
+
+import scala.jdk.FutureConverters.*
+import java.net.URI
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
-  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here.
+  val s3Config = S3Config(
+    "http://localhost:9090",
+    "bucket",
+    Region.US_EAST_1.toString,
+    "mock_id",
+    "mock_key",
+  )
+
+  // Note: we used Adobe s3mock before. It worked well in a container, but that adds a docker dependency,
+  // and it doesn't work well in-process (restarts are a pain).
+  // We therefore transitioned for now to s3Proxy with a "transient" (i.e. in-memory) backend. It is unfortunately
+  // significantly slower than s3mock though, so if in the future runtime of tests that use s3 mocks becomes an issue,
+  // we should reconsider again.
   def withS3Mock[A](
       loggerFactory: NamedLoggerFactory
   )(test: S3BucketConnection => Future[A])(implicit ec: ExecutionContext): Future[A] = {
 
-    val container = new S3MockContainer("4.11.0")
-      .withInitialBuckets("bucket")
-      .withEnv(
-        Map(
-          "debug" -> "true"
-        ).asJava
+    val properties = new Properties
+    properties.setProperty("jclouds.provider", "transient-nio2")
+    properties.setProperty("transient-nio2.identity", "mock_id")
+    properties.setProperty("transient-nio2.credential", "mock_key")
+    val blobStoreContext = ContextBuilder
+      .newBuilder("transient-nio2")
+      .overrides(properties)
+      .build(classOf[BlobStoreContext])
+    val s3ProxyBuilder = S3Proxy.builder.blobStore(blobStoreContext.getBlobStore)
+    s3ProxyBuilder.endpoint(URI.create(s3Config.endpoint))
+    val s3Proxy = s3ProxyBuilder.build
+    s3Proxy.start()
+
+    val createBucketRequest = CreateBucketRequest.builder().bucket("bucket").build()
+    val client = S3AsyncClient
+      .builder()
+      .endpointOverride(URI.create(s3Config.endpoint))
+      .region(Region.US_EAST_1)
+      .credentialsProvider(
+        StaticCredentialsProvider.create(
+          AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
+        )
       )
+      .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+      .build
 
-    container.start()
-
-    container.followOutput { frame =>
-      logger.debug(s"[s3Mock] ${frame.getUtf8String}")
-    }
-
-    test(getS3BucketConnection(loggerFactory, container)).andThen({ case _ =>
-      container.stop()
+    (for {
+      _ <- client.createBucket(createBucketRequest).asScala
+      res <- test(getS3BucketConnection(loggerFactory))
+    } yield res).andThen({ case _ =>
+      s3Proxy.stop()
     })
   }
 
   private def getS3BucketConnection(
-      loggerFactory: NamedLoggerFactory,
-      container: S3MockContainer,
+      loggerFactory: NamedLoggerFactory
   ): S3BucketConnection = {
-    val s3Config = S3Config(
-      container.getHttpEndpoint,
-      "bucket",
-      Region.US_EAST_1.toString,
-      "mock_id",
-      "mock_key",
-    )
     S3BucketConnectionForUnitTests(s3Config, "bucket", loggerFactory)
   }
 

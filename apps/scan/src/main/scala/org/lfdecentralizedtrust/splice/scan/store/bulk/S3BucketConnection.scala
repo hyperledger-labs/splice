@@ -179,7 +179,12 @@ object S3BucketConnection {
           )
         )
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+        .serviceConfiguration(
+          S3Configuration
+            .builder()
+            .pathStyleAccessEnabled(true)
+            .build()
+        )
         .build(),
       bucketName,
       loggerFactory,

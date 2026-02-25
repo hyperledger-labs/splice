@@ -8,6 +8,7 @@ import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation
 
 import java.io.DataInputStream
 import java.nio.ByteBuffer
@@ -88,8 +89,17 @@ object S3BucketConnectionForUnitTests {
             AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
           )
         )
+        // The default RequestChecksumCalculation.WHEN_SUPPORTED breaks with s3proxy, so disabling for now.
+        // For tests it's definitely fine.
+        // TODO(#3429): understand this better for prod
+        .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+        .serviceConfiguration(
+          S3Configuration
+            .builder()
+            .pathStyleAccessEnabled(true)
+            .build()
+        )
         .build(),
       bucketName,
       loggerFactory,
