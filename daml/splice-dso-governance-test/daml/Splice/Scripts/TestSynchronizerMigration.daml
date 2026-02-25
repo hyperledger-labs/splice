@@ -57,6 +57,7 @@ testSynchronizerMigration = do
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
       legacySequencerConfig = None
+      physicalSynchronizers = None
 
   -- SVs mark the synchronizer as operational
   executeDsoRulesConfigChange app $ \config ->
