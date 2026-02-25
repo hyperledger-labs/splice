@@ -9,7 +9,9 @@ import {
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
+  getPathToPrivateConfigFile,
   installSpliceHelmChart,
+  loadJsonFromFile,
   loadYamlFromFile,
   LogLevel,
   sanitizedForPostgres,
@@ -30,6 +32,29 @@ import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/con
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
+
+const getSequencerRateLimitConfig = (): string | undefined =>{
+  const rateLimitsFile = getPathToPrivateConfigFile('sequencer-rate-limits.json');
+  if (!rateLimitsFile) {
+    return undefined;
+  }
+  const rateLimits = loadJsonFromFile(rateLimitsFile);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const limitsForMessageType = (message: string, config: any): string =>
+    [
+      `canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.${message} {`,
+      `  global-tps-cap = ${config.globalTpsCap}`,
+      `  per-client-tps-cap = ${config.perClientTpsCap}`,
+      `  global-kbps-cap = ${config.globalKbpsCap}`,
+      `  per-client-kbps-cap = ${config.perClientKbpsCap}`,
+      '}',
+    ].join("\n");
+  return [
+    limitsForMessageType('confirmation-request', rateLimits.messages.confirmationRequest),
+    limitsForMessageType('topology', rateLimits.messages.topology),
+  ].join("\n");
+}
+
 
 abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource
@@ -87,6 +112,8 @@ abstract class InStackDecentralizedSynchronizerNode
       }
     );
 
+    const rateLimitConfig = getSequencerRateLimitConfig();
+
     installSpliceHelmChart(
       this.xns,
       this.name,
@@ -108,7 +135,7 @@ abstract class InStackDecentralizedSynchronizerNode
             },
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
-            additionalEnvVars: svConfig.sequencer?.additionalEnvVars,
+            additionalEnvVars: (rateLimitConfig ? [{name: "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS", value: rateLimitConfig}] : []).concat(svConfig.sequencer?.additionalEnvVars || []),
             resources: svConfig.sequencer?.resources,
           },
           mediator: {
