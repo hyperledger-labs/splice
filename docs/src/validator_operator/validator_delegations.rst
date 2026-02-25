@@ -204,6 +204,8 @@ First, set up the required environment variables:
    export DELEGATE_PARTY="validator_operator::1220efgh..."
    export DSO_PARTY="DSO::1220ijkl..."
    export EXPIRES_AT="2025-12-31T23:59:59Z"
+   # This could be created by
+   # export EXPIRES_AT="$(date -u -d '+1 year' '+%Y-%m-%dT%H:%M:%SZ')"
    export AMULET_MERGE_LIMIT=10
 
 Then create the proposal using curl:
