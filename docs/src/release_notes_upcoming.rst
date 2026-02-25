@@ -43,3 +43,8 @@
 
         - Switched the gRPC service ``SequencerService.subscribe`` and ``SequencerService.downloadTopologyStateForInit`` to manual
           control flow, so that the sequencer doesn't crash with an ``OutOfMemoryError`` when responding to slow clients.
+
+    - Scan txlog script
+
+      - scan_txlog.py script has been deprecated. It will not be maintained moving forward, and will be removed completely in a future release.
+        A user interested in understanding how to parse transactions from history is reffered to the :ref:`Reading and parsing transaction history involving Token Standard contracts <token_standard_usage_reading_tx_history>` section.

@@ -7,7 +7,6 @@
 # A simple proof-of-concept script for lossless streaming from a scan `updates` endpoint.
 #
 # Outputs transactions to STDOUT.
-# See `scripts/scan-txlog/scan_txlog.py` for pointers on further parsing.
 #
 # Supports rudimentary filtering based on template name. Extend as needed.
 #
