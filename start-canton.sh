@@ -218,7 +218,7 @@ tmux_cmd_canton() {
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
      CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
-      --log-level-canton=DEBUG \
+      --log-level-canton=INFO \
       --log-encoder json \
       --log-file-name $mainLogFile \
       --bootstrap $bootstrapScriptPath \
