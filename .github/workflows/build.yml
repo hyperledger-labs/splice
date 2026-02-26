@@ -226,7 +226,6 @@ jobs:
       test_name: wall-clock-time-bft
       with_gcp_creds: true
       pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
-      run_if_commit_tag: 'bft'
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}
