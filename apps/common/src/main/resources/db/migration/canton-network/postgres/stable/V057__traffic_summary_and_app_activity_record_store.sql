@@ -6,7 +6,7 @@
 alter table scan_verdict_store
     -- Total traffic cost of the message paid by the sender
     add column total_traffic_cost          bigint null,
-    -- Envelope data as JSONB array: [{"tc": 123, "vid": [1, 2]}, ...]
+    -- Envelope traffic cost data as JSONB array: [{"tc": 123, "vid": [1, 2]}, ...]
     -- where "tc" is the traffic cost and "vid" is an array of view_ids from the verdict
     add column envelope_traffic_costs       jsonb null;
 
