@@ -3912,9 +3912,8 @@ components:
     EventHistoryAppActivityRecords:
       type: object
       description: |
-        Computed app activity record derived from verdicts and traffic summaries.
-        Each record represents the traffic-weighted activity of app providers at a given record_time,
-        and is derived from a computation involving the verdict and traffic summary data.
+        App activity record computed from verdicts and traffic summaries
+        as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
       required:
         - record_time
         - round_number
