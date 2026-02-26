@@ -424,6 +424,9 @@ runAmuletDepositBots app = do
     svRewardCoupons <- queryFilter @SvRewardCoupon app.dso $ \c ->
       c.round `elem` issuingRoundNumbers && c.beneficiary == user
 
+    rewardCouponV2s <- queryFilter @RewardCouponV2 app.dso $ \c ->
+      c.beneficiary == user
+
     -- get all amulets of this user
     amulets <- getAmuletInputs user
     -- Need readAs rights for all hosted users to collect their validator rewards,
@@ -440,6 +443,7 @@ runAmuletDepositBots app = do
               map (mkInputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
               map (InputValidatorLivenessActivityRecord . fst) validatorLivenessActivityRecords ++
               map (InputSvRewardCoupon . fst) svRewardCoupons ++
+              map (InputRewardCouponV2 . fst) rewardCouponV2s ++
               amulets
           outputs = []
           beneficiaries = None -- no beneficiaries for self-transfer
@@ -455,6 +459,28 @@ runAmuletDepositBots app = do
   let amuletOwners = map (._2.owner) amulets
   require "Owners of amulets must be unique" (unique amuletOwners)
   pure ()
+
+mintRewardsV2 : AmuletApp -> Party -> Script ()
+mintRewardsV2 app beneficiary = do
+  -- create transfer context
+  (openMiningRound, _) <- getLatestOpenRound app
+  let context = TransferContext with
+        openMiningRound
+        issuingMiningRounds = Map.empty
+        validatorRights = Map.empty
+        featuredAppRight = None
+  -- query the coupons
+  coupons <- query @RewardCouponV2 beneficiary
+  void $ submitExerciseAmuletRulesByKey app [beneficiary] [] AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = beneficiary
+      provider = beneficiary
+      inputs = map (InputRewardCouponV2 . fst) coupons
+      outputs = []
+      beneficiaries = None -- no featured-app-marker beneficiaries
+    context
+    expectedDso = Some app.dso
+
 
 -- | Retrieve the list of all amulets that the given party can use as transfer inputs.
 getAmuletInputs : Party -> Script [TransferInput]

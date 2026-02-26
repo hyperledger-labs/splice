@@ -26,8 +26,9 @@ import Splice.Types
 import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
 
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
+import Splice.Testing.TokenStandard.WalletClient as WalletClient
+import Splice.Testing.Utils
 
 -- TODO:
 -- - test dry-run
@@ -126,22 +127,22 @@ test_reward_accounting_v2 = do
   sortOn (.beneficiary) (map snd couponsAfterUnhiding) ===
     map (\c -> c with beneficiaryIsObserver = True) expectedCoupons
 
-{- FIXME:
 
-  -- mint alice's coupon in a split fashion
-  coupons <- queryInterface @Api.RewardAssignmentV1.RewardCoupon alice
-  AmuletRegistry.mintRewards app.registry alice
-    [ (bob, 100.0)
-    , (charlie, 200.0)
-    ]
-    (map fst coupons)
+  -- attribute part of alice's coupon to bob and charly
+  [(aliceCouponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon alice
+  void $ submitMulti [alice] [app.dso] $ exerciseCmd aliceCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    newBeneficiaries =
+      [ Api.RewardAssignmentV1.RewardBeneficiary bob 300.0
+      , Api.RewardAssignmentV1.RewardBeneficiary charlie 200.0
+      ]
+    extraArgs = emptyExtraArgs
 
-  amulets <- query @Splice.Amulet.Amulet app.dso
-  let actualAmounts = sort [ (a.owner, a.amount.initialAmount) | (_, a) <- amulets ]
-  let expectedAmounts = sort [ (alice, 700.0), (bob, 100.0), (charlie, 200.0) ]
-  actualAmounts === expectedAmounts
+  -- check that reward minting works
+  mintRewardsV2 app alice
+  WalletClient.checkBalance alice app.registry.instrumentId 500.0
 
--}
+  mintRewardsV2 app bob
+  WalletClient.checkBalance bob app.registry.instrumentId 2300.0  -- 300.0 from alice + 2000.0 from bob
 
   pure ()
 
