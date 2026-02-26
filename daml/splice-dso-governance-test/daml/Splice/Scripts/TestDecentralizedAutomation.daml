@@ -518,7 +518,7 @@ testExpireAmuletTransferInstruction : Script ()
 testExpireAmuletTransferInstruction = do
   (app, _, (sv1, _, _, _)) <- initDevNet
   sender <- setupUser app "sender" app.dso
-  amuletCid <- tap app sender 100.0
+  _  <- tap app sender 100.0
   let registry = AmuletRegistry.AmuletRegistry
         with
           dso = app.dso
@@ -526,6 +526,9 @@ testExpireAmuletTransferInstruction = do
             with
               admin = app.dso
               id = "Amulet"
+  liquidAmulets <- query @Amulet sender.primaryParty
+  let totalBalance = sum (map (\(_, a) -> a.amount.initialAmount) liquidAmulets)
+  let senderAmuletCids = map fst liquidAmulets            
   receiver <- allocateParty "receiver"
   now <- getTime
   transfer <- RegistryApi.getTransferFactory registry TransferInstructionV1.TransferFactory_Transfer
@@ -534,11 +537,11 @@ testExpireAmuletTransferInstruction = do
       transfer = TransferInstructionV1.Transfer with
         sender = sender.primaryParty
         receiver
-        amount = 50.0
+        amount = totalBalance
         instrumentId = registry.instrumentId
         requestedAt = now
         executeBefore = now `addRelTime` hours 1
-        inputHoldingCids = [toInterfaceContractId amuletCid]
+        inputHoldingCids = map toInterfaceContractId senderAmuletCids
         meta = emptyMetadata
       extraArgs = ExtraArgs with
         context = emptyChoiceContext
@@ -546,12 +549,15 @@ testExpireAmuletTransferInstruction = do
 
   submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
 
-  lockedAmuletsBefore <- query @LockedAmulet sender.primaryParty
+  lockedAmuletsBeforeExpire <- query @LockedAmulet sender.primaryParty
+  length lockedAmuletsBeforeExpire === 1          
 
-  length lockedAmuletsBefore === 1
+  liquidAmuletsBeforeExpire <- query @Amulet sender.primaryParty
+  assertMsg "Sender liquid wallet should be truly empty" (null liquidAmuletsBeforeExpire)
 
   passTime (hours 2)
- 
+  
+
   [(instrCid, _)] <- query @AmuletTransferInstruction app.dso
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
@@ -559,8 +565,11 @@ testExpireAmuletTransferInstruction = do
     amuletTransferInstructionCid = instrCid
     sv = Some sv1
 
+  lockedAmuletsAfterExpire <- query @LockedAmulet sender.primaryParty
+  length lockedAmuletsAfterExpire === 0  
+
   instructions <- query @AmuletTransferInstruction app.dso
-  instructions === [] 
+  instructions === []
 
   senderAmulets <- query @Amulet sender.primaryParty
   assertMsg "Sender should have their amulets back" (not $ null senderAmulets) 
