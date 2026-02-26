@@ -78,21 +78,25 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         resultBefore <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           CantonTimestamp.ofEpochSecond(50),
+          d1,
         )
         _ = resultBefore shouldBe None
         resultAtCreate <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           createTime,
+          d1,
         )
         _ = resultAtCreate.map(_.contract) shouldBe Some(coupon)
         resultBetween <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           CantonTimestamp.ofEpochSecond(150),
+          d1,
         )
         _ = resultBetween.map(_.contract) shouldBe Some(coupon)
         resultAtArchive <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           archiveTime,
+          d1,
         )
       } yield resultAtArchive shouldBe None
     }
@@ -114,6 +118,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         resultAt50 <- store.listContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(50),
+          d1,
           HardLimit.tryCreate(10),
         )
         _ = resultAt50 shouldBe empty
@@ -121,6 +126,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         resultAt100 <- store.listContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
+          d1,
           HardLimit.tryCreate(10),
         )
         _ = resultAt100.map(_.contract) shouldBe Seq(coupon1)
@@ -128,6 +134,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         resultAt250 <- store.listContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(250),
+          d1,
           HardLimit.tryCreate(10),
         )
         _ = resultAt250.map(_.contract).toSet shouldBe Set(coupon1, coupon2)
@@ -135,6 +142,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         resultAt300 <- store.listContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(300),
+          d1,
           HardLimit.tryCreate(10),
         )
         _ = resultAt300.map(_.contract).toSet shouldBe Set(coupon2, coupon3)
@@ -142,6 +150,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         resultAt400 <- store.listContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(400),
+          d1,
           HardLimit.tryCreate(10),
         )
         _ = resultAt400.map(_.contract) shouldBe Seq(coupon2)
@@ -158,6 +167,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
           store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
             c(1).contractId,
             CantonTimestamp.Epoch,
+            d1,
           )
         }
         lookupError.getMessage should include("lookupContractByIdAsOf requires an AcsArchiveConfig")
@@ -166,6 +176,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
           store.listContractsAsOf(
             AppRewardCoupon.COMPANION,
             CantonTimestamp.Epoch,
+            d1,
             HardLimit.tryCreate(10),
           )
         }

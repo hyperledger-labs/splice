@@ -8,7 +8,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -31,6 +31,7 @@ class DbScanTemporalAcsStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    synchronizerId: SynchronizerId,
     ingestionConfig: IngestionConfig,
     override val defaultLimit: Limit,
 )(implicit
@@ -64,21 +65,22 @@ class DbScanTemporalAcsStore(
 
   override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](
       companion: C
-  )(id: ContractId[?], asOf: CantonTimestamp)(implicit
+  )(id: ContractId[?], asOf: CantonTimestamp, synchronizerId: SynchronizerId)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] =
-    multiDomainAcsStore.lookupContractByIdAsOf(companion)(id, asOf)
+    multiDomainAcsStore.lookupContractByIdAsOf(companion)(id, asOf, synchronizerId)
 
   override def listContractsAsOf[C, TCid <: ContractId[?], T](
       companion: C,
       asOf: CantonTimestamp,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] =
-    multiDomainAcsStore.listContractsAsOf(companion, asOf, limit)
+    multiDomainAcsStore.listContractsAsOf(companion, asOf, synchronizerId, limit)
 
   def lookupFeaturedAppRightsAsOf(
       asOf: CantonTimestamp,
@@ -86,7 +88,7 @@ class DbScanTemporalAcsStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    listContractsAsOf(FeaturedAppRight.COMPANION, asOf, limit)
+    listContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId, limit)
 
   def lookupOpenMiningRoundsAsOf(
       asOf: CantonTimestamp,
@@ -94,12 +96,12 @@ class DbScanTemporalAcsStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    listContractsAsOf(OpenMiningRound.COMPANION, asOf, limit)
+    listContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId, limit)
 
   def lookupAmuletRulesAsOf(
       asOf: CantonTimestamp
   )(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]] =
-    listContractsAsOf(AmuletRules.COMPANION, asOf, defaultLimit).map(_.headOption)
+    listContractsAsOf(AmuletRules.COMPANION, asOf, synchronizerId, defaultLimit).map(_.headOption)
 }

@@ -155,13 +155,14 @@ final class DbMultiDomainAcsStore[TXE](
   // The former is slightly more asynchronous due to RetryProvider/FutureUnlessShutdown.
   def hasFinishedAcsIngestion: Boolean = finishedAcsIngestion.isCompleted
 
-  def lastIngestedRecordTime: Option[CantonTimestamp] = state.get().lastIngestedRecordTime
+  def lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp] =
+    state.get().lastIngestedRecordTimes
 
-  def waitUntilRecordTimeReached(asOf: CantonTimestamp)(implicit
+  def waitUntilRecordTimeReached(synchronizerId: SynchronizerId, asOf: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     val s = state.get()
-    if (s.lastIngestedRecordTime.exists(_ >= asOf)) Future.unit
+    if (s.lastIngestedRecordTimes.get(synchronizerId).exists(_ >= asOf)) Future.unit
     else
       retryProvider
         .waitUnlessShutdown(s.offsetChanged.future)
@@ -172,7 +173,7 @@ final class DbMultiDomainAcsStore[TXE](
             )
             .asRuntimeException()
         }
-        .flatMap(_ => waitUntilRecordTimeReached(asOf))
+        .flatMap(_ => waitUntilRecordTimeReached(synchronizerId, asOf))
   }
 
   def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
@@ -219,13 +220,14 @@ final class DbMultiDomainAcsStore[TXE](
   override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](companion: C)(
       id: ContractId[?],
       asOf: CantonTimestamp,
+      synchronizerId: SynchronizerId,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("lookupContractByIdAsOf")
     waitUntilAcsIngested {
-      waitUntilRecordTimeReached(asOf).flatMap { _ =>
+      waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
         storage
           .querySingle(
             selectFromAcsTableWithStateAsOf(
@@ -248,6 +250,7 @@ final class DbMultiDomainAcsStore[TXE](
   override def listContractsAsOf[C, TCid <: ContractId[?], T](
       companion: C,
       asOf: CantonTimestamp,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -255,7 +258,7 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("listContractsAsOf")
     waitUntilAcsIngested {
-      waitUntilRecordTimeReached(asOf).flatMap { _ =>
+      waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
         val templateId = companionClass.typeId(companion)
         val opName = s"listContractsAsOf:${templateId.getEntityName}"
         for {
@@ -1425,13 +1428,12 @@ final class DbMultiDomainAcsStore[TXE](
                   .mapValues(trees =>
                     CantonTimestamp.assertFromInstant(trees.last.tree.getRecordTime)
                   )
-                val maxRecordTime = synchronizerIdToRecordTime.values.maxOption
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       lastTree.getOffset,
-                      maxRecordTime,
+                      synchronizerIdToRecordTime.toMap,
                     )
                   )
                   .signalOffsetChanged(lastTree.getOffset)
@@ -1459,7 +1461,7 @@ final class DbMultiDomainAcsStore[TXE](
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       reassignment.offset,
-                      Some(reassignment.recordTime),
+                      Map(synchronizerId -> reassignment.recordTime),
                     )
                   )
                   .signalOffsetChanged(reassignment.offset)
@@ -2360,7 +2362,7 @@ object DbMultiDomainAcsStore {
       acsSize: Int,
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
-      lastIngestedRecordTime: Option[CantonTimestamp],
+      lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp],
   ) {
     def withInitialState(
         acsStoreId: AcsStoreId,
@@ -2387,7 +2389,7 @@ object DbMultiDomainAcsStore {
     def withUpdate(
         newAcsSize: Int,
         newOffset: Long,
-        recordTime: Option[CantonTimestamp] = None,
+        recordTimes: Map[SynchronizerId, CantonTimestamp] = Map.empty,
     ): State = {
       val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
       this.copy(
@@ -2397,9 +2399,10 @@ object DbMultiDomainAcsStore {
         offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
           offsetToSignal > newOffset
         },
-        lastIngestedRecordTime = recordTime
-          .map(rt => lastIngestedRecordTime.fold(rt)(_.max(rt)))
-          .orElse(lastIngestedRecordTime),
+        lastIngestedRecordTimes = recordTimes.foldLeft(lastIngestedRecordTimes) {
+          case (acc, (syncId, rt)) =>
+            acc.updated(syncId, acc.get(syncId).fold(rt)(_.max(rt)))
+        },
       )
     }
 
@@ -2442,7 +2445,7 @@ object DbMultiDomainAcsStore {
       acsSize = 0,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
-      lastIngestedRecordTime = None,
+      lastIngestedRecordTimes = Map.empty,
     )
   }
 
