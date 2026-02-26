@@ -70,11 +70,28 @@ class DbAppActivityRecordStoreTest
         first <- store.getRecordByRecordTime(baseTs)
         middle <- store.getRecordByRecordTime(baseTs.plusSeconds(25))
         last <- store.getRecordByRecordTime(baseTs.plusSeconds(49))
+        // Batch fetch a subset of records
+        batchTimes = Seq(baseTs, baseTs.plusSeconds(10), baseTs.plusSeconds(49))
+        batchResult <- store.getRecordsByRecordTimes(batchTimes)
+        // Batch fetch with empty input
+        emptyResult <- store.getRecordsByRecordTimes(Seq.empty)
+        // Batch fetch with a non-existent time mixed in
+        missingTs = baseTs.plusSeconds(999)
+        partialResult <- store.getRecordsByRecordTimes(Seq(baseTs, missingTs))
       } yield {
         maxAfter shouldBe Some(baseTs.plusSeconds(49))
         first.value shouldBe records(0)
         middle.value shouldBe records(25)
         last.value shouldBe records(49)
+        // Batch assertions
+        batchResult should have size 3
+        batchResult(baseTs) shouldBe records(0)
+        batchResult(baseTs.plusSeconds(10)) shouldBe records(10)
+        batchResult(baseTs.plusSeconds(49)) shouldBe records(49)
+        emptyResult shouldBe empty
+        partialResult should have size 1
+        partialResult(baseTs) shouldBe records(0)
+        partialResult.get(missingTs) shouldBe None
       }
     }
 

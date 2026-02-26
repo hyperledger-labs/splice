@@ -130,6 +130,14 @@ class ScanEventStore(
       case None => Future.successful(None)
     }
 
+  def getAppActivityRecords(recordTimes: Seq[CantonTimestamp])(implicit
+      tc: TraceContext
+  ): Future[Map[CantonTimestamp, AppActivityRecordT]] =
+    verdictStore.appActivityRecordStoreO match {
+      case Some(store) => store.getRecordsByRecordTimes(recordTimes)
+      case None => Future.successful(Map.empty)
+    }
+
   // Get values from in-memory refs, fallsback to DB read
   private def resolveCurrentMigrationCap(
       memVerdictRt: Option[CantonTimestamp],

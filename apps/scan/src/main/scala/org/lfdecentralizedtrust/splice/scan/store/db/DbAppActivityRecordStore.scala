@@ -90,6 +90,25 @@ class DbAppActivityRecordStore(
     )
   }
 
+  def getRecordsByRecordTimes(
+      recordTimes: Seq[CantonTimestamp]
+  )(implicit tc: TraceContext): Future[Map[CantonTimestamp, AppActivityRecordT]] = {
+    if (recordTimes.isEmpty) Future.successful(Map.empty)
+    else {
+      val inClause = sqlCommaSeparated(recordTimes.map(rt => sql"$rt"))
+      storage
+        .query(
+          (sql"""
+          select record_time, round_number, app_provider_parties, app_activity_weights
+          from #${Tables.appActivityRecords}
+          where history_id = $historyId and record_time in (""" ++ inClause ++ sql")")
+            .as[AppActivityRecordT],
+          "appActivity.getRecordsByRecordTimes",
+        )
+        .map(rows => rows.map(r => r.recordTime -> r).toMap)
+    }
+  }
+
   /** Batch insert app activity records using multi-row INSERT. */
   private def batchInsertAppActivityRecords(items: Seq[AppActivityRecordT]) = {
     if (items.isEmpty) {
