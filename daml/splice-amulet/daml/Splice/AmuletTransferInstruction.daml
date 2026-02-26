@@ -37,7 +37,7 @@ template AmuletTransferInstruction
         abortAmuletTransferInstruction this arg.extraArgs
 
       transferInstruction_updateImpl _self arg =
-        updateAmuletTransferInstruction this arg.extraArgs
+        updateAmuletTransferInstruction this arg.extraActors arg.extraArgs
 
       transferInstruction_withdrawImpl _self arg = do
         abortAmuletTransferInstruction this arg.extraArgs
@@ -79,8 +79,9 @@ abortAmuletTransferInstruction instr extraArgs = do
     output = TransferInstructionResult_Failed
     meta = emptyMetadata
 
-updateAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
-updateAmuletTransferInstruction instr extraArgs = do
+updateAmuletTransferInstruction : AmuletTransferInstruction -> [Party] ->ExtraArgs -> Update TransferInstructionResult
+updateAmuletTransferInstruction instr extraActors extraArgs = do
+  assertMsg "Amulet transfer expiry does not support extra actors" (null extraActors)
   assertDeadlineExceeded "Transfer.executeBefore" instr.transfer.executeBefore
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
