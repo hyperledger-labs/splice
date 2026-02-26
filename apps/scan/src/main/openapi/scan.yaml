@@ -3736,6 +3736,9 @@ components:
         traffic_summary:
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
           nullable: true
+        app_activity_record:
+          $ref: "#/components/schemas/EventHistoryAppActivityRecord"
+          nullable: true
     EventHistoryVerdict:
       type: object
       required:
@@ -3900,6 +3903,42 @@ components:
           items:
             type: integer
             format: int32
+    EventHistoryAppActivityRecord:
+      type: object
+      description: |
+        Computed app activity record derived from verdicts and traffic summaries.
+        Each record represents the traffic-weighted activity of featured app providers at a given record_time,
+        and is derived from a computation involving the verdict and traffic summary data.
+      required:
+        - record_time
+        - round_number
+        - app_provider_parties
+        - app_activity_weights
+      properties:
+        record_time:
+          description: |
+            The record_time (= sequencing_time) of the verdict/traffic summary.
+          type: string
+        round_number:
+          description: |
+            The mining round number to which this activity is assigned.
+          type: integer
+          format: int64
+        app_provider_parties:
+          description: |
+            App providers for which app activity should be recorded.
+          type: array
+          items:
+            type: string
+        app_activity_weights:
+          description: |
+            Activity weight assigned to the app providers.
+            Measured in bytes of traffic.
+            Values are in one-to-one correspondence with the values in the app_provider_parties array.
+          type: array
+          items:
+            type: integer
+            format: int64
 
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
