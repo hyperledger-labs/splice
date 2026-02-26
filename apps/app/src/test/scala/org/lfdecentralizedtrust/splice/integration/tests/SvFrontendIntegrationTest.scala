@@ -1428,18 +1428,27 @@ class SvFrontendIntegrationTest
     "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
       val providerPartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
 
-      // First, create a Grant proposal and capture the contract ID
-      val grantProposalContractId = assertCreateProposal(
+      // First, create a Grant proposal for the provider.
+      assertCreateProposal(
         "SRARC_GrantFeaturedAppRight",
         "grant-featured-app",
       ) { implicit webDriver =>
         fillOutTextField("grant-featured-app-idValue", providerPartyId)
       }
 
-      // Now create a Revoke proposal using the Grant proposal's contract ID
+      // Now create a Revoke proposal by selecting a contract ID from the provider's dropdown.
       assertCreateProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") {
         implicit webDriver =>
-          fillOutTextField("revoke-featured-app-idValue", grantProposalContractId)
+          fillOutTextField("revoke-featured-app-partyId", providerPartyId)
+
+          eventually() {
+            val dropdown = webDriver.findElement(By.id("revoke-featured-app-rightCid-dropdown"))
+            dropdown.click()
+
+            val options = webDriver.findElements(By.cssSelector("li[role='option']"))
+            options.size should be > 0
+            options.get(0).click()
+          }
       }
     }
 

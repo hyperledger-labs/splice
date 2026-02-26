@@ -615,6 +615,29 @@ paths:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
 
+  /v0/admin/sv/featured-app-rights/{provider_party_id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "listFeaturedAppRightsByProvider"
+      description: |
+        List all `FeaturedAppRight` contracts for the provider.
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Featured app rights for provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFeaturedAppRightsByProviderResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+
   /v0/admin/feature-support:
     get:
       tags: [ sv ]
@@ -1192,3 +1215,15 @@ components:
       properties:
         participant_id:
           type: string
+
+    ListFeaturedAppRightsByProviderResponse:
+      description: |
+        Contracts of Daml template `Splice.Amulet.FeaturedAppRight` for a provider.
+      type: object
+      required:
+        - featured_app_rights
+      properties:
+        featured_app_rights:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

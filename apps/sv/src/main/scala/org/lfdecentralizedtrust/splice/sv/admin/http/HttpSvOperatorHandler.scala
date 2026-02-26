@@ -479,6 +479,33 @@ class HttpSvOperatorHandler(
       .map(r0.FeatureSupportResponseOK(_))
   }
 
+  override def listFeaturedAppRightsByProvider(
+      respond: r0.ListFeaturedAppRightsByProviderResponse.type
+  )(providerPartyId: String)(
+      extracted: ActAsKnownUserRequest
+  ): Future[r0.ListFeaturedAppRightsByProviderResponse] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.listFeaturedAppRightsByProvider") { _ => _ =>
+      for {
+        provider <- PartyId.fromProtoPrimitive(providerPartyId, "providerPartyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode provider party ID: $error")
+            )
+        }
+        scanConnection <- scanConnectionF
+        featuredAppRights <- scanConnection.listFeaturedAppRights()
+      } yield {
+        val providerRights = featuredAppRights
+          .filter(_.payload.provider == provider.toProtoPrimitive)
+          .map(_.toHttp)
+          .toVector
+        respond.OK(definitions.ListFeaturedAppRightsByProviderResponse(providerRights))
+      }
+    }
+  }
+
   override def getCometBftNodeDebugDump(
       respond: r0.GetCometBftNodeDebugDumpResponse.type
   )()(extracted: ActAsKnownUserRequest): Future[
