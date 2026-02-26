@@ -3914,23 +3914,23 @@ components:
         as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
       required:
         - round_number
-        - entries
+        - records
       properties:
         round_number:
           description: |
             The round number assigned to the activity records.
           type: integer
           format: int64
-        entries:
+        records:
           description: |
-            App activity entries, one per app provider.
+            App activity records, one per app provider.
           type: array
           items:
-            $ref: "#/components/schemas/AppActivityEntry"
-    AppActivityEntry:
+            $ref: "#/components/schemas/AppActivityRecord"
+    AppActivityRecord:
       type: object
       description: |
-        A single app provider's activity weight.
+        ActivityRecord for an app.
       required:
         - party
         - weight
