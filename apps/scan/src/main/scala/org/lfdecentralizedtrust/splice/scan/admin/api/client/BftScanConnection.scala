@@ -268,6 +268,14 @@ class BftScanConnection(
     bftCall(_.lookupFeaturedAppRight(providerPartyId))
   }
 
+  override def listFeaturedAppRights()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    bftCall(_.listFeaturedAppRights())
+  }
+
   override def getMigrationSchedule()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
