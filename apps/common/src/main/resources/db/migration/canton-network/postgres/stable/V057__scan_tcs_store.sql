@@ -12,7 +12,7 @@ create table acs_store_archived_template(
 );
 
 create index acs_store_archived_template_temporal
-    on acs_store_archived_template (store_id, migration_id, template_id_qualified_name, created_at, archived_at);
+    on acs_store_archived_template (store_id, migration_id, template_id_qualified_name, created_at) include (archived_at);
 
 create table scan_tcs_store_active
 (
@@ -53,4 +53,4 @@ create table scan_tcs_store_archived
 
 -- temporal query support: created_at + archived_at filtering for point-in-time lookups on the archive table
 create index scan_tcs_store_archived_temporal
-    on scan_tcs_store_archived (store_id, migration_id, template_id_qualified_name, created_at, archived_at);
+    on scan_tcs_store_archived (store_id, migration_id, template_id_qualified_name, created_at) include (archived_at);
