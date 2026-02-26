@@ -170,7 +170,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
     actualUpdatesWithoutLostData should have length recordedUpdatesWithoutLostData.size.longValue()
 
-    actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
+    forAll(actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData)) {
       case (actual, recorded) =>
         actual shouldBe recorded
     }
