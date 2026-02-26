@@ -228,7 +228,7 @@ class WalletIntegrationTest
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(
               walletCodegen.AppPaymentRequest.COMPANION
-            )(alice) should have size (batchSize.toLong + 2)
+            )(alice) should have size (batchSize.toLong + 2) withClue "AppPaymentRequests"
         }
 
         val offsetBefore =
@@ -398,7 +398,7 @@ class WalletIntegrationTest
       )(
         "splitwell provider is no longer featured",
         { _ =>
-          sv1ScanBackend.listFeaturedAppRights() shouldBe empty
+          sv1ScanBackend.listFeaturedAppRights() shouldBe empty withClue "FeaturedAppRights"
           splitwellWalletClient.userStatus().hasFeaturedAppRight shouldBe false
         },
       )
@@ -537,7 +537,7 @@ class WalletIntegrationTest
       )
 
       clue("Alice is listed as a user") {
-        aliceValidatorBackend.listUsers() should contain(aliceUser)
+        aliceValidatorBackend.listUsers() should contain(aliceUser) withClue "Users"
       }
       actAndCheck(
         "We offboard Alice",

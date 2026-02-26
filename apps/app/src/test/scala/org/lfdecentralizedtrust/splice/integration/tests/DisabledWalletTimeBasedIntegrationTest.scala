@@ -83,7 +83,7 @@ class DisabledWalletTimeBasedIntegrationTest
               coupon.data.sv == sv1Backend.getDsoInfo().svParty.toProtoPrimitive &&
               coupon.data.round.number == currentRound
             },
-          ) should not be empty
+          ) should not be empty withClue "current round SvRewardCoupons"
 
         advanceRoundsToNextRoundOpening
         currentRound += 1
@@ -95,11 +95,11 @@ class DisabledWalletTimeBasedIntegrationTest
             .filterJava(UnclaimedReward.COMPANION)(
               dsoParty,
               reward => BigDecimal(reward.data.amount) >= expectedMinAmount,
-            ) should not be empty
+            ) should not be empty withClue s"UnclaimedRewards >= $expectedMinAmount"
         }
 
         sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(Amulet.COMPANION)(dsoParty, _ => true) shouldBe empty
+          .filterJava(Amulet.COMPANION)(dsoParty, _ => true) shouldBe empty withClue "Amulets"
       }
     }
 

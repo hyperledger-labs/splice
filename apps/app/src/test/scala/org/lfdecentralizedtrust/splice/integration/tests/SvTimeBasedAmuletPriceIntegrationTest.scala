@@ -80,7 +80,7 @@ class SvTimeBasedAmuletPriceIntegrationTest
           sv1Backend.metrics.list(
             s"$MetricsPrefix.amulet_price.voted_price",
             Map("sv" -> sv),
-          ) should not be empty
+          ) should not be empty withClue "voted_price metrics"
 
           sv1Backend.metrics
             .get(
@@ -94,7 +94,7 @@ class SvTimeBasedAmuletPriceIntegrationTest
           sv1Backend.metrics.list(
             s"$MetricsPrefix.amulet_price.voted_price",
             Map("sv" -> sv),
-          ) shouldBe empty
+          ) shouldBe empty withClue "voted_price metrics after get"
       }
     }
 

@@ -80,7 +80,8 @@ class WalletExpirationsIntegrationTest
 
       clue("The payment request has been expired after resuming the trigger") {
         eventually() {
-          aliceWalletClient.listAppPaymentRequests() shouldBe empty
+          aliceWalletClient
+            .listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests"
         }
       }
     }

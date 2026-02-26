@@ -35,7 +35,7 @@ class WalletRewardsTimeBasedIntegrationTest
 
       // Retrieve transferred amulet in bob's wallet and transfer part of it back to alice;
       // bob's validator will receive some app rewards
-      eventually()(bobWalletClient.list().amulets should have size 1)
+      eventually()(bobWalletClient.list().amulets should have size 1 withClue "amulets")
       p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0)
 
       val openRounds = eventually() {
@@ -44,21 +44,25 @@ class WalletRewardsTimeBasedIntegrationTest
           .getOpenAndIssuingMiningRounds()
           ._1
           .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
-        openRounds should not be empty
+        openRounds should not be empty withClue "openRounds"
         openRounds
       }
 
       advanceTimeForRewardAutomationToRunForCurrentRound
 
       eventually(40.seconds) {
-        bobValidatorWalletClient.listAppRewardCoupons() should have size 1
-        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
-        aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
-        aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         bobValidatorWalletClient
-          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+          .listAppRewardCoupons() should have size 1 withClue "AppRewardCoupons"
+        bobValidatorWalletClient
+          .listValidatorRewardCoupons() should have size 1 withClue "ValidatorRewardCoupons"
         aliceValidatorWalletClient
-          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+          .listAppRewardCoupons() should have size 1 withClue "AppRewardCoupons"
+        aliceValidatorWalletClient
+          .listValidatorRewardCoupons() should have size 1 withClue "ValidatorRewardCoupons"
+        bobValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong withClue "bob ValidatorLivenessActivityRecords"
+        aliceValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong withClue "alice ValidatorLivenessActivityRecords"
       }
 
       // avoid messing with the computation of balance
@@ -77,9 +81,12 @@ class WalletRewardsTimeBasedIntegrationTest
       advanceTimeForRewardAutomationToRunForCurrentRound
 
       eventually() {
-        bobValidatorWalletClient.listAppRewardCoupons() should have size 0
-        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
-        bobValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+        bobValidatorWalletClient
+          .listAppRewardCoupons() should have size 0 withClue "AppRewardCoupons"
+        bobValidatorWalletClient
+          .listValidatorRewardCoupons() should have size 0 withClue "ValidatorRewardCoupons"
+        bobValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size 0 withClue "ValidatorLivenessActivityRecords"
 
         val newBalance = bobValidatorWalletClient.balance().unlockedQty
 

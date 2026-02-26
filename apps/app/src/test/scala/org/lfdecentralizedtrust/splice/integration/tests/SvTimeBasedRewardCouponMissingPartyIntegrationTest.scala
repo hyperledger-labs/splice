@@ -77,7 +77,7 @@ class SvTimeBasedRewardCouponMissingPartyIntegrationTest
                     .getOpenAndIssuingMiningRounds()
                     ._1
                     .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
-                  openRounds should not be empty
+                  openRounds should not be empty withClue "OpenMiningRounds"
                 }
               }
             }
