@@ -62,7 +62,7 @@ groups:
           __dashboardUid__: 50503893-d05f-4ece-9ebf-36fd20ffb06f
           __panelId__: "6"
           description: A failed connection is periodically retried for availability. A fatal subscription is considered invalid and will never be retried.
-          summary: The sequencer connection of job {{ $labels.job }} in namespace {{ $labels.namespace }} is not validated.
+          summary: The sequencer connection {{ $labels.connection }} of job {{ $labels.job }} in namespace {{ $labels.namespace }} failed validation.
         isPaused: false
       - uid: dfebau7w2r7cwa
         title: Number of active subscriptions in the subscription pool
@@ -162,13 +162,13 @@ groups:
         dashboardUid: 50503893-d05f-4ece-9ebf-36fd20ffb06f
         panelId: 5
         noDataState: NoData
-        execErrState: Alerting
+        execErrState: Error
         for: 5m
         annotations:
           __dashboardUid__: 50503893-d05f-4ece-9ebf-36fd20ffb06f
           __panelId__: "5"
           description: The liveness margin determines how many subscriptions on different sequencers are continuously maintained, beyond the minimum number defined by the trust threshold. In other words, the subscription pool will strive to maintain at all times (trust threshold + liveness margin)-many subscriptions active. This provides tolerance to subscriptions falling, enabling the node to continue operating while some sequencers are down.
-          summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} has less active subscriptions than the sum of trust threshold in the subscription pool
+          summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} has {{ index $values "C" }} less active subscriptions than the sum of trust threshold in the subscription pool
           severity: critical
         labels: {}
         isPaused: false
