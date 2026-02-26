@@ -197,7 +197,7 @@ Once you have confirmed that the migration has been successful:
 
 * Restart the validator app once more, keeping the ``-m <migration ID>`` but omitting the ``-M``.
   The ``-M`` is required only for the first startup after the migration, to instruct the validator to perform the actual migration.
-* The old participant database (``participant=-<OLD_MIGRATION_ID>``) is no longer used and can be pruned.
+* The old participant database (``participant-<OLD_MIGRATION_ID>``) is no longer used and can be pruned.
   We recommend retaining it (or a current backup thereof) for at least another week after the migration,
   in case the synchronizer migration needs to be rolled back due to an unexpected major issue.
 
