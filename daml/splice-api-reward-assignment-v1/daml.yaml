@@ -7,7 +7,6 @@ dependencies:
   - daml-stdlib
 data-dependencies:
   - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
-  - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
@@ -15,5 +14,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceRewardMintingInterfaces
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceRewardAssignmentV1Interfaces
     output-directory: target/daml-codegen-java

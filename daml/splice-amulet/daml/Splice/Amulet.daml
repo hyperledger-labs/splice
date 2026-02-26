@@ -409,10 +409,14 @@ template RewardCouponV2
     interface instance Api.RewardAssignmentV1.RewardCoupon for RewardCouponV2 where
       view = Api.RewardAssignmentV1.RewardCouponView with
         dso
+        provider = beneficiary -- FIXME: rename benefiary to provider in coupon
         beneficiary
         amount
         expiresAt
         meta = Api.Token.MetadataV1.emptyMetadata
+        maxNumNewBeneficiaries = maxNumNewCouponV2Beneficiaries
+
+      rewardCoupon_assignBeneficiariesImpl _self arg = rewardCouponV2_assignBeneficiariesImpl this arg
 
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
@@ -579,6 +583,9 @@ template UnclaimedActivityRecord
         pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
 
 
+-- Support code
+---------------
+
 requireAmuletExpiredForAllRounds : ContractId ExternalPartyConfigState -> ContractId ExternalPartyConfigState -> Amulet -> Update ()
 requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid amulet = do
   require "externalPartyConfigState0Cid /= externalPartyConfigState1Cid" (externalPartyConfigState0Cid /= externalPartyConfigState1Cid)
@@ -587,6 +594,45 @@ requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfi
   let round = min config0.holdingFeesOpenRoundNumber config1.holdingFeesOpenRoundNumber
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
 
+-- | Maximum number of new beneficiaries that can be assigned to a RewardCouponV2.
+-- Set to the same limit as the one for featured-app-marker beneficiaries to minmize migration effort
+-- for app providers.
+maxNumNewCouponV2Beneficiaries : Int
+maxNumNewCouponV2Beneficiaries = 20
+
+-- | Implementation of the 'RewardCoupon_AssignBeneficiaries' choice for 'RewardCouponV2'.
+rewardCouponV2_assignBeneficiariesImpl
+  : RewardCouponV2
+  -> Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries
+  -> Update Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult
+rewardCouponV2_assignBeneficiariesImpl coupon arg = do
+  let newBeneficiaries = arg.newBeneficiaries
+  let totalNewBeneficiaryAmount = sum (map (.amount) arg.newBeneficiaries)
+  require ("No more than " <> show maxNumNewCouponV2Beneficiaries <> " beneficiaries assigned")
+    (length arg.newBeneficiaries <= maxNumNewCouponV2Beneficiaries)
+  require "Total amount assigned to new beneficiaries below coupon amount" (totalNewBeneficiaryAmount <= coupon.amount)
+
+  -- return remainder to original beneficiary
+  let remainingAmount = coupon.amount - totalNewBeneficiaryAmount
+  originalBeneficiaryRemainderCid <-
+    if (remainingAmount > 0.0)
+      then do
+        Some <$> create coupon with
+          amount = remainingAmount
+          beneficiaryIsObserver = True
+      else do
+        pure None
+
+  -- create coupons for new beneficiaries
+  newBeneficiaryCouponCids <- forA newBeneficiaries $ \newBeneficiary -> do
+    create coupon with
+      amount = newBeneficiary.amount
+      beneficiary = newBeneficiary.beneficiary
+      beneficiaryIsObserver = True
+
+  return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
+    newBeneficiariesCouponCids = map toInterfaceContractId newBeneficiaryCouponCids
+    originalBeneficiaryRemainderCid = fmap toInterfaceContractId originalBeneficiaryRemainderCid
 
 
 -- instances

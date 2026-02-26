@@ -16,7 +16,6 @@ module Splice.Testing.Registries.AmuletRegistry
   , tapFaucet
   , featureApp
   , createTransferPreapproval
-  , mintRewards
   , beneficiariesToMetadata
 
   -- ** Locking
@@ -35,14 +34,12 @@ module Splice.Testing.Registries.AmuletRegistry
 import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
-import qualified DA.Map as Map
 import DA.Optional (isSome)
 import DA.List.Total
 import qualified DA.TextMap as TextMap
 import DA.Text qualified as T
 import DA.Time
 
-import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
@@ -190,30 +187,6 @@ featureApp registry provider = do
   result <- submitMulti [provider] [registry.dso] $ exerciseCmd amuletRulesCid AmuletRules_DevNet_FeatureApp with
     provider
   return result.featuredAppRightCid
-
--- | Mint rewards using the reward minting factory.
-mintRewards : AmuletRegistry -> Party -> [(Party, Decimal)] -> [ContractId Api.RewardAssignmentV1.RewardCoupon] -> Script (Api.RewardAssignmentV1.RewardMintingFactory_MintResult)
-mintRewards registry beneficiary mintingBeneficiaries rewardCouponCids = do
-  [(factoryCid0, _)] <- query @ExternalPartyAmuletRules registry.dso
-  let factoryCid = toInterfaceContractId @Api.RewardAssignmentV1.RewardMintingFactory factoryCid0
-  context <- getExternalPartyConfigStateContext registry
-  let submitters = mconcat $ map actAs $ beneficiary :: map fst mintingBeneficiaries
-  let disclosures = discloseMany (Map.values context.disclosures.disclosures)
-  submit (submitters <> readAs registry.dso <> disclosures) $ exerciseCmd factoryCid
-    Api.RewardAssignmentV1.RewardMintingFactory_Mint with
-      couponBeneficiary = beneficiary
-      mintingBeneficiaries = do
-        (beneficiary, amount) <- mintingBeneficiaries
-        pure Api.RewardAssignmentV1.MintingBeneficiary with
-          beneficiary
-          amount
-      rewardCouponCids
-      expectedDso = registry.dso
-      extraArgs = ExtraArgs with
-        context = context.choiceContext
-        meta = emptyMetadata
-
-
 
 -- | Encode a list of beneficiaries as metadata to pass in via token standard choices.
 -- Currently only supported for allocation execution.

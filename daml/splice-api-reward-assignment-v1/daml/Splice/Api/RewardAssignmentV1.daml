@@ -1,10 +1,7 @@
 -- | An API for app providers to assign reward coupons for their activity to the their beneficiaries.
 module Splice.Api.RewardAssignmentV1 where
 
-import qualified DA.TextMap as TextMap
-
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
 
 
 -- | View on a coupon representing the right to mint a certain amount of rewards.
@@ -67,7 +64,7 @@ interface RewardCoupon where
 data RewardCoupon_AssignBeneficiariesResult = RewardCoupon_AssignBeneficiariesResult with
     newBeneficiariesCouponCids : [ContractId RewardCoupon]
       -- ^ The coupons created for the newly assigned beneficiaries.
-    originalBeneficiaryChangeCid : Optional (ContractId RewardCoupon)
+    originalBeneficiaryRemainderCid : Optional (ContractId RewardCoupon)
       -- ^ Coupon for the original beneficiary with the remaining amount not assigned to the new beneficiaries.
   deriving (Eq, Show)
 
