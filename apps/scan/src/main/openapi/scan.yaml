@@ -3924,7 +3924,7 @@ components:
           type: string
         round_number:
           description: |
-            The oldest open mining round at the record_time of this event.
+            The round number assigned to the activity record.
           type: integer
           format: int64
         entries:
