@@ -1129,10 +1129,10 @@ template DsoRules with
     nonconsuming choice DsoRules_Amulet_ExpireTransferInstruction : DsoRules_Amulet_ExpireTransferInstructionResult
       with
         amuletTransferInstructionCid : ContractId AmuletTransferInstruction
-        sv : Optional Party
+        sv : Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        _ <- getAndValidateSvParty this (Some sv)
         
         let transferInstructionCid = toInterfaceContractId @TransferInstruction amuletTransferInstructionCid
 
