@@ -5,6 +5,7 @@ import { AmountDisplay, ErrorDisplay, Loading } from '@lfdecentralizedtrust/spli
 
 import { Box, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
+import { useLocation } from 'react-router';
 
 import { useBalance } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
@@ -16,11 +17,16 @@ const Hero: React.FC = () => {
   const balanceQuery = useBalance();
   const amuletPriceQuery = useAmuletPrice();
   const featureSupport = useFeatureSupport();
+  const location = useLocation();
 
   const isLoading =
     balanceQuery.isPending || amuletPriceQuery.isPending || featureSupport.isLoading;
   const isError = balanceQuery.isError || amuletPriceQuery.isError || featureSupport.isError;
   console.log('Feature support data:', featureSupport.data);
+
+  if (location.pathname.includes('development-fund')) {
+    return null;
+  }
 
   return (
     <Stack mt={4} mb={4} spacing={4} direction="row" justifyContent="space-between">
