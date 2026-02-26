@@ -3861,7 +3861,7 @@ components:
     EventHistoryTrafficSummary:
       type: object
       description: |
-        Traffic summary data from the sequencer for a given transaction.
+        Traffic summary data from the sequencer for a given event.
         When present, the sequencing_time matches the verdict's record_time.
       required:
         - sequencing_time
