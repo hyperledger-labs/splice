@@ -555,11 +555,15 @@ testExpireAmuletTransferInstruction = do
   liquidAmuletsBeforeExpire <- query @Amulet sender.primaryParty
   assertMsg "Sender liquid wallet should be truly empty" (null liquidAmuletsBeforeExpire)
 
-  passTime (hours 2)
-  
-
   [(instrCid, _)] <- query @AmuletTransferInstruction app.dso
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
+
+  submitMultiMustFail [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstruction with
+      amuletTransferInstructionCid = instrCid
+      sv = Some sv1
+
+  passTime (hours 2)
 
   submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstruction with
     amuletTransferInstructionCid = instrCid
