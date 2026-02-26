@@ -233,6 +233,10 @@ data DsoRules_Amulet_ExpireTransferInstructionResult = DsoRules_Amulet_ExpireTra
     transferInstructionResult : TransferInstructionResult
   deriving (Eq, Show)
 
+data DsoRules_Amulet_ExpireTransferInstructionsResult = DsoRules_Amulet_ExpireTransferInstructionsResult
+  with
+    results : [DsoRules_Amulet_ExpireTransferInstructionResult]
+  deriving (Eq, Show)
 
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
@@ -1126,25 +1130,25 @@ template DsoRules with
 
     -- | Cleanup choice for expired Amulet transfer instructions.
     
-    nonconsuming choice DsoRules_Amulet_ExpireTransferInstruction : DsoRules_Amulet_ExpireTransferInstructionResult
+    nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
       with
-        amuletTransferInstructionCid : ContractId AmuletTransferInstruction
+        amuletTransferInstructionCids : [ContractId AmuletTransferInstruction]
         sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
         
-        let transferInstructionCid = toInterfaceContractId @TransferInstruction amuletTransferInstructionCid
+        individualResults <- forA amuletTransferInstructionCids $ \cid -> do
+          let transferInstructionCid = toInterfaceContractId @TransferInstruction cid
+          exercise transferInstructionCid TransferInstruction_Update with
+            extraActors = []
+            extraArgs = ExtraArgs with
+              meta = emptyMetadata
+              context = ChoiceContext with
+                values = TextMap.fromList [(expireLockKey, toAnyValue True)]
 
-        result <- exercise transferInstructionCid TransferInstruction_Update with
-          extraActors = []
-          extraArgs = ExtraArgs with
-            meta = emptyMetadata
-            context = ChoiceContext with
-              values = TextMap.fromList [(expireLockKey, toAnyValue True)]
-
-        return DsoRules_Amulet_ExpireTransferInstructionResult with
-          transferInstructionResult = result
+        return DsoRules_Amulet_ExpireTransferInstructionsResult with
+          results = map (DsoRules_Amulet_ExpireTransferInstructionResult) individualResults
     
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with

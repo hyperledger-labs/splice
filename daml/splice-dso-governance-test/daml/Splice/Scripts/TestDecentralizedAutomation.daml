@@ -559,14 +559,14 @@ testExpireAmuletTransferInstruction = do
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
   submitMultiMustFail [sv1] [app.dso] $ 
-    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstruction with
-      amuletTransferInstructionCid = instrCid
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+      amuletTransferInstructionCids = [instrCid]
       sv = sv1
 
   passTime (hours 2)
 
-  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstruction with
-    amuletTransferInstructionCid = instrCid
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+    amuletTransferInstructionCids = [instrCid]
     sv = sv1
 
   lockedAmuletsAfterExpire <- query @LockedAmulet sender.primaryParty
