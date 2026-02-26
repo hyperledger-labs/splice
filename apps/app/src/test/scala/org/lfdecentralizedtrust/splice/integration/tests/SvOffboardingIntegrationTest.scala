@@ -142,7 +142,7 @@ class SvOffboardingIntegrationTest
                   case _ => false
                 },
             )
-          confirmations should have size (4)
+          confirmations should have size (4) withClue "CreateTransferCommandCounter Confirmations"
         },
       )
 
@@ -202,7 +202,7 @@ class SvOffboardingIntegrationTest
       )(
         "The majority has voted but without an acceptance majority, the trigger should not remove sv4",
         _ => {
-          sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 4
+          sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 4 withClue "dsoRules.svs"
         },
       )
 
@@ -215,7 +215,7 @@ class SvOffboardingIntegrationTest
       )(
         "Everyone voted, thus the trigger should remove the dso party hosting for sv4",
         _ => {
-          sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 3
+          sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 3 withClue "dsoRules.svs"
           suppressFailedClues(loggerFactory) {
             clue("Check partyToParticipant offboarding") {
               val mapping = sv3Backend.appState.participantAdminConnection

@@ -160,13 +160,13 @@ abstract class ValidatorPreflightIntegrationTestBase
   "run through runbook against cluster validator" in { implicit env =>
     val alicePartyId = withFrontEnd("alice-validator") { implicit webDriver =>
       val alicePartyId = loginAndOnboardToWalletUi("alice")
-      findAll(className("amulets-table-row")) should have size 0
+      findAll(className("amulets-table-row")) should have size 0 withClue "Amulets rows"
       alicePartyId
     }
 
     val bobPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
       val bobPartyId = loginAndOnboardToWalletUi("bob")
-      findAll(className("amulets-table-row")) should have size 0
+      findAll(className("amulets-table-row")) should have size 0 withClue "Amulets rows"
       bobPartyId
     }
 
@@ -329,7 +329,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         }
         actAndCheck("add user", eventuallyClickOn(className("add-user-link")))(
           "user has been added and invite link disappears",
-          _ => findAll(className("add-user-link")).toSeq shouldBe empty,
+          _ => findAll(className("add-user-link")).toSeq shouldBe empty withClue "'Add' button",
         )
         addTeamLunch(100)
       }
@@ -364,7 +364,7 @@ abstract class ValidatorPreflightIntegrationTestBase
               row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
             }
             val rows = findAll(className("balance-updates-list-item")).toSeq
-            rows should have size 2
+            rows should have size 2 withClue "'Balance Updates' items"
             // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
             forExactly(1, rows)(row =>
               matchRow(
@@ -411,7 +411,7 @@ abstract class ValidatorPreflightIntegrationTestBase
                 ansUiUrl,
                 () => {
                   waitForQuery(id("entry-name-field"))
-                  find(id("entry-name-field")) should not be empty
+                  find(id("entry-name-field")) should not be empty withClue "ANS name field"
                 },
               )
             } else {
@@ -434,7 +434,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           ansUiUrl,
           () => {
             waitForQuery(id("entry-name-field"))
-            find(id("entry-name-field")) should not be empty
+            find(id("entry-name-field")) should not be empty withClue "ANS name field"
           },
         )
       }
@@ -456,7 +456,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         val connections = inside(sv1ScanClient.listDsoSequencers()) {
           case Seq(DomainSequencers(_, connections)) => connections
         }
-        connections should not be empty
+        connections should not be empty withClue "sequencer connections"
         val latestMigrationId = connections.map(_.migrationId).max
         val availableConnections = connections.filter(connection =>
           connection.migrationId == latestMigrationId &&
@@ -531,7 +531,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       auth0Login(
         user,
         splitwellUiUrl,
-        () => find(id("group-id-field")) should not be empty,
+        () => find(id("group-id-field")) should not be empty withClue "'Group ID' textfield",
       )
       waitForQuery(id("logged-in-user"))
     }
@@ -556,7 +556,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       auth0Login(
         user,
         url,
-        () => find(id("onboard-button")) should not be empty,
+        () => find(id("onboard-button")) should not be empty withClue "'Onboard yourself' button",
       )
     }
     onboardUserAfterLogin()

@@ -161,7 +161,7 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         )
         .value
         .sequencerConnections
-      sequencerConnections.connections.size shouldBe 4
+      sequencerConnections.connections.size shouldBe 4 withClue "sequencerConnections count"
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.one
       sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
@@ -404,7 +404,7 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
 
     val aliceEntries = eventually() {
       val entriesResponse = aliceAnsExternalClient.listAnsEntries()
-      entriesResponse.entries should have size 1
+      entriesResponse.entries should have size 1 withClue "ANS entries"
       entriesResponse
     }
 
