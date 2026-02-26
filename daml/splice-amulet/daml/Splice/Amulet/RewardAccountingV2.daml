@@ -28,10 +28,6 @@ overall:
 - separate the minting API and its implementation into its own PR
 
 
-api:
-- introduce api package: splice-api-reward-assignment-v1
-  - take a note wrt integration with HoldingV2 interface introduced by token standard v2
-
 tests:
 - minting delegation of RewardCouponV2
 
