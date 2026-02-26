@@ -75,7 +75,7 @@ class SplitwellUpgradeFrontendIntegrationTest
               .filterJava(splitwellCodegen.SplitwellInstallRequest.COMPANION)(
                 splitwellBackend.getProviderPartyId()
               )
-            contracts shouldBe empty
+            contracts shouldBe empty withClue "SplitwellInstallRequests"
           }
         }
       }
@@ -123,13 +123,15 @@ class SplitwellUpgradeFrontendIntegrationTest
         withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
           val groupsBefore = eventually() {
             val groupsBefore = getGroupContractIds()
-            groupsBefore should have size 2
+            groupsBefore should have size 2 withClue "groups before"
             groupsBefore
           }
 
           clue("Alice sees bob’s accepted invite") {
             eventually() {
-              findAll(className("add-user-link")).toSeq should have size 1
+              findAll(
+                className("add-user-link")
+              ).toSeq should have size 1 withClue "'Add' button under 'Membership Requests'"
             }
           }
 
@@ -140,7 +142,7 @@ class SplitwellUpgradeFrontendIntegrationTest
             "Group contract id changes",
             _ => {
               val groupsAfter = getGroupContractIds()
-              groupsAfter should have size 2
+              groupsAfter should have size 2 withClue "groups after"
               groupsAfter should not equal groupsBefore
             },
           )
@@ -268,7 +270,7 @@ class SplitwellUpgradeFrontendIntegrationTest
                   currentUrl should startWith(s"http://localhost:${bobSplitwellUIPort}")
                   val balanceUpdates =
                     bobSplitwellClient.listBalanceUpdates(GroupKey(abGroupName, alice))
-                  balanceUpdates should have size 3
+                  balanceUpdates should have size 3 withClue "bob BalanceUpdates"
                   assertAllOn(splitwellUpgradeAlias)(balanceUpdates.map(_.contractId)*)
                 },
               )

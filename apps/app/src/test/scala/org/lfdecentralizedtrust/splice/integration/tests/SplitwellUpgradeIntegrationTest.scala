@@ -73,7 +73,7 @@ class SplitwellUpgradeIntegrationTest
                 )
               )
             } else {
-              logs shouldBe empty
+              logs shouldBe empty withClue "log warnings"
             }
           },
         )
