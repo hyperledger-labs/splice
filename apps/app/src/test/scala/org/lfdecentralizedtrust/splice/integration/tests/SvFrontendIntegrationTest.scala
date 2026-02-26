@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_act
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_SetConfig,
+  VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -1426,14 +1427,52 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
-      val providerPartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val providerParty = sv3Backend.getDsoInfo().svParty
+      val providerPartyId = providerParty.toProtoPrimitive
 
       // First, create a Grant proposal for the provider.
-      assertCreateProposal(
+      val grantProposalContractId = assertCreateProposal(
         "SRARC_GrantFeaturedAppRight",
         "grant-featured-app",
       ) { implicit webDriver =>
         fillOutTextField("grant-featured-app-idValue", providerPartyId)
+      }
+
+      clue("vote the grant request to execution before creating revoke request") {
+        val grantTrackingCid = eventually() {
+          val voteRequest: Contract[VoteRequest.ContractId, VoteRequest] = sv1Backend
+            .listVoteRequests()
+            .find { request =>
+              val requestCid = request.contractId.contractId
+              val trackingCid =
+                if (request.payload.trackingCid.isPresent) {
+                  Some(request.payload.trackingCid.get.contractId)
+                } else {
+                  None
+                }
+              requestCid == grantProposalContractId || trackingCid.contains(grantProposalContractId)
+            }
+            .getOrElse(
+              fail(
+                s"Could not find vote request for grant proposal contract id: $grantProposalContractId"
+              )
+            )
+
+          if (voteRequest.payload.trackingCid.isPresent) voteRequest.payload.trackingCid.get
+          else voteRequest.contractId
+        }
+
+        eventuallySucceeds() {
+          sv3Backend.castVote(grantTrackingCid, true, "", "")
+        }
+
+        eventuallySucceeds() {
+          sv4Backend.castVote(grantTrackingCid, true, "", "")
+        }
+
+        eventually() {
+          sv1ScanBackend.lookupFeaturedAppRight(providerParty) shouldBe a[Some[?]]
+        }
       }
 
       // Now create a Revoke proposal by selecting a contract ID from the provider's dropdown.
