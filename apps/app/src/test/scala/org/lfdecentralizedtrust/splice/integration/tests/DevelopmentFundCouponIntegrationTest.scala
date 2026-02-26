@@ -92,7 +92,7 @@ class DevelopmentFundCouponIntegrationTest
         "as it only acts when the number of coupons is ≥ 2 × threshold",
       _ => {
         val coupons = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
-        coupons should have size 5
+        coupons should have size 5 withClue "coupons"
         aliceValidatorBackend.scanProxy.listUnclaimedDevelopmentFundCoupons() shouldBe coupons
         BigDecimal(coupons.head.contract.payload.amount)
       },
@@ -228,11 +228,11 @@ class DevelopmentFundCouponIntegrationTest
           // Beneficiary can list their coupons
           val activeDevelopmentFundCouponContracts =
             bobWalletClient.listActiveDevelopmentFundCoupons()
-          activeDevelopmentFundCouponContracts should have size 1
+          activeDevelopmentFundCouponContracts should have size 1 withClue "bob ActiveDevelopmentFundCoupons"
 
           // Fund manager can list their coupons
           aliceValidatorWalletClient
-            .listActiveDevelopmentFundCoupons() should have size 1
+            .listActiveDevelopmentFundCoupons() should have size 1 withClue "alice ActiveDevelopmentFundCoupons"
 
           // Verify the coupon
           val developmentFundCouponContract = activeDevelopmentFundCouponContracts.head
@@ -248,7 +248,7 @@ class DevelopmentFundCouponIntegrationTest
 
           // Fund manager can list their coupons
           aliceValidatorWalletClient
-            .listActiveDevelopmentFundCoupons() should have size 1
+            .listActiveDevelopmentFundCoupons() should have size 1 withClue "alice ActiveDevelopmentFundCoupons later"
 
           developmentFundCouponContract.contractId
         },
@@ -281,7 +281,8 @@ class DevelopmentFundCouponIntegrationTest
           "the archived coupon is listed in listDevelopmentFundCouponHistory",
         _ => {
           // Verify that the coupon is archived
-          aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+          aliceValidatorWalletClient
+            .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
           // Verify that a new unclaimed development fund coupon was created
           assertUnclaimedDevelopmentCouponAmounts(
             Seq(10.0, 10.0, 20.0, developmentFundCouponAmount.toDouble)
@@ -356,7 +357,7 @@ class DevelopmentFundCouponIntegrationTest
         _ => {
           aliceValidatorWalletClient
             .listActiveDevelopmentFundCoupons()
-            .map(_.payload.expiresAt) should not be empty
+            .map(_.payload.expiresAt) should not be empty withClue "alice coupon expiries"
           val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
             sv1ValidatorBackend
           )
@@ -369,7 +370,8 @@ class DevelopmentFundCouponIntegrationTest
 
     val bobBalanceAfter = clue("Coupon is collected by the collect rewards automation") {
       eventually() {
-        aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+        aliceValidatorWalletClient
+          .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
         val newBalance = 34 // 40 - fees
         checkWallet(
           bobParty,
@@ -412,7 +414,7 @@ class DevelopmentFundCouponIntegrationTest
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
             logEntry.sender.value.party shouldBe bobParty.toProtoPrimitive
             logEntry.sender.value.amount should be(bobBalanceAfter - bobBalanceBefore)
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "Transfer receivers"
             logEntry.developmentFundCouponsUsed shouldBe Some(developmentFundCouponAmount)
           }
         ),
@@ -479,7 +481,7 @@ class DevelopmentFundCouponIntegrationTest
           "A coupon is created and the total unclaimed development fund coupon amount decreases",
           _ => {
             aliceValidatorWalletClient
-              .listActiveDevelopmentFundCoupons() should have size 1
+              .listActiveDevelopmentFundCoupons() should have size 1 withClue "alice coupons"
             val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
               sv1ValidatorBackend
             )
@@ -495,7 +497,7 @@ class DevelopmentFundCouponIntegrationTest
       ) {
         eventually() {
           aliceValidatorWalletClient
-            .listActiveDevelopmentFundCoupons() shouldBe empty
+            .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
         }
       }
 
@@ -578,7 +580,7 @@ class DevelopmentFundCouponIntegrationTest
           _ => {
             val developmentFundCoupons = aliceValidatorWalletClient
               .listActiveDevelopmentFundCoupons()
-            developmentFundCoupons should have size 1
+            developmentFundCoupons should have size 1 withClue "alice coupons"
             val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
               sv1ValidatorBackend
             )
@@ -602,7 +604,8 @@ class DevelopmentFundCouponIntegrationTest
       )(
         "The coupon is archived and the total unclaimed development fund coupon amount increases",
         _ => {
-          aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+          aliceValidatorWalletClient
+            .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
           getUnclaimedDevelopmentFundCouponTotal(
             sv1ValidatorBackend
           ) shouldBe (unclaimedDevelopmentFundCouponTotalBeforeRejection + developmentFundCouponAmount)
@@ -715,7 +718,7 @@ class DevelopmentFundCouponIntegrationTest
         _ => {
           val developmentFundCoupons = aliceValidatorWalletClient
             .listActiveDevelopmentFundCoupons()
-          developmentFundCoupons should have size 6
+          developmentFundCoupons should have size 6 withClue "alice coupons"
 
           developmentFundCoupons.sortBy(_.payload.amount).map(_.contractId)
         },
@@ -736,7 +739,8 @@ class DevelopmentFundCouponIntegrationTest
         "The coupons are withdrawn and appear in listDevelopmentFundCouponHistory in the correct order",
         _ => {
           // Verify that five coupons have been archived
-          aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() should have size 1
+          aliceValidatorWalletClient
+            .listActiveDevelopmentFundCoupons() should have size 1 withClue "alice coupons"
 
           val limit = 2
           val pages =
@@ -753,7 +757,7 @@ class DevelopmentFundCouponIntegrationTest
           val history = pages.flatMap(
             _.developmentFundCouponHistory.filter(_.beneficiary == beneficiary.toProtoPrimitive)
           )
-          history should have size 5
+          history should have size 5 withClue "coupon history"
           history shouldBe history
             .sortBy(_.archivedAt)
             .reverse

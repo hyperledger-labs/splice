@@ -126,7 +126,7 @@ class FeaturedAppActivityMarkerIntegrationTest
       _ => {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs.filterJava(
           amulet.FeaturedAppActivityMarker.COMPANION
-        )(dsoParty, _ => true) should have size 0
+        )(dsoParty, _ => true) should have size 0 withClue "FeaturedAppActivityMarkers"
         inside(
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(

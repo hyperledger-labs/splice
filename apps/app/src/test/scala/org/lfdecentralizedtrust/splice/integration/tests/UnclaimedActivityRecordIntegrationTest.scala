@@ -108,7 +108,7 @@ class UnclaimedActivityRecordIntegrationTest
             sv1Backend.participantClient.ledger_api_extensions.acs
               .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(
                 dsoParty
-              ) should not be empty
+              ) should not be empty withClue "UnallocatedUnclaimedActivityRecord"
           },
         )
       }
@@ -116,7 +116,9 @@ class UnclaimedActivityRecordIntegrationTest
       clue("UnallocatedUnclaimedActivityRecord gets archived") {
         eventually() {
           sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
+            .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(
+              dsoParty
+            ) shouldBe empty withClue "UnallocatedUnclaimedActivityRecord"
         }
       }
     }
@@ -139,7 +141,9 @@ class UnclaimedActivityRecordIntegrationTest
         )
       }
       sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
+        .filterJava(UnclaimedReward.COMPANION)(
+          dsoParty
+        ) should not be empty withClue "UnclaimedReward"
     }
 
     setTriggersWithin(
@@ -174,9 +178,13 @@ class UnclaimedActivityRecordIntegrationTest
         "UnclaimedActivityRecord has been created",
         _ => {
           sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedActivityRecord.COMPANION)(dsoParty) should not be empty
+            .filterJava(UnclaimedActivityRecord.COMPANION)(
+              dsoParty
+            ) should not be empty withClue "UnclaimedActivityRecord"
           sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedReward.COMPANION)(dsoParty) shouldBe empty
+            .filterJava(UnclaimedReward.COMPANION)(
+              dsoParty
+            ) shouldBe empty withClue "UnclaimedReward"
         },
       )
     }
@@ -188,7 +196,9 @@ class UnclaimedActivityRecordIntegrationTest
       clue("UnclaimedActivityRecord gets archived") {
         eventually() {
           sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
+            .filterJava(UnclaimedActivityRecord.COMPANION)(
+              dsoParty
+            ) shouldBe empty withClue "UnclaimedActivityRecord"
         }
       }
     }
@@ -213,7 +223,9 @@ class UnclaimedActivityRecordIntegrationTest
         )
       }
       sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
+        .filterJava(UnclaimedReward.COMPANION)(
+          dsoParty
+        ) should not be empty withClue "UnclaimedReward"
     }
 
     setTriggersWithin(
@@ -245,7 +257,9 @@ class UnclaimedActivityRecordIntegrationTest
         "UnclaimedActivityRecord has been created",
         _ => {
           sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedActivityRecord.COMPANION)(dsoParty) should not be empty
+            .filterJava(UnclaimedActivityRecord.COMPANION)(
+              dsoParty
+            ) should not be empty withClue "UnclaimedActivityRecord"
 
           val unclaimedRewardLeftover: BigDecimal =
             sv1Backend.participantClient.ledger_api_extensions.acs
@@ -266,7 +280,9 @@ class UnclaimedActivityRecordIntegrationTest
     clue("UnclaimedActivityRecord gets archived") {
       eventually() {
         sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
+          .filterJava(UnclaimedActivityRecord.COMPANION)(
+            dsoParty
+          ) shouldBe empty withClue "UnclaimedActivityRecord"
       }
     }
   }

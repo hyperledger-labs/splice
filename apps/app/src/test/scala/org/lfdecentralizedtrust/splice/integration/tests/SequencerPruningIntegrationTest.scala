@@ -88,7 +88,7 @@ class SequencerPruningIntegrationTest
         sv2ValidatorBackend,
       )
     }
-    sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
+    sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2 withClue "dsoRules svs"
     val bobValidatorLocalBackend: ValidatorAppBackendReference = v("bobValidatorLocal")
 
     val unavailableParticipantId = withCanton(

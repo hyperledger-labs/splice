@@ -386,7 +386,7 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       clue("Double-check that no vote request exists") {
-        sv1Backend.listVoteRequests() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty withClue "sv1 VoteRequests"
       }
 
       val (_, voteRequest) = actAndCheck(
