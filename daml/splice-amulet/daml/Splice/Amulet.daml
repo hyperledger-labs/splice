@@ -385,10 +385,11 @@ template AppRewardCoupon
 template RewardCouponV2
   with
     dso : Party
-    beneficiary : Party -- ^ The party that can claim the reward.
-    round : Round -- ^ The round for which this reward can be claimed.
-    amount : Decimal -- ^ The amount of reward to be claimed. Denominated in Amulet.
-    expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be claimed.
+    provider : Party -- ^ The party that provided the service for whose activity the minting right was granted.
+    round : Round -- ^ The round in which the providers activity was recorded.
+    beneficiary : Party -- ^ The party that can mint the reward for the activity by the provider.
+    amount : Decimal -- ^ The amount of reward that can be minted for this coupon. Denominated in Amulet.
+    expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be minted.
     beneficiaryIsObserver : Bool
       -- ^ Whether the beneficiary should be an observer, which they are unless
       -- their vetting state at the time of coupon creation does not allow it.
@@ -399,6 +400,7 @@ template RewardCouponV2
     observer if beneficiaryIsObserver then [beneficiary] else []
     ensure amount > 0.0
 
+    -- FIXME: do using direct choice on AmuletRules for less storage overhead
     choice RewardCouponV2_DsoExpire : RewardCouponV2_DsoExpireResult
       controller dso
       do
@@ -409,7 +411,7 @@ template RewardCouponV2
     interface instance Api.RewardAssignmentV1.RewardCoupon for RewardCouponV2 where
       view = Api.RewardAssignmentV1.RewardCouponView with
         dso
-        provider = beneficiary -- FIXME: rename benefiary to provider in coupon
+        provider
         beneficiary
         amount
         expiresAt

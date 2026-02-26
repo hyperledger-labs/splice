@@ -77,9 +77,9 @@ template CalculateRewardsV2 with
   where
     signatory dso
 
--- | A minting allowance for a beneficiary to mint Amulet.
+-- | A minting allowance for a Canton Network service provider to mint Amulet.
 data MintingAllowance = MintingAllowance with
-    beneficiary : Party
+    provider : Party
     amount : Decimal
   deriving (Eq, Show)
 
@@ -105,9 +105,9 @@ template ProcessRewardsV2 with
     choice ProcessRewardsV2_ProcessBatch : ProcessRewardsV2_ProcessBatchResult
       with
         batch : Batch
-        beneficiariesWithWrongVettingState : Set Party
-          -- ^ Beneficiaries that do not have the correct vetting state for receiving rewards.
-      observer batchBeneficiaries beneficiariesWithWrongVettingState batch
+        providersWithWrongVettingState : Set Party
+          -- ^ Service providers that do not have the correct vetting state for receiving rewards.
+      observer batchProviders providersWithWrongVettingState batch
       controller dso
       do
         let actualHash = CryptoHash.hash batch
@@ -128,20 +128,21 @@ template ProcessRewardsV2 with
                 create RewardCouponV2 with
                   dso
                   round
-                  beneficiary
+                  provider
+                  beneficiary = provider
                   amount
                   expiresAt = now `addRelTime` rewardsTimeToLive
                   beneficiaryIsObserver =
-                    not $ Set.member beneficiary beneficiariesWithWrongVettingState
+                    not $ Set.member provider providersWithWrongVettingState
 
         -- intentationally not returning any information here to save computational overhead
         return ProcessRewardsV2_ProcessBatchResult {}
 
-batchBeneficiaries : Set Party -> Batch -> [Party]
-batchBeneficiaries ignoredBeneficiaries batch = case batch of
+batchProviders : Set Party -> Batch -> [Party]
+batchProviders ignoredBeneficiaries batch = case batch of
   BatchOfBatches _ -> []
   BatchOfMintingAllowances mintingAllowances ->
-    [ beneficiary | MintingAllowance{..} <- mintingAllowances, not (Set.member beneficiary ignoredBeneficiaries) ]
+    [ provider | MintingAllowance{..} <- mintingAllowances, not (Set.member provider ignoredBeneficiaries) ]
 
 
 -- instances
@@ -149,7 +150,7 @@ batchBeneficiaries ignoredBeneficiaries batch = case batch of
 instance CryptoHash.Hashable MintingAllowance where
   hash MintingAllowance{..} =
     CryptoHash.hashRecord
-      [ CryptoHash.hash beneficiary
+      [ CryptoHash.hash provider
       , CryptoHash.hash amount
       ]
 

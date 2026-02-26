@@ -59,11 +59,11 @@ test_reward_accounting_v2 = do
 
 
   -- setup demo data
-  let mintingAllowances1 = sortOn (.beneficiary)
+  let mintingAllowances1 = sortOn (.provider)
         [ MintingAllowance alice 1000.0
         , MintingAllowance bob 2000.0
         ]
-  let mintingAllowances2 = sortOn (.beneficiary)
+  let mintingAllowances2 = sortOn (.provider)
         [ MintingAllowance charlie 30.0
         , MintingAllowance dora 5.1
         ]
@@ -94,7 +94,7 @@ test_reward_accounting_v2 = do
             processRewardsCid
             choiceArg = ProcessRewardsV2_ProcessBatch with
               batch = b
-              beneficiariesWithWrongVettingState = Set.fromList badVettingState
+              providersWithWrongVettingState = Set.fromList badVettingState
 
   processBatches -- expand root hash into batch hashes
   processBatches -- expand follow-up batches into coupons
@@ -103,11 +103,12 @@ test_reward_accounting_v2 = do
         MintingAllowance{..} <- mintingAllowances1 ++ mintingAllowances2
         pure RewardCouponV2 with
           dso = app.dso
-          beneficiary
+          provider
+          beneficiary = provider
           amount
           round = Round 0
           expiresAt = addRelTime demoTime (days 2)
-          beneficiaryIsObserver = not $ beneficiary `elem` [bob, dora]
+          beneficiaryIsObserver = not $ provider `elem` [bob, dora]
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
@@ -136,6 +137,27 @@ test_reward_accounting_v2 = do
       , Api.RewardAssignmentV1.RewardBeneficiary charlie 200.0
       ]
     extraArgs = emptyExtraArgs
+
+  let expectedCouponsBob =
+        [ RewardCouponV2 with
+            dso = app.dso
+            provider = alice
+            beneficiary = bob
+            amount = 300.0
+            round = Round 0
+            expiresAt = addRelTime demoTime (days 2)
+            beneficiaryIsObserver = True
+        , RewardCouponV2 with
+            dso = app.dso
+            provider = bob
+            beneficiary = bob
+            amount = 2000.0
+            round = Round 0
+            expiresAt = addRelTime demoTime (days 2)
+            beneficiaryIsObserver = True
+        ]
+  actualCouponsBob <- query @RewardCouponV2 bob
+  sortOn (.amount) (map snd actualCouponsBob) === sortOn (.amount) expectedCouponsBob
 
   -- check that reward minting works
   mintRewardsV2 app alice
