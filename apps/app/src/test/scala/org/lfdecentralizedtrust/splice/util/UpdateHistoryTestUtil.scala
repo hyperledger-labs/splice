@@ -207,10 +207,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
       actual: UpdateHistoryResponse,
       recorded: UpdateHistoryResponse,
   ): Assertion =
-    (actual, recorded) match {
+    (actual.update, recorded.update) match {
       case (
-            UpdateHistoryResponse(TransactionTreeUpdate(actualTx), _),
-            UpdateHistoryResponse(TransactionTreeUpdate(recordedTx), _),
+            TransactionTreeUpdate(actualTx),
+            TransactionTreeUpdate(recordedTx),
           ) =>
         def toByteArray(hash: ByteString): Array[Byte] =
           Option(hash).map(_.toByteArray).getOrElse(Array.emptyByteArray)
