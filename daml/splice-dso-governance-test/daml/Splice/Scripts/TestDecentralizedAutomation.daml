@@ -546,6 +546,10 @@ testExpireAmuletTransferInstruction = do
 
   submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
 
+  lockedAmuletsBefore <- query @LockedAmulet sender.primaryParty
+
+  length lockedAmuletsBefore === 1
+
   passTime (hours 2)
  
   [(instrCid, _)] <- query @AmuletTransferInstruction app.dso
