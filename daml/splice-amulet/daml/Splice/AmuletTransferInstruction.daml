@@ -11,6 +11,7 @@ import Splice.Api.Token.TransferInstructionV1
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
+import DA.Assert (assertDeadlineExceeded)
 
 -- | A transfer instruction for transferring Amulet tokens pending on receiver
 -- acceptance.
@@ -80,16 +81,10 @@ abortAmuletTransferInstruction instr extraArgs = do
 
 updateAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 updateAmuletTransferInstruction instr extraArgs = do
-  now <- getTime
-  if now >= instr.transfer.executeBefore then do
-    let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
-    senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
-    pure TransferInstructionResult with
-      senderChangeCids = senderHoldingCids
-      output = TransferInstructionResult_Failed
-      meta = emptyMetadata
-  else
-    fail $ "Transfer instruction has not yet expired. Current time: " 
-         <> show now 
-         <> ", Expiry: " 
-         <> show instr.transfer.executeBefore
+  assertDeadlineExceeded "Transfer.executeBefore" instr.transfer.executeBefore
+  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
+  senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+  pure TransferInstructionResult with
+    senderChangeCids = senderHoldingCids
+    output = TransferInstructionResult_Failed
+    meta = emptyMetadata
