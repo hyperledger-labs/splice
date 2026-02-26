@@ -3902,7 +3902,7 @@ components:
           format: int64
         view_ids:
           description: |
-            View IDs from the verdict that this envelope corresponds to.
+            View IDs from the verdict contained in this envelope
           type: array
           items:
             type: integer
