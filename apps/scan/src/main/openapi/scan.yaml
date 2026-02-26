@@ -3916,29 +3916,36 @@ components:
         and is derived from a computation involving the verdict and traffic summary data.
       required:
         - round_number
-        - app_provider_parties
-        - app_activity_weights
+        - entries
       properties:
         round_number:
           description: |
             The oldest open mining round at the record_time of this event.
           type: integer
           format: int64
-        app_provider_parties:
+        entries:
           description: |
-            App providers for which app activity should be recorded.
+            App activity entries, one per featured app provider.
           type: array
           items:
-            type: string
-        app_activity_weights:
+            $ref: "#/components/schemas/AppActivityEntry"
+    AppActivityEntry:
+      type: object
+      description: |
+        A single app provider's activity weight for a given record_time.
+      required:
+        - party
+        - weight
+      properties:
+        party:
           description: |
-            Activity weight assigned to the app providers.
-            Measured in bytes of traffic.
-            Values are in one-to-one correspondence with the values in the app_provider_parties array.
-          type: array
-          items:
-            type: integer
-            format: int64
+            The app provider party identifier.
+          type: string
+        weight:
+          description: |
+            Activity weight in bytes of traffic.
+          type: integer
+          format: int64
 
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
