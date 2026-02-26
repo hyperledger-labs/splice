@@ -3726,6 +3726,11 @@ components:
         If an event pertains to a wholly private transaction, there will only be verdict data.
         If an event pertains to a transaction that is partially private, it may also bear verdict information for the private portions.
         When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
+
+        **Experimental**: for networks where the SVs enable it
+        a traffic summary is present when a verdict is present.
+
+        This support is experimental while the preview phase of CIP-104 is running.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
