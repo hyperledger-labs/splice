@@ -578,4 +578,9 @@ testExpireAmuletTransferInstruction = do
   senderAmulets <- query @Amulet sender.primaryParty
   assertMsg "Sender should have their amulets back" (not $ null senderAmulets) 
 
+  let totalBalanceAfter = sum (map (\(_, a) -> a.amount.initialAmount) senderAmulets)
+
+  assertMsg ("Balance should be recovered, but got: " <> show totalBalanceAfter)
+            (totalBalanceAfter == totalBalance)
+
   pure ()
