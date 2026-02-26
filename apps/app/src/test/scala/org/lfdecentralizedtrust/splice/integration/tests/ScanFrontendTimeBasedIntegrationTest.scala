@@ -332,9 +332,9 @@ class ScanFrontendTimeBasedIntegrationTest
               ._1
               .map(_.payload)
               .sortBy(_.round.number)
-            openRounds should not be empty
+            openRounds should not be empty withClue "open rounds"
             val shownRounds = findAll(className("open-mining-round-row")).toList
-            shownRounds should have size openRounds.size.toLong
+            shownRounds should have size openRounds.size.toLong withClue "'Open Mining Rounds' table rows"
             forEvery(shownRounds zip openRounds) { case (shownRound, openRound) =>
               def rt(n: String) = shownRound.childElement(className(n)).text
               rt("round-number") should matchText(openRound.round.number.toString)
@@ -517,7 +517,7 @@ class ScanFrontendTimeBasedIntegrationTest
                 .number
             val actual =
               findAll(className("validator-faucets-leaderboard-row")).toSeq.map(seleniumText)
-            actual should have length 4
+            actual should have length 4 withClue "'Validator Liveness Leaderboard' table rows"
             actual.head should be(
               s"${aliceValidatorWalletParty} ${openRounds.size} 0 $firstCollectedInRound $lastCollectedInRound"
             )

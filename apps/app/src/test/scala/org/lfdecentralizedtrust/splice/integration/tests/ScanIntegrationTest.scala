@@ -212,7 +212,9 @@ class ScanIntegrationTest
       val desc = TransactionHistoryRequest.SortOrder.Desc
       val allPagesAsc = collectAllTapPagesForAlice(asc)
       val allPagesDesc = collectAllTapPagesForAlice(desc)
-      allPagesAsc.map(_.round) should contain only Some(latestRound)
+      allPagesAsc.map(_.round) should contain only Some(
+        latestRound
+      ) withClue "alice tap pages' rounds"
 
       val tapsFirstPageAscending = allPagesAsc.take(pageSize)
 
@@ -308,7 +310,7 @@ class ScanIntegrationTest
           tap.amuletOwner
         ) == aliceUserParty
       }
-      taps should have size (2)
+      taps should have size (2) withClue "alice taps"
       taps.map(t =>
         (PartyId.tryFromProtoPrimitive(t.amuletOwner), BigDecimal(t.amuletAmount))
       ) shouldBe
@@ -321,7 +323,7 @@ class ScanIntegrationTest
           ) == aliceUserParty && transfer.receivers.isEmpty
         }
 
-      merges should have size (1)
+      merges should have size (1) withClue "alice merges"
       val mergeTransfer = merges.head
       PartyId.tryFromProtoPrimitive(mergeTransfer.sender.party) shouldBe aliceUserParty
       mergeTransfer.sender.inputAmuletAmount
@@ -405,7 +407,7 @@ class ScanIntegrationTest
                 ) == bobUserParty
               })
 
-          activities should have size (1)
+          activities should have size (1) withClue "bob-sent transfers"
           activities.loneElement.round shouldBe Some(openRoundForTransfer)
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputAmuletAmount =
@@ -424,12 +426,14 @@ class ScanIntegrationTest
 
           // receiverFee is by default set to 0, sender pays all fees.
           transfer.receivers
-            .map(r => BigDecimal(r.receiverFee)) should contain only (BigDecimal(0))
+            .map(r => BigDecimal(r.receiverFee)) should contain only (BigDecimal(
+            0
+          )) withClue "receiverFees"
 
           val taps = sv1ScanBackend.listActivity(None, 10).flatMap(_.tap).filter { tap =>
             PartyId.tryFromProtoPrimitive(tap.amuletOwner) == bobUserParty
           }
-          taps should have size (1)
+          taps should have size (1) withClue "bob taps"
           val tap = taps.head
           // bob tapped
           BigDecimal(tap.amuletAmount) shouldBe walletUsdToAmulet(bobTapAmount)
@@ -457,7 +461,7 @@ class ScanIntegrationTest
               transfer.receivers.size == 1 && PartyId
                 .tryFromProtoPrimitive(transfer.receivers.head.party) == bobUserParty
             }
-          transfers should have size (1)
+          transfers should have size (1) withClue "bob self-transfers"
           val transfer = transfers.head
           val receiver = transfer.receivers.loneElement
           PartyId
@@ -513,7 +517,7 @@ class ScanIntegrationTest
               transfer.receivers.size == 1 && PartyId
                 .tryFromProtoPrimitive(transfer.receivers.head.party) == charlieUserParty
             }
-          transfers should have size (1)
+          transfers should have size (1) withClue "bob self-transfers"
           val transfer = transfers.head
           val receiver = transfer.receivers.loneElement
           PartyId
@@ -579,7 +583,7 @@ class ScanIntegrationTest
         "Bob's validator will receive some rewards",
         _ => {
           bobValidatorWalletClient
-            .listAppRewardCoupons() should have size 1
+            .listAppRewardCoupons() should have size 1 withClue "bob AppRewardCoupons"
           // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
 
           //          bobValidatorWalletClient.listValidatorRewardCoupons() should
@@ -614,7 +618,7 @@ class ScanIntegrationTest
     clue("Checking app and validator reward and faucet amounts") {
       eventually() {
         bobValidatorWalletClient
-          .listAppRewardCoupons() should have size 0
+          .listAppRewardCoupons() should have size 0 withClue "bob AppRewardCoupons"
         // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
         //        bobValidatorWalletClient
         //          .listValidatorRewardCoupons() should have size 0
