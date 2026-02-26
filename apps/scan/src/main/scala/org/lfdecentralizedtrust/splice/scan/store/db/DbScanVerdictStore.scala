@@ -283,7 +283,7 @@ object DbScanVerdictStore {
 class DbScanVerdictStore(
     storage: DbStorage,
     updateHistory: UpdateHistory,
-    appActivityRecordStoreO: Option[DbAppActivityRecordStore],
+    val appActivityRecordStoreO: Option[DbAppActivityRecordStore],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
