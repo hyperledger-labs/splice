@@ -35,6 +35,8 @@
 
     - Daml:
 
+       - Add missing validation of ``sv`` party to ``DsoRules_ClaimExpiredRewards``.
+
        - Restrict ``AmuletConfig`` to not allow fees as part of CIP FIXME. This has no functional effect
          as `CIP 78 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`_ set the fees to zero already.
 
