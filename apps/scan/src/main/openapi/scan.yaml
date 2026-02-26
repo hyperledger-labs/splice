@@ -3733,6 +3733,9 @@ components:
         verdict:
           $ref: "#/components/schemas/EventHistoryVerdict"
           nullable: true
+        traffic_summary:
+          $ref: "#/components/schemas/EventHistoryTrafficSummary"
+          nullable: true
     EventHistoryVerdict:
       type: object
       required:
@@ -3852,6 +3855,51 @@ components:
         - VERDICT_RESULT_UNSPECIFIED
         - VERDICT_RESULT_ACCEPTED
         - VERDICT_RESULT_REJECTED
+    EventHistoryTrafficSummary:
+      type: object
+      description: |
+        Traffic summary data from the sequencer for a given transaction.
+        When present, the sequencing_time matches the verdict's record_time.
+      required:
+        - sequencing_time
+        - total_traffic_cost
+        - envelope_traffic_costs
+      properties:
+        sequencing_time:
+          description: |
+            The sequencing time of the submission request.
+          type: string
+        total_traffic_cost:
+          description: |
+            Total traffic cost of the message paid by the sender.
+          type: integer
+          format: int64
+        envelope_traffic_costs:
+          description: |
+            Per-envelope traffic cost breakdown.
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvelopeTrafficCost"
+    EnvelopeTrafficCost:
+      type: object
+      description: |
+        Traffic cost for a single envelope, with the view IDs it corresponds to.
+      required:
+        - traffic_cost
+        - view_ids
+      properties:
+        traffic_cost:
+          description: |
+            Traffic cost in bytes for this envelope.
+          type: integer
+          format: int64
+        view_ids:
+          description: |
+            View IDs from the verdict that this envelope corresponds to.
+          type: array
+          items:
+            type: integer
+            format: int32
 
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
