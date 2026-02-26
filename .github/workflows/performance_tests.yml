@@ -36,6 +36,7 @@ jobs:
       - name: Env vars
         shell: bash
         run: |
+          sleep 600
           echo "Checking connection to Splice services... Connecting to '$PERFORMANCE_TESTS_DB_HOST' with user '$PERFORMANCE_TESTS_DB_USER'..."
 
       - name: Connection check
