@@ -968,7 +968,6 @@ components:
       oneOf:
         - "$ref": "#/components/schemas/AcceptedStateNotFoundErrorResponse"
         - "$ref": "#/components/schemas/ProposalNotFoundErrorResponse"
-        - "$ref": "#/components/schemas/ErrorResponse"
     AcceptedStateNotFoundErrorResponse:
       type: object
       required:
@@ -989,13 +988,6 @@ components:
             party_to_participant_base_serial:
               type: integer
               description: "The serial of the party to participant accepted state as seen by the sponsor"
-    ErrorResponse:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: string
 
     OnboardSvSequencerRequest:
       type: object
