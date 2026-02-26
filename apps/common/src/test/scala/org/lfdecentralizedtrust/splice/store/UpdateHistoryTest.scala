@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 }
 import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
+import com.daml.ledger.javaapi.data.Transaction;
 
 import java.time.Instant
 import java.util.Collections
@@ -959,6 +960,14 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
       }
     }
 
+    def extractTransactionTree(
+        updates: Seq[TreeUpdateWithMigrationId]
+    ): Transaction =
+      updates
+        .map(_.update.update)
+        .collect { case tx: TransactionTreeUpdate => tx.tree }
+        .loneElement
+
     "getExternalTransactionHash" should {
       "return stored external transaction hash when empty" in {
         val store = mkStore(storeName = "store")
@@ -979,12 +988,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
         } yield {
           updates should have size 1
-          val storedTransaction = updates
-            .map(_.update.update)
-            .collect { case tx: TransactionTreeUpdate =>
-              tx.tree
-            }
-            .loneElement
+          val storedTransaction = extractTransactionTree(updates)
           storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
           storedTransaction.getExternalTransactionHash should be(
             expectedUpdate.getExternalTransactionHash
@@ -1011,8 +1015,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
         } yield {
           updates should have size 1
-          val storedTransaction =
-            updates.loneElement.update.update.asInstanceOf[TransactionTreeUpdate].tree
+          val storedTransaction = extractTransactionTree(updates)
           storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
           storedTransaction.getExternalTransactionHash should be(
             expectedUpdate.getExternalTransactionHash

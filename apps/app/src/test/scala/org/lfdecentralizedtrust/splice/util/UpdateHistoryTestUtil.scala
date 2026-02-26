@@ -44,6 +44,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
 import org.scalatest.Assertion
 
@@ -211,17 +212,12 @@ trait UpdateHistoryTestUtil extends TestCommon {
             UpdateHistoryResponse(TransactionTreeUpdate(actualTx), _),
             UpdateHistoryResponse(TransactionTreeUpdate(recordedTx), _),
           ) =>
-        val actualExtTxnHash =
-          Option(actualTx.getExternalTransactionHash)
-            .map(_.toByteArray)
-            .getOrElse(Array.emptyByteArray)
+        def toByteArray(hash: ByteString): Array[Byte] =
+          Option(hash).map(_.toByteArray).getOrElse(Array.emptyByteArray)
 
-        val recordedExtTxnHash =
-          Option(recordedTx.getExternalTransactionHash)
-            .map(_.toByteArray)
-            .getOrElse(Array.emptyByteArray)
+        toByteArray(actualTx.getExternalTransactionHash) shouldBe
+          toByteArray(recordedTx.getExternalTransactionHash)
 
-        actualExtTxnHash shouldBe recordedExtTxnHash
       case _ =>
         succeed
     }
