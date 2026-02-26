@@ -30,7 +30,8 @@ with the configuration key being kebab case compared to the camel case in the sc
 -  `SvAppConfig.scala <https://github.com/hyperledger-labs/splice/blob/main/apps/sv/src/main/scala/org/lfdecentralizedtrust/splice/sv/config/SvAppConfig.scala#L199>`__
 -  `ScanAppConfig.scala <https://github.com/hyperledger-labs/splice/blob/main/apps/scan/src/main/scala/org/lfdecentralizedtrust/splice/scan/config/ScanAppConfig.scala#L28>`__
 
-Furthermore, the participant and other synchronizer components can be configured independently as well. Further info on such configurations can be found in the `daml docs <https://docs.daml.com/canton/usermanual/static_conf.html>`__.
+Furthermore, the participant and other synchronizer components can be configured independently as well. Further information on such configurations can be found in the `Canton docs <https://docs.digitalasset.com/operate/3.4/howtos/configure/general/conf_file.html>`__.
+**Note:** Examples in the Canton docs might have different root configuration keys for the configured nodes; Splice participants/mediators/sequencers are always configured under ``canton.participants.participant {``/``canton.mediators.mediator {``/``canton.sequencers.sequencer {``, respectively.
 
 .. todo:: point to the release that these docs are built from; or inline the source code or Scaladoc to avoid confusion
 
