@@ -275,16 +275,17 @@ jobs:
   #   secrets: inherit
 
   scala_test_with_docker_and_canton_simtime:
-    uses: ./.github/workflows/build.scala_test.yml
+    uses: ./.github/workflows/build.scala_test_for_compose.yml
+    if: ${{ ! inputs.oss_only }}
     with:
       runs_on: self-hosted-docker-large
       test_names_file: 'test-full-class-names-docker-no-canton.log'
-      start_canton_options: -s -p docker
+      start_canton_options: -s
+      with_canton: true
       parallelism: 1
       test_name: docker-canton-simtime
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
 
