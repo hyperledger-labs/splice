@@ -3886,7 +3886,7 @@ components:
     EnvelopeTrafficCost:
       type: object
       description: |
-        Traffic cost for a single envelope, with the view IDs it corresponds to.
+        Traffic cost for a single envelope and the view IDs contained in it
       required:
         - traffic_cost
         - view_ids
