@@ -850,7 +850,12 @@ class HttpScanHandler(
           val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
             ScanHttpEncodings.encodeVerdict(v, views)
           }
-          Right(definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded))
+          val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
+            v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+          }
+          Right(
+            definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
+          )
       }
     }
   }
@@ -899,7 +904,10 @@ class HttpScanHandler(
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
         }
-        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded)
+        val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
+          v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+        }
+        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
       }.toVector
     }
   }
