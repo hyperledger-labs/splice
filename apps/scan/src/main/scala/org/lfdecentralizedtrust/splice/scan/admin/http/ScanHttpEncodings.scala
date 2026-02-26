@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
+  TrafficSummaryT,
   TransactionViewT,
   VerdictResultDbValue,
   VerdictT,
@@ -500,6 +501,22 @@ object ScanHttpEncodings {
       verdictResult = verdictResultEnum,
       mediatorGroup = verdict.mediatorGroup,
       transactionViews = txViews,
+    )
+  }
+
+  def encodeTrafficSummary(
+      summary: TrafficSummaryT
+  ): definitions.EventHistoryTrafficSummary = {
+    val envelopes = summary.envelopeTrafficSummarys.map { env =>
+      definitions.EnvelopeTrafficCost(
+        trafficCost = env.trafficCost,
+        viewIds = env.viewIds.toVector,
+      )
+    }.toVector
+    definitions.EventHistoryTrafficSummary(
+      sequencingTime = formatRecordTime(summary.sequencingTime.toInstant),
+      totalTrafficCost = summary.totalTrafficCost,
+      envelopeTrafficCosts = envelopes,
     )
   }
 
