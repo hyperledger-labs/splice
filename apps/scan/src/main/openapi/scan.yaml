@@ -3726,6 +3726,8 @@ components:
         If an event pertains to a wholly private transaction, there will only be verdict data.
         If an event pertains to a transaction that is partially private, it may also bear verdict information for the private portions.
         When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
+        A traffic summary is present when sequencer traffic cost data is available for the verdict's confirmation request.
+        An app activity record is present when the verdict is successful and involves featured app providers.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
