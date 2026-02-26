@@ -515,7 +515,6 @@ object ScanHttpEncodings {
       )
     }.toVector
     definitions.EventHistoryTrafficSummary(
-      sequencingTime = formatRecordTime(summary.sequencingTime.toInstant),
       totalTrafficCost = summary.totalTrafficCost,
       envelopeTrafficCosts = envelopes,
     )
@@ -531,7 +530,6 @@ object ScanHttpEncodings {
       }
       .toVector
     definitions.EventHistoryAppActivityRecords(
-      recordTime = formatRecordTime(record.recordTime.toInstant),
       roundNumber = record.roundNumber,
       entries = entries,
     )
