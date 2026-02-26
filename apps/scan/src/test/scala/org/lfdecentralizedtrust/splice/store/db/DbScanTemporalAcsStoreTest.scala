@@ -118,6 +118,7 @@ class DbScanTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest w
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       DomainMigrationInfo(0L, None),
       participantId,
+      d1,
       IngestionConfig(),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
