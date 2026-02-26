@@ -27,6 +27,11 @@
         <sv_participant_pruning>` for instructions on how to enable
         it.
 
+    - Scan txlog script
+
+      - scan_txlog.py script has been deprecated. It will not be maintained moving forward, and will be removed completely in a future release.
+        A user interested in understanding how to parse transactions from history is reffered to the :ref:`Reading and parsing transaction history involving Token Standard contracts <token_standard_usage_reading_tx_history>` section.
+
     - Canton
 
       - JSON Ledger API OpenAPI/AsyncAPI Specification Updates
@@ -107,11 +112,6 @@
         - Fixed a race condition in mediator that could cause verdicts for invalid requests to not be emitted to ongoing inspection service streams.
           If you have disabled asynchronous processing using ``canton.mediators.mediator.mediator.asynchronous-processing = false``,
           you may remove this override now.
-
-    - Scan txlog script
-
-      - scan_txlog.py script has been deprecated. It will not be maintained moving forward, and will be removed completely in a future release.
-        A user interested in understanding how to parse transactions from history is reffered to the :ref:`Reading and parsing transaction history involving Token Standard contracts <token_standard_usage_reading_tx_history>` section.
 
 .. release-notes:: 0.5.12
 
