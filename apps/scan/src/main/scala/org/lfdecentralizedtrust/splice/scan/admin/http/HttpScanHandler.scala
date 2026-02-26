@@ -840,24 +840,42 @@ class HttpScanHandler(
         updateId,
         updateHistory.domainMigrationInfo.currentMigrationId,
       )
-    } yield {
-      eventO match {
-        case None => Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
-        case Some((verdictWithViewsO, updateO)) =>
-          val encodedUpdateV2 = updateO
-            .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
-            .map(toUpdateV2)
-          val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
-            ScanHttpEncodings.encodeVerdict(v, views)
-          }
-          val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
-            v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
-          }
-          Right(
-            definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
+      result <- eventO match {
+        case None =>
+          Future.successful(
+            Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
           )
+        case Some((verdictWithViewsO, updateO)) =>
+          val recordTimeO = verdictWithViewsO.map { case (v, _) => v.recordTime }
+          for {
+            appActivityRecordO <- recordTimeO match {
+              case Some(rt) => eventStore.getAppActivityRecord(rt)
+              case None => Future.successful(None)
+            }
+          } yield {
+            val encodedUpdateV2 = updateO
+              .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+              .map(toUpdateV2)
+            val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+              ScanHttpEncodings.encodeVerdict(v, views)
+            }
+            val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
+              v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+            }
+            val appActivityRecordEncoded = appActivityRecordO.map(
+              ScanHttpEncodings.encodeAppActivityRecord
+            )
+            Right(
+              definitions.EventHistoryItem(
+                encodedUpdateV2,
+                verdictEncoded,
+                trafficSummaryEncoded,
+                appActivityRecordEncoded,
+              )
+            )
+          }
       }
-    }
+    } yield result
   }
 
   override def getEventById(respond: ScanResource.GetEventByIdResponse.type)(
@@ -897,18 +915,35 @@ class HttpScanHandler(
           currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
           limit = PageLimit.tryCreate(pageSize),
         )
-      } yield events.map { case (verdictWithViewsO, updateO) =>
-        val encodedUpdateV2 = updateO
-          .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
-          .map(toUpdateV2)
-        val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
-          ScanHttpEncodings.encodeVerdict(v, views)
+        items <- Future.traverse(events) { case (verdictWithViewsO, updateO) =>
+          val recordTimeO = verdictWithViewsO.map { case (v, _) => v.recordTime }
+          for {
+            appActivityRecordO <- recordTimeO match {
+              case Some(rt) => eventStore.getAppActivityRecord(rt)
+              case None => Future.successful(None)
+            }
+          } yield {
+            val encodedUpdateV2 = updateO
+              .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+              .map(toUpdateV2)
+            val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+              ScanHttpEncodings.encodeVerdict(v, views)
+            }
+            val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
+              v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+            }
+            val appActivityRecordEncoded = appActivityRecordO.map(
+              ScanHttpEncodings.encodeAppActivityRecord
+            )
+            definitions.EventHistoryItem(
+              encodedUpdateV2,
+              verdictEncoded,
+              trafficSummaryEncoded,
+              appActivityRecordEncoded,
+            )
+          }
         }
-        val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
-          v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
-        }
-        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
-      }.toVector
+      } yield items.toVector
     }
   }
 

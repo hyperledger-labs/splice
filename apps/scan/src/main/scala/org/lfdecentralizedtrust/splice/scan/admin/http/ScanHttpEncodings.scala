@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
   TrafficSummaryT,
   TransactionViewT,
@@ -517,6 +518,17 @@ object ScanHttpEncodings {
       sequencingTime = formatRecordTime(summary.sequencingTime.toInstant),
       totalTrafficCost = summary.totalTrafficCost,
       envelopeTrafficCosts = envelopes,
+    )
+  }
+
+  def encodeAppActivityRecord(
+      record: AppActivityRecordT
+  ): definitions.EventHistoryAppActivityRecord = {
+    definitions.EventHistoryAppActivityRecord(
+      recordTime = formatRecordTime(record.recordTime.toInstant),
+      roundNumber = record.roundNumber,
+      appProviderParties = record.appProviderParties.toVector,
+      appActivityWeights = record.appActivityWeights.toVector,
     )
   }
 
