@@ -3743,7 +3743,7 @@ components:
         app_activity_record:
           description: |
             **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
-          $ref: "#/components/schemas/EventHistoryAppActivityRecord"
+          $ref: "#/components/schemas/EventHistoryAppActivityRecords"
           nullable: true
     EventHistoryVerdict:
       type: object
@@ -3909,7 +3909,7 @@ components:
           items:
             type: integer
             format: int32
-    EventHistoryAppActivityRecord:
+    EventHistoryAppActivityRecords:
       type: object
       description: |
         Computed app activity record derived from verdicts and traffic summaries.
