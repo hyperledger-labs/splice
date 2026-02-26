@@ -3728,6 +3728,7 @@ components:
         When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
         A traffic summary is present when sequencer traffic cost data is available for the verdict's confirmation request.
         An app activity record is present when the verdict is successful and involves app providers.
+        When present, both the traffic summary and app activity record correspond to the verdict's record_time.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
@@ -3868,16 +3869,11 @@ components:
       type: object
       description: |
         Traffic summary data from the sequencer for a given event.
-        When present, the sequencing_time matches the verdict's record_time.
+        The sequencing time is the same as the verdict's record_time.
       required:
-        - sequencing_time
         - total_traffic_cost
         - envelope_traffic_costs
       properties:
-        sequencing_time:
-          description: |
-            The sequencing time of the submission request.
-          type: string
         total_traffic_cost:
           description: |
             Total traffic cost of the message paid by the sender.
@@ -3915,14 +3911,9 @@ components:
         App activity record computed from verdicts and traffic summaries
         as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
       required:
-        - record_time
         - round_number
         - entries
       properties:
-        record_time:
-          description: |
-            The record_time (= sequencing_time) of the verdict/traffic summary.
-          type: string
         round_number:
           description: |
             The round number assigned to the activity record.
@@ -3937,7 +3928,7 @@ components:
     AppActivityEntry:
       type: object
       description: |
-        A single app provider's activity weight for a given record_time.
+        A single app provider's activity weight.
       required:
         - party
         - weight
