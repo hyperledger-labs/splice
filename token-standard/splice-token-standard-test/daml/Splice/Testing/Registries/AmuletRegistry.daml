@@ -42,7 +42,7 @@ import qualified DA.TextMap as TextMap
 import DA.Text qualified as T
 import DA.Time
 
-import Splice.Api.RewardMintingV1 qualified as Api.RewardMintingV1
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
@@ -192,19 +192,19 @@ featureApp registry provider = do
   return result.featuredAppRightCid
 
 -- | Mint rewards using the reward minting factory.
-mintRewards : AmuletRegistry -> Party -> [(Party, Decimal)] -> [ContractId Api.RewardMintingV1.RewardCoupon] -> Script (Api.RewardMintingV1.RewardMintingFactory_MintResult)
+mintRewards : AmuletRegistry -> Party -> [(Party, Decimal)] -> [ContractId Api.RewardAssignmentV1.RewardCoupon] -> Script (Api.RewardAssignmentV1.RewardMintingFactory_MintResult)
 mintRewards registry beneficiary mintingBeneficiaries rewardCouponCids = do
   [(factoryCid0, _)] <- query @ExternalPartyAmuletRules registry.dso
-  let factoryCid = toInterfaceContractId @Api.RewardMintingV1.RewardMintingFactory factoryCid0
+  let factoryCid = toInterfaceContractId @Api.RewardAssignmentV1.RewardMintingFactory factoryCid0
   context <- getExternalPartyConfigStateContext registry
   let submitters = mconcat $ map actAs $ beneficiary :: map fst mintingBeneficiaries
   let disclosures = discloseMany (Map.values context.disclosures.disclosures)
   submit (submitters <> readAs registry.dso <> disclosures) $ exerciseCmd factoryCid
-    Api.RewardMintingV1.RewardMintingFactory_Mint with
+    Api.RewardAssignmentV1.RewardMintingFactory_Mint with
       couponBeneficiary = beneficiary
       mintingBeneficiaries = do
         (beneficiary, amount) <- mintingBeneficiaries
-        pure Api.RewardMintingV1.MintingBeneficiary with
+        pure Api.RewardAssignmentV1.MintingBeneficiary with
           beneficiary
           amount
       rewardCouponCids

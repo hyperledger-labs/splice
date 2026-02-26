@@ -13,7 +13,7 @@ import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
-import Splice.Api.RewardMintingV1 qualified as Api.RewardMintingV1
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -406,8 +406,8 @@ template RewardCouponV2
         return RewardCouponV2_DsoExpireResult with
           amount
 
-    interface instance Api.RewardMintingV1.RewardCoupon for RewardCouponV2 where
-      view = Api.RewardMintingV1.RewardCouponView with
+    interface instance Api.RewardAssignmentV1.RewardCoupon for RewardCouponV2 where
+      view = Api.RewardAssignmentV1.RewardCouponView with
         dso
         beneficiary
         amount

@@ -13,7 +13,7 @@ import DA.Time
 
 import Daml.Script
 
-import Splice.Api.RewardMintingV1 qualified as Api.RewardMintingV1
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 
 import Splice.Amulet
 import Splice.Amulet.RewardAccountingV2
@@ -127,7 +127,7 @@ test_reward_accounting_v2 = do
     map (\c -> c with beneficiaryIsObserver = True) expectedCoupons
 
   -- mint alice's coupon in a split fashion
-  coupons <- queryInterface @Api.RewardMintingV1.RewardCoupon alice
+  coupons <- queryInterface @Api.RewardAssignmentV1.RewardCoupon alice
   AmuletRegistry.mintRewards app.registry alice
     [ (bob, 100.0)
     , (charlie, 200.0)
