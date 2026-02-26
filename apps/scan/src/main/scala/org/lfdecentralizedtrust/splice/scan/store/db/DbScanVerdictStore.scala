@@ -529,8 +529,9 @@ class DbScanVerdictStore(
   /** Insert multiple verdicts, their transaction views and additional data in a single transaction.
     *
     * Similar to insertItems of UpdateHistory, we check whether the first verdict's
-    * update_id already exists. If it does, we assume this batch has been
-    * inserted already and skip all other inserts, including for the extra tables
+    * update_id already exists. If it does, then we assume this is a retry
+    * by the DB layer of this very statement, and skip the ingestion.
+    * This works as the ingestion itself ensures that there never are overlapping batches.
     */
   def insertVerdictsWithAppActivityRecords(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
