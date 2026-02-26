@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.store
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.data.CantonTimestamp
@@ -25,6 +25,7 @@ class ScanEventStore(
 
   type VerdictT = DbScanVerdictStore.VerdictT
   type TransactionViewT = DbScanVerdictStore.TransactionViewT
+  type AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
   type Verdict = (VerdictT, Seq[TransactionViewT])
   type Event = (Option[Verdict], Option[TreeUpdateWithMigrationId])
 
@@ -120,6 +121,22 @@ class ScanEventStore(
         .toSeq
     }
   }
+
+  def getAppActivityRecord(recordTime: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Option[AppActivityRecordT]] =
+    verdictStore.appActivityRecordStoreO match {
+      case Some(store) => store.getRecordByRecordTime(recordTime)
+      case None => Future.successful(None)
+    }
+
+  def getAppActivityRecords(recordTimes: Seq[CantonTimestamp])(implicit
+      tc: TraceContext
+  ): Future[Map[CantonTimestamp, AppActivityRecordT]] =
+    verdictStore.appActivityRecordStoreO match {
+      case Some(store) => store.getRecordsByRecordTimes(recordTimes)
+      case None => Future.successful(Map.empty)
+    }
 
   // Get values from in-memory refs, fallsback to DB read
   private def resolveCurrentMigrationCap(

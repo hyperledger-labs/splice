@@ -3726,12 +3726,27 @@ components:
         If an event pertains to a wholly private transaction, there will only be verdict data.
         If an event pertains to a transaction that is partially private, it may also bear verdict information for the private portions.
         When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
+        **Experimental**: for networks where the SVs enable activity record
+        computation, a traffic summary and app activity record are present when
+        a verdict is present.
+
+        This support is experimental while the preview phase of CIP-104 is running.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
           nullable: true
         verdict:
           $ref: "#/components/schemas/EventHistoryVerdict"
+          nullable: true
+        traffic_summary:
+          description: |
+            **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
+          $ref: "#/components/schemas/EventHistoryTrafficSummary"
+          nullable: true
+        app_activity_records:
+          description: |
+            **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
+          $ref: "#/components/schemas/EventHistoryAppActivityRecords"
           nullable: true
     EventHistoryVerdict:
       type: object
@@ -3852,6 +3867,83 @@ components:
         - VERDICT_RESULT_UNSPECIFIED
         - VERDICT_RESULT_ACCEPTED
         - VERDICT_RESULT_REJECTED
+    EventHistoryTrafficSummary:
+      type: object
+      description: |
+        Traffic summary data from the sequencer for a given event.
+        The sequencing time is the same as the verdict's record_time.
+      required:
+        - total_traffic_cost
+        - envelope_traffic_costs
+      properties:
+        total_traffic_cost:
+          description: |
+            Total traffic cost of the message paid by the sender.
+          type: integer
+          format: int64
+        envelope_traffic_costs:
+          description: |
+            Per-envelope traffic cost breakdown.
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvelopeTrafficCost"
+    EnvelopeTrafficCost:
+      type: object
+      description: |
+        Traffic cost for a single envelope and the view IDs contained in it
+      required:
+        - traffic_cost
+        - view_ids
+      properties:
+        traffic_cost:
+          description: |
+            Traffic cost in bytes for this envelope.
+          type: integer
+          format: int64
+        view_ids:
+          description: |
+            View IDs from the verdict contained in this envelope
+          type: array
+          items:
+            type: integer
+            format: int32
+    EventHistoryAppActivityRecords:
+      type: object
+      description: |
+        App activity record computed from verdicts and traffic summaries
+        as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
+      required:
+        - round_number
+        - records
+      properties:
+        round_number:
+          description: |
+            The round number assigned to the activity records.
+          type: integer
+          format: int64
+        records:
+          description: |
+            App activity records, one per app provider.
+          type: array
+          items:
+            $ref: "#/components/schemas/AppActivityRecord"
+    AppActivityRecord:
+      type: object
+      description: |
+        ActivityRecord for an app.
+      required:
+        - party
+        - weight
+      properties:
+        party:
+          description: |
+            The app provider party identifier.
+          type: string
+        weight:
+          description: |
+            Activity weight in bytes of traffic.
+          type: integer
+          format: int64
 
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
