@@ -963,10 +963,10 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
     def extractTransactionTree(
         updates: Seq[TreeUpdateWithMigrationId]
     ): Transaction =
-      updates
-        .map(_.update.update)
-        .collect { case tx: TransactionTreeUpdate => tx.tree }
-        .loneElement
+      updates.loneElement.update.update match {
+        case TransactionTreeUpdate(tree) => tree
+        case u => fail(s"unexpected update $u")
+      }
 
     "getExternalTransactionHash" should {
       "return stored external transaction hash when empty" in {
