@@ -7,7 +7,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -556,32 +559,37 @@ class ScanTimeBasedIntegrationTest
       val bucketConnection = S3BucketConnection(s3ConfigMock, loggerFactory)
       eventually() {
 
-        clue("wait for latest ACS snapshots to be created") {
-          sv1ScanBackend
-            .getDateOfMostRecentSnapshotBefore(endTime, 0)
-            .value
-            .toInstant shouldBe >=(lastMidnight)
-        }
+        // wait for latest ACS snapshots to be created
+        sv1ScanBackend
+          .getDateOfMostRecentSnapshotBefore(endTime, 0)
+          .value
+          .toInstant shouldBe >=(lastMidnight)
 
         val s3Objs = bucketConnection.listObjects.futureValue.contents().asScala
-        clue("Wait for bulk storage objects to be created") {
-          s3Objs.map(_.key()) should contain(expectedAcsSnapshotKey)
-          // Depending on how the days are split exactly (based on the exact simtime when the test was started),
-          // the updates may be in one or two segments, so we only assert that there exists a segment that ends
-          // at last midnight
-          s3Objs.map(_.key()).filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
-        }
 
-        clue("Compare bulk storage data to hot storage data from scan") {
-          val acsAtMidnightFromScan = sv1ScanBackend.getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0).value.createdEvents
-          val acsObjKey = s3Objs.filter(_.key() == expectedAcsSnapshotKey).head
-          val acsAtMidnightFromS3 = readUncompressAndDecode(
-            bucketConnection,
-            io.circe.parser.decode[definitions.CreatedEvent],
-          )(acsObjKey)
+        // Wait for bulk storage objects to be created
+        s3Objs.map(_.key()) should contain(expectedAcsSnapshotKey)
 
-          acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
-        }
+        // Depending on how the days are split exactly (based on the exact simtime when the test was started),
+        // the updates may be in one or two segments, so we only assert that there exists a segment that ends
+        // at last midnight
+        s3Objs
+          .map(_.key())
+          .filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
+
+        // Compare bulk storage data to hot storage data from scan
+        val acsAtMidnightFromScan = sv1ScanBackend
+          .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
+          .value
+          .createdEvents
+        val acsObjKey = s3Objs.filter(_.key() == expectedAcsSnapshotKey).head
+        val acsAtMidnightFromS3 = readUncompressAndDecode(
+          bucketConnection,
+          io.circe.parser.decode[definitions.CreatedEvent],
+        )(acsObjKey)
+
+        acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
+
       }
     }
   }

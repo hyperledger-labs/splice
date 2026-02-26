@@ -2126,9 +2126,17 @@ class UpdateHistory(
     *         And also for past migrations, whether the SV was present in them or not.
     */
   def isHistoryBackfilled(migrationId: Long)(implicit tc: TraceContext) = {
-    sourceHistory
-      .migrationInfo(migrationId)
-      .map(_.exists(i => i.complete && i.importUpdatesComplete))
+    state
+      .get()
+      .historyId
+      .fold(
+        // historyId not yet initialized
+        Future.successful(false)
+      )(_ =>
+        sourceHistory
+          .migrationInfo(migrationId)
+          .map(_.exists(i => i.complete && i.importUpdatesComplete))
+      )
   }
 
   lazy val sourceHistory: HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
