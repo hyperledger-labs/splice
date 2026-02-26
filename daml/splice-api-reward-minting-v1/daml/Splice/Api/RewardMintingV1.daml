@@ -1,15 +1,11 @@
--- | An API for apps to programmatically mint their Amulet rewards.
--- It can also be used by external parties to create minting transactions with long submission delays.
-module Splice.Api.RewardMintingV1 where
+-- | An API for app providers to assign reward coupons for their activity to the their beneficiaries.
+module Splice.Api.RewardAssignmentV1 where
 
 import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
 
-
--- Interface to refer to coupons and assign their beneficiaries
----------------------------------------------------------------
 
 -- | View on a coupon representing the right to mint a certain amount of rewards.
 data RewardCouponView = RewardCouponView
@@ -26,12 +22,6 @@ data RewardCouponView = RewardCouponView
       -- ^ Expiration time of the coupon. The minting right granted by the coupon can only be exercised before this time.
     maxNumNewBeneficiaries : Int
       -- ^ The maximum number of new beneficiaries that can be assigned to the coupon in a single assignment.
-      --
-      -- One-step creation of coupons is limited to ensure that traffic cost of
-      -- creating coupons guards the overhead of tracking the created coupons
-      -- for the DSO party. The choice exercises of
-      -- `RewardCoupon_AssignBeneficiaries` can be chained to assign to more
-      -- beneficiaries if needed.
     meta : Metadata
       -- ^ Metadata associated with this coupon. Provided for extensibility.
   deriving (Show, Eq)
@@ -61,7 +51,12 @@ interface RewardCoupon where
         -- ^ The new beneficiaries to assign part of the minting amount of the
         -- coupon. Left-over change is assigned to the original beneficiary.
         --
-        -- There MUST be at most `maxNumNewBeneficiaries` new beneficiaries, as specified in the coupon view.
+        -- There MUST be at most `(view this).maxNumNewBeneficiaries` new beneficiaries in the list.
+        -- The purpose of this limit is to ensure that traffic cost of
+        -- creating coupons guards the overhead of tracking the created coupons
+        -- for the DSO party. The choice returns the coupon representing the
+        -- change for the original beneficiary, which allows chaining to assign
+        -- as many new beneficiaries as needed in a single Daml transaction.
       extraArgs : ExtraArgs
         -- ^ Extra arguments for extensibility. Set to empty, unless needed for specific implementations.
     observer map (.beneficiary) newBeneficiaries
@@ -75,83 +70,4 @@ data RewardCoupon_AssignBeneficiariesResult = RewardCoupon_AssignBeneficiariesRe
     originalBeneficiaryChangeCid : Optional (ContractId RewardCoupon)
       -- ^ Coupon for the original beneficiary with the remaining amount not assigned to the new beneficiaries.
   deriving (Eq, Show)
-
-
--- Interface to request minting of rewards
-------------------------------------------
-
-data MintingBeneficiary = MintingBeneficiary with
-    beneficiary : Party
-    amount : Decimal
-  deriving (Eq, Show)
-
-data RewardMintingFactoryView = RewardMintingFactoryView with
-    dso : Party
-  deriving (Show, Eq)
-
--- | An interface for contracts allowing application providers to record their featured activity.
---
--- FIXME: add open-api specification for receiving factory and its related contracts.
-interface RewardMintingFactory where
-  viewtype RewardMintingFactoryView
-
-  rewardMintingFactory_publicFetchImpl : ContractId RewardMintingFactory -> RewardMintingFactory_PublicFetch -> Update RewardMintingFactoryView
-  rewardMintingFactory_mintImpl
-    : ContractId RewardMintingFactory -> RewardMintingFactory_Mint -> Update RewardMintingFactory_MintResult
-
-  nonconsuming choice RewardMintingFactory_Mint : RewardMintingFactory_MintResult
-    -- ^ Mint amulet rewards.
-    with
-        couponBeneficiary : Party
-          -- ^ The beneficiary of the reward coupons. Can be a decentralized party use for operations only.
-        mintingBeneficiaries : [MintingBeneficiary]
-          -- ^ The beneficiaries of the minting. These parties actually mint the rewards and should be seen as the ultimate beneficiaries.
-          --
-          -- Note that minting beneficiaries are supported in addition to the assignment of rewards to offer
-          -- applications to choose the most efficient option for them. Assigning ultimate beneficiares directly
-          -- on minting is more traffic-efficient, but only works if all minting beneficiaries are available at the time of minting.
-        rewardCouponCids : [ContractId RewardCoupon]
-          -- ^ The reward coupons to use for minting.
-        expectedDso : Party
-          -- ^ The expected DSO party of the factory. Implementations MUST validate that this matches
-          -- the DSO party of the factory.
-          -- Callers SHOULD ensure they get `expectedDso` from a trusted source, e.g., a read against
-          -- their own participant. That way they can ensure that it is safe to exercise a choice
-          -- on a factory contract acquired from an untrusted source *provided*
-          -- all vetted Daml packages only contain interface implementations
-          -- that check the expected admin party.
-        extraArgs : ExtraArgs
-          -- ^ Extra arguments for extensibility.
-    controller couponBeneficiary :: map (.beneficiary) mintingBeneficiaries
-    do rewardMintingFactory_mintImpl this self arg
-
-  nonconsuming choice RewardMintingFactory_PublicFetch : RewardMintingFactoryView
-    -- ^ Fetch the view of the factory contract.
-    with
-      expectedDso : Party
-        -- ^ The expected DSO party of the factory. Implementations MUST validate that this matches
-        -- the DSO party of the factory.
-        -- Callers SHOULD ensure they get `expectedDso` from a trusted source, e.g., a read against
-        -- their own participant. That way they can ensure that it is safe to exercise a choice
-        -- on a factory contract acquired from an untrusted source *provided*
-        -- all vetted Daml packages only contain interface implementations
-        -- that check the expected admin party.
-      actor : Party
-        -- ^ The party fetching the contract.
-    controller actor
-    do rewardMintingFactory_publicFetchImpl this self arg
-
-
--- | Result of calling the `Minting` choice.
-data RewardMintingFactory_MintResult = RewardMintingFactory_MintResult
-  with
-    inputRewardAmounts : TextMap.TextMap Decimal
-      -- ^ The amount of Amulet from different reward sources that were used as inputs for the minting. The keys of the map are the contract IDs of the input reward coupons, and the values are the amounts from those coupons that were used for minting.
-      --  This is provided for informational purposes.
-    mintingBeneficiaryHoldingCids : [ContractId Holding]
-      -- ^ The holdings created for the minting beneficiaries, in the same order as the `mintingBeneficiaries` in the choice arguments.
-    couponBeneficiaryHoldingCid : Optional (ContractId Holding)
-      -- ^ The holding created for the coupon beneficiary, if any. This is optional to allow minting without creating a holding for the beneficiary, in which case the beneficiary would receive the minted amount directly in their wallet without an associated holding contract.
-    meta : Metadata
-      -- ^ Metadata associated with the minting result. Provided for extensibility.
 
