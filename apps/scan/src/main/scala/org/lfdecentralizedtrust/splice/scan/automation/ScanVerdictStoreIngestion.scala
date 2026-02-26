@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
-import org.lfdecentralizedtrust.splice.util.CantonTimestampUtil
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -166,8 +165,8 @@ class ScanVerdictStoreIngestion(
       rowId = 0,
       migrationId = migrationId,
       domainId = synchronizerId,
-      recordTime = CantonTimestampUtil.tryFromProtoTimestamp(verdict.getRecordTime),
-      finalizationTime = CantonTimestampUtil.tryFromProtoTimestamp(verdict.getFinalizationTime),
+      recordTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getRecordTime),
+      finalizationTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getFinalizationTime),
       submittingParticipantUid = verdict.submittingParticipantUid,
       verdictResult = resultShort,
       mediatorGroup = verdict.mediatorGroup,
