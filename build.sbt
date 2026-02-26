@@ -2092,11 +2092,10 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
-  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
-  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
-  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
-  def isLocalNetTest(name: String): Boolean =
+  def isWithDockerWithoutCantonTest(name: String): Boolean =
     name.contains("LocalNet") || name.contains("BulkStorageTest")
+  def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
+    name contains "ScanTimeBasedIntegrationTest"
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
@@ -2127,9 +2126,9 @@ updateTestConfigForParallelRuns := {
       (t: String) => isManualSignatureIntegrationTest(t),
     ),
     (
-      "tests for localnet",
-      "test-full-class-names-local-net-based.log",
-      (t: String) => isLocalNetTest(t),
+      "tests with docker, without canton",
+      "test-full-class-names-docker-no-canton.log",
+      (t: String) => isWithDockerWithoutCantonTest(t),
     ),
     (
       "Unit tests",
@@ -2236,6 +2235,11 @@ updateTestConfigForParallelRuns := {
       "test-full-class-names-dynamic-synchronizer-params-reconciliation.log",
       (t: String) => isDynamicSynchronizerParamsReconciliationTest(t),
     ),
+      (
+        "tests with simulated time and docker",
+        "test-full-class-names-sim-time-docker.log",
+        (t: String) => isWithDockerWithSimtimeCantonTest(t),
+      ),
     (
       "tests with simulated time",
       "test-full-class-names-sim-time.log",

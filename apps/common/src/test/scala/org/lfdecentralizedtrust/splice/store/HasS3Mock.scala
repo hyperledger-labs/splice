@@ -4,7 +4,6 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.github.luben.zstd.ZstdInputStream
 import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
-import org.lfdecentralizedtrust.splice.config.S3Config
 import org.scalatest.EitherValues
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
@@ -17,27 +16,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
-<<<<<<< HEAD
 import scala.jdk.CollectionConverters.*
-=======
-import org.gaul.s3proxy.S3Proxy
 
-import java.util.Properties
-import org.jclouds.ContextBuilder
-import org.jclouds.blobstore.BlobStoreContext
-import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.services.s3.S3AsyncClient
-
-import scala.jdk.FutureConverters.*
-import java.net.URI
->>>>>>> b0018e53e ([ci] with integration test)
-
-/**  Note: we used Adobe s3mock before. It worked well in a container, but that adds a docker dependency,
-  * and it doesn't work well in-process (restarts are a pain).
-  * We therefore transitioned for now to s3Proxy with a "transient" (i.e. in-memory) backend. It is unfortunately
-  * significantly slower than s3mock though, so if in the future runtime of tests that use s3 mocks becomes an issue,
-  * we should reconsider again.
-  */
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
@@ -50,14 +30,14 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
   )
 
   def startContainer() = {
-    new S3MockContainer("4.11.0")
+    val container = new S3MockContainer("4.11.0")
       .withInitialBuckets("bucket")
       .withEnv(
         Map(
           "debug" -> "true"
-        ).asJava
+        ).asJava)
 
-          container.start()
+    container.start()
 
     container.followOutput { frame =>
       logger.debug(s"[s3Mock] ${frame.getUtf8String}")
