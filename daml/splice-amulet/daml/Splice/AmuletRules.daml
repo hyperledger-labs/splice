@@ -39,6 +39,13 @@ import Splice.DecentralizedSynchronizer
 import Splice.ValidatorLicense
 
 import Splice.Util
+import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
+
+
+data AmuletRules_Amulet_ExpireTransferInstructionsResult = AmuletRules_Amulet_ExpireTransferInstructionsResult
+  with
+    results : [TransferInstructionResult]
+  deriving (Eq, Show)
 
 data AmuletRules_UpdateToLatestSchemaVersionResult = AmuletRules_UpdateToLatestSchemaVersionResult
   with
@@ -770,6 +777,24 @@ template AmuletRules
              else pure []
          pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
 
+    nonconsuming choice AmuletRules_Amulet_ExpireTransferInstructions : AmuletRules_Amulet_ExpireTransferInstructionsResult
+      with
+        amuletTransferInstructionCids : [ContractId TransferInstruction]
+        observers : [Party] 
+      observer observers
+      controller dso
+      do
+        individualResults <- forA amuletTransferInstructionCids $ \cid -> do
+          exercise cid TransferInstruction_Update with
+            extraActors = []
+            extraArgs = ExtraArgs with
+              meta = emptyMetadata
+              context = ChoiceContext with
+                values = TextMap.fromList [(expireLockKey, toAnyValue True)]
+        
+        pure AmuletRules_Amulet_ExpireTransferInstructionsResult with
+          results = individualResults
+    
     nonconsuming choice AmuletRules_UpdateExternalPartyConfigStates : AmuletRules_UpdateExternalPartyConfigStatesResult
       with
         externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState

@@ -37,12 +37,6 @@ import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
-import Splice.AmuletTransferInstruction
-import Splice.Api.Token.TransferInstructionV1
-import Splice.Api.Token.MetadataV1
-import qualified DA.TextMap as TextMap
-import Splice.Amulet.TokenApiUtils (expireLockKey, ToAnyValue(toAnyValue))
-
 
 -- Types
 ---------
@@ -229,13 +223,9 @@ data DsoRules_ConfirmSvOnboardingResult = DsoRules_ConfirmSvOnboardingResult wit
 data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingConfirmedResult with
     newDsoRules : ContractId DsoRules
 
-data DsoRules_Amulet_ExpireTransferInstructionResult = DsoRules_Amulet_ExpireTransferInstructionResult with
-    transferInstructionResult : TransferInstructionResult
-  deriving (Eq, Show)
-
 data DsoRules_Amulet_ExpireTransferInstructionsResult = DsoRules_Amulet_ExpireTransferInstructionsResult
   with
-    results : [DsoRules_Amulet_ExpireTransferInstructionResult]
+    result : AmuletRules_Amulet_ExpireTransferInstructionsResult
   deriving (Eq, Show)
 
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
@@ -1132,23 +1122,15 @@ template DsoRules with
     
     nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
       with
-        amuletTransferInstructionCids : [ContractId AmuletTransferInstruction]
+        amuletRulesCid : ContractId AmuletRules
+        transferInsts : AmuletRules_Amulet_ExpireTransferInstructions 
         sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
         
-        individualResults <- forA amuletTransferInstructionCids $ \cid -> do
-          let transferInstructionCid = toInterfaceContractId @TransferInstruction cid
-          exercise transferInstructionCid TransferInstruction_Update with
-            extraActors = []
-            extraArgs = ExtraArgs with
-              meta = emptyMetadata
-              context = ChoiceContext with
-                values = TextMap.fromList [(expireLockKey, toAnyValue True)]
-
-        return DsoRules_Amulet_ExpireTransferInstructionsResult with
-          results = map (DsoRules_Amulet_ExpireTransferInstructionResult) individualResults
+        res <- exercise amuletRulesCid transferInsts 
+        pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
     
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with

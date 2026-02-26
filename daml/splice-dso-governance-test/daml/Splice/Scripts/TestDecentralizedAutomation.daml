@@ -37,6 +37,9 @@ import Splice.Api.Token.MetadataV1
 import Splice.Testing.Utils
 import Splice.AmuletTransferInstruction
 
+import Splice.Api.Token.TransferInstructionV1(TransferInstruction)
+import DA.Optional (fromSomeNote)
+
 
 testUnclaimedRewardsMerging : Script ()
 testUnclaimedRewardsMerging = do
@@ -555,19 +558,31 @@ testExpireAmuletTransferInstruction = do
   liquidAmuletsBeforeExpire <- query @Amulet sender.primaryParty
   assertMsg "Sender liquid wallet should be truly empty" (null liquidAmuletsBeforeExpire)
 
-  [(instrCid, _)] <- query @AmuletTransferInstruction app.dso
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  [(instrInterfaceCid, maybeView)] <- queryInterface @TransferInstruction app.dso
+  let instrView = fromSomeNote "Need view" maybeView
+
+  let stakeholders = [instrView.transfer.sender, instrView.transfer.receiver]
+
+  let expireBatchChoice = AmuletRules_Amulet_ExpireTransferInstructions with
+        amuletTransferInstructionCids = [instrInterfaceCid]
+        observers = stakeholders
 
   submitMultiMustFail [sv1] [app.dso] $ 
     exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
-      amuletTransferInstructionCids = [instrCid]
-      sv = sv1
+      amuletRulesCid = amuletRulesCid
+      transferInsts = expireBatchChoice 
+      sv = sv1    
 
   passTime (hours 2)
 
-  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
-    amuletTransferInstructionCids = [instrCid]
-    sv = sv1
+  submitMulti [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
+      amuletRulesCid = amuletRulesCid
+      transferInsts = expireBatchChoice 
+      sv = sv1
 
   lockedAmuletsAfterExpire <- query @LockedAmulet sender.primaryParty
   length lockedAmuletsAfterExpire === 0  
