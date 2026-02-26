@@ -996,6 +996,32 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         }
       }
 
+      "return empty ByteString when stored external transaction hash is NULL" in {
+        val store = mkStore(storeName = "null_hash_store")
+
+        // Simulate receiving null from java APIs and writing it to Scan DB
+        @SuppressWarnings(Array("org.wartremover.warts.Null"))
+        val javaNullHash: ByteString = null
+
+        for {
+          _ <- initStore(store)
+          _ <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(),
+              synchronizerId = domain1,
+              externalTransactionHash = javaNullHash,
+            )
+          })(store)
+          updates <- store.getAllUpdates(None, PageLimit.Max)
+        } yield {
+          updates should have size 1
+          val storedTransaction = extractTransactionTree(updates)
+          // Even if the DB has NULL, our Slick mapping should return EMPTY
+          storedTransaction.getExternalTransactionHash shouldBe ByteString.EMPTY
+        }
+      }
+
       "return stored external transaction hash when not empty" in {
         val store = mkStore(storeName = "store")
         val externalTransactionHash = ByteString.copyFromUtf8("someExternalHash")

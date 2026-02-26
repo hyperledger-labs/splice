@@ -587,10 +587,9 @@ class UpdateHistory(
       .map(lengthLimited)
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
-    // transaction hash is SHA-256, so it is 32 bytes, but we apply relaxed future-proof limit just in case
-    val safeExternalTransactionHash = lengthLimitedByteString(tree.getExternalTransactionHash)
+    val safeExternalTransactionHash = sanitizedExtTxnHash(tree.getExternalTransactionHash)
 
-    import storage.DbStorageConverters.setParameterByteArray
+    import storage.DbStorageConverters.setParameterOptionalByteArray
     (sql"""
       insert into update_history_transactions(
         history_id, update_id, record_time,
