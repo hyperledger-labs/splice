@@ -35,11 +35,19 @@ jobs:
 
       - name: Env vars
         shell: bash
+        env:
+          PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
+          PERFORMANCE_TESTS_DB_HOST: ${{ secrets.PERFORMANCE_TESTS_DB_HOST }}
+          PERFORMANCE_TESTS_DB_USER: ${{ secrets.PERFORMANCE_TESTS_DB_USER }}
         run: |
           echo "Checking connection to Splice services... Connecting to '$PERFORMANCE_TESTS_DB_HOST' with user '$PERFORMANCE_TESTS_DB_USER'..."
 
       - name: Connection check
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
+        env:
+          PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
+          PERFORMANCE_TESTS_DB_HOST: ${{ secrets.PERFORMANCE_TESTS_DB_HOST }}
+          PERFORMANCE_TESTS_DB_USER: ${{ secrets.PERFORMANCE_TESTS_DB_USER }}
         with:
           additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
           cmd: ./scripts/check-cloudsql-conn.sh
