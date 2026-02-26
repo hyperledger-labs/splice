@@ -522,14 +522,14 @@ object ScanHttpEncodings {
 
   def encodeAppActivityRecord(
       record: AppActivityRecordT
-  ): definitions.EventHistoryAppActivityRecord = {
+  ): definitions.EventHistoryAppActivityRecords = {
     val entries = record.appProviderParties
       .zip(record.appActivityWeights)
       .map { case (party, weight) =>
         definitions.AppActivityEntry(party = party, weight = weight)
       }
       .toVector
-    definitions.EventHistoryAppActivityRecord(
+    definitions.EventHistoryAppActivityRecords(
       roundNumber = record.roundNumber,
       entries = entries,
     )
