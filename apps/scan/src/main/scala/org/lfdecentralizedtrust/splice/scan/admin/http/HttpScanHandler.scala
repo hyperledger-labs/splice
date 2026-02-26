@@ -127,6 +127,8 @@ class HttpScanHandler(
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
+    serveTrafficSummaries: Boolean,
+    serveAppActivityRecords: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
@@ -848,10 +850,13 @@ class HttpScanHandler(
         case Some((verdictWithViewsO, updateO)) =>
           val recordTimeO = verdictWithViewsO.map { case (v, _) => v.recordTime }
           for {
-            appActivityRecordO <- recordTimeO match {
-              case Some(rt) => eventStore.getAppActivityRecord(rt)
-              case None => Future.successful(None)
-            }
+            appActivityRecordO <-
+              if (serveAppActivityRecords)
+                recordTimeO match {
+                  case Some(rt) => eventStore.getAppActivityRecord(rt)
+                  case None => Future.successful(None)
+                }
+              else Future.successful(None)
           } yield {
             val encodedUpdateV2 = updateO
               .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
@@ -859,9 +864,12 @@ class HttpScanHandler(
             val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
               ScanHttpEncodings.encodeVerdict(v, views)
             }
-            val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
-              v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
-            }
+            val trafficSummaryEncoded =
+              if (serveTrafficSummaries)
+                verdictWithViewsO.flatMap { case (v, _) =>
+                  v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+                }
+              else None
             val appActivityRecordEncoded = appActivityRecordO.map(
               ScanHttpEncodings.encodeAppActivityRecord
             )
@@ -918,10 +926,13 @@ class HttpScanHandler(
         items <- Future.traverse(events) { case (verdictWithViewsO, updateO) =>
           val recordTimeO = verdictWithViewsO.map { case (v, _) => v.recordTime }
           for {
-            appActivityRecordO <- recordTimeO match {
-              case Some(rt) => eventStore.getAppActivityRecord(rt)
-              case None => Future.successful(None)
-            }
+            appActivityRecordO <-
+              if (serveAppActivityRecords)
+                recordTimeO match {
+                  case Some(rt) => eventStore.getAppActivityRecord(rt)
+                  case None => Future.successful(None)
+                }
+              else Future.successful(None)
           } yield {
             val encodedUpdateV2 = updateO
               .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
@@ -929,9 +940,12 @@ class HttpScanHandler(
             val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
               ScanHttpEncodings.encodeVerdict(v, views)
             }
-            val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
-              v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
-            }
+            val trafficSummaryEncoded =
+              if (serveTrafficSummaries)
+                verdictWithViewsO.flatMap { case (v, _) =>
+                  v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+                }
+              else None
             val appActivityRecordEncoded = appActivityRecordO.map(
               ScanHttpEncodings.encodeAppActivityRecord
             )
