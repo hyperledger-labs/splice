@@ -3741,7 +3741,7 @@ components:
             **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
           nullable: true
-        app_activity_record:
+        app_activity_records:
           description: |
             **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
           $ref: "#/components/schemas/EventHistoryAppActivityRecords"
@@ -3916,7 +3916,7 @@ components:
       properties:
         round_number:
           description: |
-            The round number assigned to the activity record.
+            The round number assigned to the activity records.
           type: integer
           format: int64
         entries:
