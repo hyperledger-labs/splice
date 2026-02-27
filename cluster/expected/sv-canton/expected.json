@@ -1750,6 +1750,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1880,6 +1881,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -2505,6 +2507,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -2676,6 +2679,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -4028,6 +4032,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -4158,6 +4163,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -4787,6 +4793,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -4983,6 +4990,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -5770,6 +5778,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -5900,6 +5909,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -6525,6 +6535,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "auth": {
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
@@ -6696,6 +6707,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "auth": {
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"

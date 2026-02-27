@@ -133,6 +133,10 @@ export class MultiValidator extends MultiNodeDeployment {
               value: multiValidatorConfig?.logLevel,
             },
             {
+              name: 'LOG_LEVEL_API_REQUEST',
+              value: multiValidatorConfig?.apiRequestLogLevel,
+            },
+            {
               name: 'LOG_LEVEL_STDOUT',
               value: multiValidatorConfig?.logLevel,
             },

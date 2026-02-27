@@ -90,6 +90,7 @@ export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
       level: LogLevelSchema.optional(),
+      apiRequestLogLevel: LogLevelSchema.optional(),
       async: z.boolean().optional(),
     })
     .default({}),
