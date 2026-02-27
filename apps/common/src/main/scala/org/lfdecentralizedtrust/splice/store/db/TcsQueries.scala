@@ -23,7 +23,7 @@ trait TcsQueries extends AcsQueries {
     * Live table: contracts created at or before asOf (still active).
     * Archive table: contracts created at or before asOf and archived after asOf.
     */
-  private def temporalUnionAll[C, TCid <: ContractId[?], T](
+  private def tcsUnionAll[C, TCid <: ContractId[?], T](
       columns: String,
       acsTableName: String,
       archiveTableName: String,
@@ -60,7 +60,7 @@ trait TcsQueries extends AcsQueries {
        """ ++ orderLimit).toActionBuilder
   }
 
-  protected def selectFromAcsTableAsOf[C, TCid <: ContractId[?], T](
+  protected def selectFromTcsTableAsOf[C, TCid <: ContractId[?], T](
       acsTableName: String,
       archiveTableName: String,
       storeId: AcsStoreId,
@@ -70,7 +70,7 @@ trait TcsQueries extends AcsQueries {
       additionalWhere: SQLActionBuilder = sql"",
       orderLimit: SQLActionBuilder = sql"",
   )(implicit companionClass: ContractCompanion[C, TCid, T]) = {
-    temporalUnionAll(
+    tcsUnionAll(
       SelectFromAcsTableResult.sqlColumnsCommaSeparated(),
       acsTableName,
       archiveTableName,
@@ -83,7 +83,7 @@ trait TcsQueries extends AcsQueries {
     ).as[SelectFromAcsTableResult]
   }
 
-  protected def selectFromAcsTableWithStateAsOf[C, TCid <: ContractId[?], T](
+  protected def selectFromTcsTableWithStateAsOf[C, TCid <: ContractId[?], T](
       acsTableName: String,
       archiveTableName: String,
       storeId: AcsStoreId,
@@ -95,7 +95,7 @@ trait TcsQueries extends AcsQueries {
   )(implicit companionClass: ContractCompanion[C, TCid, T]): SqlStreamingAction[Vector[
     SelectFromAcsTableWithStateResult
   ], SelectFromAcsTableWithStateResult, Effect.Read] = {
-    temporalUnionAll(
+    tcsUnionAll(
       SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated(),
       acsTableName,
       archiveTableName,
