@@ -95,8 +95,20 @@ object CantonTimestamp {
       ts <- LfTimestamp.fromInstant(instant).left.map(err => TimestampConversionError(err))
     } yield new CantonTimestamp(ts)
 
+  def tryFromProtoTimestamp(ts: ProtoTimestamp): CantonTimestamp =
+    fromProtoTimestamp(ts).fold(
+      err => throw new IllegalArgumentException(err.message),
+      identity,
+    )
+
   def fromProtoPrimitive(ts: Long): ParsingResult[CantonTimestamp] =
     LfTimestamp.fromLong(ts).bimap(TimestampConversionError.apply, new CantonTimestamp(_))
+
+  def tryFromProtoPrimitive(ts: Long): CantonTimestamp =
+    fromProtoPrimitive(ts).fold(
+      err => throw new IllegalArgumentException(err.message),
+      identity,
+    )
 
   def ofEpochSecond(seconds: Long): CantonTimestamp = {
     // Explicitly check the bounds here to avoid overflows due to the scaling by 1M
