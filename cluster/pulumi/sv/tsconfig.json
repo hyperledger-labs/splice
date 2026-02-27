@@ -3,5 +3,5 @@
   "include": [
     "src/**/*.ts",
     "*.ts"
-  ]
+, "../common-sv/src/synchronizer/participant.ts"  ]
 }
