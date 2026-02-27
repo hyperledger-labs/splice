@@ -12,7 +12,7 @@ create table acs_store_archived_test(
 );
 
 create index acs_store_archived_test_temporal
-    on acs_store_archived_test (store_id, migration_id, template_id_qualified_name, created_at) include (archived_at);
+    on acs_store_archived_test (store_id, migration_id, template_id_qualified_name, archived_at) include (created_at);
 
 create table scan_tcs_store_active
 (
@@ -47,5 +47,6 @@ create table scan_tcs_store_archived
 );
 
 -- temporal query support: created_at + archived_at filtering for point-in-time lookups on the archive table
+-- Since we would be typically doing lookups for recently archived contracts, index on archived_at will help skip past events more efficiently
 create index scan_tcs_store_archived_temporal
-    on scan_tcs_store_archived (store_id, migration_id, template_id_qualified_name, created_at) include (archived_at);
+    on scan_tcs_store_archived (store_id, migration_id, template_id_qualified_name, archived_at) include (created_at);
