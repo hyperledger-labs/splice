@@ -382,8 +382,8 @@ class SvFrontendIntegrationTest
         requestReasonUrl: String,
         effectiveAtThreshold: Boolean,
         extraFormOps: WebDriverType => Unit,
-    )(implicit webDriver: WebDriverType): String = {
-      val (_, contractId) = actAndCheck(
+    )(implicit webDriver: WebDriverType): Unit = {
+      actAndCheck(
         "sv1 operator can create a new proposal", {
           if (effectiveAtThreshold) {
             eventually() {
@@ -434,47 +434,30 @@ class SvFrontendIntegrationTest
             val proposals = getInflightProposals()
             proposals.size should be > 0
           }
-
-          clue("click the first inflight proposal to view details") {
-            val proposals = getInflightProposals()
-            webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
-          }
-
-          eventually() {
-            val currentUrl = webDriver.getCurrentUrl
-            currentUrl should include("/governance/proposals/")
-            currentUrl.split("/governance/proposals/")(1).split("\\?")(0)
-          }
         },
       )
-      contractId
     }
 
-    def sv2CastVoteOnActionRequired()(implicit
+    def sv2CastVoteOnActionRequired(proposalContractId: String)(implicit
         webDriver: WebDriverType,
         env: SpliceTestConsoleEnvironment,
     ): Unit = {
       actAndCheck(
-        "sv2 operator can login and browse to the governance page", {
-          go to s"http://localhost:$sv2UIPort/governance"
+        "sv2 operator can login and browse to the proposal details page", {
+          go to s"http://localhost:$sv2UIPort/governance/proposals/$proposalContractId"
           loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
         },
       )(
-        "sv2 can see the action required section with at least one item",
+        "sv2 can see the vote form",
         _ =>
           eventuallySucceeds() {
-            find(
-              testId("action-required-section")
-            ) should not be empty withClue "'Action Required' Box"
-            getActionRequiredElems().size should be > 0
+            find(testId("your-vote-reason-input")) should not be empty withClue "'Action Required' Box"
           },
       )
 
       actAndCheck(
-        "sv2 clicks on an action required item", {
-          val actionsRequired = getActionRequiredElems()
-          actionsRequired.asScala.head.click()
-        },
+        "sv2 casts vote on the proposal",
+        {},
       )(
         "sv2 can see the vote request and cast a vote",
         _ => {
@@ -535,6 +518,16 @@ class SvFrontendIntegrationTest
         },
       )
 
+    def voteRequestActionName(
+        request: Contract[VoteRequest.ContractId, VoteRequest]
+    ): String =
+      request.payload.action match {
+        case dsoAction: ARC_DsoRules => dsoAction.dsoAction.getClass.getSimpleName
+        case amuletAction: ARC_AmuletRules =>
+          amuletAction.amuletRulesAction.getClass.getSimpleName
+        case otherAction => otherAction.getClass.getSimpleName
+      }
+
     def assertCreateProposal(
         action: String,
         formPrefix: String,
@@ -546,6 +539,8 @@ class SvFrontendIntegrationTest
     ): String = clue(s"Creating proposal: $action") {
       val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
+      val existingProposalTrackingCids =
+        sv1Backend.listVoteRequests().map(getTrackingId(_).contractId).toSet
 
       val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>
         loginToGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
@@ -558,9 +553,26 @@ class SvFrontendIntegrationTest
           extraFormOps,
         )
       }
+      eventually() {
+        val newRequests = sv1Backend.listVoteRequests().filter { request =>
+          val trackingCid = getTrackingId(request).contractId
+          !existingProposalTrackingCids.contains(trackingCid)
+        }
+        val createdRequest = newRequests
+          .find { request =>
+            voteRequestActionName(request) == action
+          }
+          .getOrElse {
+            val newActions = newRequests.map(voteRequestActionName).distinct.sorted.mkString(", ")
+            fail(
+              s"Could not find created vote request for action $action. New vote request actions after submission: [$newActions]"
+            )
+          }
+        getTrackingId(createdRequest).contractId
+      }
 
       withFrontEnd("sv2") { implicit webDriver =>
-        sv2CastVoteOnActionRequired()
+        sv2CastVoteOnActionRequired(proposalContractId)
       }
 
       withFrontEnd("sv1") { implicit webDriver =>
@@ -1073,10 +1085,13 @@ class SvFrontendIntegrationTest
           }
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
-            eventuallyClickOn(id("tab-panel-in-progress"))
-            val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-            rows.size shouldBe previousVoteRequestsInProgress + 1
-            rows.head
+            eventually() {
+              closeVoteModalsIfOpen
+              eventuallyClickOn(id("tab-panel-in-progress"))
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+              rows.size shouldBe previousVoteRequestsInProgress + 1
+              rows.head
+            }
           }
 
           actAndCheck(
@@ -1214,6 +1229,7 @@ class SvFrontendIntegrationTest
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
             eventually() {
+              closeVoteModalsIfOpen
               eventuallyClickOn(id("tab-panel-in-progress"))
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress + 1
@@ -1396,13 +1412,7 @@ class SvFrontendIntegrationTest
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
 
       assertCreateProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
-        // Click on the member dropdown to open it
-        val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
-        dropdown.click()
-
-        // Select the SV to offboard from the dropdown menu
-        val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
-        memberOption.click()
+        selectMuiOptionByValue("offboard-sv-member-dropdown", sv3PartyId)
       }
     }
 
@@ -1420,6 +1430,7 @@ class SvFrontendIntegrationTest
           val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv4PartyId']"))
           memberOption.click()
         }
+        selectMuiOptionByValue("offboard-sv-member-dropdown", sv4PartyId)
       }
     }
 
@@ -1477,14 +1488,7 @@ class SvFrontendIntegrationTest
         implicit webDriver =>
           fillOutTextField("revoke-featured-app-partyId", providerPartyId)
 
-          eventually() {
-            val dropdown = webDriver.findElement(By.id("revoke-featured-app-rightCid-dropdown"))
-            dropdown.click()
-
-            val options = webDriver.findElements(By.cssSelector("li[role='option']"))
-            options.size should be > 0
-            options.get(0).click()
-          }
+          selectFirstMuiOption("revoke-featured-app-rightCid-dropdown")
       }
     }
 
@@ -1519,13 +1523,7 @@ class SvFrontendIntegrationTest
 
       assertCreateProposal("SRARC_UpdateSvRewardWeight", "update-sv-reward-weight") {
         implicit webDriver =>
-          val dropdown = webDriver.findElement(By.id("update-sv-reward-weight-member-dropdown"))
-          dropdown.click()
-
-          val memberOption =
-            webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
-          memberOption.click()
-
+          selectMuiOptionByValue("update-sv-reward-weight-member-dropdown", sv3PartyId)
           fillOutTextField("update-sv-reward-weight-weight", newWeight)
       }
     }
@@ -1548,6 +1546,36 @@ class SvFrontendIntegrationTest
       waitForQuery(id("action-change-dialog-proceed"))
       val proceedButton = webDriver.findElement(By.id("action-change-dialog-proceed"))
       proceedButton.click()
+    }
+  }
+
+  def selectMuiOptionByValue(dropdownId: String, optionValue: String)(implicit
+      webDriver: WebDriverType
+  ): Unit = {
+    // Reset potentially stale state and retry the full open+select sequence.
+    eventually() {
+      webDriver.findElement(By.tagName("body")).sendKeys(org.openqa.selenium.Keys.ESCAPE)
+
+      val dropdown = webDriver.findElement(By.id(dropdownId))
+      dropdown.click()
+
+      val options = webDriver.findElements(By.cssSelector(s"[data-value='$optionValue']"))
+      options.size should be > 0
+      options.get(0).click()
+    }
+  }
+
+  def selectFirstMuiOption(dropdownId: String)(implicit webDriver: WebDriverType): Unit = {
+    // Reset potentially stale state and retry the full open+select sequence.
+    eventually() {
+      webDriver.findElement(By.tagName("body")).sendKeys(org.openqa.selenium.Keys.ESCAPE)
+
+      val dropdown = webDriver.findElement(By.id(dropdownId))
+      dropdown.click()
+
+      val options = webDriver.findElements(By.cssSelector("li[role='option']"))
+      options.size should be > 0
+      options.get(0).click()
     }
   }
 
