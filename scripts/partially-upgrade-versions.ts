@@ -26,6 +26,7 @@ function main(
   ]
 
   for (const sv of svs)
+    chartVersions[sv] ??= {}
     for (const chart of svCharts)
       chartVersions[sv][chart] = newVersion
 
@@ -36,6 +37,7 @@ function main(
   ]
 
   for (const validator of ['validator1'])
+    chartVersions[validator] ??= {}
     for (const chart of validatorCharts)
       chartVersions[validator][chart] = newVersion
 
