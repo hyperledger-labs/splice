@@ -105,7 +105,7 @@ final class DbMultiDomainAcsStore[TXE](
 ) extends MultiDomainAcsStore
     with AcsTables
     with AcsQueries
-    with TemporalAcsQueries
+    with TcsQueries
     with TxLogQueries[TXE]
     with TcsStore
     with StoreErrors
