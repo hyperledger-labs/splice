@@ -236,7 +236,7 @@ final class DbMultiDomainAcsStore[TXE](
       waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
         storage
           .querySingle(
-            selectFromAcsTableWithStateAsOf(
+            selectFromTcsTableWithStateAsOf(
               acsTableName,
               archiveConfig.archiveTableName,
               acsStoreId,
@@ -269,7 +269,7 @@ final class DbMultiDomainAcsStore[TXE](
         val opName = s"listContractsAsOf:${templateId.getEntityName}"
         for {
           result <- storage.query(
-            selectFromAcsTableWithStateAsOf(
+            selectFromTcsTableWithStateAsOf(
               acsTableName,
               archiveConfig.archiveTableName,
               acsStoreId,
