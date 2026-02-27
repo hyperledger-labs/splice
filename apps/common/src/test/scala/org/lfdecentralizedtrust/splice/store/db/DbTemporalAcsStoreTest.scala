@@ -33,7 +33,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
   private def mkStore(
       acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = Some(
         DbMultiDomainAcsStore.AcsArchiveConfig(
-          "acs_store_archived_template",
+          "acs_store_archived_test",
           DbMultiDomainAcsStore.AcsArchiveConfig.defaultBaseColumns,
         )
       )
