@@ -35,11 +35,6 @@ create table scan_tcs_store_active
 create index scan_tcs_store_active_temporal
     on scan_tcs_store_active (store_id, migration_id, template_id_qualified_name, created_at);
 
--- lookup FeaturedAppRight
-create index scan_tcs_store_active_sid_mid_tid_farp
-    on scan_tcs_store_active (store_id, migration_id, template_id_qualified_name, featured_app_right_provider)
-    where featured_app_right_provider is not null;
-
 create table scan_tcs_store_archived
 (
     like scan_tcs_store_active including all,
