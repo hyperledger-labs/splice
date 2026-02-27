@@ -49,7 +49,7 @@ const GRANT_REVOKE_FEATURED_APP_CONFIG = {
   },
   SRARC_RevokeFeaturedAppRight: {
     providerFieldTitle: 'Provider Party ID',
-    rightCidFieldTitle: 'Featured Application Right Contract Id',
+    rightCidFieldTitle: 'Featured Application Right Contract ID',
     testIdPrefix: 'revoke-featured-app',
     reviewFormKey: 'revoke-right' as const,
   },
@@ -218,6 +218,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
             effectiveDate={form.state.values.effectiveDate.effectiveDate}
             formType={reviewFormKey}
             grantRight={form.state.values.idValue}
+            providerPartyId={form.state.values.partyId}
             revokeRight={form.state.values.rightCid}
             onEdit={() => setShowConfirmation(false)}
             onSubmit={() => {}}
@@ -310,11 +311,9 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                 <form.AppField
                   name="partyId"
                   validators={{
-                    onBlur: ({ value }) => validatePartyId(value),
                     onChange: ({ value }) => validatePartyId(value),
                     onChangeAsyncDebounceMs: 500,
                     onChangeAsync: ({ value }) => validateRevokeProviderAndLoadRights(value),
-                    onBlurAsync: ({ value }) => validateRevokeProviderAndLoadRights(value),
                   }}
                 >
                   {field => (

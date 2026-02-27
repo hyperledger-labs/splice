@@ -382,6 +382,14 @@ describe('Revoke Featured App Form', () => {
     await user.click(submitButton);
 
     expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeInTheDocument();
+    expect(screen.getByTestId('revokeProviderPartyId-title').textContent).toBe('Provider Party ID');
+    expect(screen.getByTestId('revokeProviderPartyId-field').textContent).toBe(
+      'a-party-id::1014912492'
+    );
+    expect(screen.getByTestId('revokeRight-title').textContent).toBe(
+      'Featured Application Right Contract ID'
+    );
+    expect(screen.getByTestId('revokeRight-field').textContent).toBe('rightCid123');
   });
 
   test('should show error on form if submission fails', async () => {
