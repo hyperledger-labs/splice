@@ -34,6 +34,7 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
       }
     | {
         formType: 'revoke-right';
+        providerPartyId: string;
         revokeRight: string;
       }
     | {
@@ -108,11 +109,18 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
         )}
 
         {formType === 'revoke-right' && (
-          <ProposalField
-            id="revokeRight"
-            title="Featured Application Right Contract Id"
-            value={props.revokeRight}
-          />
+          <>
+            <ProposalField
+              id="revokeProviderPartyId"
+              title="Provider Party ID"
+              value={props.providerPartyId}
+            />
+            <ProposalField
+              id="revokeRight"
+              title="Featured Application Right Contract ID"
+              value={props.revokeRight}
+            />
+          </>
         )}
 
         {formType === 'offboard' && (

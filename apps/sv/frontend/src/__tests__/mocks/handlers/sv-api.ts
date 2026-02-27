@@ -11,6 +11,7 @@ import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  ListFeaturedAppRightsByProviderResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
@@ -215,8 +216,9 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
 
   rest.get(`${svUrl}/v0/admin/sv/party-to-participant/:partyId`, (req, res, ctx) => {
-    const { partyId } = req.params;
-    if (partyId === 'a-party-id::1014912492' || partyId === svPartyId) {
+    const normalizedPartyId = decodeURIComponent(String(req.params.partyId));
+
+    if (normalizedPartyId === 'a-party-id::1014912492' || normalizedPartyId === svPartyId) {
       return res(
         ctx.json({
           participant_id: svPartyId,
@@ -225,5 +227,27 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
     } else {
       return res(ctx.status(404));
     }
+  }),
+
+  rest.get(`${svUrl}/v0/admin/sv/featured-app-rights/:providerPartyId`, (req, res, ctx) => {
+    const providerPartyId = decodeURIComponent(String(req.params.providerPartyId));
+    const featuredAppRights =
+      providerPartyId === 'a-party-id::1014912492'
+        ? [
+            {
+              template_id: 'featured-app-right-template-id',
+              contract_id: 'rightCid123',
+              payload: {},
+              created_event_blob: '',
+              created_at: '2026-02-26T13:00:00.000000Z',
+            },
+          ]
+        : [];
+
+    return res(
+      ctx.json<ListFeaturedAppRightsByProviderResponse>({
+        featured_app_rights: featuredAppRights,
+      })
+    );
   }),
 ];

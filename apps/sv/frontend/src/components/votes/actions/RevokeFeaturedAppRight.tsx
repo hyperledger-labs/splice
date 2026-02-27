@@ -40,7 +40,7 @@ const RevokeFeaturedAppRight: React.FC<{
 
   return (
     <Stack direction="column" mb={4} spacing={1}>
-      <Typography variant="h6">Featured Application Right Contract Id</Typography>
+      <Typography variant="h6">Featured Application Right Contract ID</Typography>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
         <TextField
           id="set-application-rightcid"
