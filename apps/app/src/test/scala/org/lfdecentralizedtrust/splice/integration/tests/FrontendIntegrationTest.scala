@@ -17,6 +17,7 @@ import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, Firefo
 import org.openqa.selenium.{
   By,
   JavascriptExecutor,
+  Keys,
   OutputType,
   TakesScreenshot,
   WebDriver,
@@ -736,6 +737,30 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         eventually()(
           dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
         )
+      }
+    }
+  }
+
+  /** Sets date/time without using Selenium's clear/click (which can fail with "could not be
+    * scrolled into view" for elements in scrollable layouts). Use only when the standard
+    * setDateTime fails for a specific picker; other tests must continue using setDateTime.
+    */
+  protected def setDateTimeWithoutScroll(pickerId: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ): Assertion = {
+    clue(s"Selecting the date $dateTime (no-scroll path)") {
+      val dateTimePicker = webDriver.findElement(By.id(pickerId))
+      val digitsAndAmPm = dateTime.replaceAll("[^0-9APMapm]", "")
+      eventually() {
+        webDriver.executeScript("arguments[0].focus(); arguments[0].click();", dateTimePicker)
+        dateTimePicker.sendKeys(Keys.chord(Keys.CONTROL, "a"))
+        dateTimePicker.sendKeys(digitsAndAmPm)
+        val actual = dateTimePicker.getAttribute("value").toLowerCase
+        val expected = dateTime.toLowerCase
+        // MUI picker may display "a"/"p" instead of "am"/"pm"; normalize for comparison
+        val normalizeAmPm = (s: String) =>
+          s.replaceAll("\\b(a)(?![m])", "am").replaceAll("\\b(p)(?![m])", "pm")
+        eventually()(normalizeAmPm(actual) shouldBe normalizeAmPm(expected))
       }
     }
   }
