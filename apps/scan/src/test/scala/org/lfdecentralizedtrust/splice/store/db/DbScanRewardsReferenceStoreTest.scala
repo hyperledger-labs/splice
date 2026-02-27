@@ -19,7 +19,10 @@ import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import slick.jdbc.JdbcProfile
 
-class DbScanRewardsReferenceStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
+class DbScanRewardsReferenceStoreTest
+    extends StoreTestBase
+    with SplicePostgresTest
+    with AcsJdbcTypes {
 
   "DbScanRewardsReferenceStore" should {
 
