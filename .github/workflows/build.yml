@@ -275,7 +275,7 @@ jobs:
   #   secrets: inherit
 
   scala_test_with_docker_and_canton_simtime:
-    uses: ./.github/workflows/build.scala_test_for_compose.yml
+    uses: ./.github/workflows/build.scala_test.yml
     if: ${{ ! inputs.oss_only }}
     with:
       runs_on: self-hosted-docker-large
