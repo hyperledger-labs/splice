@@ -17,7 +17,11 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
+import com.digitalasset.canton.admin.participant.v30.{
+  ExportAcsResponse,
+  ExportPartyAcsResponse,
+  PruningServiceGrpc,
+}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -326,8 +330,8 @@ class ParticipantAdminConnection(
     )
   }
 
-  private def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(
-      implicit tc: TraceContext
+  def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(implicit
+      tc: TraceContext
   ): Future[NonNegativeLong] =
     runCmd(
       ParticipantAdminCommands.PartyManagement
@@ -346,16 +350,7 @@ class ParticipantAdminConnection(
     val observer = new SeqAccumulatingObserver[ExportAcsResponse]
 
     for {
-      offset <- timestampOrOffset match {
-        case Right(offset) => Future.successful(offset)
-        case Left(timestamp) =>
-          offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
-            logger.debug(
-              s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
-            )
-            offset
-          }
-      }
+      offset <- resolveOffset(timestampOrOffset, synchronizerId, force)
       _ <- runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
           parties = parties,
@@ -368,6 +363,51 @@ class ParticipantAdminConnection(
       )
       responses <- observer.resultFuture
     } yield responses.map(_.chunk)
+  }
+
+  private def resolveOffset(
+      timestampOrOffset: Either[Instant, NonNegativeLong],
+      synchronizerId: SynchronizerId,
+      force: Boolean,
+  )(implicit tc: TraceContext) = {
+    timestampOrOffset match {
+      case Right(offset) => Future.successful(offset)
+      case Left(timestamp) =>
+        offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
+          logger.debug(
+            s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
+          )
+          offset
+        }
+    }
+  }
+
+  def exportPartyAcs(
+      party: PartyId,
+      synchronizerId: SynchronizerId,
+      targetParticipantId: ParticipantId,
+      beforeActivationOffset: NonNegativeLong,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    logger.info(
+      show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
+    )
+    val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
+
+    for {
+      _ <- runCmd(
+        ParticipantAdminCommands.PartyManagement.ExportPartyAcs(
+          party,
+          synchronizerId,
+          targetParticipantId,
+          beforeActivationOffset,
+          waitForActivationTimeout = None, // i.e., default
+          observer,
+        )
+      )
+      chunks <- observer.resultFuture
+    } yield ByteString.copyFrom(chunks.map(_.chunk).asJava)
   }
 
   def downloadAcsSnapshotNonChunked(
@@ -400,6 +440,24 @@ class ParticipantAdminConnection(
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,
             excludedStakeholders = Set.empty,
+            representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+          ),
+        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
+      ).map(_ => ()),
+      logger,
+    )
+  }
+
+  def importPartyAcs(acsBytes: ByteString)(implicit tc: TraceContext): Future[Unit] = {
+    retryProvider.retryForClientCalls(
+      "import_party_acs",
+      "Imports the acs in the participant",
+      runCmd(
+        ParticipantAdminCommands.PartyManagement
+          .ImportPartyAcs(
+            acsBytes,
+            IMPORT_ACS_WORKFLOW_ID_PREFIX,
+            contractImportMode = ContractImportMode.Validation,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
@@ -613,10 +671,9 @@ class ParticipantAdminConnection(
       newParticipant: ParticipantId,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
-      // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
-      // See SvOnboardingPromoteToSubmitterTrigger.
+      // onboarding flag is cleared in SvOnboardingPromoteToSubmitterTrigger
       val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermission.Observation)
+        HostingParticipant(newParticipant, ParticipantPermission.Submission, onboarding = true)
       if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
         participants
       } else {
@@ -661,7 +718,8 @@ class ParticipantAdminConnection(
         val newHostingParticipants = previous.participants.appended(
           HostingParticipant(
             newParticipant,
-            ParticipantPermission.Observation,
+            ParticipantPermission.Submission,
+            onboarding = true,
           )
         )
         Right(
