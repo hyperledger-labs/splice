@@ -38,7 +38,6 @@ import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
 
-
 -- Types
 ---------
 
@@ -223,6 +222,11 @@ data DsoRules_ConfirmSvOnboardingResult = DsoRules_ConfirmSvOnboardingResult wit
 
 data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingConfirmedResult with
     newDsoRules : ContractId DsoRules
+
+data DsoRules_Amulet_ExpireTransferInstructionsResult = DsoRules_Amulet_ExpireTransferInstructionsResult
+  with
+    result : AmuletRules_Amulet_ExpireTransferInstructionsResult
+  deriving (Eq, Show)
 
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
@@ -1114,6 +1118,25 @@ template DsoRules with
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
 
+    -- | Cleanup choice for expired Amulet transfer instructions.
+    
+    nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        transferInsts : AmuletRules_Amulet_ExpireTransferInstructions 
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        
+        amuletRules <- fetchChecked (ForDso dso) amuletRulesCid
+        
+        assertMsg "The AmuletRules dso must match the DsoRules dso" 
+          (amuletRules.dso == dso)
+        
+        res <- exercise amuletRulesCid transferInsts 
+        pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
+    
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with
         cid : ContractId Amulet
