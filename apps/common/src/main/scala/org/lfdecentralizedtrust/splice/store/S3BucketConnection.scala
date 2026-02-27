@@ -66,7 +66,7 @@ class S3BucketConnection(
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */
   class AppendWriteObject protected[S3BucketConnection] (val key: String)(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
   ) {
     val createRequest = CreateMultipartUploadRequest
       .builder()
