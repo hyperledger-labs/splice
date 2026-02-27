@@ -1,5 +1,5 @@
 # sv (Pulumi project)
 
-Deploys the logical part of the synchronizer and SV apps for an SV.
+Deploys the participant, i.e. the Canton components that don't change on an LSU.
 
 Deployment typically managed via an [operator](../operator). For manual deployment s.a. `cncluster apply`.
