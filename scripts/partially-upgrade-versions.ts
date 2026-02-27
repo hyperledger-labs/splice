@@ -25,10 +25,11 @@ function main(
     'splice-validator',
   ]
 
-  for (const sv of svs)
+for (const sv of svs) {
     chartVersions[sv] ??= {}
     for (const chart of svCharts)
       chartVersions[sv][chart] = newVersion
+}
 
   const validatorCharts = [
     'splice-validator',
