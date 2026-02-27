@@ -4,23 +4,23 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.github.luben.zstd.ZstdInputStream
 import io.grpc.netty.shaded.io.netty.buffer.{ByteBufInputStream, Unpooled}
-import org.scalatest.EitherValues
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, EitherValues, Suite}
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.S3Object
+import software.amazon.awssdk.services.s3.model.{CreateBucketRequest, DeleteBucketRequest, S3Object}
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 import org.lfdecentralizedtrust.splice.config.S3Config
-import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 import org.testcontainers.containers.wait.strategy.Wait
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 
 
-trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
+trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
 
   val s3ConfigMock = S3Config(
     "http://127.0.0.1:9090",
@@ -30,9 +30,13 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     "mock_key",
   )
 
+  private var container: Option[S3MockContainer] = None
+  override def beforeAll(): Unit = startContainer()
+  override def afterAll(): Unit = container.foreach(_.stop)
+  override def beforeEach(): Unit = clearBucket()
+
   private def startContainer() = {
-    logger.debug("Starting s3mock container")
-    val container = new S3MockContainer("4.11.0")
+    val c = new S3MockContainer("4.11.0")
       .withInitialBuckets("bucket")
       .withExposedPorts(9090)
       .withEnv(
@@ -41,35 +45,22 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
         ).asJava)
       .waitingFor(Wait.forHttp("/").forPort(9090).forStatusCode(200).withStartupTimeout(java.time.Duration.ofMinutes(5)))
 
-    container.setPortBindings(Seq("9090:9090").asJava)
-    container.start()
-    logger.debug("Done starting s3mock container")
+    c.setPortBindings(Seq("9090:9090").asJava)
+    c.start()
 
-    container.followOutput { frame =>
+    c.followOutput { frame =>
       logger.debug(s"[s3Mock] ${frame.getUtf8String}")
     }
-    container
+    container = Some(c)
+    c
   }
 
-  def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
-
-    val container = startContainer()
-
-    test.andThen({
-      case _ =>
-        container.stop()
-    })
-  }
-
-  def withS3MockSync[A](test: => A): A = {
-
-    val container = startContainer()
-
-    try {
-      test
-    } finally {
-      container.stop()
-    }
+  private def clearBucket() = {
+    val client = S3BucketConnection(s3ConfigMock, loggerFactory).s3Client
+    val deleteRequest = DeleteBucketRequest.builder().bucket(s3ConfigMock.bucketName).build()
+    client.deleteBucket(deleteRequest).asScala.futureValue
+    val createRequest = CreateBucketRequest.builder().bucket(s3ConfigMock.bucketName).build()
+    client.createBucket(createRequest).asScala.futureValue
   }
 
   def readUncompressAndDecode[T](

@@ -369,7 +369,6 @@ class ScanTimeBasedIntegrationTest
   }
 
   "snapshotting" in { implicit env =>
-    withS3MockSync {
       val (aliceUserParty, _) = onboardAliceAndBob()
       val migrationId = sv1ScanBackend.config.domainMigrationId
 
@@ -592,5 +591,4 @@ class ScanTimeBasedIntegrationTest
 
       }
     }
-  }
 }

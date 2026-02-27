@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 
 class S3BucketConnection(
-    s3Client: S3AsyncClient,
+    val s3Client: S3AsyncClient,
     bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
