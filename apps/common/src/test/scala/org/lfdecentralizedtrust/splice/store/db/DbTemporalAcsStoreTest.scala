@@ -28,7 +28,6 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import slick.jdbc.JdbcProfile
 
-
 class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
   private def mkStore(
       acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = Some(
