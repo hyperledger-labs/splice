@@ -54,6 +54,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         publicKeyAsHexString(subjectPublicKeyInfo),
       )
       .topologyTxs
+
     val signedTopologyTxs = listOfTransactionsAndHashes.map { tx =>
       SignedTopologyTx(
         tx.topologyTx,
@@ -135,11 +136,19 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       )
   }
 
+  case class ExternalPartySetupResult(
+      transferPreapprovalCid: TransferPreapproval.ContractId,
+      updateId: String,
+      txHash: String,
+  )
+
   protected def createAndAcceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       verboseHashing: Boolean = false,
-  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String) = {
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): ExternalPartySetupResult = {
     val proposal = createExternalPartySetupProposal(provider, externalPartyOnboarding)
     acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
   }
@@ -187,7 +196,9 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       externalPartyOnboarding: OnboardingResult,
       proposal: ExternalPartySetupProposal.ContractId,
       verboseHashing: Boolean = false,
-  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String) = {
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): ExternalPartySetupResult = {
     val preparedTx =
       prepareAcceptExternalPartySetupProposal(
         provider,
@@ -195,7 +206,9 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         proposal,
         verboseHashing,
       )
-    submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
+    val (cid, updateId) =
+      submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
+    ExternalPartySetupResult(cid, updateId, preparedTx.txHash)
   }
 
   protected def prepareAcceptExternalPartySetupProposal(
