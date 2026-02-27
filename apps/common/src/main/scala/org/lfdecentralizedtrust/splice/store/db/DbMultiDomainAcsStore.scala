@@ -96,6 +96,7 @@ final class DbMultiDomainAcsStore[TXE](
       */
     handleIngestionSummary: IngestionSummary => Unit = _ => (),
     override val defaultLimit: Limit,
+    acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = None,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -1544,7 +1545,7 @@ final class DbMultiDomainAcsStore[TXE](
               },
               onExercise = (st, ev, _) => {
                 if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
-                  st + (ev.getContractId -> Delete(ev))
+                  st + (ev.getContractId -> Delete(ev, tree.tree.getRecordTime))
                 } else {
                   st
                 }
@@ -1554,7 +1555,7 @@ final class DbMultiDomainAcsStore[TXE](
         // optimization: a delete on a contract cancels-out with the corresponding insert
         .foldLeft(VectorMap.empty[String, OperationToDo]) { case (acc, treeOps) =>
           val (toRemove, toAdd) = treeOps.partition {
-            case (contractId, Delete(_)) if acc.contains(contractId) => true
+            case (contractId, Delete(_, _)) if acc.contains(contractId) => true
             case _ => false
           }
           (acc -- toRemove.keys) ++ toAdd
@@ -1602,9 +1603,7 @@ final class DbMultiDomainAcsStore[TXE](
             DBIO.successful(())
         }
         _ <- doDeleteContracts(
-          workTodo.collect { case Delete(exercisedEvent) =>
-            exercisedEvent
-          },
+          workTodo.collect { case d: Delete => d },
           summary,
         )
         // TODO (#3048): batch this
@@ -1849,18 +1848,45 @@ final class DbMultiDomainAcsStore[TXE](
               """ ++ indexColumnNameValues ++ sql")")
     }
 
-    private def doDeleteContracts(events: Seq[ExercisedEvent], summary: MutableIngestionSummary) = {
-      if (events.isEmpty) DBIO.successful(())
+    private def doDeleteContracts(deletes: Seq[Delete], summary: MutableIngestionSummary) = {
+      if (deletes.isEmpty) DBIO.successful(())
       else {
-        DBIO.sequence(events.grouped(ingestionConfig.maxDeletesPerStatement).map { events =>
-          (sql"""
-            delete from #$acsTableName
-            where store_id = $acsStoreId
-              and migration_id = $domainMigrationId
-              and """ ++ inClause(
-            "contract_id",
-            events.map(e => lengthLimited(e.getContractId)),
-          ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
+        DBIO.sequence(deletes.grouped(ingestionConfig.maxDeletesPerStatement).map { deletes =>
+          val events = deletes.map(_.evt)
+          val contractIds = events.map(e => lengthLimited(e.getContractId))
+
+          val deleteFragment =
+            sql"""DELETE FROM #$acsTableName
+                  WHERE store_id = $acsStoreId
+                    AND migration_id = $domainMigrationId
+                    AND """ ++ inClause("contract_id", contractIds)
+
+          val query = acsArchiveConfigOpt match {
+            case Some(DbMultiDomainAcsStore.AcsArchiveConfig(archiveTableName, baseColumns)) =>
+              val valuesPairs = deletes.map { d =>
+                val cid = lengthLimited(d.evt.getContractId)
+                val archivedAt = CantonTimestamp.assertFromInstant(d.recordTime).toMicros
+                sql"($cid, $archivedAt)"
+              }
+              val valuesClause = sqlCommaSeparated(valuesPairs)
+              (sql"""
+                WITH archive_times(contract_id, archived_at) AS (
+                  VALUES """ ++ valuesClause ++ sql"""
+                ),
+                deleted AS (
+                  """ ++ deleteFragment ++ sql"""
+                  RETURNING #$baseColumns
+                )
+                INSERT INTO #$archiveTableName (#$baseColumns, archived_at)
+                SELECT d.*, at.archived_at
+                FROM deleted d JOIN archive_times at ON d.contract_id = at.contract_id
+                RETURNING contract_id
+              """).toActionBuilder.as[String]
+            case None =>
+              (deleteFragment ++ sql" RETURNING contract_id").toActionBuilder.as[String]
+          }
+
+          query.map { deletedCids =>
             val deletedCidSet = deletedCids.toSet
             val ingestedArchivedEvents =
               events.filter(evt => deletedCidSet.contains(evt.getContractId))
@@ -1989,7 +2015,7 @@ final class DbMultiDomainAcsStore[TXE](
 
     sealed trait OperationToDo
     case class Insert(evt: CreatedEvent, synchronizerId: SynchronizerId) extends OperationToDo
-    case class Delete(evt: ExercisedEvent) extends OperationToDo
+    case class Delete(evt: ExercisedEvent, recordTime: Instant) extends OperationToDo
   }
 
   private def getIndexColumnValues(
@@ -2193,6 +2219,37 @@ final class DbMultiDomainAcsStore[TXE](
 }
 
 object DbMultiDomainAcsStore {
+
+  /** Configuration for archiving deleted ACS rows into a separate table.
+    * @param archiveTableName The name of the archive table to copy deleted rows into.
+    * @param baseColumns Comma-separated column names to copy from the ACS table to the archive table.
+    */
+  case class AcsArchiveConfig(
+      archiveTableName: String,
+      baseColumns: String,
+  )
+
+  object AcsArchiveConfig {
+
+    /** Default base columns matching acs_store_template (18 columns). */
+    val defaultBaseColumns: String =
+      "store_id, migration_id, event_number, contract_id, " +
+        "template_id_package_id, template_id_qualified_name, package_name, " +
+        "create_arguments, created_event_blob, created_at, contract_expires_at, " +
+        "state_number, assigned_domain, reassignment_counter, " +
+        "reassignment_target_domain, reassignment_source_domain, " +
+        "reassignment_submitter, reassignment_unassign_id"
+
+    def withIndexColumns(
+        archiveTableName: String,
+        indexColumns: Seq[String],
+    ): AcsArchiveConfig =
+      AcsArchiveConfig(
+        archiveTableName,
+        if (indexColumns.isEmpty) defaultBaseColumns
+        else defaultBaseColumns + indexColumns.mkString(", ", ", ", ""),
+      )
+  }
 
   /** @param acsStoreId The primary key of this stores ACS entry in the store_descriptors table
     * @param txLogStoreId The primary key of this stores TxLog entry in the store_descriptors table

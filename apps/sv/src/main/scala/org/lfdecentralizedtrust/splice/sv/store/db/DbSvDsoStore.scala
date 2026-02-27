@@ -43,6 +43,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
   DbAppStore,
+  DbMultiDomainAcsStore,
   StoreDescriptor,
 }
 import org.lfdecentralizedtrust.splice.store.{
@@ -107,6 +108,12 @@ class DbSvDsoStore(
       ),
       domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          DsoTables.archivedAcsTableName,
+          DsoTables.DsoAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with SvDsoStore
     with AcsTables

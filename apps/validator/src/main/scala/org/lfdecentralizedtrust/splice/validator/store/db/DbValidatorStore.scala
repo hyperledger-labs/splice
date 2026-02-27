@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
   DbAppStore,
+  DbMultiDomainAcsStore,
 }
 import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
@@ -76,6 +77,12 @@ class DbValidatorStore(
       ),
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          ValidatorTables.archivedAcsTableName,
+          ValidatorTables.ValidatorAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with ValidatorStore
     with AcsTables
