@@ -60,6 +60,7 @@ import { Resource } from '@pulumi/pulumi';
 import {
   delegatelessAutomationExpectedTaskDuration,
   delegatelessAutomationExpiredRewardCouponBatchSize,
+  delegatelessAutomationExpiredRewardCouponNumBatches,
 } from '../../common/src/automation';
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { configureScanBigQuery } from './bigQuery';
@@ -493,6 +494,8 @@ function installSvApp(
     delegatelessAutomationExpectedTaskDuration: delegatelessAutomationExpectedTaskDuration,
     delegatelessAutomationExpiredRewardCouponBatchSize:
       delegatelessAutomationExpiredRewardCouponBatchSize,
+    delegatelessAutomationExpiredRewardCouponNumBatches:
+      delegatelessAutomationExpiredRewardCouponNumBatches,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
     logAsyncFlush: config.logging?.appsAsync,

@@ -330,11 +330,17 @@ def matchTODOWithBuckets(line: String, bucketsForLine: String): List[(Bucket, St
     .map(rgx =>
       rgx.regex
         .findFirstMatchIn(bucketsForLine)
-        .map(m => rgx.getBucket(m.matched) -> line)
+        .map(m => (rgx, rgx.getBucket(m.matched) -> line))
     )
     .collect { case Some(x) => x }
 
-  if (allAttempts.isEmpty) List(UnknownBucket -> line) else allAttempts
+  // If CrossRefIssue matched, filter out bare Issue matches to avoid
+  // misattributing cross-repo issues (e.g., org/other-repo#123) to the current repo.
+  val hasCrossRef = allAttempts.exists(_._1 == CrossRefIssue)
+  val filtered = if (hasCrossRef) allAttempts.filterNot(_._1 == Issue) else allAttempts
+  val results = filtered.map(_._2)
+
+  if (results.isEmpty) List(UnknownBucket -> line) else results
 }
 
 def processScalaStyleTodo(line: String): List[(Bucket, String)] = {

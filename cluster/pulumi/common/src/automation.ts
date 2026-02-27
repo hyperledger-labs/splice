@@ -8,11 +8,13 @@ export const AutomationSchema = z.object({
     .object({
       delegatelessAutomationExpectedTaskDuration: z.number().default(5000),
       delegatelessAutomationExpiredRewardCouponBatchSize: z.number().default(100),
+      delegatelessAutomationExpiredRewardCouponNumBatches: z.number().default(100),
     })
     .optional()
     .default({
       delegatelessAutomationExpectedTaskDuration: 5000,
       delegatelessAutomationExpiredRewardCouponBatchSize: 100,
+      delegatelessAutomationExpiredRewardCouponNumBatches: 100,
     }),
 });
 
@@ -25,3 +27,5 @@ export const delegatelessAutomationExpectedTaskDuration =
   fullConfig.automation.delegatelessAutomationExpectedTaskDuration;
 export const delegatelessAutomationExpiredRewardCouponBatchSize =
   fullConfig.automation.delegatelessAutomationExpiredRewardCouponBatchSize;
+export const delegatelessAutomationExpiredRewardCouponNumBatches =
+  fullConfig.automation.delegatelessAutomationExpiredRewardCouponNumBatches;

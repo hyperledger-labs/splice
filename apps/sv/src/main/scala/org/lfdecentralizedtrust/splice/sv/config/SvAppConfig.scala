@@ -332,6 +332,7 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
+    delegatelessAutomationExpiredRewardCouponNumBatches: Int = 20,
     // What batch size to target for converting app activity markers
     delegatelessAutomationFeaturedAppActivityMarkerBatchSize: Int = 100,
     // how long to wait before forcing a conversion even though the batch size is not full

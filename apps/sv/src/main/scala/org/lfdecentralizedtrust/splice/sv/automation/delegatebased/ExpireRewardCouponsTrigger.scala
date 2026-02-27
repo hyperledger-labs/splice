@@ -50,7 +50,10 @@ class ExpireRewardCouponsTrigger(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
         context.config.ignoredExpiredRewardsPartyIds,
-        PageLimit.tryCreate(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize),
+        batchSize =
+          PageLimit.tryCreate(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize),
+        numBatches =
+          PageLimit.tryCreate(svTaskContext.delegatelessAutomationExpiredRewardCouponNumBatches),
       )
       // We select at most parallelism batches per round as  processing more than that would most likely just hit contention
       // If any work was done the trigger will run again anyway so it's safer to just requery the stores
