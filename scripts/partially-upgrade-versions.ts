@@ -37,10 +37,11 @@ for (const sv of svs) {
     'splice-splitwell-web-ui',
   ]
 
-  for (const validator of ['validator1'])
+for (const validator of ['validator1']) {
     chartVersions[validator] ??= {}
     for (const chart of validatorCharts)
       chartVersions[validator][chart] = newVersion
+}
 
   process.stdout.write(JSON.stringify(chartVersions, undefined, 2))
 }
