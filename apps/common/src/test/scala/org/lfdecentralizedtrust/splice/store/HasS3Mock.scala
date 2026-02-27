@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.s3.model.S3Object
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 import org.lfdecentralizedtrust.splice.config.S3Config
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
+import org.testcontainers.containers.wait.strategy.Wait
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -36,6 +37,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
         Map(
           "debug" -> "true"
         ).asJava)
+      .waitingFor(Wait.forHttp("/status").forStatusCode(200))
 
     container.setPortBindings(Seq("9090:9090").asJava)
     container.start()
