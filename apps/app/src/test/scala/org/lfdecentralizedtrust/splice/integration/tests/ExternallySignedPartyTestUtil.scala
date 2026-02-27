@@ -167,19 +167,25 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
   ): ExternalPartySetupProposal.ContractId = {
-    val (proposal, _) = actAndCheck(
-      s"Create external party proposal for ${externalPartyOnboarding.party}", {
-        provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
-      },
-    )(
-      s"External party proposal for ${externalPartyOnboarding.party} was created",
-      proposal => {
-        provider
-          .listExternalPartySetupProposals()
-          .map(_.contract.contractId.contractId) should contain(proposal.contractId)
-      },
-    )
-    proposal
+    provider
+      .listExternalPartySetupProposals()
+      .find(_.payload.user == externalPartyOnboarding.party.toProtoPrimitive) match {
+      case Some(proposal) => proposal.contractId // this will happen on retries
+      case None =>
+        val (proposal, _) = actAndCheck(
+          s"Create external party proposal for ${externalPartyOnboarding.party}", {
+            provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
+          },
+        )(
+          s"External party proposal for ${externalPartyOnboarding.party} was created",
+          proposal => {
+            provider
+              .listExternalPartySetupProposals()
+              .map(_.contract.contractId.contractId) should contain(proposal.contractId)
+          },
+        )
+        proposal
+    }
   }
 
   protected def acceptExternalPartySetupProposal(
