@@ -6,17 +6,14 @@ import {
   Button,
   Card,
   CardContent,
-  FormControl,
-  FormHelperText,
   InputAdornment,
-  OutlinedInput,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 import dayjs from 'dayjs';
 import { useWalletConfig } from '../utils/config';
 import { useDevelopmentFundAllocationForm } from '../hooks/useDevelopmentFundAllocationForm';
@@ -38,6 +35,7 @@ const DevelopmentFundAllocation: React.FC = () => {
     amountNum,
     isAmountValid,
     amountExceedsAvailable,
+    expiryError,
     isValid,
     allocateMutation,
     isFundManager,
@@ -74,48 +72,50 @@ const DevelopmentFundAllocation: React.FC = () => {
             <Stack direction="row" spacing={3}>
               <Stack spacing={1} sx={{ flex: 1 }}>
                 <Typography variant="h6">Amount</Typography>
-                <FormControl
+                <TextField
+                  id="development-fund-allocation-amount"
+                  type="text"
                   fullWidth
+                  value={amount}
+                  onChange={event => setAmount(event.target.value)}
                   disabled={disabled}
                   error={amount !== '' && (!isAmountValid || amountExceedsAvailable)}
-                >
-                  <OutlinedInput
-                    id="development-fund-allocation-amount"
-                    type="number"
-                    value={amount}
-                    onChange={event => setAmount(event.target.value)}
-                    endAdornment={
-                      <InputAdornment position="end">
-                        {config.spliceInstanceNames.amuletNameAcronym}
-                      </InputAdornment>
-                    }
-                    error={amount !== '' && (!isAmountValid || amountExceedsAvailable)}
-                    inputProps={{
+                  helperText={
+                    amountExceedsAvailable
+                      ? `Available: ${unclaimedTotal.toFixed(4)} ${config.spliceInstanceNames.amuletNameAcronym}`
+                      : undefined
+                  }
+                  slotProps={{
+                    htmlInput: {
                       'aria-label': 'amount',
-                    }}
-                    disabled={disabled}
-                  />
-                  {amountExceedsAvailable && (
-                    <FormHelperText>
-                      Available: {unclaimedTotal.toFixed(4)}{' '}
-                      {config.spliceInstanceNames.amuletNameAcronym}
-                    </FormHelperText>
-                  )}
-                </FormControl>
+                      inputMode: 'decimal',
+                    },
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          {config.spliceInstanceNames.amuletNameAcronym}
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
               </Stack>
 
               <Stack spacing={1} sx={{ flex: 1 }}>
                 <Typography variant="h6">Expires At</Typography>
-                <DateTimePicker
+                <DesktopDateTimePicker
                   label="Expires At"
                   value={expiresAt}
                   onChange={newValue => setExpiresAt(newValue)}
                   minDateTime={dayjs()}
                   disabled={disabled}
+                  enableAccessibleFieldDOMStructure={false}
                   slotProps={{
                     textField: {
                       id: 'development-fund-allocation-expires-at',
                       fullWidth: true,
+                      error: !!expiryError,
+                      helperText: expiryError,
                     },
                   }}
                 />

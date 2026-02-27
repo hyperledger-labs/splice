@@ -81,6 +81,10 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
     browseToWallet(3001, ledgerApiUser)
   }
 
+  protected def browseToCharlieWallet(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3000, ledgerApiUser)
+  }
+
   protected def browseToSv1Wallet(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     browseToWallet(3011, ledgerApiUser)
   }

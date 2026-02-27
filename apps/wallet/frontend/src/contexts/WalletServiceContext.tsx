@@ -489,7 +489,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             fundManager: contract.payload.fundManager,
             beneficiary: contract.payload.beneficiary,
             amount: new BigNumber(contract.payload.amount),
-            expiresAt: new Date(Number(contract.payload.expiresAt) / 1000),
+            expiresAt: new Date(contract.payload.expiresAt),
             reason: contract.payload.reason,
           };
         });
@@ -502,7 +502,6 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           pageSize,
           cursor
         );
-        console.log('responseresponse', response)
         const events: CouponHistoryEvent[] =
           response.development_fund_coupon_history.map(
             (item: ArchivedDevelopmentFundCoupon, index: number) => ({

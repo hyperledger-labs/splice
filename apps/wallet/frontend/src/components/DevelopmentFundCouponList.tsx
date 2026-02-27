@@ -48,7 +48,6 @@ const ActiveCouponsTable: React.FC = () => {
     invalidateAll,
   } = useDevelopmentFund();
 
-  console.log('coupons', coupons);
   const [selectedCoupon, setSelectedCoupon] = useState<string | null>(null);
   const [withdrawalReason, setWithdrawalReason] = useState('');
 
@@ -146,7 +145,11 @@ const ActiveCouponsTable: React.FC = () => {
       </Card>
 
       {/* Withdraw Dialog */}
-      <Dialog open={!!selectedCoupon} onClose={() => setSelectedCoupon(null)}>
+      <Dialog
+        open={!!selectedCoupon}
+        onClose={() => setSelectedCoupon(null)}
+        slotProps={{ paper: { id: 'withdraw-development-fund-dialog' } }}
+      >
         <DialogTitle>Withdraw Development Fund Coupon</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
@@ -216,7 +219,6 @@ const CouponHistoryTable: React.FC = () => {
     );
   }
 
-  console.log('historyEvents', historyEvents);
   return (
     <Card variant="outlined">
       <CardContent>
