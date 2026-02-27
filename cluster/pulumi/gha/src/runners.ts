@@ -55,7 +55,7 @@ const runnerSpecs = [
     resources: {
       requests: {
         cpu: '4',
-        memory: '10Gi',
+        memory: '8Gi',
       },
       limits: {
         cpu: '6',
@@ -69,12 +69,12 @@ const runnerSpecs = [
     docker: false,
     resources: {
       requests: {
-        cpu: '4',
-        memory: '18Gi',
+        cpu: '6',
+        memory: '16Gi',
       },
       limits: {
-        cpu: '6',
-        memory: '18Gi',
+        cpu: '8',
+        memory: '20Gi',
       },
     },
   },
@@ -84,12 +84,12 @@ const runnerSpecs = [
     docker: true,
     resources: {
       requests: {
-        cpu: '5',
+        cpu: '8',
         memory: '24Gi',
       },
       limits: {
-        cpu: '7',
-        memory: '24Gi',
+        cpu: '10',
+        memory: '30Gi',
       },
     },
   },
@@ -99,12 +99,12 @@ const runnerSpecs = [
     docker: true,
     resources: {
       requests: {
-        cpu: '6',
-        memory: '32Gi',
+        cpu: '10',
+        memory: '36Gi',
       },
       limits: {
-        cpu: '8',
-        memory: '32Gi',
+        cpu: '12',
+        memory: '42Gi',
       },
     },
   },
@@ -114,11 +114,11 @@ const runnerSpecs = [
     docker: false,
     resources: {
       requests: {
-        cpu: '8',
-        memory: '52Gi',
+        cpu: '12',
+        memory: '42Gi',
       },
       limits: {
-        cpu: '10',
+        cpu: '14',
         memory: '52Gi',
       },
     },
