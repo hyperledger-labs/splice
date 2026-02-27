@@ -5,6 +5,7 @@ import {
   Auth0Config,
   ChartValues,
   CnChartVersion,
+  DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
   getLedgerApiAudience,
@@ -24,9 +25,12 @@ export function installParticipant(
   args: ParticipantArgs,
   customOptions?: SpliceCustomResourceOptions
 ): ParticipantOutput {
-  const { existingDb } = args;
+  const { existingDb, migration } = args;
   const db = existingDb ?? installParticipantPostgres(args);
-  const chart = installParticipantChart(args, db, customOptions);
+  const chart =
+    migration === undefined || migration.isStillRunning
+      ? installParticipantChart(args, db, customOptions)
+      : undefined;
   return { db, chart };
 }
 
@@ -40,11 +44,15 @@ export type ParticipantArgs = {
   disableProtection?: boolean;
   participantAdminUserNameFrom?: k8s.types.input.core.v1.EnvVarSource;
   imagePullServiceAccountName?: string;
+  migration?: {
+    id: DomainMigrationIndex;
+    isStillRunning: boolean;
+  };
 };
 
 export type ParticipantOutput = {
   db: Postgres;
-  chart: InstalledHelmChart;
+  chart?: InstalledHelmChart;
 };
 
 function installParticipantPostgres({
@@ -52,15 +60,16 @@ function installParticipantPostgres({
   participant,
   version,
   disableProtection,
+  migration,
 }: ParticipantArgs): Postgres {
   return installPostgres(
     xns,
-    'participant-pg',
+    `participant${migrationSuffix(migration?.id)}-pg`,
     'participant-pg',
     version,
     participant?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
     true,
-    { disableProtection }
+    { isActive: migration?.isStillRunning, migrationId: migration?.id, disableProtection }
   );
 }
 
@@ -73,6 +82,7 @@ function installParticipantChart(
     auth0,
     participantAdminUserNameFrom,
     imagePullServiceAccountName,
+    migration,
   }: ParticipantArgs,
   db: Postgres,
   customOptions?: SpliceCustomResourceOptions
@@ -80,7 +90,7 @@ function installParticipantChart(
   const defaultValues: ChartValues = loadDefaultParticipantValues(auth0);
 
   const { kmsValues, kmsDependencies } = participant?.kms
-    ? getParticipantKmsHelmResources(xns, participant.kms)
+    ? getParticipantKmsHelmResources(xns, participant.kms, migration?.id)
     : { kmsValues: {}, kmsDependencies: [] };
 
   const values: ChartValues = {
@@ -91,7 +101,7 @@ function installParticipantChart(
       host: db.address,
       secretName: db.secretName,
       // the following will not be needed when the MIGRATION_ID gets removed from defaults
-      databaseName: 'participant',
+      databaseName: `participant${migrationSuffix(migration?.id, '_')}`,
     },
     auth: {
       ...defaultValues.auth,
@@ -109,6 +119,11 @@ function installParticipantChart(
     participantAdminUserNameFrom,
     metrics: {
       enable: true,
+      ...(migration?.id !== undefined
+        ? {
+            migration: { id: migration.id },
+          }
+        : {}),
     },
     additionalJvmOptions: getAdditionalJvmOptions(participant?.additionalJvmOptions),
     enablePostgresMetrics: true,
@@ -122,17 +137,32 @@ function installParticipantChart(
       : undefined,
   };
 
-  return installSpliceHelmChart(xns, `participant`, 'splice-participant', values, version, {
-    ...(customOptions ?? {}),
-    dependsOn: [...(customOptions?.dependsOn ?? []), db, ...kmsDependencies],
-  });
+  return installSpliceHelmChart(
+    xns,
+    `participant${migrationSuffix(migration?.id)}`,
+    'splice-participant',
+    values,
+    version,
+    {
+      ...(customOptions ?? {}),
+      dependsOn: [...(customOptions?.dependsOn ?? []), db, ...kmsDependencies],
+    }
+  );
 }
 
-function loadDefaultParticipantValues(auth0: Auth0Config): ChartValues {
+function loadDefaultParticipantValues(
+  auth0: Auth0Config,
+  migrationId?: DomainMigrationIndex
+): ChartValues {
   return loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
     {
+      MIGRATION_ID: `${migrationId}`,
       OIDC_AUTHORITY_URL: auth0.auth0Domain,
     }
   );
+}
+
+function migrationSuffix(migrationId?: DomainMigrationIndex, separator: string = '-'): string {
+  return migrationId !== undefined ? `${separator}${migrationId}` : '';
 }
