@@ -1,11 +1,13 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import com.daml.ledger.javaapi.data.Identifier
+import cats.data.NonEmptyList
+import com.daml.ledger.javaapi.data.{Identifier, OffsetCheckpoint, SynchronizerTime}
 import com.daml.ledger.javaapi.data.codegen.DamlRecord
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
 import org.lfdecentralizedtrust.splice.store.StoreTestBase.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
@@ -25,6 +27,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import slick.jdbc.JdbcProfile
+
 
 class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
   private def mkStore(
@@ -157,6 +160,73 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
       } yield succeed
     }
 
+    "waitUntilRecordTimeReached completes when record time is reached via offset checkpoint" in {
+      implicit val store = mkStore()
+      val d1CheckpointTime = CantonTimestamp.ofEpochSecond(200)
+      val d2CheckpointTime = CantonTimestamp.ofEpochSecond(150)
+      for {
+        _ <- initWithAcs()(store)
+        _ = store.lastIngestedRecordTimes shouldBe empty
+        // Ingest an offset checkpoint carrying synchronizer times for both domains
+        _ <- store.testIngestionSink.ingestUpdateBatch(
+          NonEmptyList.of(
+            TreeUpdateOrOffsetCheckpoint.Checkpoint(
+              new OffsetCheckpoint(
+                nextOffset(),
+                java.util.List.of(
+                  new SynchronizerTime(d1.toProtoPrimitive, d1CheckpointTime.toInstant),
+                  new SynchronizerTime(d2.toProtoPrimitive, d2CheckpointTime.toInstant),
+                ),
+              )
+            )
+          )
+        )
+        // Both domains should have their record times updated independently
+        _ = store.lastIngestedRecordTimes.get(d1) shouldBe Some(d1CheckpointTime)
+        _ = store.lastIngestedRecordTimes.get(d2) shouldBe Some(d2CheckpointTime)
+        _ <- store.waitUntilRecordTimeReached(d1, d1CheckpointTime)
+        _ <- store.waitUntilRecordTimeReached(d2, d2CheckpointTime)
+        // d2 is at 150, so waiting for 200 on d2 should not complete
+        waitD2Future = store.waitUntilRecordTimeReached(d2, CantonTimestamp.ofEpochSecond(200))
+        _ = waitD2Future.isCompleted shouldBe false
+        // Advance d2 via another checkpoint
+        _ <- store.testIngestionSink.ingestUpdateBatch(
+          NonEmptyList.of(
+            TreeUpdateOrOffsetCheckpoint.Checkpoint(
+              new OffsetCheckpoint(
+                nextOffset(),
+                java.util.List.of(
+                  new SynchronizerTime(
+                    d2.toProtoPrimitive,
+                    CantonTimestamp.ofEpochSecond(200).toInstant,
+                  )
+                ),
+              )
+            )
+          )
+        )
+        _ <- waitD2Future
+      } yield succeed
+    }
+
+    "waitUntilRecordTimeReached complete when record time is reached via transaction ingestion" in {
+      implicit val store = mkStore()
+      for {
+        _ <- initWithAcs()(store)
+        // Ingest a transaction on d1 at t=100
+        _ <- d1.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
+        // Waiting for t=200 on d1 should not complete immediately
+        waitD1Future = store.waitUntilRecordTimeReached(d1, CantonTimestamp.ofEpochSecond(200))
+        _ = waitD1Future.isCompleted shouldBe false
+        // Advancing d2 to t=200 should not unblock d1's wait
+        _ <- d2.create(c(2), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
+        _ = waitD1Future.isCompleted shouldBe false
+        // Advancing d1 to t=200 unblocks d1's wait
+        _ <- d1.create(c(3), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
+        _ <- waitD1Future
+      } yield succeed
+    }
+
     "temporal store query methods throw when archive config is None" in {
       implicit val store = mkStore(acsArchiveConfigOpt = None)
       for {
@@ -188,6 +258,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
   protected val d1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
+  protected val d2: SynchronizerId = SynchronizerId.tryFromString("domain2::domain")
 
   case class GenericAcsRowData(contract: Contract[?, ?]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Timestamp] = None
