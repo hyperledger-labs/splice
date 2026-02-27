@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.util.ContractWithState
 
 import scala.concurrent.Future
 
-trait TemporalAcsStore {
+trait TcsStore {
 
   def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](
       companion: C

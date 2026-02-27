@@ -8,9 +8,9 @@ import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import org.lfdecentralizedtrust.splice.util.Contract
 
-object ScanTemporalAcsTables extends AcsTables {
+object ScanTcsTables extends AcsTables {
 
-  case class ScanTemporalAcsStoreRowData(
+  case class ScanTcsStoreRowData(
       contract: Contract[?, ?],
       contractExpiresAt: Option[Timestamp] = None,
       round: Option[Long] = None,
@@ -22,9 +22,9 @@ object ScanTemporalAcsTables extends AcsTables {
     )
   }
 
-  object ScanTemporalAcsStoreRowData {
-    implicit val hasIndexColumns: AcsRowData.HasIndexColumns[ScanTemporalAcsStoreRowData] =
-      new AcsRowData.HasIndexColumns[ScanTemporalAcsStoreRowData] {
+  object ScanTcsStoreRowData {
+    implicit val hasIndexColumns: AcsRowData.HasIndexColumns[ScanTcsStoreRowData] =
+      new AcsRowData.HasIndexColumns[ScanTcsStoreRowData] {
         override val indexColumnNames: Seq[String] = Seq(
           "round",
           "featured_app_right_provider",

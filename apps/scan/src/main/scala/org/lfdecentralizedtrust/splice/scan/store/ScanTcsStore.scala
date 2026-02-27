@@ -6,27 +6,27 @@ package org.lfdecentralizedtrust.splice.scan.store
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.scan.store.db.ScanTemporalAcsTables.ScanTemporalAcsStoreRowData
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanTcsTables.ScanTcsStoreRowData
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
-trait ScanTemporalAcsStore extends AppStore {
+trait ScanTcsStore extends AppStore {
 
   def key: ScanStore.Key
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
-    ScanTemporalAcsStoreRowData,
+    ScanTcsStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
   ] =
-    ScanTemporalAcsStore.contractFilter(key)
+    ScanTcsStore.contractFilter(key)
 }
 
-object ScanTemporalAcsStore {
+object ScanTcsStore {
 
   def contractFilter(
       key: ScanStore.Key
   ): MultiDomainAcsStore.ContractFilter[
-    ScanTemporalAcsStoreRowData,
+    ScanTcsStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
   ] = {
     import MultiDomainAcsStore.mkFilter
@@ -36,10 +36,10 @@ object ScanTemporalAcsStore {
       key.dsoParty,
       Map(
         mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
-          ScanTemporalAcsStoreRowData(_)
+          ScanTcsStoreRowData(_)
         ),
         mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
-          ScanTemporalAcsStoreRowData(
+          ScanTcsStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
             round = Some(contract.payload.round.number),
@@ -47,7 +47,7 @@ object ScanTemporalAcsStore {
         },
         mkFilter(splice.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) {
           contract =>
-            ScanTemporalAcsStoreRowData(
+            ScanTcsStoreRowData(
               contract = contract,
               featuredAppRightProvider =
                 Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
