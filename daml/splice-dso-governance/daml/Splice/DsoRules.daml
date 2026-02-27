@@ -1129,7 +1129,7 @@ template DsoRules with
       do
         _ <- getAndValidateSvParty this (Some sv)
         
-        amuletRules <- fetch amuletRulesCid
+        amuletRules <- fetchChecked (ForDso dso) amuletRulesCid
         
         assertMsg "The AmuletRules dso must match the DsoRules dso" 
           (amuletRules.dso == dso)
