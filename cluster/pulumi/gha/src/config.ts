@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { SingleResourceSchema } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import util from 'node:util';
 import { z } from 'zod';
@@ -13,6 +14,19 @@ const GhaConfigSchema = z.object({
     // this is a https://github.com/actions/actions-runner-controller version
     runnerScaleSetVersion: z.string(),
     workPvcSize: z.string().default('20Gi'),
+    runnerSpecs: z
+      .array(
+        z.object({
+          name: z.enum(['tiny', 'x-small', 'small', 'medium', 'large', 'x-large']),
+          k8s: z.boolean(),
+          docker: z.boolean(),
+          resources: z.object({
+            limits: SingleResourceSchema,
+            requests: SingleResourceSchema,
+          }),
+        })
+      )
+      .default([]),
   }),
 });
 

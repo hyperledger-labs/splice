@@ -32,99 +32,6 @@ type ResourcesSpec = {
   };
 };
 
-const runnerSpecs = [
-  {
-    name: 'tiny',
-    k8s: false,
-    docker: true,
-    resources: {
-      requests: {
-        cpu: '0.5',
-        memory: '512Mi',
-      },
-      limits: {
-        cpu: '0.5',
-        memory: '512Mi',
-      },
-    },
-  },
-  {
-    name: 'x-small',
-    k8s: true,
-    docker: false,
-    resources: {
-      requests: {
-        cpu: '4',
-        memory: '8Gi',
-      },
-      limits: {
-        cpu: '6',
-        memory: '10Gi',
-      },
-    },
-  },
-  {
-    name: 'small',
-    k8s: true,
-    docker: false,
-    resources: {
-      requests: {
-        cpu: '6',
-        memory: '16Gi',
-      },
-      limits: {
-        cpu: '8',
-        memory: '20Gi',
-      },
-    },
-  },
-  {
-    name: 'medium',
-    k8s: true,
-    docker: true,
-    resources: {
-      requests: {
-        cpu: '8',
-        memory: '24Gi',
-      },
-      limits: {
-        cpu: '10',
-        memory: '30Gi',
-      },
-    },
-  },
-  {
-    name: 'large',
-    k8s: true,
-    docker: true,
-    resources: {
-      requests: {
-        cpu: '10',
-        memory: '36Gi',
-      },
-      limits: {
-        cpu: '12',
-        memory: '42Gi',
-      },
-    },
-  },
-  {
-    name: 'x-large',
-    k8s: true,
-    docker: false,
-    resources: {
-      requests: {
-        cpu: '12',
-        memory: '42Gi',
-      },
-      limits: {
-        cpu: '14',
-        memory: '52Gi',
-      },
-    },
-  },
-];
-
 const localnetHostAliases = [
   {
     ip: '127.0.0.1',
@@ -375,7 +282,7 @@ function installDockerRunnerScaleSets(
 
   const dependsOn = [tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret];
 
-  runnerSpecs
+  ghaConfig.runnerSpecs
     .filter(spec => spec.docker)
     .forEach(spec => {
       installDockerRunnerScaleSet(
@@ -726,7 +633,7 @@ function installK8sRunnerScaleSets(
 ): void {
   const dependsOn = [controller, runnersNamespace, tokenSecret, performanceTestsDb.db];
 
-  runnerSpecs
+  ghaConfig.runnerSpecs
     .filter(spec => spec.k8s)
     .forEach(spec => {
       installK8sRunnerScaleSet(
