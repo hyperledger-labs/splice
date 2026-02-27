@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode, SynchronizerNodeService}
 import org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
@@ -91,7 +91,10 @@ class SvDsoAutomationService(
       ledgerClient,
       retryProvider,
       config.parameters,
-    ) {
+) {
+
+  private val synchronizerNodeService =
+    localSynchronizerNodes.map(new SynchronizerNodeService(_, participantAdminConnection, config.domains.global.alias, loggerFactory))
 
   override def companion
       : org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.type =
@@ -312,36 +315,25 @@ class SvDsoAutomationService(
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
-    localSynchronizerNodes
-      .map(_.current)
-      .foreach(current =>
+    synchronizerNodeService
+      .foreach { service =>
         registerTrigger(
           new ReconcileSequencerLimitWithMemberTrafficTrigger(
             triggerContext,
             dsoStore,
-            current.sequencerAdminConnection,
+            service,
             config.trafficBalanceReconciliationDelay,
           )
         )
-      )
-    localSynchronizerNodes.flatMap(_.successor).foreach { successor =>
-      registerTrigger(
-        new ReconcileSequencerLimitWithMemberTrafficTrigger(
-          triggerContext,
-          dsoStore,
-          successor.sequencerAdminConnection,
-          config.trafficBalanceReconciliationDelay,
+        registerTrigger(
+          new SvOnboardingUnlimitedTrafficTrigger(
+            onboardingTriggerContext,
+            dsoStore,
+            service,
+            config.trafficBalanceReconciliationDelay,
+          )
         )
-      )
-    }
-    registerTrigger(
-      new SvOnboardingUnlimitedTrafficTrigger(
-        onboardingTriggerContext,
-        dsoStore,
-        localSynchronizerNodes.map(_.current).map(_.sequencerAdminConnection),
-        config.trafficBalanceReconciliationDelay,
-      )
-    )
+      }
   }
 
   def registerPostUnlimitedTrafficTriggers(): Unit = {

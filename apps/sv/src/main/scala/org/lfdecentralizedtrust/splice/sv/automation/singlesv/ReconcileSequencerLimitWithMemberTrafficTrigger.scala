@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNodeService
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
@@ -32,7 +33,7 @@ import scala.jdk.CollectionConverters.*
 class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    sequencerAdminConnection: SequencerAdminConnection,
+    synchronizerNodeService: SynchronizerNodeService,
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     ec: ExecutionContext,
@@ -61,6 +62,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         },
         memberId => {
           val synchronizerId = SynchronizerId.tryFromString(memberTraffic.payload.synchronizerId)
+          synchronizerNodeService.sequencerAdminConnection().flatMap { sequencerAdminConnection =>
           sequencerAdminConnection.getStatus
             .map(_.successOption.map(_.synchronizerId))
             .flatMap {
@@ -110,6 +112,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                     }
                   })
             }
+          }
         },
       )
   }

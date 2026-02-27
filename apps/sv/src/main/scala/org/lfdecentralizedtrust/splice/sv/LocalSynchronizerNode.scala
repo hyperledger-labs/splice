@@ -7,6 +7,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SubmissionRequestAmplification}
 import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
@@ -61,6 +62,7 @@ final class LocalSynchronizerNode(
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
     mediatorPruningConfig: Option[PruningConfig],
+    val serial: NonNegativeInt,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
