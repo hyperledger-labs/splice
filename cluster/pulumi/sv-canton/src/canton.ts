@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   auth0UserNameEnvVarSource,
@@ -104,25 +105,27 @@ export function installCantonComponents(
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     );
-  const { chart: participant } = installParticipant(
-    {
-      xns,
-      participant: svConfig.participant,
-      logging: svConfig.logging,
-      version,
-      auth0: auth0Config,
-      existingDb: dbs?.participant,
-      disableProtection,
-      participantAdminUserNameFrom: ledgerApiUserSecretSource,
-      imagePullServiceAccountName,
-      migration: {
-        id: migrationId,
-        isStillRunning: migrationStillRunning,
-      },
-    },
-    withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
-  );
-  if (migrationStillRunning && participant !== undefined) {
+  const { chart: participant } = !migrationInfo.enableLogicalSynchronizerDeploymentMode
+    ? installParticipant(
+        {
+          xns,
+          participant: svConfig.participant,
+          logging: svConfig.logging,
+          version,
+          auth0: auth0Config,
+          existingDb: dbs?.participant,
+          disableProtection,
+          participantAdminUserNameFrom: ledgerApiUserSecretSource,
+          imagePullServiceAccountName,
+          migration: {
+            id: migrationId,
+            isStillRunning: migrationStillRunning,
+          },
+        },
+        withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
+      )
+    : { chart: undefined };
+  if (migrationStillRunning) {
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(
           svConfig,
@@ -158,10 +161,16 @@ export function installCantonComponents(
         );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,
-      participant: {
-        asDependencies: [participant],
-        internalClusterAddress: participant.name,
-      },
+      participant:
+        participant !== undefined
+          ? {
+              asDependencies: [participant],
+              internalClusterAddress: participant.name,
+            }
+          : {
+              asDependencies: [],
+              internalClusterAddress: pulumi.output('participant'),
+            },
     };
   } else {
     return undefined;
