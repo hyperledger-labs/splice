@@ -17,7 +17,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import slick.jdbc.canton.SQLActionBuilder
 import slick.sql.SqlStreamingAction
 
-trait TemporalAcsQueries extends AcsQueries {
+trait TcsQueries extends AcsQueries {
 
   /** Builds a UNION ALL query across live and archive tables for point-in-time queries.
     * Live table: contracts created at or before asOf (still active).
