@@ -167,6 +167,10 @@ computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons
       rewardsToIssue
       issuancePerCoupon = capPerCoupon  -- signal what could be earned with one coupon in this round
       unclaimedRewards = rewardsToIssue
+  | capPerCoupon <= 0.0 = IssuanceTranche with
+      rewardsToIssue
+      issuancePerCoupon = 0.0
+      unclaimedRewards = rewardsToIssue
   | otherwise =
       let
         scaledTotalCoupons = capPerCoupon * totalCoupons

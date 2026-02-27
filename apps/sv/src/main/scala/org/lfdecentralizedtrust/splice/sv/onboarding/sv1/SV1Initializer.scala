@@ -723,6 +723,7 @@ class SV1Initializer(
                     developmentFundPercentage =
                       if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
                     developmentFundManager = sv1Config.developmentFundManager,
+                    validatorFaucetCap = sv1Config.validatorFaucetCap.orElse(Some(BigDecimal(2.85))),
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,
