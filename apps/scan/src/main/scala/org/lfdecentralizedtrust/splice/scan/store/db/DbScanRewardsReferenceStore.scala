@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.{ScanStore, ScanTcsStore}
+import org.lfdecentralizedtrust.splice.scan.store.{ScanStore, ScanRewardsReferenceStore}
 import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.{DbAppStore, DbMultiDomainAcsStore, StoreDescriptor}
@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDeco
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DbScanTcsStore(
+class DbScanRewardsReferenceStore(
     override val key: ScanStore.Key,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -40,11 +40,11 @@ class DbScanTcsStore(
     closeContext: CloseContext,
 ) extends DbAppStore(
       storage = storage,
-      acsTableName = ScanTcsTables.acsTableName,
+      acsTableName = ScanRewardsReferenceTables.acsTableName,
       interfaceViewsTableNameOpt = None,
       acsStoreDescriptor = StoreDescriptor(
         version = 1,
-        name = "DbScanTcsStore",
+        name = "DbScanRewardsReferenceStore",
         party = key.dsoParty,
         participant = participantId,
         key = Map(
@@ -55,12 +55,12 @@ class DbScanTcsStore(
       ingestionConfig = ingestionConfig,
       acsArchiveConfigOpt = Some(
         DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
-          ScanTcsTables.archiveTableName,
-          ScanTcsTables.ScanTcsStoreRowData.hasIndexColumns.indexColumnNames,
+          ScanRewardsReferenceTables.archiveTableName,
+          ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData.hasIndexColumns.indexColumnNames,
         )
       ),
     )
-    with ScanTcsStore
+    with ScanRewardsReferenceStore
     with TcsStore {
 
   override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](

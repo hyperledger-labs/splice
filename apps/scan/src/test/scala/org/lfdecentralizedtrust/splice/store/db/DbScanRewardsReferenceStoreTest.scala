@@ -14,14 +14,14 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanTcsStore
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import slick.jdbc.JdbcProfile
 
-class DbScanTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
+class DbScanRewardsReferenceStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
 
-  "DbScanTcsStore" should {
+  "DbScanRewardsReferenceStore" should {
 
     "lookupFeaturedAppRightsAsOf returns all active FeaturedAppRights at given time" in {
       val store = mkStore()
@@ -102,8 +102,8 @@ class DbScanTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJ
 
   protected val d1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
 
-  private def mkStore(): DbScanTcsStore = {
-    val participantId = mkParticipantId("DbScanTcsStoreTest")
+  private def mkStore(): DbScanRewardsReferenceStore = {
+    val participantId = mkParticipantId("DbScanRewardsReferenceStoreTest")
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.amulet.all
@@ -111,7 +111,7 @@ class DbScanTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJ
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    new DbScanTcsStore(
+    new DbScanRewardsReferenceStore(
       key = ScanStore.Key(dsoParty),
       storage,
       loggerFactory,

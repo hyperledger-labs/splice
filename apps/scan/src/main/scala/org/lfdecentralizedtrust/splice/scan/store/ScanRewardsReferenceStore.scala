@@ -6,27 +6,27 @@ package org.lfdecentralizedtrust.splice.scan.store
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.scan.store.db.ScanTcsTables.ScanTcsStoreRowData
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
-trait ScanTcsStore extends AppStore {
+trait ScanRewardsReferenceStore extends AppStore {
 
   def key: ScanStore.Key
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
-    ScanTcsStoreRowData,
+    ScanRewardsReferenceStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
   ] =
-    ScanTcsStore.contractFilter(key)
+    ScanRewardsReferenceStore.contractFilter(key)
 }
 
-object ScanTcsStore {
+object ScanRewardsReferenceStore {
 
   def contractFilter(
       key: ScanStore.Key
   ): MultiDomainAcsStore.ContractFilter[
-    ScanTcsStoreRowData,
+    ScanRewardsReferenceStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
   ] = {
     import MultiDomainAcsStore.mkFilter
@@ -36,10 +36,10 @@ object ScanTcsStore {
       key.dsoParty,
       Map(
         mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
-          ScanTcsStoreRowData(_)
+          ScanRewardsReferenceStoreRowData(_)
         ),
         mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
-          ScanTcsStoreRowData(
+          ScanRewardsReferenceStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
             round = Some(contract.payload.round.number),
@@ -47,7 +47,7 @@ object ScanTcsStore {
         },
         mkFilter(splice.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) {
           contract =>
-            ScanTcsStoreRowData(
+            ScanRewardsReferenceStoreRowData(
               contract = contract,
               featuredAppRightProvider =
                 Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
