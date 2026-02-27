@@ -451,7 +451,9 @@ class SvFrontendIntegrationTest
         "sv2 can see the vote form",
         _ =>
           eventuallySucceeds() {
-            find(testId("your-vote-reason-input")) should not be empty withClue "'Action Required' Box"
+            find(
+              testId("your-vote-reason-input")
+            ) should not be empty withClue "'Action Required' Box"
           },
       )
 
