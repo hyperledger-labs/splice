@@ -402,6 +402,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       updateId = "update-xyz",
       submittingParties = Seq(partyA, partyB),
       transactionRootViews = Seq(0, 2),
+      trafficSummaryO = None,
     )
 
     val view0 = DbScanVerdictStore.TransactionViewT(

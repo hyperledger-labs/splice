@@ -141,6 +141,21 @@ trait AcsJdbcTypes {
       }
   }
 
+  protected implicit lazy val longArrayGetResult: GetResult[Array[Long]] =
+    (r: PositionedResult) => {
+      val sqlArray = r.rs.getArray(r.skip.currentPos)
+      if (sqlArray == null) Array.emptyLongArray
+      else
+        sqlArray.getArray match {
+          case arr: Array[java.lang.Long] => arr.map(_.longValue())
+          case arr: Array[Long] => arr
+          case x =>
+            throw new IllegalStateException(
+              s"Expected an array of longs, but got $x. Are you sure you selected a bigint array column?"
+            )
+        }
+    }
+
   protected implicit lazy val stringArrayOptGetResult: GetResult[Option[Array[String]]] =
     (r: PositionedResult) => {
       Option(r.rs.getArray(r.skip.currentPos)).map {
@@ -168,12 +183,18 @@ trait AcsJdbcTypes {
   protected implicit lazy val longArraySetParameter: SetParameter[Array[Long]] = (v, pp) =>
     pp.setObject(v, java.sql.Types.ARRAY)
 
-  private val stringArraySetParameter: SetParameter[Array[String]] =
+  protected implicit lazy val longSeqSetParameter: SetParameter[Seq[Long]] =
+    (longs: Seq[Long], pp: PositionedParameters) => longArraySetParameter(longs.toArray, pp)
+
+  protected implicit lazy val stringArraySetParameter: SetParameter[Array[String]] =
     (strings: Array[String], pp: PositionedParameters) =>
       pp.setObject(
         pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
         JDBCType.ARRAY.getVendorTypeNumber,
       )
+
+  protected implicit lazy val stringSeqSetParameter: SetParameter[Seq[String]] =
+    (strings: Seq[String], pp: PositionedParameters) => stringArraySetParameter(strings.toArray, pp)
 
   protected implicit lazy val string3ArraySetParameter: SetParameter[Array[String3]] =
     (strings: Array[String3], pp: PositionedParameters) =>
