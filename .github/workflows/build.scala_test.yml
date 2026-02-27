@@ -125,6 +125,8 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_INITDB_ARGS: ${{ inputs.postgres_init_args }}
+        ports:
+          - 5432:5432
 
     steps:
 
