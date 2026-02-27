@@ -25,6 +25,7 @@ export interface UseDevelopmentFundAllocationFormResult {
   isAmountValid: boolean;
   amountExceedsAvailable: boolean;
   isExpiryValid: boolean;
+  expiryError: string | undefined;
   isReasonValid: boolean;
   isValid: boolean;
   resetForm: () => void;
@@ -57,7 +58,16 @@ export const useDevelopmentFundAllocationForm = (): UseDevelopmentFundAllocation
   const isAmountValid =
     amountNum !== null && amountNum.isFinite() && amountNum.gt(0);
   const amountExceedsAvailable = isAmountValid && amountNum.gt(unclaimedTotal);
-  const isExpiryValid = expiresAt?.isAfter(dayjs()) ?? false;
+  const isExpiryValid =
+    expiresAt != null && expiresAt.isValid() && expiresAt.isAfter(dayjs());
+  const expiryError =
+    expiresAt != null
+      ? !expiresAt.isValid()
+        ? 'Invalid date'
+        : !expiresAt.isAfter(dayjs())
+          ? 'Expiry must be in the future'
+          : undefined
+      : undefined;
   const isReasonValid = reason.trim().length > 0;
   const isValid =
     Boolean(beneficiary) &&
@@ -109,6 +119,7 @@ export const useDevelopmentFundAllocationForm = (): UseDevelopmentFundAllocation
     isAmountValid,
     amountExceedsAvailable,
     isExpiryValid,
+    expiryError,
     isReasonValid,
     isValid,
     resetForm,
