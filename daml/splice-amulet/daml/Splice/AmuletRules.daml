@@ -790,6 +790,13 @@ template AmuletRules
       controller dso
       do
         individualResults <- forA inputs $ \input -> do
+          instr <- fetch input.transferInstructionCid
+          let instrView = view instr
+          
+          assertMsg "The DSO must be the admin of the transfer instruction's instrument" 
+            (instrView.transfer.instrumentId.admin == dso)
+          
+
           exercise input.transferInstructionCid TransferInstruction_Update with
             extraActors = []
             extraArgs = ExtraArgs with
