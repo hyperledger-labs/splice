@@ -33,6 +33,8 @@ Our recommended approach for switching to use KMS is to:
 2. Transfer all relevant assets from the existing non-KMS validator to the new KMS-enabled validator.
 3. Retire the non-KMS validator.
 
+.. _validator-kms-config:
+
 Configuring a fresh validator to use an external KMS
 ----------------------------------------------------
 
