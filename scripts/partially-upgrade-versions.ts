@@ -26,9 +26,9 @@ function main(
   ]
 
   for (const sv of svs) {
-      chartVersions[sv] ??= {}
-      for (const chart of svCharts)
-        chartVersions[sv][chart] = newVersion
+    chartVersions[sv] ??= {}
+    for (const chart of svCharts)
+      chartVersions[sv][chart] = newVersion
   }
 
   const validatorCharts = [
@@ -38,9 +38,9 @@ function main(
   ]
 
   for (const validator of ['validator1']) {
-      chartVersions[validator] ??= {}
-      for (const chart of validatorCharts)
-        chartVersions[validator][chart] = newVersion
+    chartVersions[validator] ??= {}
+    for (const chart of validatorCharts)
+      chartVersions[validator][chart] = newVersion
   }
 
   process.stdout.write(JSON.stringify(chartVersions, undefined, 2))
