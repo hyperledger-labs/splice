@@ -159,22 +159,27 @@ final class DbMultiDomainAcsStore[TXE](
   def lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp] =
     state.get().lastIngestedRecordTimes
 
-  def waitUntilRecordTimeReached(synchronizerId: SynchronizerId, asOf: CantonTimestamp)(implicit
-      tc: TraceContext
+  def waitUntilRecordTimeReached(
+      synchronizerId: SynchronizerId,
+      asOf: CantonTimestamp,
   ): Future[Unit] = {
-    val s = state.get()
-    if (s.lastIngestedRecordTimes.get(synchronizerId).exists(_ >= asOf)) Future.unit
-    else
-      retryProvider
-        .waitUnlessShutdown(s.offsetChanged.future)
-        .failOnShutdownTo {
-          io.grpc.Status.UNAVAILABLE
-            .withDescription(
-              s"Aborted waitUntilRecordTimeReached($asOf), as RetryProvider(${retryProvider.loggerFactory.properties}) is shutting down in store $acsStoreDescriptor"
-            )
-            .asRuntimeException()
-        }
-        .flatMap(_ => waitUntilRecordTimeReached(synchronizerId, asOf))
+    state
+      .updateAndGet(_.withRecordTimeWaiter(synchronizerId, asOf))
+      .recordTimeWaiters
+      .get(synchronizerId)
+      .flatMap(_.get(asOf)) match {
+      case None => Future.unit
+      case Some(promise) =>
+        retryProvider
+          .waitUnlessShutdown(promise.future)
+          .failOnShutdownTo {
+            io.grpc.Status.UNAVAILABLE
+              .withDescription(
+                s"Aborted waitUntilRecordTimeReached($asOf), as RetryProvider(${retryProvider.loggerFactory.properties}) is shutting down in store $acsStoreDescriptor"
+              )
+              .asRuntimeException()
+          }
+    }
   }
 
   def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
@@ -1437,7 +1442,7 @@ final class DbMultiDomainAcsStore[TXE](
                       synchronizerIdToRecordTime.toMap,
                     )
                   )
-                  .signalOffsetChanged(lastTree.getOffset)
+                  .signalWaiters(lastTree.getOffset, synchronizerIdToRecordTime.toMap)
                 val summary =
                   summaryState.toIngestionSummary(
                     offset = lastTree.getOffset,
@@ -1457,18 +1462,19 @@ final class DbMultiDomainAcsStore[TXE](
                 "ingestReassignment",
               )
               .map { summaryState =>
+                val reassignmentRecordTimes = Map(synchronizerId -> reassignment.recordTime)
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       reassignment.offset,
-                      Map(synchronizerId -> reassignment.recordTime),
+                      reassignmentRecordTimes,
                     )
                   )
-                  .signalOffsetChanged(reassignment.offset)
+                  .signalWaiters(reassignment.offset, reassignmentRecordTimes)
                 val summary =
                   summaryState.toIngestionSummary(
-                    synchronizerIdToRecordTime = Map(synchronizerId -> reassignment.recordTime),
+                    synchronizerIdToRecordTime = reassignmentRecordTimes,
                     offset = reassignment.offset,
                     newAcsSize = state.get().acsSize,
                     metrics = metrics,
@@ -1490,10 +1496,8 @@ final class DbMultiDomainAcsStore[TXE](
               )
               .map { _ =>
                 state
-                  .getAndUpdate(s =>
-                    s.withUpdate(s.acsSize, offset, synchronizerIdToRecordTime)
-                  )
-                  .signalOffsetChanged(offset)
+                  .getAndUpdate(s => s.withUpdate(s.acsSize, offset, synchronizerIdToRecordTime))
+                  .signalWaiters(offset, synchronizerIdToRecordTime)
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
                     synchronizerIdToRecordTime = synchronizerIdToRecordTime,
@@ -2371,6 +2375,7 @@ object DbMultiDomainAcsStore {
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
       lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp],
+      recordTimeWaiters: Map[SynchronizerId, SortedMap[CantonTimestamp, Promise[Unit]]],
   ) {
     def withInitialState(
         acsStoreId: AcsStoreId,
@@ -2400,6 +2405,18 @@ object DbMultiDomainAcsStore {
         recordTimes: Map[SynchronizerId, CantonTimestamp] = Map.empty,
     ): State = {
       val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
+      val updatedRecordTimes = recordTimes.foldLeft(lastIngestedRecordTimes) {
+        case (acc, (syncId, rt)) =>
+          acc.updated(syncId, acc.get(syncId).fold(rt)(_.max(rt)))
+      }
+      val remainingWaiters = recordTimeWaiters.flatMap { case (syncId, waiters) =>
+        updatedRecordTimes.get(syncId) match {
+          case Some(reachedTime) =>
+            val remaining = waiters.filter { case (waitTime, _) => waitTime > reachedTime }
+            if (remaining.isEmpty) None else Some(syncId -> remaining)
+          case None => Some(syncId -> waiters)
+        }
+      }
       this.copy(
         acsSize = newAcsSize,
         offset = Some(newOffset),
@@ -2407,10 +2424,8 @@ object DbMultiDomainAcsStore {
         offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
           offsetToSignal > newOffset
         },
-        lastIngestedRecordTimes = recordTimes.foldLeft(lastIngestedRecordTimes) {
-          case (acc, (syncId, rt)) =>
-            acc.updated(syncId, acc.get(syncId).fold(rt)(_.max(rt)))
-        },
+        lastIngestedRecordTimes = updatedRecordTimes,
+        recordTimeWaiters = remainingWaiters,
       )
     }
 
@@ -2423,6 +2438,28 @@ object DbMultiDomainAcsStore {
           }
         }
       }
+    }
+
+    def signalRecordTimesReached(
+        recordTimes: Map[SynchronizerId, CantonTimestamp]
+    ): Unit = {
+      recordTimes.foreach { case (syncId, reachedTime) =>
+        recordTimeWaiters.get(syncId).foreach { waiters =>
+          waiters.foreach { case (waitTime, promise) =>
+            if (waitTime <= reachedTime) {
+              promise.success(())
+            }
+          }
+        }
+      }
+    }
+
+    def signalWaiters(
+        newOffset: Long,
+        recordTimes: Map[SynchronizerId, CantonTimestamp],
+    ): Unit = {
+      signalOffsetChanged(newOffset)
+      signalRecordTimesReached(recordTimes)
     }
 
     /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
@@ -2444,6 +2481,30 @@ object DbMultiDomainAcsStore {
         }
       }
     }
+
+    def withRecordTimeWaiter(
+        synchronizerId: SynchronizerId,
+        asOf: CantonTimestamp,
+    ): State = {
+      if (lastIngestedRecordTimes.get(synchronizerId).exists(_ >= asOf)) {
+        this
+      } else {
+        val waitersForSync =
+          recordTimeWaiters.getOrElse(
+            synchronizerId,
+            SortedMap.empty[CantonTimestamp, Promise[Unit]],
+          )
+        waitersForSync.get(asOf) match {
+          case Some(_) => this
+          case None =>
+            val p = Promise[Unit]()
+            copy(
+              recordTimeWaiters =
+                recordTimeWaiters.updated(synchronizerId, waitersForSync + (asOf -> p))
+            )
+        }
+      }
+    }
   }
   private object State {
     def empty(): State = State(
@@ -2454,6 +2515,7 @@ object DbMultiDomainAcsStore {
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
       lastIngestedRecordTimes = Map.empty,
+      recordTimeWaiters = Map.empty,
     )
   }
 
