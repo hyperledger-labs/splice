@@ -1129,6 +1129,11 @@ template DsoRules with
       do
         _ <- getAndValidateSvParty this (Some sv)
         
+        amuletRules <- fetch amuletRulesCid
+        
+        assertMsg "The AmuletRules dso must match the DsoRules dso" 
+          (amuletRules.dso == dso)
+        
         res <- exercise amuletRulesCid transferInsts 
         pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
     
