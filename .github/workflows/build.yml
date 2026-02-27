@@ -279,7 +279,7 @@ jobs:
     if: ${{ ! inputs.oss_only }}
     with:
       runs_on: self-hosted-docker-large
-      test_names_file: 'test-full-class-names-docker-no-canton.log'
+      test_names_file: 'test-full-class-names-sim-time-docker.log'
       start_canton_options: -s
       with_canton: true
       parallelism: 1
