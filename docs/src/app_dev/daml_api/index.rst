@@ -24,10 +24,47 @@ Canton Network Token Standard APIs (CIP-0056)
 Refer to the :ref:`Token Standard documentation section <token_standard>`.
 
 
+.. _reward_assignment_api:
+
+Reward Assignment API (CIP-0104)
+--------------------------------
+
+As part of implementing `CIP-0104 <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md>`__
+the following Daml API was introduced:
+
+   .. toctree::
+      :maxdepth: 1
+
+      ../api/splice-api-reward-assignment-v1/index
+
+The API is meant for apps whose ultimate beneficiaries of rewards are different from
+the app provider party (e.g., decentralized apps).
+The API allows them to assign the rewards they receive for their app to their ultimate beneficiaries.
+
+The API is based on a Daml interface, so that apps can use it from their Daml
+code without incurring a static dependency on ``splice-amulet`` and the
+corresponding upgrading challenges. The reward assignment choice can also
+be called directly from the Ledger API for apps that don't use custom Daml code.
+
+Note that the coupons always specify the original app provider party for whose activity
+the reward coupon was created.
+Thereby allowing consistent attribution of rewards collected to the app provider party.
+
+
 .. _featured_app_activity_markers_api:
 
 Featured App Activity Markers API (CIP-0047)
 --------------------------------------------
+
+.. important::
+
+   On networks where traffic-based app rewards as described in `CIP-0104 <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md>`__ are enabled,
+   the Featured App Activity Markers API will become irrelevant.
+   On such networks, the API is still supported, but no rewards can be earned using it.
+   We recommend apps to stop creating featured app activity markers once CIP-0104 is enabled.
+
+   The documentation here is provided for apps that need to integrate with app rewards prior
+   to CIP-0104 being enabled to avoid unnecessary traffic costs.
 
 * See the `text of the CIP-0047 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__
   for its background on its design and its specification.

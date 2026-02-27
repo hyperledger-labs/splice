@@ -1,0 +1,124 @@
+-- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Templates and support code for reward accounting based on off-ledger calculations, as initially
+-- described in CIP-104 for traffic-based app rewards.
+--
+-- It is a Version 2 compared to the previous reward accounting mechanism that is based on tracking
+-- all state on-ledger using App|Validator|SvRewardCoupon and IssuingMiningRound contracts.
+--
+-- The design is flexible to allow for extending it to other kinds of rewards
+-- that are based on off-ledger calculations, but the initial implementation is
+-- specialized to traffic-based app rewards.
+module Splice.Amulet.RewardAccountingV2 where
+
+import DA.Action (unless)
+import DA.Foldable (forA_)
+import DA.Set as Set
+import DA.Time
+
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.Amulet
+import Splice.Types
+import Splice.Util
+
+-- | State contract tracking the need to calculate and confirm the app reward amounts for the given round.
+template CalculateRewardsV2 with
+    dso : Party
+    round : Round
+    rewardCouponTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
+    dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
+  where
+    signatory dso
+
+-- | A minting allowance for a service provider to mint Amulet.
+data MintingAllowance = MintingAllowance with
+    provider : Party
+    amount : Decimal
+  deriving (Eq, Show)
+
+type MintingAllowances = [MintingAllowance]
+
+data Batch
+  = BatchOfBatches [CryptoHash.Hash]
+  | BatchOfMintingAllowances MintingAllowances
+  deriving (Eq, Show)
+
+data ProcessRewardsV2_ProcessBatchResult = ProcessRewardsV2_ProcessBatchResult {}
+  deriving (Eq, Show)
+
+-- | State contract tracking outstanding processing of rewards for a given round and batch hash.
+template ProcessRewardsV2 with
+    dso : Party
+    round : Round
+    dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
+    rewardCouponTimeToLive : RelTime
+    batchHash : CryptoHash.Hash
+  where
+    signatory dso
+
+    choice ProcessRewardsV2_ProcessBatch : ProcessRewardsV2_ProcessBatchResult
+      with
+        batch : Batch
+        providersWithWrongVettingState : Set Party
+          -- ^ Service providers that do not have the correct vetting state for receiving rewards.
+      observer batchProviders providersWithWrongVettingState batch
+      controller dso
+      do
+        let actualHash = CryptoHash.hash batch
+        require "batch hash matches" (actualHash == batchHash)
+        case batch of
+          BatchOfBatches batchHashes -> do
+            forA_ batchHashes $ \newBatchHash ->
+              create ProcessRewardsV2 with
+                dso
+                round
+                rewardCouponTimeToLive
+                dryRun
+                batchHash = newBatchHash
+          BatchOfMintingAllowances mintingAllowances -> do
+            unless dryRun $ do
+              -- Coupon expiry is determined here based on the time of creation to ensure
+              -- providers are always given the full rewardCouponTimeToLive duration to redeem their coupons,
+              -- independent of how long the processing takes and how many batches there are.
+              now <- getTime
+              let expiresAt = now `addRelTime` rewardCouponTimeToLive
+              forA_ mintingAllowances $ \MintingAllowance{..} ->
+                create RewardCouponV2 with
+                  dso
+                  round
+                  provider
+                  beneficiary = provider
+                  amount
+                  expiresAt
+                  beneficiaryIsObserver =
+                    not $ Set.member provider providersWithWrongVettingState
+
+        -- intentionally not returning any information here to save computational overhead
+        return ProcessRewardsV2_ProcessBatchResult {}
+
+batchProviders : Set Party -> Batch -> [Party]
+batchProviders ignoredProviders batch = case batch of
+  BatchOfBatches _ -> []
+  BatchOfMintingAllowances mintingAllowances ->
+    [ provider | MintingAllowance{..} <- mintingAllowances, not (Set.member provider ignoredProviders) ]
+
+
+-- instances
+
+instance CryptoHash.Hashable MintingAllowance where
+  hash MintingAllowance {provider, amount} =
+    CryptoHash.hashRecord [CryptoHash.hash provider , CryptoHash.hash amount]
+
+instance CryptoHash.Hashable Batch where
+  hash batch = case batch of
+    BatchOfBatches batchHashes ->
+      CryptoHash.hashVariant "BatchOfBatches" [CryptoHash.hash batchHashes]
+    BatchOfMintingAllowances mintingAllowances ->
+      CryptoHash.hashVariant "BatchOfMintingAllowances" [CryptoHash.hash mintingAllowances]
+
+instance HasCheckedFetch CalculateRewardsV2 ForDso where
+  contractGroupId CalculateRewardsV2 with .. = ForDso with ..
+
+instance HasCheckedFetch ProcessRewardsV2 ForDso where
+  contractGroupId ProcessRewardsV2 with .. = ForDso with ..

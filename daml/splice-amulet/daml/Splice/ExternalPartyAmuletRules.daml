@@ -21,9 +21,8 @@ import Splice.AmuletRules
 import Splice.Types
 import Splice.Util
 
-
-
 import DA.Exception
+
 
 -- | Rules contract that can be used in transactions that require signatures
 -- from an external party. This is intended to get archived and recreated as rarely as possible

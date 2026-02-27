@@ -47,7 +47,16 @@ import Splice.Util
 data AmuletApp = AmuletApp with
     dso : Party
     dsoUser : AmuletUser
+    registry : Registry.AmuletRegistry
   deriving (Eq, Ord, Show)
+
+mkAmuletApp : Party -> AmuletUser -> AmuletApp
+mkAmuletApp dso dsoUser = AmuletApp with
+    dso
+    dsoUser
+    registry = Registry.AmuletRegistry with
+      dso
+      instrumentId = amuletInstrumentId dso
 
 demoTime : Time
 demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
@@ -57,21 +66,30 @@ demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
 setupApp : Script AmuletApp
 setupApp = genericSetupApp ""
 
+setupAppWithConfig : AmuletConfig Unit.USD -> Script AmuletApp
+setupAppWithConfig config = genericSetupAppWithConfig config ""
+
 -- | Setup the DSO party with a specific prefix and the contracts defining the Amulet app.
 genericSetupApp : Text -> Script AmuletApp
-genericSetupApp dsoPrefix = do
+genericSetupApp dsoPrefix = genericSetupAppWithConfig defaultAmuletConfig dsoPrefix
+
+-- | Setup the DSO party with a specific prefix and the contracts defining the Amulet app.
+genericSetupAppWithConfig : AmuletConfig Unit.USD -> Text -> Script AmuletApp
+genericSetupAppWithConfig config dsoPrefix = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
 
   dso <- allocateParty (dsoPrefix <> "dso-party")
   dsoUser <- validateUserId (dsoPrefix <> "dummy-dso-user")
   _ <- createUser (User dsoUser (Some dso)) []
-  let app =  AmuletApp with dso, dsoUser = AmuletUser dsoUser dso
+  let app = mkAmuletApp dso (AmuletUser dsoUser dso)
 
   recordValidatorOf app app.dso app.dso
 
   _ <- submit dso $ createCmd AmuletRules with
-    configSchedule = defaultAmuletConfigSchedule
+    configSchedule = Schedule with
+      initialValue = config
+      futureValues = []
     isDevNet = True
     contractStateSchemaVersion = None
     ..
@@ -85,6 +103,7 @@ genericSetupApp dsoPrefix = do
 
   -- return the off-ledger reference to the app for later script steps
   return app
+
 
 
 -- Replacing AmuletConfig
@@ -312,7 +331,7 @@ pay : AmuletApp -> AmuletUser -> Party -> Decimal -> Script ()
 pay app sender recipient amuletAmount = do
   payWithTransferFeeRatio app sender recipient amuletAmount 0.0
 
--- | A simple and slightly hacky-way to test payment: it just gathers all amulets from
+-- | A simple and slightly hacky-way to test payment: it just gathers all amulets and RewarCouponV2s from
 -- the sender and transfers the desired amount off of them to the receiver.
 -- The left-over amount is kept.
 payWithTransferFeeRatio : AmuletApp -> AmuletUser -> Party -> Decimal -> Decimal -> Script ()
@@ -320,10 +339,11 @@ payWithTransferFeeRatio app sender recipient amuletAmount transferFeeRatio = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
   amulets <- getAmuletInputs sender.primaryParty
+  rewardCoupons <- query @RewardCouponV2 sender.primaryParty
   let transfer = Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
-        inputs = amulets
+        inputs = amulets ++ map (InputRewardCouponV2 . fst) rewardCoupons
         outputs =
           [  TransferOutput with
               receiver = recipient
@@ -415,6 +435,9 @@ runAmuletDepositBots app = do
     svRewardCoupons <- queryFilter @SvRewardCoupon app.dso $ \c ->
       c.round `elem` issuingRoundNumbers && c.beneficiary == user
 
+    rewardCouponV2s <- queryFilter @RewardCouponV2 app.dso $ \c ->
+      c.beneficiary == user
+
     -- get all amulets of this user
     amulets <- getAmuletInputs user
     -- Need readAs rights for all hosted users to collect their validator rewards,
@@ -431,6 +454,7 @@ runAmuletDepositBots app = do
               map (mkInputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
               map (InputValidatorLivenessActivityRecord . fst) validatorLivenessActivityRecords ++
               map (InputSvRewardCoupon . fst) svRewardCoupons ++
+              map (InputRewardCouponV2 . fst) rewardCouponV2s ++
               amulets
           outputs = []
           beneficiaries = None -- no beneficiaries for self-transfer
@@ -446,6 +470,28 @@ runAmuletDepositBots app = do
   let amuletOwners = map (._2.owner) amulets
   require "Owners of amulets must be unique" (unique amuletOwners)
   pure ()
+
+mintRewardsV2 : AmuletApp -> Party -> Script ()
+mintRewardsV2 app beneficiary = do
+  -- create transfer context
+  (openMiningRound, _) <- getLatestOpenRound app
+  let context = TransferContext with
+        openMiningRound
+        issuingMiningRounds = Map.empty
+        validatorRights = Map.empty
+        featuredAppRight = None
+  -- query the coupons
+  coupons <- query @RewardCouponV2 beneficiary
+  void $ submitExerciseAmuletRulesByKey app [beneficiary] [] AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = beneficiary
+      provider = beneficiary
+      inputs = map (InputRewardCouponV2 . fst) coupons
+      outputs = []
+      beneficiaries = None -- no featured-app-marker beneficiaries
+    context
+    expectedDso = Some app.dso
+
 
 -- | Retrieve the list of all amulets that the given party can use as transfer inputs.
 getAmuletInputs : Party -> Script [TransferInput]
@@ -623,6 +669,12 @@ setAmuletConfig app baseConfig newConfig = do
     exerciseCmd amuletRulesCid AmuletRules_SetConfig with
       newConfig
       baseConfig
+
+updateAmuletConfig : AmuletApp -> (AmuletConfig Unit.USD -> AmuletConfig Unit.USD) -> Script ()
+updateAmuletConfig app f = do
+  baseConfig <- getAmuletConfig app
+  let newConfig = f baseConfig
+  setAmuletConfig app baseConfig newConfig
 
 allocateDevelopmentFundCoupon
   : AmuletApp -> Party -> Party -> Decimal -> Time -> Text -> [ContractId UnclaimedDevelopmentFundCoupon]

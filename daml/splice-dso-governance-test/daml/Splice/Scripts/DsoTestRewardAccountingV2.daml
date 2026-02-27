@@ -1,0 +1,130 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.DsoTestRewardAccountingV2 where
+
+
+import DA.Action (void)
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import DA.Set as Set
+import DA.Time
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Amulet.RewardAccountingV2
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.DsoRules
+import Splice.Types
+
+import Splice.Scripts.Util
+import Splice.Scripts.DsoTestUtils
+
+import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
+
+
+-- | Test that reward accounting can be driven via DsoRules.
+--
+-- We focus on the core logic only, as the extensive functional testing is done
+-- directly on `AmuletRules` in `TestRewardAccountingV2`, and the choices in DsoRules
+-- are pass-through choices to `AmuletRules` that don't have any additional logic.
+test_reward_accounting_v2 : Script ()
+test_reward_accounting_v2 = do
+    -- enable traffic based app rewards, which are the first use-case for reward accounting v2
+  let amuletConfig = defaultAmuletConfig with
+        rewardConfig = Some $ RewardConfig with
+          mintingVersion = RewardVersion_TrafficBasedAppRewards
+          dryRunVersion = None
+          batchSize = 100
+          rewardCouponTimeToLive = hours 36
+
+  let couponExpiryTime = demoTime `addRelTime` hours 36
+
+  (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
+
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  dora <- allocateParty "Dora"
+
+  setTime demoTime
+
+  -- move the first round through issuance, which will also trigger the reward calculation for this round
+  runNextIssuanceD app 1.0
+
+  -- setup demo data
+  let mintingAllowances1 = sortOn (.provider)
+        [ MintingAllowance alice 1000.0
+        , MintingAllowance bob 2000.0
+        ]
+  let mintingAllowances2 = sortOn (.provider)
+        [ MintingAllowance charlie 30.0
+        , MintingAllowance dora 5.1
+        ]
+  let b1 = BatchOfMintingAllowances mintingAllowances1
+  let b2 = BatchOfMintingAllowances mintingAllowances2
+  let rootBatch = BatchOfBatches [CryptoHash.hash b1, CryptoHash.hash b2]
+  let rootBatchHash = CryptoHash.hash rootBatch
+  let batchesWithHiding = [(b1, [bob]), (b2, [dora]), (rootBatch, [])]
+
+  -- get the contract representing the pending calculation and confirmation of rewards for round 0
+  [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
+
+  -- setup reward coupon creation workflow state
+  confirmAndExecutionAction app ARC_AmuletRules with
+    amuletRulesAction = CRARC_StartProcessingRewardsV2
+      AmuletRules_StartProcessingRewardsV2 with
+        calculateRewardsCid
+        batchHash = rootBatchHash
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+
+  let processBatches = do
+        states <- query @ProcessRewardsV2 app.dso
+        forA_ states $ \(processRewardsCid, processRewards) -> do
+          let Some (b, badVettingState) = find (\(b, _) -> CryptoHash.hash b == processRewards.batchHash) batchesWithHiding
+          void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ProcessRewardsV2_ProcessBatch with
+            sv = sv1
+            processRewardsCid
+            choiceArg = ProcessRewardsV2_ProcessBatch with
+              batch = b
+              providersWithWrongVettingState = Set.fromList badVettingState
+
+  processBatches -- expand root hash into batch hashes
+  processBatches -- expand follow-up batches into coupons
+
+  let expectedCoupons = do
+        MintingAllowance{..} <- mintingAllowances1 ++ mintingAllowances2
+        pure RewardCouponV2 with
+          dso = app.dso
+          provider
+          beneficiary = provider
+          amount
+          round = Round 0
+          expiresAt = couponExpiryTime
+          beneficiaryIsObserver = provider `notElem` [bob, dora]
+
+  actualCoupons0 <- query @RewardCouponV2 app.dso
+  let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
+  actualCoupons === expectedCoupons
+
+  -- make Bob and Dora observers of their coupons (simulates them changing their vetting state)
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  unobservableCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> not c.beneficiaryIsObserver)
+  void $ submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_UnhideRewardCouponsV2 with
+    sv = sv1
+    amuletRulesCid
+    choiceArg = AmuletRules_UnhideRewardCouponsV2 with
+      rewardCouponCids = map fst unobservableCoupons
+      beneficiaries = map (._2.beneficiary) unobservableCoupons
+
+  couponsAfterUnhiding <- query @RewardCouponV2 app.dso
+  sortOn (.beneficiary) (map snd couponsAfterUnhiding) ===
+    map (\c -> c with beneficiaryIsObserver = True) expectedCoupons
+
+  pure ()
+

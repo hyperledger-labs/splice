@@ -47,6 +47,39 @@ data TransferConfigV2 unit = TransferConfigV2 with
     maxNumLockHolders : Int
   deriving (Eq, Show)
 
+
+-- Reward configuration
+-----------------------
+
+-- | How rewards and their minting allowances are tracked and computed.
+data RewardVersion
+  = RewardVersion_FeaturedAppMarkers
+      -- ^ Version of app rewards pre CIP-104
+  | RewardVersion_TrafficBasedAppRewards
+      -- ^ Traffic-based app rewards as introduced in CIP-104
+  deriving (Eq, Show)
+
+useTrafficBasedAppRewards : Optional RewardVersion -> Bool
+useTrafficBasedAppRewards rv = case rv of
+  None -> False
+  Some RewardVersion_FeaturedAppMarkers -> False
+  Some RewardVersion_TrafficBasedAppRewards -> True
+
+useFeaturedAppMarkers : Optional RewardVersion -> Bool
+useFeaturedAppMarkers = not . useTrafficBasedAppRewards
+
+-- | Configuration for how reward accounting and calculation should be performed.
+data RewardConfig = RewardConfig with
+    mintingVersion : RewardVersion -- ^ What scheme to use for minting rewards.
+    dryRunVersion : Optional RewardVersion -- ^ What scheme to use for dry-running reward minting. If None, dry-runs are disabled.
+    batchSize : Int -- ^ Batch size to use for building the Merkle-tree over minting allowances.
+    rewardCouponTimeToLive : RelTime -- ^ Time to live for reward coupons, default 36h to support batching of collection across 12h with a 24h prepare-submission delay.
+  deriving (Eq, Show)
+
+
+-- Full AmuletConfig
+--------------------
+
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --
 -- See Splice.Scripts.Parameters for concrete values.
@@ -63,8 +96,10 @@ data AmuletConfig unit = AmuletConfig with
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
-    externalPartyConfigStateTickDuration : Optional RelTime 
+    externalPartyConfigStateTickDuration : Optional RelTime
       -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts. Default: 24h.
+    rewardConfig : Optional RewardConfig
+      -- ^ Configuration for the reward accounting and calculation. If None, then on-ledger reward tracking is used.
   deriving (Eq, Show)
 
 getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
@@ -136,6 +171,9 @@ data PackageConfig = PackageConfig
 validPackageConfig : PackageConfig -> Bool
 validPackageConfig _ = True
 
+instance Patchable RewardVersion where
+  patch = patchScalar
+
 instance Patchable (AmuletConfig USD) where
   patch new base current = AmuletConfig with
     transferConfig = patch new.transferConfig base.transferConfig current.transferConfig
@@ -147,6 +185,14 @@ instance Patchable (AmuletConfig USD) where
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
     optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
     externalPartyConfigStateTickDuration = patch new.externalPartyConfigStateTickDuration base.externalPartyConfigStateTickDuration current.externalPartyConfigStateTickDuration
+    rewardConfig = patch new.rewardConfig base.rewardConfig current.rewardConfig
+
+instance Patchable RewardConfig where
+  patch new base current = RewardConfig with
+    mintingVersion = patch new.mintingVersion base.mintingVersion current.mintingVersion
+    dryRunVersion = patch new.dryRunVersion base.dryRunVersion current.dryRunVersion
+    batchSize = patch new.batchSize base.batchSize current.batchSize
+    rewardCouponTimeToLive = patch new.rewardCouponTimeToLive base.rewardCouponTimeToLive current.rewardCouponTimeToLive
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with
