@@ -444,7 +444,8 @@ class DbSvDsoStore(
 
   override def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -452,13 +453,15 @@ class DbSvDsoStore(
     listCouponsGroupedByRound(
       AppRewardCoupon.COMPANION,
       domain,
-      totalCouponsLimit,
+      batchSize,
+      numBatches,
       ignoredParties,
     )
 
   override def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -466,13 +469,15 @@ class DbSvDsoStore(
     listCouponsGroupedByRound(
       ValidatorRewardCoupon.COMPANION,
       domain,
-      totalCouponsLimit,
+      batchSize,
+      numBatches,
       ignoredParties,
     )
 
   override def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -480,13 +485,15 @@ class DbSvDsoStore(
     listCouponsGroupedByRound(
       ValidatorFaucetCoupon.COMPANION,
       domain,
-      totalCouponsLimit,
+      batchSize,
+      numBatches,
       ignoredParties,
     )
 
   override def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -494,26 +501,30 @@ class DbSvDsoStore(
     listCouponsGroupedByRound(
       ValidatorLivenessActivityRecord.COMPANION,
       domain,
-      totalCouponsLimit,
+      batchSize,
+      numBatches,
       ignoredParties,
     )
 
   override def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit tc: TraceContext): Future[Seq[RoundBatch[SvRewardCoupon.ContractId]]] =
     listCouponsGroupedByRound(
       SvRewardCoupon.COMPANION,
       domain,
-      totalCouponsLimit,
+      batchSize,
+      numBatches,
       ignoredParties,
     )
 
   private def listCouponsGroupedByRound[C, TCId <: ContractId[?]: ClassTag, T](
       companion: C,
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
@@ -541,28 +552,32 @@ class DbSvDsoStore(
         result <- storage
           .query(
             (sql"""
-                select reward_round, array_agg(contract_id)
-                from dso_acs_store
-                where store_id = $acsStoreId
-                  and migration_id = $domainMigrationId
-                  and package_name = ${packageQualifiedName.packageName}
-                  and template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-                  and assigned_domain = $domain
-                  and reward_party is not null -- otherwise index is not used
-                  and reward_round is not null -- otherwise index is not used
-                  """ ++ partyFilter ++ sql"""
-                group by reward_round
-                order by reward_round asc
-                limit ${sqlLimit(totalCouponsLimit)}
+                select sub.reward_round, array_agg(sub.contract_id)
+                from (
+                  select reward_round, contract_id,
+                         row_number() over (partition by reward_round) as rn
+                  from dso_acs_store
+                  where store_id = $acsStoreId
+                    and migration_id = $domainMigrationId
+                    and package_name = ${packageQualifiedName.packageName}
+                    and template_id_qualified_name = ${packageQualifiedName.qualifiedName}
+                    and assigned_domain = $domain
+                    and reward_party is not null -- otherwise index is not used
+                    and reward_round is not null -- otherwise index is not used
+                    """ ++ partyFilter ++ sql"""
+                ) sub
+                where sub.rn <= ${sqlLimit(batchSize)}
+                group by sub.reward_round
+                order by sub.reward_round asc
+                limit ${sqlLimit(numBatches)}
                """).toActionBuilder.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
             opName,
           )
-      } yield applyLimit(opName, totalCouponsLimit, result)
+      } yield applyLimit(opName, numBatches, result)
         .map { case (round, batch) =>
           RoundBatch(
             round,
             batch
-              .take(totalCouponsLimit.limit)
               .map(cid => companionClass.toContractId(companion, cid.contractId))
               .toSeq,
           )
