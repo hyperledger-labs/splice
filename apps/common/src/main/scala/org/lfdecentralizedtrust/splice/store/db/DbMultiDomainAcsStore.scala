@@ -44,6 +44,7 @@ import com.digitalasset.canton.util.ShowUtil.showPretty
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.{Seq, SortedMap, VectorMap}
+import scala.jdk.CollectionConverters.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -1477,6 +1478,11 @@ final class DbMultiDomainAcsStore[TXE](
               }
           case UpdateCheckpoint(checkpoint) =>
             val offset = checkpoint.checkpoint.getOffset
+            val synchronizerIdToRecordTime =
+              checkpoint.checkpoint.getSynchronizerTimes.asScala.map { syncTime =>
+                SynchronizerId.tryFromString(syncTime.getSynchronizerId) ->
+                  CantonTimestamp.assertFromInstant(syncTime.getRecordTime)
+              }.toMap
             storage
               .queryAndUpdate(
                 ingestUpdateAtOffset(offset, DBIO.unit, isOffsetCheckpoint = true),
@@ -1484,11 +1490,13 @@ final class DbMultiDomainAcsStore[TXE](
               )
               .map { _ =>
                 state
-                  .getAndUpdate(s => s.withUpdate(s.acsSize, offset))
+                  .getAndUpdate(s =>
+                    s.withUpdate(s.acsSize, offset, synchronizerIdToRecordTime)
+                  )
                   .signalOffsetChanged(offset)
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
-                    synchronizerIdToRecordTime = Map.empty,
+                    synchronizerIdToRecordTime = synchronizerIdToRecordTime,
                     offset = offset,
                     newAcsSize = state.get().acsSize,
                     metrics = metrics,
