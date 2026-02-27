@@ -239,7 +239,8 @@ object BuildCommon {
             "docs/clean",
           ).map(";" + _).mkString(""),
         ) ++
-        addCommandAlias("splice-clean", "; clean-splice")
+        addCommandAlias("splice-clean", "; clean-splice") ++
+        addCommandAlias("updateDarResources", "apps-dar-resources-generator/runMain org.lfdecentralizedtrust.splice.darutils.DarResourcesGenerator apps/common/src/main/scala/org/lfdecentralizedtrust/splice/environment/DarResources.scala; apps-common/scalafmt; apps-common/headerCreate")
     val buildSettings = inThisBuild(
       Seq(
         organization := "org.lfdecentralizedtrust.splice",
