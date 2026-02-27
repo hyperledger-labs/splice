@@ -46,6 +46,12 @@ data AmuletRules_Amulet_ExpireTransferInstructionsResult = AmuletRules_Amulet_Ex
     results : [TransferInstructionResult]
   deriving (Eq, Show)
 
+data AmuletRules_ExpireTransferInstructionInput = AmuletRules_ExpireTransferInstructionInput
+  with
+    transferInstructionCid : ContractId TransferInstruction
+    expireLock : Bool
+  deriving (Eq, Show)  
+
 data AmuletRules_UpdateToLatestSchemaVersionResult = AmuletRules_UpdateToLatestSchemaVersionResult
   with
     amuletRulesCid : ContractId AmuletRules
@@ -778,18 +784,18 @@ template AmuletRules
 
     nonconsuming choice AmuletRules_Amulet_ExpireTransferInstructions : AmuletRules_Amulet_ExpireTransferInstructionsResult
       with
-        inputs : [(ContractId TransferInstruction, Bool)]
+        inputs : [AmuletRules_ExpireTransferInstructionInput]
         observers : [Party] 
       observer observers
       controller dso
       do
-        individualResults <- forA inputs $ \(cid, expireLock) -> do
-          exercise cid TransferInstruction_Update with
+        individualResults <- forA inputs $ \input -> do
+          exercise input.transferInstructionCid TransferInstruction_Update with
             extraActors = []
             extraArgs = ExtraArgs with
               meta = emptyMetadata
               context = ChoiceContext with
-                values = TextMap.fromList [(expireLockKey, toAnyValue expireLock)]
+                values = TextMap.fromList [(expireLockKey, toAnyValue input.expireLock)]
         
         pure AmuletRules_Amulet_ExpireTransferInstructionsResult with
           results = individualResults

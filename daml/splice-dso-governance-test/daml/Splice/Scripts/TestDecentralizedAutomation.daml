@@ -567,7 +567,9 @@ testExpireAmuletTransferInstruction = do
   let stakeholders = [instrView.transfer.sender, instrView.transfer.receiver]
 
   let expireBatchChoice = AmuletRules_Amulet_ExpireTransferInstructions with
-        inputs = [(instrInterfaceCid, True)]
+        inputs = [AmuletRules_ExpireTransferInstructionInput with 
+                    transferInstructionCid = instrInterfaceCid
+                    expireLock = True]
         observers = stakeholders
 
   submitMultiMustFail [sv1] [app.dso] $ 
