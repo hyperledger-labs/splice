@@ -32,7 +32,7 @@ class AutomationServiceIntegrationTest extends SvIntegrationTestBase {
             + ".*"
             + Pattern.quote(SomeNonSvTrigger.getSimpleName)
         )
-      ) should have size 1,
+      ) should have size 1 withClue "paused-triggers logs",
     )
   }
 }

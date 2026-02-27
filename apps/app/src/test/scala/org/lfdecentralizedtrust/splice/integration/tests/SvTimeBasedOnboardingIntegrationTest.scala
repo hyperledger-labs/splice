@@ -47,7 +47,7 @@ class SvTimeBasedOnboardingIntegrationTest
               sv3ValidatorBackend,
             ): _*
         )
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3 withClue "dsoRules.svs"
       }
 
       clue(
@@ -81,7 +81,7 @@ class SvTimeBasedOnboardingIntegrationTest
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(
                 dsoParty
-              ) shouldBe empty,
+              ) shouldBe empty withClue "SvOnboardingRequests",
         )
       }
 
@@ -126,7 +126,7 @@ class SvTimeBasedOnboardingIntegrationTest
               .filterJava(splice.svonboarding.SvOnboardingConfirmed.COMPANION)(
                 dsoParty,
                 _.data.svParty == svYParty.toProtoPrimitive,
-              ) shouldBe empty,
+              ) shouldBe empty withClue "SvOnboardingConfirmeds",
         )
       }
 
@@ -161,7 +161,7 @@ class SvTimeBasedOnboardingIntegrationTest
                 .listOngoingValidatorOnboardings()
                 .filter(e =>
                   e.contract.payload.candidateSecret == testCandidateSecret
-                ) should have size 1,
+                ) should have size 1 withClue "ValidatorOnboarding",
           )
           actAndCheck(
             "No confirmation happens within 2h",
@@ -173,7 +173,7 @@ class SvTimeBasedOnboardingIntegrationTest
                 .listOngoingValidatorOnboardings()
                 .filter(e =>
                   e.contract.payload.candidateSecret == testCandidateSecret
-                ) should have size 0,
+                ) should have size 0 withClue "ValidatorOnboarding",
           )
         }
       }
@@ -213,14 +213,14 @@ class SvTimeBasedOnboardingIntegrationTest
         )(
           "sv1 can see the new vote request",
           _ => {
-            sv1Backend.listVoteRequests() should not be empty
+            sv1Backend.listVoteRequests() should not be empty withClue "VoteRequests"
           },
         )
 
         actAndCheck("one week has passed", advanceTime(JavaDuration.ofDays(8)))(
           "the vote request is not displayed anymore",
           _ => {
-            sv1Backend.listVoteRequests() shouldBe empty
+            sv1Backend.listVoteRequests() shouldBe empty withClue "VoteRequests"
           },
         )
       }

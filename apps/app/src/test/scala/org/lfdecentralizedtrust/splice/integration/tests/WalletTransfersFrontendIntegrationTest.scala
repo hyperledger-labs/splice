@@ -69,7 +69,9 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
       )
       createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient, cc)
 
-      listTransferOffersViaBackend(bobWalletClient) shouldBe empty
+      listTransferOffersViaBackend(
+        bobWalletClient
+      ) shouldBe empty withClue "bob TransferOffers"
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
@@ -89,7 +91,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
             currentUrl should endWith("/transactions")
 
             val offers = listTransferOffersViaBackend(bobWalletClient)
-            offers should have size 1
+            offers should have size 1 withClue "TransferOffers"
             val transfer = offers.head
             val tenDaysFromNow = Instant.now().plus(expiryDays.toLong, ChronoUnit.DAYS)
             val timeDiff = ChronoUnit.MINUTES.between(transfer.expiry, tenDaysFromNow)
@@ -115,7 +117,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
           _ => {
             val offerCards = findAll(className("transfer-offer")).toList
 
-            offerCards should have size (1)
+            offerCards should have size (1) withClue "Transfer Offer card"
 
             inside(offerCards) { case Seq(offerCard) =>
               seleniumText(
@@ -175,7 +177,10 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         ),
       )(
         "alice observes transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ =>
+          listTransferOffersViaBackend(
+            aliceWalletClient
+          ) should have size 1 withClue "alice TransferOffers",
       )
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -183,7 +188,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         eventually() {
           val offerCards = findAll(className("transfer-offer")).toList
 
-          offerCards should have size (1)
+          offerCards should have size (1) withClue "Transfer Offer card"
 
           inside(offerCards) { case Seq(offerCard) =>
             seleniumText(
@@ -237,14 +242,19 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         ),
       )(
         "alice has an outgoing transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ =>
+          listTransferOffersViaBackend(
+            aliceWalletClient
+          ) should have size 1 withClue "alice TransferOffers",
       )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         clue("Alice can't see transfer offers she created") {
           eventually() {
-            findAll(className("transfer-offer")).toList should have size 0
+            findAll(
+              className("transfer-offer")
+            ).toList should have size 0 withClue "Transfer Offer cards"
           }
         }
       }
@@ -285,14 +295,19 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         },
       )(
         "alice observes transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ =>
+          listTransferOffersViaBackend(
+            aliceWalletClient
+          ) should have size 1 withClue "alice TransferOffers",
       )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
 
         eventually() {
-          findAll(className("transfer-offer")).toList should have size (1)
+          findAll(
+            className("transfer-offer")
+          ).toList should have size (1) withClue "Transfer Offer cards"
         }
 
         actAndCheck(
@@ -302,7 +317,9 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         )(
           "Alice sees no more pending transfer offers",
           _ => {
-            findAll(className("transfer-offer")).toList should have size (0)
+            findAll(
+              className("transfer-offer")
+            ).toList should have size (0) withClue "Transfer Offer cards"
             assertInRange(bobWalletClient.balance().unlockedQty, (BigDecimal(6), BigDecimal(7)))
             assertInRange(aliceWalletClient.balance().unlockedQty, (BigDecimal(12), BigDecimal(13)))
           },
@@ -345,14 +362,17 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         },
       )(
         "alice observes transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ =>
+          listTransferOffersViaBackend(
+            aliceWalletClient
+          ) should have size 1 withClue "alice TransferOffers",
       )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
 
         eventually() {
-          findAll(className("transfer-offer")) should have size 1
+          findAll(className("transfer-offer")) should have size 1 withClue "Transfer Offer cards"
         }
 
         actAndCheck(
@@ -362,7 +382,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         )(
           "Alice sees no more pending transfer offers",
           _ => {
-            findAll(className("transfer-offer")) should have size 0
+            findAll(className("transfer-offer")) should have size 0 withClue "Transfer Offer cards"
             assertInRange(bobWalletClient.balance().unlockedQty, (BigDecimal(9), BigDecimal(10)))
             assertInRange(aliceWalletClient.balance().unlockedQty, (BigDecimal(9), BigDecimal(10)))
           },

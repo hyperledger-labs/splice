@@ -40,7 +40,7 @@ class ScanTxLogOwnerExpireLockIntegrationTest
         aliceWalletClient.tap(100),
       )(
         "Wait for amulet to appear",
-        _ => aliceWalletClient.list().amulets should have size (1),
+        _ => aliceWalletClient.list().amulets should have size (1) withClue "amulets",
       )
 
       val (_, locked) = actAndCheck(

@@ -15,7 +15,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     // Sync with background automation that onboards validator.
     eventually()({
       val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
-      rounds should have size 3
+      rounds should have size 3 withClue "OpenMiningRounds"
     })
 
     // one tick - round 0 closes.
@@ -24,7 +24,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
         dsoParty,
-      ) should have size 1
+      ) should have size 1 withClue "IssuingMiningRounds"
     )
     // next tick - round 1 closes.
     advanceRoundsToNextRoundOpening
@@ -32,7 +32,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
         dsoParty,
-      ) should have size 2
+      ) should have size 2 withClue "IssuingMiningRounds"
     )
     // next tick - round 2 closes.
     advanceRoundsToNextRoundOpening
@@ -40,7 +40,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
         dsoParty,
-      ) should have size 3
+      ) should have size 3 withClue "IssuingMiningRounds"
     )
 
     val offsetBefore = sv1Backend.participantClientWithAdminToken.ledger_api.state.end()
@@ -63,19 +63,21 @@ class SvTimeBasedRoundMgmtIntegrationTest
         transactions.flatMap(
           DecodeUtil.decodeAllCreated(splice.round.ClosedMiningRound.COMPANION)(_)
         )
-      rounds should have size 1
+      rounds should have size 1 withClue "ClosedMiningRound"
     }
     eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
         dsoParty,
-      ) should have size 3
+      ) should have size 3 withClue "IssuingMiningRounds"
     )
 
     clue("Wait until the closed round is archived") {
       eventually()(
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(splice.round.ClosedMiningRound.COMPANION)(dsoParty) should have size 0
+          .filterJava(splice.round.ClosedMiningRound.COMPANION)(
+            dsoParty
+          ) should have size 0 withClue "ClosedMiningRounds"
       )
     }
 

@@ -167,7 +167,10 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               None,
             )
           },
-        )("the request is created", _ => sv1Backend.listVoteRequests() should not be empty)
+        )(
+          "the request is created",
+          _ => sv1Backend.listVoteRequests() should not be empty withClue "VoteRequests",
+        )
         actAndCheck(
           "SV1 accepts the request as it requires two votes",
           sv1Backend.castVote(
@@ -186,7 +189,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .svs
               .keySet() should contain theSameElementsAs Seq(
               sv2Backend
-            ).map(_.getDsoInfo().svParty.toProtoPrimitive)
+            ).map(_.getDsoInfo().svParty.toProtoPrimitive) withClue "dsoRules.svs"
           },
         )
         clue("SV1 is offboarded from the Decentralized Namespace") {
@@ -219,11 +222,11 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .loneElement
               .item
               .allSequencers
-              .toIndexedSeq should have size 1
+              .toIndexedSeq should have size 1 withClue "sole sequencers"
             sv2Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
               .getSequencerOrderingTopology()
               .futureValue
-              .sequencerIds should have size 1
+              .sequencerIds should have size 1 withClue "sole sequencerId"
           }
           sv2Backend.dsoAutomation.trigger[SvBftSequencerPeerOffboardingTrigger].resume()
         }
