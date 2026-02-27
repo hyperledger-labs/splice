@@ -10,6 +10,12 @@ import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
+/** This is a temporal contract store (TcsStore) to provide efficient asOf round
+  * lookups of FeaturedAppRight, OpenMiningRound, and AmuletRules contracts
+  * necessary for rewards calculations. It is a separate store with its own
+  * tables to enable it to have its own indexing scheme and pruning schedule to
+  * ensure consistent performance.
+  */
 trait ScanRewardsReferenceStore extends AppStore {
 
   def key: ScanStore.Key
