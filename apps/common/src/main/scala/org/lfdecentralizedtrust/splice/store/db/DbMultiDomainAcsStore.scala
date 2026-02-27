@@ -107,7 +107,7 @@ final class DbMultiDomainAcsStore[TXE](
     with AcsQueries
     with TemporalAcsQueries
     with TxLogQueries[TXE]
-    with TemporalAcsStore
+    with TcsStore
     with StoreErrors
     with NamedLogging
     with LimitHelpers {

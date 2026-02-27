@@ -16,15 +16,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.{ScanStore, ScanTemporalAcsStore}
-import org.lfdecentralizedtrust.splice.store.{Limit, TemporalAcsStore}
+import org.lfdecentralizedtrust.splice.scan.store.{ScanStore, ScanTcsStore}
+import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.{DbAppStore, DbMultiDomainAcsStore, StoreDescriptor}
 import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDecoder}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DbScanTemporalAcsStore(
+class DbScanTcsStore(
     override val key: ScanStore.Key,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -40,11 +40,11 @@ class DbScanTemporalAcsStore(
     closeContext: CloseContext,
 ) extends DbAppStore(
       storage = storage,
-      acsTableName = ScanTemporalAcsTables.acsTableName,
+      acsTableName = ScanTcsTables.acsTableName,
       interfaceViewsTableNameOpt = None,
       acsStoreDescriptor = StoreDescriptor(
         version = 1,
-        name = "DbScanTemporalAcsStore",
+        name = "DbScanTcsStore",
         party = key.dsoParty,
         participant = participantId,
         key = Map(
@@ -55,13 +55,13 @@ class DbScanTemporalAcsStore(
       ingestionConfig = ingestionConfig,
       acsArchiveConfigOpt = Some(
         DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
-          ScanTemporalAcsTables.archiveTableName,
-          ScanTemporalAcsTables.ScanTemporalAcsStoreRowData.hasIndexColumns.indexColumnNames,
+          ScanTcsTables.archiveTableName,
+          ScanTcsTables.ScanTcsStoreRowData.hasIndexColumns.indexColumnNames,
         )
       ),
     )
-    with ScanTemporalAcsStore
-    with TemporalAcsStore {
+    with ScanTcsStore
+    with TcsStore {
 
   override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](
       companion: C

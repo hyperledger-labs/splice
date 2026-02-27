@@ -25,10 +25,10 @@ org.lfdecentralizedtrust.splice.store.db.AcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbExternalPartyWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbScanStoreTest
-org.lfdecentralizedtrust.splice.store.db.DbScanTemporalAcsStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbScanTcsStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvDsoStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvSvStoreTest
-org.lfdecentralizedtrust.splice.store.db.DbTemporalAcsStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbTcsStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest

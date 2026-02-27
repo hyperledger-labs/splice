@@ -28,7 +28,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import slick.jdbc.JdbcProfile
 
-class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
+class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
   private def mkStore(
       acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = Some(
         DbMultiDomainAcsStore.AcsArchiveConfig(
@@ -37,7 +37,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
         )
       )
   ): DbMultiDomainAcsStore[TestTxLogEntry] = {
-    val participantId = mkParticipantId("DbTemporalAcsStoreTest")
+    val participantId = mkParticipantId("DbTcsStoreTest")
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.amulet.all ++ DarResources.TokenStandard.allPackageResources.flatMap(_.all)
@@ -66,7 +66,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
   protected def c(i: Int): Contract[AppRewardCoupon.ContractId, AppRewardCoupon] =
     appRewardCoupon(i, dsoParty, contractId = validContractId(i))
 
-  "DbTemporalAcsStore" should {
+  "DbTcsStore" should {
 
     "lookupContractByIdAsOf is visible in [created_at, archived_at) interval" in {
       implicit val store = mkStore()
@@ -299,7 +299,7 @@ class DbTemporalAcsStoreTest extends StoreTestBase with SplicePostgresTest with 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
     StoreDescriptor(
       version = 1,
-      name = "DbTemporalAcsStoreTest",
+      name = "DbTcsStoreTest",
       party = dsoParty,
       participant = participantId,
       key = Map(
