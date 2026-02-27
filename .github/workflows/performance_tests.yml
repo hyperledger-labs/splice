@@ -1,0 +1,77 @@
+name: CI on PRs (Splice Contributors)
+on: # TODO: replace with main only, once a day
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-perftest
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+
+jobs:
+  performance_tests:
+    runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+    name: Performance Tests
+    if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ''
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup
+        id: setup
+        uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
+        with:
+          test_name: oss
+          target: 'oss'
+
+      - name: Connection check
+        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
+        env:
+          PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
+          PERFORMANCE_TESTS_DB_HOST: ${{ secrets.PERFORMANCE_TESTS_DB_HOST }}
+          PERFORMANCE_TESTS_DB_USER: ${{ secrets.PERFORMANCE_TESTS_DB_USER }}
+        with:
+          additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
+          cmd: |
+            echo "Downloading updates from mainnet for performance tests"
+            sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf download-scan-updates -m 4 -w /tmp/mainnetupdates.json"
+            echo "Downloaded, running performance tests"
+            export POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST"
+            export POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER"
+            export POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"
+            sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbScanStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"
+
+      - name: Check logs for errors
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
+        with:
+          # we don't care if some integration test happened to make the repo dirty
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: checkErrors
+
+      - name: Upload logs
+        # We upload the logs on not success so that we also capture them for cancelled runs
+        # Unfortunately when our apps don't init and stop with sys.exit(1) the run is considered cancelled (as it fails with a timeout) but we do need the logs
+        if: ${{ !success() }}
+        uses: ./splice-shared-gha/.github/actions/sbt/upload_logs
+        with:
+          name: "logs-performance-tests"
+
+#      - name: Report Failures on Slack & Github
+#        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+#        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
+#        with:
+#          job_subname: "${{ inputs.test_suite_name }} (${{ inputs.runner_index }})"
+#          workload_identity_provider: "${{ inputs.google_workload_identity_provider }}"
+#          service_account: "${{ inputs.failure_notifications_invoker_sa }}"
+#          notifications_url: "${{ inputs.failure_notifications_invoker_url }}"
+#          slack_channel: "${{ inputs.failure_notifications_slack_channel }}"
+
