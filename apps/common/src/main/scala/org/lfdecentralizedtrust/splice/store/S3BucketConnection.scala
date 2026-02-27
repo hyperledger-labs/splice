@@ -58,7 +58,7 @@ class S3BucketConnection(
 
   def newAppendWriteObject(
       key: String
-  )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
+  )(implicit ec: ExecutionContext, tc: TraceContext): AppendWriteObject = new AppendWriteObject(key)
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
@@ -67,6 +67,7 @@ class S3BucketConnection(
     */
   class AppendWriteObject protected[S3BucketConnection] (val key: String)(implicit
       ec: ExecutionContext,
+      tc: TraceContext,
   ) {
     val createRequest = CreateMultipartUploadRequest
       .builder()
@@ -74,7 +75,13 @@ class S3BucketConnection(
       .key(key)
       .build();
 
-    private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
+    private val uploadId = {
+      logger.debug(s"Creating multi-part upload for $key")
+      s3Client.createMultipartUpload(createRequest).asScala.map{
+        logger.debug(s"Multi-part upload for $key created")
+        _.uploadId()
+      }
+    }
     private val numParts = new AtomicInteger(0)
     private val parts = TrieMap.empty[Integer, CompletedPart]
 
@@ -85,8 +92,9 @@ class S3BucketConnection(
     /** Thread safe, may be called in parallel.
       *       partNumber must be an index returned from prepareUploadNext()
       */
-    def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
+    def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
       require(numParts.get() >= partNumber)
+      logger.debug(s"Uploading part $partNumber to $key")
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -109,6 +117,7 @@ class S3BucketConnection(
               .build(),
           )
           .fold {
+            logger.debug(s"Part $partNumber of $key uploaded")
             Future.successful(())
           }(_ =>
             Future.failed(new RuntimeException(s"Part number $partNumber uploaded more than once"))
