@@ -85,7 +85,7 @@ class S3BucketConnection(
     /** Thread safe, may be called in parallel.
       *       partNumber must be an index returned from prepareUploadNext()
       */
-    def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
+    def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       require(numParts.get() >= partNumber)
       for {
         id <- uploadId
@@ -96,7 +96,6 @@ class S3BucketConnection(
           .uploadId(id)
           .partNumber(partNumber)
           .build()
-        _ = logger.debug(s"Uploading part number $partNumber to object $key")
         response <- s3Client
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
           .asScala
@@ -110,7 +109,6 @@ class S3BucketConnection(
               .build(),
           )
           .fold {
-            logger.debug(s"Done uploading part number $partNumber to object $key")
             Future.successful(())
           }(_ =>
             Future.failed(new RuntimeException(s"Part number $partNumber uploaded more than once"))
