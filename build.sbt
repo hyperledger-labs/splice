@@ -1133,7 +1133,8 @@ lazy val `apps-scan` =
         scalapb_runtime,
         zstd,
         aws_s3,
-        s3mock_testcontainers,
+        s3proxy,
+        jclouds_fs, // not strictly required for s3proxy, but for reasons I don't understand it's much faster with this dependency, so we keep it.
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -2092,11 +2093,8 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
-  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
-  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
-  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
   def isLocalNetTest(name: String): Boolean =
-    name.contains("LocalNet") || name.contains("BulkStorageTest")
+    name.contains("LocalNet")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =

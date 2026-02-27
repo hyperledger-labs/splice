@@ -62,7 +62,10 @@ object Dependencies {
 
   lazy val zstd = "com.github.luben" % "zstd-jni" % "1.5.7-6"
 
-  lazy val aws_s3 = "software.amazon.awssdk" % "s3" % CantonDependencies.aws_version
+  lazy val aws_s3 = "software.amazon.awssdk" % "s3" % "2.30.22"
 
-  lazy val s3mock_testcontainers = "com.adobe.testing" % "s3mock-testcontainers" % "4.11.0" % "test"
+  lazy val s3proxy = "org.gaul" % "s3proxy" % "3.0.0" % Test
+
+  lazy val jclouds_fs = "org.apache.jclouds.api" % "filesystem" % "2.5.0" % Test
+
 }

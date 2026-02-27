@@ -13,6 +13,8 @@ org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProviderTest
+org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorageTest
+org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorageTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.ZstdTest
 org.lfdecentralizedtrust.splice.store.DomainTimeStoreTest
 org.lfdecentralizedtrust.splice.store.InMemorySynchronizerStoreTest
