@@ -104,6 +104,7 @@ object SvOnboardingConfig {
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      validatorFaucetCap: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

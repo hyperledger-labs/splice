@@ -346,6 +346,43 @@ testAllIssuanceForFund = script do
   expectedParameters_AllIssuanceForFund === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5_fundOne summaryExample1
 
 
--- Utility: apply 5% Development Fund allocation
+-- Example 6: zero validator faucet cap (CIP-0096)
+---------------------------------------------------
+
+-- When optValidatorFaucetCap=0, the faucet tranche issues nothing;
+-- the full unclaimed validator reward flows into unclaimedValidatorRewards.
+
+expectedParameters_E1_0_0p5_ZeroFaucetCap : IssuingRoundParameters
+expectedParameters_E1_0_0p5_ZeroFaucetCap =
+  expectedParameters_E1_0_0p5 with
+    issuancePerValidatorFaucetCoupon = 0.0 -- faucet cap is zero, so no faucet rewards
+    unclaimedValidatorRewards = 36051.7503805175 -- all faucet-eligible rewards remain unclaimed
+
+expectedParameters_E1_0_0p5_ZeroFaucetCap_DevFund5 : IssuingRoundParameters
+expectedParameters_E1_0_0p5_ZeroFaucetCap_DevFund5 =
+  expectedParameters_E1_0_0p5_DevFund5 with
+    issuancePerValidatorFaucetCoupon = 0.0 -- faucet cap is zero
+    unclaimedValidatorRewards = 34149.1628614916 -- all faucet-eligible rewards remain unclaimed
+
+testZeroFaucetCap : Script ()
+testZeroFaucetCap = script do
+  validateOpenMiningRoundSummary summaryExample1
+
+  -- 0% Development Fund
+  let config = withZeroFaucetCap issuanceConfig_0_0p5
+  expectedParameters_E1_0_0p5_ZeroFaucetCap === computeIssuingRoundParameters tickDuration amuletPrice config summaryExample1
+
+  -- 5% Development Fund
+  expectedParameters_E1_0_0p5_ZeroFaucetCap_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 config) summaryExample1
+
+
+-- Utilities
+-------------
+
+-- | Apply zero validator faucet cap (CIP-0096).
+withZeroFaucetCap : IssuanceConfig -> IssuanceConfig
+withZeroFaucetCap config = config with optValidatorFaucetCap = Some 0.0
+
+-- | Apply 5% Development Fund allocation.
 withDevFund5 : IssuanceConfig -> IssuanceConfig
 withDevFund5 config = config with optDevelopmentFundPercentage = Some 0.05
