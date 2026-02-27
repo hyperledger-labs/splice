@@ -55,7 +55,7 @@ class PackageVetting(
       PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1,
       PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
     ).map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg)) ++
-      DarResources.batchedMarkers.all.map(pkg =>
+      DarResources.utilBatchedMarkers.all.map(pkg =>
         PackageIdResolver.Package.SpliceUtilBatchedMarkers -> pkg.metadata.version
       )
 
