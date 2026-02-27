@@ -37,7 +37,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
         Map(
           "debug" -> "true"
         ).asJava)
-      .waitingFor(Wait.forHttp("/").forStatusCode(200))
+      .waitingFor(Wait.forHttp("/").forStatusCode(200).withStartupTimeout(java.time.Duration.ofMinutes(5)))
 
     container.setPortBindings(Seq("9090:9090").asJava)
     container.start()
