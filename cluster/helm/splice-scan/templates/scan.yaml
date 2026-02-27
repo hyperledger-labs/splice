@@ -8,6 +8,8 @@ kind: Deployment
 metadata:
   name: {{ $scanAppLabel }}
   namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- include "splice-util-lib.default-annotations" | nindent 4 }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
@@ -217,6 +219,8 @@ kind: Deployment
 metadata:
   name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- include "splice-util-lib.default-annotations" | nindent 4 }}
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" $scanWebUiAppLabel) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}

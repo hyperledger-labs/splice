@@ -237,7 +237,9 @@ app: {{ .app }}
 {{- end }}
 {{- end -}}
 {{- end -}}
-
+{{- define "splice-util-lib.default-annotations" -}}
+reloader.stakater.com/auto: "true"
+{{- end -}}
 {{- define "splice-util-lib.affinity" -}}
 {{- if or .enableAntiAffinity .affinity }}
 affinity:

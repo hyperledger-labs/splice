@@ -3336,6 +3336,86 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {},
+        "name": "reloader"
+      }
+    },
+    "name": "reloader",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "reloader",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "reloader",
+      "namespace": "reloader",
+      "repositoryOpts": {
+        "repo": "https://stakater.github.io/stakater-charts"
+      },
+      "values": {
+        "image": {
+          "pullPolicy": "Always"
+        },
+        "reloader": {
+          "containerSecurityContext": {
+            "allowPrivilegeEscalation": false,
+            "capabilities": {
+              "drop": [
+                "ALL"
+              ]
+            },
+            "readOnlyRootFilesystem": true
+          },
+          "deployment": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_infra",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_infra",
+                "operator": "Exists"
+              }
+            ]
+          },
+          "enableMetricsByNamespace": true,
+          "logFormat": "json",
+          "readOnlyRootFileSystem": true
+        },
+        "serviceMonitor": {
+          "enabled": true
+        }
+      },
+      "version": "2.2.8"
+    },
+    "name": "reloader",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "network": "projects/da-cn-devnet/global/networks/default"
     },
     "name": "router-test-stack",

@@ -26,6 +26,7 @@ import { configureIstio, istioMonitoring } from './istio';
 import { deployGCPodReaper } from './maintenance';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
+import { configureReloader } from './reloader';
 import { configureStorage } from './storage';
 
 const network = configureNetwork(clusterBasename, clusterBaseDomain);
@@ -79,6 +80,8 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
+
+configureReloader();
 
 installExtraCustomResources();
 
