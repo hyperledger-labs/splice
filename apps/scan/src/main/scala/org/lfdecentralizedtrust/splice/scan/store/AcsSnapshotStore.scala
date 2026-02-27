@@ -8,6 +8,8 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   AcsSnapshot,
+  IncrementalAcsSnapshot,
+  IncrementalAcsSnapshotTable,
   QueryAcsSnapshotResult,
   amuletQualifiedName,
   lockedAmuletQualifiedName,
@@ -24,9 +26,11 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryParts.*
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.jdbc.canton.SQLActionBuilder
 import slick.jdbc.{GetResult, JdbcProfile}
 
 import java.util.concurrent.Semaphore
@@ -407,12 +411,454 @@ class AcsSnapshotStore(
       }
   }
 
+  private def getIncrementalSnapshotAction(
+      table: IncrementalAcsSnapshotTable
+  ) = {
+    sql"""
+      select
+        snapshot_id,
+        history_id,
+        table_name,
+        record_time,
+        migration_id,
+        target_record_time
+      from acs_incremental_snapshot
+      where history_id = $historyId
+        and table_name = ${table.tableName}
+    """.as[IncrementalAcsSnapshot].headOption
+  }
+
+  /** The state of an incremental snapshot.
+    *
+    * @param table The table name of the incremental snapshot.
+    *              MUST be a compile time constant, as it is included directly in the SQL statement.
+    */
+  def getIncrementalSnapshot(
+      table: IncrementalAcsSnapshotTable
+  )(implicit tc: TraceContext): Future[Option[IncrementalAcsSnapshot]] = {
+    storage
+      .querySingle(
+        getIncrementalSnapshotAction(table),
+        "getIncrementalSnapshot",
+      )
+      .value
+  }
+
+  /** Wraps the given database action in a transaction that makes sure the action silently
+    * does nothing if the action has already been applied.
+    *
+    * Note: Database actions must be idempotent in Canton.
+    * For incremental snapshots, all methods of this store modify the state of the incremental snapshot
+    * (i.e., the acs_incremental_snapshot table). We therefore use the state to determine if
+    * an action has already been applied.
+    */
+  private def withIncrementalSnapshotIdempotencyCheck[R, E <: Effect](
+      table: IncrementalAcsSnapshotTable,
+      action: DBIOAction[R, NoStream, E],
+      expectedState: Option[IncrementalAcsSnapshot],
+  )(implicit
+      tc: TraceContext
+  ): DBIOAction[Unit, NoStream, Effect.Transactional & Effect.Read & E] = {
+    (for {
+      actualState <- getIncrementalSnapshotAction(table)
+      result <-
+        if (actualState == expectedState) {
+          action.map(_ => ())
+        } else {
+          logger.info(
+            s"Skipping action because actual state $actualState != expected state $expectedState. " +
+              "In production, this is expected only during retries after transient network failures."
+          )
+          DBIOAction.unit
+        }
+    } yield result).transactionally
+  }
+
+  /** Initializes an incremental snapshot from a snapshot stored in historical storage.
+    *
+    * @param table             The table name of the incremental snapshot.
+    *                          MUST be a compile time constant, as it is included directly in the SQL statement.
+    * @param initializeFrom    The snapshot to initialize from.
+    * @param targetRecordTime  The record time at which the incremental snapshot should be finished and copied back
+    *                          to a historical snapshot.
+    */
+  def initializeIncrementalSnapshot(
+      table: IncrementalAcsSnapshotTable,
+      initializeFrom: AcsSnapshot,
+      targetRecordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    assert(targetRecordTime.isAfter(initializeFrom.snapshotRecordTime))
+    val statement = for {
+      snapshotId <- sql"""
+        insert into acs_incremental_snapshot (
+          history_id,
+          table_name,
+          record_time,
+          migration_id,
+          target_record_time
+        )
+        values (
+          ${historyId},
+          ${table.tableName},
+          ${initializeFrom.snapshotRecordTime},
+          ${initializeFrom.migrationId},
+          ${targetRecordTime}
+        )
+        returning snapshot_id
+      """.as[Long].head
+      _ <- (sql"""
+        insert into #${table.tableName} (
+          """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
+          snapshot_id
+        )
+
+
+        select
+          """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
+          $snapshotId
+        from acs_snapshot_data d
+        join update_history_creates c on d.create_id=c.row_id
+        where
+          d.row_id <= ${initializeFrom.firstRowId}
+          and d.row_id >= ${initializeFrom.lastRowId}
+          -- The source table `acs_snapshot_data` contains one row per stakeholder for each contract,
+          -- the target table contains only one row per contract.
+          -- We know the DSO is a stakeholder of all contracts in the scan ACS, so we can filter by that.
+          and d.stakeholder = $dsoParty
+      """).toActionBuilder.asUpdate
+    } yield ()
+
+    storage.queryAndUpdate(
+      withIncrementalSnapshotIdempotencyCheck(table, statement, None),
+      "initializeIncrementalSnapshot",
+    )
+  }
+
+  /** Initializes an incremental snapshot that represents an empty ACS at the given record time.
+    *
+    * @param table             The table name of the incremental snapshot.
+    *                          MUST be a compile time constant, as it is included directly in the SQL statement.
+    * @param recordTime        The record time as of which the ACS is empty. Use a time just before the first
+    *                          non-import update.
+    * @param targetRecordTime  The record time at which the incremental snapshot should be finished and copied back
+    *                          to a historical snapshot.
+    * @param migrationId       The migration id of the snapshot.
+    */
+  def initializeIncrementalSnapshotFromImportUpdates(
+      table: IncrementalAcsSnapshotTable,
+      recordTime: CantonTimestamp,
+      targetRecordTime: CantonTimestamp,
+      migrationId: Long,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    assert(targetRecordTime.isAfter(recordTime))
+    val statement = for {
+      snapshotId <- sql"""
+          insert into acs_incremental_snapshot (
+            history_id,
+            table_name,
+            record_time,
+            migration_id,
+            target_record_time
+          )
+          values (
+            ${historyId},
+            ${table.tableName},
+            ${recordTime},
+            ${migrationId},
+            ${targetRecordTime}
+          )
+          returning snapshot_id
+        """.as[Long].head
+      insertedRows <-
+        (sql"""
+          insert into #${table.tableName} (
+            """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
+            snapshot_id
+          )
+          select
+            """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
+            $snapshotId
+          from update_history_creates c
+          where history_id = $historyId
+            and migration_id = ${migrationId}
+            and record_time = ${CantonTimestamp.MinValue}
+        """).toActionBuilder.asUpdate
+    } yield {
+      logger.debug(
+        s"Initialized incremental snapshot $snapshotId at $recordTime from import updates. ACS: $insertedRows."
+      )
+      ()
+    }
+
+    storage.queryAndUpdate(
+      withIncrementalSnapshotIdempotencyCheck(table, statement, None),
+      "initializeIncrementalSnapshotFromImportUpdates",
+    )
+  }
+
+  /** Copies an incremental snapshot to historical storage.
+    *
+    * @param table The table name of the incremental snapshot.
+    *   MUST be a compile time constant, as it is included directly in the SQL statement.
+    * @param snapshot The incremental snapshot to update.
+    * @param nextSnapshotTargetRecordTime The record time at which the next incremental snapshot
+    *   should be finished and copied back to a historical snapshot.
+    */
+  def saveIncrementalSnapshot(
+      table: IncrementalAcsSnapshotTable,
+      snapshot: IncrementalAcsSnapshot,
+      nextSnapshotTargetRecordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    logger.debug(
+      s"Saving incremental snapshot ${snapshot.snapshotId} at ${snapshot.recordTime}"
+    )
+    assert(snapshot.tableName == table.tableName)
+    assert(snapshot.historyId == historyId)
+    assert(snapshot.recordTime == snapshot.targetRecordTime)
+    val statement = for {
+      // Note: Only one client can write to acs_snapshot_data at a time, enforced via advisory locks.
+      // We therefore don't need to worry about concurrent writes between getting max_row_id_before and using it.
+      max_row_id_before <- sql"""
+        select coalesce(max(row_id), -1) from acs_snapshot_data
+      """.as[Long].head
+
+      // Copy rows from incremental snapshot to acs_snapshot_data.
+      // This is the main, slow part of this operation.
+      copied_rows <- sqlu"""
+        insert into acs_snapshot_data (create_id, template_id, stakeholder)
+        select s.create_id, s.template_id, stakeholder
+        from #${table.tableName} s
+        cross join unnest(s.stakeholders) as stakeholder
+        where s.snapshot_id = ${snapshot.snapshotId}
+        order by created_at, contract_id
+      """
+
+      (min_row_id, max_row_id) <- sql"""
+        select
+          min(row_id) as min_row_id,
+          max(row_id) as max_row_id
+        from acs_snapshot_data
+        where row_id > $max_row_id_before
+      """.as[(Long, Long)].head
+
+      (unlocked_amulet_balance, locked_amulet_balance) <- sql"""
+        select
+            sum(s.unlocked_amulet_balance) AS unlocked_amulet_balance,
+            sum(s.locked_amulet_balance) AS locked_amulet_balance
+        from #${table.tableName} s
+        where snapshot_id = ${snapshot.snapshotId}
+      """.as[(BigDecimal, BigDecimal)].head
+
+      _ <- sqlu"""
+        insert into acs_snapshot (
+          snapshot_record_time,
+          migration_id,
+          history_id,
+          first_row_id,
+          last_row_id,
+          unlocked_amulet_balance,
+          locked_amulet_balance
+        )
+        values (
+          ${snapshot.recordTime},
+          ${snapshot.migrationId},
+          ${snapshot.historyId},
+          ${min_row_id},
+          ${max_row_id},
+          ${unlocked_amulet_balance},
+          ${locked_amulet_balance}
+        )
+       """
+
+      _ <- sqlu"""
+        update acs_incremental_snapshot
+        set
+          target_record_time = ${nextSnapshotTargetRecordTime}
+        where snapshot_id = ${snapshot.snapshotId}
+      """
+    } yield {
+      logger.debug(
+        s"Saved incremental snapshot ${snapshot.snapshotId} at ${snapshot.recordTime} with $copied_rows rows." +
+          s" Next snapshot target record time: $nextSnapshotTargetRecordTime"
+      )
+      ()
+    }
+    storage.queryAndUpdate(
+      withExclusiveSnapshotDataLock(
+        withIncrementalSnapshotIdempotencyCheck(
+          table,
+          statement,
+          Some(snapshot),
+        )
+      ),
+      "saveIncrementalSnapshot",
+    )
+  }
+
+  /** Updates an incremental snapshot to a new record time.
+    *
+    * @param table             The table name of the incremental snapshot.
+    *                          MUST be a compile time constant, as it is included directly in the SQL statement.
+    * @param snapshot          The incremental snapshot to update.
+    * @param targetRecordTime  The record time to update the snapshot to.
+    */
+  def updateIncrementalSnapshot(
+      table: IncrementalAcsSnapshotTable,
+      snapshot: IncrementalAcsSnapshot,
+      targetRecordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    assert(snapshot.tableName == table.tableName)
+    assert(snapshot.historyId == historyId)
+    // snapshot.recordTime < targetRecordTime <= snapshot.targetRecordTime
+    assert(targetRecordTime.isAfter(snapshot.recordTime))
+    assert(!targetRecordTime.isAfter(snapshot.targetRecordTime))
+    logger.debug(
+      s"Updating incremental snapshot ${snapshot.snapshotId} from ${snapshot.recordTime} to $targetRecordTime"
+    )
+    val statement = for {
+      insertedRows <-
+        (sql"""
+          insert into #${table.tableName} (
+            """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
+            snapshot_id
+          )
+          select
+            """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
+            ${snapshot.snapshotId}
+          from update_history_creates c
+          where history_id = $historyId
+            and migration_id = ${snapshot.migrationId}
+            and record_time > ${snapshot.recordTime}
+            and record_time <= $targetRecordTime
+        """).toActionBuilder.asUpdate
+      deletedRows <-
+        sql"""
+          delete
+          from #${table.tableName} as s
+          using update_history_exercises as e
+          where s.snapshot_id = ${snapshot.snapshotId}
+            and s.contract_id = e.contract_id
+            and e.history_id = $historyId
+            and e.migration_id = ${snapshot.migrationId}
+            and e.record_time > ${snapshot.recordTime}
+            and e.record_time <= $targetRecordTime
+            and e.consuming
+        """.as[Int].head
+      _ <- sqlu"""
+          update acs_incremental_snapshot
+          set record_time = $targetRecordTime
+          where snapshot_id = ${snapshot.snapshotId}
+        """
+    } yield {
+      logger.info(
+        s"Updated incremental snapshot ${snapshot.snapshotId} from ${snapshot.recordTime} to $targetRecordTime. ACS: +$insertedRows, -$deletedRows."
+      )
+      ()
+    }
+    storage.queryAndUpdate(statement.transactionally, "updateIncrementalSnapshot")
+  }
+
+  def deleteIncrementalSnapshot(
+      table: IncrementalAcsSnapshotTable,
+      snapshot: IncrementalAcsSnapshot,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    assert(snapshot.tableName == table.tableName)
+    assert(snapshot.historyId == historyId)
+    val statement = for {
+      _ <- sqlu"""delete from #${table.tableName} where snapshot_id = ${snapshot.snapshotId}"""
+      _ <- sqlu"""delete from acs_incremental_snapshot where snapshot_id = ${snapshot.snapshotId}"""
+    } yield ()
+    storage.queryAndUpdate(
+      withIncrementalSnapshotIdempotencyCheck(table, statement, Some(snapshot)),
+      "deleteIncrementalSnapshot",
+    )
+  }
 }
 
 object AcsSnapshotStore {
 
+  sealed trait IncrementalAcsSnapshotTable { def tableName: String }
+  object IncrementalAcsSnapshotTable {
+    case object Next extends IncrementalAcsSnapshotTable {
+      val tableName: String = "acs_incremental_snapshot_data_next"
+    }
+    case object Backfill extends IncrementalAcsSnapshotTable {
+      val tableName: String = "acs_incremental_snapshot_data_backfill"
+    }
+  }
+
   // Only relevant for tests, in production this is already guaranteed.
   private val PreventConcurrentSnapshotsSemaphore = new Semaphore(1)
+
+  final case class IncrementalAcsSnapshot(
+      snapshotId: Long,
+      historyId: Long,
+      tableName: String,
+      recordTime: CantonTimestamp,
+      migrationId: Long,
+      targetRecordTime: CantonTimestamp,
+  ) extends PrettyPrinting {
+
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+
+    override def pretty: Pretty[this.type] = prettyOfClass(
+      param("snapshotId", _.snapshotId),
+      param("historyId", _.historyId),
+      param("tableName", _.tableName.unquoted),
+      param("recordTime", _.recordTime),
+      param("migrationId", _.migrationId),
+      param("targetRecordTime", _.targetRecordTime),
+    )
+  }
+
+  object IncrementalAcsSnapshot {
+    implicit val incrementalSnapshotGetResult: GetResult[IncrementalAcsSnapshot] = GetResult(r =>
+      IncrementalAcsSnapshot(
+        snapshotId = r.<<[Long],
+        historyId = r.<<[Long],
+        tableName = r.<<[String],
+        recordTime = r.<<[CantonTimestamp],
+        migrationId = r.<<[Long],
+        targetRecordTime = r.<<[CantonTimestamp],
+      )
+    )
+  }
+
+  object QueryParts {
+
+    val copyFromUpdateHistoryTargetColumns: SQLActionBuilder =
+      sql"""
+      create_id,
+      contract_id,
+      created_at,
+      unlocked_amulet_balance,
+      locked_amulet_balance,
+      template_id,
+      stakeholders
+    """
+    val copyFromUpdateHistorySourceColumns: SQLActionBuilder =
+      sql"""
+      c.row_id,
+      c.contract_id,
+      c.created_at,
+      case
+        when package_name = ${Amulet.COMPANION.PACKAGE_NAME}
+          and template_id_module_name = ${Amulet.COMPANION.TEMPLATE_ID.getModuleName}
+          and template_id_entity_name = ${Amulet.COMPANION.TEMPLATE_ID.getEntityName}
+        then (c.create_arguments->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric
+        else 0
+      end,
+      case
+        when package_name = ${LockedAmulet.COMPANION.PACKAGE_NAME}
+          and template_id_module_name = ${LockedAmulet.COMPANION.TEMPLATE_ID.getModuleName}
+          and template_id_entity_name = ${LockedAmulet.COMPANION.TEMPLATE_ID.getEntityName}
+        then (c.create_arguments->'record'->'fields'->0->'value'->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric
+        else 0
+      end,
+      concat(c.package_name, ':', c.template_id_module_name, ':', c.template_id_entity_name) as template_id,
+      array_cat(c.signatories, c.observers)
+    """
+  }
 
   case class AcsSnapshot(
       snapshotRecordTime: CantonTimestamp,

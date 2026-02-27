@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import cats.data.NonEmptyVector
-import com.daml.ledger.javaapi.data.Unit as damlUnit
+import com.daml.ledger.javaapi.data.{Unit as damlUnit}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.DarResources
@@ -814,7 +814,7 @@ class AcsSnapshotStoreTest
           store1 = mkStore(updateHistory1)
           migrationsWithCorruptSnapshots1 <- store1.updateHistory.migrationsWithCorruptSnapshots()
           _ = migrationsWithCorruptSnapshots1 shouldBe Set.empty
-          update1 <- ingestCreate(
+          _ <- ingestCreate(
             updateHistory1,
             amuletRules(),
             timestamp1.minusSeconds(1L),
@@ -1027,6 +1027,267 @@ class AcsSnapshotStoreTest
           snapshot.lockedAmuletBalance should be(
             Some(BigDecimal(locked.last._1.payload.amulet.amount.initialAmount))
           )
+        }
+      }
+    }
+
+    "incremental snapshot generation" should {
+      "return None when no snapshot is available" in {
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          incrementalSnapshotN <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+          incrementalSnapshotB <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
+          )
+        } yield {
+          incrementalSnapshotN should be(None)
+          incrementalSnapshotB should be(None)
+        }
+      }
+
+      "initialize from snapshot" in {
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- ingestCreate(
+            updateHistory,
+            amuletRules(),
+            timestamp1.minusSeconds(1L),
+          )
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          snapshot1 <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
+
+          _ <- store.initializeIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            snapshot1.value,
+            timestamp2,
+          )
+
+          incrementalSnapshotN <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+          incrementalSnapshotB <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
+          )
+        } yield {
+          incrementalSnapshotB shouldBe None
+
+          incrementalSnapshotN should not be empty
+          snapshot1 should not be empty
+          incrementalSnapshotN.value.recordTime shouldBe snapshot1.value.snapshotRecordTime
+          incrementalSnapshotN.value.migrationId shouldBe snapshot1.value.migrationId
+          incrementalSnapshotN.value.targetRecordTime shouldBe timestamp2
+        }
+      }
+
+      "initialize from import updates" in {
+        val c1 = amulet(providerParty(1), 1, 1, 0.1)
+        val c2 = amulet(providerParty(1), 2, 2, 0.2)
+        val c3 = amulet(providerParty(1), 3, 3, 0.3)
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+
+          _ <- ingestCreate(updateHistory, c1, CantonTimestamp.MinValue)
+          _ <- ingestCreate(updateHistory, c2, CantonTimestamp.MinValue)
+          _ <- ingestCreate(updateHistory, c3, timestamp1)
+
+          snapshotRecordTime = timestamp1.minusSeconds(1L)
+          _ <- store.initializeIncrementalSnapshotFromImportUpdates(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            snapshotRecordTime,
+            timestamp2,
+            DefaultMigrationId,
+          )
+          incrementalSnapshotN <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+          incrementalSnapshotB <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
+          )
+
+        } yield {
+          incrementalSnapshotB shouldBe None
+
+          incrementalSnapshotN should not be empty
+          incrementalSnapshotN.value.recordTime shouldBe snapshotRecordTime
+          incrementalSnapshotN.value.migrationId shouldBe DefaultMigrationId
+          incrementalSnapshotN.value.targetRecordTime shouldBe timestamp2
+        }
+      }
+
+      "calculate two snapshots in a row" in {
+        val party = providerParty(1)
+        val c01 = amulet(party, 1, 1, 0.1)
+        val c02 = amulet(party, 2, 2, 0.2)
+        val cid01 = c01.contractId.contractId
+        val cid02 = c02.contractId.contractId
+
+        // Generate some artificial history with a mix of
+        // creates, archives, and non-consuming exercises
+        def ingestHistory(
+            updateHistory: UpdateHistory,
+            t: Long,
+        ): Future[(Long, String)] = {
+          val c1 = amulet(party, t, t, 0.1)
+          val c2 = amulet(party, t, t, 0.1)
+          logger.info(
+            s"Ingesting 4 updates between T${t + 2} and T${t + 8}, adding contract ${c2.contractId.contractId} to the ACS"
+          )
+          for {
+            // Transactions at even seconds so that it's easy to create timestamps in between
+            _ <- ingestCreate(updateHistory, c1, timestamp1.plusSeconds(t + 2))
+            _ <- ingestCreate(updateHistory, c2, timestamp1.plusSeconds(t + 4))
+            _ <- ingestNonConsuming(updateHistory, c2, timestamp1.plusSeconds(t + 6))
+            _ <- ingestArchive(updateHistory, c1, timestamp1.plusSeconds(t + 8))
+          } yield (t * 8 + 8, c2.contractId.contractId)
+        }
+
+        for {
+          updateHistoryM1 <- mkUpdateHistory(migrationId = 1L)
+          storeM1 = mkStore(updateHistoryM1)
+
+          _ <- clueF(s"Ingest some import updates")(for {
+            _ <- ingestCreate(updateHistoryM1, c01, CantonTimestamp.MinValue)
+            _ <- ingestCreate(updateHistoryM1, c02, CantonTimestamp.MinValue)
+          } yield ())
+
+          _ <- clueF(s"Snapshot A: start from import updates at T0")(
+            storeM1.initializeIncrementalSnapshotFromImportUpdates(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              recordTime = timestamp1,
+              targetRecordTime = timestamp1.plusSeconds(9L),
+              1L,
+            )
+          )
+
+          cid1 <- clueF(
+            "Snapshot A: ingest some history, then update the incremental snapshot"
+          )(
+            for {
+              (_, cid1) <- ingestHistory(updateHistoryM1, 0L)
+              snapshot <- storeM1.getIncrementalSnapshot(
+                AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+              )
+              _ <- storeM1.updateIncrementalSnapshot(
+                AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+                snapshot.value,
+                // Note: there is no event at exactly T9
+                timestamp1.plusSeconds(9L),
+              )
+            } yield cid1
+          )
+
+          _ <- clueF(s"Snapshot A: finalize snapshot at T9")(for {
+            snapshot <- storeM1.getIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            )
+            _ = snapshot.value.recordTime shouldBe timestamp1.plusSeconds(9L)
+            _ <- storeM1.saveIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              snapshot.value,
+              nextSnapshotTargetRecordTime = timestamp1.plusSeconds(20L),
+            )
+          } yield ())
+
+          _ <- clueF(s"Snapshot A: should return correct result at T9")(for {
+            result <- storeM1.queryAcsSnapshot(
+              1L,
+              timestamp1.plusSeconds(9L),
+              None,
+              PageLimit.tryCreate(10),
+              Seq.empty,
+              Seq.empty,
+            )
+            _ = result.createdEventsInPage
+              .map(_.event.getContractId) should contain theSameElementsInOrderAs Seq(
+              cid01,
+              cid02,
+              cid1,
+            )
+          } yield ())
+
+          cid2 <- clueF(
+            "Snapshot B: ingest some history, then update the incremental snapshot"
+          )(for {
+            (_, cid2) <- ingestHistory(updateHistoryM1, 12L)
+            snapshot <- storeM1.getIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            )
+            _ <- storeM1.updateIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              snapshot.value,
+              // Note: there is an event at exactly T20
+              timestamp1.plusSeconds(20L),
+            )
+          } yield cid2)
+
+          _ <- clueF(s"Snapshot B: finalize snapshot at T20")(for {
+            snapshot <- storeM1.getIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            )
+            _ = snapshot.value.recordTime shouldBe timestamp1.plusSeconds(20L)
+            _ <- storeM1.saveIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              snapshot.value,
+              nextSnapshotTargetRecordTime = timestamp1.plusSeconds(30L),
+            )
+          } yield ())
+
+          _ <- clueF(s"Snapshot B: should return correct result at T20")(for {
+            result <- storeM1.queryAcsSnapshot(
+              1L,
+              timestamp1.plusSeconds(20L),
+              None,
+              PageLimit.tryCreate(10),
+              Seq.empty,
+              Seq.empty,
+            )
+            _ = result.createdEventsInPage
+              .map(_.event.getContractId) should contain theSameElementsInOrderAs Seq(
+              cid01,
+              cid02,
+              cid1,
+              cid2,
+            )
+          } yield ())
+
+        } yield {
+          succeed
+        }
+      }
+
+      "delete snapshot" in {
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+
+          _ <- ingestCreate(updateHistory, amuletRules(), CantonTimestamp.MinValue)
+
+          _ <- store.initializeIncrementalSnapshotFromImportUpdates(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            timestamp2,
+            timestamp3,
+            DefaultMigrationId,
+          )
+
+          incrementalSnapshotBefore <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+
+          _ <- store.deleteIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            incrementalSnapshotBefore.value,
+          )
+
+          incrementalSnapshotAfter <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+        } yield {
+          incrementalSnapshotAfter shouldBe None
         }
       }
     }
