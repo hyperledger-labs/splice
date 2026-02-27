@@ -30,7 +30,8 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     "mock_key",
   )
 
-  def startContainer() = {
+  private def startContainer() = {
+    logger.debug("Starting s3mock container")
     val container = new S3MockContainer("4.11.0")
       .withInitialBuckets("bucket")
       .withExposedPorts(9090)
@@ -42,6 +43,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
 
     container.setPortBindings(Seq("9090:9090").asJava)
     container.start()
+    logger.debug("Done starting s3mock container")
 
     container.followOutput { frame =>
       logger.debug(s"[s3Mock] ${frame.getUtf8String}")
