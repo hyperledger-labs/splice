@@ -645,7 +645,7 @@ testExpireTransferInstructionAlreadyUnlocked = do
   submit sender.primaryParty $ exerciseCmd lockedAmuletCid LockedAmulet_OwnerExpireLockV2
 
   lockedAmuletsAfterOwnerExpire <- query @LockedAmulet sender.primaryParty
-  length lockedAmuletsAfterOwnerExpire === 0  
+  lockedAmuletsAfterOwnerExpire === []  
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
