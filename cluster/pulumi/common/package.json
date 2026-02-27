@@ -14,7 +14,7 @@
     "@types/auth0": "^3.3.11",
     "auth0": "^4.28.0",
     "dotenv": "^16.4.5",
-    "dotenv-expand": "^11.0.6",
+    "dotenv-expand": "^12.0.3",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "node-fetch": "^2.7.0",
