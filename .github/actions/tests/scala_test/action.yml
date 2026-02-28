@@ -95,12 +95,6 @@ runs:
   using: "composite"
   steps:
 
-    - name: Test
-      uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
-      with:
-        cmd: echo "!!!!!!!!!!!!!!!!!! TEST 1 !!!!!!!!!!!!!!!!"
-
-
     - name: Setup
       uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
       with:
@@ -113,23 +107,16 @@ runs:
         # TODO(#1296): When this runner stops using non-oss, move this to one that does
         save_nix_cache: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'canton-enterprise' }}
 
-    - name: Test
+    - name: Wait for postgres
       uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
       with:
-        cmd: echo "!!!!!!!!!!!!!!!!!! TEST 2 !!!!!!!!!!!!!!!!"
-
-    # FIXME: uncomment
-
-    # - name: Wait for postgres
-    #   uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
-    #   env:
-    #     POSTGRES_HOST: localhost
-    #     POSTGRES_PORT: 5432
-    #     POSTGRES_USER: postgres
-    #     POSTGRES_PASSWORD: postgres
-    #   with:
-    #     cmd: ./scripts/postgres.sh external wait
-    #     additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+        cmd: ./scripts/postgres.sh external wait
+        additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
 
     # Starting canton before setting up SBT, to gain a bit of time doing both in parallel
     - name: Start Canton
