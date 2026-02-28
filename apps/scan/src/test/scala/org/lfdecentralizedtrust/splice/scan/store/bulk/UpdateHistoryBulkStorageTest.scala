@@ -54,222 +54,222 @@ class UpdateHistoryBulkStorageTest
   "UpdateHistoryBulkStorage" should {
 
     "multipart upload works" in {
-        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-        val o = bucketConnection.newAppendWriteObject("test")
-        o.prepareUploadNext()
-        o.prepareUploadNext()
-        for {
-          _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
-          _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
-          _ <- o.finish()
-          content <- bucketConnection.readFullObject("test")
-        } yield {
-          new String(content.array(), "UTF-8") shouldBe "helloworld"
-        }
+      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val o = bucketConnection.newAppendWriteObject("test")
+      o.prepareUploadNext()
+      o.prepareUploadNext()
+      for {
+        _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
+        _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
+        _ <- o.finish()
+        content <- bucketConnection.readFullObject("test")
+      } yield {
+        new String(content.array(), "UTF-8") shouldBe "helloworld"
+      }
     }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
-        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-        val initialStoreSize = 1500
-        val segmentSize = 2200L
-        val segmentFromTimestamp = 100L
-        val mockStore =
-          new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli)
-        val fromTimestamp =
-          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
-        val toTimestamp =
-          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
+      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val initialStoreSize = 1500
+      val segmentSize = 2200L
+      val segmentFromTimestamp = 100L
+      val mockStore =
+        new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli)
+      val fromTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
+      val toTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
 
-        val segment = UpdatesSegment(
-          TimestampWithMigrationId(fromTimestamp, 0),
-          TimestampWithMigrationId(toTimestamp, 0),
+      val segment = UpdatesSegment(
+        TimestampWithMigrationId(fromTimestamp, 0),
+        TimestampWithMigrationId(toTimestamp, 0),
+      )
+      val metricsFactory = new InMemoryMetricsFactory
+      val probe = UpdateHistorySegmentBulkStorage
+        .asSource(
+          bulkStorageTestConfig,
+          appConfig,
+          mockStore.store,
+          bucketConnection,
+          segment,
+          new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+          loggerFactory,
         )
-        val metricsFactory = new InMemoryMetricsFactory
-        val probe = UpdateHistorySegmentBulkStorage
-          .asSource(
-            bulkStorageTestConfig,
-            appConfig,
-            mockStore.store,
-            bucketConnection,
+        .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
+        .run()
+
+      probe.request(3)
+
+      clue(
+        "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
+      ) {
+        probe.expectNoMessage(20.seconds)
+      }
+
+      clue(
+        "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
+      ) {
+        mockStore.mockIngestion(1000)
+        probe.expectNext(20.seconds) should be(
+          UpdateHistorySegmentBulkStorage.Output(
             segment,
-            new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
-            loggerFactory,
+            "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
+            isLastObjectInSegment = false,
           )
-          .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
-          .run()
-
-        probe.request(3)
-
-        clue(
-          "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
-        ) {
-          probe.expectNoMessage(20.seconds)
-        }
-
-        clue(
-          "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
-        ) {
-          mockStore.mockIngestion(1000)
-          probe.expectNext(20.seconds) should be(
-            UpdateHistorySegmentBulkStorage.Output(
-              segment,
-              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
-              isLastObjectInSegment = false,
-            )
+        )
+        probe.expectNext(20.seconds) should be(
+          UpdateHistorySegmentBulkStorage.Output(
+            segment,
+            "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
+            isLastObjectInSegment = true,
           )
-          probe.expectNext(20.seconds) should be(
-            UpdateHistorySegmentBulkStorage.Output(
-              segment,
-              "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
-              isLastObjectInSegment = true,
-            )
-          )
-          probe.expectComplete()
-          val objectCountMetrics = metricsFactory.metrics.counters
-            .get(SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count")
-            .value
-          val numObjectsFromMetric = objectCountMetrics
-            .get(MetricsContext.Empty)
-            .value
-            .markers
-            .get(MetricsContext("object_type" -> "updates"))
-            .value
-            .get()
-          numObjectsFromMetric shouldBe 2
-        }
+        )
+        probe.expectComplete()
+        val objectCountMetrics = metricsFactory.metrics.counters
+          .get(SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count")
+          .value
+        val numObjectsFromMetric = objectCountMetrics
+          .get(MetricsContext.Empty)
+          .value
+          .markers
+          .get(MetricsContext("object_type" -> "updates"))
+          .value
+          .get()
+        numObjectsFromMetric shouldBe 2
+      }
 
-        clue("Check that the dumped content is correct") {
-          for {
-            s3Objects <- bucketConnection.listObjects
-            allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
-              None,
-              HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
-            )
-            segmentUpdates = allUpdates.filter(update =>
-              update.update.update.recordTime > fromTimestamp &&
-                update.update.update.recordTime <= toTimestamp
-            )
-          } yield {
-            val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
-            objectKeys should have length 2
-            s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
-            val allUpdatesFromS3 = objectKeys.flatMap(
-              readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
-            )
-            allUpdatesFromS3.length shouldBe segmentUpdates.length
-            allUpdatesFromS3
-              .map(
-                new CompactJsonScanHttpEncodings(identity, identity).httpToLapiUpdate
-              ) should contain theSameElementsInOrderAs segmentUpdates
-          }
+      clue("Check that the dumped content is correct") {
+        for {
+          s3Objects <- bucketConnection.listObjects
+          allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
+            None,
+            HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
+          )
+          segmentUpdates = allUpdates.filter(update =>
+            update.update.update.recordTime > fromTimestamp &&
+              update.update.update.recordTime <= toTimestamp
+          )
+        } yield {
+          val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+          objectKeys should have length 2
+          s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
+          val allUpdatesFromS3 = objectKeys.flatMap(
+            readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
+          )
+          allUpdatesFromS3.length shouldBe segmentUpdates.length
+          allUpdatesFromS3
+            .map(
+              new CompactJsonScanHttpEncodings(identity, identity).httpToLapiUpdate
+            ) should contain theSameElementsInOrderAs segmentUpdates
         }
+      }
     }
 
     "successfully dump all segments" in {
-        val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-        val initialStoreSize = 2000
-        val genesisDate = LocalDate.of(2001, 1, 23)
-        val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)
-        val metricsFactory = new InMemoryMetricsFactory
-        def latestSegmentMetrics = metricsFactory.metrics.gauges
-          .get(
-            SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "latest-updates-segment"
-          )
-          .value
-
-        val mockStore = new MockUpdateHistoryStore(
-          initialStoreSize,
-          i => genesisInstant.plusSeconds(i * 10),
+      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val initialStoreSize = 2000
+      val genesisDate = LocalDate.of(2001, 1, 23)
+      val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)
+      val metricsFactory = new InMemoryMetricsFactory
+      def latestSegmentMetrics = metricsFactory.metrics.gauges
+        .get(
+          SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "latest-updates-segment"
         )
+        .value
 
-        for {
-          kvProvider <- mkProvider
-        } yield {
-          def newUpdatesBulkStorageFlow(
-              migrationId: Long
-          ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
-            new UpdateHistoryBulkStorage(
-              bulkStorageTestConfig,
-              appConfig,
-              mockStore.store,
-              kvProvider,
-              migrationId,
-              bucketConnection,
-              new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
-              loggerFactory,
-            ).getSource()
-              .toMat(TestSink.probe[UpdatesSegment])(Keep.both)
-              .run()
-          }
+      val mockStore = new MockUpdateHistoryStore(
+        initialStoreSize,
+        i => genesisInstant.plusSeconds(i * 10),
+      )
 
-          val (killSwitch, probe) = newUpdatesBulkStorageFlow(0L)
+      for {
+        kvProvider <- mkProvider
+      } yield {
+        def newUpdatesBulkStorageFlow(
+            migrationId: Long
+        ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
+          new UpdateHistoryBulkStorage(
+            bulkStorageTestConfig,
+            appConfig,
+            mockStore.store,
+            kvProvider,
+            migrationId,
+            bucketConnection,
+            new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+            loggerFactory,
+          ).getSource()
+            .toMat(TestSink.probe[UpdatesSegment])(Keep.both)
+            .run()
+        }
 
-          probe.request(4)
-          val seg1 = UpdatesSegment(
-            TimestampWithMigrationId(CantonTimestamp.MinValue, 0),
+        val (killSwitch, probe) = newUpdatesBulkStorageFlow(0L)
+
+        probe.request(4)
+        val seg1 = UpdatesSegment(
+          TimestampWithMigrationId(CantonTimestamp.MinValue, 0),
+          TimestampWithMigrationId(
+            CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
+            0,
+          ),
+        )
+        probe.expectNext(20.seconds) shouldBe seg1
+        def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) =
+          UpdatesSegment(
             TimestampWithMigrationId(
-              CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
-              0,
+              CantonTimestamp.tryFromInstant(
+                genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
+              ),
+              fromMigration.toLong,
+            ),
+            TimestampWithMigrationId(
+              CantonTimestamp.tryFromInstant(
+                genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
+              ),
+              toMigration.toLong,
             ),
           )
-          probe.expectNext(20.seconds) shouldBe seg1
-          def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) =
-            UpdatesSegment(
-              TimestampWithMigrationId(
-                CantonTimestamp.tryFromInstant(
-                  genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
-                ),
-                fromMigration.toLong,
-              ),
-              TimestampWithMigrationId(
-                CantonTimestamp.tryFromInstant(
-                  genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
-                ),
-                toMigration.toLong,
-              ),
-            )
 
-          def assertLatestSegmentInMetrics(hour: Int) =
-            latestSegmentMetrics.get(MetricsContext.Empty).value.value.get()._1 shouldBe genesisDate
-              .atTime(hour, 0)
-              .toInstant(ZoneOffset.UTC)
-              .toEpochMilli * 1000
+        def assertLatestSegmentInMetrics(hour: Int) =
+          latestSegmentMetrics.get(MetricsContext.Empty).value.value.get()._1 shouldBe genesisDate
+            .atTime(hour, 0)
+            .toInstant(ZoneOffset.UTC)
+            .toEpochMilli * 1000
 
-          clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
-            probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
-            probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
-            assertLatestSegmentInMetrics(8)
-            probe.expectNoMessage(20.seconds)
-          }
-
-          clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
-            mockStore.mockIngestion(2000)
-            probe.request(2)
-            probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
-            probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
-            assertLatestSegmentInMetrics(12)
-            probe.expectNoMessage(20.seconds)
-          }
-
-          // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
-          // then start a new one with the new migration and ingest updates in the new migration
-          killSwitch.shutdown()
-          val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
-          mockStore.mockMigration()
-
-          clue("2000 more updates in the new migration, up to 19:13:50") {
-            mockStore.mockIngestion(2000)
-            probe1.request(4)
-            probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
-            probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
-            probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
-            assertLatestSegmentInMetrics(18)
-            probe1.expectNoMessage(20.seconds)
-          }
-          killSwitch1.shutdown()
-          succeed
+        clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
+          probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
+          probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
+          assertLatestSegmentInMetrics(8)
+          probe.expectNoMessage(20.seconds)
         }
+
+        clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
+          mockStore.mockIngestion(2000)
+          probe.request(2)
+          probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
+          probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
+          assertLatestSegmentInMetrics(12)
+          probe.expectNoMessage(20.seconds)
+        }
+
+        // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
+        // then start a new one with the new migration and ingest updates in the new migration
+        killSwitch.shutdown()
+        val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
+        mockStore.mockMigration()
+
+        clue("2000 more updates in the new migration, up to 19:13:50") {
+          mockStore.mockIngestion(2000)
+          probe1.request(4)
+          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
+          probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
+          probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
+          assertLatestSegmentInMetrics(18)
+          probe1.expectNoMessage(20.seconds)
+        }
+        killSwitch1.shutdown()
+        succeed
       }
+    }
   }
 
   class MockUpdateHistoryStore(

@@ -66,7 +66,7 @@ class S3BucketConnection(
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */
   class AppendWriteObject protected[S3BucketConnection] (val key: String)(implicit
-      ec: ExecutionContext,
+      ec: ExecutionContext
   ) {
     val createRequest = CreateMultipartUploadRequest
       .builder()
@@ -108,7 +108,7 @@ class S3BucketConnection(
               .eTag(response.eTag())
               .build(),
           )
-          .fold (
+          .fold(
             Future.successful(())
           )(_ =>
             Future.failed(new RuntimeException(s"Part number $partNumber uploaded more than once"))
