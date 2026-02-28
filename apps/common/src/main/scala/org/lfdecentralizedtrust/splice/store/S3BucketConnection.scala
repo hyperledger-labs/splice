@@ -58,7 +58,7 @@ class S3BucketConnection(
 
   def newAppendWriteObject(
       key: String
-  )(implicit ec: ExecutionContext, tc: TraceContext): AppendWriteObject = new AppendWriteObject(key)
+  )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
@@ -67,7 +67,6 @@ class S3BucketConnection(
     */
   class AppendWriteObject protected[S3BucketConnection] (val key: String)(implicit
       ec: ExecutionContext,
-      tc: TraceContext,
   ) {
     val createRequest = CreateMultipartUploadRequest
       .builder()
@@ -86,7 +85,7 @@ class S3BucketConnection(
     /** Thread safe, may be called in parallel.
       *       partNumber must be an index returned from prepareUploadNext()
       */
-    def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
+    def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       require(numParts.get() >= partNumber)
       for {
         id <- uploadId

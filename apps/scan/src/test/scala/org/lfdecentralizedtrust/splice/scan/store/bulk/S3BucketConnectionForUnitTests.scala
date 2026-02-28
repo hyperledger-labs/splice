@@ -56,16 +56,15 @@ class S3BucketConnectionForUnitTests(
       // We don't strictly need any padding here, but easier to use 1 than deal with the special case of zero padding everywhere else
   ): Future[Unit] = super.writeFullObject(key, PaddedData(1, content).toByteBuffer())
 
-  override def newAppendWriteObject(key: String)(implicit ec: ExecutionContext, tc: TraceContext): AppendWriteObject =
+  override def newAppendWriteObject(key: String)(implicit ec: ExecutionContext): AppendWriteObject =
     new AppendWriteObjectForUnitTests(key)
 
   class AppendWriteObjectForUnitTests protected[S3BucketConnectionForUnitTests] (
       override val key: String
   )(implicit
-      ec: ExecutionContext,
-    tc: TraceContext
+      ec: ExecutionContext
   ) extends AppendWriteObject(key) {
-    override def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
+    override def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       // We pad all parts with 5MB of zeros, to guarantee we're above the 5MB
       // minimum per part (technically, the minimum is "except the last" part,
       // but we don't really know that a part is last in this API)
