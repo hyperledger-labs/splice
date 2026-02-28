@@ -74,7 +74,6 @@ class ScanTimeBasedIntegrationTest
         )(config)
       )
 
-  override def runTokenStandardCliSanityCheck = false // FIXME: remove this
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
       case None => 0L
