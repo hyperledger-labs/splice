@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
@@ -11,24 +13,31 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
+import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
+import org.lfdecentralizedtrust.splice.store.{HasS3Mock, S3BucketConnection}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with AmuletConfigUtil
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with HasExecutionContext
+    with HasS3Mock {
 
   val initialRound = 4815L
 
@@ -53,6 +62,17 @@ class ScanTimeBasedIntegrationTest
         // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
         advanceTimeForRewardAutomationToRunForCurrentRound
       }
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(
+            bulkStorage = BulkStorageConfig(
+              snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+              updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+              s3 = Some(s3ConfigMock),
+            )
+          )
+        )(config)
+      )
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
@@ -350,7 +370,6 @@ class ScanTimeBasedIntegrationTest
   }
 
   "snapshotting" in { implicit env =>
-    val (aliceUserParty, _) = onboardAliceAndBob()
     val migrationId = sv1ScanBackend.config.domainMigrationId
 
     clue(
@@ -365,6 +384,8 @@ class ScanTimeBasedIntegrationTest
     }
 
     val startTime = getLedgerTime
+
+    val (aliceUserParty, _) = onboardAliceAndBob()
 
     advanceTime(
       java.time.Duration
@@ -528,6 +549,70 @@ class ScanTimeBasedIntegrationTest
         ownerPartyIds = Vector(aliceUserParty),
         recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact),
       ) shouldBe None
+    }
+
+    advanceTime(java.time.Duration.ofHours(24))
+    val endTime = getLedgerTime
+    val lastMidnight = endTime.toInstant.truncatedTo(ChronoUnit.DAYS);
+    val nextMidnight = lastMidnight.plus(1, ChronoUnit.DAYS)
+    val expectedAcsSnapshotKey = s"$lastMidnight-Migration-0-$nextMidnight/ACS_0.zstd"
+
+    val bucketConnection = S3BucketConnection(s3ConfigMock, loggerFactory)
+    eventually() {
+
+      // wait for latest ACS snapshots to be created
+      sv1ScanBackend
+        .getDateOfMostRecentSnapshotBefore(endTime, 0)
+        .value
+        .toInstant shouldBe >=(lastMidnight)
+
+      val s3Objs = bucketConnection.listObjects.futureValue.contents().asScala
+
+      // Wait for bulk storage objects to be created
+      s3Objs.map(_.key()) should contain(expectedAcsSnapshotKey)
+
+      // Depending on how the days are split exactly (based on the exact simtime when the test was started),
+      // the updates may be in one or two segments, so we only assert that there exists a segment that ends
+      // at last midnight
+      s3Objs
+        .map(_.key())
+        .filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
+
+      // Compare bulk storage data to hot storage data from scan
+      val acsAtMidnightFromScan = sv1ScanBackend
+        .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
+        .value
+        .createdEvents
+      val acsObjKey = s3Objs.filter(_.key() == expectedAcsSnapshotKey).head
+      val acsAtMidnightFromS3 = readUncompressAndDecode(
+        bucketConnection,
+        io.circe.parser.decode[definitions.CreatedEvent],
+      )(acsObjKey)
+      acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
+
+      def isInTimeRange(u: definitions.UpdateHistoryItemV2) = {
+        val recordTime = CompactJsonScanHttpEncodings()
+          .httpToLapiUpdate(u)
+          .update
+          .update
+          .recordTime
+        recordTime >= startTime && recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
+      }
+
+      val updateObjs = s3Objs.filter(_.key().contains("/updates"))
+      val updatesFromS3 = updateObjs
+        .flatMap(
+          readUncompressAndDecode(
+            bucketConnection,
+            io.circe.parser.decode[definitions.UpdateHistoryItemV2],
+          )
+        )
+        .filter(isInTimeRange)
+      val updatesFromScan = sv1ScanBackend
+        .getUpdateHistory(1000, None, CompactJson)
+        .filter(isInTimeRange)
+
+      updatesFromScan should contain theSameElementsAs updatesFromS3
     }
   }
 }
