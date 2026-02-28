@@ -22,8 +22,6 @@ function usage() {
   echo "  -B <script>      path to a custom canton bootstrap script"
 }
 
-echo "running start-canton.sh with arguments: $*"
-
 # default values
 daemon=0
 wallclocktime=1
@@ -119,7 +117,6 @@ fi
 
 rm -f canton*.tokens
 
-echo "Starting postgres with mode: $POSTGRES_MODE"
 # Start Postgres
 ./scripts/postgres.sh "$POSTGRES_MODE" start
 

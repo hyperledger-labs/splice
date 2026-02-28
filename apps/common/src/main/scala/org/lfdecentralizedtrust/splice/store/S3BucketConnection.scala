@@ -75,13 +75,7 @@ class S3BucketConnection(
       .key(key)
       .build();
 
-    private val uploadId = {
-      logger.debug(s"Creating multi-part upload for $key")
-      s3Client.createMultipartUpload(createRequest).asScala.map{
-        logger.debug(s"Multi-part upload for $key created")
-        _.uploadId()
-      }
-    }
+    private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
     private val numParts = new AtomicInteger(0)
     private val parts = TrieMap.empty[Integer, CompletedPart]
 
@@ -94,7 +88,6 @@ class S3BucketConnection(
       */
     def upload(partNumber: Int, content: ByteBuffer)(implicit tc: TraceContext): Future[Unit] = {
       require(numParts.get() >= partNumber)
-      logger.debug(s"Uploading part $partNumber to $key")
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -116,10 +109,9 @@ class S3BucketConnection(
               .eTag(response.eTag())
               .build(),
           )
-          .fold {
-            logger.debug(s"Part $partNumber of $key uploaded")
+          .fold (
             Future.successful(())
-          }(_ =>
+          )(_ =>
             Future.failed(new RuntimeException(s"Part number $partNumber uploaded more than once"))
           )
 

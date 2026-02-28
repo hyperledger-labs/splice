@@ -71,8 +71,7 @@ function pgctl_stop() {
 
 function docker_wait() {
   until docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" $DOCKER_POSTGRES_CONTAINER_NAME psql -h localhost -U "$POSTGRES_USER" -c "select 1" >> "$LOG_FILE" 2>&1 ; do
-    echo "Waiting for PostgreSQL to start (in docker)"
-    docker ps -a
+    echo "Waiting for PostgreSQL to start"
     sleep 1
   done
 }
@@ -81,7 +80,7 @@ function psql_wait() {
   export PGPASSWORD="$POSTGRES_PASSWORD"
   # shellcheck disable=SC2153
   until psql -U "$POSTGRES_USER" -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -c "select 1" >> "$LOG_FILE" 2>&1 ; do
-    echo "Waiting for PostgreSQL to start (via psql)"
+    echo "Waiting for PostgreSQL to start"
     sleep 1
   done
 }

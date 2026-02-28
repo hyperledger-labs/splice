@@ -94,7 +94,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-
     - name: Setup
       uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
       with:
