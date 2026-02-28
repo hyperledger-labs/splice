@@ -2235,11 +2235,11 @@ updateTestConfigForParallelRuns := {
       "test-full-class-names-dynamic-synchronizer-params-reconciliation.log",
       (t: String) => isDynamicSynchronizerParamsReconciliationTest(t),
     ),
-      (
-        "tests with simulated time and docker",
-        "test-full-class-names-sim-time-docker.log",
-        (t: String) => isWithDockerWithSimtimeCantonTest(t),
-      ),
+    (
+      "tests with simulated time and docker",
+      "test-full-class-names-sim-time-docker.log",
+      (t: String) => isWithDockerWithSimtimeCantonTest(t),
+    ),
     (
       "tests with simulated time",
       "test-full-class-names-sim-time.log",

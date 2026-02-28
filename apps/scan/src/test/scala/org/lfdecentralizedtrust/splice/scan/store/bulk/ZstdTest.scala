@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpd
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.store.{HasS3Mock, StoreTestBase, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TreeUpdateWithMigrationId}
 
 import java.nio.charset.StandardCharsets
 import java.time.Instant
@@ -20,7 +20,7 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.duration.*
 import scala.sys.process.*
 
-class ZstdTest extends StoreTestBase with HasS3Mock {
+class ZstdTest extends StoreTestBase {
   "ZstdGroupedWeight" should {
     "just work" in {
 
@@ -38,7 +38,7 @@ class ZstdTest extends StoreTestBase with HasS3Mock {
           contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
         )
         val tx = mkCreateTx(
-          1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
+          1,
           Seq(contract),
           Instant.ofEpochSecond(idx.toLong),
           Seq(alicePartyId, bobPartyId),
