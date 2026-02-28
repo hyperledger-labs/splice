@@ -260,19 +260,19 @@ jobs:
   #     daml_base_version: ${{ inputs.daml_base_version }}
   #   secrets: inherit
 
-  # scala_test_with_docker_no_canton:
-  #   uses: ./.github/workflows/build.scala_test_for_compose.yml
-  #   if: ${{ ! inputs.oss_only }}
-  #   with:
-  #     runs_on: self-hosted-docker-large
-  #     test_names_file: 'test-full-class-names-docker-no-canton.log'
-  #     parallelism: 1
-  #     test_name: docker-no-canton
-  #     with_canton: false
-  #     start_canton_options: ""
-  #     commit_sha: ${{ inputs.commit_sha }}
-  #     daml_base_version: ${{ inputs.daml_base_version }}
-  #   secrets: inherit
+  scala_test_with_docker_no_canton:
+    uses: ./.github/workflows/build.scala_test_for_compose.yml
+    if: ${{ ! inputs.oss_only }}
+    with:
+      runs_on: self-hosted-docker-large
+      test_names_file: 'test-full-class-names-docker-no-canton.log'
+      parallelism: 1
+      test_name: docker-no-canton
+      with_canton: false
+      start_canton_options: ""
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+    secrets: inherit
 
   scala_test_with_docker_and_canton_simtime:
     uses: ./.github/workflows/build.scala_test_for_compose.yml
