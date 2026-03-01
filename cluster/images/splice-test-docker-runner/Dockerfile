@@ -1,5 +1,5 @@
-ARG RUNNER_VERSION=2.331.0
-ARG RUNNER_DIGEST=sha256:dced476aa42703ebd9aafc295ce52f160989c4528e831fc3be2aef83a1b3f6da
+ARG RUNNER_VERSION=2.332.0
+ARG RUNNER_DIGEST=sha256:8c3f5970b8ceb90cbd3e89b80c6806bb74d9c31686e9177c743323a4539d12f5
 
 # Note that we don't currently support arm64 runners, so we build this only for amd64
 FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:${RUNNER_VERSION}@${RUNNER_DIGEST}
