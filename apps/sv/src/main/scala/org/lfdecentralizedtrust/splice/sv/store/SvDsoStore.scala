@@ -360,9 +360,10 @@ trait SvDsoStore
     ]]
   ]
 
-  /** Returns at most expired coupon batches per round and coupon type.
-    * It will return one entry per closed round that has expired coupon and per type of coupon.
-    * It will return a maximum of `batchSize` per coupon type
+  /** Returns expired coupon batches per round and coupon type.
+    * It will return one entry per closed round that has expired coupons, and per type of coupon.
+    * It will return a maximum of `batchSize` contracts per round and coupon type,
+    * and at most `numBatches` rounds per coupon type.
     */
   final def getExpiredCouponsInBatchesPerRoundAndCouponType(
       domain: SynchronizerId,
@@ -424,7 +425,7 @@ trait SvDsoStore
         (appRewardGroups ++ validatorRewardGroups ++ validatorFaucetGroups ++ validatorLivenessActivityRecordGroups ++ svRewardCouponGroups)
           .map(_.roundNumber)
           .toSet
-      closedRounds <- listClosedRounds(roundNumbers, domain, batchSize)
+      closedRounds <- listClosedRounds(roundNumbers, domain, numBatches)
       closedRoundMap = closedRounds.map(r => r.payload.round.number -> r).toMap
     } yield associateRoundContractWithBatch(appRewardGroups, closedRoundMap).map {
       case (closedRound, batch) =>
