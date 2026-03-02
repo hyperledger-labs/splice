@@ -144,9 +144,11 @@ abstract class StoreIngestionPerformanceTest(
             totalItems += batch.length
             totalBatches += 1
             val avg = totalTime / totalItems
-            logger.info(
+            val msg =
               f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTime ns"
-            )
+            logger.info(msg)
+            // Ensuring that it's logged also on GHA console, as opposed to only in log files (which are not uploaded on success)
+            println(msg)
           }
       })
   }
