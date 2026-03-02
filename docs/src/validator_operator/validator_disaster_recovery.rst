@@ -274,6 +274,39 @@ To address a failed :term:`ACS` import, you can usually:
    You can now take down the node to which you originally tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different participant ID prefix
    (i.e., a different ``newParticipantIdentifier`` / ``<new_participant_id>`` depending on your deployment model).
 
+In rare cases, the re-onboarding process may fail at the ``ImportTopologySnapshot`` step
+because an ``OwnerToKeyMapping`` for the old participant ID has an insufficient number of
+signatures in the topology snapshot. This can happen when the topology snapshot was created
+at a time when fewer signatures were required than the current Canton version expects.
+You can identify this issue by looking for the following messages in your participant logs:
+
+.. code::
+
+   Missing authorizers: ReferencedAuthorizations(extraKeys = <key-id>...)
+   Rejected transaction ... OwnerToKeyMapping(...) ... due to Not authorized
+
+To work around this, follow these steps:
+
+1. Start only the new participant (without the validator app). Do not wipe its state from
+   the previous (failed) re-onboarding attempt.
+
+2. Open a :ref:`Canton console <console_access>` to the new participant and run the following
+   commands to propose the corrected ``OwnerToKeyMapping``. Replace the key ID prefixes with
+   those from the rejected ``OwnerToKeyMapping`` in your participant logs, and replace the
+   old participant ID with your actual old participant ID:
+
+   .. code::
+
+      val keys = Seq("<signing-key-id-prefix>", "<encryption-key-id-prefix>").map(prefix =>
+        participant.keys.public.list().filter(_.publicKey.id.toProtoPrimitive.startsWith(prefix)).head.publicKey)
+
+      val oldParticipantId = ParticipantId.fromProtoPrimitive("<old-participant-id>", "participant").toOption.get
+      val otk = OwnerToKeyMapping(member = oldParticipantId, keys = NonEmpty.from(keys).get)
+      participant.topology.owner_to_key_mappings.propose(otk, force = ForceFlag.AlienMember)
+
+3. Start the validator app using your original identities dump configuration (not one with a
+   custom topology snapshot).
+
 .. _validator_recover_external_party:
 
 Recover the Coin balance of an external party
