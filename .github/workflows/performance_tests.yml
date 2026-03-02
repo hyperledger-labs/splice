@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   performance_tests:
-    runs-on: self-hosted-k8s-small
+    runs-on: self-hosted-k8s-large
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     name: Performance Tests
@@ -33,7 +33,7 @@ jobs:
           test_name: oss
           target: 'oss'
 
-      - name: Connection check
+      - name: Run performance tests
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         env:
           PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
