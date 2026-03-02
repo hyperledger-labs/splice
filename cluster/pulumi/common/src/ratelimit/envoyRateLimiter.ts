@@ -129,7 +129,7 @@ function validateEffectiveRateLimits(
 
   // Filter out banned and unlimited entries
   return args.rateLimits?.filter((rl): rl is LocalLimit<Limits> => {
-    // TODO: in banned case, implement actual banning with special short-circuit for whitelisted IPs
+    // TODO (#4201): in banned case, implement actual banning with special short-circuit for whitelisted IPs
     // Currently skipping banned endpoints instead of setting 0/0 limits
     // in unlimited case, we fall back to globalRateLimit so don't need a rule
     return !('type' in rl.limits);
