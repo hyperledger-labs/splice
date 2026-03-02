@@ -88,13 +88,12 @@ class DbAppActivityRecordStore(
   )(implicit tc: TraceContext): Future[Map[CantonTimestamp, AppActivityRecordT]] = {
     if (recordTimes.isEmpty) Future.successful(Map.empty)
     else {
-      val inClause = sqlCommaSeparated(recordTimes.map(rt => sql"$rt"))
       storage
         .query(
           (sql"""
           select record_time, round_number, app_provider_parties, app_activity_weights
           from #${Tables.appActivityRecords}
-          where history_id = $historyId and record_time in (""" ++ inClause ++ sql")")
+          where history_id = $historyId and """ ++ inClause("record_time", recordTimes))
             .as[AppActivityRecordT],
           "appActivity.getRecordsByRecordTimes",
         )
