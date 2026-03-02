@@ -630,7 +630,8 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
           result <- store.listAppRewardCouponsGroupedByRound(
             domain = dummyDomain,
-            totalCouponsLimit = PageLimit.tryCreate(1000),
+            batchSize = PageLimit.tryCreate(1000),
+            numBatches = PageLimit.tryCreate(1000),
             ignoredParties = Set.empty,
           )
         } yield {
@@ -675,7 +676,8 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
           result <- store.listValidatorRewardCouponsGroupedByRound(
             domain = dummyDomain,
-            totalCouponsLimit = PageLimit.tryCreate(1000),
+            batchSize = PageLimit.tryCreate(1000),
+            numBatches = PageLimit.tryCreate(1000),
             ignoredParties = Set.empty,
           )
         } yield {
@@ -722,7 +724,8 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
           result <- store.listValidatorFaucetCouponsGroupedByRound(
             domain = dummyDomain,
-            totalCouponsLimit = PageLimit.tryCreate(1000),
+            batchSize = PageLimit.tryCreate(1000),
+            numBatches = PageLimit.tryCreate(1000),
             ignoredParties = Set.empty,
           )
         } yield {
@@ -772,7 +775,8 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
           result <- store.listValidatorLivenessActivityRecordsGroupedByRound(
             domain = dummyDomain,
-            totalCouponsLimit = PageLimit.tryCreate(1000),
+            batchSize = PageLimit.tryCreate(1000),
+            numBatches = PageLimit.tryCreate(1000),
             ignoredParties = Set.empty,
           )
         } yield {
@@ -851,19 +855,19 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         result <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
           enableExpireValidatorFaucet = true,
-          totalCouponsLimit = PageLimit.tryCreate(1000),
+          batchSize = PageLimit.tryCreate(1000),
           ignoredExpiredRewardsPartyIds = Set.empty,
         )
         resultWithIgnoredUserParty <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
           enableExpireValidatorFaucet = true,
-          totalCouponsLimit = PageLimit.tryCreate(1000),
+          batchSize = PageLimit.tryCreate(1000),
           ignoredExpiredRewardsPartyIds = Set(userParty(1), userParty(3)),
         )
         resultWithoutFaucet <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
           enableExpireValidatorFaucet = false,
-          totalCouponsLimit = PageLimit.tryCreate(1000),
+          batchSize = PageLimit.tryCreate(1000),
           ignoredExpiredRewardsPartyIds = Set.empty,
         )
       } yield {
@@ -921,6 +925,63 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         }
         resultWithoutFaucet should have size 3
         forAll(resultWithoutFaucet)(_.validatorFaucets should have size 0)
+      }
+    }
+
+    "getExpiredRewards should respect batch size limit" in {
+      val closedRound2 = closedMiningRound(dsoParty, 2)
+      val closedRound3 = closedMiningRound(dsoParty, 3)
+      // Create 6 validator coupons in round 2 and 4 in round 3
+      val validatorRound2 = (1 to 6).map(_ => validatorRewardCoupon(round = 2, userParty(1)))
+      val validatorRound3 = (1 to 4).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(closedRound2)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(closedRound3)(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(validatorRound2 ++ validatorRound3)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        // Use batchSize=3 to limit contracts per round — should return both rounds, each capped at 3
+        result <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
+          domain = dummyDomain,
+          enableExpireValidatorFaucet = false,
+          batchSize = PageLimit.tryCreate(3),
+          numBatches = PageLimit.tryCreate(100),
+          ignoredExpiredRewardsPartyIds = Set.empty,
+        )
+      } yield {
+        result should have size 2
+        result.head.closedRoundNumber shouldBe 2
+        result.head.validatorCoupons should have size 3
+        result.last.closedRoundNumber shouldBe 3
+        result.last.validatorCoupons should have size 3
+      }
+    }
+
+    "getExpiredRewards should respect num batches limit" in {
+      val closedRound2 = closedMiningRound(dsoParty, 2)
+      val closedRound3 = closedMiningRound(dsoParty, 3)
+      val validatorRound2 = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(1)))
+      val validatorRound3 = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(closedRound2)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(closedRound3)(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(validatorRound2 ++ validatorRound3)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        // Use numBatches=1 to only get 1 round (should be round 2, the oldest)
+        result <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
+          domain = dummyDomain,
+          enableExpireValidatorFaucet = false,
+          batchSize = PageLimit.tryCreate(100),
+          numBatches = PageLimit.tryCreate(1),
+          ignoredExpiredRewardsPartyIds = Set.empty,
+        )
+      } yield {
+        result should have size 1
+        result.head.closedRoundNumber shouldBe 2
+        result.head.validatorCoupons should have size 3
       }
     }
 
