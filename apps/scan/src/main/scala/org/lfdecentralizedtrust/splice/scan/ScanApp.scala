@@ -39,7 +39,6 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -47,11 +46,13 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanEventStore,
   ScanKeyValueProvider,
   ScanKeyValueStore,
+  ScanRewardsReferenceStore,
   ScanStore,
 }
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
+  DbScanRewardsReferenceStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -337,7 +338,22 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
-      appActivityComputation = NoOpAppActivityComputation
+      rewardsReferenceStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          val rewardsStore = new DbScanRewardsReferenceStore(
+            key = ScanRewardsReferenceStore.Key(dsoParty = dsoParty),
+            storage,
+            loggerFactory,
+            retryProvider,
+            migrationInfo,
+            participantId,
+            synchronizerId,
+            config.automation.ingestion,
+            config.parameters.defaultLimit,
+          )
+          automation.registerRewardsReferenceStoreIngestion(rewardsStore)
+          Some(rewardsStore)
+        } else None
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
@@ -349,7 +365,7 @@ class ScanApp(
         synchronizerId,
         nodeMetrics.verdictIngestion,
         sequencerTrafficClientO,
-        appActivityComputation,
+        rewardsReferenceStoreO,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,

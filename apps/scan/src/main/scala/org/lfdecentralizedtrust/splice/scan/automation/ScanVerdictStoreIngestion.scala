@@ -48,7 +48,7 @@ class ScanVerdictStoreIngestion(
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
     sequencerTrafficClientO: Option[SequencerTrafficClient],
-    appActivityComputation: AppActivityComputation,
+    appActivityComputationO: Option[AppActivityComputation],
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -190,11 +190,16 @@ class ScanVerdictStoreIngestion(
           summaryByTime.get(recordTime).map(_ -> v)
         }
 
-        // Compute app activity records (pure, before DB transaction).
+        // Compute app activity records (before DB transaction).
         // Records have verdictRowId = 0; the store resolves actual row_ids during insertion.
-        computedActivities = appActivityComputation.computeActivities(summariesWithVerdicts)
-        pendingAppActivity = computedActivities.flatMap { case (summary, _, recordO) =>
-          recordO.map(summary.sequencingTime -> _)
+        pendingAppActivity <- appActivityComputationO match {
+          case Some(appActivityComputation) =>
+            appActivityComputation.computeActivities(summariesWithVerdicts).map {
+              _.flatMap { case (summary, _, recordO) =>
+                recordO.map(summary.sequencingTime -> _)
+              }
+            }
+          case None => Future.successful(Seq.empty)
         }
 
         _ <- store.insertVerdictsWithAppActivityRecords(items, pendingAppActivity)
