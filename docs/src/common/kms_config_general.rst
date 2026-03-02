@@ -24,4 +24,4 @@ Whatever KMS provider you choose, please note:
   The security implication for KMS-enabled participants is that an adversary with access to a memory snapshot might be able to obtain symmetric keys that allow decrypting up to one hour of encrypted messages.
   The default session key parameters can be overridden via :ref:`configuration overrides <configuration_ad_hoc>`.
   Please refer to the `Canton documentation <https://docs.digitalasset.com/operate/3.4/howtos/optimize/session_keys.html>`__ for an overview of the relevant parameters.
-  The use of session **signing** keys is currently not yet supported for Splice participants.
+  The use of session **signing** keys is not yet supported for Splice participants.
