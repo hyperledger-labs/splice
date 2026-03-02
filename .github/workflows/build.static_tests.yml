@@ -149,7 +149,7 @@ jobs:
       - name: Verify no changes in SBT test files
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:
-          cmd: git add . && git diff --staged --exit-code test*.log
+          cmd: git add . && git diff --staged --exit-code test*.log '**/DarResources.scala'
 
       # We explicitly do not call post-sbt job here. We don't want to save the
       # cache as it will be saved by the docs job that is much faster, and we

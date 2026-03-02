@@ -10,8 +10,6 @@ import com.digitalasset.daml.lf.language.Ast.PackageMetadata
 
 object DarResources {
   object TokenStandard {
-
-
     val apiTokenMetadataV1_1_0_0 = DarResource(
       "splice-api-token-metadata-v1-1.0.0.dar",
       "4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f",
