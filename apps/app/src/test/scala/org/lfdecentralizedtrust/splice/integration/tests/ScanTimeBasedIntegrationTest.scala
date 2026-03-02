@@ -596,7 +596,8 @@ class ScanTimeBasedIntegrationTest
           .update
           .update
           .recordTime
-        recordTime >= startTime && recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
+//        recordTime >= startTime &&
+        recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
       }
 
       val updateObjs = s3Objs.filter(_.key().contains("/updates"))
@@ -611,6 +612,14 @@ class ScanTimeBasedIntegrationTest
       val updatesFromScan = sv1ScanBackend
         .getUpdateHistory(1000, None, CompactJson)
         .filter(isInTimeRange)
+
+      logger.debug("all updates in S3:")
+
+      updatesFromS3.foreach{u => logger.debug(CompactJsonScanHttpEncodings().httpToLapiUpdate(u).update.update.toString)}
+      logger.debug("all updates from scan:")
+      updatesFromScan.foreach{u => logger.debug(CompactJsonScanHttpEncodings().httpToLapiUpdate(u).update.update.toString)}
+
+
 
       updatesFromScan should contain theSameElementsAs updatesFromS3
     }
