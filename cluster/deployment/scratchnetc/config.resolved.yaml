@@ -141,6 +141,7 @@ svs:
         requests:
           memory: '2Gi'
     logging:
+      apiRequestLogLevel: 'DEBUG'
       appsAsync: false
       appsLogLevel: 'DEBUG'
       cantonAsync: false

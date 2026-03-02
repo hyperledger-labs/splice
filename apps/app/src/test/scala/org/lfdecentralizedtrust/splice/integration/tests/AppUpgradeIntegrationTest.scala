@@ -197,7 +197,7 @@ class AppUpgradeIntegrationTest
           clue("Check that bob still sees the same wallet tx history") {
             val txsAfter =
               withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
-            txsAfter should contain allElementsOf bobTxsBeforeUpgrade
+            txsAfter should contain allElementsOf bobTxsBeforeUpgrade withClue "bob tx history"
           }
 
           clue("Validating that the balance is visible in the upgraded validator") {
@@ -462,7 +462,7 @@ class AppUpgradeIntegrationTest
             createSplitwellInstalls(bobSplitwellClient, bob)
             actAndCheck("Alice creates group", aliceSplitwellClient.requestGroup(group))(
               "Alice sees group",
-              _ => aliceSplitwellClient.listGroups() should have size 1,
+              _ => aliceSplitwellClient.listGroups() should have size 1 withClue "alice groups",
             )
             val (_, invite) =
               actAndCheck(
@@ -517,7 +517,10 @@ class AppUpgradeIntegrationTest
               aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
             )(
               "Alice sees balance update",
-              _ => aliceSplitwellClient.listBalanceUpdates(key) should have size 1,
+              _ =>
+                aliceSplitwellClient.listBalanceUpdates(
+                  key
+                ) should have size 1 withClue "alice BalanceUpdates",
             )
           }
         })

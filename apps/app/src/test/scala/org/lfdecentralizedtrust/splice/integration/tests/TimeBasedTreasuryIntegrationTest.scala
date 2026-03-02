@@ -57,8 +57,14 @@ class TimeBasedTreasuryIntegrationTest
 
     // run a transfer such that alice's validator has some rewards
     p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
-    eventually()(aliceValidatorWalletClient.listAppRewardCoupons() should have size 1)
-    eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
+    eventually()(
+      aliceValidatorWalletClient
+        .listAppRewardCoupons() should have size 1 withClue "alice AppRewardCoupons"
+    )
+    eventually()(
+      aliceValidatorWalletClient
+        .listValidatorRewardCoupons() should have size 1 withClue "alice ValidatorRewardCoupons"
+    )
     // and give alice another amulet.
     aliceWalletClient.tap(50)
     checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)), holdingFee)
@@ -74,13 +80,15 @@ class TimeBasedTreasuryIntegrationTest
       // app rewards are automatically collected
       aliceValidatorWalletClient
         .listAppRewardCoupons()
-        .filter(_.payload.round.number == 1) should have size 0
+        .filter(_.payload.round.number == 1) should have size 0 withClue "round 1 AppRewardCoupons"
       // and amulets are automatically merged.
       checkWallet(alice, aliceWalletClient, Seq((59, 61)), holdingFee)
       // same for validator rewards
       aliceValidatorWalletClient
         .listValidatorRewardCoupons()
-        .filter(_.payload.round.number == 1) should have size 0
+        .filter(
+          _.payload.round.number == 1
+        ) should have size 0 withClue "round 1 ValidatorRewardCoupons"
     })
   }
 

@@ -253,6 +253,7 @@
       "auth0Client": {},
       "decentralizedSynchronizerUpgradeConfig": {
         "active": {
+          "enableLogicalSynchronizerDeploymentMode": false,
           "id": 3,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
@@ -274,6 +275,7 @@
         },
         "archived": [
           {
+            "enableLogicalSynchronizerDeploymentMode": false,
             "id": 1,
             "releaseReference": {
               "deploymentDir": "cluster/deployment",
@@ -292,6 +294,7 @@
             }
           },
           {
+            "enableLogicalSynchronizerDeploymentMode": false,
             "id": 2,
             "releaseReference": {
               "deploymentDir": "cluster/deployment",
@@ -311,6 +314,7 @@
           }
         ],
         "upgrade": {
+          "enableLogicalSynchronizerDeploymentMode": false,
           "id": 4,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
@@ -1787,6 +1791,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1892,6 +1897,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
@@ -1946,6 +1952,7 @@
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
+        "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -2125,6 +2132,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
@@ -2724,6 +2732,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -2833,6 +2842,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
@@ -2889,6 +2899,7 @@
         "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
+        "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -3031,6 +3042,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",

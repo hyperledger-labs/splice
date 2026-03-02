@@ -143,7 +143,7 @@ class DistributedDomainIntegrationTest
       (_: Unit) =>
         forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
           val votes = sv.listAmuletPriceVotes()
-          votes should have size 4
+          votes should have size 4 withClue "AmuletPriceVotes"
           forAll(votes) { vote =>
             vote.payload.amuletPrice.toScala.map(BigDecimal(_)) shouldBe Some(newPrice)
           }

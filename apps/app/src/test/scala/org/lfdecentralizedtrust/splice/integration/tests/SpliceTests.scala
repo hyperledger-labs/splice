@@ -129,8 +129,6 @@ object SpliceTests extends LazyLogging {
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
-          sanityChecksIgnoredRootCreates,
-          sanityChecksIgnoredRootExercises,
           skipAcsSnapshotChecks,
           loggerFactory,
         )
@@ -190,8 +188,6 @@ object SpliceTests extends LazyLogging {
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
-          sanityChecksIgnoredRootCreates,
-          sanityChecksIgnoredRootExercises,
           skipAcsSnapshotChecks,
           loggerFactory,
         )

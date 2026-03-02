@@ -85,7 +85,7 @@ class Ans4SvsIntegrationTest
         )(
           "no more subscriptions exist",
           _ => {
-            aliceWalletClient.listSubscriptions() shouldBe empty
+            aliceWalletClient.listSubscriptions() shouldBe empty withClue "alice Subscriptions"
           },
         )
 
@@ -93,7 +93,7 @@ class Ans4SvsIntegrationTest
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(subscriptionsCodegen.TerminatedSubscription.COMPANION)(
               aliceUserParty
-            ) should not be empty
+            ) should not be empty withClue "TerminatedSubscriptions"
         }
         clue("Resuming TerminatedSubscriptionTrigger") {
           resumeAllDsoDelegateTriggers[TerminatedSubscriptionTrigger]
@@ -103,7 +103,7 @@ class Ans4SvsIntegrationTest
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(subscriptionsCodegen.TerminatedSubscription.COMPANION)(
               aliceUserParty
-            ) shouldBe empty
+            ) shouldBe empty withClue "TerminatedSubscriptions"
         }
 
       }

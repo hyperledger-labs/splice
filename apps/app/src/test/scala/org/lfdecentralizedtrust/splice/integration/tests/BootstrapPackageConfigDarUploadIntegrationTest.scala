@@ -127,8 +127,12 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           }
           .map(dar => dar.metadata.name -> dar.metadata.version)
       }
-      uploadedPackages.diff(vettedDarNameAndVersions) should have size 0
-      vettedDarNameAndVersions.diff(uploadedPackages) should have size 0
+      uploadedPackages.diff(
+        vettedDarNameAndVersions
+      ) should have size 0 withClue "uploaded not in vetted"
+      vettedDarNameAndVersions.diff(
+        uploadedPackages
+      ) should have size 0 withClue "vetted not in uploaded"
       darsToCheck.foreach { case (packageResource, upToVersion) =>
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
@@ -151,7 +155,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
         uploadedDars.filter { case (name, _) =>
           name == packageResource.latest.metadata.name
         }
-      dars should not be empty
+      dars should not be empty withClue s"dars for ${packageResource.latest.metadata.name}"
       dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
     }
   }

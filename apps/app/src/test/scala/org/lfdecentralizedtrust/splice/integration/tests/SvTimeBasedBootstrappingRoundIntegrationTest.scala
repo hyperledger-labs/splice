@@ -23,7 +23,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest extends SvTimeBasedIntegratio
     clue("Check bootstrapped rounds") {
       val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
       val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-      rounds should have size 3
+      rounds should have size 3 withClue "OpenMiningRounds"
       val round0 = rounds.head
       val round1 = rounds(1)
       val round2 = rounds(2)
@@ -45,7 +45,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest extends SvTimeBasedIntegratio
         getSortedIssuingRounds(
           sv1Backend.participantClientWithAdminToken,
           dsoParty,
-        ) should have size 0,
+        ) should have size 0 withClue "IssuingMiningRounds",
     )
 
     actAndCheck(
@@ -63,7 +63,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest extends SvTimeBasedIntegratio
         getSortedIssuingRounds(
           sv1Backend.participantClientWithAdminToken,
           dsoParty,
-        ) should have size 1,
+        ) should have size 1 withClue "IssuingMiningRounds",
     )
 
     actAndCheck("Advancing time by another tick", advanceRoundsToNextRoundOpening)(
@@ -72,7 +72,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest extends SvTimeBasedIntegratio
         getSortedIssuingRounds(
           sv1Backend.participantClientWithAdminToken,
           dsoParty,
-        ) should have size 2,
+        ) should have size 2 withClue "IssuingMiningRounds",
     )
   }
 }

@@ -72,10 +72,12 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
     )(
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
       _ => {
-        getRewardCoupons(round) shouldBe empty
+        getRewardCoupons(round) shouldBe empty withClue s"reward coupons round $round"
         sv1ScanBackend
           .getClosedRounds()
-          .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
+          .filter(r => r.payload.round.number == round.payload.round.number) should be(
+          empty
+        ) withClue s"ClosedRound $round"
         val (lastRound, _) = sv1ScanBackend.getRoundOfLatestData()
         sv1WalletClient
           .listSvRewardCoupons()

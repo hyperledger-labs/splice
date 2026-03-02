@@ -32,6 +32,7 @@ export const MigrationInfoSchema = z
       .gte(0),
     version: CnChartVersionSchema,
     releaseReference: GitReferenceSchema.optional(),
+    enableLogicalSynchronizerDeploymentMode: z.boolean().default(false),
     sequencer: z
       .object({
         enableBftSequencer: z.boolean().default(false),

@@ -115,7 +115,7 @@ class SvTimeBasedRewardCouponIntegrationTest
               _.item.packages.map(_.packageId)
             )
         forAll(expectedVettedPackages) { expectedPackage =>
-          vettedByAlice should contain(expectedPackage)
+          vettedByAlice should contain(expectedPackage) withClue "alice vetted packages"
         }
       }
       // now that we know that alice has vetted the latest packages, we can resume the trigger for the rest of the test
@@ -132,15 +132,15 @@ class SvTimeBasedRewardCouponIntegrationTest
           .getOpenAndIssuingMiningRounds()
           ._1
           .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
-        openRounds should not be empty
+        openRounds should not be empty withClue "OpenMiningRounds"
         openRounds
       }
       eventually() {
         val expectedSize = openRounds.size.toLong
         val sv1Coupons = sv1WalletClient.listSvRewardCoupons()
         val aliceCoupons = aliceValidatorWalletClient.listSvRewardCoupons()
-        sv1Coupons should have size expectedSize
-        aliceCoupons should have size expectedSize
+        sv1Coupons should have size expectedSize withClue "sv1 SvRewardCoupons"
+        aliceCoupons should have size expectedSize withClue "alice SvRewardCoupons"
         sv1Coupons.map(_.payload.weight) should be(
           Seq.fill(expectedSize.toInt)(BigDecimal(SvUtil.DefaultSV1Weight))
         )
@@ -165,8 +165,10 @@ class SvTimeBasedRewardCouponIntegrationTest
       advanceRoundsToNextRoundOpening
       eventually() {
         val expectedSize = (openRounds.size - 1).toLong
-        sv1WalletClient.listSvRewardCoupons() should have size expectedSize
-        aliceValidatorWalletClient.listSvRewardCoupons() should have size expectedSize
+        sv1WalletClient
+          .listSvRewardCoupons() should have size expectedSize withClue "sv1 SvRewardCoupons"
+        aliceValidatorWalletClient
+          .listSvRewardCoupons() should have size expectedSize withClue "alice SvRewardCoupons"
       }
 
       val eachSvGetInRound0 =
@@ -194,7 +196,7 @@ class SvTimeBasedRewardCouponIntegrationTest
           sv1WalletClient,
           Seq[CheckTxHistoryFn] { case b: TransferTxLogEntry =>
             b.subtype.value shouldBe TransferTransactionSubtype.WalletAutomation.toProto
-            b.receivers shouldBe empty
+            b.receivers shouldBe empty withClue "tx receivers"
             b.sender.value.party should be(sv1Party.toProtoPrimitive)
             b.sender.value.amount should beWithin(
               BigDecimal(eachSvGetInRound0) - feesUpperBoundCC,
@@ -209,7 +211,7 @@ class SvTimeBasedRewardCouponIntegrationTest
           aliceValidatorWalletClient,
           Seq[CheckTxHistoryFn] { case b: TransferTxLogEntry =>
             b.subtype.value shouldBe TransferTransactionSubtype.WalletAutomation.toProto
-            b.receivers shouldBe empty
+            b.receivers shouldBe empty withClue "tx receivers"
             b.sender.value.party should be(aliceValidatorParty.toProtoPrimitive)
             b.sender.value.amount should beWithin(
               BigDecimal(expectedAliceAmount) - feesUpperBoundCC,
@@ -342,7 +344,9 @@ class SvTimeBasedRewardCouponIntegrationTest
         sv4ValidatorBackend.appState.participantAdminConnection
           .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId, AuthorizedState)
           .futureValue
-          .flatMap(_.mapping.packages.map(_.packageId)) should not contain latestAmuletPackageId
+          .flatMap(
+            _.mapping.packages.map(_.packageId)
+          ) should not contain latestAmuletPackageId withClue "alice vetted packages"
       },
     )
 
@@ -358,7 +362,7 @@ class SvTimeBasedRewardCouponIntegrationTest
                 .getOpenAndIssuingMiningRounds()
                 ._1
                 .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
-              openRounds should not be empty
+              openRounds should not be empty withClue "OpenMiningRounds"
               openRounds
             }
             val aliceRewards = getSvRewardCoupon("alice")

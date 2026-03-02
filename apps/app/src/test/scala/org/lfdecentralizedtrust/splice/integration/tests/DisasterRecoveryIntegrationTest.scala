@@ -255,7 +255,9 @@ class DisasterRecoveryIntegrationTest
             dump.createdAt should be(timestampBeforeDisaster)
             dump.migrationId shouldBe 1
             dump.participantUsers.users
-              .find(_.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)) should not be empty
+              .find(
+                _.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)
+              ) should not be empty withClue "users with initial_round key"
             writeMigrationDumpFile(sv, ids, dump)
         }
       },
@@ -367,7 +369,7 @@ class DisasterRecoveryIntegrationTest
           balanceChanges should contain allElementsOf Seq(
             walletUsdToAmulet(1337),
             walletUsdToAmulet(1338),
-          )
+          ) withClue "balanceChanges"
         }
         withClueAndLog(
           "More than one tap visible in the scan transaction history on the old domain"
@@ -375,7 +377,10 @@ class DisasterRecoveryIntegrationTest
           val taps = sv1ScanBackend
             .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
             .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
-          taps should contain allElementsOf Seq(walletUsdToAmulet(1337), walletUsdToAmulet(1338))
+          taps should contain allElementsOf Seq(
+            walletUsdToAmulet(1337),
+            walletUsdToAmulet(1338),
+          ) withClue "tap amounts"
         }
 
         val acsSnapshotAfterDisaster = withClueAndLog("Generating ACS snapshot after disaster") {
@@ -528,7 +533,7 @@ class DisasterRecoveryIntegrationTest
               taps should contain theSameElementsAs Seq(
                 walletUsdToAmulet(1337),
                 walletUsdToAmulet(1500),
-              )
+              ) withClue "tap amounts"
             }
 
             withClueAndLog(
@@ -537,7 +542,9 @@ class DisasterRecoveryIntegrationTest
               val balanceChanges = sv1WalletLocalClient.listTransactions(None, 100).collect {
                 case e: BalanceChangeTxLogEntry => e.amount
               }
-              balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
+              balanceChanges should contain theSameElementsAs Seq(
+                walletUsdToAmulet(1337)
+              ) withClue "balance change amounts"
             }
 
             withClueAndLog(
@@ -579,7 +586,9 @@ class DisasterRecoveryIntegrationTest
           val balanceChanges = aliceValidatorWalletLocalClient.listTransactions(None, 100).collect {
             case e: BalanceChangeTxLogEntry => e.amount
           }
-          balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1500))
+          balanceChanges should contain theSameElementsAs Seq(
+            walletUsdToAmulet(1500)
+          ) withClue "balance change amounts"
         }
 
         withClueAndLog("Old validator balance has been transferred") {
@@ -611,7 +620,9 @@ class DisasterRecoveryIntegrationTest
         eventuallySucceeds() {
           val snapshot = svBackend.getDomainDataSnapshot(timestamp, force = true)
           snapshot.participantUsers.users
-            .find(_.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)) should not be empty
+            .find(
+              _.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)
+            ) should not be empty withClue "users with initial_round key"
         }
       )
     }

@@ -137,6 +137,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
         epoch,
         config.delegatelessAutomationExpectedTaskDuration,
         config.delegatelessAutomationExpiredRewardCouponBatchSize,
+        config.delegatelessAutomationExpiredRewardCouponNumBatches,
         packageVersionSupport,
       )
 

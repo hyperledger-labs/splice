@@ -67,14 +67,14 @@ class ScanEventHistoryIntegrationTest
       after = Some(cursorBeforeTap),
       encoding = CompactJson,
     )
-    eventHistoryAfterLastCursor shouldBe empty
+    eventHistoryAfterLastCursor shouldBe empty withClue "EventHistory after pre-tap cursor"
 
     aliceWalletClient.tap(1)
 
     // Verify that new events are visible after the cursor
     val eventHistory = eventually() {
       val eh = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTap))
-      eh should not be empty
+      eh should not be empty withClue "EventHistory after tap"
       eh
     }
 
@@ -185,7 +185,7 @@ class ScanEventHistoryIntegrationTest
         after = Some(cursorBefore),
         encoding = CompactJson,
       )
-      historyWhileDown shouldBe empty
+      historyWhileDown shouldBe empty withClue "EventHistory while mediator ingestion down"
     }
 
     val expectedUpdateIds = clue("Fetch the updateIds for the taps from wallet history") {
@@ -218,7 +218,7 @@ class ScanEventHistoryIntegrationTest
 
       eventually() {
         val eventHistory = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBefore))
-        eventHistory should not be empty
+        eventHistory should not be empty withClue "EventHistory after ingestion resume"
       }
       expectedUpdateIds.foreach { id =>
         val eventByIdO = sv1ScanBackend.getEventById(
@@ -359,7 +359,7 @@ class ScanEventHistoryIntegrationTest
 
       silentClue(s"Missing expected updateIds: ${missing
           .mkString(",")} | expected=${expectedSet.size}, present=${presentSet.size}") {
-        missing shouldBe empty
+        missing shouldBe empty withClue "missing updateIds"
       }
       eh
     }
@@ -398,7 +398,7 @@ class ScanEventHistoryIntegrationTest
     }
 
     silentClue("Update events with missing verdict: " + missing.mkString(",")) {
-      missing shouldBe empty
+      missing shouldBe empty withClue "updates missing verdict"
     }
 
     eventHistory

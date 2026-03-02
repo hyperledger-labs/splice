@@ -132,6 +132,7 @@ object SvTaskBasedTrigger {
       epoch: Long,
       delegatelessAutomationExpectedTaskDuration: Long,
       delegatelessAutomationExpiredRewardCouponBatchSize: Int,
+      delegatelessAutomationExpiredRewardCouponNumBatches: Int,
       packageVersionSupport: PackageVersionSupport,
   )
 }
