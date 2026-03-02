@@ -2428,6 +2428,84 @@
               }
             ],
             "comparison": "COMPARISON_GT",
+            "duration": "0s",
+            "filter": "resource.type=\"k8s_container\" AND metric.type = \"logging.googleapis.com/user/logged_secrets_mock\"",
+            "trigger": {
+              "count": 1
+            }
+          },
+          "displayName": "Logged secrets detected in mock"
+        }
+      ],
+      "displayName": "Logged secrets detected in mock",
+      "notificationChannels": [
+        null
+      ]
+    },
+    "name": "loggedSecretsAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "description": "Logs containing secrets (JWTs, Bearer tokens, passwords, etc.)",
+      "filter": "resource.labels.cluster_name=\"cn-mocknet\"\n(jsonPayload.message=~\"(secret|token|private-key|password)=[^, ]+\" OR jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\")\n-jsonPayload.message=~\"(secret|token|private-key|password)=(\\\"\\\\*\\\\*\\\\*\\\\*\\\"|hidden)\"\n",
+      "labelExtractors": {
+        "cluster": "EXTRACT(resource.labels.cluster_name)",
+        "namespace": "EXTRACT(resource.labels.namespace_name)"
+      },
+      "metricDescriptor": {
+        "labels": [
+          {
+            "description": "Pod namespace",
+            "key": "namespace"
+          },
+          {
+            "description": "Cluster name",
+            "key": "cluster"
+          }
+        ],
+        "metricKind": "DELTA",
+        "valueType": "INT64"
+      },
+      "name": "logged_secrets_mock"
+    },
+    "name": "logged_secrets",
+    "provider": "",
+    "type": "gcp:logging/metric:Metric"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionThreshold": {
+            "aggregations": [
+              {
+                "alignmentPeriod": "600s",
+                "crossSeriesReducer": "REDUCE_SUM",
+                "groupByFields": [
+                  "metric.label.cluster"
+                ],
+                "perSeriesAligner": "ALIGN_SUM"
+              }
+            ],
+            "comparison": "COMPARISON_GT",
             "duration": "300s",
             "filter": "resource.type=\"k8s_container\"  AND metric.type = \"logging.googleapis.com/user/log_warnings_mock\"",
             "trigger": {

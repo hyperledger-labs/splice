@@ -70,6 +70,7 @@ const MonitoringConfigSchema = z
         }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
+      loggedSecretsFilter: z.string().optional(),
     }),
   })
   .strict();
