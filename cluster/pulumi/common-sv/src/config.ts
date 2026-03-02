@@ -82,7 +82,7 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   version: CnChartVersion;
 }
 
-export const GCPBucketSchema = z.object({
+export const TopologySnapshotSchema = z.object({
   projectId: z.string(),
   bucketName: z.string(),
   backupInterval: z.string(),

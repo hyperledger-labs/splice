@@ -14,7 +14,7 @@ import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
 
-import { GCPBucketSchema } from './config';
+import { TopologySnapshotSchema } from './config';
 
 const SvCometbftConfigSchema = z
   .object({
@@ -163,7 +163,7 @@ const SingleSvConfigSchema = z
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
-    periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
+    periodicSnapshots: z.object({ topology: TopologySnapshotSchema.optional() }).optional(),
     versionOverride: CnChartVersionSchema.optional(),
   })
   .strict();
