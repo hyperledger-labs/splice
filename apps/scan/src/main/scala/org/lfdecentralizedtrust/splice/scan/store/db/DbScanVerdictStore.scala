@@ -23,7 +23,6 @@ import slick.jdbc.canton.SQLActionBuilder
 import slick.dbio.DBIO
 
 import java.util.concurrent.atomic.AtomicReference
-import io.circe.parser.parse
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -661,12 +660,6 @@ class DbScanVerdictStore(
          """.as[TransactionViewT],
       "scanVerdict.listTransactionViews",
     )
-  }
-
-  implicit val optionalJsonGetResult: GetResult[Option[Json]] = GetResult { prs =>
-    prs.<<?[String].flatMap { jsonString =>
-      parse(jsonString).toOption
-    }
   }
 
   def maxVerdictRecordTime(migrationId: Long)(implicit
