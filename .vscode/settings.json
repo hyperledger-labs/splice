@@ -34,5 +34,7 @@
   },
   "metals.inlayHints.implicitArguments.enable": true,
   "metals.inlayHints.implicitConversions.enable": true,
-  "makefile.configureOnOpen": false
+  "makefile.configureOnOpen": false,
+  "deno.enable": true,
+  "deno.enablePaths": ["scripts/"]
 }

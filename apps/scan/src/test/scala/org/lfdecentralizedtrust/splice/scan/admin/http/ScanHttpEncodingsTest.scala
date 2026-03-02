@@ -415,7 +415,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         )
       ),
       subViews = Seq(3),
-      viewHash = Some("hash0"),
     )
     val view1 = DbScanVerdictStore.TransactionViewT(
       verdictRowId = 0L,
@@ -428,7 +427,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         )
       ),
       subViews = Seq.empty,
-      viewHash = Some("hash1"),
     )
 
     val view2 = DbScanVerdictStore.TransactionViewT(
@@ -446,7 +444,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         ),
       ),
       subViews = Seq(1),
-      viewHash = Some("hash2"),
     )
 
     val view3 = DbScanVerdictStore.TransactionViewT(
@@ -460,7 +457,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         )
       ),
       subViews = Seq(4, 5),
-      viewHash = Some("hash3"),
     )
 
     val view4 = DbScanVerdictStore.TransactionViewT(
@@ -474,7 +470,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         )
       ),
       subViews = Seq(6),
-      viewHash = Some("hash4"),
     )
     val view5 = DbScanVerdictStore.TransactionViewT(
       verdictRowId = 0L,
@@ -491,7 +486,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         )
       ),
       subViews = Seq.empty,
-      viewHash = Some("hash5"),
     )
 
     val view6 = DbScanVerdictStore.TransactionViewT(
@@ -505,7 +499,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         )
       ),
       subViews = Seq.empty,
-      viewHash = None, // Test that None encodes to empty string
     )
 
     val viewsIn = Seq(view2, view0, view1, view6, view4, view5, view3)
@@ -532,7 +525,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       v.informees shouldBe Vector(partyC)
       v.subViews shouldBe Vector(3)
       v.confirmingParties shouldBe Vector(httpApi.Quorum(Vector(partyA), 1))
-      v.viewHash shouldBe "hash0" // Some("hash0") encodes to "hash0"
     }
 
     inside(views(1)) { case v =>
@@ -588,7 +580,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       v.confirmingParties shouldBe Vector(
         httpApi.Quorum(Vector(partyA), 1)
       )
-      v.viewHash shouldBe "" // None encodes to empty string
     }
 
     val encodedAccepted =

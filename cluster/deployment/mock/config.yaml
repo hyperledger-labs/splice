@@ -152,6 +152,7 @@ svs:
         limits:
           memory: '2048Mi'
     svApp:
+      permissionedSynchronizer: false  # will be removed once the permissioned synchronizer is the default
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
@@ -195,6 +196,7 @@ svs:
       appsLogLevel: WARN
       cantonLogLevel: INFO
       cantonStdoutLogLevel: DEBUG
+      apiRequestLogLevel: DEBUG
   sv:
     participant:
       bftSequencerConnection: false
@@ -208,6 +210,7 @@ svs:
       appsLogLevel: WARN
       cantonLogLevel: INFO
       cantonStdoutLogLevel: DEBUG
+      apiRequestLogLevel: DEBUG
     scanApp:
       bigQuery:
         dataset: mock_da2_scan
@@ -247,6 +250,7 @@ svs:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
+      apiRequestLogLevel: DEBUG
 infra:
   extraCustomResources:
     deny-onboard-prepare-endpoint:

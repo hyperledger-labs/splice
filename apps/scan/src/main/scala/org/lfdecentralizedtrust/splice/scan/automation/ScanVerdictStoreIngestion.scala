@@ -165,12 +165,8 @@ class ScanVerdictStoreIngestion(
       rowId = 0,
       migrationId = migrationId,
       domainId = synchronizerId,
-      recordTime = CantonTimestamp
-        .fromProtoTimestamp(verdict.getRecordTime)
-        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
-      finalizationTime = CantonTimestamp
-        .fromProtoTimestamp(verdict.getFinalizationTime)
-        .getOrElse(throw new IllegalArgumentException("Invalid timestamp")),
+      recordTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getRecordTime),
+      finalizationTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getFinalizationTime),
       submittingParticipantUid = verdict.submittingParticipantUid,
       verdictResult = resultShort,
       mediatorGroup = verdict.mediatorGroup,
@@ -195,7 +191,6 @@ class ScanVerdictStoreIngestion(
           informees = txView.informees,
           confirmingParties = confirmingPartiesJson,
           subViews = txView.subViews,
-          viewHash = Some(txView.viewHash).filter(_.nonEmpty),
         )
       }.toSeq
     }

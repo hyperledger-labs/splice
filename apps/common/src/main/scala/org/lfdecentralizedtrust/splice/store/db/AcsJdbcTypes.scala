@@ -339,6 +339,24 @@ trait AcsJdbcTypes {
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
 
+  /** Transaction hash is SHA-256 (32 bytes), but we apply a relaxed future-proof limit of 1024 bytes just in case.
+    *  The hash is not guaranteed to be present. For consistency with historical data,
+    *  we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
+    */
+  protected def sanitizedExtTxnHash(
+      extTxnHash: ByteString,
+      maxLength: Int = 1024,
+  ): Option[Array[Byte]] = {
+    Option(extTxnHash)
+      .filterNot(_.isEmpty)
+      .map { nonNullExtTxnHash =>
+        val trimmedExtTxnHash =
+          if (nonNullExtTxnHash.size() > maxLength) nonNullExtTxnHash.substring(0, maxLength)
+          else nonNullExtTxnHash
+        trimmedExtTxnHash.toByteArray
+      }
+  }
+
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],
       createdEvent: CreatedEvent,

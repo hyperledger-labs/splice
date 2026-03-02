@@ -1750,6 +1750,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1792,6 +1793,10 @@
         },
         "sequencer": {
           "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+              "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+            },
             {
               "name": "CUSTOM_MOCK_ENV_VAR_NAME",
               "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -1876,6 +1881,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1918,6 +1924,10 @@
         },
         "sequencer": {
           "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+              "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+            },
             {
               "name": "CUSTOM_MOCK_ENV_VAR_NAME",
               "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -4020,6 +4030,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -4062,6 +4073,10 @@
         },
         "sequencer": {
           "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+              "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+            },
             {
               "name": "CUSTOM_MOCK_ENV_VAR_NAME",
               "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -4146,6 +4161,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -4188,6 +4204,10 @@
         },
         "sequencer": {
           "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+              "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+            },
             {
               "name": "CUSTOM_MOCK_ENV_VAR_NAME",
               "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -5754,6 +5774,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -5796,6 +5817,10 @@
         },
         "sequencer": {
           "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+              "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+            },
             {
               "name": "CUSTOM_MOCK_ENV_VAR_NAME",
               "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
@@ -5880,6 +5905,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -5922,6 +5948,10 @@
         },
         "sequencer": {
           "additionalEnvVars": [
+            {
+              "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+              "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+            },
             {
               "name": "CUSTOM_MOCK_ENV_VAR_NAME",
               "value": "CUSTOM_MOCK_ENV_VAR_VALUE"

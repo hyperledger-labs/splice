@@ -22,6 +22,7 @@ export function valuesForSvApp(
   additionalEnvVars: EnvVarConfig[];
   cometBFT?: object;
   pvc: object;
+  permissionedSynchronizer?: boolean;
 } {
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const bftSequencerConnectionEnvVars =
@@ -76,6 +77,7 @@ export function valuesForSvApp(
       volumeStorageClass: standardStorageClassName,
       volumeName: `sv-app-global-domain-migration-${pvcSuffix}`,
     },
+    permissionedSynchronizer: config.svApp?.permissionedSynchronizer,
     additionalEnvVars,
   };
 }

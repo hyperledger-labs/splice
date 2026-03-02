@@ -1,0 +1,62 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: sequencer client delay
+      folder: canton
+      interval: 1m
+      rules:
+        - uid: efe3v7bed6134e
+          title: Sequencer Client Delay
+          condition: client delay threshold exceeded
+          data:
+            - refId: client delay
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: min by (namespace, job) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros) - (daml_sequencer_client_handler_last_sequencing_time_micros>0)/1e6)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: client delay
+            - refId: client delay threshold exceeded
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - $SEQUENCER_CLIENT_DELAY_THRESHOLD_SECONDS
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: client delay
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: client delay threshold exceeded
+                type: threshold
+          dashboardUid: ca9df344-c699-4efe-83c2-5fb2639d96d9
+          panelId: 3
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: ca9df344-c699-4efe-83c2-5fb2639d96d9
+            __panelId__: "3"
+            summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} is reporting an increased sequencer client delay.
+            severity: critical
+          labels: {}
+          isPaused: false

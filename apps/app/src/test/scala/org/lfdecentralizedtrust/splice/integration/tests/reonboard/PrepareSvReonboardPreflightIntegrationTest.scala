@@ -34,7 +34,7 @@ class PrepareSvReonboardPreflightIntegrationTest
             walletUrl,
             svUsername,
             svPassword,
-            () => find(id("logout-button")) should not be empty,
+            () => find(id("logout-button")) should not be empty withClue "'Logout' button",
           )
         },
       )(

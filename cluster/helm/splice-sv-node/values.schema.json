@@ -5,6 +5,10 @@
     "uiPollInterval": {
       "type": "number",
       "description": "The interval in milliseconds to poll the UI for updates"
+    },
+    "permissionedSynchronizer": {
+      "type": "boolean",
+      "description": "Whether to enable permissioned synchronizer features"
     }
   },
   "allOf": [

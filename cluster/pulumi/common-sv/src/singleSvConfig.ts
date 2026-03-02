@@ -89,6 +89,7 @@ const SvAppConfigSchema = z
     svIdKeyGcpSecret: z.string().optional(),
     // defaults to {svName}-cometbft-governance-key if not set
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
+    permissionedSynchronizer: z.boolean().optional(),
     resources: K8sResourceSchema,
   })
   .strict();
@@ -156,6 +157,7 @@ const SingleSvConfigSchema = z
         appsAsync: z.boolean().default(false),
         cantonLogLevel: LogLevelSchema,
         cantonStdoutLogLevel: LogLevelSchema.optional(),
+        apiRequestLogLevel: LogLevelSchema.optional(),
         cantonAsync: z.boolean().default(false),
         cometbftLogLevel: CometbftLogLevelSchema.optional(),
         cometbftExtraLogLevelFlags: z.string().optional(),

@@ -49,7 +49,10 @@ class AnsAuth0FrontendIntegrationTest
               s"http://localhost:$aliceAnsUIPort",
               user.email,
               user.password,
-              () => seleniumText(find(id("logged-in-user"))) should not be empty,
+              () =>
+                seleniumText(
+                  find(id("logged-in-user"))
+                ) should not be empty withClue "CurrentUser onboarded",
             )
           }
       }

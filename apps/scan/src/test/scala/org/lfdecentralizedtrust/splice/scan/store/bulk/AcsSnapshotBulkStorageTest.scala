@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.store.{
   Limit,
   StoreTestBase,
   TimestampWithMigrationId,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
@@ -131,6 +132,7 @@ class AcsSnapshotBulkStorageTest
         val ts2 = ts1.add(3.hours)
         val ts3 = ts1.add(24.hours)
         val store = new MockAcsSnapshotStore(ts1)
+        val updateHistory = mockUpdateHistory()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         val metricsFactory = new InMemoryMetricsFactory
         def assertLatestSnapshotInMetrics(ts: CantonTimestamp) = {
@@ -153,6 +155,7 @@ class AcsSnapshotBulkStorageTest
             bulkStorageTestConfig,
             appConfig,
             store.store,
+            updateHistory,
             s3BucketConnection,
             kvProvider,
             new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
@@ -192,6 +195,14 @@ class AcsSnapshotBulkStorageTest
         }
       }
     }
+  }
+
+  private def mockUpdateHistory() = {
+    val store = mock[UpdateHistory]
+    when(
+      store.isHistoryBackfilled(anyLong)(any[TraceContext])
+    ).thenReturn(Future.successful(true))
+    store
   }
 
   class MockAcsSnapshotStore(val initialSnapshotTimestamp: CantonTimestamp) {

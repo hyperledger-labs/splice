@@ -100,7 +100,7 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
                   -totalCostCc - smallAmount,
                   -totalCostCc,
                 )
-                logEntry.receivers shouldBe empty
+                logEntry.receivers shouldBe empty withClue "receivers"
               },
               { case logEntry: TransferTxLogEntry =>
                 logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto
@@ -122,7 +122,7 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
               Seq[CheckTxHistoryFn](
                 { case logEntry: TransferTxLogEntry =>
                   logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
-                  logEntry.receivers shouldBe empty
+                  logEntry.receivers shouldBe empty withClue "receivers"
                   logEntry.sender.value.party shouldBe sv1ValidatorBackend
                     .getValidatorPartyId()
                     .toProtoPrimitive
@@ -160,7 +160,7 @@ class WalletTxLogWithSynchronizerFeesNoDevNetTimeBasedIntegrationTest
                   -totalCostCc - smallAmount,
                   -totalCostCc,
                 )
-                logEntry.receivers shouldBe empty
+                logEntry.receivers shouldBe empty withClue "receivers"
               },
               { case logEntry: TransferTxLogEntry =>
                 logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto

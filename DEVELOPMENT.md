@@ -229,6 +229,8 @@ There are a few extensions that improve the VS Code experience when working on v
 - [Run it On](https://marketplace.visualstudio.com/items?itemName=fsevenm.run-it-on): Optional, if you want to add an automatic "scalafix on save" command while editing Scala files
 - [Nix](https://marketplace.visualstudio.com/items?itemName=bbenoist.Nix)
 - [vscode-proto3](https://marketplace.visualstudio.com/items?itemName=zxh404.vscode-proto3)
+- [Deno](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno): An extension for getting IntelliSense to work properly with TypeScript shell scripts
+- [direnv](https://marketplace.visualstudio.com/items?itemName=mkhl.direnv): Essential for Deno to pick up the binary from nix
 
 ### Configuring VS Code for Daml Development
 

@@ -39,10 +39,12 @@ jobs:
         with:
           # Checkout the PR head commit to get the commit message
           ref: ${{ github.event.pull_request.head.sha }}
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Split tests
         id: prep
-        uses: ./.github/actions/tests/pre_scala_test
+        uses: ./splice-shared-gha/.github/actions/tests/pre_scala_test
         with:
           parallelism: ${{ inputs.parallelism }}
           test_names_file: ${{ inputs.test_names_file }}
@@ -108,9 +110,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.commit_sha }}
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Tests
-        uses: ./.github/actions/tests/scala_test
+        uses: ./splice-shared-gha/.github/actions/tests/scala_test
         with:
           start_canton_options: -F -w
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}

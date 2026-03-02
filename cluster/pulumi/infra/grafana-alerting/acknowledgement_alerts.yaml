@@ -85,14 +85,14 @@ groups:
                 maxDataPoints: 43200
                 refId: No recent report
                 type: threshold
-          dashboardUid: cdlm6c7fn7vuod
+          dashboardUid: 3ccfda97-fb9c-4413-bc05-5ed6f2c888f7
           panelId: 18
           noDataState: Alerting
           execErrState: Alerting
           for: 5m
           annotations:
-            __dashboardUid__: cdlm6c7fn7vuod
-            __panelId__: "18"
+            __dashboardUid__: 3ccfda97-fb9c-4413-bc05-5ed6f2c888f7
+            __panelId__: "13"
             description: The mediator {{ $labels.member_prefix }} has not submitted a recent acknowledgement
             severity: critical
             summary: Mediator Acknowledgement lag

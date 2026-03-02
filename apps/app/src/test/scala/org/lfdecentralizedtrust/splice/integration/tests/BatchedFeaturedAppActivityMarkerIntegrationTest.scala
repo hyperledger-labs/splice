@@ -151,7 +151,7 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       alice.toProtoPrimitive,
       bob.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
-    )
+    ) withClue "informees"
 
     actAndCheck(
       "Splitwell creates batched marker through the v2 choice", {
@@ -177,7 +177,9 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
         // The second produces 50 for splitwell with weight 50.
         // The third one produces one marker with weight 1.
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) should have size 201,
+          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(
+            dsoParty
+          ) should have size 201 withClue "FeaturedAppActivityMarkers",
     )
 
     val scanCursorBeforeConversion = latestEventHistoryCursor(sv1ScanBackend)
@@ -189,7 +191,9 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       "Check that the conversion produced only a single view",
       _ => {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) shouldBe empty
+          .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(
+            dsoParty
+          ) shouldBe empty withClue "FeaturedAppActivityMarkers"
         val events =
           sv1ScanBackend.getEventHistory(1000, Some(scanCursorBeforeConversion), CompactJson)
         // Note: There may actually be multiple batches in the trigger because we can't easily synchronize on it having ingested all the markers.
@@ -207,21 +211,21 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
         }
         // Check that we actually got some so the forAll does not become redundant
         withClue(s"Unfiltered events: $events") {
-          conversionEvents should not be empty
+          conversionEvents should not be empty withClue "ConvertFeaturedAppActivityMarkers txs"
         }
         // Check that each conversion only produces 2 views, one for the SV and one for validator
         forAll(conversionEvents) { event =>
           val views = event.verdict.value.transactionViews.views
-          views should have size (2)
+          views should have size (2) withClue "conversionEvent views"
           forExactly(1, views) { view =>
             view.informees should contain theSameElementsAs Seq(
               dsoParty.toProtoPrimitive,
               sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
               sv1Backend.participantClient.id.uid.toProtoPrimitive,
-            )
+            ) withClue "informees"
           }
           forExactly(1, views) { view =>
-            view.informees should contain atLeastOneOf (alice.toProtoPrimitive, bob.toProtoPrimitive)
+            view.informees should contain atLeastOneOf (alice.toProtoPrimitive, bob.toProtoPrimitive) withClue "informees"
           }
         }
       },

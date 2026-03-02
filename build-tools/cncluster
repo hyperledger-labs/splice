@@ -128,9 +128,11 @@ function _retry_until_success() {
         exit 1
     fi
 
-    # with 5 second sleep + 1 second kubectl timeout, this is roughly 15 minutes
-    # See also max_wait which caps the overall wait time
-    local -i -r max_retries=$((150))
+    # With 5 second sleep and 3 second kubectl timeout, this is between
+    # 16 minutes (no kubectl timeout triggered, for example because `no matching resources found`)
+    # and 27 minutes (if we hit the kubectil timeout every time).
+    # See also max_wait which caps the overall wait time.
+    local -i -r max_retries=$((200))
     local -i num_retries=0
     local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
     local -i -r start_time=$(date +%s)
@@ -1353,28 +1355,9 @@ subcmd_export_to() {
 subcommand_whitelist[partial_upgrade]="Upgrades SV-1's sv-app and validator1's validator-app to the version passed"
 
 function subcmd_partial_upgrade() {
-    new_version=$1
-    original_versions_file=$2
-    json=$(cat "$original_versions_file")
-
-    json_paths=(
-        '["sv-1","splice-participant"]'
-        '["sv-1","splice-global-domain"]'
-        '["sv-1","splice-cometbft"]'
-        '["sv-1","splice-scan"]'
-        '["sv-1","splice-sv-node"]'
-        '["sv-1","splice-validator"]'
-        '["validator1","splice-validator"]'
-        '["validator1","splice-participant"]'
-        '["validator1","splice-splitwell-web-ui"]'
-    )
-    for json_path in "${json_paths[@]}"; do
-      json=$(jq "setpath($json_path; \"$new_version\")" <<< "$json")
-    done
-
-    _info "Upgrading sv-1 sv-app & validator1 validator-app to version $new_version"
     local -x IMAGE_VERSIONS_FILE="/tmp/partial_upgrade_versions.json"
-    echo "$json" > "$IMAGE_VERSIONS_FILE"
+    "${SPLICE_ROOT}/scripts/partially-upgrade-versions.ts" "$@" > "$IMAGE_VERSIONS_FILE"
+    _info "Upgrading ${3:-1} sv(s) & validator1 validator-app to version $1"
 
     _pulumi_automation_run_up
 }

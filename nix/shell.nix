@@ -105,6 +105,7 @@ let
     tinyproxy
     tmux
     toxiproxy
+    deno
     unzip
     which
     zip
@@ -133,6 +134,7 @@ let
     scala_2_13
     shellcheck
     skopeo
+    which
   ] ++ linuxOnly;
 
 in pkgs.mkShell {

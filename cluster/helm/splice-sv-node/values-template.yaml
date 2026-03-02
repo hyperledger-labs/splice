@@ -43,6 +43,7 @@ pvc:
   volumeStorageClass: standard-rwo
 
 failOnAppVersionMismatch: true
+permissionedSynchronizer: false
 
 spliceInstanceNames:
   networkName: # Please provide a value as provided in the docs
