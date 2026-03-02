@@ -320,6 +320,12 @@ trait AcsJdbcTypes {
         .getOrElse(throw new IllegalStateException("JSONB column didn't contain valid JSON."))
   }
 
+  protected implicit lazy val optionalJsonGetResult: GetResult[Option[Json]] = GetResult { prs =>
+    prs.<<?[String].flatMap { jsonString =>
+      circeParse(jsonString).toOption
+    }
+  }
+
   protected implicit lazy val jsonSetParameter: SetParameter[Json] =
     (json: Json, pp: PositionedParameters) => {
       pp.setObject(json.noSpaces, java.sql.Types.OTHER)
