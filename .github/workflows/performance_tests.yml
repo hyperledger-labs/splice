@@ -45,7 +45,7 @@ jobs:
             set -euxo pipefail
 
             echo "Downloading updates from mainnet for performance tests"
-            curl -sSL "https://storage.googleapis.com/splice-performance-tests-mainnet-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
+            curl -sSL --fail-with-body "https://storage.googleapis.com/splice-performance-tests-mainnet-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
             ls -lah /tmp/mainnetupdates.json
             echo "Downloaded, running performance tests"
             export POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST"
