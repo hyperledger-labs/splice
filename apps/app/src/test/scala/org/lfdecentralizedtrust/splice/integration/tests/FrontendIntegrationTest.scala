@@ -697,6 +697,12 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         ExpectedConditions.elementToBeClickable(_)
       }
     }
+    driver
+      .asInstanceOf[JavascriptExecutor]
+      .executeScript(
+        "arguments[0].scrollIntoView({block: 'center'});",
+        driver.findElement(query.by),
+      )
     clickOn(query)
   }
 
