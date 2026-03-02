@@ -39,6 +39,14 @@ import scala.jdk.OptionConverters.*
   */
 sealed trait ScanHttpEncodings {
 
+  private def hexHashOption(extTxnHash: ByteString): Option[String] = {
+    if (extTxnHash.isEmpty) {
+      None
+    } else {
+      Some(extTxnHash.toByteArray.map("%02x" format _).mkString)
+    }
+  }
+
   def lapiToHttpUpdate(
       updateWithMigrationId: TreeUpdateWithMigrationId,
       eventIdBuilder: (String, Int) => String,
@@ -68,7 +76,7 @@ sealed trait ScanHttpEncodings {
                   eventIdBuilder,
                 )
               }.toMap,
-              tree.getExternalTransactionHash.toByteArray.map("%02x" format _).mkString,
+              hexHashOption(tree.getExternalTransactionHash),
             )
         )
 
@@ -258,7 +266,9 @@ sealed trait ScanHttpEncodings {
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
-            ByteString.copyFrom(HexFormat.of().parseHex(http.externalTransactionHash)),
+            http.externalTransactionHash
+              .map(hex => ByteString.copyFrom(HexFormat.of().parseHex(hex)))
+              .getOrElse(ByteString.EMPTY),
           )
         ),
         synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),

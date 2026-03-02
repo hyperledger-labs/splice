@@ -292,7 +292,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           rightChildId1 -> mkCreate(rightChildId1),
           rightChildId2 -> mkCreate(rightChildId2),
         ),
-        externalTransactionHash = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7",
+        externalTransactionHash = Option("4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"),
       )
     )
 
