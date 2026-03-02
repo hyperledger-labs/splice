@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOff
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
+import java.util.HexFormat
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -67,8 +68,10 @@ sealed trait ScanHttpEncodings {
                   eventIdBuilder,
                 )
               }.toMap,
+              tree.getExternalTransactionHash.toByteArray.map("%02x" format _).mkString,
             )
         )
+
       case ledgerApi.ReassignmentUpdate(update) =>
         update.event match {
           case ledgerApi.ReassignmentEvent.Assign(
@@ -217,6 +220,7 @@ sealed trait ScanHttpEncodings {
       offset = LegacyOffset.Api.fromLong(offset),
       rootEventIds = httpV2.rootEventIds,
       eventsById = httpV2.eventsById,
+      externalTransactionHash = httpV2.externalTransactionHash,
     )
     httpToLapiTransaction(http)
   }
@@ -254,7 +258,7 @@ sealed trait ScanHttpEncodings {
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
-            ByteString.EMPTY, // TODO(#3408): Revisit when adding APIs
+            ByteString.copyFrom(HexFormat.of().parseHex(http.externalTransactionHash)),
           )
         ),
         synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),
