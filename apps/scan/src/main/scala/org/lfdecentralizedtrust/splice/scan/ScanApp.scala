@@ -37,7 +37,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
@@ -312,7 +312,7 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
-      appActivityComputation = NoOpAppActivityComputation
+      appActivityComputation = new AppActivityComputation(loggerFactory)
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
