@@ -32,7 +32,7 @@ create table app_activity_record_store
     -- Values are in one-to-one correspondence with the values in the app_provider_parties array.
     app_activity_weights        bigint[] not null,
     -- Primary key: (history_id, record_time) uniquely identifies an activity record
-    primary key (history_id, record_time)
+    constraint app_activity_record_store_pkey primary key (history_id, record_time)
 );
 
 
