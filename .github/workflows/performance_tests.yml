@@ -59,7 +59,7 @@ jobs:
             export POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST"
             export POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER"
             export POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"
-            sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbScanStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"
+            sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"
 
       - name: Check logs for errors
         uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
