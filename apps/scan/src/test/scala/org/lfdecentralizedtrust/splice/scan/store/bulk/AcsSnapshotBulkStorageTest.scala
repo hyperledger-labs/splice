@@ -200,6 +200,7 @@ class AcsSnapshotBulkStorageTest
 
   private def mockUpdateHistory() = {
     val store = mock[UpdateHistory]
+    when(store.isReady).thenReturn(true)
     when(
       store.isHistoryBackfilled(anyLong)(any[TraceContext])
     ).thenReturn(Future.successful(true))

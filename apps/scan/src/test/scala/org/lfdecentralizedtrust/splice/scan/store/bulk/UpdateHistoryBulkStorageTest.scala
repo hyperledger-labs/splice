@@ -328,6 +328,7 @@ class UpdateHistoryBulkStorageTest
           data.filter(_.update.update.recordTime > recordTime).map(_.migrationId).minOption
         )
       }
+      when(store.isReady).thenReturn(true)
       when(
         store.isHistoryBackfilled(anyLong)(any[TraceContext])
       ).thenReturn(Future.successful(true))
