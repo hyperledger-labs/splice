@@ -61,7 +61,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
   lazy val scheduledLsu = ScheduledLsuConfig(
     Instant.now().plusSeconds(150).truncatedTo(ChronoUnit.SECONDS),
-    Instant.now().plusSeconds(180).truncatedTo(ChronoUnit.SECONDS),
+    Instant.now().plusSeconds(210).truncatedTo(ChronoUnit.SECONDS),
     NonNegativeInt.one,
     ProtocolVersion.v34,
   )
