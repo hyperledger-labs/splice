@@ -889,9 +889,9 @@ class DbSvDsoStore(
               domainMigrationId,
               splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
               additionalWhere = (sql"""
-                and assigned_domain = $synchronizerId
-                and (create_arguments->'transfer'->>'executeBefore')::timestamp < ${now}
-              """ ++ filterClause).toActionBuilder,
+              and assigned_domain = $synchronizerId
+              and (create_arguments->'transfer'->>'expiresAt')::timestamp < ${now}
+            """ ++ filterClause).toActionBuilder,
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
             "listExpiredAmuletTransferInstructions",
