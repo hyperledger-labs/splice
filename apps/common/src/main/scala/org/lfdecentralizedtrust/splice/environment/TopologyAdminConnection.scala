@@ -36,6 +36,7 @@ import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SigningPublicKey,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -66,6 +67,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
+  TopologySnapshot,
   TopologyTransactionType,
 }
 
@@ -218,6 +220,7 @@ abstract class TopologyAdminConnection(
       partyId: PartyId,
       operation: Option[TopologyChangeOp],
       topologyTransactionType: TopologyTransactionType,
+      snapshot: TopologySnapshot,
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(
       listPartyToParticipant(
@@ -225,6 +228,7 @@ abstract class TopologyAdminConnection(
         filterParty = partyId.filterString,
         operation = operation,
         topologyTransactionType = topologyTransactionType,
+        timeQuery = snapshot.timeQuery,
       ).map { txs =>
         txs.headOption
       }
@@ -236,8 +240,9 @@ abstract class TopologyAdminConnection(
       // get only active (non-removed) mappings by default; this matches the Canton console defaults
       operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
+      topologySnapshot: TopologySnapshot = TopologySnapshot.Effective,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
-    findPartyToParticipant(synchronizerId, partyId, operation, topologyTransactionType).getOrElse {
+    findPartyToParticipant(synchronizerId, partyId, operation, topologyTransactionType, topologySnapshot).getOrElse {
       throw Status.NOT_FOUND
         .withDescription(s"No PartyToParticipant state for $partyId on domain $synchronizerId")
         .asRuntimeException
@@ -1600,6 +1605,19 @@ object TopologyAdminConnection {
 
     }
 
+  }
+
+  sealed abstract class TopologySnapshot {
+    def timeQuery: TimeQuery
+  }
+
+  object TopologySnapshot {
+    case object Sequenced extends TopologySnapshot {
+      override def timeQuery: TimeQuery = TimeQuery.Snapshot(CantonTimestamp.MaxValue)
+    }
+    case object Effective extends TopologySnapshot {
+      override def timeQuery: TimeQuery = TimeQuery.HeadState
+    }
   }
 
   sealed abstract class RecreateOnAuthorizedStateChange {

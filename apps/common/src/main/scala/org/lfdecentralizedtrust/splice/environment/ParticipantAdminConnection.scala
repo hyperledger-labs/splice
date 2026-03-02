@@ -63,6 +63,7 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   RecreateOnAuthorizedStateChange,
   TopologyResult,
+  TopologySnapshot,
 }
 
 import java.time.Instant
@@ -636,6 +637,7 @@ class ParticipantAdminConnection(
       party: PartyId,
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
+      topologySnapshot: TopologySnapshot = TopologySnapshot.Sequenced,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
@@ -646,6 +648,7 @@ class ParticipantAdminConnection(
             synchronizerId = synchronizerId,
             partyId = party,
             topologyTransactionType = topologyTransactionType,
+            topologySnapshot = topologySnapshot,
           )
             .map(result =>
               Either
