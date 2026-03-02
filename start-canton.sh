@@ -216,6 +216,7 @@ tmux_cmd_canton() {
   tmux_cmd "$windowName" \
     "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
+     LOG_LEVEL_API_REQUEST=DEBUG \
      CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
       --log-level-canton=INFO \

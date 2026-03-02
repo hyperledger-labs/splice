@@ -11,7 +11,8 @@ import { installNode } from './installNode';
 async function main() {
   const sv = config.requireEnv('SPLICE_SV');
 
-  const auth0FetchOutput = getAuth0Config(Auth0ClientType.MAINSTACK);
+  const clientType = sv === 'sv' ? Auth0ClientType.RUNBOOK : Auth0ClientType.MAINSTACK;
+  const auth0FetchOutput = getAuth0Config(clientType);
   auth0FetchOutput.apply(async auth0Fetch => {
     await auth0Fetch.loadAuth0Cache();
 

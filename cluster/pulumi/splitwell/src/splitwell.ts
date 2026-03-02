@@ -110,6 +110,7 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       maxDarVersion: splitwellConfig?.maxDarVersion,
       logLevel: splitwellConfig.logging?.level,
+      apiRequestLogLevel: splitwellConfig.logging?.apiRequestLogLevel,
       logAsyncFlush: splitwellConfig.logging?.async,
     },
     activeVersion,
