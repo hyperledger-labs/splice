@@ -42,8 +42,10 @@ jobs:
         with:
           additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
           cmd: |
+            set -euxo pipefail
+
             echo "Downloading updates from mainnet for performance tests"
-            wget -q "https://storage.googleapis.com/splice-performance-tests-mainnet-dumps/mainnetupdates.json" -O /tmp/mainnetupdates.json
+            curl -sSL "https://storage.googleapis.com/splice-performance-tests-mainnet-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
             ls -lah /tmp/mainnetupdates.json
             echo "Downloaded, running performance tests"
             export POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST"
