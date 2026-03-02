@@ -863,6 +863,47 @@ class DbSvDsoStore(
     listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION, filterClause)
   }
 
+  override def listExpiredAmuletTransferInstructions(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amulettransferinstruction.AmuletTransferInstruction.ContractId,
+    splice.amulettransferinstruction.AmuletTransferInstruction,
+  ] = (now, limit) =>
+    implicit tc => {
+      val filterClause = if (ignoredParties.nonEmpty) {
+        (sql" and " ++ notInClause(
+          "create_arguments->'transfer'->>'sender'",
+          ignoredParties,
+        )).toActionBuilder
+      } else {
+        sql""
+      }
+
+      waitUntilAcsIngested {
+        for {
+          synchronizerId <- getDsoRules().map(_.domain)
+          rows <- storage.query(
+            selectFromAcsTableWithState(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
+              additionalWhere = (sql"""
+                and assigned_domain = $synchronizerId
+                and (create_arguments->'transfer'->>'executeBefore')::timestamp < ${now}
+              """ ++ filterClause).toActionBuilder,
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
+            ),
+            "listExpiredAmuletTransferInstructions",
+          )
+        } yield rows.map(
+          assignedContractFromRow(
+            splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION
+          )(_)
+        )
+      }
+    }
+
   private def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
       companion: Template[Id, T],
       extraFilter: SQLActionBuilder,

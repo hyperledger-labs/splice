@@ -189,6 +189,14 @@ trait SvDsoStore
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet]
 
+  /** List amulet transfer instructions that are expired and can never be used as transfer input. */
+  def listExpiredAmuletTransferInstructions(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amulettransferinstruction.AmuletTransferInstruction.ContractId,
+    splice.amulettransferinstruction.AmuletTransferInstruction,
+  ]
+
   /** List locked amulets that are expired and can never be used as transfer input. */
   def listLockedExpiredAmulets(
       ignoredParties: Set[PartyId]
