@@ -112,6 +112,12 @@ class ScanEventHistoryIntegrationTest
     withClue("Mismatch between CompactJson and ProtobufJson update ids") {
       txIdsProtobuf shouldBe txIdsCompact
     }
+
+    withClue("Traffic summaries should not be served when serveTrafficSummaries is disabled") {
+      eventHistory.foreach { item =>
+        item.trafficSummary shouldBe None
+      }
+    }
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
