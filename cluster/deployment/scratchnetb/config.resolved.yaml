@@ -141,10 +141,11 @@ svs:
         requests:
           memory: '2Gi'
     logging:
+      apiRequestLogLevel: 'DEBUG'
       appsAsync: false
-      appsLogLevel: 'DEBUG'
+      appsLogLevel: 'INFO'
       cantonAsync: false
-      cantonLogLevel: 'DEBUG'
+      cantonLogLevel: 'INFO'
       cometbftLogLevel: 'debug'
     mediator:
       resources:

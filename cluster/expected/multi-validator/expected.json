@@ -372,6 +372,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
+                  },
+                  {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
                   },
@@ -814,6 +818,10 @@
                   {
                     "name": "LOG_LEVEL_CANTON",
                     "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
                   },
                   {
                     "name": "LOG_LEVEL_STDOUT",
@@ -1260,6 +1268,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
+                  },
+                  {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
                   },
@@ -1704,6 +1716,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
+                  },
+                  {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
                   },
@@ -2146,6 +2162,10 @@
                   {
                     "name": "LOG_LEVEL_CANTON",
                     "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
                   },
                   {
                     "name": "LOG_LEVEL_STDOUT",
@@ -2658,6 +2678,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
+                  },
+                  {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
                   },
@@ -3105,6 +3129,10 @@
                   {
                     "name": "LOG_LEVEL_CANTON",
                     "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
                   },
                   {
                     "name": "LOG_LEVEL_STDOUT",
@@ -3556,6 +3584,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
+                  },
+                  {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
                   },
@@ -4005,6 +4037,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
+                  },
+                  {
                     "name": "LOG_LEVEL_STDOUT",
                     "value": "INFO"
                   },
@@ -4452,6 +4488,10 @@
                   {
                     "name": "LOG_LEVEL_CANTON",
                     "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_API_REQUEST",
+                    "value": "DEBUG"
                   },
                   {
                     "name": "LOG_LEVEL_STDOUT",
