@@ -1791,6 +1791,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1896,6 +1897,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
@@ -2129,6 +2131,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
@@ -2728,6 +2731,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -2837,6 +2841,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
@@ -3035,6 +3040,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
