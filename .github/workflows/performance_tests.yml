@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   performance_tests:
-    runs-on: self-hosted-k8s-large
+    runs-on: self-hosted-k8s-x-large
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     name: Performance Tests
