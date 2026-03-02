@@ -206,21 +206,24 @@ object AcsSnapshotTriggerBase {
                     None
                 }
             }
-          case Some(snapshot) =>
-            if (snapshot.migrationId != migrationId) {
+          case Some(incrementalSnapshot) =>
+            if (incrementalSnapshot.migrationId != migrationId) {
               // Incremental snapshot contains data from a wrong migration, delete it and start over.
               Future.successful(
-                Some(AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(snapshot))
+                Some(AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(incrementalSnapshot))
               )
             } else {
               // Note: the code below makes sure that `recordTime` never moves past `targetRecordTime`.
-              assert(!snapshot.recordTime.isAfter(snapshot.targetRecordTime))
-              if (snapshot.recordTime == snapshot.targetRecordTime) {
+              assert(!incrementalSnapshot.recordTime.isAfter(incrementalSnapshot.targetRecordTime))
+              if (incrementalSnapshot.recordTime == incrementalSnapshot.targetRecordTime) {
                 // Incremental snapshot is complete, copy it to historical storage.
-                val nextSnapshotTime = storageConfig.nextSnapshotTime(snapshot)
+                val nextSnapshotTime = storageConfig.nextSnapshotTime(incrementalSnapshot)
                 Future.successful(
                   Some(
-                    AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, nextSnapshotTime)
+                    AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(
+                      incrementalSnapshot,
+                      nextSnapshotTime,
+                    )
                   )
                 )
               } else {
@@ -228,14 +231,16 @@ object AcsSnapshotTriggerBase {
                 // The intent is that we process around 30sec (the update interval) of updates per iteration.
                 // The target time for the update is therefore computed
                 // from the state of the incremental snapshot (and not from the current time).
-                val updateUntil = snapshot.recordTime
+                val updateUntil = incrementalSnapshot.recordTime
                   .plus(updateInterval)
-                  .min(snapshot.targetRecordTime) // Don't move past the target record time.
+                  .min(
+                    incrementalSnapshot.targetRecordTime
+                  ) // Don't move past the target record time.
 
                 Future.successful(
                   Some(
                     AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
-                      snapshot,
+                      incrementalSnapshot,
                       updateUntil,
                     )
                   )
@@ -245,6 +250,11 @@ object AcsSnapshotTriggerBase {
         }
     }
   }
+
+  sealed trait RetrieveTaskResult
+  case class TaskToPerform(task: Task) extends RetrieveTaskResult
+  case object NoTaskToPerform extends RetrieveTaskResult
+  case object ReachedMigrationEnd extends RetrieveTaskResult
 
   sealed trait Task extends PrettyPrinting
   case class InitializeIncrementalSnapshotTask(from: AcsSnapshot, nextAt: CantonTimestamp)
