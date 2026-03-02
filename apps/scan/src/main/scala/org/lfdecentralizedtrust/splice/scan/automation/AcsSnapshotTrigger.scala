@@ -46,6 +46,7 @@ class AcsSnapshotTrigger(
       tc: TraceContext
   ): Future[Seq[AcsSnapshotTriggerBase.Task]] = {
     if (!updateHistory.isReady) {
+      logger.debug("Waiting for UpdateHistory to become ready.")
       Future.successful(Seq.empty)
     } else {
       AcsSnapshotTrigger

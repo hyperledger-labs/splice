@@ -55,6 +55,7 @@ class AcsSnapshotBackfillingTrigger(
     if (isDone.get()) {
       Future.successful(Seq.empty)
     } else if (!updateHistory.isReady) {
+      logger.debug("Waiting for UpdateHistory to become ready.")
       Future.successful(Seq.empty)
     } else {
       AcsSnapshotBackfillingTrigger
@@ -145,7 +146,7 @@ object AcsSnapshotBackfillingTrigger {
               // There is a migration before the earliest known backfilled migration,
               // check if we can start backfilling on it.
               logger.debug(
-                s"Earliest backfilled migration is $earliestKnownBackfilledMigrationId, looking tasks in migration $migrationIdToBackfill."
+                s"Earliest backfilled migration is $earliestKnownBackfilledMigrationId, looking for tasks in migration $migrationIdToBackfill."
               )
               for {
                 proposedTaskO <- AcsSnapshotTriggerBase.retrieveTaskForMigration(
