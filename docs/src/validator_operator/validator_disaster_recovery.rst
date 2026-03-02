@@ -198,7 +198,11 @@ Limitations and Troubleshooting
 
 In some non-standard cases, the automated re-onboarding from key backup might not succeed in migrating (i.e., recovering) a party.
 Please check the logs of the validator for warnings or error entries that may give clues.
-Among other things, the following types of parties will not be migrated by default:
+
+Parties not migrated automatically
+""""""""""""""""""""""""""""""""""
+
+The following types of parties will not be migrated by default:
 
 * Parties that are hosted on multiple participants.
   These may get unhosted from the original (failed) participant, but will remain hosted on any other participants.
@@ -210,6 +214,9 @@ In some cases you might want to force the migration attempt for a set of parties
 To do so, you can set the ``parties-to-migrate`` :ref:`configuration option <configuration>` on your validator app.
 A migration will be attempted for each party that you pass to this option.
 The initialization of the validator app will be interrupted on the first failed migration attempt.
+
+Troubleshooting failed ACS imports
+"""""""""""""""""""""""""""""""""""
 
 If you still observe issues, in particular you observe
 ``ACS_COMMITMENT_MISMATCH`` warnings in your participant logs,
@@ -274,6 +281,9 @@ To address a failed :term:`ACS` import, you can usually:
    You can now take down the node to which you originally tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different participant ID prefix
    (i.e., a different ``newParticipantIdentifier`` / ``<new_participant_id>`` depending on your deployment model).
 
+Troubleshooting rejected topology snapshots
+""""""""""""""""""""""""""""""""""""""""""""
+
 In rare cases, the re-onboarding process may fail at the ``ImportTopologySnapshot`` step
 because an ``OwnerToKeyMapping`` for the old participant ID has an insufficient number of
 signatures in the topology snapshot. This can happen when the topology snapshot was created
@@ -304,8 +314,7 @@ To work around this, follow these steps:
       val otk = OwnerToKeyMapping(member = oldParticipantId, keys = NonEmpty.from(keys).get)
       participant.topology.owner_to_key_mappings.propose(otk, force = ForceFlag.AlienMember)
 
-3. Start the validator app using your original identities dump configuration (not one with a
-   custom topology snapshot).
+3. Start the validator app using your original identities dump configuration.
 
 .. _validator_recover_external_party:
 
