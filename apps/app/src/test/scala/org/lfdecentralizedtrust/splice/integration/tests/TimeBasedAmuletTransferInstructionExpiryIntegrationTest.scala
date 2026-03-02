@@ -8,9 +8,13 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpiredAmuletTransferInstructionTrigger
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 
+import java.time.Duration
+import scala.concurrent.duration.DurationInt
 
-class AmuletTransferInstructionExpiryIntegrationTest
+class TimeBasedAmuletTransferInstructionExpiryIntegrationTest
   extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil
@@ -20,7 +24,6 @@ class AmuletTransferInstructionExpiryIntegrationTest
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      // Start the trigger in paused state so we can manipulate the contracts before it fires
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(sv => {
           sv.withPausedTrigger[ExpiredAmuletTransferInstructionTrigger]
@@ -31,11 +34,46 @@ class AmuletTransferInstructionExpiryIntegrationTest
 
     onboardAliceAndBob()
     aliceWalletClient.tap(100.0)
-    aliceWalletClient.tap(100.0)
 
-    val amulets = aliceWalletClient.list().amulets
-    amulets should have length 2
+    aliceWalletClient.list().amulets should have length 1
 
+    val transfer_1 = aliceWalletClient.createTokenStandardTransfer(
+      receiver = bobValidatorBackend.getValidatorPartyId(),
+      amount = BigDecimal(10.0),
+      description = "Transfer 1",
+      expiresAt = getLedgerTime.plus(Duration.ofMinutes(5)),
+      trackingId = "tracking-id-1"
+    )
 
+    val _ = aliceWalletClient.createTokenStandardTransfer(
+      receiver = bobValidatorBackend.getValidatorPartyId(),
+      amount = BigDecimal(10.0),
+      description = "Transfer 2",
+      expiresAt = getLedgerTime.plus(Duration.ofMinutes(5)),
+      trackingId = "tracking-id-2"
+    )
+
+    aliceWalletClient.listTokenStandardTransfers()  should have length 2
+
+    advanceTime(Duration.ofMinutes(10))
+
+    aliceWalletClient.list().lockedAmulets should have length 2
+
+    aliceWalletClient.withdrawTokenStandardTransfer(transfer_1.output match {
+      case members.TransferInstructionPending(value) =>
+        new TransferInstruction.ContractId(value.transferInstructionCid)
+      case other => fail(s"Expected TransferInstructionPending, but got $other")
+    })
+
+    aliceWalletClient.list().lockedAmulets should have length 1
+
+    sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTransferInstructionTrigger].resume()
+
+    advanceTime(Duration.ofDays(1))
+
+    eventually(60.seconds) {
+      aliceWalletClient.listTokenStandardTransfers() shouldBe empty
+      aliceWalletClient.list().lockedAmulets shouldBe empty
+    }
   }
 }
