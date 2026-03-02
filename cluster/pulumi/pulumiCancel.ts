@@ -5,6 +5,7 @@ import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi
 
 import { awaitAllOrThrowAllExceptions, Operation, stack } from './pulumi';
 import { operation } from './pulumiOperations';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 export async function runStacksCancel(): Promise<void> {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
@@ -20,6 +21,15 @@ export async function runStacksCancel(): Promise<void> {
     true
   );
   operations = operations.concat(cantonStacksOperations);
+  const svStacksOperations = runSvProjectForAllSvs(
+    'cancel',
+    stack => {
+      return stack.cancel();
+    },
+    false,
+    true,
+  );
+  operations = operations.concat(svStacksOperations);
   const validator1 = await stack('validator1', 'validator1', true, {});
   operations.push(cancelOperation(validator1));
   const splitwell = await stack('splitwell', 'splitwell', true, {});
