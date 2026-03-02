@@ -110,10 +110,11 @@ class UpdateHistoryBulkStorage(
       actorSystem: org.apache.pekko.actor.ActorSystem,
   ): Source[UpdatesSegment, Cancellable] = {
 
-    // Wait for history backfilling to complete before starting bulk storage dumps
+    // Wait for update history to initialize and for history backfilling to complete before starting bulk storage dumps
     val backfillingCompleteGate =
       Source
         .tick(0.seconds, appConfig.updatesPollingInterval.underlying, ())
+        .map(_ => updateHistory.isReady)
         .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(currentMigrationId))
         .filter(identity)
         .take(1)

@@ -370,6 +370,7 @@ class ScanTimeBasedIntegrationTest
   }
 
   "snapshotting" in { implicit env =>
+    val (aliceUserParty, _) = onboardAliceAndBob()
     val migrationId = sv1ScanBackend.config.domainMigrationId
 
     clue(
@@ -384,8 +385,6 @@ class ScanTimeBasedIntegrationTest
     }
 
     val startTime = getLedgerTime
-
-    val (aliceUserParty, _) = onboardAliceAndBob()
 
     advanceTime(
       java.time.Duration
@@ -596,7 +595,6 @@ class ScanTimeBasedIntegrationTest
           .update
           .update
           .recordTime
-//        recordTime >= startTime &&
         recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
       }
 
@@ -612,14 +610,6 @@ class ScanTimeBasedIntegrationTest
       val updatesFromScan = sv1ScanBackend
         .getUpdateHistory(1000, None, CompactJson)
         .filter(isInTimeRange)
-
-      logger.debug("all updates in S3:")
-
-      updatesFromS3.foreach{u => logger.debug(CompactJsonScanHttpEncodings().httpToLapiUpdate(u).update.update.toString)}
-      logger.debug("all updates from scan:")
-      updatesFromScan.foreach{u => logger.debug(CompactJsonScanHttpEncodings().httpToLapiUpdate(u).update.update.toString)}
-
-
 
       updatesFromScan should contain theSameElementsAs updatesFromS3
     }
