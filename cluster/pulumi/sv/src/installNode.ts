@@ -4,6 +4,7 @@ import {
   activeVersion,
   Auth0Client,
   auth0UserNameEnvVarSource,
+  DecentralizedSynchronizerUpgradeConfig,
   exactNamespace,
   imagePullSecretWithNonDefaultServiceAccount,
   installLedgerApiUserSecret,
@@ -27,19 +28,23 @@ export function installNode(sv: string, auth0Client: Auth0Client): void {
   const auth0Config = auth0Client.getCfg();
   const ledgerApiUserSecret = installLedgerApiUserSecret(auth0Client, xns, 'sv', 'sv');
   const ledgerApiUserSecretSource = auth0UserNameEnvVarSource('sv', true);
-  installParticipant(
-    {
-      xns,
-      participant: config.participant,
-      logging: config.logging,
-      auth0: auth0Config,
-      version: config.versionOverride ?? activeVersion,
-      disableProtection: staticConfig.nodeName === svRunbookConfig.nodeName,
-      participantAdminUserNameFrom: ledgerApiUserSecretSource,
-      imagePullServiceAccountName: serviceAccountName,
-    },
-    { dependsOn: [...imagePullDeps, ledgerApiUserSecret] }
-  );
+  const isLsuDeployment =
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
+  if (isLsuDeployment) {
+    installParticipant(
+      {
+        xns,
+        participant: config.participant,
+        logging: config.logging,
+        auth0: auth0Config,
+        version: config.versionOverride ?? activeVersion,
+        disableProtection: staticConfig.nodeName === svRunbookConfig.nodeName,
+        participantAdminUserNameFrom: ledgerApiUserSecretSource,
+        imagePullServiceAccountName: serviceAccountName,
+      },
+      { dependsOn: [...imagePullDeps, ledgerApiUserSecret] }
+    );
+  }
 }
 
 function findStaticConfigOrFail(sv: string): StaticSvConfig {
