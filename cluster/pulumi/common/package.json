@@ -35,7 +35,7 @@
   "devDependencies": {
     "@jest/globals": "^30.2.0",
     "@types/js-yaml": "^4.0.5",
-    "@types/lodash": "^4.17.23",
+    "@types/lodash": "^4.17.24",
     "@types/sinon": "^10.0.15",
     "@types/ws": "^8.18.1",
     "dedent": "^1.7.1",
