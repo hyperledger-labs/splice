@@ -44,6 +44,14 @@ jobs:
           cmd: |
             set -euxo pipefail
 
+            echo "Clearing database"
+            PGPASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD" psql \
+              -h"$PERFORMANCE_TESTS_DB_HOST" \
+              -U"$PERFORMANCE_TESTS_DB_USER" \
+              -dcantonnet \
+              -c 'DROP DATABASE IF EXISTS splice_apps' \
+              -c 'CREATE DATABASE splice_apps' || (echo "Connection to DB failed" && exit 1)
+
             echo "Downloading updates from mainnet for performance tests"
             curl -sSL --fail-with-body "https://storage.googleapis.com/splice-performance-tests-mainnet-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
             ls -lah /tmp/mainnetupdates.json
