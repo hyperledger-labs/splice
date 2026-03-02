@@ -63,7 +63,8 @@ object BuildCommon {
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
     libraryDependencies ++= Seq(
       scalatest % Test
-    )
+    ),
+    resolvers += ("Canton snapshots" at "artifactregistry://europe-maven.pkg.dev/da-images/public-maven-unstable"),
   ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings ++ excludeTranscodeConflictingDependencies
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
