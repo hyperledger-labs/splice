@@ -114,8 +114,11 @@ class UpdateHistoryBulkStorage(
     val backfillingCompleteGate =
       Source
         .tick(0.seconds, appConfig.updatesPollingInterval.underlying, ())
-        .map(_ => updateHistory.isReady)
-        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(currentMigrationId))
+        .mapAsync(1)(_ =>
+          if (updateHistory.isReady)
+            updateHistory.isHistoryBackfilled(currentMigrationId)
+          else Future.successful(false)
+        )
         .filter(identity)
         .take(1)
 

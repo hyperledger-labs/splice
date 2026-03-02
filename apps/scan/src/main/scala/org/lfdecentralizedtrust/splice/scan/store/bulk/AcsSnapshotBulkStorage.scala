@@ -80,8 +80,11 @@ class AcsSnapshotBulkStorage(
     val backfillingCompleteGate =
       Source
         .tick(0.seconds, appConfig.snapshotPollingInterval.underlying, ())
-        .map(_ => updateHistory.isReady)
-        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId))
+        .mapAsync(1)(_ =>
+          if (updateHistory.isReady)
+            updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId)
+          else Future.successful(false)
+        )
         .filter(identity)
         .take(1)
 
