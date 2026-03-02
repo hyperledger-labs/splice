@@ -565,6 +565,7 @@ testExpireAmuletTransferInstruction = do
   let stakeholders = [instrView.transfer.sender, instrView.transfer.receiver]
 
   let expireBatchChoice = AmuletRules_Amulet_ExpireTransferInstructions with
+        expectedDso = app.dso
         inputs = [AmuletRules_ExpireTransferInstructionInput with 
                     transferInstructionCid = instrInterfaceCid
                     expireLock = True]
@@ -654,6 +655,7 @@ testExpireTransferInstructionAlreadyUnlocked = do
   let stakeholders = [instrView.transfer.sender, instrView.transfer.receiver]
 
   let expireBatchChoiceTrue = AmuletRules_Amulet_ExpireTransferInstructions with
+        expectedDso = app.dso
         inputs = [AmuletRules_ExpireTransferInstructionInput with 
                     transferInstructionCid = instrInterfaceCid
                     expireLock = True]
@@ -666,6 +668,7 @@ testExpireTransferInstructionAlreadyUnlocked = do
       sv = sv1    
 
   let expireBatchChoiceFalse = AmuletRules_Amulet_ExpireTransferInstructions with
+        expectedDso = app.dso
         inputs = [AmuletRules_ExpireTransferInstructionInput with 
                     transferInstructionCid = instrInterfaceCid
                     expireLock = False]

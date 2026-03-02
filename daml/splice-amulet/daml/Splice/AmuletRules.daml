@@ -784,11 +784,13 @@ template AmuletRules
 
     nonconsuming choice AmuletRules_Amulet_ExpireTransferInstructions : AmuletRules_Amulet_ExpireTransferInstructionsResult
       with
+        expectedDso: Party
         inputs : [AmuletRules_ExpireTransferInstructionInput]
         observers : [Party] 
       observer observers
       controller dso
       do
+        require "The expectedDso must match the AmuletDso" (dso== expectedDso)
         individualResults <- forA inputs $ \input -> do
           instr <- fetchCheckedInterface (ForDso dso) input.transferInstructionCid
           let instrView = view instr

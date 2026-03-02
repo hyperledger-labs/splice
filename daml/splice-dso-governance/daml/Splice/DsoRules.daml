@@ -1129,12 +1129,7 @@ template DsoRules with
       do
         _ <- getAndValidateSvParty this (Some sv)
         
-        amuletRules <- fetchChecked (ForDso dso) amuletRulesCid
-        
-        assertMsg "The AmuletRules dso must match the DsoRules dso" 
-          (amuletRules.dso == dso)
-        
-        res <- exercise amuletRulesCid transferInsts 
+        res <- exercise amuletRulesCid (transferInsts with expectedDso = dso) 
         pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
     
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
