@@ -286,8 +286,9 @@ Troubleshooting rejected topology snapshots
 
 In rare cases, the re-onboarding process may fail at the ``ImportTopologySnapshot`` step
 because an ``OwnerToKeyMapping`` for the old participant ID has an insufficient number of
-signatures in the topology snapshot. This can happen when the topology snapshot was created
-at a time when fewer signatures were required than the current Canton version expects.
+signatures in the topology snapshot. This only affects validators that were originally
+onboarded on Splice 0.4.1 or earlier, which used a Canton version that did not require
+the mapped keys to co-sign ``OwnerToKeyMapping`` transactions.
 You can identify this issue by looking for the following messages in your participant logs:
 
 .. code::
