@@ -166,6 +166,7 @@ svs:
       appsLogLevel: DEBUG
       appsAsync: false
       cantonLogLevel: DEBUG
+      apiRequestLogLevel: DEBUG
       cantonAsync: false
       cometbftLogLevel: debug
     pruning:
