@@ -77,8 +77,8 @@ setupOtcTrade  = do
   AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
   AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
 
-  let 
-    mkTransfer id sender receiver amount = 
+  let
+    mkTransfer id sender receiver amount =
       Api.Token.AllocationV2.TransferLeg with
         transferLegId = id
         sender = basicAccount sender
@@ -158,14 +158,14 @@ setupOtcTrade  = do
   expectBurn result.meta
 
   -- check lock context
-  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId  
+  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
   let expectedLock = Lock with
         expiresAt = None
         expiresAfter = None
         holders = [registry.dso]
         context = Some "allocation for settlement OTCTradeProposal"
   ((fromSome lockedHolding.lock) with expiresAt = None) === expectedLock
-  assertMsg "locks expire should be in the future" 
+  assertMsg "locks expire should be in the future"
     (fromSome (fromSome lockedHolding.lock).expiresAt > now)
 
   -- Bob sees the allocation request in his wallet as well
@@ -194,7 +194,7 @@ setupOtcTrade  = do
     creator = provider
   submitWithDisclosures' provider enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
-    
+
   pure AllocatedOTCTrade with
     alice
     bob
@@ -229,12 +229,12 @@ testDvP = script do
           context = context.choiceContext
           meta = beneficiaryMetadata
     pure (allocCid, extraArgs, context.disclosures, alloc.holdingCids)
-  let 
+  let
     disclosures = foldMap ((._3) . snd) (Map.toList richAllocationsWithContext)
-    holdingCids = Map.fromList $ 
-      concatMap 
-        (\((_, authorizer), (_, _, _, holdings_map)) -> 
-          map (\(instrId, hs') -> ((instrId, authorizer), hs')) (Map.toList holdings_map)) 
+    holdingCids = Map.fromList $
+      concatMap
+        (\((_, authorizer), (_, _, _, holdings_map)) ->
+          map (\(instrId, hs') -> ((instrId, authorizer), hs')) (Map.toList holdings_map))
         (Map.toList richAllocationsWithContext)
 
     allocationsWithContext = Map.fromList $ map (\(k, (cid, ea, _, _)) -> (k, (cid, ea))) (Map.toList richAllocationsWithContext)
@@ -262,7 +262,7 @@ testDvP = script do
   -- Allocation: 0.13 = 2 * 0.03/0.5 create fee + 0.005/0.5 lock fee
   -- Transfer 1: 0.32 = 3 * 0.03/0.5 create fee + 20 * 0.01 transfer fee
   -- Transfer 2: 0.13 = 2 * 0.03/0.5 create fee + 1 * 0.01 transfer fee
-  WalletClient.checkBalanceApprox bob amuletId 1078.36  
+  WalletClient.checkBalanceApprox bob amuletId 1078.36
 
   -- check that the provider got their featured app reward coupons
   coupons <- map snd <$> query @AppRewardCoupon provider
@@ -365,8 +365,8 @@ appBackendListAllocations p ref = do
         guard (fundedAllocation.allocation.settlement.settlementRef == ref)
         let tl::_ = fundedAllocation.allocation.transferLegs
             admin = tl.instrumentId.admin
-            sender = fundedAllocation.sender
-        return ((admin, sender), (cid, fundedAllocation))
+            authorizer = fundedAllocation.authorizer
+        return ((admin, authorizer), (cid, fundedAllocation))
   pure $ Map.fromList matchingAllocs
 
 expectBurn : Metadata -> Script ()

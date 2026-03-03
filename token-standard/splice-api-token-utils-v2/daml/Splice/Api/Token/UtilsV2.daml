@@ -75,8 +75,8 @@ lock_v2_to_v1 HoldingV2.Lock{..} = HoldingV1.Lock with ..
 holding_v2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
 holding_v2_to_v1 v2 = v1
   where
-    meta' = Metadata with 
-      values = 
+    meta' = Metadata with
+      values =
         insertOptional "canton.network/account.provider" (partyToText <$> v2.account.provider) $
         insertOptional "canton.network/account.id" (v2.account.id) $
         v2.meta.values
@@ -110,7 +110,7 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
       settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
 
 transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> Text -> AllocationV2.TransferLeg
-transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId = 
+transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId =
   AllocationV2.TransferLeg with
     instrumentId = instrumentId_v1_to_v2 instrumentId
     sender = senderAccount
@@ -130,7 +130,7 @@ transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId =
 
 
 allocation_specification_v1_to_v2 : AllocationV1.AllocationSpecification -> AllocationV2.AllocationSpecification
-allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} = 
+allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} =
   AllocationV2.AllocationSpecification with
     settlement = settlement_info_v1_to_v2 settlement
     transferLegs = (transfer_leg_v1_to_v2 transferLeg transferLegId)::otherLegs
@@ -140,24 +140,24 @@ allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} =
       Some ol -> [] -- TODO: Parse other legs.
 
 allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.AllocationView
-allocation_view_v1_to_v2 AllocationV1.AllocationView{..} = 
+allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
   AllocationV2.AllocationView with
     allocation = allocation_specification_v1_to_v2 allocation
-    holdingCids = Map.fromList [(instrumentId_v1_to_v2 allocation.transferLeg.instrumentId, map coerceInterfaceContractId holdingCids)] 
+    holdingCids = Map.fromList [(instrumentId_v1_to_v2 allocation.transferLeg.instrumentId, map coerceInterfaceContractId holdingCids)]
     meta
-    sender
+    authorizer
     expiresAt
   where
-    sender = HoldingV2.Account with
+    authorizer = HoldingV2.Account with
       owner = allocation.transferLeg.sender
       provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
       id = TextMap.lookup "canton.network/sender.id" meta.values
-    expiresAt = Some $ optional 
+    expiresAt = Some $ optional
       (allocation.settlement.settleBefore)
       decodeTime
       (TextMap.lookup "canton.network/expiresAt" meta.values)
 
-      
+
 -- Downcast
 reference_v2_to_v1 : AllocationV2.Reference -> AllocationV1.Reference
 reference_v2_to_v1 AllocationV2.Reference{..} = AllocationV1.Reference with ..
@@ -165,8 +165,8 @@ reference_v2_to_v1 AllocationV2.Reference{..} = AllocationV1.Reference with ..
 settlement_info_v2_to_v1 : AllocationV2.SettlementInfo -> AllocationV1.SettlementInfo
 settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
   where
-    meta' = Metadata with 
-      values = 
+    meta' = Metadata with
+      values =
         TextMap.insert "canton.network/version" "v2" $
         TextMap.insert "canton.network/controllerOverride" (show controllerOverride) $
         meta.values
@@ -180,7 +180,7 @@ settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
       meta = meta'
 
 transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
-transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} = 
+transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} =
   AllocationV1.TransferLeg with
     instrumentId = instrumentId_v2_to_v1 instrumentId
     sender = sender.owner
@@ -188,8 +188,8 @@ transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} =
     meta = meta'
     ..
   where
-   meta' = Metadata with 
-      values = 
+   meta' = Metadata with
+      values =
         insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
         insertOptional "canton.network/sender.id" (sender.id) $
         insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
@@ -197,7 +197,7 @@ transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} =
         meta.values
 
 allocation_specification_v2_to_v1 : AllocationV2.AllocationSpecification -> AllocationV1.AllocationSpecification
-allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} = 
+allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} =
   AllocationV1.AllocationSpecification with
     settlement = settlement_info_v2_to_v1 settlement
     transferLegId = transferLeg'.transferLegId
@@ -206,7 +206,7 @@ allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} =
     (transferLeg', other) = case transferLegs of
       x::xs -> (x, xs)
       [] -> error "Cannot downcast an allocation specification without any legs."
-    meta = Metadata with 
+    meta = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
         TextMap.insert "canton.network/otherLegs" (show other) $ -- TODO
@@ -214,20 +214,21 @@ allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} =
     transferLeg = transferLeg' with meta
 
 allocation_view_v2_to_v1 : AllocationV2.AllocationView -> AllocationV1.AllocationView
-allocation_view_v2_to_v1 AllocationV2.AllocationView{..} = 
+allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
   AllocationV1.AllocationView with
     allocation = allocation_specification_v2_to_v1 allocation
     holdingCids = concatMap (\(_, holdingCids) -> map coerceInterfaceContractId holdingCids) (Map.toList holdingCids)
     meta = meta'
-  where 
+  where
     meta' = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
-        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
-        insertOptional "canton.network/sender.id" (sender.id) $ 
+        -- FIXME: double check that sender.provider and .id are the right ones to use here
+        insertOptional "canton.network/sender.provider" (partyToText <$> authorizer.provider) $
+        insertOptional "canton.network/sender.id" (authorizer.id) $
         insertOptional "canton.network/expiresAt" (fmap encodeTime expiresAt) $
         meta.values
-      
+
 
 -- Choices
 
@@ -245,9 +246,9 @@ allocation_transfer_result_v2_to_v1 AllocationV2.Allocation_ExecuteTransferResul
 
 allocation_v1_executeTransferImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_ExecuteTransfer -> Update AllocationV1.Allocation_ExecuteTransferResult
 allocation_v1_executeTransferImpl this self execv1 = do
-  resv2 <- AllocationV2.allocation_executeTransferImpl 
+  resv2 <- AllocationV2.allocation_executeTransferImpl
     this
-    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    (coerceInterfaceContractId @AllocationV2.Allocation self)
     (allocation_execute_transfer_v1_to_v2 execv1)
   return (allocation_transfer_result_v2_to_v1 resv2)
 
@@ -260,9 +261,9 @@ allocation_withdraw_result_v2_to_v1 AllocationV2.Allocation_WithdrawResult {..} 
 
 allocation_v1_withdrawImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Withdraw -> Update AllocationV1.Allocation_WithdrawResult
 allocation_v1_withdrawImpl this self AllocationV1.Allocation_Withdraw{..} = do
-  resv2 <- AllocationV2.allocation_withdrawImpl 
+  resv2 <- AllocationV2.allocation_withdrawImpl
     this
-    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    (coerceInterfaceContractId @AllocationV2.Allocation self)
     AllocationV2.Allocation_Withdraw {..}
   return (allocation_withdraw_result_v2_to_v1 resv2)
 
@@ -275,9 +276,9 @@ allocation_cancel_result_v2_to_v1 AllocationV2.Allocation_CancelResult {..} =
 
 allocation_v1_cancelImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Cancel -> Update AllocationV1.Allocation_CancelResult
 allocation_v1_cancelImpl this self AllocationV1.Allocation_Cancel{..} = do
-  resv2 <- AllocationV2.allocation_cancelImpl 
+  resv2 <- AllocationV2.allocation_cancelImpl
    this
-    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    (coerceInterfaceContractId @AllocationV2.Allocation self)
     AllocationV2.Allocation_Cancel {..}
   return (allocation_cancel_result_v2_to_v1 resv2)
 
@@ -287,7 +288,7 @@ allocation_v1_cancelImpl this self AllocationV1.Allocation_Cancel{..} = do
 
 -- Upcast
 allocation_instruction_view_v1_to_v2 : AllocationInstructionV1.AllocationInstructionView -> AllocationInstructionV2.AllocationInstructionView
-allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructionView{..} = 
+allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructionView{..} =
   AllocationInstructionV2.AllocationInstructionView with
     originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
     allocation = allocation_specification_v1_to_v2 allocation
@@ -305,7 +306,7 @@ allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructi
 
 -- Downcast
 allocation_instruction_view_v2_to_v1 : AllocationInstructionV2.AllocationInstructionView -> AllocationInstructionV1.AllocationInstructionView
-allocation_instruction_view_v2_to_v1 AllocationInstructionV2.AllocationInstructionView{..} = 
+allocation_instruction_view_v2_to_v1 AllocationInstructionV2.AllocationInstructionView{..} =
   AllocationInstructionV1.AllocationInstructionView with
     originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
     allocation = allocation_specification_v2_to_v1 allocation
@@ -313,28 +314,28 @@ allocation_instruction_view_v2_to_v1 AllocationInstructionV2.AllocationInstructi
     requestedAt
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     meta = meta'
-  where 
+  where
     meta' = Metadata with
       values =
         TextMap.insert "canton.network/version" "v2" $
-        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
         insertOptional "canton.network/sender.id" (sender.id) $
         meta.values
 
 -- Choices
 
 allocation_instruction_result_output_v2_to_v1 : AllocationInstructionV2.AllocationInstructionResult_Output -> AllocationInstructionV1.AllocationInstructionResult_Output
-allocation_instruction_result_output_v2_to_v1 iro = 
+allocation_instruction_result_output_v2_to_v1 iro =
   case iro of
-    AllocationInstructionV2.AllocationInstructionResult_Pending cid -> 
+    AllocationInstructionV2.AllocationInstructionResult_Pending cid ->
       AllocationInstructionV1.AllocationInstructionResult_Pending (coerceInterfaceContractId cid)
-    AllocationInstructionV2.AllocationInstructionResult_Completed cid -> 
+    AllocationInstructionV2.AllocationInstructionResult_Completed cid ->
       AllocationInstructionV1.AllocationInstructionResult_Completed (coerceInterfaceContractId cid)
-    AllocationInstructionV2.AllocationInstructionResult_Failed -> 
+    AllocationInstructionV2.AllocationInstructionResult_Failed ->
       AllocationInstructionV1.AllocationInstructionResult_Failed
 
 allocation_instruction_result_v2_to_v1 : AllocationInstructionV2.AllocationInstructionResult -> AllocationInstructionV1.AllocationInstructionResult
-allocation_instruction_result_v2_to_v1 AllocationInstructionV2.AllocationInstructionResult{..} = 
+allocation_instruction_result_v2_to_v1 AllocationInstructionV2.AllocationInstructionResult{..} =
   AllocationInstructionV1.AllocationInstructionResult with
     output = allocation_instruction_result_output_v2_to_v1 output
     senderChangeCids = map coerceInterfaceContractId senderChangeCids
@@ -342,18 +343,18 @@ allocation_instruction_result_v2_to_v1 AllocationInstructionV2.AllocationInstruc
 
 allocationInstruction_v1_withdrawImpl : AllocationInstructionV2.AllocationInstruction -> ContractId AllocationInstructionV1.AllocationInstruction -> AllocationInstructionV1.AllocationInstruction_Withdraw -> Update AllocationInstructionV1.AllocationInstructionResult
 allocationInstruction_v1_withdrawImpl this self AllocationInstructionV1.AllocationInstruction_Withdraw{..} = do
-  resv2 <- AllocationInstructionV2.allocationInstruction_withdrawImpl 
+  resv2 <- AllocationInstructionV2.allocationInstruction_withdrawImpl
     this
-    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self) 
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self)
     AllocationInstructionV2.AllocationInstruction_Withdraw {..}
   return (allocation_instruction_result_v2_to_v1 resv2)
 
 
 allocationInstruction_v1_updateImpl : AllocationInstructionV2.AllocationInstruction -> ContractId AllocationInstructionV1.AllocationInstruction -> AllocationInstructionV1.AllocationInstruction_Update -> Update AllocationInstructionV1.AllocationInstructionResult
 allocationInstruction_v1_updateImpl this self AllocationInstructionV1.AllocationInstruction_Update{..} = do
-  resv2 <- AllocationInstructionV2.allocationInstruction_updateImpl 
+  resv2 <- AllocationInstructionV2.allocationInstruction_updateImpl
     this
-    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self) 
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self)
     AllocationInstructionV2.AllocationInstruction_Update {..}
   return (allocation_instruction_result_v2_to_v1 resv2)
 
@@ -363,14 +364,14 @@ allocationInstruction_v1_updateImpl this self AllocationInstructionV1.Allocation
 
 -- Upcast
 allocation_factory_view_v1_to_v2 : AllocationInstructionV1.AllocationFactoryView -> AllocationInstructionV2.AllocationFactoryView
-allocation_factory_view_v1_to_v2 AllocationInstructionV1.AllocationFactoryView{..} = 
+allocation_factory_view_v1_to_v2 AllocationInstructionV1.AllocationFactoryView{..} =
   AllocationInstructionV2.AllocationFactoryView with
     admin
     meta
 
 -- Downcast
 allocation_factory_view_v2_to_v1 : AllocationInstructionV2.AllocationFactoryView -> AllocationInstructionV1.AllocationFactoryView
-allocation_factory_view_v2_to_v1 AllocationInstructionV2.AllocationFactoryView{..} = 
+allocation_factory_view_v2_to_v1 AllocationInstructionV2.AllocationFactoryView{..} =
   AllocationInstructionV1.AllocationFactoryView with
     admin
     meta
@@ -389,18 +390,18 @@ allocation_factory_allocate_v1_to_v2 AllocationInstructionV1.AllocationFactory_A
 
 allocationFactory_v1_allocateImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_Allocate -> Update AllocationInstructionV1.AllocationInstructionResult
 allocationFactory_v1_allocateImpl this self alloc = do
-  resv2 <- AllocationInstructionV2.allocationFactory_allocateImpl 
+  resv2 <- AllocationInstructionV2.allocationFactory_allocateImpl
     this
-    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self) 
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self)
     (allocation_factory_allocate_v1_to_v2 alloc)
   return (allocation_instruction_result_v2_to_v1 resv2)
 
 
 allocationFactory_v1_publicFetchImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_PublicFetch -> Update AllocationInstructionV1.AllocationFactoryView
 allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.AllocationFactory_PublicFetch{..} = do
-  resv2 <- AllocationInstructionV2.allocationFactory_publicFetchImpl 
+  resv2 <- AllocationInstructionV2.allocationFactory_publicFetchImpl
     this
-    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self) 
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self)
     AllocationInstructionV2.AllocationFactory_PublicFetch {..}
   return (allocation_factory_view_v2_to_v1 resv2)
 
@@ -434,9 +435,9 @@ transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
 
 transfer_instruction_status_v1_to_v2 : TransferInstructionV1.TransferInstructionStatus -> TransferInstructionV2.TransferInstructionStatus
 transfer_instruction_status_v1_to_v2 tis = case tis of
-  TransferInstructionV1.TransferPendingReceiverAcceptance -> 
+  TransferInstructionV1.TransferPendingReceiverAcceptance ->
     TransferInstructionV2.TransferPendingReceiverAcceptance
-  TransferInstructionV1.TransferPendingInternalWorkflow pendingActions -> 
+  TransferInstructionV1.TransferPendingInternalWorkflow pendingActions ->
     TransferInstructionV2.TransferPendingInternalWorkflow pendingActions
 
 transfer_instruction_view_v1_to_v2 : TransferInstructionV1.TransferInstructionView -> TransferInstructionV2.TransferInstructionView
@@ -446,7 +447,7 @@ transfer_instruction_view_v1_to_v2 TransferInstructionV1.TransferInstructionView
     transfer = transfer_v1_to_v2 transfer
     status = transfer_instruction_status_v1_to_v2 status
     meta
-  
+
 
 -- Downcast
 transfer_v2_to_v1 : TransferInstructionV2.Transfer -> TransferInstructionV1.Transfer
@@ -462,8 +463,8 @@ transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
     meta = meta'
     ..
   where
-   meta' = Metadata with 
-      values = 
+   meta' = Metadata with
+      values =
         insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
         insertOptional "canton.network/sender.id" (sender.id) $
         insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
@@ -472,9 +473,9 @@ transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
 
 transfer_instruction_status_v2_to_v1 : TransferInstructionV2.TransferInstructionStatus -> TransferInstructionV1.TransferInstructionStatus
 transfer_instruction_status_v2_to_v1 tis = case tis of
-  TransferInstructionV2.TransferPendingReceiverAcceptance -> 
+  TransferInstructionV2.TransferPendingReceiverAcceptance ->
     TransferInstructionV1.TransferPendingReceiverAcceptance
-  TransferInstructionV2.TransferPendingInternalWorkflow pendingActions -> 
+  TransferInstructionV2.TransferPendingInternalWorkflow pendingActions ->
     TransferInstructionV1.TransferPendingInternalWorkflow pendingActions
 
 transfer_instruction_view_v2_to_v1 : TransferInstructionV2.TransferInstructionView -> TransferInstructionV1.TransferInstructionView
@@ -507,34 +508,34 @@ transfer_instruction_result_v2_to_v1 TransferInstructionV2.TransferInstructionRe
 
 transferInstruction_v1_acceptImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Accept -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_acceptImpl this self TransferInstructionV1.TransferInstruction_Accept{..} = do
-  resv2 <- TransferInstructionV2.transferInstruction_acceptImpl 
+  resv2 <- TransferInstructionV2.transferInstruction_acceptImpl
     this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self)
     (TransferInstructionV2.TransferInstruction_Accept{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
-    
+
 
 transferInstruction_v1_rejectImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Reject -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_rejectImpl this self TransferInstructionV1.TransferInstruction_Reject{..} = do
-  resv2 <- TransferInstructionV2.transferInstruction_rejectImpl 
+  resv2 <- TransferInstructionV2.transferInstruction_rejectImpl
     this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self)
     (TransferInstructionV2.TransferInstruction_Reject{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
 transferInstruction_v1_withdrawImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Withdraw -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_withdrawImpl this self TransferInstructionV1.TransferInstruction_Withdraw{..} = do
-  resv2 <- TransferInstructionV2.transferInstruction_withdrawImpl 
+  resv2 <- TransferInstructionV2.transferInstruction_withdrawImpl
     this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self)
     (TransferInstructionV2.TransferInstruction_Withdraw{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
 transferInstruction_v1_updateImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Update -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_updateImpl this self TransferInstructionV1.TransferInstruction_Update{..} = do
-  resv2 <- TransferInstructionV2.transferInstruction_updateImpl 
+  resv2 <- TransferInstructionV2.transferInstruction_updateImpl
     this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self)
     (TransferInstructionV2.TransferInstruction_Update{..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
@@ -563,17 +564,17 @@ transfer_factory_transfer_v1_to_v2 TransferInstructionV1.TransferFactory_Transfe
 
 transferFactory_v1_transferImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_Transfer -> Update TransferInstructionV1.TransferInstructionResult
 transferFactory_v1_transferImpl this self args = do
-  resv2 <- TransferInstructionV2.transferFactory_transferImpl 
+  resv2 <- TransferInstructionV2.transferFactory_transferImpl
     this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
+    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self)
     (transfer_factory_transfer_v1_to_v2 args)
   return (transfer_instruction_result_v2_to_v1 resv2)
 
 transferFactory_v1_publicFetchImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_PublicFetch -> Update TransferInstructionV1.TransferFactoryView
 transferFactory_v1_publicFetchImpl this self TransferInstructionV1.TransferFactory_PublicFetch{..} = do
-  resv2 <- TransferInstructionV2.transferFactory_publicFetchImpl 
+  resv2 <- TransferInstructionV2.transferFactory_publicFetchImpl
     this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
+    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self)
     TransferInstructionV2.TransferFactory_PublicFetch with ..
   return (transfer_factory_view_v2_to_v1 resv2)
 

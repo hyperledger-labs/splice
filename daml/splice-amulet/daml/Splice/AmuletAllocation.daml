@@ -27,24 +27,24 @@ import DA.List (groupOn)
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
   with
-    lockedAmulet : Optional (ContractId LockedAmulet) 
+    lockedAmulet : Optional (ContractId LockedAmulet)
     -- ^ Locked amulet that holds the funds for the allocation.
     -- Empty if no outgoing legs.
     allocation : AllocationSpecification
-    sender : Party
+    authorizer : Party
     admin : Party
     expiresAt : Time
   where
-    signatory admin, sender
+    signatory admin, authorizer
     observer allocation.settlement.executor
 
-    ensure 
-      all 
+    ensure
+      all
         (\tl -> (
-            -- Sender needs to appear as sender or receiver of each leg.
-            sender `elem` [tl.sender.owner, tl.receiver.owner]) 
+            -- Authorizer needs to appear as sender or receiver of each leg.
+            authorizer `elem` [tl.sender.owner, tl.receiver.owner])
             -- Only one admin Id allowed.
-            && tl.instrumentId.admin == admin) 
+            && tl.instrumentId.admin == admin)
         allocation.transferLegs
 
     interface instance Allocation for AmuletAllocation where
@@ -52,7 +52,7 @@ template AmuletAllocation
         allocation
         holdingCids = Map.fromList $ optional [] (\la -> [(amuletInstrumentId admin, [toInterfaceContractId la])]) lockedAmulet
         meta = emptyMetadata
-        sender = basicAccount sender
+        authorizer = basicAccount authorizer
         expiresAt = Some expiresAt
 
       allocation_executeTransferImpl self args =
@@ -78,10 +78,10 @@ template AmuletAllocation
         TextMap.fromList . concat <$>
           mapA
             (\tls@(tl::_) ->
-              if tl.sender.owner == sender || (sender `notElem` allocationControllers allocation)
+              if tl.sender.owner == authorizer || (authorizer `notElem` allocationControllers allocation)
                 then do
                   authCid <- create AmuletAllocationTransferAuthorization with
-                    authorizer = sender
+                    authorizer = authorizer
                     transferLegs = tls
                     settlement = allocation.settlement
                     admin
@@ -142,7 +142,7 @@ unlockAmuletAllocation amuletAllocation extraArgs = do
   case amuletAllocation.lockedAmulet of
     None -> return []
     Some la -> do
-      let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.sender amuletAllocation.allocation.transferLegs amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation.settlement
+      let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.authorizer amuletAllocation.allocation.transferLegs amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation.settlement
       abortTwoStepTransfer twoStepTransfer la extraArgs
 
 template AmuletAllocationTransferAuthorization
@@ -162,7 +162,7 @@ template AmuletAllocationTransferAuthorization
             && (basicAccount authorizer == sender || basicAccount authorizer == receiver)
 
     interface instance AllocationTransferAuthorization for AmuletAllocationTransferAuthorization where
-      view = AllocationTransferAuthorizationView with 
+      view = AllocationTransferAuthorizationView with
         settlement
         transferLegs
         authorizer = basicAccount authorizer
@@ -177,7 +177,7 @@ template AmuletAllocationTransferAuthorization
             extraAuth <- fetch (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid)
             extraAuth === this with
               authorizer = receiver.owner
-            exercise (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid) 
+            exercise (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid)
               AmuletAllocationTransferAuthorization_TransferWithExtraAuth with
                 extraController = authorizer
                 ..

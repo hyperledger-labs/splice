@@ -400,15 +400,16 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
   openMiningRound <- fetch paymentContext.context.openMiningRound
 
-  let sender = creator
-  let amount = allocationAmount sender arg.allocation
+  -- FIXME: rename creator to authorizer
+  let authorizer = creator
+  let amount = allocationAmount authorizer arg.allocation
 
-  let 
+  let
     deadline = fromOptional maxTime allocation.settlement.settlementDeadline
     expiresAt = if amount == 0.0
       then deadline
       else  min deadline (maxExpiry openMiningRound amount)
-  require "Allocation.settlement.settleAt <= Allocation.expiresAt" 
+  require "Allocation.settlement.settleAt <= Allocation.expiresAt"
     (settlement.settleAt <= expiresAt)
 
   forA_ transferLegs (\transferLeg -> do
@@ -436,9 +437,9 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   require "At least one input holding must be provided" (amount == 0.0 || not (null inputHoldingCids))
 
   -- lock the funds
-  let twoStepTransfer = allocationToTwoStepTransfer sender arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
+  let twoStepTransfer = allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
 
-  (lockedAmulet, senderChangeCids, meta) <- if amount == 0.0 
+  (lockedAmulet, senderChangeCids, meta) <- if amount == 0.0
     then return (None, [], emptyMetadata)
     else do
       (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
@@ -448,7 +449,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
     allocation = arg.allocation
     lockedAmulet
     admin = dso
-    sender
+    authorizer
     expiresAt
 
   -- finaly done: return the result
