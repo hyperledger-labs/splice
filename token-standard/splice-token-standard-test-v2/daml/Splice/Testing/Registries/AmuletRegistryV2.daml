@@ -251,7 +251,15 @@ registryApi_getAllocationFactory_SettleBatch registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   -- FIXME: trim context
   transferC <- getAmuletRulesTransferContext registry
-  let fullContext = withExtraDisclosures extAmuletRulesD transferC
+
+  lockedDs <- forA arg.allocationCids $ \allocCid -> do
+    Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
+    -- need to disclose the amulet contract, as the executor has no visibility into it
+    case amuletAlloc.lockedAmulet of
+      None -> return mempty
+      Some la -> queryDisclosure' @LockedAmulet registry.dso la
+  let fullContext = withExtraDisclosures (extAmuletRulesD <> mconcat lockedDs) transferC
+
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @AllocationFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
