@@ -19,7 +19,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
@@ -172,8 +172,7 @@ class ScanVerdictStoreIngestion(
 
         // Compute app activity records (pure computation, before transaction)
         appActivityRecords = appActivityComputation.computeActivities(
-          summariesWithVerdicts,
-          Set.empty[PartyId], // featuredAppProviders
+          summariesWithVerdicts
         )
 
         _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
