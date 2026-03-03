@@ -78,7 +78,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .updateAllSvAppConfigs { (_, config) =>
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes.copy(successor =
-                config.localSynchronizerNodes.current.map(_.copy(serial = NonNegativeInt.one))
+                config.localSynchronizerNodes.current
               ),
               scheduledLsu = Some(
                 scheduledLsu

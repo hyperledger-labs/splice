@@ -132,6 +132,18 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.amulet_0_1_16,
     )
 
+  def supportsPhysicalSynchronizers(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance,
+      DarResources.dsoGovernance_0_1_23,
+    )
+  }
+
   private def isDarSupported(
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,

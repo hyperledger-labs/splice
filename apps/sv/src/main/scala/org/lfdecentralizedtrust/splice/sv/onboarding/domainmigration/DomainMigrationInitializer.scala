@@ -289,6 +289,7 @@ class DomainMigrationInitializer(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
+        packageVersionSupport,
         skipTrafficReconciliationTriggers = true,
         unpauseSynchronizer = migrationDump.domainDataSnapshot.synchronizerWasPaused,
       )
@@ -412,7 +413,9 @@ class DomainMigrationInitializer(
                 localSynchronizerNodes.current.sequencerAdminConnection
                   .initializeFromGenesisState(
                     genesisState,
-                    localSynchronizerNodes.current.staticSynchronizerParameters,
+                    localSynchronizerNodes.current.staticSynchronizerParameters(
+                      NonNegativeInt.zero
+                    ),
                   ),
                 logger,
               )

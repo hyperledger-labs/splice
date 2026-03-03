@@ -366,6 +366,7 @@ class JoiningNodeInitializer(
         decentralizedSynchronizerId,
         dsoAutomation,
         svAutomation,
+        packageVersionSupport,
       )
     } yield {
       (
@@ -384,6 +385,7 @@ class JoiningNodeInitializer(
       decentralizedSynchronizer: SynchronizerId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
+      packageVersionSupport: PackageVersionSupport,
       skipTrafficReconciliationTriggers: Boolean = false,
       unpauseSynchronizer: Boolean = false,
   ): Future[Unit] = {
@@ -393,6 +395,7 @@ class JoiningNodeInitializer(
       dsoStore,
       dsoAutomationService.connection(SpliceLedgerConnectionPriority.Low),
       config.legacyMigrationId,
+      packageVersionSupport,
       clock,
       retryProvider,
       logger,

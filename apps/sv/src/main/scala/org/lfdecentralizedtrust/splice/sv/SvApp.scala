@@ -218,20 +218,13 @@ class SvApp(
           metrics.grpcClientMetrics,
           retryProvider,
         ),
-        svSynchronizerConfig.staticParameters
-          .copy(topologyChangeDelay = config.topologyChangeDelayDuration.toInternal),
-        svSynchronizerConfig.sequencer.internalApi,
-        svSynchronizerConfig.sequencer.externalPublicApiUrl,
-        svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
-        svSynchronizerConfig.sequencer.pruning,
-        svSynchronizerConfig.mediator.sequencerRequestAmplification,
         loggerFactory,
         retryProvider,
         SequencerConfig.fromConfig(
           svSynchronizerConfig.sequencer,
           cometBftConfig,
         ),
-        svSynchronizerConfig.mediator.pruning,
+        svSynchronizerConfig,
         svSynchronizerConfig.serial,
       )
     }
@@ -241,6 +234,7 @@ class SvApp(
         LocalSynchronizerNodes(
           localSyncNodeFromConfig(currentNodeConfig),
           config.localSynchronizerNodes.successor.map(localSyncNodeFromConfig),
+          config.localSynchronizerNodes.legacy.map(localSyncNodeFromConfig),
         )
       }
     initialize(
@@ -255,6 +249,7 @@ class SvApp(
         localSynchronizerNodes.foreach { nodes =>
           nodes.current.close()
           nodes.successor.foreach(_.close())
+          nodes.legacy.foreach(_.close())
         }
         Future.failed(err)
       }
@@ -870,6 +865,7 @@ object SvApp {
           localSynchronizerNodes.foreach { nodes =>
             nodes.current.close()
             nodes.successor.foreach(_.close())
+            nodes.legacy.foreach(_.close())
           },
         ),
         SyncCloseable(

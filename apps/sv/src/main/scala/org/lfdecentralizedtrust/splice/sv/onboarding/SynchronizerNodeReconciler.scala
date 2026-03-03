@@ -3,36 +3,47 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
-  LegacySequencerConfig,
-  MediatorConfig,
-  ScanConfig,
-  SequencerConfig,
-  SynchronizerNodeConfig,
-}
-import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider, SpliceLedgerConnection}
-import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeState
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+import cats.implicits.toTraverseOps
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
+  LegacySequencerConfig,
+  MediatorConfig,
+  PhysicalSynchronizerNodeConfig,
+  ScanConfig,
+  SequencerConfig,
+  SynchronizerNodeConfig,
+  SequencerNodeConfig as DamlSequencerNodeConfig,
+}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  RetryFor,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeState
 import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
+import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
+import java.lang
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.MapHasAsScala
+import scala.jdk.CollectionConverters.{MapHasAsJava, MapHasAsScala}
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 class SynchronizerNodeReconciler(
     dsoStore: SvDsoStore,
     connection: SpliceLedgerConnection,
     legacyMigrationId: Option[Long],
+    versionSupport: PackageVersionSupport,
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
@@ -89,13 +100,21 @@ class SynchronizerNodeReconciler(
         existingSequencerConfig,
         localSequencerConfig,
       )
+      existingPhysicalSynchronizers = synchronizerNodeConfig.flatMap(
+        _.physicalSynchronizers.toScala
+      )
+      localPhysicalSynchronizers <- buildPhysicalSynchronizers(
+        synchronizerNodes,
+        state,
+      )
       _ <-
         if (
           existingSequencerConfig != localSequencerConfig ||
           existingMediatorConfig != localMediatorConfig ||
           existingScanConfig != localScanConfig ||
           shouldMarkSequencerAsOnboarded ||
-          updatedSequencerConfigUpdate.isRight
+          updatedSequencerConfigUpdate.isRight ||
+          existingPhysicalSynchronizers.map(_.asScala.toMap) != localPhysicalSynchronizers
         ) {
           def setConfig(
               synchronizerId: SynchronizerId,
@@ -151,8 +170,8 @@ class SynchronizerNodeReconciler(
               .toJava,
             localScanConfig,
             updatedSequencerConfigUpdate.getOrElse(existingLegacySequencerConfig).toJava,
-            synchronizerNodeConfig
-              .flatMap(_.physicalSynchronizers.toScala)
+            localPhysicalSynchronizers
+              .map(_.asJava)
               .toJava,
           )
           setConfig(synchronizerId, rulesAndState, nodeConfig)
@@ -170,6 +189,84 @@ class SynchronizerNodeReconciler(
         setConfigIfRequired(),
         logger,
       )
+  }
+
+  private[onboarding] def buildPhysicalSynchronizers(
+      synchronizerNodes: Option[LocalSynchronizerNodes],
+      state: SynchronizerNodeState,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[Map[lang.Long, PhysicalSynchronizerNodeConfig]]] = {
+    versionSupport
+      .supportsPhysicalSynchronizers(Seq(svParty, dsoParty), clock.now)
+      .map(_.supported)
+      .flatMap { hasSupport =>
+        if (hasSupport) {
+          val currentEntryFuture =
+            synchronizerNodes.map(_.current).traverse { currentNode =>
+              val availableAfter = state match {
+                case SynchronizerNodeState.OnboardedAfterDelay =>
+                  Some(clock.now.toInstant.plus(currentNode.sequencerAvailabilityDelay))
+                case SynchronizerNodeState.OnboardedImmediately =>
+                  Some(clock.now.toInstant)
+                case SynchronizerNodeState.Onboarding =>
+                  None
+              }
+              buildNodeConfig(currentNode, availableAfter)
+            }
+
+          val legacyEntryFuture =
+            synchronizerNodes.flatMap(_.legacy).traverse { legacyNode =>
+              buildNodeConfig(legacyNode, availableAfter = None)
+            }
+
+          val successorEntryFuture =
+            synchronizerNodes.flatMap(_.successor).flatTraverse { successorNode =>
+              successorNode.sequencerAdminConnection.isNodeInitialized().flatMap {
+                case true =>
+                  buildNodeConfig(successorNode, availableAfter = None).map(Some(_))
+                case false =>
+                  Future.successful(None)
+              }
+            }
+
+          for {
+            currentEntry <- currentEntryFuture
+            legacyEntry <- legacyEntryFuture
+            successorEntry <- successorEntryFuture
+          } yield {
+            Some((legacyEntry.toList ++ currentEntry.toList ++ successorEntry.toList).toMap)
+          }
+        } else Future.successful(None)
+      }
+
+  }
+
+  private def buildNodeConfig(
+      node: SynchronizerNode,
+      availableAfter: Option[java.time.Instant],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[(lang.Long, PhysicalSynchronizerNodeConfig)] = {
+    for {
+      psid <- node.sequencerAdminConnection.getPhysicalSynchronizerId()
+      sequencerId <- node.sequencerAdminConnection.getSequencerId
+      mediatorId <- node.mediatorAdminConnection.getMediatorId
+    } yield {
+      val serial = psid.serial.unwrap.toLong
+      lang.Long.valueOf(serial) -> new PhysicalSynchronizerNodeConfig(
+        java.util.Optional.of(
+          new DamlSequencerNodeConfig(
+            sequencerId.toProtoPrimitive,
+            node.sequencerExternalPublicUrl,
+            availableAfter.toJava,
+          )
+        ),
+        java.util.Optional.of(new MediatorConfig(mediatorId.toProtoPrimitive)),
+      )
+    }
   }
 
   private def ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(

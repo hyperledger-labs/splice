@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.config
 
-import cats.syntax.either.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 import com.digitalasset.canton.config.*
@@ -14,8 +13,6 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
@@ -333,9 +330,6 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
-    // We want to be able to override this for simtime tests
-    topologyChangeDelayDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
     // What batch size to target for converting app activity markers
@@ -495,20 +489,15 @@ final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
     protocolVersion: ProtocolVersion = ProtocolVersion.v34,
-    serial: NonNegativeInt = NonNegativeInt.zero,
-) {
-  val staticParameters: StaticSynchronizerParameters = SynchronizerParametersConfig()
-    .toStaticSynchronizerParameters(
-      CryptoConfig(provider = CryptoProvider.Jce),
-      protocolVersion,
-      serial,
-    )
-    .valueOr(err => throw new IllegalArgumentException(s"Invalid domain parameters config: $err"))
-}
+    serial: Option[NonNegativeInt],
+    // We want to be able to override this for simtime tests
+    topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(250),
+)
 
 final case class SvSynchronizerNodesConfig(
     current: Option[SvSynchronizerNodeConfig],
     successor: Option[SvSynchronizerNodeConfig],
+    legacy: Option[SvSynchronizerNodeConfig] = None,
 )
 
 final case class SvCantonIdentifierConfig(

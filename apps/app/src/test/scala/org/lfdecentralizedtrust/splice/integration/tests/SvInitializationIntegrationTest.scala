@@ -1,6 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatusReport
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppConfigs_
 import org.lfdecentralizedtrust.splice.console.{
@@ -10,10 +14,6 @@ import org.lfdecentralizedtrust.splice.console.{
 }
 import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -131,24 +131,50 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     try {
       startSv(4, sv4Backend, sv4ValidatorBackend, sv4ScanBackend)
 
+      def nodeStates = {
+        val rulesAndState =
+          sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
+        rulesAndState.svNodeStates.values
+          .map(
+            _.payload.state.synchronizerNodes
+              .get(decentralizedSynchronizerId.toProtoPrimitive)
+          )
+      }
+
       clue("All SVs have reported their Scan URLs in DSO rules") {
         eventually() {
-          val rulesAndState =
-            sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
-          rulesAndState.svNodeStates.values
-            .flatMap(
-              _.payload.state.synchronizerNodes
-                .get(decentralizedSynchronizerId.toProtoPrimitive)
-                .scan
-                .toScala
-            )
-            .map(_.publicUrl) should contain theSameElementsAs Seq(
+          nodeStates.flatMap(_.scan.toScala.map(_.publicUrl)) should contain theSameElementsAs Seq(
             "http://localhost:5012",
             "http://localhost:5112",
             "http://localhost:5212",
             "http://localhost:5312",
           )
         }
+      }
+
+      clue("physical synchronizers configs are set") {
+        val allPhysicalConfigs = nodeStates.flatMap(_.physicalSynchronizers.toScala.value.asScala)
+        allPhysicalConfigs.size shouldBe 4
+        allPhysicalConfigs.map(_._1).toSeq.distinct.loneElement shouldBe java.lang.Long.valueOf(0)
+        val configs = allPhysicalConfigs.map(_._2)
+        configs.map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
+          "http://localhost:9008",
+          "http://localhost:9108",
+          "http://localhost:9208",
+          "http://localhost:9308",
+        )
+      }
+      clue("backwards compatiblity synchronizers configs is set") {
+        val allSequencerConfigs = nodeStates.map(_.sequencer.toScala.value)
+        allSequencerConfigs.size shouldBe 4
+        allSequencerConfigs.map(_.migrationId).toSeq.distinct.loneElement shouldBe java.lang.Long
+          .valueOf(0)
+        allSequencerConfigs.map(_.url) should contain theSameElementsAs Seq(
+          "http://localhost:9008",
+          "http://localhost:9108",
+          "http://localhost:9208",
+          "http://localhost:9308",
+        )
       }
     } finally {
       // Remove the sequencer again, otherwise the logic for resetting the namespace to only contain

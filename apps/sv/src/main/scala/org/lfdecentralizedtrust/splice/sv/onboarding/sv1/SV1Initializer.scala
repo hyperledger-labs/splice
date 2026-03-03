@@ -53,7 +53,6 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -64,7 +63,6 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, UnrestrictedOpen}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
   SequencerConnectionPoolDelays,
   SequencerConnections,
   TrafficControlParameters,
@@ -185,20 +183,11 @@ class SV1Initializer(
           bootstrapDomain(localSynchronizerNodes.current)
         }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
-      internalSequencerApi = localSynchronizerNodes.current.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         SynchronizerConnectionConfig(
           config.domains.global.alias,
           sequencerConnections = SequencerConnections.tryMany(
-            Seq(
-              new GrpcSequencerConnection(
-                NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
-                transportSecurity = internalSequencerApi.tlsConfig.isDefined,
-                customTrustCertificates = None,
-                SequencerAlias.Default,
-                sequencerId = None,
-              )
-            ),
+            Seq(localSynchronizerNodes.current.internalSequencerConnection),
             PositiveInt.one,
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
@@ -363,13 +352,14 @@ class SV1Initializer(
       withDsoStore = new WithDsoStore(
         dsoAutomation,
         decentralizedSynchronizer,
+        packageVersionSupport,
       )
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "bootstrap_dso_rules",
         show"the DsoRules and AmuletRules are bootstrapped",
         dsoStore.lookupDsoRules().map(_.isDefined), {
-          withDsoStore.foundDso(initialRound, packageVersionSupport)
+          withDsoStore.foundDso(initialRound)
         },
         logger,
       )
@@ -588,7 +578,7 @@ class SV1Initializer(
                   )
               _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
                 StoredTopologyTransactions(bootstrapTransactions),
-                synchronizerNode.staticSynchronizerParameters,
+                synchronizerNode.staticSynchronizerParameters(NonNegativeInt.zero),
               )
             } yield (),
             logger,
@@ -635,6 +625,7 @@ class SV1Initializer(
   private class WithDsoStore(
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       synchronizerId: SynchronizerId,
+      packageVersionSupport: PackageVersionSupport,
   ) {
 
     private val dsoStore = dsoStoreWithIngestion.store
@@ -647,12 +638,13 @@ class SV1Initializer(
       clock = clock,
       retryProvider = retryProvider,
       logger = logger,
+      versionSupport = packageVersionSupport,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly
       * allocated DSO party
       */
-    def foundDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(implicit
+    def foundDso(initialRound: Long)(implicit
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,

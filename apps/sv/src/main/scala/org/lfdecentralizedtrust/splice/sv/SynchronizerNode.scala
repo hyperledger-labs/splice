@@ -30,6 +30,7 @@ object SynchronizerNode {
   case class LocalSynchronizerNodes(
       current: LocalSynchronizerNode,
       successor: Option[LocalSynchronizerNode],
+      legacy: Option[LocalSynchronizerNode],
   )
 }
 
