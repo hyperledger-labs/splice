@@ -870,6 +870,7 @@ class DbSvDsoStore(
     splice.amulettransferinstruction.AmuletTransferInstruction,
   ] = (now, limit) =>
     implicit tc => {
+      val _ = tc
       val filterClause = if (ignoredParties.nonEmpty) {
         (sql" and " ++ notInClause(
           "create_arguments->'transfer'->>'sender'",
@@ -889,9 +890,9 @@ class DbSvDsoStore(
               domainMigrationId,
               splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
               additionalWhere = (sql"""
-              and assigned_domain = $synchronizerId
-              and (create_arguments->'transfer'->>'expiresAt')::timestamp < ${now}
-            """ ++ filterClause).toActionBuilder,
+                and assigned_domain = $synchronizerId
+                and acs.contract_expires_at < ${now.toMicros}
+              """ ++ filterClause).toActionBuilder,
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
             "listExpiredAmuletTransferInstructions",
