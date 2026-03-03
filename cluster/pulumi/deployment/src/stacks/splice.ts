@@ -1,7 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { CLUSTER_BASENAME, config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  config,
+  DecentralizedSynchronizerUpgradeConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  allSvNamesToDeploy,
+  svRunbookNodeName,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
 import {
   deployedValidators,
   validatorRunbookStackName,
@@ -95,6 +103,35 @@ export function installSpliceStacks(
       reference,
       envRefs,
       gcpSecret
+    );
+  }
+  installSvStacks(reference, envRefs, namespace, gcpSecret);
+}
+
+function installSvStacks(
+  reference: GitFluxRef,
+  envRefs: EnvRefs,
+  namespace: string,
+  gcpSecret: k8s.core.v1.Secret
+): void {
+  if (
+    !deploymentConf.projectsToDeploy.has('sv') ||
+    !DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode
+  ) {
+    return;
+  }
+  for (const sv of allSvNamesToDeploy) {
+    createStackCR(
+      `sv.${sv}`,
+      'sv',
+      namespace,
+      sv === svRunbookNodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
+      reference,
+      envRefs,
+      gcpSecret,
+      {
+        SPLICE_SV: sv,
+      }
     );
   }
 }
