@@ -158,10 +158,10 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         allPhysicalConfigs.map(_._1).toSeq.distinct.loneElement shouldBe java.lang.Long.valueOf(0)
         val configs = allPhysicalConfigs.map(_._2)
         configs.map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
-          "http://localhost:9008",
-          "http://localhost:9108",
-          "http://localhost:9208",
-          "http://localhost:9308",
+          "http://localhost:5108",
+          "http://localhost:5208",
+          "http://localhost:5308",
+          "http://localhost:5408",
         )
       }
       clue("backwards compatiblity synchronizers configs is set") {
@@ -170,10 +170,10 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         allSequencerConfigs.map(_.migrationId).toSeq.distinct.loneElement shouldBe java.lang.Long
           .valueOf(0)
         allSequencerConfigs.map(_.url) should contain theSameElementsAs Seq(
-          "http://localhost:9008",
-          "http://localhost:9108",
-          "http://localhost:9208",
-          "http://localhost:9308",
+          "http://localhost:5108",
+          "http://localhost:5208",
+          "http://localhost:5308",
+          "http://localhost:5408",
         )
       }
     } finally {
