@@ -1,7 +1,9 @@
-name: CI on PRs (Splice Contributors)
-on: # TODO: replace with main only, once a day
-  pull_request:
-    types: [ opened, synchronize, reopened ]
+name: Daily store ingestion performance tests
+on:
+  # allow manual running on PRs that you expect might affect store performance
+  workflow_dispatch:
+  schedule:
+    - cron: '37 3 * * 1-5' # 3:37 AM on workdays
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-perftest
@@ -13,6 +15,8 @@ permissions:
 
 jobs:
   performance_tests:
+    # note that we're loading the entirety of mainnet updates (and in the future, the ACS) so as to make sure that that's not the bottleneck.
+    # as of 03.03.2026 that seems to be enough, but we might have to increase it as the activity in mainnet does too.
     runs-on: self-hosted-k8s-medium
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
@@ -61,6 +65,7 @@ jobs:
             export POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"
             sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"
 
+      # sanity check
       - name: Check logs for errors
         uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         with:
@@ -69,20 +74,20 @@ jobs:
           cmd: checkErrors
 
       - name: Upload logs
-        # We upload the logs on not success so that we also capture them for cancelled runs
-        # Unfortunately when our apps don't init and stop with sys.exit(1) the run is considered cancelled (as it fails with a timeout) but we do need the logs
+        # if they're successful we don't care too much about the logs - but note that the ingestion are still logged
+        # as part of the GHA run itself (meaning: we use println to stdout)
         if: ${{ !success() }}
         uses: ./splice-shared-gha/.github/actions/sbt/upload_logs
         with:
           name: "logs-performance-tests"
 
-#      - name: Report Failures on Slack & Github
-#        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
-#        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
-#        with:
-#          job_subname: "${{ inputs.test_suite_name }} (${{ inputs.runner_index }})"
-#          workload_identity_provider: "${{ inputs.google_workload_identity_provider }}"
-#          service_account: "${{ inputs.failure_notifications_invoker_sa }}"
-#          notifications_url: "${{ inputs.failure_notifications_invoker_url }}"
-#          slack_channel: "${{ inputs.failure_notifications_slack_channel }}"
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'schedule'
+        uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
+        with:
+          job_subname: "Daily Store Ingestion Performance Tests"
+          workload_identity_provider: "${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}"
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
 
