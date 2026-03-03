@@ -116,7 +116,7 @@ abstract class StoreIngestionPerformanceTest(
   }
 
   // Ensuring that it's logged also on GHA console, as opposed to only in log files (which are not uploaded on success)
-  @SuppressWarnings(Array("org.wartremover.warts.Println"))
+  @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
   private def ingestAll(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
       tc: TraceContext
   ): Future[Done] = {
