@@ -64,6 +64,7 @@ monitoring:
         overMinutes: 5
         quantile: 0.95
     enableNoDataAlerts: false
+    loggedSecretsFilter: "(jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" OR jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\")\n-jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n"
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
@@ -141,10 +142,11 @@ svs:
         requests:
           memory: '2Gi'
     logging:
+      apiRequestLogLevel: 'DEBUG'
       appsAsync: false
-      appsLogLevel: 'DEBUG'
+      appsLogLevel: 'INFO'
       cantonAsync: false
-      cantonLogLevel: 'DEBUG'
+      cantonLogLevel: 'INFO'
       cometbftLogLevel: 'debug'
     mediator:
       resources:
@@ -154,6 +156,9 @@ svs:
           cpu: '1'
           memory: '2Gi'
     participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
       bftSequencerConnection: true
       resources:
         limits:
@@ -164,6 +169,11 @@ svs:
     pruning:
       cometbft:
         retainBlocks: 2000
+      participant:
+        cron: '0 /10 * * * ?'
+        enabled: true
+        maxDuration: '5m'
+        retentionPeriod: '30d'
       sequencer:
         enabled: false
     scanApp:

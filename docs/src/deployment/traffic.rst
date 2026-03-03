@@ -144,6 +144,25 @@ To give an overview here:
 Like all parts of the ``AmuletRulesConfig``, the ``SynchronizerFeesConfig`` is set by SVs via on-ledger voting, as part of DSO governance.
 The :ref:`SV operations docs <sv-determining-traffic-parameters>` contain pointers for determining good values for some of these parameters.
 
+How traffic balance interacts with transaction submission
+---------------------------------------------------------
+
+Here's an example of traffic accounting in practice for submitting a transaction:
+
+1. Transaction submitted.
+2. The traffic manager (on the sequencer) checks your node's base rate (i.e. free) traffic balance and the traffic that you have purchased.
+3. Included in your base rate traffic is that accrued since your last submission. This accrual is time-linear, calculated to reach ``burstAmount`` after ``burstWindow`` time.
+4. If you have enough base rate traffic, your submission is sequenced.
+   Your base rate traffic balance is drawn down for the transaction and your extra traffic balance is unchanged.
+5. If you do not have enough base rate traffic, but your extra traffic is enough to pay the difference, your submission is sequenced.
+   Your base rate traffic balance is depleted and your extra traffic balance is drawn down for the remainder.
+6. If neither of the above applies, the submission will fail.
+7. Regardless of any situation, if you don't submit transactions for ``burstWindow``, your base rate traffic balance will be fully replenished to ``burstAmount``.
+   This will, at minimum, allow you to buy traffic again to avoid getting stuck in the situation where you don't have enough traffic to top up your extra traffic.
+
+A successful sequencing does not necessarily mean the transaction is fully accepted.
+See :ref:`traffic_wasted` below for explanation of these cases and how best to avoid them.
+
 .. _traffic_topup:
 
 Traffic top-ups; how does one "buy" traffic?
@@ -161,10 +180,18 @@ Traffic top-ups; how does one "buy" traffic?
    Sequencers also update the in-sequencer traffic state themselves, whenever traffic is consumed (see :ref:`traffic_accounting`).
 
 The validator app contains built-in top-up automation that automatically buys traffic to meet preconfigured throughput needs.
-In a nutshell, operators can configure a target throughput (per minimum top-up interval)
-and the validator app will automatically buy extra traffic ensuring that
-(1) sufficient traffic balance is available to sustain the configured target throughput, and
-(2) exceeding the target throughput will not incur additional charges.
+Operators configure a target throughput (bytes per second) and a minimum top-up interval (seconds);
+the automation buys ``target throughput × minimum top-up interval`` bytes whenever both of the following conditions are met:
+
+- the extra traffic balance has fallen below that total top-up amount, and
+- at least the minimum top-up interval has elapsed since the last top-up.
+
+The latter condition is a safeguard: it gives the operator a chance to intervene before CC is rapidly spent down in the case of a bug or attack causing runaway submissions.
+This is a tradeoff for the operator to manage:
+a shorter interval reduces the risk of traffic running out between top-ups, but increases the risk of CC being spent quickly before the operator has time to notice it;
+a longer interval gives the operator more time to notice problems, but increases the risk of running out of traffic.
+Both failure modes occur in practice: a node can stop transacting either because it ran out of traffic, or because it ran out of CC to purchase more.
+
 Additionally, to prevent top-up transactions from failing due to an already depleted traffic balance,
 the validator app will
 :ref:`abort ledger submissions if the balance has fallen below a predefined amount<error-below-reserved-traffic-amount>`.

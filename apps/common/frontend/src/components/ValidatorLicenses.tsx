@@ -69,7 +69,7 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
   );
 
   return (
-    <Stack mt={4} spacing={4} direction="column" justifyContent="center">
+    <Stack spacing={4} direction="column" justifyContent="center">
       <Typography mt={6} variant="h4">
         Validator Licenses
       </Typography>

@@ -60,7 +60,7 @@ class WalletTimeBasedIntegrationTest
       clue("Alice gets some amulets") {
         aliceWalletClient.tap(50)
       }
-      aliceWalletClient.listSubscriptions() shouldBe empty
+      aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions"
 
       bracket(
         clue("Creating 3 subscriptions, 10 days apart") {
@@ -205,7 +205,9 @@ class WalletTimeBasedIntegrationTest
           activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         clue("Check wallet after advancing to next 2 rounds") {
-          eventually()(aliceWalletClient.list().lockedAmulets shouldBe empty)
+          eventually()(
+            aliceWalletClient.list().lockedAmulets shouldBe empty withClue "lockedAmulets"
+          )
         }
       }
     }

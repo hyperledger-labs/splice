@@ -228,7 +228,8 @@ trait SvDsoStore
 
   def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -251,7 +252,8 @@ trait SvDsoStore
 
   def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -291,7 +293,8 @@ trait SvDsoStore
 
   def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -301,7 +304,8 @@ trait SvDsoStore
 
   def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -340,7 +344,8 @@ trait SvDsoStore
 
   def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
-      totalCouponsLimit: Limit,
+      batchSize: Limit,
+      numBatches: Limit,
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
@@ -355,15 +360,17 @@ trait SvDsoStore
     ]]
   ]
 
-  /** Returns at most expired coupon batches per round and coupon type.
-    * It will return one entry per closed round that has expired coupon and per type of coupon.
-    * It will return a maximum of `totalCouponsLimit` per coupon type
+  /** Returns expired coupon batches per round and coupon type.
+    * It will return one entry per closed round that has expired coupons, and per type of coupon.
+    * It will return a maximum of `batchSize` contracts per round and coupon type,
+    * and at most `numBatches` rounds per coupon type.
     */
   final def getExpiredCouponsInBatchesPerRoundAndCouponType(
       domain: SynchronizerId,
       enableExpireValidatorFaucet: Boolean,
       ignoredExpiredRewardsPartyIds: Set[PartyId],
-      totalCouponsLimit: Limit = PageLimit.tryCreate(100),
+      batchSize: Limit = PageLimit.tryCreate(100),
+      numBatches: Limit = PageLimit.tryCreate(100),
   )(implicit
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = {
@@ -382,38 +389,43 @@ trait SvDsoStore
     for {
       appRewardGroups <- listAppRewardCouponsGroupedByRound(
         domain,
-        totalCouponsLimit = totalCouponsLimit,
+        batchSize = batchSize,
+        numBatches = numBatches,
         ignoredExpiredRewardsPartyIds,
       )
       validatorRewardGroups <- listValidatorRewardCouponsGroupedByRound(
         domain,
-        totalCouponsLimit = totalCouponsLimit,
+        batchSize = batchSize,
+        numBatches = numBatches,
         ignoredExpiredRewardsPartyIds,
       )
       validatorFaucetGroups <-
         if (enableExpireValidatorFaucet)
           listValidatorFaucetCouponsGroupedByRound(
             domain,
-            totalCouponsLimit = totalCouponsLimit,
+            batchSize = batchSize,
+            numBatches = numBatches,
             ignoredExpiredRewardsPartyIds,
           )
         else Future.successful(Seq.empty)
       validatorLivenessActivityRecordGroups <-
         listValidatorLivenessActivityRecordsGroupedByRound(
           domain,
-          totalCouponsLimit = totalCouponsLimit,
+          batchSize = batchSize,
+          numBatches = numBatches,
           ignoredExpiredRewardsPartyIds,
         )
       svRewardCouponGroups <- listSvRewardCouponsGroupedByRound(
         domain,
-        totalCouponsLimit = totalCouponsLimit,
+        batchSize = batchSize,
+        numBatches = numBatches,
         ignoredExpiredRewardsPartyIds,
       )
       roundNumbers =
         (appRewardGroups ++ validatorRewardGroups ++ validatorFaucetGroups ++ validatorLivenessActivityRecordGroups ++ svRewardCouponGroups)
           .map(_.roundNumber)
           .toSet
-      closedRounds <- listClosedRounds(roundNumbers, domain, totalCouponsLimit)
+      closedRounds <- listClosedRounds(roundNumbers, domain, numBatches)
       closedRoundMap = closedRounds.map(r => r.payload.round.number -> r).toMap
     } yield associateRoundContractWithBatch(appRewardGroups, closedRoundMap).map {
       case (closedRound, batch) =>

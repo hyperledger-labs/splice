@@ -113,6 +113,12 @@ monitoring:
         pendingPeriodMinutes: 5
       sequencerClientDelay:
         seconds: 90
+    # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
+    # Key=value secrets (excluding masked values)
+    # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
+    loggedSecretsFilter: |
+      (jsonPayload.message=~"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+" OR jsonPayload.message=~"eyJhbGc[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}" OR jsonPayload.message=~"Bearer\s+eyJ[A-Za-z0-9_-]{2,}")
+      -jsonPayload.message=~"(?i)(secret|token|(private|secret)(-)?key|password)=(\"\*\*\*\*\"|hidden)"
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true
@@ -166,11 +172,17 @@ svs:
       appsLogLevel: DEBUG
       appsAsync: false
       cantonLogLevel: DEBUG
+      apiRequestLogLevel: DEBUG
       cantonAsync: false
       cometbftLogLevel: debug
     pruning:
       sequencer:
         enabled: false
+      participant:
+        enabled: true
+        cron: '0 /10 * * * ?'
+        maxDuration: 5m
+        retentionPeriod: 30d
     participant:
       bftSequencerConnection: true
       resources:
@@ -178,6 +190,10 @@ svs:
           memory: '12Gi'
         limits:
           memory: '18Gi'
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
+          value: |
+            canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"
     validatorApp:
       additionalEnvVars:
         # enable https://github.com/hyperledger-labs/splice/pull/2499

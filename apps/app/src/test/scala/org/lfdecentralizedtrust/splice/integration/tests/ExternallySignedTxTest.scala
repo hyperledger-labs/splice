@@ -35,7 +35,9 @@ trait ExternallySignedTxTest
 
         eventually() {
           aliceValidatorBackend.participantClient.parties
-            .hosted(filterParty = party.filterString) should not be empty
+            .hosted(filterParty =
+              party.filterString
+            ) should not be empty withClue "alice hosted on participant"
         }
     }
 

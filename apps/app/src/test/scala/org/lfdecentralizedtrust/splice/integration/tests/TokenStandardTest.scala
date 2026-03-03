@@ -89,7 +89,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       trackingHoldingCid => {
         participant.ledger_api.event_query
           .by_contract_id(trackingHoldingCid.contractId, requestingParties = Seq(sender.partyId))
-          .archived should not be empty
+          .archived should not be empty withClue "archived holding"
       },
     )
   }
@@ -392,13 +392,13 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
             val aliceRequest = clue("Alice sees the allocation request") {
               val requests = listAllocationRequests(aliceWalletClient)
               val request = requests.loneElement
-              request.transferLegs.asScala should have size (2)
+              request.transferLegs.asScala should have size (2) withClue "transferLegs"
               request
             }
             val bobRequest = clue("Bob sees the allocation request") {
               val requests = listAllocationRequests(aliceWalletClient)
               val request = requests.loneElement
-              request.transferLegs.asScala should have size (2)
+              request.transferLegs.asScala should have size (2) withClue "transferLegs"
               request
             }
             (trade, aliceRequest, bobRequest)

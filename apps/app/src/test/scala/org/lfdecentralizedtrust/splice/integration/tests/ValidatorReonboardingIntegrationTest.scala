@@ -511,7 +511,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
               .listPartyToParticipantFromAllStores(
                 filterParty = aliceValidatorWalletParty.filterString
               )
-              .futureValue shouldBe empty
+              .futureValue shouldBe empty withClue "alice p2p mapping"
           },
         )
       }

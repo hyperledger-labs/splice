@@ -1,0 +1,16 @@
+{
+    "messages": {
+        "confirmationRequest": {
+            "globalTpsCap": 2,
+            "perClientTpsCap": 1,
+            "globalKbpsCap": 200,
+            "perClientKbpsCap": 100
+        },
+        "topology": {
+            "globalTpsCap": 4,
+            "perClientTpsCap": 3,
+            "globalKbpsCap": 400,
+            "perClientKbpsCap": 300
+        }
+    }
+}

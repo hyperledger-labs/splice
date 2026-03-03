@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE configuration [
-<!ENTITY entityCorrelationIdTrailingSpaceReplace "&#x0025;replace(tid:&#x0025;mdc{trace-id} ){'tid: ', ''}- &#x0025;msg&#x0025;replace(, context: &#x0025;marker){', context: $', ''}&#x0025;replace( err-context:&#x0025;mdc{err-context} ){' err-context: ', ''}&#x0025;n">
-]>
+        <!ENTITY entityCorrelationIdTrailingSpaceReplace "&#x0025;replace(tid:&#x0025;mdc{trace-id} ){'tid: ', ''}- &#x0025;msg&#x0025;replace(, context: &#x0025;marker){', context: $', ''}&#x0025;replace( err-context:&#x0025;mdc{err-context} ){' err-context: ', ''}&#x0025;n">
+        ]>
 <configuration debug="false">
   <!-- propagate logback changes to jul handlers -->
   <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
     <resetJUL>true</resetJUL>
   </contextListener>
-
+  <!--
+    TODO(#18445) move all this logic into the "application setup", as this xml file has reached the point of not being maintainable and testable
+  -->
   <!-- whoever figures out how to define the encoder once and doesn't use copy pasta such as I did here wins a price! -->
   <if condition='isDefined("LOG_FORMAT_JSON")'>
     <then>
@@ -32,18 +34,12 @@
               <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
             </matcher>
             <matcher>
-              <Name>requestlogger_logger</Name>
-              <regex>ApiRequestLogger</regex>
-            </matcher>
-            <matcher>
               <Name>requestlogger_message</Name>
               <regex>StateService/GetConnectedDomains</regex>
             </matcher>
             <expression>
                 level &lt;= INFO &amp;&amp;
-                ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
-                  requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
-                )
+                ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) )
             </expression>
           </evaluator>
           <OnMismatch>NEUTRAL</OnMismatch>
@@ -112,6 +108,18 @@
             </encoder>
             <filter class="${log_last_errors_filter}" />
           </appender>
+
+          <!-- Appender for KMS logs -->
+          <appender name="KMS-FILE" class="ch.qos.logback.core.FileAppender">
+            <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
+            <append>${KMS_LOG_FILE_APPEND:-true}</append>
+            <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+            <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
+            <encoder>
+              <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
+              <pattern>%date [%thread] %-5level %logger{10} &entityCorrelationIdTrailingSpaceReplace;</pattern>
+            </encoder>
+          </appender>
         </else>
       </if>
     </then>
@@ -134,18 +142,12 @@
                       <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
                     </matcher>
                     <matcher>
-                      <Name>requestlogger_logger</Name>
-                      <regex>ApiRequestLogger</regex>
-                    </matcher>
-                    <matcher>
                       <Name>requestlogger_message</Name>
                       <regex>StateService/GetConnectedDomains</regex>
                     </matcher>
                     <expression>
                         level &lt;= INFO &amp;&amp;
-                        ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
-                          requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
-                        )
+                        ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) )
                     </expression>
                   </evaluator>
                   <OnMismatch>NEUTRAL</OnMismatch>
@@ -186,6 +188,25 @@
                 </encoder>
                 <filter class="${log_last_errors_filter}" />
               </appender>
+
+
+              <!-- Appender for KMS logs -->
+              <appender name="KMS-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
+                <append>true</append>
+                <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+                <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
+                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                  <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
+                  <fileNamePattern>${KMS_LOG_FILE_NAME:-log/canton_kms.log}.%d{${KMS_LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
+                  <!-- keep all archived log files by default -->
+                  <maxHistory>${KMS_LOG_FILE_HISTORY:-0}</maxHistory>
+                </rollingPolicy>
+                <encoder>
+                  <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
+                  <pattern>%date [%thread] %-5level %logger{35} &entityCorrelationIdTrailingSpaceReplace;</pattern>
+                </encoder>
+              </appender>
             </else>
           </if>
         </then>
@@ -194,6 +215,99 @@
         </else>
       </if>
     </else>
+  </if>
+
+  <!-- By default, KMS audit logs will go to the Canton log file. To log them to a different file, set the KMS_LOG_FILE_NAME environment variable to the desired file path -->
+  <if condition='isDefined("KMS_LOG_FILE_NAME")'>
+    <then>
+      <if condition='isDefined("LOG_FILE_FLAT")'>
+        <then>
+          <if condition='isDefined("LOG_FORMAT_JSON")'>
+            <then>
+              <appender name="KMS-FILE" class="ch.qos.logback.core.FileAppender">
+                <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
+                <append>${KMS_LOG_FILE_APPEND:-true}</append>
+                <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+                <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
+                <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
+                  <fieldNames>
+                    <version>[ignore]</version>
+                    <levelValue>[ignore]</levelValue>
+                  </fieldNames>
+                </encoder>
+              </appender>
+            </then>
+            <else>
+              <appender name="KMS-FILE" class="ch.qos.logback.core.FileAppender">
+                <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
+                <append>${KMS_LOG_FILE_APPEND:-true}</append>
+                <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+                <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
+                <encoder>
+                  <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
+                  <pattern>%date [%thread] %-5level %logger{10} &entityCorrelationIdTrailingSpaceReplace;</pattern>
+                </encoder>
+              </appender>
+            </else>
+          </if>
+        </then>
+        <else>
+          <if condition='isDefined("LOG_FILE_ROLLING")'>
+            <then>
+              <if condition='isDefined("LOG_FORMAT_JSON")'>
+                <then>
+                  <appender name="KMS-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                    <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
+                    <append>true</append>
+                    <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+                    <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
+                    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                      <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
+                      <fileNamePattern>${KMS_LOG_FILE_NAME:-log/canton_kms.log}.%d{${KMS_LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
+                      <!-- keep all archived log files by default -->
+                      <maxHistory>${KMS_LOG_FILE_HISTORY:-0}</maxHistory>
+                    </rollingPolicy>
+                    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
+                      <fieldNames>
+                        <version>[ignore]</version>
+                        <levelValue>[ignore]</levelValue>
+                      </fieldNames>
+                    </encoder>
+                  </appender>
+                </then>
+                <else>
+                  <appender name="KMS-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                    <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
+                    <append>true</append>
+                    <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
+                    <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
+                    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                      <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
+                      <fileNamePattern>${KMS_LOG_FILE_NAME:-log/canton_kms.log}.%d{${KMS_LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
+                      <!-- keep all archived log files by default -->
+                      <maxHistory>${KMS_LOG_FILE_HISTORY:-0}</maxHistory>
+                    </rollingPolicy>
+                    <encoder>
+                      <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
+                      <pattern>%date [%thread] %-5level %logger{35} &entityCorrelationIdTrailingSpaceReplace;</pattern>
+                    </encoder>
+                  </appender>
+                </else>
+              </if>
+            </then>
+          </if>
+        </else>
+      </if>
+      <logger name="com.digitalasset.canton.crypto.kms.aws.audit" level="${LOG_LEVEL_CANTON:-INFO}" additivity="false">
+        <appender-ref ref="KMS-FILE"/>
+      </logger>
+      <logger name="com.digitalasset.canton.crypto.kms.gcp.audit" level="${LOG_LEVEL_CANTON:-INFO}" additivity="false">
+        <appender-ref ref="KMS-FILE"/>
+      </logger>
+      <logger name="com.digitalasset.canton.crypto.kms.mock.audit" level="${LOG_LEVEL_CANTON:-INFO}" additivity="false">
+        <appender-ref ref="KMS-FILE"/>
+      </logger>
+    </then>
   </if>
 
   <!-- include the rewrite appender to rewrite certain log levels of certain messages -->
@@ -213,6 +327,7 @@
     </then>
     <else>
       <logger name="com.digitalasset" level="${LOG_LEVEL_CANTON:-INFO}"/>
+      <logger name="com.digitalasset.canton.networking.grpc" level="${LOG_LEVEL_API_REQUEST:-DEBUG}" />
       <logger name="com.daml" level="${LOG_LEVEL_CANTON:-INFO}"/>
       <logger name="org.lfdecentralizedtrust.splice" level="${LOG_LEVEL_CANTON:-INFO}"/>
     </else>

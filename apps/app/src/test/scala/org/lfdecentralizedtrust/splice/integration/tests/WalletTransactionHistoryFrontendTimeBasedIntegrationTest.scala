@@ -54,7 +54,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           "Alice sees the transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 3
+            txs should have size 3 withClue "txs"
             forAll(txs.take(2))(readPartyDescriptionFromRow(_) shouldBe defined)
             txs
           },
@@ -75,7 +75,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           "Alice sees the new transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 5
+            txs should have size 5 withClue "txs"
             forAll(txs.take(2))(readPartyDescriptionFromRow(_) shouldBe defined)
             txs
           },

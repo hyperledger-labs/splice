@@ -100,7 +100,9 @@ class DsoPreflightIntegrationTest
       )(
         "The docs are live",
         { _ =>
-          find(id("global-synchronizer-for-the-canton-network")) should not be empty
+          find(
+            id("global-synchronizer-for-the-canton-network")
+          ) should not be empty withClue "docs index page"
         },
       )
     }

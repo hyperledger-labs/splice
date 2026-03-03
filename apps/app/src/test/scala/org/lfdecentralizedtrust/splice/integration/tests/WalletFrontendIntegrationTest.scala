@@ -215,9 +215,9 @@ class WalletFrontendIntegrationTest
             webDriver: WebDriver
         ): Unit = {
           val proposalRows = findAll(className("proposal-row")).toSeq
-          proposalRows should have size proposalCount
+          proposalRows should have size proposalCount withClue "'Proposed Minting Delegations' row"
           val delegationRows = findAll(className("delegation-row")).toSeq
-          delegationRows should have size activeCount
+          delegationRows should have size activeCount withClue "'Active Minting Delegations' row"
         }
 
         // 1. Setup
@@ -240,10 +240,14 @@ class WalletFrontendIntegrationTest
 
         // 2. Verify empty initial state via API
         clue("Check that no minting delegation proposals exist initially") {
-          aliceWalletClient.listMintingDelegationProposals().proposals shouldBe empty
+          aliceWalletClient
+            .listMintingDelegationProposals()
+            .proposals shouldBe empty withClue "MintingDelegationProposals"
         }
         clue("Check that no minting delegations exist initially") {
-          aliceWalletClient.listMintingDelegations().delegations shouldBe empty
+          aliceWalletClient
+            .listMintingDelegations()
+            .delegations shouldBe empty withClue "MintingDelegations"
         }
 
         // 3. Create three proposals, one from each beneficiary
@@ -261,7 +265,7 @@ class WalletFrontendIntegrationTest
           _ => {
             aliceWalletClient
               .listMintingDelegationProposals()
-              .proposals should have size 3
+              .proposals should have size 3 withClue "MintingDelegationProposals"
           },
         )
 
@@ -287,7 +291,7 @@ class WalletFrontendIntegrationTest
             _ => {
               find(id("proposals-label")).valueOrFail("Proposed heading not found!")
               val proposalRows = findAll(className("proposal-row")).toSeq
-              proposalRows should have size 3
+              proposalRows should have size 3 withClue "'Proposed Minting Delegations' row"
 
               proposalRows.foreach { row =>
                 row
@@ -417,7 +421,7 @@ class WalletFrontendIntegrationTest
               eventually() {
                 aliceWalletClient
                   .listMintingDelegationProposals()
-                  .proposals should have size 2
+                  .proposals should have size 2 withClue "MintingDelegationProposals"
                 checkRowCounts(2, 2)
               }
             },

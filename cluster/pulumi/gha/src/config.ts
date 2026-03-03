@@ -12,6 +12,7 @@ const GhaConfigSchema = z.object({
     runnerHookVersion: z.string(),
     // this is a https://github.com/actions/actions-runner-controller version
     runnerScaleSetVersion: z.string(),
+    workPvcSize: z.string().default('20Gi'),
   }),
 });
 

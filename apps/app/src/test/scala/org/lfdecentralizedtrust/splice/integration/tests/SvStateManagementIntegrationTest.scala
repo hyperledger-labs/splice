@@ -115,7 +115,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )(
       "vote request has been rejected because the majority of the votes are negative",
       _ => {
-        sv1Backend.listVoteRequests() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty withClue "VoteRequests"
 
         sv1Backend
           .listVoteRequestResults(None, Some(false), None, None, None, 1)
@@ -156,7 +156,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )(
       "vote request has expired",
       _ => {
-        sv1Backend.listVoteRequests() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty withClue "VoteRequests"
         sv1Backend
           .listVoteRequestResults(None, Some(false), None, None, None, 1)
           .loneElement
@@ -196,7 +196,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )(
       "vote request was rejected",
       _ => {
-        sv1Backend.listVoteRequests() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty withClue "VoteRequests"
         sv1Backend
           .listVoteRequestResults(None, Some(false), None, None, None, 1)
           .loneElement
@@ -357,7 +357,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           .loneElement
           .item
           .owners
-          .forgetNE should have size (3)
+          .forgetNE should have size (3) withClue "namespace owners"
       },
     )
   }
@@ -368,7 +368,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     clue("Initialize DSO with 4 SVs") {
       initDso()
       eventually() {
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 4
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 4 withClue "dsoRules.svs"
       }
     }
 
@@ -404,9 +404,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )(
       "The vote request has been created, SV1 accepts as he created it and all other SVs observe it",
       _ => {
-        svs.foreach { sv => sv.listVoteRequests() should not be empty }
+        svs.foreach { sv =>
+          sv.listVoteRequests() should not be empty withClue s"${sv.name} VoteRequests"
+        }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
-        sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
+        sv1Backend.lookupVoteRequest(head).payload.votes should have size 1 withClue "votes"
         (head, sv1Backend.getDsoInfo().dsoRules.payload.config.numUnclaimedRewardsThreshold)
       },
     )
@@ -464,7 +466,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     clue("Initialize DSO with 4 SVs") {
       initDso()
       eventually() {
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 4
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 4 withClue "dsoRules.svs"
       }
     }
 
@@ -514,9 +516,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )(
       "The vote request has been created and SV1 accepts as he created it",
       _ => {
-        svs.foreach { sv => sv.listVoteRequests() should not be empty }
+        svs.foreach { sv =>
+          sv.listVoteRequests() should not be empty withClue s"${sv.name}.listVoteRequests"
+        }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
-        sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
+        sv1Backend.lookupVoteRequest(head).payload.votes should have size 1 withClue "votes"
         head
       },
     )
@@ -595,7 +599,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
 
     clue("looking up a known party returns a non-empty participant id") {
       val response = sv1Backend.getPartyToParticipant(sv1Party)
-      response.participantId should not be empty
+      response.participantId should not be empty withClue "participantId"
     }
 
     clue("looking up a prefix of a known party fails with a 404") {
@@ -626,7 +630,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv2Backend,
       )
       eventually() {
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2 withClue "dsoRules.svs"
       }
     }
     clue("Pausing vote request expiration automation") {
@@ -655,8 +659,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )(
       "The vote request has been created and all SVs observe it",
       _ => {
-        sv1Backend.listVoteRequests() should have size 1
-        sv2Backend.listVoteRequests() should have size 1
+        sv1Backend.listVoteRequests() should have size 1 withClue "sv1 VoteRequests"
+        sv2Backend.listVoteRequests() should have size 1 withClue "sv2 VoteRequests"
       },
     )
     clue("Resuming vote request expiration automation") {
@@ -666,8 +670,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     }
     clue("Eventually the vote request expires and gets archived") {
       eventually() {
-        sv1Backend.listVoteRequests() shouldBe empty
-        sv2Backend.listVoteRequests() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty withClue "sv1 VoteRequests"
+        sv2Backend.listVoteRequests() shouldBe empty withClue "sv2 VoteRequests"
       }
     }
   }
