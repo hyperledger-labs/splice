@@ -7,6 +7,8 @@ module Splice.AmuletAllocation (
   allocationToTwoStepTransfer,
 ) where
 
+import DA.Foldable (forA_)
+import DA.Optional (isNone, isSome)
 import DA.Text as Text
 import DA.TextMap qualified as TextMap
 
@@ -17,8 +19,13 @@ import Splice.Api.Token.AllocationV2
 import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
+import Splice.AmuletRules
 import Splice.Amulet.TwoStepTransfer
-import Splice.Amulet.TokenApiUtils (amuletInstrumentId)
+import Splice.Amulet.TokenApiUtils
+import Splice.Fees (expiringAmount)
+import Splice.Types
+import Splice.Util
+
 import qualified DA.Map as Map
 import DA.Optional (fromSome)
 import DA.Assert ((===))
@@ -92,6 +99,48 @@ template AmuletAllocation
             )
             grouped_tls
 
+      allocation_settleImpl _self Allocation_Settle{..} = do
+        -- compute total funds to move
+        let netAmount = netAllocationAmount authorizer allocation.transferLegs
+        if netAmount >= 0.0 then do
+          require "No locked amulet expected for non-negative net amount" (isNone lockedAmulet)
+          if netAmount > 0.0
+            then do
+              -- FIXME: share context fetching code once rebased on Moritz's 24h changes
+              openRoundCid <- getFromContextU extraArgs.context openRoundContextKey
+              openRound <- fetchChecked (ForDso with dso = admin) openRoundCid
+              let holdingFeeAmulet = (transferConfigAmuletFromOpenRound openRound).holdingFee
+
+              newHoldingCid <- create Amulet with
+                dso = admin
+                owner = authorizer
+                amount = expiringAmount holdingFeeAmulet netAmount openRound.round
+
+              pure Allocation_SettleResult with
+                newHoldingCids = Map.singleton (amuletInstrumentId admin) [toInterfaceContractId newHoldingCid]
+                meta = emptyMetadata
+
+          else
+            pure Allocation_SettleResult with
+              newHoldingCids = Map.empty
+              meta = emptyMetadata
+
+
+
+           -- create amulet with netAmount
+           -- store amulet cid in contract state
+        else do
+          -- check locked amulet has enough funds
+          require "Locked amulet expected for negative net amount" (isSome lockedAmulet)
+          forA_ lockedAmulet $ \cid -> do
+             lockedAmulet <- fetchAndArchive (ForOwner with dso = admin; owner = authorizer) cid
+             require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
+
+          pure Allocation_SettleResult with
+            newHoldingCids = Map.empty
+            meta = emptyMetadata
+
+
     interface instance AllocationV1.Allocation for AmuletAllocation where
       view = allocation_view_v2_to_v1 (view (toInterface @Allocation this))
 
@@ -101,6 +150,16 @@ template AmuletAllocation
 
 -- Allocation usage
 -------------------
+
+-- FIXME: consider lifting out to utils
+netAllocationAmount : Party -> [TransferLeg] -> Decimal
+netAllocationAmount authorizer transferLegs =
+    sum $ map legAmount transferLegs
+  where
+    legAmount tl
+      | tl.sender.owner == authorizer = negate tl.amount
+      | tl.receiver.owner == authorizer = tl.amount
+      | otherwise = error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
 
 allocationAmount : Party -> AllocationSpecification -> Decimal
 allocationAmount sender allocation = sum (map (._2) outputs)
@@ -191,3 +250,7 @@ template AmuletAllocationTransferAuthorization
       controller extraController :: settlement.executor :: fromSome (settlement.controllerOverride) -- should never be None if this is called.
       do
         transferAmuletAllocation this holdingCids
+
+
+instance HasCheckedFetch AmuletAllocation ForDso where
+  contractGroupId AmuletAllocation{..} = ForDso with dso = admin
