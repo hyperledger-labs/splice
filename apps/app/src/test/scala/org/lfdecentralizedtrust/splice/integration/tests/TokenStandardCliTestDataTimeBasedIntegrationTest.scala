@@ -932,6 +932,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
     aliceWalletClient.list().lockedAmulets should have length 2
 
+
+    // SCENARIO A: Lock Missing
+    // We manually withdraw transfer_1. This consumes its LockedAmulet immediately.
+    // When the trigger runs later, it will find the instruction but no LockedAmulet.
+
     aliceWalletClient.withdrawTokenStandardTransfer(transfer_1.output match {
       case members.TransferInstructionPending(value) =>
         new TransferInstruction.ContractId(value.transferInstructionCid)
@@ -942,11 +947,15 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
     sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTransferInstructionTrigger].resume()
 
+    // SCENARIO B: Lock Exists
+    // The trigger picks up Transfer 2. It finds both the instruction and the LockedAmulet.
+
     advanceTime(Duration.ofDays(1))
 
     eventually() {
       aliceWalletClient.listTokenStandardTransfers() shouldBe empty
       aliceWalletClient.list().lockedAmulets shouldBe empty
+      aliceWalletClient.list().amulets.length shouldBe 3
     }
   }
 
