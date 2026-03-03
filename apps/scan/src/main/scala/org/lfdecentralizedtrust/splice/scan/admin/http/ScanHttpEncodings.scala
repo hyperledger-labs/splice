@@ -679,7 +679,7 @@ object ScanHttpEncodings {
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
-      ByteString.EMPTY, // TODO(#3408): Revisit when adding APIs
+      tree.getExternalTransactionHash,
     )
   }
 }

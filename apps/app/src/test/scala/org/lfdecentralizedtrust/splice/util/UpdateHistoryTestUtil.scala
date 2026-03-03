@@ -44,6 +44,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
 import org.scalatest.Assertion
@@ -186,12 +187,8 @@ trait UpdateHistoryTestUtil extends TestCommon {
     // and that all expected hashes are present in the recorded updates
     val recordedExtTxnHashes = recordedUpdates.collect {
       case UpdateHistoryResponse(TransactionTreeUpdate(tx), _)
-          if Option(tx.getExternalTransactionHash).exists(!_.isEmpty) =>
-        Option(tx.getExternalTransactionHash)
-          .map(_.toByteArray)
-          .getOrElse(Array.emptyByteArray)
-          .map("%02x" format _)
-          .mkString
+          if !tx.getExternalTransactionHash.isEmpty =>
+        HexString.toHexString(tx.getExternalTransactionHash)
     }
 
     recordedExtTxnHashes should not be empty
@@ -255,6 +252,33 @@ trait UpdateHistoryTestUtil extends TestCommon {
       fromPointwiseLookup shouldBe fromHistory
     })
 
+    succeed
+  }
+
+  def compareHistoryViaLosslessScanApiWithExtTxnHashes(
+      scanBackend: ScanAppBackendReference,
+      scanClient: ScanAppClientReference,
+      extTxnHashes: Seq[String] = Seq.empty,
+  ): Assertion = {
+    compareHistoryViaLosslessScanApi(scanBackend, scanClient)
+    val historyThroughApi = scanClient
+      .getUpdateHistory(
+        1000,
+        None,
+        encoding = ProtobufJson,
+      )
+      .map(ProtobufJsonScanHttpEncodings.httpToLapiUpdate)
+
+    val recordedExtTxnHashes = historyThroughApi.flatMap { update =>
+      update.update.update match {
+        case TransactionTreeUpdate(tx) =>
+          val hash = tx.getExternalTransactionHash
+          if (hash.isEmpty) None else Some(HexString.toHexString(hash))
+        case _ => None
+      }
+    }
+    recordedExtTxnHashes should not be empty
+    recordedExtTxnHashes should contain allElementsOf extTxnHashes
     succeed
   }
 
