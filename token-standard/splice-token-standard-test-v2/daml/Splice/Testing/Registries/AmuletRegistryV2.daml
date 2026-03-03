@@ -72,6 +72,7 @@ data AmuletRegistry = AmuletRegistry with
 instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
+  getAllocationFactory_SettleBatch = registryApi_getAllocationFactory_SettleBatch
   getAllocation_TransferContext app cid _meta = registryApi_getAllocationTransferContext app cid
   getAllocation_WithdrawContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
@@ -235,6 +236,20 @@ registryApi_getAllocationFactory
   -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_Allocate)
 registryApi_getAllocationFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
+  transferC <- getAmuletRulesTransferContext registry
+  let fullContext = withExtraDisclosures extAmuletRulesD transferC
+  pure EnrichedFactoryChoice with
+    factoryCid = toInterfaceContractId @AllocationFactory extAmuletRulesCid
+    arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
+    disclosures = fullContext.disclosures
+
+registryApi_getAllocationFactory_SettleBatch
+  : AmuletRegistry
+  -> AllocationFactory_SettleBatch
+  -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_SettleBatch)
+registryApi_getAllocationFactory_SettleBatch registry arg = do
+  (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
+  -- FIXME: trim context
   transferC <- getAmuletRulesTransferContext registry
   let fullContext = withExtraDisclosures extAmuletRulesD transferC
   pure EnrichedFactoryChoice with
