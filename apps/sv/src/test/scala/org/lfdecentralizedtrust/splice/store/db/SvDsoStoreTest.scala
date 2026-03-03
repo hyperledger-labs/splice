@@ -456,7 +456,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
 
         val expiredCid = amuletTransferInstruction(
           sender = userParty(1),
-          receiver = userParty(2),
+          receiver = userParty(3),
           amount = amount,
           requestedAt = past.minusSeconds(60),
           expiresAt = past

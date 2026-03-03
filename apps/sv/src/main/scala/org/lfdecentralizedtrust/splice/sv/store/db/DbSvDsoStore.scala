@@ -875,6 +875,9 @@ class DbSvDsoStore(
         (sql" and " ++ notInClause(
           "create_arguments->'transfer'->>'sender'",
           ignoredParties,
+        ) ++ sql" and " ++ notInClause(
+          "create_arguments->'transfer'->>'receiver'",
+          ignoredParties,
         )).toActionBuilder
       } else {
         sql""
