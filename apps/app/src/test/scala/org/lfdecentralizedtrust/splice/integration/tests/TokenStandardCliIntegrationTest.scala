@@ -235,7 +235,7 @@ class TokenStandardCliIntegrationTest
       }
 
       clue(
-        "SV1 scan (/vX/updates/{update_id})  API should return the updates with external txn hashes"
+        "SV1 scan API (/vX/updates/{update_id})  should return the update with external txn hash"
       ) {
         eventually() {
           val scanClient = scancl("sv1ScanClient")

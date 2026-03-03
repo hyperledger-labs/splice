@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
@@ -31,7 +32,6 @@ import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.matchers.should.Matchers
 
 import java.time.Instant
-import java.util.HexFormat
 import scala.util.Random
 
 class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Matchers {
@@ -43,8 +43,8 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
       val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
-      val byteArray = HexFormat.of().parseHex(extTxnHashHexString)
-      val externalTxnHash = ByteString.copyFrom(byteArray)
+      val externalTxnHash =
+        HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
 
       val javaTree = mkExerciseTx(
         offset = 99,
