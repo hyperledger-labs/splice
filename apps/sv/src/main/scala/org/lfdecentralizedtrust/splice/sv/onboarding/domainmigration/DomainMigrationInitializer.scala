@@ -73,7 +73,8 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigra
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.io.FileNotFoundException
@@ -82,7 +83,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
-    localSynchronizerNodes: LocalSynchronizerNodes,
+    localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
     cometBftConfig: Option[SvCometBftConfig],

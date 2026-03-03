@@ -43,7 +43,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -88,7 +88,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       dsoStore: SvDsoStore,
       ledgerClient: SpliceLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -138,7 +138,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def newSvDsoAutomationService(
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
       enabledFeatures: EnabledFeaturesConfig,

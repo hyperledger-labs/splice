@@ -10,7 +10,8 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNodeService
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNodeService
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
@@ -33,7 +34,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class SvOnboardingUnlimitedTrafficTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    synchronizerNodeService: SynchronizerNodeService,
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,

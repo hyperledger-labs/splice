@@ -26,8 +26,9 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryProvider,
   SequencerAdminConnection,
+  SynchronizerNode,
 }
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{
   CometBftClient,
   CometBftNode,
@@ -155,7 +156,7 @@ object SvUtil {
       migrationId: Long,
   )
 
-  def getSequencerConfig(synchronizerNode: Option[SynchronizerNode], migrationId: Long)(implicit
+  def getSequencerConfig(synchronizerNode: Option[SvSynchronizerNode], migrationId: Long)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[LocalSequencerConfig]] = synchronizerNode.map { node =>

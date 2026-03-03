@@ -29,11 +29,18 @@ import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeSta
 import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeState
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 
 import java.lang
 import java.time.Instant
@@ -55,7 +62,7 @@ class SynchronizerNodeReconciler(
   private val dsoParty = dsoStore.key.dsoParty
 
   def reconcileSynchronizerNodeConfigIfRequired(
-      synchronizerNodes: Option[LocalSynchronizerNodes],
+      synchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
       synchronizerId: SynchronizerId,
       state: SynchronizerNodeState,
       migrationId: Long,

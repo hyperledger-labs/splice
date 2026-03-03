@@ -30,11 +30,8 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.sv.{
-  BftSequencerConfig,
-  LocalSynchronizerNode,
-  SynchronizerNodeService,
-}
+import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNodeService
 import org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
@@ -57,7 +54,7 @@ import org.lfdecentralizedtrust.splice.sv.lsu.{
 }
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.nio.file.Path
@@ -74,7 +71,7 @@ class SvDsoAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
-    localSynchronizerNodes: Option[LocalSynchronizerNodes],
+    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
     upgradesConfig: UpgradesConfig,
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,

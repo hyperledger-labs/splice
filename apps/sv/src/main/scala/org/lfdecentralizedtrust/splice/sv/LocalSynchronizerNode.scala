@@ -62,7 +62,7 @@ class LocalSynchronizerNode(
     httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
-) extends SynchronizerNode(
+) extends SvSynchronizerNode(
       sequencerAdminConnection,
       mediatorAdminConnection,
       config.sequencer.externalPublicApiUrl,

@@ -98,7 +98,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 
 import scala.jdk.OptionConverters.*
 import java.util.concurrent.TimeUnit
@@ -107,7 +107,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize sv1. */
 class SV1Initializer(
-    localSynchronizerNodes: LocalSynchronizerNodes,
+    localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
     sv1Config: SvOnboardingConfig.FoundDso,
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
