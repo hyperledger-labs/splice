@@ -470,7 +470,8 @@ object DamlPlugin extends AutoPlugin {
       if (!artifact.exists) {
         log.info(s"Downloading missing ${artifactFilename} to ${root.path}")
         root.createDirectoryIfNotExists(createParents = true)
-        val curlWithBasicOptions = "curl" :: "-sSL" :: "--fail" :: Nil
+        val curlWithBasicOptions =
+          "curl" :: "-sSL" :: "--fail" :: "--retry" :: "3" :: "--retry-connrefused" :: Nil
         val credentials = url match {
           case artifactory if artifactory.startsWith("https://digitalasset.jfrog.io/") =>
             // CircleCI specifies ARTIFACTORY_ env variables

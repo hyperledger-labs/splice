@@ -9,6 +9,7 @@ import { startDownOperationsForCantonStacks } from '@lfdecentralizedtrust/splice
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { downOperation } from './pulumiOperations';
 import { startDownOperationsForValidatorStacks } from './validator-runbook/pulumiDown';
+import { startDownOperationsForSvStacks } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumiDown';
 
 const abortController = new PulumiAbortController();
 
@@ -18,6 +19,8 @@ async function runStacksDown() {
   operations.push(downOperation(mainStack, abortController));
   const cantonDown = startDownOperationsForCantonStacks(abortController);
   operations = operations.concat(cantonDown);
+  const svsDown = startDownOperationsForSvStacks(abortController);
+  operations = operations.concat(svsDown);
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});
     operations.push(downOperation(validator1, abortController));

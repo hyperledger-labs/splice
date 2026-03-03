@@ -1750,6 +1750,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -1880,6 +1881,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -4028,6 +4030,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -4158,6 +4161,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -5770,6 +5774,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
@@ -5900,6 +5905,7 @@
             }
           }
         },
+        "apiRequestLogLevel": "DEBUG",
         "cluster": {
           "dnsName": "mock.global.canton.network.digitalasset.com",
           "fixedTokens": false,
