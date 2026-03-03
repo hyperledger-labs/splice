@@ -72,7 +72,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
 }
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   PackageVetting,
@@ -86,7 +86,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
 class JoiningNodeInitializer(
-    localSynchronizerNodes: Option[LocalSynchronizerNodes],
+    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,

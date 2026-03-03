@@ -25,7 +25,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, StatusAdminConnection}
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
 
 import java.net.URI
@@ -33,7 +33,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class LogicalSynchronizerUpgradeTrigger(
     baseContext: TriggerContext,
-    currentSynchronizerNode: SynchronizerNode,
+    currentSynchronizerNode: SvSynchronizerNode,
     successorSynchronizerNode: LocalSynchronizerNode,
 )(implicit
     ec: ExecutionContext,
