@@ -28,6 +28,12 @@ template OpenMiningRound
     transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for Amulet transfers
     issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+    trafficPrice : Optional Decimal
+      -- ^ Traffic price in $/MB at round start time. Used by the reward
+      -- calculation to translate traffic burn back to amulet.
+    rewardConfig : Optional RewardConfig
+      -- ^ Configuration for off-ledger reward calculation for this round.
+      -- If None, rewards are computed on-ledger using the pre-CIP-104 mechanism.
   where
     signatory dso
     ensure isDefinedRound round
