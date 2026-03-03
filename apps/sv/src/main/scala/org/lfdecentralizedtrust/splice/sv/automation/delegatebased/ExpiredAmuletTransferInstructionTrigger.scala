@@ -12,6 +12,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredAmuletTransferInstructionTrigger.*
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 
@@ -54,7 +55,7 @@ class ExpiredAmuletTransferInstructionTrigger(
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
 
-      inputs <- Future.traverse(task.work.expiredContracts) { contract =>
+      inputs <- MonadUtil.sequentialTraverse(task.work.expiredContracts) { contract =>
         for {
           // If LockedAmulet still exists, we need to unlock it (expireLock = true). If not, the user already did it (expireLock = false).
           lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
