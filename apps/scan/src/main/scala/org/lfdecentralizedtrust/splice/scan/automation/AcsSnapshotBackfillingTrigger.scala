@@ -67,7 +67,7 @@ class AcsSnapshotBackfillingTrigger(
           getRecordTimeRange = getRecordTimeRange,
           getPreviousMigrationId = getPreviousMigrationId,
           storageConfig = storageConfig,
-          updateInterval = context.config.pollingInterval.asJava,
+          updateInterval = updateInterval,
           logger: TracedLogger,
         )
         .flatMap {

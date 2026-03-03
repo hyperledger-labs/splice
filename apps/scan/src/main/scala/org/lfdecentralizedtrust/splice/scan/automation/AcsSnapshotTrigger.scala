@@ -58,7 +58,7 @@ class AcsSnapshotTrigger(
           getLatestSnapshot = getLatestSnapshot,
           getRecordTimeRange = getRecordTimeRange,
           storageConfig = storageConfig,
-          updateInterval = context.config.pollingInterval.asJava,
+          updateInterval = updateInterval,
           logger = logger,
         )
     }
