@@ -38,16 +38,11 @@ jobs:
           target: 'oss'
 
       - name: Run performance tests
-        uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
-        env:
-          PERFORMANCE_TESTS_DB_PASSWORD: ${{ secrets.PERFORMANCE_TESTS_DB_PASSWORD }}
-          PERFORMANCE_TESTS_DB_HOST: ${{ secrets.PERFORMANCE_TESTS_DB_HOST }}
-          PERFORMANCE_TESTS_DB_USER: ${{ secrets.PERFORMANCE_TESTS_DB_USER }}
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
         with:
           additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
-          cmd: |
-            set -euxo pipefail
-
+          extra_env_vars: 'POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST" POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER" POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"'
+          pre_sbt_cmd: |
             echo "Clearing database"
             PGPASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD" psql \
               -h"$PERFORMANCE_TESTS_DB_HOST" \
@@ -59,11 +54,7 @@ jobs:
             echo "Downloading updates from mainnet for performance tests"
             curl -sSL --fail-with-body "https://storage.googleapis.com/mainnet-history-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
             ls -lah /tmp/mainnetupdates.json
-            echo "Downloaded, running performance tests"
-            export POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST"
-            export POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER"
-            export POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"
-            sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"
+          cmd: '"apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
 
       # sanity check
       - name: Check logs for errors
