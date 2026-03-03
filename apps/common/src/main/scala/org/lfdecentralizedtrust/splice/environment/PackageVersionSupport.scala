@@ -132,6 +132,7 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.amulet_0_1_16,
     )
 
+  // TODO(#564) - ensure the right version is used
   def supportsPhysicalSynchronizers(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {

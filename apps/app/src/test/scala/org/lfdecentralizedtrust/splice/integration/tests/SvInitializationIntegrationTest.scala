@@ -164,7 +164,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           "http://localhost:5408",
         )
       }
-      clue("backwards compatiblity synchronizers configs is set") {
+      clue("backwards compatible synchronizers configs is set") {
         val allSequencerConfigs = nodeStates.map(_.sequencer.toScala.value)
         allSequencerConfigs.size shouldBe 4
         allSequencerConfigs.map(_.migrationId).toSeq.distinct.loneElement shouldBe java.lang.Long
