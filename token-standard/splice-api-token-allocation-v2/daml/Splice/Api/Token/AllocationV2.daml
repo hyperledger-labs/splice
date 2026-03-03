@@ -18,7 +18,6 @@ import DA.Assert ((===))
 import DA.Optional (isSome, fromOptional, optionalToList)
 import DA.Map as Map (insert, toList, lookup, fromList, Map)
 import DA.Action (foldlA)
-import qualified DA.Set as Set
 
 -- | A generic type to refer to data defined within an app.
 
@@ -50,7 +49,7 @@ data SettlementInfo = SettlementInfo
       -- ^ Additional metadata about the settlement, used for extensibility.
     controllerOverride : Optional [Party]
       -- ^ Additional party signatures in addition to executor that need to authorize
-      -- choices on the Allocation. Defaults to senders and receivers across all 
+      -- choices on the Allocation. Defaults to senders and receivers across all
       -- transferLegs.
     settlementDeadline : Optional Time
       -- ^ The latest point at which settlement will occur. This allows registries
@@ -100,8 +99,8 @@ data AllocationView = AllocationView with
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
-    sender : Account
-      -- ^ The sender of this allocation
+    authorizer : Account
+      -- ^ The authorizer authorizing the transfer legs of the allocation to be executed.
     expiresAt : Optional Time
     -- ^ A time at which this allocation expires. SHOULD be as close as the
     -- registry can make it to the settlementInfo's settlementDeadline.
@@ -204,13 +203,13 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).sender.owner::(optionalToList (view this).sender.provider)
+    controller (view this).authorizer.owner::(optionalToList (view this).authorizer.provider)
     do allocation_withdrawImpl this self arg
 
 -- AllocationTransferAuthorization
 ----------------------------------
 
--- | A contract representing a delegated authority from the signatories to the executor to settle 
+-- | A contract representing a delegated authority from the signatories to the executor to settle
 -- given transfer legs.
 interface AllocationTransferAuthorization where
   viewtype AllocationTransferAuthorizationView
@@ -285,7 +284,7 @@ matchMeta expected received = do
 
 matchLegs : [TransferLeg] -> [TransferLeg] -> Either Text ()
 matchLegs expected received = do
-  assertMsg 
+  assertMsg
     ("Expected " <> show (length expected) <> " transfer legs. Received " <> show (length received))
     (length expected == length received)
   F.forA_ (zip expected received) (\(e, r) -> do
@@ -293,7 +292,7 @@ matchLegs expected received = do
         ("Expected transfer leg Id " <> r.transferLegId <> ", but got " <> e.transferLegId)
         (e.transferLegId == r.transferLegId)
       let
-        baseExpected = e with meta = emptyMetadata 
+        baseExpected = e with meta = emptyMetadata
         baseReceived = r with meta = emptyMetadata
       baseExpected === baseReceived
       matchMeta e.meta r.meta
@@ -318,19 +317,19 @@ matchAllocationWithMeta expected received = do
 --------------------------------------------------------------------
 -- TODO: Move away from interfaces to make easier to upgrade?
 
-settleAllocations : 
+settleAllocations :
   [TransferLeg] ->
   Map (InstrumentId, Account) [ContractId Holding] ->
   Map (Party, Account) (ContractId Allocation, ExtraArgs) ->
   Update ((Map (InstrumentId, Account) [ContractId Holding]), [Metadata])
-settleAllocations 
-  transferLegs 
+settleAllocations
+  transferLegs
   -- ^ transferLegs specifies he execution order of transfer legs.
   -- The boolean indicates whether receiver auth is needed.
   holdings
   -- ^ holdings are all input holdings, sorted by instrumentId. Typically these
   -- match the instrumentIds on the allocations.
-  allocationsWithContext 
+  allocationsWithContext
   -- ^ these are the allocations to be used, grouped by admin and account.
   = do
     -- Start by sorting all transferauthorizations into a map.
@@ -338,8 +337,8 @@ settleAllocations
     authsByLeg <- Map.fromList . concat <$>
       mapA (\((_, account), (aCid, extraArgs)) -> do
         auths <- exercise aCid Allocation_GetTransferAuthorizations with extraArgs
-        return (map (\(tlId, authCid) -> ((tlId, account), authCid)) (TextMap.toList auths)) 
-        ) 
+        return (map (\(tlId, authCid) -> ((tlId, account), authCid)) (TextMap.toList auths))
+        )
         (Map.toList allocationsWithContext)
     settleAuthorizations transferLegs holdings authsByLeg
 
@@ -348,8 +347,8 @@ settleAuthorizations :
   Map (InstrumentId, Account) [ContractId Holding] ->
   Map (Text, Account) (ContractId AllocationTransferAuthorization) ->
   Update ((Map (InstrumentId, Account) [ContractId Holding]), [Metadata])
-settleAuthorizations   
-  transferLegs 
+settleAuthorizations
+  transferLegs
   -- ^ transferLegs specifies he execution order of transfer legs.
   -- The boolean indicates whether receiver auth is needed.
   holdings
@@ -358,7 +357,7 @@ settleAuthorizations
   authsByLeg
   -- ^ The needed AllocationTransferAuthorizations soted by leg and authorizer.
  = do
-  (res_holdings, res_metas, _) <- foldlA (\(hs, ms, stls) tl -> 
+  (res_holdings, res_metas, _) <- foldlA (\(hs, ms, stls) tl ->
     if tl.transferLegId `elem` stls
       then return (hs, ms, stls) -- Already settled. Do nothing.
       else do
@@ -378,14 +377,14 @@ settleAuthorizations
               extraObservers = if isSome auth_r then tl.receiver.owner::(optionalToList tl.receiver.provider) else []
             return (r, sls)
         -- Update the holdings maps
-        let 
+        let
           hs' =
             Map.insert (tl.instrumentId, tl.sender) res.senderHoldingCids $
-            Map.insert (tl.instrumentId, tl.receiver) 
+            Map.insert (tl.instrumentId, tl.receiver)
               (res.receiverHoldingCids ++ fromOptional [] (Map.lookup (tl.instrumentId, tl.receiver) hs)) $
             hs
           stls' = dedupSort (settled_legs ++ stls)
-          
+
         return (hs', res.meta::ms, stls')
     )
     (holdings, [], [])
@@ -396,19 +395,19 @@ settleAuthorizations
 default_allocation_executeTransferImpl : Allocation -> ContractId Allocation -> Allocation_ExecuteTransfer -> Update Allocation_ExecuteTransferResult
 default_allocation_executeTransferImpl this self args = do
   let
-    holdings = 
+    holdings =
       Map.fromList $
         map
-          (\(instrumentId, hs) -> ((instrumentId, (view this).sender), hs))
+          (\(instrumentId, hs) -> ((instrumentId, (view this).authorizer), hs))
           (Map.toList (view this).holdingCids)
-  
-    allocationsWithContext = (Map.fromList [((allocationAdmin (view this).allocation, (view this).sender), (self, args.extraArgs))])
-  
+
+    allocationsWithContext = (Map.fromList [((allocationAdmin (view this).allocation, (view this).authorizer), (self, args.extraArgs))])
+
   authsByLeg <- Map.fromList . concat <$>
     mapA (\((_, account), (_, extraArgs)) -> do
       auths <- allocation_getTransferAuthorizationsImpl this self (Allocation_GetTransferAuthorizations with extraArgs)
-      return (map (\(tlId, authCid) -> ((tlId, account), authCid)) (TextMap.toList auths)) 
-      ) 
+      return (map (\(tlId, authCid) -> ((tlId, account), authCid)) (TextMap.toList auths))
+      )
       (Map.toList allocationsWithContext)
 
   (hs, ms) <- settleAuthorizations
@@ -418,8 +417,8 @@ default_allocation_executeTransferImpl this self args = do
 
   let
     (receiverHoldingCids, senderHoldingCids) = foldl
-      (\(r, s) ((_, account), h) -> 
-        if account == (view this).sender
+      (\(r, s) ((_, account), h) ->
+        if account == (view this).authorizer
           then (r, s ++ h)
           else (r ++ h, s)
       )
@@ -428,8 +427,8 @@ default_allocation_executeTransferImpl this self args = do
 
     meta = case ms of
       [meta] -> meta
-      _ -> Metadata with 
-        values = TextMap.fromList $ 
+      _ -> Metadata with
+        values = TextMap.fromList $
           concatMap (\(tl, m) -> map (\(k, v) -> (tl.transferLegId <> "/" <> k, v)) (TextMap.toList m.values)) (zip (view this).allocation.transferLegs ms)
 
   return Allocation_ExecuteTransferResult with

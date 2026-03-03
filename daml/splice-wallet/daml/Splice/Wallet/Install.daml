@@ -648,8 +648,8 @@ template WalletAppInstall
         withdrawArg : Splice.Api.Token.AllocationV2.Allocation_Withdraw
       controller validatorParty
       do allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
-          -- Amulet only supports a single sender per allocation
-         let HoldingV2.Account{HoldingV2.owner = sender} = (view allocation).sender
+          -- Amulet only supports a single authorizer per allocation
+         let HoldingV2.Account{HoldingV2.owner = sender} = (view allocation).authorizer
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise allocationCid withdrawArg
 
