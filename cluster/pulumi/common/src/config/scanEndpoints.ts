@@ -9,6 +9,11 @@ const scanYamlPath = path.join(__dirname, '../../../../../apps/scan/src/main/ope
 
 const MinimalOpenApiSchema = z.object({ paths: z.object({}).catchall(z.unknown()).default({}) });
 
+/**
+ * Read scan.yaml OpenAPI paths into normalized `/api/scan...` endpoint prefixes.
+ * Keep only the static prefix before the first `{...}` segment if the path contains parameters.
+ * This preserves only the segment for which simple string prefix matching works.
+ */
 export function parseScanYamlEndpoints(): string[] {
   const yaml = MinimalOpenApiSchema.parse(readAndParseYaml(scanYamlPath));
   const paths = yaml.paths;
