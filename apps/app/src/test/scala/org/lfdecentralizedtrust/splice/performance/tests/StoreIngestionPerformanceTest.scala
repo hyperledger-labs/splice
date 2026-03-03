@@ -115,6 +115,8 @@ abstract class StoreIngestionPerformanceTest(
     }
   }
 
+  // Ensuring that it's logged also on GHA console, as opposed to only in log files (which are not uploaded on success)
+  @SuppressWarnings(Array("org.wartremover.warts.Println"))
   private def ingestAll(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
       tc: TraceContext
   ): Future[Done] = {
@@ -147,7 +149,6 @@ abstract class StoreIngestionPerformanceTest(
             val msg =
               f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTime ns"
             logger.info(msg)
-            // Ensuring that it's logged also on GHA console, as opposed to only in log files (which are not uploaded on success)
             println(s"${this.getClass.getName}: $msg")
           }
       })
