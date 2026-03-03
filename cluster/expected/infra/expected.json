@@ -2451,7 +2451,7 @@
     "id": "",
     "inputs": {
       "description": "Logs containing secrets (JWTs, Bearer tokens, passwords, etc.)",
-      "filter": "resource.labels.cluster_name=\"cn-mocknet\"\n(jsonPayload.message=~\"(secret|token|private-key|password)=[^, ]+\" OR jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\")\n-jsonPayload.message=~\"(secret|token|private-key|password)=(\\\"\\\\*\\\\*\\\\*\\\\*\\\"|hidden)\"\n",
+      "filter": "resource.labels.cluster_name=\"cn-mocknet\"\n(jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" OR jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\")\n-jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n",
       "labelExtractors": {
         "cluster": "EXTRACT(resource.labels.cluster_name)",
         "namespace": "EXTRACT(resource.labels.namespace_name)"
