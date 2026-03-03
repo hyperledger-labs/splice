@@ -406,13 +406,15 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
   -- FIXME: rename creator to authorizer
   let authorizer = creator
-  let amount = allocationAmount authorizer arg.allocation
+  let amount = netAllocationAmount authorizer arg.allocation.transferLegs
 
   let
     deadline = fromOptional maxTime allocation.settlement.settlementDeadline
-    expiresAt = if amount == 0.0
+
+    -- FIXME: revisit this logic; as the DSO also has to keep around the allocation until the deadline ==> problematic for ACS sizes
+    expiresAt = if amount <= 0.0
       then deadline
-      else  min deadline (maxExpiry openMiningRound amount)
+      else min deadline (maxExpiry openMiningRound amount)
   require "Allocation.settlement.settleAt <= Allocation.expiresAt"
     (settlement.settleAt <= expiresAt)
 
@@ -438,12 +440,13 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   assertDeadlineExceeded "requestedAt" requestedAt
 
   -- inputHoldingCids:
-  require "At least one input holding must be provided" (amount == 0.0 || not (null inputHoldingCids))
+  require "At least one input holding must be provided when net amount is negative" (amount >= 0.0 || not (null inputHoldingCids))
 
   -- lock the funds
   let twoStepTransfer = allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
 
-  (lockedAmulet, senderChangeCids, meta) <- if amount == 0.0
+  (lockedAmulet, senderChangeCids, meta) <-
+    if amount >= 0.0
     then return (None, [], emptyMetadata)
     else do
       (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
@@ -506,7 +509,7 @@ validateExpectedTransfers [] allocated
   | otherwise = abort ("Unexpected remaining allocated transfer legs: " <> show allocated)
 validateExpectedTransfers (expected :: expectedRest) allocated =
   case Map.lookup expected allocated of
-    None -> abort ("Expected transfer leg " <> show expected <> " has no matching allocation")
+    None -> abort ("Expected transfer leg " <> show expected <> " has no matching allocation in: " <> show allocated)
     Some [] -> validateExpectedTransfers expectedRest (Map.delete expected allocated)
     Some remaining -> validateExpectedTransfers expectedRest (Map.insert expected remaining allocated)
 

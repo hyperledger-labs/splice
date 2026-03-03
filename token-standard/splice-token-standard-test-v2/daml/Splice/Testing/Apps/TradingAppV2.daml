@@ -6,15 +6,16 @@
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
 module Splice.Testing.Apps.TradingAppV2 where
 
-import DA.Optional (catOptionals, optionalToList)
+import DA.Optional (optionalToList)
 import DA.Set qualified as Set
 import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
+import Splice.Api.Token.AllocationInstructionV2 as Api.Token.AllocationInstructionV2
 import Splice.Api.Token.AllocationRequestV2
-import Splice.Api.Token.HoldingV2 (Account, Holding, InstrumentId)
-import DA.List (dedupSort, groupOn)
+import Splice.Api.Token.HoldingV2 (Account)
+import DA.List (dedupSort)
 import DA.Foldable (mapA_)
 import DA.Assert ((===))
 import DA.Time
@@ -51,7 +52,7 @@ template OTCTradeAllocationRequest with
 
       allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that assets won't be allocated / that the trade is being rejected.
-        require "Actor is is the needed authorizer" 
+        require "Actor is is the needed authorizer"
           (actor == authorizer.owner || Some actor == authorizer.provider)
         pure ChoiceExecutionMetadata with meta = emptyMetadata
 
@@ -61,61 +62,56 @@ template OTCTradeAllocationRequest with
 
 template OTCTrade with
     venue : Party
-    transferLegs : [TransferLeg]
+    transferLegsByAdmin : Map.Map Party [TransferLeg]
     createdAt : Time
     settleAt : Time
     settlementDeadline : Optional Time
   where
     signatory venue
-    observer venue, tradingParties transferLegs
+    observer venue, tradingParties (concat $ Map.values transferLegsByAdmin)
 
     nonconsuming choice OTCTrade_RequestAllocations : [ContractId OTCTradeAllocationRequest]
-      with
-        fee : TransferLeg
-        -- ^ An extra transfer leg to represent the fee for the executor.
       controller venue
       do
-        let
-          allLegs = fee::transferLegs
-          allTraders = dedupSort $ concatMap (\tl -> [tl.sender, tl.receiver]) transferLegs
-          legsByAdmin =
-            groupOn (.instrumentId.admin) $
-            allLegs
-        concat <$> 
-          forA legsByAdmin (\legs -> do
-            catOptionals <$> forA allTraders (\trader -> do
-              let trader_legs = filter (\leg -> trader == leg.sender || trader == leg.receiver) legs
-              if null trader_legs
-                then return None
-                else do
-                  Some <$> create OTCTradeAllocationRequest with 
-                    otcTradeCid = self
-                    authorizer = trader
-                    transferLegs = trader_legs
-                    ..
-              )
-          )
+        requestss <- forA (Map.values transferLegsByAdmin) $ \transferLegs -> do
+          let traders = dedupSort $ concatMap (\tl -> [tl.sender, tl.receiver]) transferLegs
+          forA traders $ \trader -> do
+            create OTCTradeAllocationRequest with
+              venue
+              otcTradeCid = self
+              authorizer = trader
+              transferLegs = filter (\leg -> trader == leg.sender || trader == leg.receiver) transferLegs
+              createdAt = createdAt
+              settleAt = settleAt
+              settlementDeadline = settlementDeadline
+        pure (concat requestss)
 
-    -- Nonconsuming to avoid disclusures inside.
-    nonconsuming choice OTCTrade_Settle : (Map.Map (InstrumentId, Account) [ContractId Holding], [Metadata])
+    -- Nonconsuming to avoid disclosures inside.
+    -- FIXME: check whether this really does what we want it to do
+    nonconsuming choice OTCTrade_Settle : [Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatchResult] -- FIXME: better type
       with
-        fee : TransferLeg
-        holdingCids : Map.Map (InstrumentId, Account) [ContractId Holding]
-        allocationsWithContext : Map.Map (Party, Account) (ContractId Allocation, ExtraArgs)
-        -- ^ Allocations sorted by admin and sender.
+        allocationBatchesByAdmin : Map.Map Party (ContractId Api.Token.AllocationInstructionV2.AllocationFactory, [ContractId Api.Token.AllocationV2.Allocation], ExtraArgs)
+        -- ^ Allocations sorted by admin party
         allocationRequests : [ContractId OTCTradeAllocationRequest]
       controller venue
       do
         archive self
         -- Could be safer by validating the requests match the trade, but venue is the only authorizer
-        -- so we can assume the checks happened off-ledger. 
+        -- so we can assume the checks happened off-ledger.
+        -- FIXME: don't make this assumption
+
         mapA_ archive allocationRequests
-        -- 
-        -- We use the default implementation.
-        settleAllocations
-          (transferLegs ++ [fee])
-          holdingCids
-          allocationsWithContext
+
+        require "Admins of batches match expected legs" (Map.keys allocationBatchesByAdmin == Map.keys transferLegsByAdmin)
+        forA (Map.toList allocationBatchesByAdmin) $ \(admin, (factoryCid, allocationCids, extraArgs)) -> do
+          Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
+          exercise factoryCid Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatch with
+            expectedAdmin = admin
+            executor = venue
+            transferLegs
+            allocationCids
+            extraArgs
+
 
     -- NOTE: this choice is an approximation to what a real app would do.
     -- As it stands, the venue can't cancel allocations that come right after
@@ -143,7 +139,7 @@ template OTCTrade with
             (view alloc).allocation.settlement.executor === venue
             exercise allocCid (Allocation_Cancel extraArgs)
           )
-          allocationsWithContext            
+          allocationsWithContext
 
 accountParties : Account -> [Party]
 accountParties account = account.owner::optionalToList account.provider

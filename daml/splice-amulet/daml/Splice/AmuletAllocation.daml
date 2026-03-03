@@ -3,7 +3,7 @@
 
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
-  allocationAmount,
+  netAllocationAmount,
   allocationToTwoStepTransfer,
 ) where
 
@@ -161,18 +161,15 @@ netAllocationAmount authorizer transferLegs =
       | tl.receiver.owner == authorizer = tl.amount
       | otherwise = error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
 
-allocationAmount : Party -> AllocationSpecification -> Decimal
-allocationAmount sender allocation = sum (map (._2) outputs)
-  where
-    senderLegs = filter (\tl -> tl.sender.owner == sender) $ allocation.transferLegs
-    outputs = map (\tl -> (tl.receiver, tl.amount)) senderLegs
-
 allocationToTwoStepTransfer : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
 allocationToTwoStepTransfer sender transferLegs admin expiresAt settlement =
   TwoStepTransfer with
     dso = admin
     sender
-    outputs = map (\tl -> (tl.receiver.owner, tl.amount)) filteredLegs
+    -- Note: we use a single leg to the sender to get the right locking behavior as part of preparing the two-step transfer
+    -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
+    -- FIXME: improve representation once the design for batch settlement is definite
+    outputs = [(sender, negate (netAllocationAmount sender transferLegs))]
     provider = settlement.executor
     transferBefore = expiresAt
     transferBeforeDeadline = "allocation.expiresAt"
@@ -180,8 +177,6 @@ allocationToTwoStepTransfer sender transferLegs admin expiresAt settlement =
     lockContext = Text.implode
       -- We don't show more context to avoid bloating the response here.
       ["allocation for settlement ", settlement.settlementRef.id]
-  where
-    filteredLegs = filter (\tl -> tl.sender.owner == sender) transferLegs
 
 transferAmuletAllocation : AmuletAllocationTransferAuthorization -> [ContractId Holding] -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation aata holdingCids = do

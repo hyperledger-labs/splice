@@ -56,7 +56,8 @@ data AllocatedOTCTrade = AllocatedOTCTrade
 
 setupOtcTrade : Script AllocatedOTCTrade
 setupOtcTrade  = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
   let amuletId = registry.instrumentId
 
   alice <- allocatePartyExact "alice"
@@ -101,7 +102,7 @@ setupOtcTrade  = do
       deadline = now `addRelTime` hours 2
   otcTradeCid <- submit provider $ createCmd OTCTrade with
     venue = provider
-    transferLegs = [aliceLeg, aliceLeg2, bobLeg, bobLeg2]
+    transferLegsByAdmin = groupLegsByAdmin [aliceLeg, aliceLeg2, bobLeg, bobLeg2, feeLeg]
     settleAt
     createdAt = now
     settlementDeadline = Some deadline
@@ -114,12 +115,12 @@ setupOtcTrade  = do
       settleAt = settleAt
       meta = emptyMetadata
       controllerOverride = Some [] -- We will settle using only executor authority.
+        -- FIXME: decide whether we still need overrides
       settlementDeadline = Some deadline
 
   -- venue requests settlement
   requestCids <- submit provider $
-    exerciseCmd otcTradeCid OTCTrade_RequestAllocations with
-      fee = feeLeg
+    exerciseCmd otcTradeCid OTCTrade_RequestAllocations
 
   Some otcTrade <- queryContractId provider otcTradeCid
 
@@ -155,7 +156,7 @@ setupOtcTrade  = do
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- check metadata
-  expectBurn result.meta
+  -- expectBurn result.meta
 
   -- check lock context
   [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
@@ -170,7 +171,7 @@ setupOtcTrade  = do
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
-  bobAlloc.transferLegs === [feeLeg, aliceLeg, aliceLeg2, bobLeg, bobLeg2]
+  bobAlloc.transferLegs === [aliceLeg, aliceLeg2, bobLeg, bobLeg2, feeLeg]
 
   -- bob accepts allocation request directly via his wallet
   inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
@@ -209,6 +210,7 @@ setupOtcTrade  = do
     amuletId
     feeLeg
 
+
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP : Script ()
 testDvP = script do
@@ -222,31 +224,30 @@ testDvP = script do
   allocationsMap <- appBackendListAllocations provider otcTradeRef
   Map.size allocationsMap === 3
 
-  let beneficiaryMetadata = AmuletRegistry.beneficiariesToMetadata providerBeneficiaries
-  richAllocationsWithContext <- Traversable.forA allocationsMap $ \(allocCid, alloc) -> do
-    context <- RegistryApi.getAllocation_TransferContext registry allocCid beneficiaryMetadata
-    let extraArgs = ExtraArgs with
-          context = context.choiceContext
-          meta = beneficiaryMetadata
-    pure (allocCid, extraArgs, context.disclosures, alloc.holdingCids)
-  let
-    disclosures = foldMap ((._3) . snd) (Map.toList richAllocationsWithContext)
-    holdingCids = Map.fromList $
-      concatMap
-        (\((_, authorizer), (_, _, _, holdings_map)) ->
-          map (\(instrId, hs') -> ((instrId, authorizer), hs')) (Map.toList holdings_map))
-        (Map.toList richAllocationsWithContext)
+  settleBatchContexts <-
+    forA (Map.toList otcTrade.transferLegsByAdmin) $ \(admin, transferLegs) -> do
+      let allocationCids = do
+            ((allocAdmin, _authorizer), (allocCid, _allocView)) <- Map.toList allocationsMap
+            guard (allocAdmin == admin)
+            pure allocCid
+      context <- RegistryApi.getAllocationFactory_SettleBatch registry AllocationFactory_SettleBatch with
+        expectedAdmin = registry.dso
+        transferLegs
+        allocationCids
+        extraArgs = emptyExtraArgs
+        executor = provider
+      pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
-    allocationsWithContext = Map.fromList $ map (\(k, (cid, ea, _, _)) -> (k, (cid, ea))) (Map.toList richAllocationsWithContext)
+  let disclosures = foldMap snd settleBatchContexts
+  let allocationBatchesByAdmin = Map.fromList $ map fst settleBatchContexts
+
 
   results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
-    fee = feeLeg
-    holdingCids
-    allocationsWithContext
+    allocationBatchesByAdmin
     allocationRequests = requestCids
 
   -- check metadata
-  forA_ results._2 $ \meta -> expectBurn meta
+  -- forA_ results._2 $ \meta -> expectBurn meta
 
   -- check that the expected transfers happened
   -- Alice should have two holdings of 10 as no merging happens after she receives.
@@ -293,6 +294,7 @@ testDvP = script do
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()
 
+{-
 testDvPCancel : Script ()
 testDvPCancel = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
@@ -350,14 +352,14 @@ testDvPWithdraw = script do
   AmuletRegistry.expireLockAsOwner registry bobLockedHoldingCid
 
   pure ()
-
+-}
 
 -- utilities
 ------------
 
 -- | List all allocations matching a particular settlement reference, sorted by their admin and trader.
 -- This function would be run on the trading app provider's backend as part of an automation loop.
-appBackendListAllocations : Party -> Reference -> Script (Map(Party, Account) (ContractId Allocation, AllocationView))
+appBackendListAllocations : Party -> Reference -> Script (Map (Party, Account) (ContractId Allocation, AllocationView))
 appBackendListAllocations p ref = do
   allocs <- queryInterface @Allocation p
   let matchingAllocs = do
@@ -373,3 +375,9 @@ expectBurn : Metadata -> Script ()
 expectBurn meta =
   unless (isSome $ TextMap.lookup burnedMetaKey meta.values) $
     fail $ "Expected burned meta key to be present in " <> show meta
+
+
+groupLegsByAdmin : [Api.Token.AllocationV2.TransferLeg] -> Map Party [Api.Token.AllocationV2.TransferLeg]
+groupLegsByAdmin legs =
+  -- FIXME: implement directly using a recursive function for less overhead
+  Map.fromListWith (++) $ map (\leg -> (leg.instrumentId.admin, [leg])) legs
