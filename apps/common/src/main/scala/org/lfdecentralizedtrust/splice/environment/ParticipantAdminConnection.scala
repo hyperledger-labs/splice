@@ -789,7 +789,8 @@ class ParticipantAdminConnection(
     def promoteParticipantToSubmitter(
         participants: Seq[HostingParticipant]
     ): Seq[HostingParticipant] = {
-      val newValue = HostingParticipant(participantId, ParticipantPermission.Submission)
+      val newValue =
+        HostingParticipant(participantId, ParticipantPermission.Submission, onboarding = false)
       val oldIndex = participants.indexWhere(_.participantId == newValue.participantId)
       participants.updated(oldIndex, newValue)
     }
@@ -806,7 +807,13 @@ class ParticipantAdminConnection(
           ).map(result => {
             Either.cond(
               result.mapping.participants
-                .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
+                .contains(
+                  HostingParticipant(
+                    participantId,
+                    ParticipantPermission.Submission,
+                    onboarding = false,
+                  )
+                ),
               result,
               result,
             )

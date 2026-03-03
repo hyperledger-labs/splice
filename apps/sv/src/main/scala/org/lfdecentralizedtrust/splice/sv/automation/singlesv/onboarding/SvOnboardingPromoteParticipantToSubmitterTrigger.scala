@@ -63,7 +63,11 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         .getPartyToParticipant(dsoRules.domain, dsoParty)
         .map(_.mapping.participants)
       res <-
-        if (dsoHostingParticipants.forall(_.permission == ParticipantPermission.Submission)) {
+        if (
+          dsoHostingParticipants.forall(participant =>
+            participant.permission == ParticipantPermission.Submission && !participant.onboarding
+          )
+        ) {
           Future.successful(Seq.empty[SvOnboardingPromoteParticipantToSubmitterTrigger.Task])
         } else if (withPromotionDelay) {
           retrieveTasksWithPromotionDelay(dsoRules)
@@ -200,7 +204,13 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         .map(_.mapping.participants)
     } yield {
       dsoHostingParticipants
-        .contains(HostingParticipant(task.participantId, ParticipantPermission.Submission))
+        .contains(
+          HostingParticipant(
+            task.participantId,
+            ParticipantPermission.Submission,
+            onboarding = false,
+          )
+        )
     }
   }
 
