@@ -25,6 +25,8 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
         proxy: {
           // Configure the registry to act as a read-through cache for the Docker Hub.
           enabled: true,
+          // Keep cached images for 30 days before expiring them (default: 168h / 7 days).
+          ttl: '720h',
         },
         persistence: {
           enabled: true,
