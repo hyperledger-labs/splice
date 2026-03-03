@@ -9,7 +9,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 object DarResourcesGenerator {
   def render(): String = {
     val lines = Seq(
-      "// DO NOT EDIT! This file is generated automatically by DarResourcesGenerator.scala",
+      "// DO NOT EDIT! This file is generated automatically by DarResourcesGenerator.scala via `sbt updateDarResources`",
       "package org.lfdecentralizedtrust.splice.environment",
       "import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}",
       "import com.digitalasset.daml.lf.language.Ast.PackageMetadata",
