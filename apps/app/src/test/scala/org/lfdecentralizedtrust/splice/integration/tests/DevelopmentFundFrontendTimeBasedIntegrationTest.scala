@@ -29,7 +29,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.openqa.selenium.WebDriver
 
-import java.time.Duration
+import java.time.{Duration, Instant}
 import java.util.Optional
 import scala.jdk.OptionConverters._
 
@@ -335,9 +335,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
             clue("Advance time past expiresAt") {
-              // Advance ~10 years to get past expiringExpiresAt (2040-12-31)
-              // while staying before futureExpiresAt (2060-12-31)
-              advanceTime(Duration.ofDays(365 * 10))
+              // Compute the advance needed to get past expiringExpiresAt (2040-12-31T23:59:00Z)
+              // dynamically, since the sim clock position after bootstrap is non-deterministic.
+              val now = getLedgerTime.toInstant
+              val expiringExpiresAtInstant = Instant.parse("2040-12-31T23:59:00Z")
+              val timeToAdvance = Duration.between(now, expiringExpiresAtInstant).plusDays(30)
+              advanceTime(timeToAdvance)
             }
             expiredDevelopmentFundCouponTriggers.foreach(_.resume())
 
