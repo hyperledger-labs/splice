@@ -3096,6 +3096,7 @@
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
+        "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -4042,6 +4043,7 @@
         "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
+        "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
