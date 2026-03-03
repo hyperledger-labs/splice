@@ -62,7 +62,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./splice-shared-gha/.github/actions/sbt/post_sbt
         with:
-          cache_version: 7
+          cache_version: 77777777777777777
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Upload logs
