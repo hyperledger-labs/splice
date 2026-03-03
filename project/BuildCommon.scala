@@ -19,6 +19,7 @@ import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
 import CantonDependencies.{daml_ledger_api_value_proto, excludeTranscodeConflictingDependencies}
+import org.latestbit.sbt.gcs.GcsPlugin.autoImport.googleCredentialsDisable
 
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -184,6 +185,7 @@ object BuildCommon {
       //      Global / excludeLintKeys += `demo` / autoAPIMappings,
       Global / excludeLintKeys += `canton-slick-fork` / autoAPIMappings,
       Global / excludeLintKeys += Global / damlCodeGeneration,
+      Global / googleCredentialsDisable := true,
       Global / resolvers += ("Canton snapshots" at "artifactregistry://europe-maven.pkg.dev/da-images/public-maven-unstable"),
     )
 
