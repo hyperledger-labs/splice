@@ -26,7 +26,7 @@ export function installScanBulkStorage(
   }
 
   const bucketName = `${ClusterBasename}-${xns.logicalName}-bulk`;
-  // TODO(#XXX): review other bucket configs
+  // TODO(#3429): review other bucket configs
   const bucket = new gcp.storage.Bucket(bucketName, { name: bucketName, location: GcpRegion });
   const bucketServiceAccount = new gcp.serviceaccount.Account(`${bucketName}-sa`, {
     accountId: `${bucketName}-sa`,
