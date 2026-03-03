@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import cats.implicits.toTraverseOps
+import cats.implicits.{catsSyntaxApplicativeError, toTraverseOps}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
@@ -232,16 +232,31 @@ class SynchronizerNodeReconciler(
 
           val successorEntryFuture =
             synchronizerNodes.flatMap(_.successor).flatTraverse { successorNode =>
-              successorNode.sequencerAdminConnection.isNodeInitialized().flatMap {
-                case true =>
-                  buildNodeConfig(
-                    existingState,
-                    successorNode,
-                    availableAfterIfNotAlreadySet = Some(clock.now.toInstant),
-                  ).map(Some(_))
-                case false =>
-                  Future.successful(None)
-              }
+              successorNode.sequencerAdminConnection
+                .isNodeInitialized()
+                .attemptT
+                .foldF(
+                  failure =>
+                    currentEntryFuture.map(_.flatMap { case (currentSyncSerial, _) =>
+                      val existingSuccessors =
+                        existingState.map(_.view.filterKeys(_ > currentSyncSerial).toSeq)
+                      logger.info(
+                        s"Failed to get successor status, will keep state with serial > than $currentSyncSerial: $existingSuccessors",
+                        failure,
+                      )
+                      existingSuccessors
+                    }),
+                  {
+                    case true =>
+                      buildNodeConfig(
+                        existingState,
+                        successorNode,
+                        availableAfterIfNotAlreadySet = Some(clock.now.toInstant),
+                      ).map(config => Some(Seq(config)))
+                    case false =>
+                      Future.successful(None)
+                  },
+                )
             }
 
           for {
@@ -249,7 +264,7 @@ class SynchronizerNodeReconciler(
             legacyEntry <- legacyEntryFuture
             successorEntry <- successorEntryFuture
           } yield {
-            Some((legacyEntry.toList ++ currentEntry.toList ++ successorEntry.toList).toMap)
+            Some((legacyEntry.toList ++ currentEntry.toList ++ successorEntry.toList.flatten).toMap)
           }
         } else Future.successful(None)
       }
