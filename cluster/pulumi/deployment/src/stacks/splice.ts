@@ -115,23 +115,22 @@ function installSvStacks(
   gcpSecret: k8s.core.v1.Secret
 ): void {
   if (
-    !deploymentConf.projectsToDeploy.has('sv') ||
-    !DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode
+    deploymentConf.projectsToDeploy.has('sv') &&
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode
   ) {
-    return;
-  }
-  for (const sv of allSvNamesToDeploy) {
-    createStackCR(
-      `sv.${sv}`,
-      'sv',
-      namespace,
-      sv === svRunbookNodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
-      reference,
-      envRefs,
-      gcpSecret,
-      {
-        SPLICE_SV: sv,
-      }
-    );
+    for (const sv of allSvNamesToDeploy) {
+      createStackCR(
+        `sv.${sv}`,
+        'sv',
+        namespace,
+        sv === svRunbookNodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
+        reference,
+        envRefs,
+        gcpSecret,
+        {
+          SPLICE_SV: sv,
+        }
+      );
+    }
   }
 }
