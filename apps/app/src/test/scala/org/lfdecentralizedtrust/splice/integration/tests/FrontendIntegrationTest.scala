@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithIsolatedEnvironment,
   IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
   TestCommon,
 }
@@ -39,9 +39,8 @@ import java.util.concurrent.atomic.AtomicLong
 import org.openqa.selenium.firefox.GeckoDriverService
 
 import scala.collection.mutable
-import scala.concurrent.blocking
+import scala.concurrent.{ExecutionContext, Future, TimeoutException, blocking}
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
@@ -422,13 +421,15 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   )(condition: By => ExpectedCondition[WebElement])(implicit
       webDriver: WebDriver
   ): Unit = {
-    waitForQuery(query, timeUntilSuccess)
+    clue(s"Waiting for $query until $timeUntilSuccess") {
+      waitForQuery(query, timeUntilSuccess)
 
-    val waitDuration = timeUntilSuccess.getOrElse(20.seconds)
-    val wait = new WebDriverWait(webDriver, waitDuration.toJava);
+      val waitDuration = timeUntilSuccess.getOrElse(20.seconds)
+      val wait = new WebDriverWait(webDriver, waitDuration.toJava);
 
-    eventually(waitDuration) {
-      wait.until(condition(query.by))
+      eventually(waitDuration) {
+        wait.until(condition(query.by))
+      }
     }
   }
 
@@ -692,10 +693,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   }
 
   protected def eventuallyClickOn(query: Query)(implicit driver: WebDriver) = {
-    clue(s"Waiting for $query to be clickable") {
-      waitForCondition(query) {
-        ExpectedConditions.elementToBeClickable(_)
-      }
+    waitForCondition(query) {
+      ExpectedConditions.elementToBeClickable(_)
     }
     clickOn(query)
   }
@@ -710,14 +709,35 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     eventuallyClickOn(query)
   }
 
-  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
-    clue(s"Waiting for $query to be found") {
-      waitForCondition(query) {
+  protected def eventuallyFindBase[T](
+      query: Query,
+      action: Query => T,
+      fallback: Option[() => T] = None,
+      timeUntilSuccess: Option[FiniteDuration],
+  )(implicit
+      driver: WebDriver
+  ): T = {
+    try {
+      waitForCondition(query, timeUntilSuccess) {
         ExpectedConditions.visibilityOfElementLocated(_)
       }
+      action(query)
+    } catch {
+      case e: TimeoutException =>
+        fallback match {
+          case Some(lazyFallback) => lazyFallback()
+          case None => throw e
+        }
     }
-    find(query)
   }
+
+  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) =
+    eventuallyFindBase(query, find, None, None)
+
+  protected def eventuallyFindAll(query: Query, timeUntilSuccess: FiniteDuration = 5.seconds)(
+      implicit driver: WebDriver
+  ) =
+    eventuallyFindBase(query, findAll, Some(() => Iterator.empty), Some(timeUntilSuccess))
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType
