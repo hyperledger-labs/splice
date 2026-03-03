@@ -259,11 +259,6 @@ object AcsSnapshotTriggerBase {
     }
   }
 
-  sealed trait RetrieveTaskResult
-  case class TaskToPerform(task: Task) extends RetrieveTaskResult
-  case object NoTaskToPerform extends RetrieveTaskResult
-  case object ReachedMigrationEnd extends RetrieveTaskResult
-
   sealed trait Task extends PrettyPrinting
   case class InitializeIncrementalSnapshotTask(from: AcsSnapshot, nextAt: CantonTimestamp)
       extends Task {

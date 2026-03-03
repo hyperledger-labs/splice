@@ -8,6 +8,7 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   AcsSnapshot,
+  FailedToAcquireLockException,
   IncrementalAcsSnapshot,
   IncrementalAcsSnapshotTable,
   QueryAcsSnapshotResult,
@@ -26,6 +27,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryParts.*
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import slick.dbio.{DBIOAction, Effect, NoStream}
@@ -221,8 +223,14 @@ class AcsSnapshotStore(
         .head
       result <- lockResult match {
         case true => action
-        // Lock conflicts should almost never happen. If they do, we fail immediately and rely on the trigger infrastructure to retry and log errors.
-        case false => DBIOAction.failed(new Exception("Failed to acquire exclusive lock"))
+        // Lock conflicts can happen:
+        // - In production, if the application crashes while writing a snapshot and then restarts
+        //   and tries to write another snapshot before the database has closed the connection and released the lock.
+        // - In production, if two triggers (ingesting and backfilling) happen to write a snapshot at the same time.
+        // - In testing, where multiple scan instances write to the same app database.
+        // In all cases, we want to fail immediately, and rely on the caller's infrastructure to retry.
+        case false =>
+          DBIOAction.failed(FailedToAcquireLockException())
       }
     } yield result).transactionally
 
@@ -776,6 +784,9 @@ class AcsSnapshotStore(
 }
 
 object AcsSnapshotStore {
+
+  case class FailedToAcquireLockException()
+      extends QuietNonRetryableException("Failed to acquire exclusive lock.")
 
   sealed trait IncrementalAcsSnapshotTable { def tableName: String }
   object IncrementalAcsSnapshotTable {
