@@ -93,6 +93,10 @@ const SvAppConfigSchema = z
     resources: K8sResourceSchema,
   })
   .strict();
+const BulkStorageConfigSchema = z.object({
+  enabled: z.boolean(),
+});
+export type BulkStorageConfig = z.infer<typeof BulkStorageConfigSchema>;
 const ScanAppConfigSchema = z
   .object({
     bigQuery: z
@@ -101,6 +105,7 @@ const ScanAppConfigSchema = z
         prefix: z.string(),
       })
       .optional(),
+    bulkStorage: BulkStorageConfigSchema.optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     resources: K8sResourceSchema,

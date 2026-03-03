@@ -18,6 +18,7 @@ import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validato
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
+import { BulkStorageBucket } from './bulkStorage';
 import { SingleSvConfiguration } from './singleSvConfig';
 import {
   StaticCometBftConfig,
@@ -80,6 +81,7 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   initialRound?: string;
   periodicTopologySnapshotConfig?: BackupConfig;
   version: CnChartVersion;
+  bulkStorageBucket?: BulkStorageBucket;
 }
 
 export const TopologySnapshotSchema = z.object({
