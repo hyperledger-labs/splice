@@ -446,6 +446,69 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       }
     }
 
+    "listExpiredAmuletTransferInstructions" should {
+
+      "return expired instructions and respect ignored parties" in {
+        val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        val past = now.minusSeconds(3600)
+        val future = now.plusSeconds(3600)
+        val amount = new java.math.BigDecimal("10.0").setScale(10)
+
+        val expiredCid = amuletTransferInstruction(
+          sender = userParty(1),
+          receiver = userParty(2),
+          amount = amount,
+          requestedAt = past.minusSeconds(60),
+          expiresAt = past
+        )
+
+        val activeCid = amuletTransferInstruction(
+          sender = userParty(1),
+          receiver = userParty(2),
+          amount = amount,
+          requestedAt = now,
+          expiresAt = future
+        )
+
+        val ignoredCid = amuletTransferInstruction(
+          sender = userParty(2),
+          receiver = userParty(1),
+          amount = amount,
+          requestedAt = past.minusSeconds(60),
+          expiresAt = past
+        )
+
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(Seq(expiredCid, activeCid, ignoredCid))(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+
+          resultAll <- store.listExpiredAmuletTransferInstructions(Set.empty)(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100)
+          )(traceContext)
+
+          resultFiltered <- store.listExpiredAmuletTransferInstructions(Set(userParty(2)))(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100)
+          )(traceContext)
+
+        } yield {
+          val allContracts = resultAll.map(_.contract)
+          allContracts should contain(expiredCid)
+          allContracts should contain(ignoredCid)
+          allContracts should not contain activeCid
+
+          val filteredContracts = resultFiltered.map(_.contract)
+          filteredContracts should contain(expiredCid)
+          filteredContracts should not contain ignoredCid
+          filteredContracts should not contain activeCid
+        }
+      }
+    }
+
     "listConfirmations" should {
 
       "list all confirmations with a matching action" in {

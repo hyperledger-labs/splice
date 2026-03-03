@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.InstrumentId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
@@ -79,6 +80,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.history.{AmuletCreate, AppRewardCreate}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.Transfer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.LockedAmulet
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
@@ -339,6 +344,40 @@ abstract class StoreTestBase
       identifier = templateId,
       contractId = new amuletCodegen.Amulet.ContractId(contractId),
       payload = template,
+    )
+  }
+  protected def amuletTransferInstruction(
+      sender: PartyId,
+      receiver: PartyId,
+      amount: java.math.BigDecimal,
+      requestedAt: Instant,
+      expiresAt: Instant,
+      contractId: String = nextCid()
+  ): Contract[
+    AmuletTransferInstruction.ContractId,
+    AmuletTransferInstruction,
+  ] = {
+    val instrumentId = new InstrumentId(dsoParty.toProtoPrimitive, "Amulet")
+    val transfer = new Transfer(
+      sender.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      amount,
+      instrumentId,
+      requestedAt,
+      expiresAt,
+      java.util.List.of(),
+      new Metadata(java.util.Collections.emptyMap()),
+    )
+
+    val template = new AmuletTransferInstruction(
+      new LockedAmulet.ContractId(nextCid()),
+      transfer,
+    )
+
+    contract(
+      AmuletTransferInstruction.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new AmuletTransferInstruction.ContractId(contractId),
+      template,
     )
   }
 

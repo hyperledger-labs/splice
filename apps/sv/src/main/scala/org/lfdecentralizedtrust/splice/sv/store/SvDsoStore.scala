@@ -1399,6 +1399,14 @@ object SvDsoStore {
           miningRound = Some(contract.payload.holdingFeesOpenRoundNumber.number),
         )
       },
+      mkFilter(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(co =>
+        co.payload.transfer.instrumentId.admin == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
+        )
+      },
     )
 
     MultiDomainAcsStore.SimpleContractFilter(
