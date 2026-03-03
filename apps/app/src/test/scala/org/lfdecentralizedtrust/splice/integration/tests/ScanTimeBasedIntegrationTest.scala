@@ -73,6 +73,15 @@ class ScanTimeBasedIntegrationTest
           )
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Scan)(
+          _.copy(
+            // By default, the acs snapshot trigger processes 30sec of history per invocation,
+            // which is too slow for this test which advances time by hours or days.
+            acsSnapshotTriggerPollingInterval = Some(NonNegativeFiniteDuration.ofHours(1))
+          )
+        )(config)
+      )
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {

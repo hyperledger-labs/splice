@@ -40,6 +40,14 @@ abstract class AcsSnapshotTriggerBase(
 
   protected val snapshotTable: IncrementalAcsSnapshotTable
 
+  // The time interval to process per trigger invocation.
+  // Setting this to a large value allows snapshot generation to catch up faster when it's behind,
+  // but also increases the risk of timeouts and long-running transactions.
+  protected val updateInterval: java.time.Duration =
+    context.config.acsSnapshotTriggerPollingInterval
+      .getOrElse(context.config.pollingInterval)
+      .asJava
+
   override final def completeTask(task: AcsSnapshotTriggerBase.Task)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = task match {
