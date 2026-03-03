@@ -98,8 +98,7 @@ class ExpiredAmuletTransferInstructionTrigger(
         .noDedup
         .withSynchronizerId(dsoRules.domain)
         .yieldUnit()
-      _ = logger.debug(s"Successfully archived batch of ${task.work.expiredContracts.size} transfer instructions.")
-    } yield TaskSuccess("archived batch of expired transfer instructions")
+    } yield TaskSuccess(s"archived batch of ${task.work.expiredContracts.size} expired transfer instructions")
   }
 }
 
