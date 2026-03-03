@@ -62,19 +62,20 @@ final class LocalSynchronizerNode(
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
     mediatorPruningConfig: Option[PruningConfig],
-    val serial: NonNegativeInt,
+    override val serial: NonNegativeInt,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
-) extends SynchronizerNode(
+) extends SvSynchronizerNode(
       sequencerAdminConnection,
       mediatorAdminConnection,
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
       sequencerConfig,
       mediatorSequencerAmplification,
+      serial,
     )
     with RetryProvider.Has
     with FlagCloseable

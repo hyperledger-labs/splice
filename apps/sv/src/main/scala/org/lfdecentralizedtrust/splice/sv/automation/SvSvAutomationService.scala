@@ -29,7 +29,8 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -43,7 +44,7 @@ class SvSvAutomationService(
     storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    localSynchronizerNodes: Option[LocalSynchronizerNodes],
+    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
     retryProvider: RetryProvider,
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,

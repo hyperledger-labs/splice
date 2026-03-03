@@ -93,7 +93,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvUtil,
   ValidatorOnboardingSecret,
 }
-import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
 
 import java.time.Instant
@@ -238,7 +238,7 @@ class SvApp(
 
     val localSynchronizerNodes = config.localSynchronizerNodes.current
       .map { currentNodeConfig =>
-        LocalSynchronizerNodes(
+        SynchronizerNode.LocalSynchronizerNodes(
           localSyncNodeFromConfig(currentNodeConfig),
           config.localSynchronizerNodes.successor.map(localSyncNodeFromConfig),
         )
@@ -263,7 +263,7 @@ class SvApp(
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: SpliceLedgerClient,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
 
@@ -844,7 +844,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes],
+      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
       storage: DbStorage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
