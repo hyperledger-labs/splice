@@ -6,9 +6,6 @@ package org.lfdecentralizedtrust.splice.sv
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SubmissionRequestAmplification}
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.{ClientConfig, CryptoConfig, CryptoProvider}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -60,7 +57,6 @@ class LocalSynchronizerNode(
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
     val config: SvSynchronizerNodeConfig,
-    val serial: NonNegativeInt,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,

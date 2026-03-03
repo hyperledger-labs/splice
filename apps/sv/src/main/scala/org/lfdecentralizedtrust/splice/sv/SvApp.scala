@@ -225,7 +225,6 @@ class SvApp(
           cometBftConfig,
         ),
         svSynchronizerConfig,
-        svSynchronizerConfig.serial,
       )
     }
 

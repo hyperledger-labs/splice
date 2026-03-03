@@ -69,6 +69,7 @@ class SynchronizerNodeService(
       case Some(successor) =>
         for {
           connections <- participantAdminConnection.listConnectedDomains()
+          succesorInitialized <- successor.sequencerAdminConnection.isNodeInitialized()
           global = connections
             .find(
               _.synchronizerAlias == globalSynchronizerAlias
@@ -78,7 +79,11 @@ class SynchronizerNodeService(
                 .withDescription(s"No connected synchronizer with alias $globalSynchronizerAlias")
                 .asRuntimeException
             )
-        } yield (global.physicalSynchronizerId.serial == successor.serial)
+          successorPSId <-
+            if (succesorInitialized)
+              successor.sequencerAdminConnection.getPhysicalSynchronizerId().map(Some(_))
+            else Future.successful(None)
+        } yield successorPSId.map(_.serial).contains(global.physicalSynchronizerId.serial)
     }
 
   private def synchronizerNode()(implicit tc: TraceContext) =
