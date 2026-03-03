@@ -39,6 +39,7 @@ export type ProjectFilter = z.infer<typeof ProjectFilterSchema>;
 function* iterateDefaultProjectFilters(): Generator<ProjectFilter> {
   yield 'canton-network';
   yield 'infra';
+  yield 'sv';
   yield 'sv-canton';
   yield 'validator-runbook';
 
