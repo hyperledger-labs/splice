@@ -4,6 +4,32 @@ infra:
     retentionDuration: "30d"
     retentionSize: "200GB"
     storageSize: "600Gi"
+operatorDeployment:
+  reference:
+    gitReference: refs/heads/mblaze-da/scratchnetc-operator-test
+    repoUrl: https://github.com/hyperledger-labs/splice
+    pulumiStacksDir: "cluster/stacks/scratchnets"
+    pulumiBaseDir: "cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."
+    privateConfigsDir: "cluster/configs/configs-private"
+    publicConfigsDir: "cluster/configs/configs"
+synchronizerMigration:
+  active:
+    id: 0
+    version: '0.5.13'
+    enableLogicalSynchronizerDeploymentMode: true
+    sequencer:
+      enableBftSequencer: false
+    releaseReference:
+      gitReference: refs/heads/mblaze-da/scratchnetc-operator-test
+      repoUrl: https://github.com/hyperledger-labs/splice
+      pulumiStacksDir: "cluster/stacks/ci"
+      pulumiBaseDir: "cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
 pulumiProjectConfig:
   default:
     cloudSql:

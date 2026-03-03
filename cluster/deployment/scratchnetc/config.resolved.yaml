@@ -84,6 +84,16 @@ multiValidator:
       requests:
         cpu: '0.5'
         memory: '2400Mi'
+operatorDeployment:
+  reference:
+    deploymentDir: 'cluster/deployment'
+    gitReference: 'refs/heads/mblaze-da/scratchnetc-operator-test'
+    privateConfigsDir: 'cluster/configs/configs-private'
+    publicConfigsDir: 'cluster/configs/configs'
+    pulumiBaseDir: 'cluster/pulumi'
+    pulumiStacksDir: 'cluster/stacks/scratchnets'
+    repoUrl: 'https://github.com/hyperledger-labs/splice'
+    spliceRoot: '.'
 pulumiProjectConfig:
   default:
     allowDowngrade: true
@@ -220,6 +230,22 @@ svs:
       auth0:
         clientId: 'fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY'
       walletUser: 'auth0|68c2c41e6470184569e4521e'
+synchronizerMigration:
+  active:
+    enableLogicalSynchronizerDeploymentMode: true
+    id: 0
+    releaseReference:
+      deploymentDir: 'cluster/deployment'
+      gitReference: 'refs/heads/mblaze-da/scratchnetc-operator-test'
+      privateConfigsDir: 'cluster/configs/configs-private'
+      publicConfigsDir: 'cluster/configs/configs'
+      pulumiBaseDir: 'cluster/pulumi'
+      pulumiStacksDir: 'cluster/stacks/ci'
+      repoUrl: 'https://github.com/hyperledger-labs/splice'
+      spliceRoot: '.'
+    sequencer:
+      enableBftSequencer: false
+    version: '0.5.13'
 validator1:
   deduplicationDuration: '30m'
   logging:
