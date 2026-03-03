@@ -232,6 +232,7 @@ class SvApp(
           cometBftConfig,
         ),
         svSynchronizerConfig.mediator.pruning,
+        svSynchronizerConfig.serial,
       )
     }
 

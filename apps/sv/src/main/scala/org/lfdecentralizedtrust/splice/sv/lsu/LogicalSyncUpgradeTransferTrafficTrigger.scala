@@ -101,8 +101,9 @@ class LogicalSyncUpgradeTransferTrafficTrigger(
     currentSynchronizerNode.sequencerAdminConnection
       .listLsuAnnouncements(synchronizerId.logical)
       .map(_.filter { announcement =>
-        announcement.mapping.upgradeTime
-          .isAfter(now) && announcement.mapping.successorSynchronizerId != synchronizerId
+        now.isAfter(
+          announcement.mapping.upgradeTime
+        ) && announcement.mapping.successorSynchronizerId != synchronizerId
       })
   }
 }
