@@ -9,6 +9,7 @@ import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
@@ -27,7 +28,6 @@ import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOff
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
-import java.util.HexFormat
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -38,14 +38,6 @@ import scala.jdk.OptionConverters.*
   * http: org.lfdecentralizedtrust.splice.http.v0.httpApi.*
   */
 sealed trait ScanHttpEncodings {
-
-  private def hexHashOption(extTxnHash: ByteString): Option[String] = {
-    if (extTxnHash.isEmpty) {
-      None
-    } else {
-      Some(extTxnHash.toByteArray.map("%02x" format _).mkString)
-    }
-  }
 
   def lapiToHttpUpdate(
       updateWithMigrationId: TreeUpdateWithMigrationId,
@@ -76,7 +68,9 @@ sealed trait ScanHttpEncodings {
                   eventIdBuilder,
                 )
               }.toMap,
-              hexHashOption(tree.getExternalTransactionHash),
+              Option.when(!tree.getExternalTransactionHash.isEmpty)(
+                HexString.toHexString(tree.getExternalTransactionHash)
+              ),
             )
         )
 
@@ -267,7 +261,7 @@ sealed trait ScanHttpEncodings {
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
             http.externalTransactionHash
-              .map(hex => ByteString.copyFrom(HexFormat.of().parseHex(hex)))
+              .flatMap(HexString.parseToByteString)
               .getOrElse(ByteString.EMPTY),
           )
         ),
