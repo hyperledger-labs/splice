@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import cats.implicits.toTraverseOps
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
@@ -35,6 +36,7 @@ import org.lfdecentralizedtrust.splice.sv.SynchronizerNode.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 import java.lang
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.{MapHasAsJava, MapHasAsScala}
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
@@ -87,7 +89,7 @@ class SynchronizerNodeReconciler(
         case SynchronizerNodeState.OnboardedAfterDelay |
             SynchronizerNodeState.OnboardedImmediately =>
           sequencerConfig.exists(_.availableAfter.isEmpty)
-        case SynchronizerNodeState.Onboarding =>
+        case SynchronizerNodeState.Onboarding(_) =>
           false
       }
       updatedSequencerConfigUpdate =
@@ -103,8 +105,10 @@ class SynchronizerNodeReconciler(
       existingPhysicalSynchronizers = synchronizerNodeConfig.flatMap(
         _.physicalSynchronizers.toScala
       )
+      scalaExistingPhysicalSynchronizers = existingPhysicalSynchronizers.map(_.asScala.toMap)
       localPhysicalSynchronizers <- buildPhysicalSynchronizers(
         synchronizerNodes,
+        scalaExistingPhysicalSynchronizers,
         state,
       )
       _ <-
@@ -114,7 +118,7 @@ class SynchronizerNodeReconciler(
           existingScanConfig != localScanConfig ||
           shouldMarkSequencerAsOnboarded ||
           updatedSequencerConfigUpdate.isRight ||
-          existingPhysicalSynchronizers.map(_.asScala.toMap) != localPhysicalSynchronizers
+          scalaExistingPhysicalSynchronizers != localPhysicalSynchronizers
         ) {
           def setConfig(
               synchronizerId: SynchronizerId,
@@ -156,7 +160,7 @@ class SynchronizerNodeReconciler(
                     Some(clock.now.toInstant.plus(sequencerAvailabilityDelay))
                   case SynchronizerNodeState.OnboardedImmediately =>
                     Some(clock.now.toInstant)
-                  case SynchronizerNodeState.Onboarding =>
+                  case SynchronizerNodeState.Onboarding(_) =>
                     None
                 }).toJava,
               )
@@ -193,6 +197,7 @@ class SynchronizerNodeReconciler(
 
   private[onboarding] def buildPhysicalSynchronizers(
       synchronizerNodes: Option[LocalSynchronizerNodes],
+      existingState: Option[Map[lang.Long, PhysicalSynchronizerNodeConfig]],
       state: SynchronizerNodeState,
   )(implicit
       ec: ExecutionContext,
@@ -205,27 +210,35 @@ class SynchronizerNodeReconciler(
         if (hasSupport) {
           val currentEntryFuture =
             synchronizerNodes.map(_.current).traverse { currentNode =>
-              val availableAfter = state match {
+              val (availableAfter, serialOverride) = state match {
                 case SynchronizerNodeState.OnboardedAfterDelay =>
-                  Some(clock.now.toInstant.plus(currentNode.sequencerAvailabilityDelay))
+                  Some(clock.now.toInstant.plus(currentNode.sequencerAvailabilityDelay)) -> None
                 case SynchronizerNodeState.OnboardedImmediately =>
-                  Some(clock.now.toInstant)
-                case SynchronizerNodeState.Onboarding =>
-                  None
+                  Some(clock.now.toInstant) -> None
+                case SynchronizerNodeState.Onboarding(serial) =>
+                  None -> Some(serial)
               }
-              buildNodeConfig(currentNode, availableAfter)
+              buildNodeConfig(existingState, currentNode, availableAfter, serialOverride)
             }
 
           val legacyEntryFuture =
             synchronizerNodes.flatMap(_.legacy).traverse { legacyNode =>
-              buildNodeConfig(legacyNode, availableAfter = None)
+              buildNodeConfig(
+                existingState,
+                legacyNode,
+                availableAfterIfNotAlreadySet = Some(clock.now.toInstant),
+              )
             }
 
           val successorEntryFuture =
             synchronizerNodes.flatMap(_.successor).flatTraverse { successorNode =>
               successorNode.sequencerAdminConnection.isNodeInitialized().flatMap {
                 case true =>
-                  buildNodeConfig(successorNode, availableAfter = None).map(Some(_))
+                  buildNodeConfig(
+                    existingState,
+                    successorNode,
+                    availableAfterIfNotAlreadySet = Some(clock.now.toInstant),
+                  ).map(Some(_))
                 case false =>
                   Future.successful(None)
               }
@@ -244,24 +257,35 @@ class SynchronizerNodeReconciler(
   }
 
   private def buildNodeConfig(
+      existingState: Option[Map[lang.Long, PhysicalSynchronizerNodeConfig]],
       node: SynchronizerNode,
-      availableAfter: Option[java.time.Instant],
+      availableAfterIfNotAlreadySet: Option[Instant],
+      serialOverride: Option[NonNegativeInt] = None,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[(lang.Long, PhysicalSynchronizerNodeConfig)] = {
+    val serialFuture = serialOverride match {
+      case Some(serialOverride) => Future.successful(serialOverride)
+      case None => node.sequencerAdminConnection.getPhysicalSynchronizerId().map(_.serial)
+    }
     for {
-      psid <- node.sequencerAdminConnection.getPhysicalSynchronizerId()
+      serial <- serialFuture
+      jSerial = lang.Long.valueOf(serial.unwrap.toLong)
+      availableAfterWithExistingState = existingState
+        .flatMap(
+          _.get(jSerial).flatMap(_.sequencer.flatMap(_.availableAfter).toScala)
+        )
+        .orElse(availableAfterIfNotAlreadySet)
       sequencerId <- node.sequencerAdminConnection.getSequencerId
       mediatorId <- node.mediatorAdminConnection.getMediatorId
     } yield {
-      val serial = psid.serial.unwrap.toLong
-      lang.Long.valueOf(serial) -> new PhysicalSynchronizerNodeConfig(
+      jSerial -> new PhysicalSynchronizerNodeConfig(
         java.util.Optional.of(
           new DamlSequencerNodeConfig(
             sequencerId.toProtoPrimitive,
             node.sequencerExternalPublicUrl,
-            availableAfter.toJava,
+            availableAfterWithExistingState.toJava,
           )
         ),
         java.util.Optional.of(new MediatorConfig(mediatorId.toProtoPrimitive)),
@@ -335,7 +359,10 @@ object SynchronizerNodeReconciler {
     /** Onboard immediately, this is used after soft domain migrations where sequencers can be immediately used.
       */
     case object OnboardedImmediately extends SynchronizerNodeState
-    case object Onboarding extends SynchronizerNodeState
+
+    /** When onboarding the sequencer doesn't know the PSid yet so we set the serial from the participant
+      */
+    case class Onboarding(serial: NonNegativeInt) extends SynchronizerNodeState
 
   }
 

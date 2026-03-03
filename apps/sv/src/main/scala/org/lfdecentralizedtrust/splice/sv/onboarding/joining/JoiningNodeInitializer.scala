@@ -416,6 +416,9 @@ class JoiningNodeInitializer(
       )
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
+      participantReportedPSid <- participantAdminConnection.getPhysicalSynchronizerId(
+        config.domains.global.alias
+      )
       _ <-
         // Unpause the synchronizer after the post onboarding triggers are started
         // that start the BFT peer reconciliation
@@ -453,7 +456,7 @@ class JoiningNodeInitializer(
               _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
                 Some(localSynchronizerNodes),
                 decentralizedSynchronizer,
-                Onboarding,
+                Onboarding(participantReportedPSid.serial),
                 config.domainMigrationId,
                 config.scan,
               )
