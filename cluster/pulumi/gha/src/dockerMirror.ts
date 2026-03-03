@@ -30,6 +30,23 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
           enabled: true,
           size: '20Gi',
         },
+        configData: {
+          // Enable blob/manifest deletion so the proxy's built-in TTL-based
+          // scheduler can remove expired cached content.
+          // See: https://distribution.github.io/distribution/recipes/mirror/
+          storage: {
+            delete: {
+              enabled: true,
+            },
+          },
+        },
+        garbageCollect: {
+          // Run periodic garbage collection to reclaim space from
+          // unreferenced blobs after the proxy scheduler expires them.
+          enabled: true,
+          deleteUntagged: true,
+          schedule: '0 1 * * *',
+        },
         ...infraAffinityAndTolerations,
       },
     },
