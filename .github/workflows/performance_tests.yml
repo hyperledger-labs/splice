@@ -1,9 +1,8 @@
 name: Daily store ingestion performance tests
 on:
   # allow manual running on PRs that you expect might affect store performance
-  workflow_dispatch:
-  schedule:
-    - cron: '37 3 * * 1-5' # 3:37 AM on workdays
+  pull_request:
+    types: [ opened, synchronize, reopened ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-perftest
