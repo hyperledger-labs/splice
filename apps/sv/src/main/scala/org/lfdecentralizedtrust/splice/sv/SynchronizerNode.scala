@@ -55,6 +55,7 @@ class SynchronizerNodeService(
     } else {
       successorActiveCache.get(()).map { active =>
         if (active) {
+          logger.info("Switching connection to successor synchronizer")
           successorActiveRef.set(active)
         }
         active
