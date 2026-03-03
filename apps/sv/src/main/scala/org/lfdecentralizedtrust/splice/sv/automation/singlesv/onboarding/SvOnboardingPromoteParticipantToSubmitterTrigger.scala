@@ -87,7 +87,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       svParticipants <- getSvParticipants(dsoRules)
     } yield {
       val observingParticipantIds = dsoHostingParticipants
-        .filter(_.permission == ParticipantPermission.Observation)
+        .filter(_.onboarding)
         .map(_.participantId)
       val svParticipantIds = svParticipants.map(_.participantId)
       observingParticipantIds
