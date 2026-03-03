@@ -135,6 +135,10 @@ allocationControllers alloc@AllocationSpecification{..} =
     (\override -> dedup $ settlement.executor :: override)
     settlement.controllerOverride
 
+allocationSettlementControllers : AllocationSpecification -> [Party]
+allocationSettlementControllers alloc@AllocationSpecification{..} =
+  settlement.executor :: [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
+
 -- | Convenience to get the allocation admin
 allocationAdmin : AllocationSpecification -> Party
 allocationAdmin AllocationSpecification{..} = admin
@@ -153,6 +157,7 @@ interface Allocation where
   allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update Allocation_CancelResult
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
   allocation_getTransferAuthorizationsImpl : ContractId Allocation -> Allocation_GetTransferAuthorizations -> Update(TextMap (ContractId AllocationTransferAuthorization))
+  allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
 
   choice Allocation_GetTransferAuthorizations : TextMap (ContractId AllocationTransferAuthorization)
   -- ^ Transfer the authority from this Allocation to AllocationTransferAuthorizations which
@@ -168,6 +173,18 @@ interface Allocation where
         -- ^ Additional context required in order to exercise the choice.
     controller allocationControllers (view this).allocation
     do allocation_getTransferAuthorizationsImpl this self arg
+
+  choice Allocation_Settle : Allocation_SettleResult
+    -- ^ Settle the allocation. Requires authorization from the settlement executor and the instrument
+    -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
+    -- settlements of other legs of the same admins.
+    --
+    -- FIXME: adjust comments to call out that all legs must have the same instrument admin
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller allocationSettlementControllers (view this).allocation
+    do allocation_settleImpl this self arg
 
   choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
     -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
@@ -205,6 +222,15 @@ interface Allocation where
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).authorizer.owner::(optionalToList (view this).authorizer.provider)
     do allocation_withdrawImpl this self arg
+
+
+-- FIXME: comment
+data Allocation_SettleResult = Allocation_SettleResult with
+    newHoldingCids : Map.Map InstrumentId [ContractId Holding]
+      -- ^ New holdings created as part of the settlement.
+    meta : Metadata
+      -- ^ Additional metadata specific to the settlement, used for extensibility.
+  deriving (Eq, Show)
 
 -- AllocationTransferAuthorization
 ----------------------------------
