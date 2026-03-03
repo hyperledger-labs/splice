@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
+  PackageVettingService,
   RetryFor,
   SpliceLedgerConnection,
 }
@@ -134,5 +135,6 @@ object SvTaskBasedTrigger {
       delegatelessAutomationExpiredRewardCouponBatchSize: Int,
       delegatelessAutomationExpiredRewardCouponNumBatches: Int,
       packageVersionSupport: PackageVersionSupport,
+      vettingService: PackageVettingService,
   )
 }

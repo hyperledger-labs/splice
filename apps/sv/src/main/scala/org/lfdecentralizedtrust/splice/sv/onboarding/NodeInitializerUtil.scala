@@ -140,6 +140,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       localSynchronizerNode: Option[LocalSynchronizerNode],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
+      synchronizerId: SynchronizerId,
       enabledFeatures: EnabledFeaturesConfig,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -164,6 +165,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       spliceInstanceNamesConfig,
       loggerFactory,
       packageVersionSupport,
+      synchronizerId,
       enabledFeatures,
     )
 
