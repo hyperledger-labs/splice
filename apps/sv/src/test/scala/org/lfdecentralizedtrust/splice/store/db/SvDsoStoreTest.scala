@@ -449,7 +449,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
     "listExpiredAmuletTransferInstructions" should {
 
       "return expired instructions and respect ignored parties" in {
-        val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        val now = Instant.parse("2025-01-01T12:00:00.000000Z")
         val past = now.minusSeconds(3600)
         val future = now.plusSeconds(3600)
         val amount = new java.math.BigDecimal("10.0").setScale(10)
