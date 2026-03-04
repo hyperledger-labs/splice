@@ -9,6 +9,7 @@ import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
@@ -67,8 +68,12 @@ sealed trait ScanHttpEncodings {
                   eventIdBuilder,
                 )
               }.toMap,
+              Option.when(!tree.getExternalTransactionHash.isEmpty)(
+                HexString.toHexString(tree.getExternalTransactionHash)
+              ),
             )
         )
+
       case ledgerApi.ReassignmentUpdate(update) =>
         update.event match {
           case ledgerApi.ReassignmentEvent.Assign(
@@ -217,6 +222,7 @@ sealed trait ScanHttpEncodings {
       offset = LegacyOffset.Api.fromLong(offset),
       rootEventIds = httpV2.rootEventIds,
       eventsById = httpV2.eventsById,
+      externalTransactionHash = httpV2.externalTransactionHash,
     )
     httpToLapiTransaction(http)
   }
@@ -254,7 +260,9 @@ sealed trait ScanHttpEncodings {
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
-            ByteString.EMPTY, // TODO(#3408): Revisit when adding APIs
+            http.externalTransactionHash
+              .flatMap(HexString.parseToByteString)
+              .getOrElse(ByteString.EMPTY),
           )
         ),
         synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),
@@ -671,7 +679,7 @@ object ScanHttpEncodings {
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
-      ByteString.EMPTY, // TODO(#3408): Revisit when adding APIs
+      tree.getExternalTransactionHash,
     )
   }
 }

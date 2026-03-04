@@ -2382,6 +2382,11 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
+        external_transaction_hash:
+          description: |
+            For transaction externally signed, contains the external transaction hash
+            signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          type: string
     UpdateHistoryTransactionV2:
       type: object
       required:
@@ -2440,6 +2445,11 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
+        external_transaction_hash:
+          description: |
+            For transaction externally signed, contains the external transaction hash
+            signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          type: string
     TreeEvent:
       type: object
       description: |

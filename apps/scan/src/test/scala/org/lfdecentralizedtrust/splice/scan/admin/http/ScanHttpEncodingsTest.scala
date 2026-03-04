@@ -4,6 +4,8 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.util.HexString
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -40,6 +42,10 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       val receiver = mkPartyId("receiver")
       val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
+      val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+      val externalTxnHash =
+        HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
       val javaTree = mkExerciseTx(
         offset = 99,
         root = exercisedEvent(
@@ -63,6 +69,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         ),
         Seq(toCreatedEvent(amuletContract, Seq(receiver))),
         dummyDomain,
+        externalTransactionHash = externalTxnHash,
       )
 
       val original = TreeUpdateWithMigrationId(
@@ -83,7 +90,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         case _ => fail("Expected UpdateHistoryTransaction")
       }
       val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
-
       decoded shouldBe original
     }
   }
@@ -286,6 +292,8 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           rightChildId1 -> mkCreate(rightChildId1),
           rightChildId2 -> mkCreate(rightChildId2),
         ),
+        externalTransactionHash =
+          Some("4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"),
       )
     )
 

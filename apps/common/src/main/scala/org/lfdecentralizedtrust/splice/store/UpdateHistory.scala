@@ -1566,7 +1566,8 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
+          // Import updates are not externally signed, so the transaction has no hash.
+          /*externalTransactionHash = */ ByteString.EMPTY,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),

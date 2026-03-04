@@ -945,6 +945,7 @@ class HttpScanHandler(
             effectiveAt = t.effectiveAt,
             rootEventIds = t.rootEventIds,
             eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash,
           )
         )
     }
