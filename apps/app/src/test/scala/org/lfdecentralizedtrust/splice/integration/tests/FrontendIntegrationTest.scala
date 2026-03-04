@@ -691,8 +691,10 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   }
 
   protected def eventuallyClickOn(query: Query)(implicit driver: WebDriver) = {
-    waitForCondition(query) {
-      ExpectedConditions.elementToBeClickable(_)
+    clue(s"Waiting for $query to be clickable") {
+      waitForCondition(query) {
+        ExpectedConditions.elementToBeClickable(_)
+      }
     }
     clickOn(query)
   }
@@ -715,17 +717,19 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   )(implicit
       driver: WebDriver
   ): T = {
-    try {
-      waitForCondition(query, timeUntilSuccess) {
-        ExpectedConditions.visibilityOfElementLocated(_)
-      }
-      action(query)
-    } catch {
-      case e: TimeoutException =>
-        fallback match {
-          case Some(lazyFallback) => lazyFallback()
-          case None => throw e
+    clue(s"Waiting for $query to be found") {
+      try {
+        waitForCondition(query, timeUntilSuccess) {
+          ExpectedConditions.visibilityOfElementLocated(_)
         }
+        action(query)
+      } catch {
+        case e: TimeoutException =>
+          fallback match {
+            case Some(lazyFallback) => lazyFallback()
+            case None => throw e
+          }
+      }
     }
   }
 
