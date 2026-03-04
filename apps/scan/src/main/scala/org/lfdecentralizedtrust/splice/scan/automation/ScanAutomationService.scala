@@ -27,6 +27,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
+import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -45,6 +46,7 @@ class ScanAutomationService(
     svName: String,
     upgradesConfig: UpgradesConfig,
     initialRound: Long,
+    metrics: ScanAppMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -93,6 +95,7 @@ class ScanAutomationService(
       snapshotStore,
       updateHistory,
       scanStorageConfigV1,
+      metrics.dbScanStore.history.AcsSnapshots,
       triggerContext,
     )
   )
@@ -104,6 +107,7 @@ class ScanAutomationService(
         snapshotStore,
         updateHistory,
         scanStorageConfigV1,
+        metrics.dbScanStore.history.AcsSnapshotsBackfilling,
         triggerContext,
       )
     )
