@@ -19,9 +19,9 @@ import com.digitalasset.canton.util.MonadUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import PackageVettingService.CacheConfig
+import PackageVettingLookupService.CacheConfig
 
-class PackageVettingService(
+class PackageVettingLookupService(
     cacheConfig: CacheConfig,
     connection: BaseLedgerConnection,
     synchronizerId: SynchronizerId,
@@ -102,7 +102,7 @@ class PackageVettingService(
   }
 }
 
-object PackageVettingService {
+object PackageVettingLookupService {
   case class CacheConfig(
       size: NonNegativeLong = NonNegativeLong.tryCreate(10000),
       ttl: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),

@@ -93,7 +93,7 @@ class SvDsoAutomationService(
       : org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.type =
     SvDsoAutomationService
 
-  private val packageVettingService = new PackageVettingService(
+  private val packageVettingService = new PackageVettingLookupService(
     config.packageVettingCache,
     connection(
       SpliceLedgerConnectionPriority.Medium

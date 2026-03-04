@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
-  PackageVettingService,
+  PackageVettingLookupService,
   RetryProvider,
   SpliceLedgerConnection,
 }
@@ -49,7 +49,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
     config: SvAppBackendConfig,
     appLevelRetryProvider: RetryProvider,
     packageVersionSupport: PackageVersionSupport,
-    packageVettingService: PackageVettingService,
+    packageVettingService: PackageVettingLookupService,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,

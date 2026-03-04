@@ -36,7 +36,7 @@ import org.lfdecentralizedtrust.splice.config.{
 import org.lfdecentralizedtrust.splice.environment.{
   DarResource,
   DarResources,
-  PackageVettingService,
+  PackageVettingLookupService,
 }
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
@@ -378,7 +378,8 @@ case class SvAppBackendConfig(
     convertFeaturedAppActivityMarkerObservers: Boolean = true,
     // Whether to ensure that heuristic free confirmation responses get enabled on the synchronizer via the ReconcileDynamicSynchronizerConfigTrigger.
     enableFreeConfirmationResponses: Boolean = true,
-    packageVettingCache: PackageVettingService.CacheConfig = PackageVettingService.CacheConfig(),
+    packageVettingCache: PackageVettingLookupService.CacheConfig =
+      PackageVettingLookupService.CacheConfig(),
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =
