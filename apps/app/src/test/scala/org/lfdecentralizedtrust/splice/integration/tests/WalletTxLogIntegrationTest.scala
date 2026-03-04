@@ -1186,14 +1186,14 @@ class WalletTxLogIntegrationTest
         triggersToPauseAtStart = Seq(renewTransferPreapprovalTrigger),
         triggersToResumeAtStart = Seq.empty,
       ) {
-        val extPartySetupResult =
+        val preapprovalCid =
           createAndAcceptExternalPartySetupProposal(bobValidatorBackend, onboarding)
         checkTxHistory(
           bobValidatorWalletClient,
           Seq(creationTxLog, tapTxLog),
           trafficTopups = IgnoreTopupsDevNet,
         )
-        extPartySetupResult.transferPreapprovalCid
+        preapprovalCid
       }
 
       eventually() {
