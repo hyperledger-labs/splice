@@ -1317,7 +1317,6 @@ class UpdateHistory(
           tx.effective_at,
           tx.workflow_id,
           tx.command_id,
-          tx.external_transaction_hash,
           c.event_id,
           c.contract_id,
           c.created_at,
@@ -1619,6 +1618,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          // Import updates are not externally signed, so the transaction has no hash.
           /*externalTransactionHash = */ ByteString.EMPTY,
         )
       ),
@@ -1855,7 +1855,6 @@ class UpdateHistory(
   private implicit lazy val GetResultSelectFromImportUpdates: GetResult[SelectFromImportUpdates] =
     GetResult { prs =>
       import prs.*
-      def nextNonNullByteArray = prs.nextBytesOption().getOrElse(Array.emptyByteArray)
       (SelectFromImportUpdates.apply _).tupled(
         (
           <<[CantonTimestamp],
@@ -1866,7 +1865,6 @@ class UpdateHistory(
           <<[Option[String]],
           <<[Option[String]],
           <<[String],
-          nextNonNullByteArray,
           <<[String],
           <<[CantonTimestamp],
           <<[String],
@@ -2644,7 +2642,6 @@ object UpdateHistory {
       workflowId: Option[String],
       commandId: Option[String],
       eventId: String,
-      externalTransactionHash: Array[Byte],
       contractId: String,
       createdAt: CantonTimestamp,
       templatePackageId: String,

@@ -212,7 +212,7 @@ class TokenStandardCliIntegrationTest
             sv1Backend.participantClient,
             sv1ScanBackend.appState.automation.updateHistory,
             sv1LedgerBeginOffset,
-            extTxnHashes = Seq(
+            extTxnHashes = Set(
               onboardingAliceExtPartySetupResult.txHash,
               onboardingBobExtPartySetupResult.txHash,
             ),
@@ -224,9 +224,8 @@ class TokenStandardCliIntegrationTest
         eventually() {
           val scanClient = scancl("sv1ScanClient")
           compareHistoryViaLosslessScanApiWithExtTxnHashes(
-            sv1ScanBackend,
             scanClient,
-            extTxnHashes = Seq(
+            extTxnHashes = Set(
               onboardingAliceExtPartySetupResult.txHash,
               onboardingBobExtPartySetupResult.txHash,
             ),
