@@ -63,6 +63,7 @@ const MonitoringConfigSchema = z.object({
       }),
     }),
     logAlerts: z.object({}).catchall(z.string()).default({}),
+    loggedSecretsFilter: z.string().optional(),
   }),
 });
 const CloudArmorConfigSchema = z.object({
