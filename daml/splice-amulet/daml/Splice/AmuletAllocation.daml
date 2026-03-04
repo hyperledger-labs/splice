@@ -156,10 +156,11 @@ netAllocationAmount : Party -> [TransferLeg] -> Decimal
 netAllocationAmount authorizer transferLegs =
     sum $ map legAmount transferLegs
   where
-    legAmount tl
-      | tl.sender.owner == authorizer = negate tl.amount
-      | tl.receiver.owner == authorizer = tl.amount
-      | otherwise = error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
+    legAmount tl = case (tl.sender.owner == authorizer, tl.receiver.owner == authorizer) of
+      (True, True) -> 0.0
+      (True, False) -> negate tl.amount
+      (False, True) -> tl.amount
+      (False, False) -> error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
 
 allocationToTwoStepTransfer : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
 allocationToTwoStepTransfer sender transferLegs admin expiresAt settlement =
