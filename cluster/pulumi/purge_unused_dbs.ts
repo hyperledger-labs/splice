@@ -78,9 +78,13 @@ async function deleteDb(db: cloudsql.protos.google.cloud.sql.v1.IDatabaseInstanc
     instance: db.name,
     project: db.project,
   };
-  console.log(`Deleting ${db.name}...`);
-  await gcpSqlClient.delete(request);
-  console.log(`Done deleting ${db.name}`);
+  if (db.settings?.deletionProtectionEnabled?.value ?? false) {
+    console.warn(`Skipping ${db.name} deletion due to active deletion protection.`);
+  } else {
+    console.log(`Deleting ${db.name}...`);
+    await gcpSqlClient.delete(request);
+    console.log(`Done deleting ${db.name}`);
+  }
 }
 
 async function runPurgeUnusedDbs() {
