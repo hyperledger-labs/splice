@@ -155,6 +155,7 @@ allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
     expiresAt = Some $ optional
       (allocation.settlement.settleBefore)
       decodeTime
+      -- FIXME: share namespace and use cip-nr for token standard v2 as the namespace
       (TextMap.lookup "canton.network/expiresAt" meta.values)
 
 
@@ -232,6 +233,9 @@ allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
 
 -- Choices
 
+{-
+FIXME: adjust if there's a straightforward adjustment
+
 allocation_execute_transfer_v1_to_v2 : AllocationV1.Allocation_ExecuteTransfer -> AllocationV2.Allocation_ExecuteTransfer
 allocation_execute_transfer_v1_to_v2 AllocationV1.Allocation_ExecuteTransfer{..} =
   AllocationV2.Allocation_ExecuteTransfer with
@@ -251,7 +255,7 @@ allocation_v1_executeTransferImpl this self execv1 = do
     (coerceInterfaceContractId @AllocationV2.Allocation self)
     (allocation_execute_transfer_v1_to_v2 execv1)
   return (allocation_transfer_result_v2_to_v1 resv2)
-
+-}
 
 allocation_withdraw_result_v2_to_v1 : AllocationV2.Allocation_WithdrawResult -> AllocationV1.Allocation_WithdrawResult
 allocation_withdraw_result_v2_to_v1 AllocationV2.Allocation_WithdrawResult {..} =

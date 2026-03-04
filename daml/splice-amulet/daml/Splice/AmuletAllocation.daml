@@ -8,9 +8,8 @@ module Splice.AmuletAllocation (
 ) where
 
 import DA.Foldable (forA_)
-import DA.Optional (isNone, isSome)
+import DA.Optional (isNone, isSome, optionalToList)
 import DA.Text as Text
-import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -27,9 +26,6 @@ import Splice.Types
 import Splice.Util
 
 import qualified DA.Map as Map
-import DA.Optional (fromSome)
-import DA.Assert ((===))
-import DA.List (groupOn)
 
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
@@ -62,9 +58,6 @@ template AmuletAllocation
         authorizer = basicAccount authorizer
         expiresAt = Some expiresAt
 
-      allocation_executeTransferImpl self args =
-        default_allocation_executeTransferImpl (toInterface this) self args
-
       allocation_withdrawImpl _self Allocation_Withdraw{..} = do
         senderHoldingCids <- unlockAmuletAllocation this extraArgs
         pure Allocation_WithdrawResult
@@ -78,26 +71,6 @@ template AmuletAllocation
           with
             senderHoldingCids
             meta = emptyMetadata
-
-      allocation_getTransferAuthorizationsImpl _self Allocation_GetTransferAuthorizations{..} = do
-        let
-          grouped_tls = groupOn (\tl -> (tl.sender, tl.receiver)) allocation.transferLegs
-        TextMap.fromList . concat <$>
-          mapA
-            (\tls@(tl::_) ->
-              if tl.sender.owner == authorizer || (authorizer `notElem` allocationControllers allocation)
-                then do
-                  authCid <- create AmuletAllocationTransferAuthorization with
-                    authorizer = authorizer
-                    transferLegs = tls
-                    settlement = allocation.settlement
-                    admin
-                    expiresAt
-                    extraArgs
-                  return [(tl.transferLegId, toInterfaceContractId authCid)]
-                else return []
-            )
-            grouped_tls
 
       allocation_settleImpl _self Allocation_Settle{..} = do
         -- compute total funds to move
@@ -136,11 +109,10 @@ template AmuletAllocation
             newHoldingCids = Map.empty
             meta = emptyMetadata
 
-
     interface instance AllocationV1.Allocation for AmuletAllocation where
       view = allocation_view_v2_to_v1 (view (toInterface @Allocation this))
 
-      AllocationV1.allocation_executeTransferImpl = allocation_v1_executeTransferImpl (toInterface @Allocation this)
+      AllocationV1.allocation_executeTransferImpl _self arg = transferAmuletAllocation this arg
       AllocationV1.allocation_withdrawImpl = allocation_v1_withdrawImpl (toInterface @Allocation this)
       AllocationV1.allocation_cancelImpl = allocation_v1_cancelImpl (toInterface @Allocation this)
 
@@ -194,17 +166,23 @@ allocationToTwoStepTransfer_v1 sender transferLegs admin expiresAt settlement =
           ["allocation for settlement ", settlement.settlementRef.id]
     _ -> error "AllocationV1 interfaces only support sender-side, single leg transfers"
 
-transferAmuletAllocation : AmuletAllocationTransferAuthorization -> [ContractId Holding] -> Update Allocation_ExecuteTransferResult
-transferAmuletAllocation aata holdingCids = do
+transferAmuletAllocation : AmuletAllocation -> AllocationV1.Allocation_ExecuteTransfer -> Update AllocationV1.Allocation_ExecuteTransferResult
+transferAmuletAllocation aa AllocationV1.Allocation_ExecuteTransfer{..} = do
   let
-    TransferLeg{sender}::_ = aata.transferLegs
-    twoStepTransfer = allocationToTwoStepTransfer_v1 sender.owner aata.transferLegs aata.admin aata.expiresAt aata.settlement
+    TransferLeg{sender}::_ = aa.allocation.transferLegs
+    twoStepTransfer = allocationToTwoStepTransfer_v1
+      sender.owner
+      aa.allocation.transferLegs
+      aa.admin
+      aa.expiresAt
+      aa.allocation.settlement
+    holdingCids = toInterfaceContractId <$> optionalToList aa.lockedAmulet
   (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer holdingCids aata.extraArgs
-  pure Allocation_ExecuteTransferResult
+    executeTwoStepTransfer twoStepTransfer holdingCids extraArgs
+  pure AllocationV1.Allocation_ExecuteTransferResult
     with
-      senderHoldingCids
-      receiverHoldingCids
+      senderHoldingCids = map coerceContractId senderHoldingCids
+      receiverHoldingCids = map coerceContractId receiverHoldingCids
       meta
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId Holding]
@@ -214,53 +192,6 @@ unlockAmuletAllocation amuletAllocation extraArgs = do
     Some la -> do
       let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.authorizer amuletAllocation.allocation.transferLegs amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation.settlement
       abortTwoStepTransfer twoStepTransfer la extraArgs
-
-template AmuletAllocationTransferAuthorization
-  with
-    settlement : SettlementInfo
-    transferLegs : [TransferLeg]
-    extraArgs : ExtraArgs
-    expiresAt : Time
-    authorizer : Party
-    admin : Party
-  where
-    signatory admin, authorizer, settlement.executor
-    -- Validate
-    ensure not (null transferLegs) &&
-      let TransferLeg{sender; receiver}::_ = transferLegs
-       in all (\tl -> tl.sender == sender && tl.receiver == receiver) transferLegs
-            && (basicAccount authorizer == sender || basicAccount authorizer == receiver)
-
-    interface instance AllocationTransferAuthorization for AmuletAllocationTransferAuthorization where
-      view = AllocationTransferAuthorizationView with
-        settlement
-        transferLegs
-        authorizer = basicAccount authorizer
-
-      allocationTransferAuthorization_transferImpl _self AllocationTransferAuthorization_Transfer{..} = do
-        let TransferLeg{sender; receiver}::_ = transferLegs
-        -- Check this is called on the sender side.
-        sender === basicAccount authorizer
-        case receiverAuth of
-          Some authCid -> do
-            -- validate the extra auth
-            extraAuth <- fetch (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid)
-            extraAuth === this with
-              authorizer = receiver.owner
-            exercise (fromInterfaceContractId @AmuletAllocationTransferAuthorization authCid)
-              AmuletAllocationTransferAuthorization_TransferWithExtraAuth with
-                extraController = authorizer
-                ..
-          None -> do
-            transferAmuletAllocation this holdingCids
-
-    choice AmuletAllocationTransferAuthorization_TransferWithExtraAuth : Allocation_ExecuteTransferResult
-      with
-        holdingCids : [ContractId Holding]
-        extraController : Party
-      controller extraController :: settlement.executor :: fromSome (settlement.controllerOverride) -- should never be None if this is called.
-      do
-        transferAmuletAllocation this holdingCids
 
 
 instance HasCheckedFetch AmuletAllocation ForDso where
