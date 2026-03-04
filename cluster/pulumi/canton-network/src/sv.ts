@@ -587,15 +587,16 @@ function installScan(
     resources: config.scanApp?.resources,
     ...(config.bulkStorageBucket
       ? {
-        bulkStorage: {
-          s3: {
-            region: config.bulkStorageBucket.region,
-            bucketName: config.bulkStorageBucket.bucketName,
-            endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
-            secretName: config.bulkStorageBucket.secretName,
+          bulkStorage: {
+            s3: {
+              region: config.bulkStorageBucket.region,
+              bucketName: config.bulkStorageBucket.bucketName,
+              endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
+              secretName: config.bulkStorageBucket.secretName,
+            },
           },
         }
-      } : {}),
+      : {}),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {
