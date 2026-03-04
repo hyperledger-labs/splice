@@ -894,7 +894,7 @@ class DbSvDsoStore(
               splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
               additionalWhere = (sql"""
                 and assigned_domain = $synchronizerId
-                and acs.contract_expires_at < ${now.toMicros}
+                and acs.contract_expires_at < ${now}
               """ ++ filterClause).toActionBuilder,
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
