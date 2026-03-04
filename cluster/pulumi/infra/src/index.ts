@@ -20,6 +20,7 @@ import {
   installCloudSQLMaintenanceUpdateAlerts,
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
+  installLoggedSecretsAlerts,
 } from './gcpAlerts';
 import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
@@ -73,6 +74,9 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     installClusterMaintenanceUpdateAlerts(notificationChannel);
     if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
       installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+    }
+    if (monitoringConfig.alerting.loggedSecretsFilter) {
+      installLoggedSecretsAlerts(notificationChannel);
     }
   }
 }
