@@ -165,9 +165,8 @@ class ScanVerdictStoreIngestion(
         // Once #4060 is confirmed, this should simplify, as 'items' will fail
         // construction if any verdicts did not have a trafficSummary
         summariesWithVerdicts = batch.flatMap { v =>
-          CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption.flatMap { recordTime =>
-            summaryByTime.get(recordTime).map(_ -> v)
-          }
+          val recordTime = CantonTimestamp.tryFromProtoTimestamp(v.getRecordTime)
+          summaryByTime.get(recordTime).map(_ -> v)
         }
 
         featuredAppProviders = Set.empty[PartyId] // TODO: populate from config
