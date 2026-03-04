@@ -100,7 +100,7 @@ class FeaturedAppActivityMarkerTrigger(
               )
             )
           case (None, markers) =>
-            logger.warn(s"No vetted amulet version for $markers")
+            logger.warn(show"No vetted amulet version for $markers")
             Seq.empty
         }
 
