@@ -84,13 +84,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
-      .addConfigTransform((_, conf) =>
-        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
-          c.copy(scanClient =
-            c.scanClient.setAmuletRulesCacheTimeToLive(NonNegativeFiniteDuration.ofSeconds(1))
-          )
-        )(conf)
-      )
 
 
   "Development Fund - Unhappy path (invalid allocation values)" should {
