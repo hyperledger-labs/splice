@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import cats.implicits.catsSyntaxApplicativeError
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -10,6 +11,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.*
+
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -48,7 +50,10 @@ class SynchronizerNodeService[T <: SynchronizerNode](
       case Some(successor) =>
         for {
           connections <- participantAdminConnection.listConnectedDomains()
-          succesorInitialized <- successor.sequencerAdminConnection.isNodeInitialized()
+          succesorInitialized <- successor.sequencerAdminConnection
+            .isNodeInitialized()
+            .attemptT
+            .getOrElse(false)
           global = connections
             .find(
               _.synchronizerAlias == globalSynchronizerAlias
