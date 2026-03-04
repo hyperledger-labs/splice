@@ -93,7 +93,7 @@ class DomainConnector(
             case Some(serial) =>
               waitForSequencerConnectionsFromScan(clock, serial.serial)
             case None =>
-              logger.info("No registerd physicial synchronizer id, using active id from scan")
+              logger.info("No registered physicial synchronizer id, using active id from scan")
               scanConnection
                 .getActivePhysicalSynchronizerSerial()
                 .flatMap(
