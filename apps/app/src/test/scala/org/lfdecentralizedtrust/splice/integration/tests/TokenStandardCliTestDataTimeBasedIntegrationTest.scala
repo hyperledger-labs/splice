@@ -89,7 +89,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
-        updateAutomationConfig(ConfigurableApp.Validator)(
+        updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[ExpiredAmuletTransferInstructionTrigger]
         )(config)
       )
