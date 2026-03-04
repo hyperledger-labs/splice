@@ -111,6 +111,12 @@ monitoring:
         acknowledgementLagSeconds: 900
       deployment:
         pendingPeriodMinutes: 5
+    # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
+    # Key=value secrets (excluding masked values)
+    # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
+    loggedSecretsFilter: |
+      (jsonPayload.message=~"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+" OR jsonPayload.message=~"eyJhbGc[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}" OR jsonPayload.message=~"Bearer\s+eyJ[A-Za-z0-9_-]{2,}")
+      -jsonPayload.message=~"(?i)(secret|token|(private|secret)(-)?key|password)=(\"\*\*\*\*\"|hidden)"
 cloudArmor:
   enabled: false
   allRulesPreviewOnly: true
