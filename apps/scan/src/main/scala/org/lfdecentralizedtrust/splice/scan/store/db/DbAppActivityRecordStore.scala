@@ -4,8 +4,6 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
@@ -20,16 +18,16 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object DbAppActivityRecordStore {
 
-  /** App activity record for a given record_time.
+  /** App activity record for a given verdict.
     *
-    * @param recordTime the record_time (= sequencing_time) of the verdict/traffic summary
+    * @param verdictRowId the row_id of the parent verdict in scan_verdict_store
     * @param roundNumber the mining round that was open at this record_time
     * @param appProviderParties app providers for which app activity should be recorded
     * @param appActivityWeights activity weight (in bytes of traffic) for each app provider,
     *                           in one-to-one correspondence with appProviderParties
     */
   final case class AppActivityRecordT(
-      recordTime: CantonTimestamp,
+      verdictRowId: Long,
       roundNumber: Long,
       appProviderParties: Seq[String],
       appActivityWeights: Seq[Long],
@@ -38,7 +36,6 @@ object DbAppActivityRecordStore {
 
 class DbAppActivityRecordStore(
     storage: DbStorage,
-    updateHistory: UpdateHistory,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -47,10 +44,6 @@ class DbAppActivityRecordStore(
     with FlagCloseable
     with HasCloseContext
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
-
-  private def historyId = updateHistory.historyId
-
-  def waitUntilInitialized: Future[Unit] = updateHistory.waitUntilInitialized
 
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
@@ -65,26 +58,26 @@ class DbAppActivityRecordStore(
   private implicit val getResultAppActivityRecord: GetResult[AppActivityRecordT] = GetResult {
     prs =>
       DbAppActivityRecordStore.AppActivityRecordT(
-        recordTime = prs.<<[CantonTimestamp],
+        verdictRowId = prs.<<[Long],
         roundNumber = prs.<<[Long],
         appProviderParties = stringArrayGetResult(prs).toSeq,
         appActivityWeights = longArrayGetResult(prs).toSeq,
       )
   }
 
-  def getRecordByRecordTime(recordTime: CantonTimestamp)(implicit
+  def getRecordByVerdictRowId(verdictRowId: Long)(implicit
       tc: TraceContext
   ): Future[Option[AppActivityRecordT]] = {
     futureUnlessShutdownToFuture(
       storage
         .querySingle(
           sql"""
-            select record_time, round_number, app_provider_parties, app_activity_weights
+            select verdict_row_id, round_number, app_provider_parties, app_activity_weights
             from #${Tables.appActivityRecords}
-            where history_id = $historyId and record_time = $recordTime
+            where verdict_row_id = $verdictRowId
             limit 1
           """.as[AppActivityRecordT].headOption,
-          "appActivity.getRecordByRecordTime",
+          "appActivity.getRecordByVerdictRowId",
         )
         .value
     )
@@ -97,14 +90,14 @@ class DbAppActivityRecordStore(
     } else {
       val values = sqlCommaSeparated(
         items.map { row =>
-          sql"""($historyId, ${row.recordTime},
+          sql"""(${row.verdictRowId},
                 ${row.roundNumber}, ${row.appProviderParties}, ${row.appActivityWeights})"""
         }
       )
 
       (sql"""
         insert into #${Tables.appActivityRecords}(
-          history_id, record_time, round_number, app_provider_parties, app_activity_weights
+          verdict_row_id, round_number, app_provider_parties, app_activity_weights
         ) values """ ++ values).asUpdate
     }
   }
@@ -125,8 +118,7 @@ class DbAppActivityRecordStore(
 
   /** Insert multiple app activity records in a single transaction.
     *
-    * We check for existing record_times first, then insert only non-existing items.
-    * The unique constraint on (history_id, record_time) serves as a safety net.
+    * The unique constraint on verdict_row_id (PK) serves as a safety net against duplicates.
     */
   def insertAppActivityRecords(
       items: Seq[AppActivityRecordT]

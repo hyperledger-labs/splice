@@ -170,14 +170,15 @@ class ScanVerdictStoreIngestion(
           }
         }
 
-        // Compute app activity records (pure computation, before transaction)
-        appActivityRecords = appActivityComputation.computeActivities(
-          summariesWithVerdicts,
-          Set.empty[PartyId], // featuredAppProviders
-        )
+        featuredAppProviders = Set.empty[PartyId] // TODO: populate from config
 
-        _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
-      } yield (trafficSummaries.size, appActivityRecords.size)
+        _ <- store.insertVerdictsWithAppActivityRecords(
+          items,
+          summariesWithVerdicts,
+          featuredAppProviders,
+          appActivityComputation,
+        )
+      } yield (trafficSummaries.size, summariesWithVerdicts.size)
 
       result.transform {
         case Success((trafficSummaryCount, appActivityCount)) =>

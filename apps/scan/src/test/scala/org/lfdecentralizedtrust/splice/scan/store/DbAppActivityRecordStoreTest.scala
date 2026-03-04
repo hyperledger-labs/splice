@@ -28,50 +28,48 @@ class DbAppActivityRecordStoreTest
 
     "insert app activity records" in {
       for {
-        store <- newStore()
-        ts1 = CantonTimestamp.now()
+        (store, historyId) <- newStore()
+        verdictRowId <- insertVerdictRow(historyId, CantonTimestamp.now(), "update-1")
 
         record = AppActivityRecordT(
-          recordTime = ts1,
+          verdictRowId = verdictRowId,
           roundNumber = roundNumber,
           appProviderParties = Seq("app1::provider", "app2::provider"),
           appActivityWeights = Seq(100L, 50L),
         )
 
-        maxBefore <- maxRecordTime(roundNumber)
         _ <- store.insertAppActivityRecords(Seq(record))
-        maxAfter <- maxRecordTime(roundNumber)
-        loaded <- store.getRecordByRecordTime(ts1)
+        loaded <- store.getRecordByVerdictRowId(verdictRowId)
       } yield {
-        maxBefore shouldBe None
-        maxAfter shouldBe Some(ts1)
-        // Verify the row decoders return the inserted data
         loaded.value shouldBe record
       }
     }
 
     "batch insert multiple app activity records efficiently" in {
       for {
-        store <- newStore()
+        (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
 
-        records = (0 until 50).map { i =>
+        // Insert 50 verdict rows to get valid row_ids
+        verdictRowIds <- Future.traverse((0 until 50).toList) { i =>
+          insertVerdictRow(historyId, baseTs.plusSeconds(i.toLong), s"update-batch-$i")
+        }
+
+        records = verdictRowIds.zipWithIndex.map { case (rowId, i) =>
           mkRecord(
-            baseTs.plusSeconds(i.toLong),
-            roundNumber + i.toLong,
+            verdictRowId = rowId,
+            roundNumber = roundNumber + i.toLong,
             appProviderParties = Seq(s"app$i::provider"),
             appActivityWeights = Seq(i.toLong * 10),
           )
         }
 
         _ <- store.insertAppActivityRecords(records)
-        maxAfter <- maxRecordTime(roundNumber + 49)
         // Spot-check first, last and a middle record via row decoders
-        first <- store.getRecordByRecordTime(baseTs)
-        middle <- store.getRecordByRecordTime(baseTs.plusSeconds(25))
-        last <- store.getRecordByRecordTime(baseTs.plusSeconds(49))
+        first <- store.getRecordByVerdictRowId(verdictRowIds(0))
+        middle <- store.getRecordByVerdictRowId(verdictRowIds(25))
+        last <- store.getRecordByVerdictRowId(verdictRowIds(49))
       } yield {
-        maxAfter shouldBe Some(baseTs.plusSeconds(49))
         first.value shouldBe records(0)
         middle.value shouldBe records(25)
         last.value shouldBe records(49)
@@ -80,11 +78,17 @@ class DbAppActivityRecordStoreTest
 
     "handle empty activities" in {
       for {
-        store <- newStore()
-        ts = CantonTimestamp.now()
+        (store, historyId) <- newStore()
+        verdictRowId <- insertVerdictRow(historyId, CantonTimestamp.now(), "update-empty")
 
         countBefore <- countRecords()
-        record = mkRecord(ts, 100L, appProviderParties = Seq.empty, appActivityWeights = Seq.empty)
+        record =
+          mkRecord(
+            verdictRowId,
+            100L,
+            appProviderParties = Seq.empty,
+            appActivityWeights = Seq.empty,
+          )
 
         _ <- store.insertAppActivityRecords(Seq(record))
         countAfter <- countRecords()
@@ -95,19 +99,22 @@ class DbAppActivityRecordStoreTest
   }
 
   private def mkRecord(
-      recordTime: CantonTimestamp,
+      verdictRowId: Long,
       roundNumber: Long,
       appProviderParties: Seq[String],
       appActivityWeights: Seq[Long],
   ): AppActivityRecordT =
     AppActivityRecordT(
-      recordTime = recordTime,
+      verdictRowId = verdictRowId,
       roundNumber = roundNumber,
       appProviderParties = appProviderParties,
       appActivityWeights = appActivityWeights,
     )
 
-  private def newStore(): Future[DbAppActivityRecordStore] = {
+  /** Creates a new store and returns it along with a unique history_id
+    * obtained from UpdateHistory initialization.
+    */
+  private def newStore(): Future[(DbAppActivityRecordStore, Long)] = {
     val participantId = mkParticipantId("activity-test")
     val updateHistory = new UpdateHistory(
       storage.underlying,
@@ -122,26 +129,36 @@ class DbAppActivityRecordStoreTest
       HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
     updateHistory.ingestionSink.initialize().map { _ =>
-      new DbAppActivityRecordStore(
+      val store = new DbAppActivityRecordStore(
         storage.underlying,
-        updateHistory,
         loggerFactory,
       )
+      (store, updateHistory.historyId)
     }
   }
 
-  /** Test helper to query maxRecordTime directly from database */
-  private def maxRecordTime(roundNumber: Long): Future[Option[CantonTimestamp]] = {
+  /** Insert a minimal verdict row into scan_verdict_store and return its generated row_id. */
+  private def insertVerdictRow(
+      historyId: Long,
+      recordTime: CantonTimestamp,
+      updateId: String,
+  ): Future[Long] = {
     import storage.api.jdbcProfile.api.*
     futureUnlessShutdownToFuture(
-      storage
-        .query(
+      storage.underlying
+        .queryAndUpdate(
           sql"""
-          select max(record_time)
-          from app_activity_record_store
-          where round_number = $roundNumber
-        """.as[Option[CantonTimestamp]].head,
-          "test.maxRecordTime",
+          insert into scan_verdict_store(
+            history_id, migration_id, domain_id, record_time, finalization_time,
+            submitting_participant_uid, verdict_result, mediator_group,
+            update_id, submitting_parties, transaction_root_views
+          ) values (
+            $historyId, $migrationId, 'test-domain', $recordTime, $recordTime,
+            'participant1', 1, 0,
+            $updateId, array[]::text[], array[]::integer[]
+          ) returning row_id
+        """.as[Long].head,
+          "test.insertVerdictRow",
         )
     )
   }
@@ -150,7 +167,7 @@ class DbAppActivityRecordStoreTest
   private def countRecords(): Future[Long] = {
     import storage.api.jdbcProfile.api.*
     futureUnlessShutdownToFuture(
-      storage
+      storage.underlying
         .query(
           sql"""
           select count(*)
