@@ -43,6 +43,7 @@ class TokenStandardAllocationIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with TriggerTestUtil
+    with ExternallySignedPartyTestUtil
     with TokenStandardTest {
 
   import TokenStandardAllocationIntegrationTest.*
