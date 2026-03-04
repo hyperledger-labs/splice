@@ -58,9 +58,9 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected val domainTimeSync: DomainTimeSynchronization
   protected val domainUnpausedSync: DomainUnpausedSynchronization
   protected val participantAdminConnection: ParticipantAdminConnection
-  protected val cometBftNode: Option[CometBftNode]
   protected val ledgerClient: SpliceLedgerClient
   protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig
+  protected val cometBftNode: Option[CometBftNode]
 
   protected def newSvStore(
       key: SvStore.Key,
@@ -160,7 +160,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ledgerClient,
       participantAdminConnection,
       retryProvider,
-      cometBftNode,
       localSynchronizerNodes,
       upgradesConfig,
       spliceInstanceNamesConfig,
@@ -180,12 +179,11 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   )
 
   protected def rotateGenesisGovernanceKeyForSV1(
-      cometBftNode: Option[CometBftNode],
-      name: String,
+      name: String
   )(implicit tc: TraceContext): Future[Unit] =
     cometBftNode match {
-      case Some(cometBftNode) =>
-        cometBftNode.rotateGenesisGovernanceKeyForSV1(name)
+      case Some(node) =>
+        node.rotateGenesisGovernanceKeyForSV1(name)
       case _ => Future.unit
     }
 

@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.cometbft
 
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.crypto.tink.subtle.{Ed25519Sign, Ed25519Verify}
 import com.google.protobuf.ByteString
@@ -27,7 +27,7 @@ case class CometBftRequestSigner(
   private val privateKeyBytes = Base64.getDecoder.decode(privateKeyBase64)
   private val privateKey = new Ed25519Sign(privateKeyBytes)
 
-  val pubKeyBytes: Array[Byte] = Base64.getDecoder.decode(publicKeyBase64)
+  private val pubKeyBytes: Array[Byte] = Base64.getDecoder.decode(publicKeyBase64)
   val pubKey = new Ed25519Verify(pubKeyBytes)
 
   val fingerprint: String =
@@ -118,8 +118,9 @@ object CometBftRequestSigner {
   def getOrGenerateSignerFromConfig(
       config: SvCometBftConfig,
       participantAdminConnection: ParticipantAdminConnection,
-      logger: TracedLogger,
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[CometBftRequestSigner] =
+      loggerFactory: NamedLoggerFactory,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[CometBftRequestSigner] = {
+    val logger = loggerFactory.getTracedLogger(getClass)
     config.governanceKey match {
       case Some(governanceKey) =>
         logger.info("Using CometBFT governance key from config")
@@ -134,6 +135,7 @@ object CometBftRequestSigner {
           logger,
         )
     }
+  }
 
   def fingerprintForBase64PublicKey(publicKey: String): String = {
     val decodedKey: Array[Byte] = Base64.getDecoder.decode(publicKey)

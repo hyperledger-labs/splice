@@ -54,11 +54,7 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.{
-  SvAppBackendConfig,
-  SvCometBftConfig,
-  SvOnboardingConfig,
-}
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.{
   DomainMigrationDump,
   SynchronizerNodeIdentities,
@@ -86,10 +82,8 @@ class DomainMigrationInitializer(
     localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
-    cometBftConfig: Option[SvCometBftConfig],
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
-    override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
@@ -100,8 +94,7 @@ class DomainMigrationInitializer(
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     newJoiningNodeInitializer: (
-        Option[SvOnboardingConfig.JoinWithKey],
-        Option[CometBftNode],
+        Option[SvOnboardingConfig.JoinWithKey]
     ) => JoiningNodeInitializer,
     enabledFeatures: EnabledFeaturesConfig,
     svAcsStoreDescriptorUserVersion: Option[Long],
@@ -117,6 +110,9 @@ class DomainMigrationInitializer(
     esf: ExecutionSequencerFactory,
     actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
+
+  override protected val cometBftNode: Option[CometBftNode] =
+    localSynchronizerNodes.current.cometbftNode
 
   private val readOnlyConnection = ledgerClient.readOnlyConnection(
     this.getClass.getSimpleName,
@@ -214,13 +210,6 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      newCometBftNode <- CometBftNode(
-        cometBftConfig,
-        participantAdminConnection,
-        logger,
-        loggerFactory,
-        retryProvider,
-      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
         connection,
@@ -255,7 +244,7 @@ class DomainMigrationInitializer(
         dsoStore,
         dsoAutomationService,
       )
-      _ <- rotateGenesisGovernanceKeyForSV1(newCometBftNode, domainMigrationConfig.name)
+      _ <- rotateGenesisGovernanceKeyForSV1(domainMigrationConfig.name)
       // Restore users and user metadata first as scan depends on metadata
       // for startup and we depend on scan starting for BFT peer reconciliation.
       _ <- new ParticipantUsersDataRestorer(
@@ -285,7 +274,7 @@ class DomainMigrationInitializer(
           !migrationDump.domainDataSnapshot.synchronizerWasPaused && latestKnownSynchronizerParameters.base.sequenced
             .isBefore(migrationDump.domainDataSnapshot.acsTimestamp)
         )
-      _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
+      _ <- newJoiningNodeInitializer(None).onboard(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,

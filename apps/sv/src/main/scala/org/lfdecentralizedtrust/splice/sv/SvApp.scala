@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import cats.data.OptionT
-import cats.implicits.catsSyntaxTuple6Semigroupal
+import cats.implicits.{catsSyntaxTuple3Semigroupal, catsSyntaxTuple6Semigroupal, toTraverseOps}
 import cats.instances.future.*
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource
@@ -68,12 +69,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.{
   SvDsoAutomationService,
   SvSvAutomationService,
 }
-import org.lfdecentralizedtrust.splice.sv.cometbft.{
-  CometBftClient,
-  CometBftConnectionConfig,
-  CometBftHttpRpcClient,
-  CometBftNode,
-}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
   SvCantonIdentifierConfig,
@@ -92,7 +88,6 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvOnboardingToken,
   ValidatorOnboardingSecret,
 }
-import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
 
 import java.time.Instant
@@ -126,9 +121,6 @@ class SvApp(
       futureSupervisor,
       metrics,
     ) {
-
-  private val cometBftConfig = config.cometBftConfig
-    .filter(_.enabled)
 
   override def packagesForJsonDecoding: Seq[DarResource] =
     super.packagesForJsonDecoding ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
@@ -201,56 +193,69 @@ class SvApp(
     )
 
     def localSyncNodeFromConfig(svSynchronizerConfig: SvSynchronizerNodeConfig) = {
-      new LocalSynchronizerNode(
+      CometBftNode(
+        svSynchronizerConfig.cometBftConfig,
         participantAdminConnection,
-        new SequencerAdminConnection(
-          svSynchronizerConfig.sequencer.adminApi,
-          amuletAppParameters.loggingConfig.api,
-          loggerFactory,
-          metrics.grpcClientMetrics,
-          retryProvider,
-        ),
-        new MediatorAdminConnection(
-          svSynchronizerConfig.mediator.adminApi,
-          amuletAppParameters.loggingConfig.api,
-          loggerFactory,
-          metrics.grpcClientMetrics,
-          retryProvider,
-        ),
         loggerFactory,
         retryProvider,
-        SequencerConfig.fromConfig(
-          svSynchronizerConfig.sequencer,
-          cometBftConfig,
-        ),
-        svSynchronizerConfig,
+      ).map(
+        new LocalSynchronizerNode(
+          participantAdminConnection,
+          new SequencerAdminConnection(
+            svSynchronizerConfig.sequencer.adminApi,
+            amuletAppParameters.loggingConfig.api,
+            loggerFactory,
+            metrics.grpcClientMetrics,
+            retryProvider,
+          ),
+          new MediatorAdminConnection(
+            svSynchronizerConfig.mediator.adminApi,
+            amuletAppParameters.loggingConfig.api,
+            loggerFactory,
+            metrics.grpcClientMetrics,
+            retryProvider,
+          ),
+          loggerFactory,
+          retryProvider,
+          SequencerConfig.fromConfig(
+            svSynchronizerConfig.sequencer,
+            svSynchronizerConfig.cometBftConfig,
+          ),
+          svSynchronizerConfig,
+          _,
+        )
       )
     }
 
-    val localSynchronizerNodes = config.localSynchronizerNodes.current
-      .map { currentNodeConfig =>
-        SynchronizerNode.LocalSynchronizerNodes(
+    config.localSynchronizerNodes.current
+      .traverse { currentNodeConfig =>
+        (
           localSyncNodeFromConfig(currentNodeConfig),
-          config.localSynchronizerNodes.successor.map(localSyncNodeFromConfig),
-          config.localSynchronizerNodes.legacy.map(localSyncNodeFromConfig),
-        )
+          config.localSynchronizerNodes.successor.traverse(localSyncNodeFromConfig),
+          config.localSynchronizerNodes.legacy.traverse(localSyncNodeFromConfig),
+        ).mapN(SynchronizerNode.LocalSynchronizerNodes(_, _, _))
       }
-    initialize(
-      participantAdminConnection,
-      ledgerClient,
-      localSynchronizerNodes,
-    )
       .recoverWith { case err =>
         // TODO(#879) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
-        localSynchronizerNodes.foreach { nodes =>
-          nodes.current.close()
-          nodes.successor.foreach(_.close())
-          nodes.legacy.foreach(_.close())
-        }
         Future.failed(err)
       }
+      .flatMap(localSynchronizerNodes =>
+        initialize(
+          participantAdminConnection,
+          ledgerClient,
+          localSynchronizerNodes,
+        )
+          .recoverWith { case err =>
+            localSynchronizerNodes.foreach { nodes =>
+              nodes.current.close()
+              nodes.successor.foreach(_.close())
+              nodes.legacy.foreach(_.close())
+            }
+            Future.failed(err)
+          }
+      )
   }
 
   private def initialize(
@@ -258,8 +263,6 @@ class SvApp(
       ledgerClient: SpliceLedgerClient,
       localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
-    val cometBftClient = newCometBftClient
-
     for {
       participantId <- appInitStep("Get participant ID") {
         retryProvider.getValueWithRetries(
@@ -287,8 +290,7 @@ class SvApp(
         loggerFactory,
       )
       newJoiningNodeInitializer = (
-          joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
-          cometBftNode: Option[CometBftNode],
+        joiningConfig: Option[SvOnboardingConfig.JoinWithKey]
       ) =>
         new JoiningNodeInitializer(
           localSynchronizerNodes,
@@ -296,7 +298,6 @@ class SvApp(
           participantId,
           config,
           amuletAppParameters.upgradesConfig,
-          cometBftNode,
           ledgerClient,
           participantAdminConnection,
           clock,
@@ -323,55 +324,36 @@ class SvApp(
       // a fresh dso is fundamentally different from joining an existing dso
       config.onboarding match {
         case Some(sv1Config: SvOnboardingConfig.FoundDso) =>
-          for {
-            cometBftNode <- CometBftNode(
-              cometBftConfig,
+          appInitStep("SV1Initializer bootstrapping Dso") {
+            val initializer = new SV1Initializer(
+              localSynchronizerNodes
+                .getOrElse(
+                  sys.error("SV1 must always specify a domain config")
+                ),
+              sv1Config,
+              participantId,
+              config,
+              amuletAppParameters.upgradesConfig,
+              ledgerClient,
               participantAdminConnection,
-              logger,
-              loggerFactory,
+              clock,
+              domainTimeAutomationService.domainTimeSync,
+              domainParamsAutomationService.domainUnpausedSync,
+              storage,
               retryProvider,
+              config.spliceInstanceNames,
+              loggerFactory,
+              config.parameters.enabledFeatures,
+              config.svAcsStoreDescriptorUserVersion,
+              config.dsoAcsStoreDescriptorUserVersion,
             )
-            res <- appInitStep("SV1Initializer bootstrapping Dso") {
-              val initializer = new SV1Initializer(
-                localSynchronizerNodes
-                  .getOrElse(
-                    sys.error("SV1 must always specify a domain config")
-                  ),
-                sv1Config,
-                participantId,
-                config,
-                amuletAppParameters.upgradesConfig,
-                cometBftNode,
-                ledgerClient,
-                participantAdminConnection,
-                clock,
-                domainTimeAutomationService.domainTimeSync,
-                domainParamsAutomationService.domainUnpausedSync,
-                storage,
-                retryProvider,
-                config.spliceInstanceNames,
-                loggerFactory,
-                config.parameters.enabledFeatures,
-                config.svAcsStoreDescriptorUserVersion,
-                config.dsoAcsStoreDescriptorUserVersion,
-              )
-              initializer.bootstrapDso()
-            }
-          } yield res
+            initializer.bootstrapDso()
+          }
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
-          for {
-            cometBftNode <- CometBftNode(
-              cometBftConfig,
-              participantAdminConnection,
-              logger,
-              loggerFactory,
-              retryProvider,
-            )
-            res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
-              val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
-              initializer.joinDsoAndOnboardNodes()
-            }
-          } yield res
+          appInitStep("JoiningNodeInitializer joining Dso with key") {
+            val initializer = newJoiningNodeInitializer(Some(joiningConfig))
+            initializer.joinDsoAndOnboardNodes()
+          }
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
             new DomainMigrationInitializer(
@@ -381,10 +363,8 @@ class SvApp(
                 ),
               domainMigrationConfig,
               participantId,
-              cometBftConfig,
               config,
               amuletAppParameters.upgradesConfig,
-              None,
               ledgerClient,
               participantAdminConnection,
               clock,
@@ -401,19 +381,7 @@ class SvApp(
             ).migrateDomain()
           }
         case None =>
-          for {
-            cometBftNode <- CometBftNode(
-              cometBftConfig,
-              participantAdminConnection,
-              logger,
-              loggerFactory,
-              retryProvider,
-            )
-            res <- {
-              val initializer = newJoiningNodeInitializer(None, cometBftNode)
-              initializer.joinDsoAndOnboardNodes()
-            }
-          } yield res
+          newJoiningNodeInitializer(None).joinDsoAndOnboardNodes()
       }
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
@@ -527,6 +495,15 @@ class SvApp(
           )
       }
 
+      synchronizerNodeService = localSynchronizerNodes.map(
+        new SynchronizerNodeService[LocalSynchronizerNode](
+          _,
+          participantAdminConnection,
+          config.domains.global.alias,
+          loggerFactory,
+        )
+      )
+
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
 
@@ -547,7 +524,7 @@ class SvApp(
         config,
         clock,
         participantAdminConnection,
-        localSynchronizerNodes.map(_.current),
+        synchronizerNodeService,
         retryProvider,
         new DsoPartyMigration(
           svAutomation,
@@ -557,9 +534,7 @@ class SvApp(
           dsoPartyHosting,
           loggerFactory,
         ),
-        cometBftClient,
         loggerFactory,
-        config.localSynchronizerNodes.current.exists(_.sequencer.isBftSequencer),
         initialRound,
       )
 
@@ -568,9 +543,8 @@ class SvApp(
         dsoAutomation,
         config,
         clock,
-        localSynchronizerNodes.map(_.current),
+        synchronizerNodeService,
         retryProvider,
-        cometBftClient,
         packageVersionSupport,
         timeouts,
         loggerFactory,
@@ -582,7 +556,7 @@ class SvApp(
         config.domainMigrationDumpPath,
         svAutomation,
         dsoAutomation,
-        localSynchronizerNodes.map(_.current),
+        synchronizerNodeService,
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
@@ -721,19 +695,6 @@ class SvApp(
       config.domains.global.trafficBalanceCacheTimeToLive,
       loggerFactory,
     )
-  }
-
-  private def newCometBftClient = {
-    cometBftConfig
-      .map(connectionConfig =>
-        new CometBftClient(
-          new CometBftHttpRpcClient(
-            CometBftConnectionConfig(connectionConfig.connectionUri),
-            loggerFactory,
-          ),
-          loggerFactory,
-        )
-      )
   }
 
   private def waitUntilConfiguredOnboardingContractsHaveBeenCreated(

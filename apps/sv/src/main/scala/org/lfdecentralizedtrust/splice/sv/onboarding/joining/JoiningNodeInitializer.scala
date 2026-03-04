@@ -54,12 +54,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
   SvPackageVettingTrigger,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger
-import org.lfdecentralizedtrust.splice.sv.cometbft.{
-  CometBftClient,
-  CometBftConnectionConfig,
-  CometBftHttpRpcClient,
-  CometBftNode,
-}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
   SvCantonIdentifierConfig,
@@ -91,7 +86,6 @@ class JoiningNodeInitializer(
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
-    override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
@@ -114,6 +108,9 @@ class JoiningNodeInitializer(
     esf: ExecutionSequencerFactory,
     actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
+
+  override protected val cometBftNode: Option[CometBftNode] =
+    localSynchronizerNodes.flatMap(_.current.cometbftNode)
 
   private lazy val svConnection = OptionT(joiningConfig.traverse { conf =>
     SvConnection(conf.svClient.adminApi, upgradesConfig, retryProvider, loggerFactory).map {
@@ -638,20 +635,9 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def newCometBftClient = {
-    cometBftNode.map(node =>
-      new CometBftClient(
-        new CometBftHttpRpcClient(
-          CometBftConnectionConfig(node.cometBftConfig.connectionUri),
-          loggerFactory,
-        ),
-        loggerFactory,
-      )
-    )
-  }
-
   private def waitUntilCometBftNodeIsValidator = {
-    newCometBftClient
+    cometBftNode
+      .map(_.cometBftClient)
       .map(cometBftClient =>
         retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,
@@ -678,7 +664,8 @@ class JoiningNodeInitializer(
   }
 
   private def waitUntilCometBftNodeHasCaughtUp = {
-    newCometBftClient
+    cometBftNode
+      .map(_.cometBftClient)
       .map(cometBftClient =>
         retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,

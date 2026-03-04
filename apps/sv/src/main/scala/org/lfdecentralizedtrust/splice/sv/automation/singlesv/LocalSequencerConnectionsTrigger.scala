@@ -23,7 +23,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerEnabledSynchronization,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SequencerConfig
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SynchronizerNodeService,
+}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
@@ -36,7 +39,7 @@ class LocalSequencerConnectionsTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     decentralizedSynchronizerAlias: SynchronizerAlias,
     store: SvDsoStore,
-    localSynchronizerNode: LocalSynchronizerNode,
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     sequencerRequestAmplification: SubmissionRequestAmplification,
     migrationId: Long,
     newSequencerConnectionPool: Boolean,
@@ -51,6 +54,7 @@ class LocalSequencerConnectionsTrigger(
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
+      localSynchronizerNode <- synchronizerNodeService.activeSynchronizerNode()
       sequencerPSId <- localSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
       participantConnectedPSId <- participantAdminConnection.getPhysicalSynchronizerId(
         decentralizedSynchronizerAlias
@@ -102,9 +106,6 @@ class LocalSequencerConnectionsTrigger(
         case _: GrpcSequencerConnection
             if publishedSequencerInfo.availableAfter.toScala
               .exists(availableAfter => domainTime.isAfter(availableAfter)) =>
-          // connect to the sequencer with internal client config here instead of the public url to avoid
-          // - installing loopback in each SV namespace to work around traffic being blocked by cluster whitelisting
-          // - network traffic going all the way through cluster load balancer / ingress routing while the sequencer is in the same namespace
           val localEndpoint = LocalSynchronizerNode.toEndpoint(internalSequencerClientConfig)
           val localSequencerConnection =
             new GrpcSequencerConnection(
@@ -117,10 +118,8 @@ class LocalSequencerConnectionsTrigger(
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
             PositiveInt.tryCreate(1),
-            // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
-            // TODO(#2666) Make the delays configurable.
             sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           )
           if (

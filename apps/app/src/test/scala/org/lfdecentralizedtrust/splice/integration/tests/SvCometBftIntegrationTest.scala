@@ -53,15 +53,16 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
           ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
             {
               val svIdx = name.replace("sv", "")
+              val cometBftCfg = SvCometBftConfig(
+                enabled = true,
+                connectionUri = s"http://127.0.0.1:266${svIdx}7",
+                governanceKey = if (name == "sv4") Some(sv4CometBftGovernanceKey) else None,
+              )
               config
-                .focus(_.cometBftConfig)
-                .replace(
-                  Some(
-                    SvCometBftConfig(
-                      enabled = true,
-                      connectionUri = s"http://127.0.0.1:266${svIdx}7",
-                      governanceKey = if (name == "sv4") Some(sv4CometBftGovernanceKey) else None,
-                    )
+                .focus(_.localSynchronizerNodes.current)
+                .modify(
+                  _.map(
+                    _.focus(_.cometBftConfig).replace(Some(cometBftCfg))
                   )
                 )
                 .focus(_.automation.enableCometbftReconciliation)
@@ -74,14 +75,26 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
               (InstanceName.tryCreate("sv2Local") -> {
                 config
                   .svApps(InstanceName.tryCreate("sv2"))
-                  .focus(_.cometBftConfig)
-                  .modify(_.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:26657")))
+                  .focus(_.localSynchronizerNodes.current)
+                  .modify(
+                    _.map(
+                      _.focus(_.cometBftConfig).modify(
+                        _.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:26657"))
+                      )
+                    )
+                  )
               }) +
               (InstanceName.tryCreate("sv3Local") -> {
                 config
                   .svApps(InstanceName.tryCreate("sv3"))
-                  .focus(_.cometBftConfig)
-                  .modify(_.map(_.focus(_.governanceKey).replace(Some(sv3CometBftGovernanceKey))))
+                  .focus(_.localSynchronizerNodes.current)
+                  .modify(
+                    _.map(
+                      _.focus(_.cometBftConfig).modify(
+                        _.map(_.focus(_.governanceKey).replace(Some(sv3CometBftGovernanceKey)))
+                      )
+                    )
+                  )
               })
           ),
       )
@@ -223,7 +236,12 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
 
   private def cometbftClientForSvApp(sv: SvAppBackendReference) = {
     new CometBftHttpRpcClient(
-      CometBftConnectionConfig(sv.config.cometBftConfig.value.connectionUri),
+      CometBftConnectionConfig(
+        sv.config.localSynchronizerNodes.current
+          .flatMap(_.cometBftConfig)
+          .value
+          .connectionUri
+      ),
       NamedLoggerFactory.root,
     )
   }

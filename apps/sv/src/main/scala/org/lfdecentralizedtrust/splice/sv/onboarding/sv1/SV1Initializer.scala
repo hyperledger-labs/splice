@@ -112,7 +112,6 @@ class SV1Initializer(
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
-    override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: SpliceLedgerClient,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val clock: Clock,
@@ -136,6 +135,9 @@ class SV1Initializer(
     actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
+  override protected val cometBftNode: Option[CometBftNode] =
+    localSynchronizerNodes.current.cometbftNode
+
   import SV1Initializer.bootstrapTransactionOrdering
 
   def bootstrapDso()(implicit
@@ -151,7 +153,7 @@ class SV1Initializer(
     )
   ] = {
     for {
-      _ <- rotateGenesisGovernanceKeyForSV1(cometBftNode, sv1Config.name)
+      _ <- rotateGenesisGovernanceKeyForSV1(sv1Config.name)
       initConnection = ledgerClient.readOnlyConnection(
         this.getClass.getSimpleName,
         loggerFactory,

@@ -71,7 +71,6 @@ class SvDsoAutomationService(
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
-    cometBft: Option[CometBftNode],
     localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
     upgradesConfig: UpgradesConfig,
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
@@ -95,6 +94,9 @@ class SvDsoAutomationService(
       retryProvider,
       config.parameters,
     ) {
+
+  private val cometBft: Option[CometBftNode] =
+    localSynchronizerNodes.flatMap(_.current.cometbftNode)
 
   private val synchronizerNodeService =
     localSynchronizerNodes.map(
@@ -479,14 +481,14 @@ class SvDsoAutomationService(
       )
 
   if (!config.bftSequencerConnection) {
-    localSynchronizerNodes.map(_.current).foreach { node =>
+    synchronizerNodeService.foreach { service =>
       registerTrigger(
         new LocalSequencerConnectionsTrigger(
           triggerContext,
           participantAdminConnection,
           config.domains.global.alias,
           dsoStore,
-          node,
+          service,
           config.participantClient.sequencerRequestAmplification.toInternal,
           config.domainMigrationId,
           newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
