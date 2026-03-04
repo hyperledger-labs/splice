@@ -19,7 +19,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.{Done, NotUsed}
@@ -169,15 +169,15 @@ class ScanVerdictStoreIngestion(
           summaryByTime.get(recordTime).map(_ -> v)
         }
 
-        featuredAppProviders = Set.empty[PartyId] // TODO: populate from config
+        // Compute app activity records (pure, before DB transaction).
+        // Records have verdictRowId = 0; the store resolves actual row_ids during insertion.
+        computedActivities = appActivityComputation.computeActivities(summariesWithVerdicts)
+        pendingAppActivity = computedActivities.flatMap { case (summary, _, recordO) =>
+          recordO.map(summary.sequencingTime -> _)
+        }
 
-        _ <- store.insertVerdictsWithAppActivityRecords(
-          items,
-          summariesWithVerdicts,
-          featuredAppProviders,
-          appActivityComputation,
-        )
-      } yield (trafficSummaries.size, summariesWithVerdicts.size)
+        _ <- store.insertVerdictsWithAppActivityRecords(items, pendingAppActivity)
+      } yield (trafficSummaries.size, pendingAppActivity.size)
 
       result.transform {
         case Success((trafficSummaryCount, appActivityCount)) =>

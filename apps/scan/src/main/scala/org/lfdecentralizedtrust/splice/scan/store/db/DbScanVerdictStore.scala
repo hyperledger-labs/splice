@@ -26,9 +26,6 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
-import com.digitalasset.canton.mediator.admin.{v30}
-import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 
 object DbScanVerdictStore {
@@ -505,29 +502,26 @@ class DbScanVerdictStore(
 
   /** Insert multiple verdicts, their transaction views and app activity records in a single transaction.
     *
-    * Verdicts are inserted first to obtain their generated row_ids. App activity records
-    * are then computed using those row_ids and inserted in the same transaction.
+    * Verdicts are inserted first to obtain their generated row_ids. The placeholder
+    * verdictRowId (= 0) in each pending app activity record is then resolved to the
+    * actual row_id (matched by sequencingTime) before insertion.
     *
     * @param items verdicts with their transaction view constructors
-    * @param summariesWithVerdicts paired traffic summaries and verdicts for app activity computation
-    * @param featuredAppProviders the set of featured app provider party IDs
-    * @param appActivityComputation the computation that produces app activity records
+    * @param pendingAppActivity pre-computed activity records paired with their sequencingTime;
+    *                           each record has verdictRowId = 0 as a placeholder
     */
   def insertVerdictsWithAppActivityRecords(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
-      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
-      featuredAppProviders: Set[PartyId],
-      appActivityComputation: AppActivityComputation,
+      pendingAppActivity: Seq[(CantonTimestamp, AppActivityRecordT)],
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
     val combinedAction = for {
       rowIdByTime <- insertVerdictAndTransactionViewsDBIO(items)
-      appActivityRecords = appActivityComputation.computeActivities(
-        summariesWithVerdicts,
-        featuredAppProviders,
-        rowIdByTime,
-      )
+      // Resolve placeholder verdictRowId (= 0) to actual row_ids from the inserted verdicts
+      appActivityRecords = pendingAppActivity.flatMap { case (sequencingTime, record) =>
+        rowIdByTime.get(sequencingTime).map(rowId => record.copy(verdictRowId = rowId))
+      }
       _ <- insertAppActivityRecordsDBIO(appActivityRecords)
     } yield ()
 

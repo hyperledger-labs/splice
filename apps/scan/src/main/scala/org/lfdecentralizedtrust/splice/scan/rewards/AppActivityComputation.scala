@@ -3,8 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.rewards
 
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.mediator.admin.v30
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 
@@ -13,25 +11,35 @@ trait AppActivityComputation {
 
   /** Compute app activity records for a batch of verdicts.
     *
+    * Records are returned with verdictRowId = 0 as a placeholder.
+    * The caller is responsible for resolving the actual verdict row_ids
+    * and patching them before insertion.
+    *
     * @param summariesWithVerdicts paired traffic summaries and verdicts (pre-joined by sequencing time)
-    * @param featuredAppProviders the set of featured app provider party IDs
-    * @param rowIdByTime map from verdict record_time to the generated verdict row_id
-    * @return the computed app activity records
+    * @return annotated input: each pair with an optional computed activity record (verdictRowId = 0)
     */
   def computeActivities(
-      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
-      featuredAppProviders: Set[PartyId],
-      rowIdByTime: Map[CantonTimestamp, Long],
-  ): Seq[DbAppActivityRecordStore.AppActivityRecordT]
+      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)]
+  ): Seq[
+    (
+        DbScanVerdictStore.TrafficSummaryT,
+        v30.Verdict,
+        Option[DbAppActivityRecordStore.AppActivityRecordT],
+    )
+  ]
 }
 
-/** No-op implementation that does nothing. */
+/** No-op implementation that produces no activity records. */
 object NoOpAppActivityComputation extends AppActivityComputation {
 
   override def computeActivities(
-      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
-      featuredAppProviders: Set[PartyId],
-      rowIdByTime: Map[CantonTimestamp, Long],
-  ): Seq[DbAppActivityRecordStore.AppActivityRecordT] =
-    Seq.empty
+      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)]
+  ): Seq[
+    (
+        DbScanVerdictStore.TrafficSummaryT,
+        v30.Verdict,
+        Option[DbAppActivityRecordStore.AppActivityRecordT],
+    )
+  ] =
+    summariesWithVerdicts.map { case (s, v) => (s, v, None) }
 }
