@@ -1406,15 +1406,15 @@ class UpdateHistory(
   def getUpdateByHash(
       hash: String
   )(implicit tc: TraceContext): Future[Option[TreeUpdateWithMigrationId]] = {
-    // TODO(#3408): Is this the right place to throw IAE?
-    val parsedHash = HexString
-      .parseToByteString(hash)
-      .getOrElse(throw new IllegalArgumentException(s"Malformed Hex: $hash"))
-    val safeHash = sanitizedExtTxnHash(parsedHash)
+    val parsedHash = HexString.parseToByteString(hash).getOrElse(ByteString.EMPTY)
+    if (parsedHash.isEmpty) {
+      Future.successful(None)
+    } else {
+      val safeHash = sanitizedExtTxnHash(parsedHash)
 
-    import storage.DbStorageConverters.setParameterOptionalByteArray
-    val query =
-      sql"""
+      import storage.DbStorageConverters.setParameterOptionalByteArray
+      val query =
+        sql"""
       select
         row_id,
         update_id,
@@ -1432,25 +1432,26 @@ class UpdateHistory(
       and history_id = $historyId
         """
 
-    for {
-      rows <- storage
-        .query(
-          query.toActionBuilder.as[SelectFromTransactions],
-          "getUpdateByHash",
-        )
-      creates <- queryCreateEvents(rows.map(_.rowId))
-      exercises <- queryExerciseEvents(rows.map(_.rowId))
-    } yield {
-      rows.map { row =>
-        TreeUpdateWithMigrationId(
-          decodeTransaction(
-            row,
-            creates.getOrElse(row.rowId, Seq.empty),
-            exercises.getOrElse(row.rowId, Seq.empty),
-          ),
-          row.migrationId,
-        )
-      }.headOption
+      for {
+        rows <- storage
+          .query(
+            query.toActionBuilder.as[SelectFromTransactions],
+            "getUpdateByHash",
+          )
+        creates <- queryCreateEvents(rows.map(_.rowId))
+        exercises <- queryExerciseEvents(rows.map(_.rowId))
+      } yield {
+        rows.map { row =>
+          TreeUpdateWithMigrationId(
+            decodeTransaction(
+              row,
+              creates.getOrElse(row.rowId, Seq.empty),
+              exercises.getOrElse(row.rowId, Seq.empty),
+            ),
+            row.migrationId,
+          )
+        }.headOption
+      }
     }
   }
 
