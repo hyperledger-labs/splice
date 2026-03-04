@@ -179,11 +179,30 @@ allocationToTwoStepTransfer sender transferLegs admin expiresAt settlement =
       -- We don't show more context to avoid bloating the response here.
       ["allocation for settlement ", settlement.settlementRef.id]
 
+allocationToTwoStepTransfer_v1 : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
+allocationToTwoStepTransfer_v1 sender transferLegs admin expiresAt settlement =
+  case transferLegs of
+    [leg] | leg.sender.owner == sender ->
+      TwoStepTransfer with
+        dso = admin
+        sender
+        outputs = [(leg.receiver.owner, leg.amount)]
+          -- Note: that this works as for a single leg allocation by the sender,
+          -- `negate netAllocationAmount` is equal to leg.amount
+        provider = settlement.executor
+        transferBefore = expiresAt
+        transferBeforeDeadline = "allocation.expiresAt"
+        allowFeaturing = True
+        lockContext = Text.implode
+          -- We don't show more context to avoid bloating the response here.
+          ["allocation for settlement ", settlement.settlementRef.id]
+    _ -> error "AllocationV1 interfaces only support sender-side, single leg transfers"
+
 transferAmuletAllocation : AmuletAllocationTransferAuthorization -> [ContractId Holding] -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation aata holdingCids = do
   let
     TransferLeg{sender}::_ = aata.transferLegs
-    twoStepTransfer = allocationToTwoStepTransfer sender.owner aata.transferLegs aata.admin aata.expiresAt aata.settlement
+    twoStepTransfer = allocationToTwoStepTransfer_v1 sender.owner aata.transferLegs aata.admin aata.expiresAt aata.settlement
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer holdingCids aata.extraArgs
   pure Allocation_ExecuteTransferResult
