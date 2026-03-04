@@ -212,10 +212,49 @@ class TokenStandardCliIntegrationTest
             sv1Backend.participantClient,
             sv1ScanBackend.appState.automation.updateHistory,
             sv1LedgerBeginOffset,
-            extTxnHashes = Seq(
+            extTxnHashes = Set(
               onboardingAliceExtPartySetupResult.txHash,
               onboardingBobExtPartySetupResult.txHash,
             ),
+          )
+        }
+      }
+
+      clue("SV1 scan API (/vX/updates) should return the updates with external txn hashes") {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareHistoryViaLosslessScanApiWithExtTxnHashes(
+            scanClient,
+            extTxnHashes = Set(
+              onboardingAliceExtPartySetupResult.txHash,
+              onboardingBobExtPartySetupResult.txHash,
+            ),
+          )
+        }
+      }
+
+      clue(
+        "SV1 scan API (/vX/updates/{update_id})  should return the update with external txn hash"
+      ) {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareExtTxnHashViaScanAPIForUpdateId(
+            scanClient,
+            onboardingBobExtPartySetupResult.updateId,
+            onboardingBobExtPartySetupResult.txHash,
+          )
+        }
+      }
+
+      clue(
+        "SV1 scan API (/vX/updates/hashes/{hash})  should return the update with external txn hash"
+      ) {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareExtTxnHashViaScanAPIForHash(
+            scanClient,
+            onboardingBobExtPartySetupResult.updateId,
+            onboardingBobExtPartySetupResult.txHash,
           )
         }
       }

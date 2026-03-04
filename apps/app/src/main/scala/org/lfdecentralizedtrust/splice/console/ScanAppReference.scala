@@ -545,6 +545,14 @@ abstract class ScanAppReference(
     }
   }
 
+  def getUpdateByHash(hash: String, encoding: definitions.DamlValueEncoding) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateByHash(hash, encoding)
+      )
+    }
+  }
+
   def getEventHistory(
       count: Int,
       after: Option[(Long, String)],
