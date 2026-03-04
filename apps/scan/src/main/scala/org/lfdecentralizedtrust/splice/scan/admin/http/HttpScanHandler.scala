@@ -2396,7 +2396,7 @@ object HttpScanHandler {
 
   // for DsoSequencers that use the serial instead of the migration we set -1 as the migration id
   // we can't simply make it non required as it's part of the public API and it would break clients
-  val NoMigrationIdSet = -1
+  val NoMigrationIdSet = -1L
 
   def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
     definitions.RoundTotals(
