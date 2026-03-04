@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
-import cats.implicits.catsSyntaxApplicativeByName
+import cats.implicits.{catsSyntaxApplicativeByName, toTraverseOps}
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
   StatusAdminConnection,
 }
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
@@ -53,7 +54,6 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.{
   DomainMigrationDump,
@@ -70,7 +70,6 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigra
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
-import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.io.FileNotFoundException
@@ -93,9 +92,7 @@ class DomainMigrationInitializer(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
-    newJoiningNodeInitializer: (
-        Option[SvOnboardingConfig.JoinWithKey]
-    ) => JoiningNodeInitializer,
+    newJoiningNodeInitializer: Option[SvOnboardingConfig.JoinWithKey] => JoiningNodeInitializer,
     enabledFeatures: EnabledFeaturesConfig,
     svAcsStoreDescriptorUserVersion: Option[Long],
     dsoAcsStoreDescriptorUserVersion: Option[Long],
@@ -110,9 +107,6 @@ class DomainMigrationInitializer(
     esf: ExecutionSequencerFactory,
     actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
-
-  override protected val cometBftNode: Option[CometBftNode] =
-    localSynchronizerNodes.current.cometbftNode
 
   private val readOnlyConnection = ledgerClient.readOnlyConnection(
     this.getClass.getSimpleName,
@@ -239,12 +233,14 @@ class DomainMigrationInitializer(
       // unlimited traffic and prevent lock-out issues due to lack of traffic (see #13868)
       _ = dsoAutomationService.registerTrafficReconciliationTriggers()
       _ <- ensureCometBftGovernanceKeysAreSet(
-        cometBftNode,
+        localSynchronizerNodes.current.cometbftNode,
         svStore.key.svParty,
         dsoStore,
         dsoAutomationService,
       )
-      _ <- rotateGenesisGovernanceKeyForSV1(domainMigrationConfig.name)
+      _ <- localSynchronizerNodes.current.cometbftNode.traverse(
+        _.rotateGenesisGovernanceKeyForSV1(domainMigrationConfig.name)
+      )
       // Restore users and user metadata first as scan depends on metadata
       // for startup and we depend on scan starting for BFT peer reconciliation.
       _ <- new ParticipantUsersDataRestorer(

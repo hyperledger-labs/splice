@@ -11,15 +11,15 @@ import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatus
 import org.lfdecentralizedtrust.splice.environment.{
-  MediatorAdminConnection,
   ParticipantAdminConnection,
   SpliceLedgerConnection,
+  SynchronizerNodeService,
   TopologyAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -31,8 +31,7 @@ class SubmitSvStatusReportTrigger(
     baseContext: TriggerContext,
     store: SvDsoStore,
     ledgerApiConnection: SpliceLedgerConnection,
-    cometBft: Option[CometBftNode],
-    mediatorAdminConnectionO: Option[MediatorAdminConnection],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -51,12 +50,10 @@ class SubmitSvStatusReportTrigger(
       dsoRules <- store.getDsoRules()
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
-      cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
-      mediatorAdminConnection = SvUtil.getMediatorAdminConnection(
-        mediatorAdminConnectionO
-      )
+      currentNode <- synchronizerNodeService.activeSynchronizerNode()
+      cometBftHeight <- currentNode.cometbftNode.traverse(_.getLatestBlockHeight())
       mediatorSynchronizerTimeLb <- getDomainTimeLowerBound(
-        mediatorAdminConnection,
+        currentNode.mediatorAdminConnection,
         dsoRules.domain,
       )
       participantSynchronizerTimeLb <- getDomainTimeLowerBound(

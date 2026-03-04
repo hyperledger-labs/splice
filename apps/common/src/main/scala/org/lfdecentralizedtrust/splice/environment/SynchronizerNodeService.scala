@@ -15,7 +15,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class SynchronizerNodeService[T <: SynchronizerNode](
-    nodes: SynchronizerNode.LocalSynchronizerNodes[T],
+    val nodes: SynchronizerNode.LocalSynchronizerNodes[T],
     participantAdminConnection: ParticipantAdminConnection,
     globalSynchronizerAlias: SynchronizerAlias,
     override protected val loggerFactory: NamedLoggerFactory,

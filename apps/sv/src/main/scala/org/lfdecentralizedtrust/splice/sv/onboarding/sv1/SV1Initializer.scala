@@ -8,6 +8,7 @@ import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,
   catsSyntaxTuple4Semigroupal,
+  toTraverseOps,
 }
 import cats.syntax.functorFilter.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -29,7 +30,6 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
@@ -98,7 +98,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 
 import scala.jdk.OptionConverters.*
 import java.util.concurrent.TimeUnit
@@ -107,7 +106,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize sv1. */
 class SV1Initializer(
-    localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     sv1Config: SvOnboardingConfig.FoundDso,
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
@@ -135,9 +134,6 @@ class SV1Initializer(
     actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
-  override protected val cometBftNode: Option[CometBftNode] =
-    localSynchronizerNodes.current.cometbftNode
-
   import SV1Initializer.bootstrapTransactionOrdering
 
   def bootstrapDso()(implicit
@@ -153,7 +149,8 @@ class SV1Initializer(
     )
   ] = {
     for {
-      _ <- rotateGenesisGovernanceKeyForSV1(sv1Config.name)
+      _ <- synchronizerNodeService.nodes.current.cometbftNode
+        .traverse(_.rotateGenesisGovernanceKeyForSV1(sv1Config.name))
       initConnection = ledgerClient.readOnlyConnection(
         this.getClass.getSimpleName,
         loggerFactory,
@@ -165,7 +162,7 @@ class SV1Initializer(
         if (!config.shouldSkipSynchronizerInitialization) {
           SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
             cantonIdentifierConfig,
-            localSynchronizerNodes.current,
+            synchronizerNodeService.nodes.current,
             clock,
             loggerFactory,
             retryProvider,
@@ -182,14 +179,14 @@ class SV1Initializer(
             (s.namespace, s)
           }
         } else {
-          bootstrapDomain(localSynchronizerNodes.current)
+          bootstrapDomain(synchronizerNodeService.nodes.current)
         }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         SynchronizerConnectionConfig(
           config.domains.global.alias,
           sequencerConnections = SequencerConnections.tryMany(
-            Seq(localSynchronizerNodes.current.internalSequencerConnection),
+            Seq(synchronizerNodeService.nodes.current.internalSequencerConnection),
             PositiveInt.one,
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
@@ -212,7 +209,7 @@ class SV1Initializer(
       _ <- ensureCantonNodesOTKRotatedIfNeeded(
         config.skipSynchronizerInitialization,
         cantonIdentifierConfig,
-        Some(localSynchronizerNodes.current),
+        Some(synchronizerNodeService.nodes.current),
         clock,
         loggerFactory,
         retryProvider,
@@ -289,7 +286,7 @@ class SV1Initializer(
         dsoStore,
         ledgerClient,
         participantAdminConnection,
-        Some(localSynchronizerNodes),
+        synchronizerNodeService,
       )
       connection = svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       (_, decentralizedSynchronizer) <- (
@@ -344,7 +341,7 @@ class SV1Initializer(
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,
-        Some(localSynchronizerNodes),
+        synchronizerNodeService,
         upgradesConfig,
         packageVersionSupport,
         enabledFeatures,
@@ -376,7 +373,7 @@ class SV1Initializer(
         logger,
       )
       _ <- ensureCometBftGovernanceKeysAreSet(
-        cometBftNode,
+        synchronizerNodeService.nodes.current.cometbftNode,
         svParty,
         dsoStore,
         dsoAutomation,
@@ -670,7 +667,7 @@ class SV1Initializer(
         tc: TraceContext
     ): Future[Unit] = {
       synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
-        localSynchronizerNodes.some,
+        synchronizerNodeService.nodes.some,
         synchronizerId,
         SynchronizerNodeState.OnboardedImmediately,
       )
@@ -688,8 +685,9 @@ class SV1Initializer(
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
-          localSynchronizerNodes.current.sequencerAdminConnection
-            .listSequencerTrafficControlState(),
+          synchronizerNodeService.sequencerAdminConnection.flatMap(
+            _.listSequencerTrafficControlState()
+          ),
           dsoStore.lookupAmuletRules(),
           dsoStore.lookupDsoRulesWithStateWithOffset(),
         ).tupled
@@ -726,8 +724,8 @@ class SV1Initializer(
                     developmentFundManager = sv1Config.developmentFundManager,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
-                    cometBftNode,
-                    localSynchronizerNodes.current,
+                    synchronizerNodeService.nodes.current.cometbftNode,
+                    synchronizerNodeService.nodes.current,
                     config.scan,
                     synchronizerId,
                     clock,

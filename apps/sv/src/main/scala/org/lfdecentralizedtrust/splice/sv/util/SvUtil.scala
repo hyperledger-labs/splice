@@ -343,22 +343,4 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
-
-  def getSequencerAdminConnection(
-      primarySequencerAdminConnection: Option[SequencerAdminConnection]
-  ): SequencerAdminConnection =
-    primarySequencerAdminConnection.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No sequencer admin connection configured for SV App")
-        .asRuntimeException()
-    )
-
-  def getMediatorAdminConnection(
-      primaryMediatorAdminConnection: Option[MediatorAdminConnection]
-  ): MediatorAdminConnection =
-    primaryMediatorAdminConnection.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No mediator admin connection configured for SV App")
-        .asRuntimeException()
-    )
 }

@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.migration
 
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
+  SynchronizerNodeService,
   TopologyAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
@@ -73,7 +74,7 @@ object SynchronizerNodeIdentities {
 
   def getSynchronizerNodeIdentities(
       participantAdminConnection: ParticipantAdminConnection,
-      synchronizerNode: LocalSynchronizerNode,
+      synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
       dsoStore: SvDsoStore,
       synchronizerAlias: SynchronizerAlias,
       loggerFactory: NamedLoggerFactory,
@@ -88,8 +89,9 @@ object SynchronizerNodeIdentities {
     for {
       synchronizerId <- dsoStore.getDsoRules().map(_.domain)
       participant <- getNodeIdentitiesDump(participantAdminConnection)
-      sequencer <- getNodeIdentitiesDump(synchronizerNode.sequencerAdminConnection)
-      mediator <- getNodeIdentitiesDump(synchronizerNode.mediatorAdminConnection)
+      node <- synchronizerNodeService.activeSynchronizerNode()
+      sequencer <- getNodeIdentitiesDump(node.sequencerAdminConnection)
+      mediator <- getNodeIdentitiesDump(node.mediatorAdminConnection)
     } yield SynchronizerNodeIdentities(
       dsoStore.key.svParty,
       dsoStore.key.dsoParty,

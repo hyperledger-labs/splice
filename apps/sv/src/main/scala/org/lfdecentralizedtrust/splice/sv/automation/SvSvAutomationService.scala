@@ -5,20 +5,9 @@ package org.lfdecentralizedtrust.splice.sv.automation
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.automation.{
-  AutomationServiceCompanion,
-  SpliceAppAutomationService,
-  SqlIndexInitializationTrigger,
-}
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  RetryProvider,
-  SpliceLedgerClient,
-}
-import org.lfdecentralizedtrust.splice.store.{
-  DomainTimeSynchronization,
-  DomainUnpausedSynchronization,
-}
+import org.lfdecentralizedtrust.splice.automation.{AutomationServiceCompanion, SpliceAppAutomationService, SqlIndexInitializationTrigger}
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider, SpliceLedgerClient, SynchronizerNodeService}
+import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
@@ -44,7 +33,7 @@ class SvSvAutomationService(
     storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -89,12 +78,7 @@ class SvSvAutomationService(
         config.domains.global.alias,
         topologySnapshotConfig,
         triggerContext,
-        localSynchronizerNodes
-          .getOrElse(
-            sys.error("Cannot take topology snapshot with no localSynchronizerNode")
-          )
-          .current
-          .sequencerAdminConnection,
+        synchronizerNodeService,
         participantAdminConnection,
         clock,
       )
@@ -108,11 +92,7 @@ class SvSvAutomationService(
         dsoStore,
         backupConfig,
         participantAdminConnection,
-        localSynchronizerNodes
-          .getOrElse(
-            sys.error("Cannot dump identities with no localSynchronizerNode")
-          )
-          .current,
+        synchronizerNodeService,
         triggerContext,
       )
     )

@@ -18,11 +18,13 @@ import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   SequencerAdminConnection,
+  SynchronizerNodeService,
 }
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.util.BackupDump
 
 import java.nio.file.Paths
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /** As taking a topology snapshot is not a cheap operation, we limit this trigger to produce at most one snapshot per day.
@@ -31,7 +33,7 @@ class PeriodicTopologySnapshotTrigger(
     synchronizerAlias: SynchronizerAlias,
     config: PeriodicBackupDumpConfig,
     triggerContext: TriggerContext,
-    sequencerAdminConnection: SequencerAdminConnection,
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
     clock: Clock,
 )(implicit
@@ -59,7 +61,6 @@ class PeriodicTopologySnapshotTrigger(
             res <-
               if (!snapshotExists)
                 takeTopologySnapshot(
-                  sequencerAdminConnection,
                   folderName,
                   now,
                   utcDate,
@@ -80,7 +81,6 @@ class PeriodicTopologySnapshotTrigger(
     } yield res
 
   private def takeTopologySnapshot(
-      sequencerAdminConnection: SequencerAdminConnection,
       folderName: String,
       now: CantonTimestamp,
       utcDate: String,
@@ -91,6 +91,7 @@ class PeriodicTopologySnapshotTrigger(
       actorSystem: ActorSystem,
   ): Future[TaskSuccess] =
     for {
+      sequencerAdminConnection <- synchronizerNodeService.sequencerAdminConnection()
       sequencerId <- sequencerAdminConnection.getSequencerId
       // uses onboardingStateV2 so we don't lose information when exporting
       _ = logger.info("Starting onboarding state stream into gcp bucket...")
