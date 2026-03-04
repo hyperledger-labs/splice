@@ -4,18 +4,9 @@
 package org.lfdecentralizedtrust.splice.validator.domain
 
 import cats.implicits.catsSyntaxApplicativeId
-import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-}
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
-import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -30,6 +21,15 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  RetryFor,
+  RetryProvider,
+}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
+import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -241,52 +241,45 @@ class DomainConnector(
       domainSequencers <- scanConnection.listDsoSequencers()
       decentralizedSynchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
     } yield {
-      val filteredSequencers = domainSequencers
+      domainSequencers
         .filter(sequencers =>
           // This filter should be a noop since we only ever expect to have one synchronizer here
           // so this is just an extra safeguard.
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
-      val svFilteredSequencers = config.domains.global.trustedSynchronizerConfig match {
-        case Some(config) =>
-          val allowedNamesSet = config.svNames.toList.toSet
-          logger.debug(
-            s"Filtering sequencers to only include: ${allowedNamesSet.toList.mkString(", ")}"
-          )
-          filteredSequencers.map { domainSequencer =>
-            domainSequencer.copy(sequencers =
-              domainSequencer.sequencers.filter(s => allowedNamesSet.contains(s.svName))
-            )
+        .map { sequencers =>
+          val (sequencersWithSerial, sequencersWithMigration) =
+            sequencers.sequencers.partition(_.serial.isDefined)
+          val serialOrMigrationSequencers =
+            if (sequencersWithSerial.nonEmpty)
+              sequencersWithSerial.filter(_.serial.contains(synchronizerSerial.unwrap.toLong))
+            else sequencersWithMigration.filter(_.migrationId == migrationId)
+          val svFilteredSequencers = config.domains.global.trustedSynchronizerConfig match {
+            case Some(config) =>
+              val allowedNamesSet = config.svNames.toList.toSet
+              logger.debug(
+                s"Filtering sequencers to only include: ${allowedNamesSet.toList.mkString(", ")}"
+              )
+              serialOrMigrationSequencers.filter(s => allowedNamesSet.contains(s.svName))
+            case None =>
+              serialOrMigrationSequencers
           }
-        case None =>
-          filteredSequencers
-      }
-      (
-        svFilteredSequencers.map { domainSequencer =>
           config.domains.global.alias ->
             extractValidConnections(
-              domainSequencer.sequencers,
+              svFilteredSequencers,
               domainTime,
-              migrationId,
-              synchronizerSerial.unwrap.toLong,
             )
-        }.toMap,
-        domainTime,
-      )
+        }
+        .toMap -> domainTime
     }
   }
 
   private def extractValidConnections(
       sequencers: Seq[DsoSequencer],
       domainTime: CantonTimestamp,
-      migrationId: Long,
-      synchronizerSerial: Long,
   ): Seq[GrpcSequencerConnection] = {
     // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
-    val (sequencersWithSerial, sequencersWithMigration) = sequencers.partition(_.serial.isDefined)
-    (if (sequencersWithSerial.nonEmpty)
-       sequencersWithSerial.filter(_.serial.contains(synchronizerSerial))
-     else sequencersWithMigration.filter(_.migrationId == migrationId))
+    sequencers
       .collect {
         case DsoSequencer(
               _,
@@ -311,11 +304,4 @@ class DomainConnector(
         conn
       }
   }
-}
-
-object DomainConnector {
-  final case class DomainConnection(
-      alias: SynchronizerAlias,
-      connections: Seq[GrpcSequencerConnection],
-  )
 }
