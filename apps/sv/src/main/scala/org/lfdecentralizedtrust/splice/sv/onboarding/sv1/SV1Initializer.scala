@@ -355,6 +355,7 @@ class SV1Initializer(
         Some(localSynchronizerNode),
         upgradesConfig,
         packageVersionSupport,
+        decentralizedSynchronizer,
         enabledFeatures,
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
