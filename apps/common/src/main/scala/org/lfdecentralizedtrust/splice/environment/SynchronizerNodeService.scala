@@ -10,7 +10,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.environment.*
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,7 +24,7 @@ class SynchronizerNodeService[T <: SynchronizerNode](
 
   private val successorActiveRef = new java.util.concurrent.atomic.AtomicReference(false)
 
-  val successorActiveCache =
+  private val successorActiveCache =
     ScaffeineCache.buildTracedAsync[Future, Unit, Boolean](
       Scaffeine().expireAfterWrite(30.seconds),
       implicit tc => _ => successorActiveUncached(),
@@ -83,6 +82,6 @@ class SynchronizerNodeService[T <: SynchronizerNode](
         }
     }
 
-  def sequencerAdminConnection()(implicit tc: TraceContext) =
+  def sequencerAdminConnection()(implicit tc: TraceContext): Future[SequencerAdminConnection] =
     synchronizerNode().map(_.sequencerAdminConnection)
 }
