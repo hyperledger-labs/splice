@@ -421,15 +421,13 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   )(condition: By => ExpectedCondition[WebElement])(implicit
       webDriver: WebDriver
   ): Unit = {
-    clue(s"Waiting for $query until $timeUntilSuccess") {
-      waitForQuery(query, timeUntilSuccess)
+    waitForQuery(query, timeUntilSuccess)
 
-      val waitDuration = timeUntilSuccess.getOrElse(20.seconds)
-      val wait = new WebDriverWait(webDriver, waitDuration.toJava);
+    val waitDuration = timeUntilSuccess.getOrElse(20.seconds)
+    val wait = new WebDriverWait(webDriver, waitDuration.toJava);
 
-      eventually(waitDuration) {
-        wait.until(condition(query.by))
-      }
+    eventually(waitDuration) {
+      wait.until(condition(query.by))
     }
   }
 
