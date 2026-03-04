@@ -24,7 +24,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
-  SynchronizerNode,
 }
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
@@ -165,7 +164,7 @@ object SvUtil {
 
   case class LocalMediatorConfig(mediatorId: String)
 
-  def getMediatorConfig(synchronizerNode: Option[SynchronizerNode])(implicit
+  def getMediatorConfig(synchronizerNode: Option[SvSynchronizerNode])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[LocalMediatorConfig]] = synchronizerNode.map { node =>

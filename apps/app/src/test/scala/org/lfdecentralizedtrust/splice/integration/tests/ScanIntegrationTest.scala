@@ -73,7 +73,7 @@ class ScanIntegrationTest
             bftSequencers = Seq(
               BftSequencerConfig(
                 config.domainMigrationId,
-                config.sequencerAdminClient,
+                config.synchronizerNodes.current.sequencer,
                 "http://testUrl:8081",
               )
             ),

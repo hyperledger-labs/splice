@@ -4,8 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 abstract class SynchronizerNode(
-    val sequencerAdminConnection: SequencerAdminConnection,
-    val mediatorAdminConnection: MediatorAdminConnection,
+    val sequencerAdminConnection: SequencerAdminConnection
 ) {}
 
 object SynchronizerNode {

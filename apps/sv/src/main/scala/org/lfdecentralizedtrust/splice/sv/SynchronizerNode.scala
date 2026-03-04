@@ -11,12 +11,12 @@ import java.time.Duration
 
 abstract class SvSynchronizerNode(
     override val sequencerAdminConnection: SequencerAdminConnection,
-    override val mediatorAdminConnection: MediatorAdminConnection,
+    val mediatorAdminConnection: MediatorAdminConnection,
     val sequencerExternalPublicUrl: String,
     val sequencerAvailabilityDelay: Duration,
     val sequencerConfig: SequencerConfig,
     val mediatorSequencerAmplification: SubmissionRequestAmplification,
-) extends SynchronizerNode(sequencerAdminConnection, mediatorAdminConnection) {}
+) extends SynchronizerNode(sequencerAdminConnection) {}
 
 sealed trait SequencerConfig {}
 
