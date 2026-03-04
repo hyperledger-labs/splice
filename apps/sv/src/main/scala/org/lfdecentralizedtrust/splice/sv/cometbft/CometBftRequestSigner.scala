@@ -13,6 +13,7 @@ import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.sv.config.SvCometBftConfig
 import scalapb.GeneratedMessage
 
 import java.util.Base64
@@ -113,6 +114,26 @@ object CometBftRequestSigner {
     }
 
   }
+
+  def getOrGenerateSignerFromConfig(
+      config: SvCometBftConfig,
+      participantAdminConnection: ParticipantAdminConnection,
+      logger: TracedLogger,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[CometBftRequestSigner] =
+    config.governanceKey match {
+      case Some(governanceKey) =>
+        logger.info("Using CometBFT governance key from config")
+        Future.successful(
+          new CometBftRequestSigner(governanceKey.publicKey, governanceKey.privateKey)
+        )
+      case None =>
+        logger.info("Using CometBFT governance key managed by participant")
+        getOrGenerateSignerFromParticipant(
+          "cometbft-governance-keys",
+          participantAdminConnection,
+          logger,
+        )
+    }
 
   def fingerprintForBase64PublicKey(publicKey: String): String = {
     val decodedKey: Array[Byte] = Base64.getDecoder.decode(publicKey)

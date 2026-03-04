@@ -90,7 +90,6 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{
   JsonOnboardingSecret,
   SvOnboardingToken,
-  SvUtil,
   ValidatorOnboardingSecret,
 }
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
@@ -325,8 +324,7 @@ class SvApp(
       config.onboarding match {
         case Some(sv1Config: SvOnboardingConfig.FoundDso) =>
           for {
-            cometBftNode <- SvUtil.mapToCometBftNode(
-              cometBftClient,
+            cometBftNode <- CometBftNode(
               cometBftConfig,
               participantAdminConnection,
               logger,
@@ -362,8 +360,7 @@ class SvApp(
           } yield res
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           for {
-            cometBftNode <- SvUtil.mapToCometBftNode(
-              cometBftClient,
+            cometBftNode <- CometBftNode(
               cometBftConfig,
               participantAdminConnection,
               logger,
@@ -385,7 +382,6 @@ class SvApp(
               domainMigrationConfig,
               participantId,
               cometBftConfig,
-              cometBftClient,
               config,
               amuletAppParameters.upgradesConfig,
               None,
@@ -406,8 +402,7 @@ class SvApp(
           }
         case None =>
           for {
-            cometBftNode <- SvUtil.mapToCometBftNode(
-              cometBftClient,
+            cometBftNode <- CometBftNode(
               cometBftConfig,
               participantAdminConnection,
               logger,
