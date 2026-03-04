@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
@@ -12,7 +13,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   IncrementalAcsSnapshot,
   IncrementalAcsSnapshotTable,
 }
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -24,6 +25,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
   UpdateIncrementalSnapshotTask,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.store.HistoryMetrics.AcsSnapshotsMetrics
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,6 +43,10 @@ class AcsSnapshotTrigger(
 
   override val snapshotTable: IncrementalAcsSnapshotTable =
     AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+
+  override val snapshotMetrics: AcsSnapshotsMetrics = new HistoryMetrics(context.metricsFactory)(
+    MetricsContext.Empty
+  ).AcsSnapshots
 
   override def retrieveTasks()(implicit
       tc: TraceContext
