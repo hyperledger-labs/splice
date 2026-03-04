@@ -244,6 +244,7 @@ class ScanApp(
         svName,
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
+        nodeMetrics,
       )
       kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
       kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
