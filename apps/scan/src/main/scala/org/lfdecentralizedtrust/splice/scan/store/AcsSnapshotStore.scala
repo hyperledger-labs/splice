@@ -27,7 +27,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryParts.*
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import slick.dbio.{DBIOAction, Effect, NoStream}
@@ -786,7 +785,9 @@ class AcsSnapshotStore(
 object AcsSnapshotStore {
 
   case class FailedToAcquireLockException()
-      extends QuietNonRetryableException("Failed to acquire exclusive lock.")
+      extends RuntimeException(
+        "Failed to acquire advisory lock for writing to the acs snapshot table."
+      )
 
   sealed trait IncrementalAcsSnapshotTable { def tableName: String }
   object IncrementalAcsSnapshotTable {

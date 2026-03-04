@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.automation
 
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
+  TaskNoop,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -50,7 +51,7 @@ abstract class AcsSnapshotTriggerBase(
 
   override final def completeTask(task: AcsSnapshotTriggerBase.Task)(implicit
       tc: TraceContext
-  ): Future[TaskOutcome] = task match {
+  ): Future[TaskOutcome] = (task match {
     case AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(from, nextAt) =>
       store
         .initializeIncrementalSnapshot(
@@ -99,6 +100,12 @@ abstract class AcsSnapshotTriggerBase(
           snapshot = snapshot,
         )
         .map(_ => TaskSuccess(s"Deleted incremental snapshot"))
+  }).recover { case e: AcsSnapshotStore.FailedToAcquireLockException =>
+    // It is expected that we sometimes fail to acquire the lock on the snapshot table.
+    // The time until the lock is released is typically much larger than our task retry timeouts,
+    // so we can just silently skip the task and try again later.
+    logger.info(s"Skipping $task", e)
+    TaskNoop
   }
 
   override final def isStaleTask(task: AcsSnapshotTriggerBase.Task)(implicit
