@@ -2,12 +2,14 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
@@ -98,6 +100,144 @@ class DbAppActivityRecordStoreTest
     }
   }
 
+  "insertVerdictsWithAppActivityRecords" should {
+
+    "insert verdicts and resolve placeholder verdictRowIds in activity records" in {
+      for {
+        (appStore, verdictStore) <- newStores()
+        baseTs = CantonTimestamp.now()
+
+        verdict1 = mkVerdict(verdictStore, "update-combined-1", baseTs)
+        verdict2 = mkVerdict(verdictStore, "update-combined-2", baseTs.plusSeconds(1L))
+
+        pendingAppActivity = Seq(
+          baseTs -> mkRecord(0L, 10L, Seq("app1::provider"), Seq(100L)),
+          baseTs.plusSeconds(1L) -> mkRecord(0L, 11L, Seq("app2::provider"), Seq(200L)),
+        )
+
+        _ <- verdictStore.insertVerdictsWithAppActivityRecords(
+          Seq(verdict1 -> noViews, verdict2 -> noViews),
+          pendingAppActivity,
+        )
+
+        // Verify verdicts were inserted
+        v1 <- verdictStore.getVerdictByUpdateId("update-combined-1")
+        v2 <- verdictStore.getVerdictByUpdateId("update-combined-2")
+
+        // Verify activity records have resolved row_ids (not 0)
+        r1 <- appStore.getRecordByVerdictRowId(v1.value.rowId)
+        r2 <- appStore.getRecordByVerdictRowId(v2.value.rowId)
+      } yield {
+        v1 shouldBe defined
+        v2 shouldBe defined
+
+        r1.value.verdictRowId shouldBe v1.value.rowId
+        r1.value.roundNumber shouldBe 10L
+        r1.value.appProviderParties shouldBe Seq("app1::provider")
+
+        r2.value.verdictRowId shouldBe v2.value.rowId
+        r2.value.roundNumber shouldBe 11L
+        r2.value.appProviderParties shouldBe Seq("app2::provider")
+      }
+    }
+
+    "insert verdicts without activity records when pendingAppActivity is empty" in {
+      for {
+        (_, verdictStore) <- newStores()
+        baseTs = CantonTimestamp.now()
+
+        verdict = mkVerdict(verdictStore, "update-no-activity", baseTs)
+
+        _ <- verdictStore.insertVerdictsWithAppActivityRecords(
+          Seq(verdict -> noViews),
+          Seq.empty,
+        )
+
+        v <- verdictStore.getVerdictByUpdateId("update-no-activity")
+        countAfter <- countRecords()
+      } yield {
+        v shouldBe defined
+        countAfter shouldBe 0L
+      }
+    }
+
+    "only create activity records for verdicts that have them" in {
+      for {
+        (appStore, verdictStore) <- newStores()
+        baseTs = CantonTimestamp.now()
+
+        // Three verdicts, but only the first and third have activity records
+        verdict1 = mkVerdict(verdictStore, "update-with-1", baseTs)
+        verdict2 = mkVerdict(verdictStore, "update-without", baseTs.plusSeconds(1L))
+        verdict3 = mkVerdict(verdictStore, "update-with-2", baseTs.plusSeconds(2L))
+
+        pendingAppActivity = Seq(
+          baseTs -> mkRecord(0L, 10L, Seq("app1::provider"), Seq(100L)),
+          baseTs.plusSeconds(2L) -> mkRecord(0L, 12L, Seq("app3::provider"), Seq(300L)),
+        )
+
+        _ <- verdictStore.insertVerdictsWithAppActivityRecords(
+          Seq(verdict1 -> noViews, verdict2 -> noViews, verdict3 -> noViews),
+          pendingAppActivity,
+        )
+
+        v1 <- verdictStore.getVerdictByUpdateId("update-with-1")
+        v2 <- verdictStore.getVerdictByUpdateId("update-without")
+        v3 <- verdictStore.getVerdictByUpdateId("update-with-2")
+
+        r1 <- appStore.getRecordByVerdictRowId(v1.value.rowId)
+        r2 <- appStore.getRecordByVerdictRowId(v2.value.rowId)
+        r3 <- appStore.getRecordByVerdictRowId(v3.value.rowId)
+
+        totalRecords <- countRecords()
+      } yield {
+        // All three verdicts should be inserted
+        v1 shouldBe defined
+        v2 shouldBe defined
+        v3 shouldBe defined
+
+        // Only first and third have activity records
+        r1.value.roundNumber shouldBe 10L
+        r1.value.appProviderParties shouldBe Seq("app1::provider")
+
+        r2 shouldBe None
+
+        r3.value.roundNumber shouldBe 12L
+        r3.value.appProviderParties shouldBe Seq("app3::provider")
+
+        totalRecords shouldBe 2L
+      }
+    }
+
+    "skip activity records with no matching verdict timestamp" in {
+      for {
+        (appStore, verdictStore) <- newStores()
+        baseTs = CantonTimestamp.now()
+
+        verdict = mkVerdict(verdictStore, "update-mismatch", baseTs)
+
+        // Activity record has a timestamp that doesn't match any verdict
+        unmatchedTs = baseTs.plusSeconds(999L)
+        pendingAppActivity = Seq(
+          unmatchedTs -> mkRecord(0L, 42L, Seq("orphan::provider"), Seq(300L))
+        )
+
+        _ <- verdictStore.insertVerdictsWithAppActivityRecords(
+          Seq(verdict -> noViews),
+          pendingAppActivity,
+        )
+
+        v <- verdictStore.getVerdictByUpdateId("update-mismatch")
+        r <- appStore.getRecordByVerdictRowId(v.value.rowId)
+        countAfter <- countRecords()
+      } yield {
+        v shouldBe defined
+        r shouldBe None
+        countAfter shouldBe 0L
+      }
+    }
+  }
+
   private def mkRecord(
       verdictRowId: Long,
       roundNumber: Long,
@@ -110,6 +250,8 @@ class DbAppActivityRecordStoreTest
       appProviderParties = appProviderParties,
       appActivityWeights = appActivityWeights,
     )
+
+  private val testDomain = SynchronizerId.tryFromString("test::domain")
 
   /** Creates a new store and returns it along with a unique history_id
     * obtained from UpdateHistory initialization.
@@ -136,6 +278,60 @@ class DbAppActivityRecordStoreTest
       (store, updateHistory.historyId)
     }
   }
+
+  /** Creates both an app activity record store and a verdict store backed by
+    * the same UpdateHistory, for testing insertVerdictsWithAppActivityRecords.
+    */
+  private def newStores(): Future[(DbAppActivityRecordStore, DbScanVerdictStore)] = {
+    val participantId = mkParticipantId("activity-test")
+    val updateHistory = new UpdateHistory(
+      storage.underlying,
+      new DomainMigrationInfo(migrationId, None),
+      "app_activity_combined_test",
+      participantId,
+      dsoParty,
+      BackfillingRequirement.BackfillingNotRequired,
+      loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = false,
+      HistoryMetrics(NoOpMetricsFactory, migrationId),
+    )
+    updateHistory.ingestionSink.initialize().map { _ =>
+      val appStore = new DbAppActivityRecordStore(
+        storage.underlying,
+        loggerFactory,
+      )
+      val verdictStore = new DbScanVerdictStore(
+        storage.underlying,
+        updateHistory,
+        Some(appStore),
+        loggerFactory,
+      )
+      (appStore, verdictStore)
+    }
+  }
+
+  private def mkVerdict(
+      verdictStore: DbScanVerdictStore,
+      updateId: String,
+      recordTs: CantonTimestamp,
+  ): verdictStore.VerdictT =
+    new verdictStore.VerdictT(
+      rowId = 0L,
+      migrationId = migrationId,
+      domainId = testDomain,
+      recordTime = recordTs,
+      finalizationTime = recordTs,
+      submittingParticipantUid = "participant1",
+      verdictResult = DbScanVerdictStore.VerdictResultDbValue.Accepted,
+      mediatorGroup = 0,
+      updateId = updateId,
+      submittingParties = Seq.empty,
+      transactionRootViews = Seq.empty,
+      trafficSummaryO = None,
+    )
+
+  private val noViews: Long => Seq[DbScanVerdictStore.TransactionViewT] = _ => Seq.empty
 
   /** Insert a minimal verdict row into scan_verdict_store and return its generated row_id. */
   private def insertVerdictRow(
