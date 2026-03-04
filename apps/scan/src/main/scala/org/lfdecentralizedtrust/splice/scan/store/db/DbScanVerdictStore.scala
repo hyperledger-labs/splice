@@ -26,8 +26,10 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
-import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore
-import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT;
+import com.digitalasset.canton.mediator.admin.{v30}
+import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
@@ -429,13 +431,15 @@ class DbScanVerdictStore(
       """.asUpdate
   }
 
-  /** Returns a DBIO action for inserting verdicts (for use in combined transactions).
-    * Unlike insertVerdictAndTransactionViews, this doesn't wrap in a transaction or Future.
+  /** Returns a DBIO action for inserting verdicts and their transaction views.
+    *
+    * Returns a map from verdict record_time to its generated row_id, which can be used
+    * to insert related records (e.g., app activity records) that reference the verdict by row_id.
     */
   def insertVerdictAndTransactionViewsDBIO(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
-  )(implicit tc: TraceContext): DBIO[Unit] = {
-    if (items.isEmpty) DBIO.successful(())
+  )(implicit tc: TraceContext): DBIO[Map[CantonTimestamp, Long]] = {
+    if (items.isEmpty) DBIO.successful(Map.empty)
     else {
       val checkExist = (sql"""
                select update_id
@@ -450,7 +454,7 @@ class DbScanVerdictStore(
         _ = logger.info(
           s"Already ingested verdicts: $alreadyExisting. Non-existing: ${nonExisting.map(_._1.updateId)}."
         )
-        _ <-
+        rowIdMap <-
           if (nonExisting.nonEmpty) {
             DBIO
               .sequence(nonExisting.map { case (verdict, mkViews) =>
@@ -463,13 +467,13 @@ class DbScanVerdictStore(
                   }
                   views = mkViews(rowId)
                   _ <- DBIO.sequence(views.map(sqlInsertView)).map(_ => ())
-                } yield ()
+                } yield verdict.recordTime -> rowId
               })
-              .map(_ => ())
+              .map(_.toMap)
           } else {
-            DBIO.successful(())
+            DBIO.successful(Map.empty[CantonTimestamp, Long])
           }
-      } yield ()
+      } yield rowIdMap
     }
   }
 
@@ -489,7 +493,7 @@ class DbScanVerdictStore(
       futureUnlessShutdownToFuture(
         storage
           .queryAndUpdate(
-            insertVerdictAndTransactionViewsDBIO(items).transactionally,
+            insertVerdictAndTransactionViewsDBIO(items).map(_ => ()).transactionally,
             "scanVerdict.insertVerdictAndTransactionViews.batch",
           )
       ).map { _ =>
@@ -499,43 +503,43 @@ class DbScanVerdictStore(
     }
   }
 
-  /** Insert verdicts and run an additional DBIO action in a single transaction.
+  /** Insert multiple verdicts, their transaction views and app activity records in a single transaction.
+    *
+    * Verdicts are inserted first to obtain their generated row_ids. App activity records
+    * are then computed using those row_ids and inserted in the same transaction.
+    *
+    * @param items verdicts with their transaction view constructors
+    * @param summariesWithVerdicts paired traffic summaries and verdicts for app activity computation
+    * @param featuredAppProviders the set of featured app provider party IDs
+    * @param appActivityComputation the computation that produces app activity records
     */
-  def insertVerdictAndTransactionViewsWith(
+  def insertVerdictsWithAppActivityRecords(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
-      additionalAction: DBIO[Unit] = DBIO.successful(()),
+      summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
+      featuredAppProviders: Set[PartyId],
+      appActivityComputation: AppActivityComputation,
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
-    val combinedAction =
-      (insertVerdictAndTransactionViewsDBIO(items) andThen additionalAction).transactionally
+    val combinedAction = for {
+      rowIdByTime <- insertVerdictAndTransactionViewsDBIO(items)
+      appActivityRecords = appActivityComputation.computeActivities(
+        summariesWithVerdicts,
+        featuredAppProviders,
+        rowIdByTime,
+      )
+      _ <- insertAppActivityRecordsDBIO(appActivityRecords)
+    } yield ()
 
     futureUnlessShutdownToFuture(
       storage.queryAndUpdate(
-        combinedAction,
-        "scanVerdict.insertVerdictAndTransactionViewsWith",
+        combinedAction.transactionally,
+        "scanVerdict.insertVerdictsWithAppActivityRecords",
       )
     ).map { _ =>
       val maxRt = items.map(_._1.recordTime).maxOption
       maxRt.foreach(advanceLastIngestedRecordTime)
     }
-  }
-
-  /** Insert multiple verdicts, their transaction views and additional data in a single transaction.
-    *
-    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
-    * update_id already exists. If it does, then we assume this is a retry
-    * by the DB layer of this very statement, and skip the ingestion.
-    * This works as the ingestion itself ensures that there never are overlapping batches.
-    */
-  def insertVerdictsWithAppActivityRecords(
-      items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
-      appActivityRecords: Seq[AppActivityRecordT],
-  )(implicit tc: TraceContext): Future[Unit] = {
-    val combined = for {
-      _ <- insertAppActivityRecordsDBIO(appActivityRecords)
-    } yield ()
-    insertVerdictAndTransactionViewsWith(items, combined)
   }
 
   def getVerdictByUpdateId(updateId: String)(implicit
