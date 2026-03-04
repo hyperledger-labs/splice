@@ -674,7 +674,7 @@ class HttpScanHandler(
             .flatMap(sequencerConfig =>
               sequencerConfig.availableAfter.map { availableAfter =>
                 definitions.DsoSequencer(
-                  -1,
+                  NoMigrationIdSet,
                   Some(serial),
                   sequencerConfig.sequencerId,
                   sequencerConfig.url,
@@ -2393,6 +2393,10 @@ object HttpScanHandler {
   // We expect a handful at most but want to somewhat guard against attacks
   // so we just hardcode a limit of 100.
   private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
+
+  // for DsoSequencers that use the serial instead of the migration we set -1 as the migration id
+  // we can't simply make it non required as it's part of the public API and it would break clients
+  val NoMigrationIdSet = -1
 
   def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
     definitions.RoundTotals(

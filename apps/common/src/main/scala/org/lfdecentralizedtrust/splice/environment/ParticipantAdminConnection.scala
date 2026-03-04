@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -141,7 +141,7 @@ class ParticipantAdminConnection(
   def lookupPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[Option[PhysicalSynchronizerId]] =
-    for {
+    OptionT(for {
       configuredDomains <- runCmd(
         ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
       )
@@ -149,7 +149,15 @@ class ParticipantAdminConnection(
       case (configuredSynchronizer, psid, _)
           if configuredSynchronizer.synchronizerAlias == synchronizerAlias =>
         psid.toOption
-    }.flatten
+    }.flatten)
+      .orElseF(
+        runCmd(
+          ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
+        ).map(Some(_)).recover {
+          case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND => None
+        }
+      )
+      .value
 
   def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
