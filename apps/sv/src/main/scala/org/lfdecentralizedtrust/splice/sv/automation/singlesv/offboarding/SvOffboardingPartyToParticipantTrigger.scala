@@ -55,7 +55,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .map(_.mapping.participants)
     } yield {
       val (svsToOffboard, svsToKeep) =
-        currentHostingParticipants.partition(e => offboardedParticipants.contains(e))
+        currentHostingParticipants.partition(e => offboardedParticipants.contains(e.participantId))
       val participantIdsToOffboard = svsToOffboard.map(_.participantId)
       if (svsToKeep.forall(_.onboarding)) {
         // realistically this is only a problem in tests (SvOnboardingViaNonFoundingSvIntegrationTest)
