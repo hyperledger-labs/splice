@@ -8,7 +8,7 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
-import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageVettingLookupService}
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
@@ -597,6 +597,8 @@ object SpliceConfig {
       deriveReader[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigReader[RangeConfig] =
       deriveReader[RangeConfig]
+    implicit val packageVettingCacheConfig: ConfigReader[PackageVettingLookupService.CacheConfig] =
+      deriveReader[PackageVettingLookupService.CacheConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -1034,6 +1036,8 @@ object SpliceConfig {
       deriveWriter[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigWriter[RangeConfig] =
       deriveWriter[RangeConfig]
+    implicit val packageVettingCacheConfig: ConfigWriter[PackageVettingLookupService.CacheConfig] =
+      deriveWriter[PackageVettingLookupService.CacheConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

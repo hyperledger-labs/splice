@@ -24,11 +24,13 @@ ONBOARDING_SECRET
    .. admonition:: DevNet-only
 
      On DevNet, you can obtain an onboarding secret automatically by
-     calling the following endpoint on any SV (replace ``SPONSOR_SV_URL`` with the URL of your SV sponsor):
+     calling the following endpoint on any SV (replace ``SPONSOR_SV_URL`` with the SV app URL defined above):
 
      .. parsed-literal::
 
         curl -X POST SPONSOR_SV_URL/api/sv/v0/devnet/onboard/validator/prepare
+
+     Make sure to use the **SV app URL** (starting with ``sv.``), not the Scan URL (starting with ``scan.``).
 
      Note that this self-served secret is only valid for 1 hour.
 
