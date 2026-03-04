@@ -22,6 +22,12 @@ import io.opentelemetry.api.trace.Tracer
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
+abstract class C {
+  def initiateShutdown(): Unit
+  def completed: Future[Done]
+  def isActive: Boolean
+}
+
 /** Abstract class to share the retry and shutdown logic between different services for ingesting ledger data using
   * a subscription to a Ledger API stream.
   */
@@ -40,11 +46,11 @@ abstract class LedgerIngestionService(
   /** Allocate a new subscription that drives ingestion. */
   protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[SpliceLedgerSubscription[?]]
+  ): Future[C]
 
   // Note that we are tracking the current subscription outside the retry loop instead of just
   // calling 'runOnShutdown' on every newly acquired subscription, as that would leak memory.
-  private val currentSubscription = new AtomicReference[Option[SpliceLedgerSubscription[?]]](None)
+  private val currentSubscription = new AtomicReference[Option[C]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
   retryProvider.runOnOrAfterClose_(new RunOnClosing {

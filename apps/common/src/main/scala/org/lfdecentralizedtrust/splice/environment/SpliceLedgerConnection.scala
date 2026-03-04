@@ -672,7 +672,8 @@ class SpliceLedgerSubscription[S](
     override protected[this] val retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer)
-    extends RetryProvider.Has
+    extends org.lfdecentralizedtrust.splice.automation.C
+    with RetryProvider.Has
     with FlagCloseableAsync
     with NamedLogging {
 
