@@ -64,7 +64,7 @@ monitoring:
         overMinutes: 5
         quantile: 0.95
     enableNoDataAlerts: false
-    loggedSecretsFilter: "(jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" OR jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\")\n-jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n"
+    loggedSecretsFilter: "(\n  (\n    jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" AND\n    -jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\"\n  ) OR\n  jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR\n  jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\"\n)\n"
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
