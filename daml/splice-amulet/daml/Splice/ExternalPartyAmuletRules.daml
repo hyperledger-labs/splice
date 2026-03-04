@@ -6,6 +6,7 @@ module Splice.ExternalPartyAmuletRules where
 
 import DA.Assert
 import DA.Foldable (forA_)
+import DA.List (dedup)
 import DA.Optional
 import qualified DA.TextMap as TextMap
 import qualified DA.Map as Map
@@ -489,7 +490,7 @@ amulet_allocationFactory_settleImpl this AllocationFactory_SettleBatch {..} = do
         case allocation.allocation.transferLegs of
           [] -> error "Unexpected empty transfer legs in allocation"
           (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
-  let expectedLegs = concatMap (\leg -> [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
+  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
   validateExpectedTransfers ppLeg expectedLegs allocatedLegs
 
   -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
