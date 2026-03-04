@@ -31,7 +31,7 @@ class ExpiredAmuletTransferInstructionTrigger(
       splice.amulettransferinstruction.AmuletTransferInstruction,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
-      svConfig.delegatelessAutomationExpiredAmuletBatchSize,
+      svConfig.delegatelessAutomationExpiredAmuletTransferInstructionBatchSize,
       svTaskContext.dsoStore
         .listExpiredAmuletTransferInstructions(context.config.ignoredExpiredAmuletPartyIds),
       splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
