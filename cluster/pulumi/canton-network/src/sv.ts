@@ -585,14 +585,17 @@ function installScan(
     logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
-    bulkStorage: {
-      s3: {
-        region: config.bulkStorageBucket?.region,
-        bucketName: config.bulkStorageBucket?.bucketName,
-        endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
-        secretName: config.bulkStorageBucket?.secretName,
-      },
-    },
+    ...(config.bulkStorageBucket
+      ? {
+        bulkStorage: {
+          s3: {
+            region: config.bulkStorageBucket.region,
+            bucketName: config.bulkStorageBucket.bucketName,
+            endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
+            secretName: config.bulkStorageBucket.secretName,
+          },
+        }
+      } : {}),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {
