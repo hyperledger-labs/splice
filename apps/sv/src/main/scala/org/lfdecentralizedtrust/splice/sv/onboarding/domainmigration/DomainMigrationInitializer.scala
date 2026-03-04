@@ -68,6 +68,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
   NodeInitializerUtil,
   SetupUtil,
   SynchronizerNodeInitializer,
+  SynchronizerNodeReconciler,
 }
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
@@ -228,25 +229,26 @@ class DomainMigrationInitializer(
         connection,
         loggerFactory,
       )
-      dsoAutomationService =
-        new SvDsoAutomationService(
-          clock,
-          domainTimeSync,
-          domainUnpausedSync,
-          config,
-          svStore,
-          dsoStore,
-          ledgerClient,
-          participantAdminConnection,
-          retryProvider,
-          newCometBftNode,
-          Some(localSynchronizerNodes),
-          upgradesConfig,
-          spliceInstanceNamesConfig,
-          loggerFactory,
-          packageVersionSupport,
-          enabledFeatures,
-        )
+      synchronizerNodeReconciler = new SynchronizerNodeReconciler(
+        dsoStore,
+        connection,
+        config.legacyMigrationId,
+        packageVersionSupport,
+        clock,
+        retryProvider,
+        logger,
+        config.domainMigrationId,
+        config.scan,
+      )
+      dsoAutomationService = newSvDsoAutomationService(
+        svStore,
+        dsoStore,
+        Some(localSynchronizerNodes),
+        upgradesConfig,
+        packageVersionSupport,
+        enabledFeatures,
+        synchronizerNodeReconciler,
+      )
       // We register the traffic triggers earlier for domain migrations to ensure that SV nodes obtain
       // unlimited traffic and prevent lock-out issues due to lack of traffic (see #13868)
       _ = dsoAutomationService.registerTrafficReconciliationTriggers()
@@ -290,7 +292,6 @@ class DomainMigrationInitializer(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
-        packageVersionSupport,
         skipTrafficReconciliationTriggers = true,
         unpauseSynchronizer = migrationDump.domainDataSnapshot.synchronizerWasPaused,
       )

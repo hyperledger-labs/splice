@@ -24,9 +24,12 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerEnabledSynchronization,
 }
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, StatusAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately
 
 import java.net.URI
 import scala.concurrent.{ExecutionContext, Future}
@@ -35,6 +38,8 @@ class LogicalSynchronizerUpgradeTrigger(
     baseContext: TriggerContext,
     currentSynchronizerNode: SvSynchronizerNode,
     successorSynchronizerNode: LocalSynchronizerNode,
+    reconciler: SynchronizerNodeReconciler,
+    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -203,6 +208,11 @@ class LogicalSynchronizerUpgradeTrigger(
             sequencerId = sequencerId,
             connection = successorConnection,
           )
+        _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
+          localSynchronizerNodes,
+          psid.logical,
+          OnboardedImmediately,
+        )
       } yield { result }
     })
   }

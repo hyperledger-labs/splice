@@ -49,6 +49,8 @@ class SynchronizerNodeReconciler(
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
+    migrationId: Long,
+    scanConfig: SvScanConfig,
 ) {
 
   private val svParty = dsoStore.key.svParty
@@ -58,8 +60,6 @@ class SynchronizerNodeReconciler(
       synchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
       synchronizerId: SynchronizerId,
       state: SynchronizerNodeState,
-      migrationId: Long,
-      scanConfig: SvScanConfig,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,

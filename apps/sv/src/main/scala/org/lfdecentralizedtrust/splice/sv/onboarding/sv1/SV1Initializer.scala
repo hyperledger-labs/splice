@@ -195,7 +195,6 @@ class SV1Initializer(
             // TODO(#2666) Make the delays configurable.
             sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           ),
-          manualConnect = false,
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
             minObservationDuration = config.timeTrackerMinObservationDuration,
@@ -347,6 +346,17 @@ class SV1Initializer(
         upgradesConfig,
         packageVersionSupport,
         enabledFeatures,
+        new SynchronizerNodeReconciler(
+          dsoStore,
+          connection,
+          config.legacyMigrationId,
+          packageVersionSupport,
+          clock,
+          retryProvider,
+          logger,
+          config.domainMigrationId,
+          config.scan,
+        ),
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
       withDsoStore = new WithDsoStore(
@@ -382,9 +392,7 @@ class SV1Initializer(
       // We only set the domain sequencer config if the existing one is different here.
       _ <-
         if (!config.shouldSkipSynchronizerInitialization) {
-          withDsoStore.reconcileSequencerConfigIfRequired(
-            config.domainMigrationId
-          )
+          withDsoStore.reconcileSequencerConfigIfRequired()
         } else {
           logger.info(
             "Skipping reconcile sequencer config step because skipSynchronizerInitialization is enabled"
@@ -639,6 +647,8 @@ class SV1Initializer(
       retryProvider = retryProvider,
       logger = logger,
       versionSupport = packageVersionSupport,
+      migrationId = config.domainMigrationId,
+      scanConfig = config.scan,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly
@@ -654,17 +664,13 @@ class SV1Initializer(
       logger,
     )
 
-    def reconcileSequencerConfigIfRequired(
-        migrationId: Long
-    )(implicit
+    def reconcileSequencerConfigIfRequired()(implicit
         tc: TraceContext
     ): Future[Unit] = {
       synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
         localSynchronizerNodes.some,
         synchronizerId,
         SynchronizerNodeState.OnboardedImmediately,
-        migrationId,
-        config.scan,
       )
     }
 
