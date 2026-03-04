@@ -27,7 +27,7 @@ jobs:
       - name: Set up Nix (Self hosted)
         uses: ./splice-shared-gha/.github/actions/nix/setup_nix
         with:
-          cache_version: 77777777777777777
+          cache_version: 77777777877777777
           artifactory_user: dummy
           artifactory_password: dummy
           target: default

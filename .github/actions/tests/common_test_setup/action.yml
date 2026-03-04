@@ -69,7 +69,7 @@ runs:
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
-        cache_version: 77777777777777777
+        cache_version: 77777777877777777
         should_save: ${{ inputs.save_nix_cache }}
         should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         target: ${{ inputs.target }}
@@ -81,4 +81,4 @@ runs:
       id: setup_sbt
       uses: ./splice-shared-gha/.github/actions/sbt/setup_sbt
       with:
-        cache_version: 77777777777777777
+        cache_version: 77777777877777777
