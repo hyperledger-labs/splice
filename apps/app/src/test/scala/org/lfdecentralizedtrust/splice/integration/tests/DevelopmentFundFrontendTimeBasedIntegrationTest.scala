@@ -52,11 +52,23 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     loginOnCurrentPage(port, ledgerApiUser, hostname)
   }
 
-  private val futureExpiresAtFormatted = "12/31/2060 12:00 pm"
-  private val pastExpiresAtFormatted = "01/01/2020 12:00 pm"
-  // Must be before futureExpiresAtFormatted but after sim-clock time
-  // (sim clock lands around ~2031 after environment bootstrap + round advances)
-  private val expiringExpiresAtFormatted = "12/31/2040 11:59 pm"
+  // Computes a formatted date string for the MUI DateTimePicker from an Instant.
+  // The sim clock position after bootstrap is non-deterministic, so all dates must
+  // be computed dynamically relative to the current ledger time.
+  private def formatDateTimeForUI(instant: Instant): String = {
+    val formatter = java.time.format.DateTimeFormatter
+      .ofPattern("MM/dd/yyyy hh:mm a", java.util.Locale.US)
+    formatter.format(instant.atZone(java.time.ZoneOffset.UTC))
+  }
+
+  // Returns the latest of the ledger time and the wall clock. Dates entered in the
+  // MUI DateTimePicker must be in the future of both: the frontend validates against
+  // the browser's wall clock, while the backend validates against the ledger time.
+  private def latestTime(implicit env: SpliceTestConsoleEnvironment): Instant = {
+    val ledgerTime = getLedgerTime.toInstant
+    val wallClock = Instant.now()
+    if (wallClock.isAfter(ledgerTime)) wallClock else ledgerTime
+  }
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -81,284 +93,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
       )
 
 
-  "Development Fund - Happy Path (DFM doesn't change)" should {
-
-    "complete full lifecycle via UI: allocation, withdrawal, claiming, and expiring" in {
-      implicit env =>
-        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-        val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-
-        clue("Set alice (wallet user) as initial DFM via governance vote") {
-          changeDevelopmentFundManager(aliceParty)
-        }
-
-        val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-        val bobDamlUser = bobWalletClient.config.ledgerApiUser
-
-        val bobCollectRewardsTrigger =
-          bobValidatorBackend
-            .userWalletAutomation(bobDamlUser)
-            .futureValue
-            .trigger[CollectRewardsAndMergeAmuletsTrigger]
-
-        val expiredDevelopmentFundCouponTriggers =
-          activeSvs.map(
-            _.dsoDelegateBasedAutomation.trigger[ExpiredDevelopmentFundCouponTrigger]
-          )
-
-        // ===================================================================
-        // Section: Generate unclaimed coupons by advancing rounds
-        // ===================================================================
-
-        clue("Advance rounds to generate unclaimed development fund coupons") {
-          aliceWalletClient.tap(100.0)
-          Range(0, 6).foreach(_ => {
-            advanceTime(tickDurationWithBuffer)
-            advanceRoundsByOneTickViaAutomation()
-          })
-        }
-
-        // ===================================================================
-        // Section: Allocation via UI
-        // ===================================================================
-
-        setTriggersWithin(
-          triggersToPauseAtStart =
-            Seq(bobCollectRewardsTrigger) ++ expiredDevelopmentFundCouponTriggers
-        ) {
-          withFrontEnd("alice") { implicit webDriver =>
-            actAndCheck(
-              "Alice (DFM) logs in and navigates to Development Fund page", {
-                browseToAliceWallet(aliceDamlUser)
-                eventuallyClickOn(id("navlink-development-fund"))
-              },
-            )(
-              "Alice sees the Development Fund page without warning",
-              _ => {
-                find(className("MuiAlert-standardInfo")) shouldBe empty
-                waitForQuery(id("development-fund-allocation-beneficiary"))
-                waitForQuery(id("unclaimed-total-amount"))
-              },
-            )
-
-            clue("Check: Total unclaimed should be positive") {
-              eventually() {
-                val totalText = find(id("unclaimed-total-amount")).value.text
-                totalText should not be "0"
-              }
-            }
-
-            val allocationAmount = BigDecimal(10)
-            val allocationReason = "Test allocation for Bob"
-
-            actAndCheck(
-              "Alice allocates a coupon to Bob via UI", {
-                setAnsField(
-                  textField(id("development-fund-allocation-beneficiary")),
-                  bobParty.toProtoPrimitive,
-                  bobParty.toProtoPrimitive,
-                )
-                eventuallyClickOn(id("development-fund-allocation-amount"))
-                textField(id("development-fund-allocation-amount")).underlying.clear()
-                textField(id("development-fund-allocation-amount")).underlying.sendKeys(
-                  allocationAmount.toString
-                )
-                waitForQuery(id("development-fund-allocation-expires-at"))
-                setDateTimeWithoutScroll(
-                  "development-fund-allocation-expires-at",
-                  futureExpiresAtFormatted,
-                )
-                eventuallyClickOn(id("development-fund-allocation-reason"))
-                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(allocationReason)
-                eventuallyClickOn(id("development-fund-allocation-submit-button"))
-              },
-            )(
-              "Coupon is allocated and shown in active list with correct fields",
-              _ => {
-                eventually() {
-                  val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
-                  rows should have size 1
-                  val rowText = rows.head.text
-                  rowText should include("10.0000")
-                  rowText should include(allocationReason)
-                }
-              },
-            )
-
-            // ===================================================================
-            // Section: Withdrawal via UI
-            // ===================================================================
-
-            actAndCheck(
-              "Alice withdraws the coupon via UI", {
-                eventuallyClickOn(
-                  cssSelector("#active-coupons-table tbody tr td:last-child button")
-                )
-                waitForQuery(cssSelector("[role='dialog']"))
-                val reasonField = webDriver.findElement(
-                  org.openqa.selenium.By.cssSelector(
-                    "[role='dialog'] textarea[placeholder='Enter the reason for withdrawal']"
-                  )
-                )
-                reasonField.sendKeys("Test withdrawal reason")
-                eventuallyClickOn(cssSelector("[role='dialog'] button.MuiButton-contained"))
-              },
-            )(
-              "Coupon is withdrawn, removed from active list, unclaimed total increased, and shown in History as withdrawn",
-              _ => {
-                eventually() {
-                  val emptyStateCell = find(
-                    cssSelector("#active-coupons-table tbody tr td[colspan='6']")
-                  )
-                  emptyStateCell.isDefined shouldBe true
-                  emptyStateCell.value.text should include("No development fund allocations found")
-
-                  val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
-                  historyRows should not be empty
-                  historyRows.exists(row => row.text.contains("Withdrawn")) shouldBe true
-                }
-              },
-            )
-          }
-        }
-
-        // ===================================================================
-        // Section: Claiming (coupon is claimed by beneficiary's automation)
-        // ===================================================================
-
-        clue("Claiming test") {
-          val bobBalanceBefore = bobWalletClient.balance().unlockedQty
-          val claimingAllocationAmount = BigDecimal(10)
-
-          bobCollectRewardsTrigger.pause().futureValue
-          expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
-
-          withFrontEnd("alice") { implicit webDriver =>
-            browseToAliceWallet(aliceDamlUser)
-            eventuallyClickOn(id("navlink-development-fund"))
-            waitForQuery(id("development-fund-allocation-beneficiary"))
-
-            actAndCheck(
-              "Alice allocates a coupon for claiming test", {
-                setAnsField(
-                  textField(id("development-fund-allocation-beneficiary")),
-                  bobParty.toProtoPrimitive,
-                  bobParty.toProtoPrimitive,
-                )
-                eventuallyClickOn(id("development-fund-allocation-amount"))
-                textField(id("development-fund-allocation-amount")).underlying.clear()
-                textField(id("development-fund-allocation-amount")).underlying.sendKeys(
-                  claimingAllocationAmount.toString
-                )
-                waitForQuery(id("development-fund-allocation-expires-at"))
-                setDateTimeWithoutScroll(
-                  "development-fund-allocation-expires-at",
-                  futureExpiresAtFormatted,
-                )
-                eventuallyClickOn(id("development-fund-allocation-reason"))
-                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(
-                  "Coupon for claiming test"
-                )
-                eventuallyClickOn(id("development-fund-allocation-submit-button"))
-              },
-            )(
-              "Coupon is allocated and unclaimed total has decreased",
-              _ => {
-                eventually() {
-                  val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
-                  rows.exists(row => row.text.contains("10.0000")) shouldBe true
-                }
-              },
-            )
-            bobCollectRewardsTrigger.resume()
-
-            eventually() {
-              aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
-              val bobBalanceAfter = bobWalletClient.balance().unlockedQty
-              bobBalanceAfter should be > bobBalanceBefore
-            }
-
-            webDriver.navigate().refresh()
-            eventuallyClickOn(id("navlink-development-fund"))
-            eventually() {
-              val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
-              historyRows.exists(row => row.text.contains("Claimed")) shouldBe true
-            }
-          }
-
-          bobCollectRewardsTrigger.pause().futureValue
-        }
-
-        // ===================================================================
-        // Section: Expiring (coupon expires after time passes)
-        // ===================================================================
-
-        clue("Expiring test") {
-          expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
-
-          val expiringAllocationAmount = BigDecimal(1)
-
-          withFrontEnd("alice") { implicit webDriver =>
-            browseToAliceWallet(aliceDamlUser)
-            eventuallyClickOn(id("navlink-development-fund"))
-            waitForQuery(id("development-fund-allocation-beneficiary"))
-
-            actAndCheck(
-              "Alice allocates a coupon with expiration", {
-                setAnsField(
-                  textField(id("development-fund-allocation-beneficiary")),
-                  bobParty.toProtoPrimitive,
-                  bobParty.toProtoPrimitive,
-                )
-                eventuallyClickOn(id("development-fund-allocation-amount"))
-                textField(id("development-fund-allocation-amount")).underlying.clear()
-                textField(id("development-fund-allocation-amount")).underlying.sendKeys(
-                  expiringAllocationAmount.toString
-                )
-                waitForQuery(id("development-fund-allocation-expires-at"))
-                setDateTimeWithoutScroll(
-                  "development-fund-allocation-expires-at",
-                  expiringExpiresAtFormatted,
-                )
-                eventuallyClickOn(id("development-fund-allocation-reason"))
-                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(
-                  "Coupon for expiring test"
-                )
-                eventuallyClickOn(id("development-fund-allocation-submit-button"))
-              },
-            )(
-              "Coupon is allocated",
-              _ => {
-                eventually() {
-                  aliceWalletClient.listActiveDevelopmentFundCoupons() should have size 1
-                }
-              },
-            )
-            clue("Advance time past expiresAt") {
-              // Compute the advance needed to get past expiringExpiresAt (2040-12-31T23:59:00Z)
-              // dynamically, since the sim clock position after bootstrap is non-deterministic.
-              val now = getLedgerTime.toInstant
-              val expiringExpiresAtInstant = Instant.parse("2040-12-31T23:59:00Z")
-              val timeToAdvance = Duration.between(now, expiringExpiresAtInstant).plusDays(30)
-              advanceTime(timeToAdvance)
-            }
-            expiredDevelopmentFundCouponTriggers.foreach(_.resume())
-
-            eventually() {
-              aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
-            }
-
-            webDriver.navigate().refresh()
-            eventuallyClickOn(id("navlink-development-fund"))
-            eventually() {
-              val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
-              historyRows.exists(row => row.text.contains("Expired")) shouldBe true
-            }
-          }
-        }
-    }
-  }
-
   "Development Fund - Unhappy path (invalid allocation values)" should {
 
     "reject allocation when amount exceeds unclaimed development fund total" in {
@@ -379,6 +113,9 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             advanceRoundsByOneTickViaAutomation()
           })
         }
+
+        val futureExpiresAtFormatted =
+          formatDateTimeForUI(latestTime.plus(Duration.ofDays(365 * 30)))
 
         withFrontEnd("alice") { implicit webDriver =>
           browseToAliceWallet(aliceDamlUser)
@@ -459,6 +196,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           advanceRoundsByOneTickViaAutomation()
         })
       }
+
+      val futureExpiresAtFormatted =
+        formatDateTimeForUI(latestTime.plus(Duration.ofDays(365 * 30)))
+      // Must be in the past of the browser's wall clock (not ledger time),
+      // since the frontend validates expiry dates against Date.now().
+      val pastExpiresAtFormatted = "01/01/2020 12:00 pm"
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
@@ -633,6 +376,9 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           advanceRoundsByOneTickViaAutomation()
         })
       }
+
+      val futureExpiresAtFormatted =
+        formatDateTimeForUI(latestTime.plus(Duration.ofDays(365 * 30)))
 
       // ===================================================================
       // Section: Create coupons for user_1, change DFM, and verify transition
@@ -957,6 +703,288 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           }
         }
       }
+    }
+  }
+
+  // This test must run last because its expiry section advances the sim clock
+  // by several years, which destabilizes Canton's round management for subsequent tests.
+  "Development Fund - Happy Path (DFM doesn't change)" should {
+
+    "complete full lifecycle via UI: allocation, withdrawal, claiming, and expiring" in {
+      implicit env =>
+        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+        clue("Set alice (wallet user) as initial DFM via governance vote") {
+          changeDevelopmentFundManager(aliceParty)
+        }
+
+        val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+        val bobDamlUser = bobWalletClient.config.ledgerApiUser
+
+        val bobCollectRewardsTrigger =
+          bobValidatorBackend
+            .userWalletAutomation(bobDamlUser)
+            .futureValue
+            .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+        val expiredDevelopmentFundCouponTriggers =
+          activeSvs.map(
+            _.dsoDelegateBasedAutomation.trigger[ExpiredDevelopmentFundCouponTrigger]
+          )
+
+        // ===================================================================
+        // Section: Generate unclaimed coupons by advancing rounds
+        // ===================================================================
+
+        clue("Advance rounds to generate unclaimed development fund coupons") {
+          aliceWalletClient.tap(100.0)
+          Range(0, 6).foreach(_ => {
+            advanceTime(tickDurationWithBuffer)
+            advanceRoundsByOneTickViaAutomation()
+          })
+        }
+
+        val futureExpiresAtFormatted =
+          formatDateTimeForUI(latestTime.plus(Duration.ofDays(365 * 30)))
+
+        // ===================================================================
+        // Section: Allocation via UI
+        // ===================================================================
+
+        setTriggersWithin(
+          triggersToPauseAtStart =
+            Seq(bobCollectRewardsTrigger) ++ expiredDevelopmentFundCouponTriggers
+        ) {
+          withFrontEnd("alice") { implicit webDriver =>
+            actAndCheck(
+              "Alice (DFM) logs in and navigates to Development Fund page", {
+                browseToAliceWallet(aliceDamlUser)
+                eventuallyClickOn(id("navlink-development-fund"))
+              },
+            )(
+              "Alice sees the Development Fund page without warning",
+              _ => {
+                find(className("MuiAlert-standardInfo")) shouldBe empty
+                waitForQuery(id("development-fund-allocation-beneficiary"))
+                waitForQuery(id("unclaimed-total-amount"))
+              },
+            )
+
+            clue("Check: Total unclaimed should be positive") {
+              eventually() {
+                val totalText = find(id("unclaimed-total-amount")).value.text
+                totalText should not be "0"
+              }
+            }
+
+            val allocationAmount = BigDecimal(10)
+            val allocationReason = "Test allocation for Bob"
+
+            actAndCheck(
+              "Alice allocates a coupon to Bob via UI", {
+                setAnsField(
+                  textField(id("development-fund-allocation-beneficiary")),
+                  bobParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
+                )
+                eventuallyClickOn(id("development-fund-allocation-amount"))
+                textField(id("development-fund-allocation-amount")).underlying.clear()
+                textField(id("development-fund-allocation-amount")).underlying.sendKeys(
+                  allocationAmount.toString
+                )
+                waitForQuery(id("development-fund-allocation-expires-at"))
+                setDateTimeWithoutScroll(
+                  "development-fund-allocation-expires-at",
+                  futureExpiresAtFormatted,
+                )
+                eventuallyClickOn(id("development-fund-allocation-reason"))
+                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(allocationReason)
+                eventuallyClickOn(id("development-fund-allocation-submit-button"))
+              },
+            )(
+              "Coupon is allocated and shown in active list with correct fields",
+              _ => {
+                eventually() {
+                  val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
+                  rows should have size 1
+                  val rowText = rows.head.text
+                  rowText should include("10.0000")
+                  rowText should include(allocationReason)
+                }
+              },
+            )
+
+            // ===================================================================
+            // Section: Withdrawal via UI
+            // ===================================================================
+
+            actAndCheck(
+              "Alice withdraws the coupon via UI", {
+                eventuallyClickOn(
+                  cssSelector("#active-coupons-table tbody tr td:last-child button")
+                )
+                waitForQuery(cssSelector("[role='dialog']"))
+                val reasonField = webDriver.findElement(
+                  org.openqa.selenium.By.cssSelector(
+                    "[role='dialog'] textarea[placeholder='Enter the reason for withdrawal']"
+                  )
+                )
+                reasonField.sendKeys("Test withdrawal reason")
+                eventuallyClickOn(cssSelector("[role='dialog'] button.MuiButton-contained"))
+              },
+            )(
+              "Coupon is withdrawn, removed from active list, unclaimed total increased, and shown in History as withdrawn",
+              _ => {
+                eventually() {
+                  val emptyStateCell = find(
+                    cssSelector("#active-coupons-table tbody tr td[colspan='6']")
+                  )
+                  emptyStateCell.isDefined shouldBe true
+                  emptyStateCell.value.text should include("No development fund allocations found")
+
+                  val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
+                  historyRows should not be empty
+                  historyRows.exists(row => row.text.contains("Withdrawn")) shouldBe true
+                }
+              },
+            )
+          }
+        }
+
+        // ===================================================================
+        // Section: Claiming (coupon is claimed by beneficiary's automation)
+        // ===================================================================
+
+        clue("Claiming test") {
+          val bobBalanceBefore = bobWalletClient.balance().unlockedQty
+          val claimingAllocationAmount = BigDecimal(10)
+
+          bobCollectRewardsTrigger.pause().futureValue
+          expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
+
+          withFrontEnd("alice") { implicit webDriver =>
+            browseToAliceWallet(aliceDamlUser)
+            eventuallyClickOn(id("navlink-development-fund"))
+            waitForQuery(id("development-fund-allocation-beneficiary"))
+
+            actAndCheck(
+              "Alice allocates a coupon for claiming test", {
+                setAnsField(
+                  textField(id("development-fund-allocation-beneficiary")),
+                  bobParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
+                )
+                eventuallyClickOn(id("development-fund-allocation-amount"))
+                textField(id("development-fund-allocation-amount")).underlying.clear()
+                textField(id("development-fund-allocation-amount")).underlying.sendKeys(
+                  claimingAllocationAmount.toString
+                )
+                waitForQuery(id("development-fund-allocation-expires-at"))
+                setDateTimeWithoutScroll(
+                  "development-fund-allocation-expires-at",
+                  futureExpiresAtFormatted,
+                )
+                eventuallyClickOn(id("development-fund-allocation-reason"))
+                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(
+                  "Coupon for claiming test"
+                )
+                eventuallyClickOn(id("development-fund-allocation-submit-button"))
+              },
+            )(
+              "Coupon is allocated and unclaimed total has decreased",
+              _ => {
+                eventually() {
+                  val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
+                  rows.exists(row => row.text.contains("10.0000")) shouldBe true
+                }
+              },
+            )
+            bobCollectRewardsTrigger.resume()
+
+            eventually() {
+              aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+              val bobBalanceAfter = bobWalletClient.balance().unlockedQty
+              bobBalanceAfter should be > bobBalanceBefore
+            }
+
+            webDriver.navigate().refresh()
+            eventuallyClickOn(id("navlink-development-fund"))
+            eventually() {
+              val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
+              historyRows.exists(row => row.text.contains("Claimed")) shouldBe true
+            }
+          }
+
+          bobCollectRewardsTrigger.pause().futureValue
+        }
+
+        // ===================================================================
+        // Section: Expiring (coupon expires after time passes)
+        // ===================================================================
+
+        clue("Expiring test") {
+          expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
+
+          val expiringAllocationAmount = BigDecimal(1)
+          val expiringExpiresAt = latestTime.plus(Duration.ofDays(365 * 5))
+          val expiringExpiresAtFormatted = formatDateTimeForUI(expiringExpiresAt)
+
+          withFrontEnd("alice") { implicit webDriver =>
+            browseToAliceWallet(aliceDamlUser)
+            eventuallyClickOn(id("navlink-development-fund"))
+            waitForQuery(id("development-fund-allocation-beneficiary"))
+
+            actAndCheck(
+              "Alice allocates a coupon with expiration", {
+                setAnsField(
+                  textField(id("development-fund-allocation-beneficiary")),
+                  bobParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
+                )
+                eventuallyClickOn(id("development-fund-allocation-amount"))
+                textField(id("development-fund-allocation-amount")).underlying.clear()
+                textField(id("development-fund-allocation-amount")).underlying.sendKeys(
+                  expiringAllocationAmount.toString
+                )
+                waitForQuery(id("development-fund-allocation-expires-at"))
+                setDateTimeWithoutScroll(
+                  "development-fund-allocation-expires-at",
+                  expiringExpiresAtFormatted,
+                )
+                eventuallyClickOn(id("development-fund-allocation-reason"))
+                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(
+                  "Coupon for expiring test"
+                )
+                eventuallyClickOn(id("development-fund-allocation-submit-button"))
+              },
+            )(
+              "Coupon is allocated",
+              _ => {
+                eventually() {
+                  aliceWalletClient.listActiveDevelopmentFundCoupons() should have size 1
+                }
+              },
+            )
+            clue("Advance time past expiresAt") {
+              val now = getLedgerTime.toInstant
+              val timeToAdvance = Duration.between(now, expiringExpiresAt).plusDays(30)
+              advanceTime(timeToAdvance)
+            }
+            expiredDevelopmentFundCouponTriggers.foreach(_.resume())
+
+            eventually() {
+              aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+            }
+
+            webDriver.navigate().refresh()
+            eventuallyClickOn(id("navlink-development-fund"))
+            eventually() {
+              val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
+              historyRows.exists(row => row.text.contains("Expired")) shouldBe true
+            }
+          }
+        }
     }
   }
 
