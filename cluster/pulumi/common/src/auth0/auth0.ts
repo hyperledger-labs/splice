@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
-import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
@@ -567,7 +567,7 @@ export function getNamespaceConfig(
 }
 
 export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {
-  const temp = getSecretVersionOutput({
+  const temp = gcp.secretmanager.getSecretVersionOutput({
     secret: `pulumi-user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
   });
   return temp.apply(config => {
