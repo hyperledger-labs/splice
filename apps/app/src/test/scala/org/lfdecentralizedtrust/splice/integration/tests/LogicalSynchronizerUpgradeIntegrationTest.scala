@@ -29,7 +29,6 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodesConfig,
 }
 import org.lfdecentralizedtrust.splice.util.*
-import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
@@ -229,19 +228,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
         .result
         .size
 
-      Seq(
-        sv1ValidatorBackend,
-        sv2ValidatorBackend,
-        sv3ValidatorBackend,
-        sv4ValidatorBackend,
-        aliceValidatorBackend,
-      ).par.foreach(
-        _.validatorAutomation
-          .trigger[ReconcileSequencerConnectionsTrigger]
-          .pause()
-          .futureValue
-      )
-
       clue("new nodes are initialized") {
         allBackends.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor)
@@ -337,6 +323,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
         allBackends.par.map { backend =>
           eventually() {
             participantIsConnectedToNewSynchronizer(backend.participantClientWithAdminToken)
+          }
+        }
+      }
+
+      clue("Scan reports active physical synchronizer serial 1 after upgrade") {
+        eventually() {
+          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
+            scan.getActivePhysicalSynchronizerSerial() shouldBe NonNegativeInt.one
           }
         }
       }

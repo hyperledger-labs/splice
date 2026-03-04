@@ -16,10 +16,10 @@ import com.digitalasset.canton.admin.api.client.data.{
   NodeStatus,
   ParticipantStatus,
 }
-import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -33,6 +33,14 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.topology.{
+  KnownPhysicalSynchronizerId,
+  NodeIdentity,
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -40,13 +48,6 @@ import com.digitalasset.canton.topology.transaction.{
   PartyToParticipant,
   SignedTopologyTransaction,
   TopologyChangeOp,
-}
-import com.digitalasset.canton.topology.{
-  NodeIdentity,
-  ParticipantId,
-  PartyId,
-  PhysicalSynchronizerId,
-  SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -66,8 +67,8 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 
 import java.time.Instant
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 /** Connection to the subset of the Canton admin API that we rely
@@ -137,28 +138,45 @@ class ParticipantAdminConnection(
     )
   }
 
+  def lookupPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+      traceContext: TraceContext
+  ): Future[Option[PhysicalSynchronizerId]] =
+    for {
+      configuredDomains <- runCmd(
+        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+      )
+    } yield configuredDomains.collectFirst {
+      case (configuredSynchronizer, psid, _)
+          if configuredSynchronizer.synchronizerAlias == synchronizerAlias =>
+        psid.toOption
+    }.flatten
+
+  def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] = runCmd(
+    ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+  ).map(
+    _.collectFirst {
+      case (_, KnownPhysicalSynchronizerId(psid), _) if psid.logical == synchronizerId => psid
+    }.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription(
+          s"No synchronizer registered and handshaked for id $synchronizerId"
+        )
+        .asRuntimeException()
+    )
+  )
   def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] =
-    // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make
-    // a new request to the sequencer to query the domain id. ListConnectedSynchronizers
-    // on the other hand relies on a cache
-    listConnectedDomains().map(
-      _.find(
-        _.synchronizerAlias == synchronizerAlias
-      ).fold(
-        throw Status.NOT_FOUND
-          .withDescription(s"Domain with alias $synchronizerAlias is not connected")
-          .asRuntimeException()
-      )(_.physicalSynchronizerId)
+  ): Future[PhysicalSynchronizerId] = lookupPhysicalSynchronizerId(synchronizerAlias).map(
+    _.getOrElse(
+      throw Status.NOT_FOUND
+        .withDescription(
+          s"No synchronizer registered and handshaked for $synchronizerAlias"
+        )
+        .asRuntimeException()
     )
-
-  def getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
-      traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] =
-    runCmd(
-      ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
-    )
+  )
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
