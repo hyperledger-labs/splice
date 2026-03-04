@@ -18,13 +18,7 @@ import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  FutureUnlessShutdown,
-  SyncCloseable,
-}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync, FutureUnlessShutdown, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
@@ -42,21 +36,10 @@ import org.apache.pekko.pattern.CircuitBreakerOpenException
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.{Done, NotUsed}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  DedupConfig,
-  DedupOffset,
-  IncompleteReassignmentEvent,
-  LedgerClient,
-  NoDedup,
-}
+import org.lfdecentralizedtrust.splice.automation.InfiniteServiceWithShutdown
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{DedupConfig, DedupOffset, IncompleteReassignmentEvent, LedgerClient, NoDedup}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  Contract,
-  ContractWithState,
-  DisclosedContracts,
-  SpliceCircuitBreaker,
-}
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState, DisclosedContracts, SpliceCircuitBreaker}
 import shapeless.<:!<
 
 import java.security.MessageDigest
@@ -665,14 +648,17 @@ class BaseLedgerConnection(
   }
 }
 
-/** Subscription for reading the ledger */
+/** An infinite service that reads from a Pekko source, and runs an async function on it.
+ *  Optimized for closing the source quickly, so should be used in cases where the source may be closing in parallel
+ *  to the service itself, thus might cause shutdown noise. Currently, this is true for ledger ingestion services
+ *  (hence the name). */
 class SpliceLedgerSubscription[S](
     source: Source[S, NotUsed],
     map: S => Future[Unit],
     override protected[this] val retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer)
-    extends org.lfdecentralizedtrust.splice.automation.C
+    extends InfiniteServiceWithShutdown
     with RetryProvider.Has
     with FlagCloseableAsync
     with NamedLogging {

@@ -41,14 +41,14 @@ class UpdateIngestionService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends LedgerIngestionService(config, backoffClock) {
+) extends RetryableInfiniteService(config, backoffClock, "update ingestion") {
 
   private val filter = ingestionSink.ingestionFilter
 
   override protected val loggerFactory: NamedLoggerFactory =
     baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
 
-  override protected def newLedgerSubscription()(implicit
+  override protected def instantiateService()(implicit
       traceContext: TraceContext
   ): Future[SpliceLedgerSubscription[?]] =
     for {
