@@ -3866,16 +3866,10 @@ components:
       type: object
       description: |
         Traffic summary data from the sequencer for a given event.
-        When present, the sequencing_time matches the verdict's record_time.
       required:
-        - sequencing_time
         - total_traffic_cost
         - envelope_traffic_costs
       properties:
-        sequencing_time:
-          description: |
-            The sequencing time of the submission request.
-          type: string
         total_traffic_cost:
           description: |
             Total traffic cost of the message paid by the sender.
