@@ -86,7 +86,9 @@ class FeaturedAppActivityMarkerTrigger(
         amulet.FeaturedAppActivityMarker,
       ]](
         PackageIdResolver.Package.SpliceAmulet,
-        c => Seq(c.payload.provider, c.payload.beneficiary).map(PartyId.tryFromProtoPrimitive(_)),
+        c =>
+          Seq(c.payload.provider, c.payload.beneficiary, c.payload.dso)
+            .map(PartyId.tryFromProtoPrimitive(_)),
         batch.markers,
       )
       .map {
