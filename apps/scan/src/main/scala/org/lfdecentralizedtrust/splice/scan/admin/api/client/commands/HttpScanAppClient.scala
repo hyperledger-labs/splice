@@ -1384,6 +1384,32 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetUpdateByHash(
+      hash: String,
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[http.GetUpdateByHashV2Response, definitions.UpdateHistoryItemV2] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdateByHashV2Response] = {
+      client.getUpdateByHashV2(
+        hash = hash,
+        damlValueEncoding = Some(damlValueEncoding),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdateByHashV2Response.OK(response) =>
+        Right(response)
+      case http.GetUpdateByHashV2Response.NotFound(_) =>
+        Left(s"Update with hash $hash not found")
+    }
+  }
+
   case class GetEventHistory(
       count: Int,
       after: Option[(Long, String)],

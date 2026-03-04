@@ -406,6 +406,39 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v2/updates/hashes/{hash}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateByHashV2"
+      description: |
+        Returns the update with the given hash.
+      parameters:
+        - name: "hash"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItemV2"
+                # TODO(#3408): external_transaction_hash is an optional field in UpdateHistoryItemV2.
+                # We need introduce a new schema with external_transaction_hash as required field for this endpoint.
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/state/acs/snapshot-timestamp:
     get:
       tags: [external, scan]

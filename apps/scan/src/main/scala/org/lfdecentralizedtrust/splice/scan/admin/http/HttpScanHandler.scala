@@ -1827,6 +1827,53 @@ class HttpScanHandler(
     }
   }
 
+  def getUpdateByHash(
+      hash: String,
+      encoding: DamlValueEncoding,
+      consistentResponses: Boolean,
+      extracted: TraceContext,
+  ): Future[Either[ErrorResponse, UpdateHistoryItem]] = {
+    implicit val tc = extracted
+    for {
+      tx <- updateHistory.getUpdateByHash(hash)
+    } yield {
+      tx.fold[Either[ErrorResponse, UpdateHistoryItem]](
+        Left(
+          ErrorResponse(s"Transaction with hash $hash not found")
+        )
+      )(txWithMigration =>
+        Right(
+          ScanHttpEncodings.encodeUpdate(
+            txWithMigration,
+            encoding = encoding,
+            version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+          )
+        )
+      )
+    }
+  }
+
+  override def getUpdateByHashV2(respond: ScanResource.GetUpdateByHashV2Response.type)(
+      hash: String,
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateByHashV2Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByHashV2") { _ => _ =>
+      getUpdateByHash(
+        hash = hash,
+        encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
+        consistentResponses = true,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByHashV2Response.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByHashV2Response.OK(toUpdateV2(update))
+        }
+    }
+  }
+
   private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(
       f: => Future[T]
   )(implicit tc: com.digitalasset.canton.tracing.TraceContext): Future[T] = {

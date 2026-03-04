@@ -366,6 +366,29 @@ trait UpdateHistoryTestUtil extends TestCommon {
     ) withClue "external transaction hash from Scan API for updateId did not match expected hash"
   }
 
+  def compareExtTxnHashViaScanAPIForHash(
+      scanClient: ScanAppClientReference,
+      updateId: String,
+      extTxnHash: String,
+  ): Assertion = {
+
+    val treeUpdate =
+      CompactJsonScanHttpEncodings().httpToLapiUpdate(
+        scanClient.getUpdateByHash(
+          hash = extTxnHash,
+          encoding = CompactJson,
+        )
+      )
+    val extractedUpdateId = treeUpdate.update.update match {
+      case TransactionTreeUpdate(tx) =>
+        Some(tx.getUpdateId)
+      case _ => None
+    }
+    extractedUpdateId shouldBe Some(
+      updateId
+    ) withClue s"updateId $extractedUpdateId from Scan API for hash $extTxnHash did not match expected updateId $updateId"
+  }
+
   def checkUpdateHistoryMetrics(
       node: LocalInstanceReference,
       participant: ParticipantClientReference,

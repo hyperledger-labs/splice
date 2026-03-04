@@ -10,6 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
 import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
+import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   Reassignment,
@@ -1386,6 +1387,57 @@ class UpdateHistory(
         .query(
           query.toActionBuilder.as[SelectFromTransactions],
           "getUpdate",
+        )
+      creates <- queryCreateEvents(rows.map(_.rowId))
+      exercises <- queryExerciseEvents(rows.map(_.rowId))
+    } yield {
+      rows.map { row =>
+        TreeUpdateWithMigrationId(
+          decodeTransaction(
+            row,
+            creates.getOrElse(row.rowId, Seq.empty),
+            exercises.getOrElse(row.rowId, Seq.empty),
+          ),
+          row.migrationId,
+        )
+      }.headOption
+    }
+  }
+
+  def getUpdateByHash(
+      hash: String
+  )(implicit tc: TraceContext): Future[Option[TreeUpdateWithMigrationId]] = {
+    // TODO(#3408): Is this the right place to throw IAE?
+    val parsedHash = HexString
+      .parseToByteString(hash)
+      .getOrElse(throw new IllegalArgumentException(s"Malformed Hex: $hash"))
+    val safeHash = sanitizedExtTxnHash(parsedHash)
+
+    import storage.DbStorageConverters.setParameterOptionalByteArray
+    val query =
+      sql"""
+      select
+        row_id,
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        effective_at,
+        root_event_ids,
+        workflow_id,
+        command_id,
+        external_transaction_hash
+      from  update_history_transactions
+      where external_transaction_hash = $safeHash
+      and history_id = $historyId
+        """
+
+    for {
+      rows <- storage
+        .query(
+          query.toActionBuilder.as[SelectFromTransactions],
+          "getUpdateByHash",
         )
       creates <- queryCreateEvents(rows.map(_.rowId))
       exercises <- queryExerciseEvents(rows.map(_.rowId))
