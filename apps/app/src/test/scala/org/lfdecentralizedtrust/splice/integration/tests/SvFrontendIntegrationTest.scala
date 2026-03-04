@@ -1536,10 +1536,7 @@ class SvFrontendIntegrationTest
   }
 
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
-    val tbodyRejected = find(id("sv-vote-results-rejected-table-body"))
-    tbodyRejected
-      .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
-      .getOrElse(0)
+    eventuallyFindAll(className("vote-row-action")).toSeq.size
   }
 
   private def svAmuletPriceShouldMatch(
