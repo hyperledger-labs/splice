@@ -53,7 +53,7 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
   SvCometBftConfig,
@@ -73,7 +73,6 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
@@ -88,7 +87,6 @@ class DomainMigrationInitializer(
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
     cometBftConfig: Option[SvCometBftConfig],
-    cometBftClient: Option[CometBftClient],
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
@@ -216,8 +214,7 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      newCometBftNode <- SvUtil.mapToCometBftNode(
-        cometBftClient,
+      newCometBftNode <- CometBftNode(
         cometBftConfig,
         participantAdminConnection,
         logger,
