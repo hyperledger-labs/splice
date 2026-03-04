@@ -142,6 +142,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
       enabledFeatures: EnabledFeaturesConfig,
+      synchronizerNodeReconciler: SynchronizerNodeReconciler,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -166,6 +167,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       loggerFactory,
       packageVersionSupport,
       enabledFeatures,
+      synchronizerNodeReconciler,
     )
 
   protected def newDsoPartyHosting(

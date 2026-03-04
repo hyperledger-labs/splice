@@ -55,6 +55,7 @@ import org.lfdecentralizedtrust.splice.sv.lsu.{
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.nio.file.Path
@@ -77,6 +78,7 @@ class SvDsoAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
     enabledFeatures: EnabledFeaturesConfig,
+    val synchronizerNodeReconciler: SynchronizerNodeReconciler,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -252,6 +254,8 @@ class SvDsoAutomationService(
             triggerContext,
             currentSynchronizerNode,
             successorSynchronizerNode,
+            synchronizerNodeReconciler,
+            localSynchronizerNodes,
           )
         )
         registerTrigger(

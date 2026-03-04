@@ -267,6 +267,17 @@ class JoiningNodeInitializer(
               config.ledgerApiUser,
               svStore.key.dsoParty,
             )
+            synchronizerNodeReconciler = new SynchronizerNodeReconciler(
+              dsoStore,
+              connection,
+              config.legacyMigrationId,
+              packageVersionSupport,
+              clock,
+              retryProvider,
+              logger,
+              config.domainMigrationId,
+              config.scan,
+            )
             dsoAutomation =
               newSvDsoAutomationService(
                 svStore,
@@ -275,6 +286,7 @@ class JoiningNodeInitializer(
                 upgradesConfig,
                 packageVersionSupport,
                 config.parameters.enabledFeatures,
+                synchronizerNodeReconciler,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -389,14 +401,7 @@ class JoiningNodeInitializer(
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
-    val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
-      dsoStore,
-      dsoAutomationService.connection(SpliceLedgerConnectionPriority.Low),
-      config.legacyMigrationId,
-      clock,
-      retryProvider,
-      logger,
-    )
+    val synchronizerNodeReconciler = dsoAutomationService.synchronizerNodeReconciler
     for {
       // Do this at the very start as scan depends on it to start up.
       _ <- SetupUtil.ensureDsoPartyMetadataAnnotation(
@@ -413,6 +418,9 @@ class JoiningNodeInitializer(
       )
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
+      participantReportedPSid <- participantAdminConnection.getPhysicalSynchronizerId(
+        config.domains.global.alias
+      )
       _ <-
         // Unpause the synchronizer after the post onboarding triggers are started
         // that start the BFT peer reconciliation
@@ -450,9 +458,7 @@ class JoiningNodeInitializer(
               _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
                 Some(localSynchronizerNodes),
                 decentralizedSynchronizer,
-                Onboarding,
-                config.domainMigrationId,
-                config.scan,
+                Onboarding(participantReportedPSid.serial),
               )
               // Finally, fully onboard the sequencer and mediator
               physicalSynchronizerId <-
@@ -490,8 +496,6 @@ class JoiningNodeInitializer(
               localSynchronizerNodes,
               decentralizedSynchronizer,
               OnboardedAfterDelay,
-              config.domainMigrationId,
-              config.scan,
             )
         } else {
           logger.info(
@@ -703,7 +707,7 @@ class JoiningNodeInitializer(
   /** Private class to share svStore, dsoPartyHosting, and global domain-id
     * across utility methods.
     */
-  class WithSvStore(
+  private class WithSvStore(
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       dsoPartyHosting: JoiningNodeDsoPartyHosting,
       synchronizerId: SynchronizerId,
@@ -859,6 +863,17 @@ class JoiningNodeInitializer(
                   svStore.key.dsoParty,
                 )
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for dsoParty")
+                synchronizerNodeReconciler = new SynchronizerNodeReconciler(
+                  dsoStore,
+                  svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
+                  config.legacyMigrationId,
+                  packageVersionSupport,
+                  clock,
+                  retryProvider,
+                  logger,
+                  config.domainMigrationId,
+                  config.scan,
+                )
                 dsoAutomation = newSvDsoAutomationService(
                   svStore,
                   dsoStore,
@@ -866,6 +881,7 @@ class JoiningNodeInitializer(
                   upgradesConfig,
                   packageVersionSupport,
                   config.parameters.enabledFeatures,
+                  synchronizerNodeReconciler,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias

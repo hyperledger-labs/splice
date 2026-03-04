@@ -3,13 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import org.lfdecentralizedtrust.splice.environment.*
-
 abstract class SynchronizerNode(
     val sequencerAdminConnection: SequencerAdminConnection,
     val mediatorAdminConnection: MediatorAdminConnection,
-    val serial: NonNegativeInt,
 ) {}
 
 object SynchronizerNode {
@@ -17,5 +13,6 @@ object SynchronizerNode {
   case class LocalSynchronizerNodes[T](
       current: T,
       successor: Option[T],
+      legacy: Option[T],
   )
 }

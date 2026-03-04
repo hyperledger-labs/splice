@@ -38,6 +38,8 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.MapHasAsScala
+import scala.jdk.OptionConverters.RichOptional
 
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
@@ -78,7 +80,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .updateAllSvAppConfigs { (_, config) =>
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes.copy(successor =
-                config.localSynchronizerNodes.current.map(_.copy(serial = NonNegativeInt.one))
+                config.localSynchronizerNodes.current
               ),
               scheduledLsu = Some(
                 scheduledLsu
@@ -290,6 +292,38 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .list(store = Synchronizer(decentralizedSynchronizerId))
           .result
           .size should be >= topologyTransactionsOnTheSync
+      }
+
+      clue("physical synchronizers configs are set") {
+        eventually() {
+          val rulesAndState =
+            sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
+          val nodeStates = rulesAndState.svNodeStates.values
+            .map(
+              _.payload.state.synchronizerNodes
+                .get(decentralizedSynchronizerId.toProtoPrimitive)
+            )
+          nodeStates
+            .flatMap { node =>
+              node.physicalSynchronizers.toScala.value.asScala.get(0)
+            }
+            .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
+            "http://localhost:5108",
+            "http://localhost:5208",
+            "http://localhost:5308",
+            "http://localhost:5408",
+          )
+          nodeStates
+            .flatMap { node =>
+              node.physicalSynchronizers.toScala.value.asScala.get(1)
+            }
+            .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
+            "http://localhost:27108",
+            "http://localhost:27208",
+            "http://localhost:27308",
+            "http://localhost:27408",
+          )
+        }
       }
 
       clue("Validator connects to the new sequencers and sync topology") {

@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSequencerConfig}
 
@@ -17,8 +16,7 @@ abstract class SvSynchronizerNode(
     val sequencerAvailabilityDelay: Duration,
     val sequencerConfig: SequencerConfig,
     val mediatorSequencerAmplification: SubmissionRequestAmplification,
-    override val serial: NonNegativeInt,
-) extends SynchronizerNode(sequencerAdminConnection, mediatorAdminConnection, serial) {}
+) extends SynchronizerNode(sequencerAdminConnection, mediatorAdminConnection) {}
 
 sealed trait SequencerConfig {}
 

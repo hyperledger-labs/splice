@@ -24,9 +24,12 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerEnabledSynchronization,
 }
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, StatusAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately
 
 import java.net.URI
 import scala.concurrent.{ExecutionContext, Future}
@@ -35,6 +38,8 @@ class LogicalSynchronizerUpgradeTrigger(
     baseContext: TriggerContext,
     currentSynchronizerNode: SvSynchronizerNode,
     successorSynchronizerNode: LocalSynchronizerNode,
+    reconciler: SynchronizerNodeReconciler,
+    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -140,6 +145,9 @@ class LogicalSynchronizerUpgradeTrigger(
       _ = logger.info("Initializing sequencer and mediators from the data of the old nodes")
       _ <- newMediatorInitializer.initializeFromDump(state.nodeIdentities.mediator)
       _ <- newSequencerIntializer.initializeFromDump(state.nodeIdentities.sequencer)
+      parameters = successorSynchronizerNode.staticSynchronizerParameters(
+        task.work.announcement.successorSynchronizerId.serial
+      )
       _ <- context.retryProvider.ensureThat(
         RetryFor.InitializingClientCalls,
         "init_sequencer_lsu",
@@ -153,11 +161,13 @@ class LogicalSynchronizerUpgradeTrigger(
         },
         (_: String) => {
           logger.info(
-            show"Initializing sequencer from predecessor with ${successorSynchronizerNode.staticSynchronizerParameters}"
+            show"Initializing sequencer from predecessor with $parameters"
           )
           successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
             state.synchronizerState,
-            successorSynchronizerNode.staticSynchronizerParameters,
+            parameters.copy(
+              protocolVersion = task.work.announcement.successorSynchronizerId.protocolVersion
+            ),
           )
         },
         logger,
@@ -186,7 +196,7 @@ class LogicalSynchronizerUpgradeTrigger(
       )
     } yield {
       TaskSuccess(
-        show"Initialized new synchronizer with parameters ${successorSynchronizerNode.staticSynchronizerParameters}"
+        show"Initialized new synchronizer with parameters $parameters"
       )
     }).flatMap(result => {
       for {
@@ -198,6 +208,11 @@ class LogicalSynchronizerUpgradeTrigger(
             sequencerId = sequencerId,
             connection = successorConnection,
           )
+        _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
+          localSynchronizerNodes,
+          psid.logical,
+          OnboardedImmediately,
+        )
       } yield { result }
     })
   }
