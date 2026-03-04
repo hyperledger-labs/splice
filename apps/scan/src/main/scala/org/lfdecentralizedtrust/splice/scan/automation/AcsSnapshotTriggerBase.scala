@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.metrics.Timed
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskNoop,
@@ -16,7 +17,6 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   IncrementalAcsSnapshot,
   IncrementalAcsSnapshotTable,
 }
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -24,9 +24,12 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.store.HistoryMetrics.AcsSnapshotsMetrics
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 abstract class AcsSnapshotTriggerBase(
     store: AcsSnapshotStore,
@@ -40,6 +43,11 @@ abstract class AcsSnapshotTriggerBase(
 ) extends PollingParallelTaskExecutionTrigger[AcsSnapshotTriggerBase.Task] {
 
   protected val snapshotTable: IncrementalAcsSnapshotTable
+
+  // Note: some of these metrics (e.g., the latency) overlap with generic trigger metrics.
+  // The tasks performed by this trigger are however very heterogeneous,
+  // and we want to be able to distinguish between them in the metrics.
+  protected val snapshotMetrics: AcsSnapshotsMetrics
 
   // The time interval to process per trigger invocation.
   // Setting this to a large value allows snapshot generation to catch up faster when it's behind,
@@ -78,21 +86,35 @@ abstract class AcsSnapshotTriggerBase(
           )
         )
     case AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(snapshot, updateUntil) =>
-      store
-        .updateIncrementalSnapshot(
-          table = snapshotTable,
-          snapshot = snapshot,
-          targetRecordTime = updateUntil,
+      Timed
+        .future(
+          snapshotMetrics.latencyUpdate,
+          store
+            .updateIncrementalSnapshot(
+              table = snapshotTable,
+              snapshot = snapshot,
+              targetRecordTime = updateUntil,
+            ),
         )
-        .map(_ => TaskSuccess(s"Updated incremental snapshot to $updateUntil"))
+        .map(_ => {
+          snapshotMetrics.latestRecordTimeUpdate.updateValue(updateUntil)
+          TaskSuccess(s"Updated incremental snapshot to $updateUntil")
+        })
     case AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, nextAt) =>
-      store
-        .saveIncrementalSnapshot(
-          table = snapshotTable,
-          snapshot = snapshot,
-          nextSnapshotTargetRecordTime = nextAt,
+      Timed
+        .future(
+          snapshotMetrics.latencySave,
+          store
+            .saveIncrementalSnapshot(
+              table = snapshotTable,
+              snapshot = snapshot,
+              nextSnapshotTargetRecordTime = nextAt,
+            ),
         )
-        .map(_ => TaskSuccess(s"Saved incremental snapshot at ${snapshot.recordTime}"))
+        .map(_ => {
+          snapshotMetrics.latestRecordTimeSave.updateValue(snapshot.recordTime)
+          TaskSuccess(s"Saved incremental snapshot at ${snapshot.recordTime}")
+        })
     case AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(snapshot) =>
       store
         .deleteIncrementalSnapshot(
@@ -100,12 +122,19 @@ abstract class AcsSnapshotTriggerBase(
           snapshot = snapshot,
         )
         .map(_ => TaskSuccess(s"Deleted incremental snapshot"))
-  }).recover { case e: AcsSnapshotStore.FailedToAcquireLockException =>
-    // It is expected that we sometimes fail to acquire the lock on the snapshot table.
-    // The time until the lock is released is typically much larger than our task retry timeouts,
-    // so we can just silently skip the task and try again later.
-    logger.info(s"Skipping $task", e)
-    TaskNoop
+  }).transform {
+    case Success(result) =>
+      snapshotMetrics.waitingForLock.updateValue(0)
+      Success(result)
+    case Failure(e: AcsSnapshotStore.FailedToAcquireLockException) =>
+      // It is expected that we sometimes fail to acquire the lock on the snapshot table.
+      // The time until the lock is released is typically much larger than our task retry timeouts,
+      // so we can just silently skip the task and try again later.
+      snapshotMetrics.waitingForLock.updateValue(1)
+      logger.info(s"Skipping $task", e)
+      Success(TaskNoop)
+    case Failure(ex) =>
+      Failure(ex)
   }
 
   override final def isStaleTask(task: AcsSnapshotTriggerBase.Task)(implicit

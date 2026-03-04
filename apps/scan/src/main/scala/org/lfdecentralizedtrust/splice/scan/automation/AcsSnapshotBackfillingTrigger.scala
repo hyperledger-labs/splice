@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
@@ -10,7 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   IncrementalAcsSnapshot,
   IncrementalAcsSnapshotTable,
 }
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
@@ -25,6 +26,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
   UpdateIncrementalSnapshotTask,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.store.HistoryMetrics.AcsSnapshotsMetrics
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import java.util.concurrent.atomic.AtomicBoolean
@@ -43,6 +45,10 @@ class AcsSnapshotBackfillingTrigger(
 
   override val snapshotTable: IncrementalAcsSnapshotTable =
     AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
+
+  override val snapshotMetrics: AcsSnapshotsMetrics = new HistoryMetrics(context.metricsFactory)(
+    MetricsContext.Empty
+  ).AcsSnapshotsBackfilling
 
   private val isDone: AtomicBoolean = new AtomicBoolean(false)
 
