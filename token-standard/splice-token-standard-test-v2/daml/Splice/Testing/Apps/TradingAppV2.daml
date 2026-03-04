@@ -102,6 +102,7 @@ template OTCTrade with
 
         mapA_ archive allocationRequests
 
+        -- FIXME: consider what other validation is missing here
         require "Admins of batches match expected legs" (Map.keys allocationBatchesByAdmin == Map.keys transferLegsByAdmin)
         forA (Map.toList allocationBatchesByAdmin) $ \(admin, (factoryCid, allocationCids, extraArgs)) -> do
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)

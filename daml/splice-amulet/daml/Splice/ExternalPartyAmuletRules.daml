@@ -497,6 +497,7 @@ amulet_allocationFactory_settleImpl this AllocationFactory_SettleBatch {..} = do
   -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
 
   -- settle all allocations
+  -- FIXME: settle sorted by authorizer to improve view compression, and merge holdings for the same owner to auto-reduce ACS size.
   newHoldingCidss <- forA allocationCids $ \allocationCid -> do
     result <- exercise allocationCid AllocationV2.Allocation_Settle with extraArgs
     pure result.newHoldingCids
@@ -527,6 +528,7 @@ validateExpectedTransfers pp (expected :: expectedRest) allocated =
       validateExpectedTransfers pp expectedRest $
         Map.insert newExpected newRemaining $ Map.delete expected allocated
 
+-- FIXME: cleanup this debug pretty-printing code
 ppMap : (leg -> Text) -> Map.Map leg [leg] -> Text
 ppMap pp m = T.unlines $ concat [ pp k :: map (\v -> "  " <> pp v) vs  | (k, vs) <- Map.toList m ]
 

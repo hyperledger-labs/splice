@@ -37,6 +37,7 @@ data SettlementInfo = SettlementInfo
   with
     executor : Party
       -- ^ The party that is responsible for executing the settlement.
+      -- FIXME: consider supporting multiple executors instead of controller overrides. The executors are the ones ensuring atomicity across different instrument admins.
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
     requestedAt : Time
@@ -148,8 +149,10 @@ allocationAdmin AllocationSpecification{..} = admin
       [a] -> a
       _ -> error "Allocations must involve instruments from exactly one admin"
 
--- | A contract representing an allocation of some amount of asset holdings to
--- a specific leg of a settlement.
+-- | A contract representing the approval of the authorizer to send or receive
+-- the net amount of assets of the transfer legs as part of a settlement where
+-- the executor and instrument admin check that every transfer leg has a matching
+-- authorization from the counterparty.
 interface Allocation where
   viewtype AllocationView
 
@@ -175,7 +178,9 @@ interface Allocation where
     do allocation_getTransferAuthorizationsImpl this self arg
 
   choice Allocation_Settle : Allocation_SettleResult
-    -- ^ Settle the allocation. Requires authorization from the settlement executor and the instrument
+    -- ^ Settle the allocation by moving the net amount of the transfer legs.
+    --
+    -- Requires authorization from the settlement executor and the instrument
     -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
     -- settlements of other legs of the same admins.
     --

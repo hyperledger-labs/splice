@@ -267,6 +267,7 @@ testDvP = script do
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()
 
+-- FIXME: reactivate
 {-
 testDvPCancel : Script ()
 testDvPCancel = script do
