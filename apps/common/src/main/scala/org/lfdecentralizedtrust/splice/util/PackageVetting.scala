@@ -40,8 +40,7 @@ class PackageVetting(
       packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResources
-        .lookupAllPackageVersions(pkg.packageName)
-        .filter(_.metadata.version <= packageVersion)
+        .getRequiredPackageVersions(pkg.packageName, packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
     // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
@@ -206,11 +205,12 @@ class PackageVetting(
     } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
       .flatMap { case (time, config) =>
         packages.flatMap { pkg =>
-          val allPackageVersions =
-            DarResources.lookupAllPackageVersions(pkg.packageName).map(_.metadata.version)
           val configPackageVersion = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
+          val allPackageVersions =
+            DarResources
+              .getRequiredPackageVersions(pkg.packageName, configPackageVersion)
+              .map(_.metadata.version)
           allPackageVersions
-            .filter(_ <= configPackageVersion)
             .map(version => time -> (pkg -> version))
         }
       }

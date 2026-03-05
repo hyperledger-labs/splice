@@ -6611,4 +6611,25 @@ object DarResources {
 
   def lookupAllPackageVersions(name: PackageName): Seq[DarResource] =
     packageResources.view.flatMap(_.all).toSeq.filter(_.metadata.name == name)
+
+  def getRequiredPackageVersions(
+      name: PackageName,
+      upToRequiredVersion: PackageVersion,
+  ): Seq[DarResource] = {
+    val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
+    packageResources.view
+      .flatMap(_.all)
+      .toSeq
+      .filter(_.metadata.name == name)
+      .filter(pkg =>
+        minimumInitializationVersion <= pkg.metadata.version && pkg.metadata.version <= upToRequiredVersion
+      )
+      .distinct
+  }
+
+  private def lookupMinimumPackageResource(name: PackageName): DarResource =
+    packageResources
+      .find(_.minimumInitialization.metadata.name == name)
+      .getOrElse(throw new NoSuchElementException("Could not find PackageResource for this name."))
+      .minimumInitialization
 }

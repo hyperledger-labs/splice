@@ -157,6 +157,17 @@ class BootstrapPackageConfigDarUploadIntegrationTest
         }
       dars should not be empty withClue s"dars for ${packageResource.latest.metadata.name}"
       dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
+      clue("versions older than minimumInitialization should not be vetted") {
+        dars.map(_._2) shouldBe DarResources
+          .getRequiredPackageVersions(
+            packageResource.latest.metadata.name,
+            PackageVersion.assertFromString(requiredVersion),
+          )
+          .map(_.metadata.version)
+        dars.map(_._2) should contain noElementsOf DarResources.packageResources.view.flatMap { p =>
+          p.all.filter(pkg => pkg.metadata.version < p.minimumInitialization.metadata.version)
+        }
+      }
     }
   }
 }
