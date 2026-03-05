@@ -950,7 +950,7 @@ function grafanaAlertNotificationPolicies() {
   const notificationPolicies = [];
   const defaultPolicy = yaml.load(
     readGrafanaAlertingFile('notification_policies/default_slack.yaml')
-  );
+  ) as Record<string, unknown>;
   if (enableAlertEmailToSupportTeam) {
     notificationPolicies.push(
       yaml.load(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
@@ -975,6 +975,8 @@ function grafanaAlertNotificationPolicies() {
       ],
     });
   } else {
+    // we can't have a single policy with matchers, the root policy must be the default if nothing else matches
+    delete defaultPolicy.object_matchers;
     return yaml.dump({
       apiVersion: 1,
       policies: [defaultPolicy],
