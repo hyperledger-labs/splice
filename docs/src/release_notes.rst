@@ -39,6 +39,10 @@
         were incorrectly retuning LedgerEffects events (i.e., ``CreatedEvent`` and ``ExercisedEvent``). They are now corrected to return
         AcsDelta (flat) events (i.e., ``CreatedEvent`` and ``ArchivedEvent``).
 
+      - `GetUpdatesRequest.updateFormat` now appears marked as required in the OpenAPI/AsyncAPI specs even though it was previously optional.
+        This is a specification fix to align with the actual behavior of the API, which requires this field.
+        If your client code was previously omitting this field, you will need to update it to include a valid value.
+
 
   - Sequencer
 
