@@ -392,7 +392,7 @@ class HttpSvOperatorHandler(
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
       withSequencerConnection(
-        _.getStatus.map(SpliceStatus.toHttpNodeStatus)
+        _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
   }
@@ -405,7 +405,7 @@ class HttpSvOperatorHandler(
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
       withMediatorConnection(
-        _.getStatus.map(SpliceStatus.toHttpNodeStatus)
+        _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
   }
