@@ -1335,15 +1335,17 @@ function subcmd_ts2_create_base() {
     ['splice-api-token-transfer-instruction-v1']='splice-api-token-transfer-instruction-v2'
     ['splice-token-standard-test-v1']='splice-token-standard-test-v2'
     ['splice-token-standard-test-v1']='splice-token-standard-test-v2'
-    ['examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml']='splice-token-standard-test-v2/daml/Splice/Testing/Apps/TradingAppV2.daml'
   )
 
   # Copy the directories if they are not yet tracked in git
   for v1_dir in "${!STD_DIRS_V1_TO_V2[@]}"; do
     local v2_dir="${STD_DIRS_V1_TO_V2[$v1_dir]}"
 
-    copy_template "token-standard/$v1_dir" "token-standard/$v2_dir"
+    copy_template "token-standard/$v1_dir/" "token-standard/$v2_dir/"
   done
+
+  copy_template 'token-standard/examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml' \
+    'token-standard/splice-token-standard-test-v2/daml/Splice/Testing/Apps/TradingAppV2.daml'
 
   # Rename modules and file name references
   simple_rename '(?<![Mm]etadata-)(?<![Mm]etadata/)(?<![Mm]etadata)(?<! )v1///v2' "-i 'token-standard/*-v2/*'"
