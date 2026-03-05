@@ -60,3 +60,9 @@
 
          App activity record computation will be enabled step-by-step on Dev/Test/MainNet,
          once the SVs have successfully concluded their performance testing.
+
+    - Token Standard V2
+
+      .. TODO(#4549): add reference to CIP once it has a number
+
+      - Add V2 of the the token standard APIs and implement them for Amulet

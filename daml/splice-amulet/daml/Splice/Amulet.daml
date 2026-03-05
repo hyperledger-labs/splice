@@ -13,6 +13,8 @@ import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
+import Splice.TokenStandard.Utils
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -155,6 +157,9 @@ template Amulet
         lock = None
         meta = amuletMetadata this
 
+    interface instance Api.Token.HoldingV2.Holding for Amulet where
+      view = upcast (view (toInterface @Api.Token.HoldingV1.Holding this))
+
 amuletMetadata : Amulet -> Api.Token.MetadataV1.Metadata
 amuletMetadata Amulet{..} =
   Api.Token.MetadataV1.Metadata with
@@ -181,6 +186,9 @@ template LockedAmulet
           expiresAfter = None
           context = lock.optContext
         meta = amuletMetadata amulet
+
+    interface instance Api.Token.HoldingV2.Holding for LockedAmulet where
+      view = upcast (view (toInterface @Api.Token.HoldingV1.Holding this))
 
     choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
       with
