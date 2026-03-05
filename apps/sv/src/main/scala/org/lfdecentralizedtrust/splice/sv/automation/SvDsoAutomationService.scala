@@ -102,6 +102,7 @@ class SvDsoAutomationService(
         _,
         participantAdminConnection,
         config.domains.global.alias,
+        config.parameters.spliceCachingConfigs.physicalSynchronizerExpiration,
         loggerFactory,
       )
     )

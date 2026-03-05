@@ -73,6 +73,11 @@ final case class EnabledFeaturesConfig(
     newSequencerConnectionPool: Boolean = true,
 )
 
+final case class SpliceCachingConfigs(
+    physicalSynchronizerExpiration: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(15)
+)
+
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
   * For example, the [[TracingConfig]] is configured once for all Splice apps that are started by a Splice binary as part of the
   * [[com.digitalasset.canton.config.MonitoringConfig]].

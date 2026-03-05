@@ -6,18 +6,19 @@ package org.lfdecentralizedtrust.splice.environment
 import cats.implicits.catsSyntaxApplicativeError
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.caching.ScaffeineCache
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
 import io.grpc.Status
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class SynchronizerNodeService[T <: SynchronizerNode](
     nodes: SynchronizerNode.LocalSynchronizerNodes[T],
     participantAdminConnection: ParticipantAdminConnection,
     globalSynchronizerAlias: SynchronizerAlias,
+    cacheExpiration: NonNegativeFiniteDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -26,7 +27,7 @@ class SynchronizerNodeService[T <: SynchronizerNode](
 
   private val successorActiveCache =
     ScaffeineCache.buildTracedAsync[Future, Unit, Boolean](
-      Scaffeine().expireAfterWrite(30.seconds),
+      Scaffeine().expireAfterWrite(cacheExpiration.asFiniteApproximation),
       implicit tc => _ => successorActiveUncached(),
     )(logger, "successorActive")
 

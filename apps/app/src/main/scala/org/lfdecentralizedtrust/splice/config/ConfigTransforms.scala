@@ -6,7 +6,12 @@ package org.lfdecentralizedtrust.splice.config
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.environment.DarResources
-import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanAppBackendConfig}
+import org.lfdecentralizedtrust.splice.scan.config.{
+  BftSequencerConfig,
+  ScanAppBackendConfig,
+  ScanSynchronizerConfig,
+  ScanSynchronizerNodesConfig,
+}
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
@@ -426,6 +431,13 @@ object ConfigTransforms {
         .focus(_.localSynchronizerNodes.successor)
         .some
         .modify(portTransform(bump, _))
+    ).andThen(
+      updateAllScanAppConfigs((_, conf) =>
+        conf
+          .focus(_.synchronizerNodes.successor)
+          .some
+          .modify(portTransform(bump, _))
+      )
     )
   }
 
@@ -447,9 +459,7 @@ object ConfigTransforms {
       updateAllScanAppConfigs((name, conf) =>
         if (predicate(name))
           conf
-            .focus(_.sequencerAdminClient)
-            .modify(portTransform(bump, _))
-            .focus(_.mediatorAdminClient)
+            .focus(_.synchronizerNodes)
             .modify(portTransform(bump, _))
             .focus(_.bftSequencers)
             .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
@@ -524,6 +534,21 @@ object ConfigTransforms {
     Port.tryCreate((range * 1000) + port.unwrap % 1000)
   }
 
+  private def setPortPrefix(
+      range: Int,
+      c: ScanSynchronizerNodesConfig,
+  ): ScanSynchronizerNodesConfig =
+    c.focus(_.current)
+      .modify(setPortPrefix(range, _))
+      .focus(_.successor)
+      .modify(_.map(setPortPrefix(range, _)))
+
+  private def setPortPrefix(range: Int, c: ScanSynchronizerConfig): ScanSynchronizerConfig =
+    c.focus(_.sequencer.port)
+      .modify(setPortPrefix(range))
+      .focus(_.mediator.port)
+      .modify(setPortPrefix(range))
+
   private def setPortPrefixInUrl(range: Int): String => String = { s =>
     val uri = Uri(s)
     val port = uri.effectivePort
@@ -582,9 +607,7 @@ object ConfigTransforms {
         config
           .focus(_.participantClient)
           .modify(portTransform(bump, _))
-          .focus(_.sequencerAdminClient)
-          .modify(portTransform(bump, _))
-          .focus(_.mediatorAdminClient)
+          .focus(_.synchronizerNodes)
           .modify(portTransform(bump, _))
       } else {
         config
@@ -602,10 +625,8 @@ object ConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
-          .focus(_.sequencerAdminClient.port)
-          .modify(setPortPrefix(range))
-          .focus(_.mediatorAdminClient.port)
-          .modify(setPortPrefix(range))
+          .focus(_.synchronizerNodes)
+          .modify(setPortPrefix(range, _))
           .focus(_.bftSequencers)
           .modify(_.map(_.focus(_.sequencerAdminClient.port).modify(setPortPrefix(range))))
       } else {
@@ -709,7 +730,7 @@ object ConfigTransforms {
       bftSequencers = Seq(
         BftSequencerConfig(
           migrationId,
-          config.sequencerAdminClient,
+          config.synchronizerNodes.current.sequencer,
           s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}",
         )
       )
@@ -744,6 +765,21 @@ object ConfigTransforms {
 
   private def portTransform(bump: Int, c: FullClientConfig): FullClientConfig =
     c.copy(port = c.port + bump)
+
+  private def portTransform(
+      bump: Int,
+      c: ScanSynchronizerNodesConfig,
+  ): ScanSynchronizerNodesConfig =
+    c.copy(
+      current = portTransform(bump, c.current),
+      successor = c.successor.map(portTransform(bump, _)),
+    )
+
+  def portTransform(bump: Int, c: ScanSynchronizerConfig): ScanSynchronizerConfig =
+    c.copy(
+      sequencer = portTransform(bump, c.sequencer),
+      mediator = portTransform(bump, c.mediator),
+    )
 
   private def portTransform(bump: Int, c: LedgerApiClientConfig): LedgerApiClientConfig =
     c.focus(_.clientConfig).modify(portTransform(bump, _))

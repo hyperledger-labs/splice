@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppClientConfig,
   ScanCacheConfig,
   ScanSynchronizerConfig,
+  ScanSynchronizerNodesConfig,
   CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
@@ -417,6 +418,8 @@ object SpliceConfig {
     implicit val contractFetchLedgerFallbackConfigReader
         : ConfigReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
       deriveReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
+    implicit val spliceCachingConfigs: ConfigReader[SpliceCachingConfigs] =
+      deriveReader[SpliceCachingConfigs]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
@@ -471,6 +474,8 @@ object SpliceConfig {
       deriveReader[S3Config]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
+    implicit val scanSynchronizerNodes: ConfigReader[ScanSynchronizerNodesConfig] =
+      deriveReader[ScanSynchronizerNodesConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -854,6 +859,8 @@ object SpliceConfig {
     implicit val contractFetchLedgerFallbackConfigWriter
         : ConfigWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
       deriveWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
+    implicit val spliceCachingConfigs: ConfigWriter[SpliceCachingConfigs] =
+      deriveWriter[SpliceCachingConfigs]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 
@@ -915,6 +922,8 @@ object SpliceConfig {
       ConfigWriter.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(c =>
         (c.migrationId, c.sequencerAdminClient, c.p2pUrl)
       )
+    implicit val scanSynchronizerNodes: ConfigWriter[ScanSynchronizerNodesConfig] =
+      deriveWriter[ScanSynchronizerNodesConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
