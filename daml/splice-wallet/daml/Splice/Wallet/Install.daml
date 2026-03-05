@@ -11,6 +11,8 @@ import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
+-- TODO(#4620): add support for allocation v2
+
 import qualified Splice.Api.Token.AllocationV1
 import qualified Splice.Api.Token.AllocationInstructionV1
 import qualified Splice.Api.Token.TransferInstructionV1

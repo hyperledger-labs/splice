@@ -7,7 +7,12 @@ set -euo pipefail
 
 source "${TOOLS_LIB}/libcli.source"
 
-if rg -P 'Impl (?!(:|this self arg))[^=]*$' --type-add 'daml:*.daml' --type daml
+if rg -P '(?<!Default)Impl (?!(:|this self arg))[^=]*$' --type-add 'daml:*.daml' --type daml
 then
     _error "Interface choices should always pass 'this self arg' in that order"
+fi
+
+if rg -P '(?<!Default)ExtraObservers (?!(:|this arg))[^=]*$' --type-add 'daml:*.daml' --type daml
+then
+    _error "Extra choice observers on interfaces should always pass 'this arg' in that order"
 fi

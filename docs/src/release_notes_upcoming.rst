@@ -120,3 +120,9 @@
       wallet             0.1.18
       walletPayments     0.1.17
       ================== =======
+
+    - Token Standard V2
+
+      .. TODO(#4549): add reference to CIP once it has a number
+
+      - Add V2 of the the token standard APIs and implement them for Amulet

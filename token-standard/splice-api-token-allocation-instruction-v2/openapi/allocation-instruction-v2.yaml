@@ -3,11 +3,11 @@
 
 openapi: 3.0.0
 info:
-  title: allocation instruction off-ledger API
+  title: V2 allocation instruction off-ledger API
   description: |
     Implemented by token registries for using and managing
     allocation instructions by wallets.
-  version: 1.0.0
+  version: 2.0.0
 paths:
 
   /registry/allocation-instruction/v2/allocation-factory:
