@@ -10,6 +10,35 @@ ADAPTIVE_SCENARIO_ENABLED=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.enab
 MAX_VUS=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.maxVUs // 50')
 MIN_VUS=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.minVUs // 0')
 SCALE_DOWN_STEP=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.scaleDownStep // 5')
+SCALE_UP_STEP=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.scaleUpStep // 2')
+SCHEDULED_START_TIME_UTC=$(echo "$EXTERNAL_CONFIG" | jq -r '.adaptiveScenario.scheduledStartTimeUTC // "03:00"')
+
+# --- Wait for scheduled start time ---
+wait_for_scheduled_time() {
+  local target_time="$1"
+  local target_hour target_minute
+  target_hour=$(echo "$target_time" | cut -d: -f1)
+  target_minute=$(echo "$target_time" | cut -d: -f2)
+
+  local now_epoch target_epoch
+  now_epoch=$(date -u +%s)
+  target_epoch=$(date -u -d "$(date -u +%Y-%m-%d) ${target_hour}:${target_minute}:00" +%s)
+
+  # If target time has already passed today, wait until tomorrow
+  if [ "$target_epoch" -le "$now_epoch" ]; then
+    target_epoch=$(( target_epoch + 86400 ))
+  fi
+
+  local wait_seconds=$(( target_epoch - now_epoch ))
+  echo "Scheduled start time is ${target_time} UTC. Current time is $(date -u +%H:%M:%S) UTC."
+  echo "Waiting ${wait_seconds} seconds ($(( wait_seconds / 3600 ))h $(( (wait_seconds % 3600) / 60 ))m) until scheduled start..."
+  sleep "$wait_seconds"
+  echo "Scheduled start time reached. Proceeding."
+}
+
+if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ] && [ -n "$SCHEDULED_START_TIME_UTC" ]; then
+  wait_for_scheduled_time "$SCHEDULED_START_TIME_UTC"
+fi
 
 # --- Script State ---
 CURRENT_VUS=1
@@ -62,10 +91,11 @@ if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ]; then
 
       # --- 4. Act based on the delta ---
       if [ "$DELTA" -eq "0" ]; then
-        # If delta is zero and max VUs not reached, scale up with 1
+        # If delta is zero and max VUs not reached, scale up
         if [ "$CURRENT_VUS" -lt "$MAX_VUS" ]; then
-          echo "✅ No new failures. Scaling up by 1 VU."
-          NEW_VUS=$(( CURRENT_VUS + 1 ))
+          echo "✅ No new failures. Scaling up by ${SCALE_UP_STEP} VU(s)."
+          NEW_VUS=$(( CURRENT_VUS + SCALE_UP_STEP ))
+          if [ "$NEW_VUS" -gt "$MAX_VUS" ]; then NEW_VUS=$MAX_VUS; fi
           k6 scale --vus="$NEW_VUS"
           CURRENT_VUS=$NEW_VUS
         else

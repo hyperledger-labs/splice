@@ -123,6 +123,8 @@ loadTester:
   maxVUs: 30
   adaptiveScenario:
     enabled: true
+    scaleUpStep: 3
+    scheduledStartTimeUTC: "02:30"
 svs:
   default:
     pruning:
