@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -52,22 +53,26 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     loginOnCurrentPage(port, ledgerApiUser, hostname)
   }
 
-  // Computes a formatted date string for the MUI DateTimePicker from an Instant.
-  // The sim clock position after bootstrap is non-deterministic, so all dates must
-  // be computed dynamically relative to the current ledger time.
   private def formatDateTimeForUI(instant: Instant): String = {
     val formatter = java.time.format.DateTimeFormatter
       .ofPattern("MM/dd/yyyy hh:mm a", java.util.Locale.US)
     formatter.format(instant.atZone(java.time.ZoneOffset.UTC))
   }
 
-  // Returns the latest of the ledger time and the wall clock. Dates entered in the
-  // MUI DateTimePicker must be in the future of both: the frontend validates against
-  // the browser's wall clock, while the backend validates against the ledger time.
   private def latestTime(implicit env: SpliceTestConsoleEnvironment): Instant = {
     val ledgerTime = getLedgerTime.toInstant
     val wallClock = Instant.now()
     if (wallClock.isAfter(ledgerTime)) wallClock else ledgerTime
+  }
+
+  private def waitForStableUnclaimedTotal()(implicit webDriver: WebDriver): BigDecimal = {
+    eventually() {
+      val val1 = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+      Threading.sleep(2000)
+      val val2 = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+      val1 shouldBe val2
+      val1
+    }
   }
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
@@ -699,8 +704,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     }
   }
 
-  // This test must run last because its expiry section advances the sim clock
-  // by several years, which destabilizes Canton's round management for subsequent tests.
   "Development Fund - Happy Path (DFM doesn't change)" should {
 
     "complete full lifecycle via UI: allocation, withdrawal, claiming, and expiring" in {
@@ -764,11 +767,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
 
-            clue("Check: Total unclaimed should be positive") {
-              eventually() {
-                val totalText = find(id("unclaimed-total-amount")).value.text
-                totalText should not be "0"
-              }
+            val totalUnclaimedBefore = clue("Check: Total unclaimed should be positive and stable") {
+              waitForStableUnclaimedTotal()
             }
 
             val allocationAmount = BigDecimal(10)
@@ -799,6 +799,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               "Coupon is allocated and shown in active list with correct fields",
               _ => {
                 eventually() {
+                  val totalText = find(id("unclaimed-total-amount")).value.text
+                  totalText should not be empty
+                  val totalUnclaimedAfter = parseUnclaimedAmount(totalText)
+                  totalUnclaimedAfter shouldBe (totalUnclaimedBefore - allocationAmount)
+
                   val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
                   rows should have size 1
                   val rowText = rows.head.text
@@ -807,6 +812,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 }
               },
             )
+
+            val totalUnclaimedBeforeWithdrawal = waitForStableUnclaimedTotal()
 
             // ===================================================================
             // Section: Withdrawal via UI
@@ -836,6 +843,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                   emptyStateCell.isDefined shouldBe true
                   emptyStateCell.value.text should include("No development fund allocations found")
 
+                  val totalText = find(id("unclaimed-total-amount")).value.text
+                  totalText should not be empty
+                  val totalUnclaimedAfterWithdrawal = parseUnclaimedAmount(totalText)
+                  totalUnclaimedAfterWithdrawal shouldBe (totalUnclaimedBeforeWithdrawal + allocationAmount)
+
                   val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
                   historyRows should not be empty
                   historyRows.exists(row => row.text.contains("Withdrawn")) shouldBe true
@@ -856,10 +868,14 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           bobCollectRewardsTrigger.pause().futureValue
           expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
 
+          var totalUnclaimedBeforeAllocation = BigDecimal(0)
+
           withFrontEnd("alice") { implicit webDriver =>
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
+
+            totalUnclaimedBeforeAllocation = waitForStableUnclaimedTotal()
 
             actAndCheck(
               "Alice allocates a coupon for claiming test", {
@@ -890,6 +906,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 eventually() {
                   val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
                   rows.exists(row => row.text.contains("10.0000")) shouldBe true
+
+                  val totalText = find(id("unclaimed-total-amount")).value.text
+                  totalText should not be empty
+                  val totalUnclaimedAfterAllocation = parseUnclaimedAmount(totalText)
+                  totalUnclaimedAfterAllocation shouldBe (totalUnclaimedBeforeAllocation - claimingAllocationAmount)
                 }
               },
             )
@@ -904,6 +925,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             webDriver.navigate().refresh()
             eventuallyClickOn(id("navlink-development-fund"))
             eventually() {
+              val totalText = find(id("unclaimed-total-amount")).value.text
+              totalText should not be empty
+              val totalUnclaimedAfterClaiming = parseUnclaimedAmount(totalText)
+              totalUnclaimedAfterClaiming shouldBe (totalUnclaimedBeforeAllocation - claimingAllocationAmount)
+
               val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
               historyRows.exists(row => row.text.contains("Claimed")) shouldBe true
             }
@@ -919,6 +945,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         clue("Expiring test") {
           expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
 
+          var totalUnclaimedBeforeAllocation = BigDecimal(0)
           val expiringAllocationAmount = BigDecimal(1)
           val expiringExpiresAt = latestTime.plus(Duration.ofDays(365 * 5))
           val expiringExpiresAtFormatted = formatDateTimeForUI(expiringExpiresAt)
@@ -927,6 +954,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
+
+            totalUnclaimedBeforeAllocation = waitForStableUnclaimedTotal()
 
             actAndCheck(
               "Alice allocates a coupon with expiration", {
@@ -956,6 +985,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               _ => {
                 eventually() {
                   aliceWalletClient.listActiveDevelopmentFundCoupons() should have size 1
+
+                  val totalText = find(id("unclaimed-total-amount")).value.text
+                  totalText should not be empty
+                  val totalUnclaimedAfterAllocation = parseUnclaimedAmount(totalText)
+                  totalUnclaimedAfterAllocation shouldBe (totalUnclaimedBeforeAllocation - expiringAllocationAmount)
                 }
               },
             )
@@ -973,6 +1007,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             webDriver.navigate().refresh()
             eventuallyClickOn(id("navlink-development-fund"))
             eventually() {
+              val totalText = find(id("unclaimed-total-amount")).value.text
+              totalText should not be empty
+              val totalUnclaimedAfterExpiry = parseUnclaimedAmount(totalText)
+              totalUnclaimedAfterExpiry shouldBe totalUnclaimedBeforeAllocation
+
               val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
               historyRows.exists(row => row.text.contains("Expired")) shouldBe true
             }
