@@ -149,7 +149,7 @@ tests:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_PERMISSIONED_SYNCHRONIZER')].value
           value: |
             canton.sv-apps.sv.permissioned-synchronizer = true
-  - it: "sets domain configuration (backwards compatible)"
+  - it: "sets synchronizer configuration (backwards compatible)"
     set:
       domain:
         sequencerPublicUrl: "https://sequencer.test.com"
