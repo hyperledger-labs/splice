@@ -2,7 +2,7 @@
 
 This directory contains the code for the Splice Load Tester, built around `k6.io` scripts.
 
-Currently there is only one test, `generate-load.js`, whose purpose is to generate Splice app load via repeated p2p transfers. It is deployed as a Kubernetes Deployment in Splice clusters that have `loadTester.enable: true` in their cluster config YAML. An optional adaptive controller can automatically scale load to find maximum throughput (see Adaptive Load Testing below).
+Currently there is only one test, `generate-load.js`, whose purpose is to generate Splice app load via repeated transfers. It is deployed as a Kubernetes Deployment in Splice clusters that have `loadTester.enable: true` in their cluster config YAML. An optional adaptive controller can automatically scale load to find maximum throughput (see Adaptive Load Testing below).
 
 It is possible to run this script in a developer initiated, ad-hoc manner via `cncluster load_test`.
 
@@ -34,7 +34,7 @@ To run this test from your machine:
 3. Run `cncluster load_test` from the cluster's deployment directory
 4. Visit `https://grafana.<HOSTNAME>/d/ccbb2351-2ae2-462f-ae0e-f2c893ad1028/k6-prometheus` to view results
 
-The current test runs a workload of 10 users per validator that iteratively perform p2p transfers for the total duration specified in K6_TEST_DURATION. The rate at which users conduct transfers amongst each other is controlled by setting the iterations per minute.
+The current test runs a workload of 10 users per validator that iteratively perform transfers for the total duration specified in K6_TEST_DURATION. The rate at which users conduct transfers amongst each other is controlled by setting the iterations per minute.
 
 These options are configured by passing in a JSON string via the environment, and parsed in `src/settings.ts`.
 
