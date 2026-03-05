@@ -38,6 +38,18 @@ export function getNotificationChannel(
     : undefined;
 }
 
+function getAlertStrategy(notificationChannel: gcp.monitoring.NotificationChannel) {
+  return {
+    autoClose: '3600s',
+    notificationChannelStrategies: [
+      {
+        notificationChannelNames: [notificationChannel.name],
+        renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+      },
+    ],
+  };
+}
+
 export function installGcpLoggingAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
@@ -81,15 +93,7 @@ ${Object.keys(logAlerts)
   const alertCount = enableChaosMesh ? 50 : 1;
   const displayName = `Log warnings and errors > ${alertCount} ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('logsAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -156,15 +160,7 @@ ${ensureTrailingNewline(loggedSecretsFilter)}`;
 
   const displayName = `Logged secrets detected in ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('loggedSecretsAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -222,15 +218,7 @@ jsonPayload.state=~"STARTED"`,
 
   const displayName = `Cluster ${CLUSTER_BASENAME} is being updated`;
   new gcp.monitoring.AlertPolicy('updateClusterAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -273,15 +261,7 @@ resource.type="cloudsql_database"
 
   const displayName = `Possible CloudSQL maintenance going on in ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('updateCloudSQLAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
