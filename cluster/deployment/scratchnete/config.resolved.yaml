@@ -496,9 +496,18 @@ svs:
 synchronizerMigration:
   active:
     id: 0
+    releaseReference:
+      deploymentDir: 'cluster/deployment'
+      gitReference: 'refs/heads/tom-da/basicScratch'
+      privateConfigsDir: 'cluster/configs/configs-private'
+      publicConfigsDir: 'cluster/configs/configs'
+      pulumiBaseDir: 'splice/cluster/pulumi'
+      pulumiStacksDir: 'cluster/stacks/prod'
+      repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
+      spliceRoot: 'splice'
     sequencer:
       enableBftSequencer: true
-    version: 'local'
+    version: '0.5.13-tomtantillo-dirty'
 validator1:
   deduplicationDuration: '30m'
   logging:
