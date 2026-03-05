@@ -36,6 +36,7 @@ class BftScanConnectionIntegrationTest
     with HasActorSystem {
 
   override protected def runEventHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -246,6 +247,31 @@ class BftScanConnectionIntegrationTest
       }
     }
 
+  }
+
+  "validator reboots when initial bootstrap scan is offline" in { implicit env =>
+    clue("Initialize the DSO") {
+      initDso()
+    }
+
+    clue("Start Alice validator") {
+      aliceValidatorBackend.startSync()
+    }
+
+    clue("Stop SV1 scan") {
+      sv1ScanBackend.stop()
+    }
+
+    clue("Stop Alice validator") {
+      aliceValidatorBackend.stop()
+    }
+
+    clue("Reboot Alice validator and verify it can initialize using the other 3 Scans") {
+      eventuallySucceeds() {
+        aliceValidatorBackend.startSync()
+        aliceValidatorBackend.onboardUser("Test")
+      }
+    }
   }
 
   private val bootstrapsWith1UrlLog =
