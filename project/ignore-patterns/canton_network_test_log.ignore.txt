@@ -117,6 +117,7 @@ Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
 Failed to connect to scan of .*DisasterRecoveryIntegrationTest
 Failed to connect to scan of .*AppUpgradeIntegrationTest
 Failed to connect to scan of .*ConfigurationProvidedBftScanConnectionIntegrationTest
+Failed to connect to scan of .*BftScanConnectionIntegrationTest
 
 # Ignore scan connection issues in reonboarding test.
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
