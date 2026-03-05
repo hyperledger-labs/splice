@@ -29,8 +29,23 @@
       in this case the main (asymmetric) encryption keys are usually already available in memory (in addition to being stored inside the participant database).
       We encourage operators of KMS-enabled participants to review the updated sections on KMS usage for :ref:`validator participants <validator-kms-config>` and :ref:`SV participants <sv-kms-participant>` for more pointers about the security impact of session key caching and ways to tweak the relevant parameters to individual needs.
 
-    - APIs:
 
+  - SV app
+
+    - Improve the automation for converting featured app activity
+      markers to handle batches of markers for nodes that have not
+      vetted the same version of the amulet package.
+
+  - Validator app
+
+    - Prevent secrets from being logged at DEBUG level when the environment variable ``SPLICE_APP_DARS`` or ``.appDars`` in Helm were set.
+
+  - Canton
+
+    - Fix issue where sequencer startup could take more than 10 minutes.
+
+    - APIs:
+    
       - *BREAKING* The
 
           - ``/v2/updates`` HTTP POST and websocket GET endpoints
@@ -42,22 +57,6 @@
       - `GetUpdatesRequest.updateFormat` now appears marked as required in the OpenAPI/AsyncAPI specs even though it was previously optional.
         This is a specification fix to align with the actual behavior of the API, which requires this field.
         If your client code was previously omitting this field, you will need to update it to include a valid value.
-
-
-  - Sequencer
-
-    - Fix issue where sequencer startup could take more than 10 minutes.
-
-
-  - SV app
-
-    - Improve the automation for converting featured app activity
-      markers to handle batches of markers for nodes that have not
-      vetted the same version of the amulet package.
-
-  - Validator app
-
-    - Prevent secrets from being logged at DEBUG level when the environment variable ``SPLICE_APP_DARS`` or ``.appDars`` in Helm were set.
 
 .. release-notes:: 0.5.13
 
