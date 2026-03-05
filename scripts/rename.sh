@@ -177,6 +177,8 @@ protected_files=(
   "$rename_script"
   '**/release_notes.rst'
   '**/auth0.ts'
+  'token-standard/README.md'
+  'token-standard/CHANGELOG.md'
 )
 
 NO_PROTECTED=$(exclude_all "${protected_files[@]}")
@@ -189,7 +191,6 @@ NO_DOCS=$(exclude_all "${docs_files[@]}")
 NO_SPECIAL=$(exclude_all "${special_files[@]}")
 NO_FRONTEND=$(exclude_all "${frontend_files[@]}")
 NO_API=$(exclude_all "${api_files[@]}")
-
 
 function simple_rename() {
   local pattern=$1
@@ -247,6 +248,21 @@ function commit_occurrences() {
   _info "Checking and storing left-over occurrences of '$pattern'"
   eval "$cmd"
   run_and_store_output "left-over occurrences of '$pattern'" "$cmd"
+}
+
+function copy_template() {
+  local template_path=$1
+  local target_path=$2
+
+  local description="copy template: $template_path -> $target_path"
+
+  if git ls-files --error-unmatch "$target_path" >/dev/null 2>&1; then
+    _info "$description"
+    echo "Skipped, as target already exists in git."
+  else
+    mkdir -p "$(dirname "$target_path")"
+    run_and_commit "$description" "rsync -a $template_path $target_path"
+  fi
 }
 
 
@@ -1303,6 +1319,43 @@ function subcmd_base_package() {
   simple_rename '/com/daml/network////org/lfdecentralizedtrust/splice'
   simple_rename 'pr(ivate|otected)\[network\]///pr\1[splice]'
 }
+
+subcommand_whitelist[ts2_create_base]='Create the base for the token standard v2 APIs'
+function subcmd_ts2_create_base() {
+  assert_clean_working_dir
+
+  # Rename test directory first to simplify specifying renames below
+  simple_rename 'token-standard-test(?!-v)///token-standard-test-v1'
+
+  declare -A STD_DIRS_V1_TO_V2=(
+    ['splice-api-token-allocation-instruction-v1']='splice-api-token-allocation-instruction-v2'
+    ['splice-api-token-allocation-request-v1']='splice-api-token-allocation-request-v2'
+    ['splice-api-token-allocation-v1']='splice-api-token-allocation-v2'
+    ['splice-api-token-holding-v1']='splice-api-token-holding-v2'
+    ['splice-api-token-transfer-instruction-v1']='splice-api-token-transfer-instruction-v2'
+    ['splice-token-standard-test-v1']='splice-token-standard-test-v2'
+    ['splice-token-standard-test-v1']='splice-token-standard-test-v2'
+    ['examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml']='splice-token-standard-test-v2/daml/Splice/Testing/Apps/TradingAppV2.daml'
+  )
+
+  # Copy the directories if they are not yet tracked in git
+  for v1_dir in "${!STD_DIRS_V1_TO_V2[@]}"; do
+    local v2_dir="${STD_DIRS_V1_TO_V2[$v1_dir]}"
+
+    copy_template "token-standard/$v1_dir" "token-standard/$v2_dir"
+  done
+
+  # Rename modules and file name references
+  simple_rename '(?<![Mm]etadata-)(?<![Mm]etadata/)(?<![Mm]etadata)(?<! )v1///v2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<![Mm]etadata-)(?<![Mm]etadata/)(?<![Mm]etadata)(?<! )V1///V2' "-i 'token-standard/*-v2/*'"
+
+  simple_rename 'AmuletRegistry(?!V2)///AmuletRegistryV2' "-i 'token-standard/*-v2/*'"
+  simple_rename 'RegistryApi(?!V2)///RegistryApiV2' "-i 'token-standard/*-v2/*'"
+  simple_rename 'WalletClient(?!V2)///WalletClientV2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<!TokenApi)Utils(?!V2)///UtilsV2' "-i 'token-standard/*-v2/*'"
+
+}
+
 
 ################################
 ### Main
