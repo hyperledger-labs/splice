@@ -261,7 +261,7 @@ class ValidatorApp(
                       participantAdminConnection,
                       config.timeTrackerMinObservationDuration,
                       config.timeTrackerObservationLatency,
-                      config.parameters.enabledFeatures.newSequencerConnectionPool,
+                      config.parameters.enabledFeatures.reconnectOnSynchronizerConfigurationChange,
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(

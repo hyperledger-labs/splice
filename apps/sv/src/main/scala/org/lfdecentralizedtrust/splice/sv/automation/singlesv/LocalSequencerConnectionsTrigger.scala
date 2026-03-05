@@ -39,7 +39,7 @@ class LocalSequencerConnectionsTrigger(
     sequencerInternalConfig: ClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification,
     migrationId: Long,
-    newSequencerConnectionPool: Boolean,
+    reconnectOnSynchronizerConfigurationChange: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -72,7 +72,7 @@ class LocalSequencerConnectionsTrigger(
       } { publishedSequencerInfo =>
         participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           decentralizedSynchronizerAlias,
-          newSequencerConnectionPool,
+          reconnectOnSynchronizerConfigurationChange,
           setLocalSequencerConnection(
             publishedSequencerInfo,
             sequencerInternalConfig,
