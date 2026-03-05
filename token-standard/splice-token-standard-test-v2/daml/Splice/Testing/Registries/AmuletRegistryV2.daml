@@ -35,7 +35,7 @@ import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
 import qualified DA.TextMap as TextMap
-import DA.Optional (fromSome, isSome)
+import DA.Optional (isSome)
 import DA.List.Total
 import DA.Time
 import DA.Text qualified as T
@@ -246,7 +246,7 @@ registryApi_getAllocationFactory_SettleBatch
 registryApi_getAllocationFactory_SettleBatch registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   -- FIXME: trim context
-  transferC <- getAmuletRulesTransferContext registry
+  transferC <- getExternalPartyConfigStateContext registry
 
   lockedDs <- forA arg.allocationCids $ \allocCid -> do
     Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
@@ -319,7 +319,8 @@ registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
       let lockedAmuletActive = isSome optLockedAmulet
       -- this can only happen if the locked amulet already expired
       now <- getTime
-      unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleBefore <= now) $
+      -- FIXME: review condition
+      unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleAt <= now) $
         fail "Invariant violation: the locked amulet is archived, but the settlement is not yet expired"
       -- this context communicates whether to unlock the amulet
       let expireLockC = OpenApiChoiceContext with
@@ -328,7 +329,7 @@ registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
       if lockedAmuletActive
         then do
           -- disclose the amulet contract, as the caller might not be able to see it
-          lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletAlloc.lockedAmulet
+          lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso la
           pure $ withExtraDisclosures lockedAmuletD expireLockC
         else
           pure expireLockC

@@ -35,7 +35,7 @@ import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
 import qualified DA.TextMap as TextMap
-import DA.Optional (fromSome, isSome)
+import DA.Optional (isSome)
 import DA.List.Total
 import DA.Time
 import DA.Text qualified as T

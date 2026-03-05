@@ -8,7 +8,7 @@ module Splice.AmuletAllocation (
 ) where
 
 import DA.Foldable (forA_)
-import DA.Optional (isNone, isSome, optionalToList)
+import DA.Optional (isNone, isSome)
 import DA.Text as Text
 
 import Splice.Api.Token.MetadataV1
@@ -21,6 +21,7 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Amulet.TwoStepTransfer
 import Splice.Amulet.TokenApiUtils
+import Splice.ExternalPartyConfigState
 import Splice.Fees (expiringAmount)
 import Splice.Types
 import Splice.Util
@@ -82,14 +83,15 @@ template AmuletAllocation
               -- Net credit of Amulet ==> create the holding
 
               -- FIXME: share context fetching code once rebased on Moritz's 24h changes
-              openRoundCid <- getFromContextU extraArgs.context openRoundContextKey
-              openRound <- fetchChecked (ForDso with dso = admin) openRoundCid
-              let holdingFeeAmulet = (transferConfigAmuletFromOpenRound openRound).holdingFee
+              externalPartyConfigStateCid <- getFromContextU @(ContractId ExternalPartyConfigState) extraArgs.context externalPartyConfigStateContextKey
+              externalPartyConfigState <- fetchChecked (ForDso with dso = admin) externalPartyConfigStateCid
+              let config = scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) $ externalPartyConfigState.transferConfig
+              let holdingFeeAmulet = config.holdingFee
 
               newHoldingCid <- create Amulet with
                 dso = admin
                 owner = authorizer
-                amount = expiringAmount holdingFeeAmulet netAmount openRound.round
+                amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
 
               pure Allocation_SettleResult with
                 newHoldingCids = Map.singleton (amuletInstrumentId admin) [toInterfaceContractId newHoldingCid]

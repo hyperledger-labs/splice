@@ -12,7 +12,6 @@ import Splice.Api.Token.TransferInstructionV2 as Api.Token.TransferInstructionV2
 import Daml.Script
 
 import DA.Action (when)
-import DA.Action (unless)
 import DA.Assert ((===))
 import DA.Foldable (forA_)
 import DA.List (sortOn)

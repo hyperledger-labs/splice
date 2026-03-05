@@ -1083,8 +1083,7 @@ testTokenStandardTransfer = script do
 
 testTokenStandardAllocate : Script ()
 testTokenStandardAllocate = script do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   aliceValidator <- allocateParty "aliceValidator"
   alice <- allocateParty "alice"

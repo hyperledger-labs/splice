@@ -11,6 +11,7 @@ import DA.Optional
 import qualified DA.TextMap as TextMap
 import qualified DA.Map as Map
 import DA.Text as T
+import DA.Time
 import DA.Exception
 
 import Splice.Api.Token.MetadataV1
@@ -28,7 +29,6 @@ import Splice.Amulet.TwoStepTransfer
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
-import Splice.Expiry (maxExpiry)
 import Splice.Types
 import Splice.Util
 
@@ -402,8 +402,6 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   whenSome settlement.settlementDeadline \d -> do
       assertWithinDeadline "Allocation.settlement.settlementDeadline" d
 
-  openMiningRound <- fetch paymentContext.context.openMiningRound
-
   -- FIXME: rename creator to authorizer
   let authorizer = creator
   let amount = netAllocationAmount authorizer arg.allocation.transferLegs
@@ -411,10 +409,8 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   let
     deadline = fromOptional maxTime allocation.settlement.settlementDeadline
 
-    -- FIXME: revisit this logic; as the DSO also has to keep around the allocation until the deadline ==> problematic for ACS sizes
-    expiresAt = if amount <= 0.0
-      then deadline
-      else min deadline (maxExpiry openMiningRound amount)
+    -- FIXME: revisit this logic -- 30 days might be too little, but we want protection for the DSO
+    expiresAt = min deadline (requestedAt `addRelTime` days 30)
   require "Allocation.settlement.settleAt <= Allocation.expiresAt"
     (settlement.settleAt <= expiresAt)
 
