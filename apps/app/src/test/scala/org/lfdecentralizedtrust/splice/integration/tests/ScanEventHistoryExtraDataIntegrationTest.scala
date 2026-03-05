@@ -35,7 +35,6 @@ class ScanEventHistoryExtraDataIntegrationTest
   private val pageLimit = 1000
 
   "should ingest and serve traffic summaries" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
