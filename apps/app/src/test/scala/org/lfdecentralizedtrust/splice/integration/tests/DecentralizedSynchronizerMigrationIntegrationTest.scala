@@ -374,9 +374,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+            val migrationSequencers = sequencers.filter(_.serial.isEmpty)
             synchronizerId shouldBe decentralizedSynchronizerId
-            sequencers should have size 4
-            sequencers.foreach { sequencer =>
+            migrationSequencers should have size 4
+            migrationSequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
             }
         }
@@ -874,13 +875,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
                   case Seq(DomainSequencers(synchronizerId, sequencers)) =>
                     synchronizerId shouldBe decentralizedSynchronizerId
-                    sequencers.foreach { sequencer =>
+                    val sequencersWithMigration = sequencers.filter(_.serial.isEmpty)
+                    sequencersWithMigration.foreach { sequencer =>
                       if (sequencer.migrationId != 0 && sequencer.migrationId != 1)
                         throw new RuntimeException(
                           s"Expected sequencer migrationId to be either 0 or 1, but got ${sequencer.migrationId}"
                         )
                     }
-                    sequencers.map { sequencer =>
+                    sequencersWithMigration.map { sequencer =>
                       (sequencer.migrationId, sequencer.url)
                     }.toSet shouldBe Set(
                       (0L, getPublicSequencerUrl(sv1Backend)),
@@ -1111,7 +1113,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     inside(sv1ScanLocalBackend.listDsoSequencers()) {
                       case Seq(DomainSequencers(synchronizerId, sequencers)) =>
                         synchronizerId shouldBe decentralizedSynchronizerId
-                        sequencers.map { sequencer =>
+                        val migrationSeqeuncers = sequencers.filter(_.serial.isEmpty)
+                        migrationSeqeuncers.map { sequencer =>
                           (sequencer.migrationId, sequencer.url)
                         }.toSet shouldBe Set(
                           (1L, getPublicSequencerUrl(sv1LocalBackend)),

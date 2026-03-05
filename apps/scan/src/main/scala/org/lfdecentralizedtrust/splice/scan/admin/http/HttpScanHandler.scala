@@ -108,6 +108,8 @@ import AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
@@ -633,32 +635,77 @@ class HttpScanHandler(
       respond: v0.ScanResource.ListDsoSequencersResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.ListDsoSequencersResponse] = {
     implicit val tc = extracted
+
+    def extractSequencersForSynchronizersFromLegacyState(
+        nodeName: String,
+        synchronizerConfig: SynchronizerNodeConfig,
+    ) = {
+      val sequencers = for {
+        sequencer <- synchronizerConfig.sequencer.toScala
+        availableAfter <- sequencer.availableAfter.toScala
+      } yield definitions.DsoSequencer(
+        sequencer.migrationId,
+        None,
+        sequencer.sequencerId,
+        sequencer.url,
+        nodeName,
+        OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
+      )
+      val legacySequencers = for {
+        legacyConfig <- synchronizerConfig.legacySequencerConfig.toScala.toList
+      } yield definitions.DsoSequencer(
+        legacyConfig.migrationId,
+        None,
+        legacyConfig.sequencerId,
+        legacyConfig.url,
+        nodeName,
+        OffsetDateTime.MIN,
+      )
+      (legacySequencers ++ sequencers).distinct
+    }
+
+    def extractSequencersForSynchronizers(
+        nodeName: String,
+        synchronizerConfig: SynchronizerNodeConfig,
+    ) = {
+      synchronizerConfig.physicalSynchronizers.toScala.toList.flatMap(_.asScala.flatMap {
+        case (serial, nodeConfig) =>
+          nodeConfig.sequencer
+            .flatMap(sequencerConfig =>
+              sequencerConfig.availableAfter.map { availableAfter =>
+                definitions.DsoSequencer(
+                  NoMigrationIdSet,
+                  Some(serial),
+                  sequencerConfig.sequencerId,
+                  sequencerConfig.url,
+                  nodeName,
+                  OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
+                )
+              }
+            )
+            .toScala
+      })
+    }
+
+    def extractSequencersFromNodeState(nodeState: SvNodeState) = {
+      nodeState.state.synchronizerNodes.asScala.toVector
+        .flatMap { case (synchronizerId, domainConfig) =>
+          val legacyConfig = extractSequencersForSynchronizersFromLegacyState(
+            nodeState.svName,
+            domainConfig,
+          )
+          val physicalSequencers = extractSequencersForSynchronizers(
+            nodeState.svName,
+            domainConfig,
+          )
+          (legacyConfig ++ physicalSequencers).map(synchronizerId -> _)
+        }
+    }
+
     withSpan(s"$workflowId.listDsoSequencers") { _ => _ =>
       store
         .listFromSvNodeStates { nodeState =>
-          for {
-            (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
-            sequencers = for {
-              sequencer <- domainConfig.sequencer.toScala
-              availableAfter <- sequencer.availableAfter.toScala
-            } yield synchronizerId -> definitions.DsoSequencer(
-              sequencer.migrationId,
-              sequencer.sequencerId,
-              sequencer.url,
-              nodeState.svName,
-              OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
-            )
-            legacySequencers = for {
-              legacyConfig <- domainConfig.legacySequencerConfig.toScala.toList
-            } yield synchronizerId -> definitions.DsoSequencer(
-              legacyConfig.migrationId,
-              legacyConfig.sequencerId,
-              legacyConfig.url,
-              nodeState.svName,
-              OffsetDateTime.MIN,
-            )
-            sequencerConfig <- (legacySequencers ++ sequencers).distinct
-          } yield sequencerConfig
+          extractSequencersFromNodeState(nodeState)
         }
         .map(list =>
           list.map { case (synchronizerId, sequencers) =>
@@ -697,6 +744,45 @@ class HttpScanHandler(
             )
           })
         )
+    }
+  }
+
+  override def getActivePhysicalSynchronizerSerial(
+      respond: ScanResource.GetActivePhysicalSynchronizerSerialResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.GetActivePhysicalSynchronizerSerialResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getActivePhysicalSynchronizerSerial") { _ => _ =>
+      for {
+        synchronizerId <- store
+          .lookupAmuletRules()
+          .map(
+            _.getOrElse(
+              throw io.grpc.Status.NOT_FOUND
+                .withDescription("No amulet rules found.")
+                .asRuntimeException()
+            ).state.fold(
+              identity,
+              throw io.grpc.Status.FAILED_PRECONDITION
+                .withDescription("Amulet rules are in flight.")
+                .asRuntimeException(),
+            )
+          )
+        connectedDomains <- participantAdminConnection.listConnectedDomains()
+        psid = connectedDomains
+          .find(_.synchronizerId == synchronizerId)
+          .getOrElse(
+            throw io.grpc.Status.NOT_FOUND
+              .withDescription(
+                s"Active synchronizer $synchronizerId is not connected to the participant."
+              )
+              .asRuntimeException()
+          )
+          .physicalSynchronizerId
+      } yield ScanResource.GetActivePhysicalSynchronizerSerialResponse.OK(
+        definitions.GetActivePhysicalSynchronizerSerialResponse(
+          serial = psid.serial.unwrap.toLong
+        )
+      )
     }
   }
 
@@ -2307,6 +2393,10 @@ object HttpScanHandler {
   // We expect a handful at most but want to somewhat guard against attacks
   // so we just hardcode a limit of 100.
   private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
+
+  // for DsoSequencers that use the serial instead of the migration we set -1 as the migration id
+  // we can't simply make it non required as it's part of the public API and it would break clients
+  val NoMigrationIdSet = -1L
 
   def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
     definitions.RoundTotals(

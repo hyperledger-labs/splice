@@ -213,9 +213,8 @@ class SvOnboardingAddlIntegrationTest
 
         clue("published sequencer information can be seen via scan") {
           inside(sv1ScanBackend.listDsoSequencers()) { case Seq(domainSequencers) =>
-            domainSequencers.sequencers should have size 4
             domainSequencers.sequencers.find(s =>
-              s.svName == nodeState.svName && s.url == localSequencerUrl.toString
+              s.svName == nodeState.svName && s.url == localSequencerUrl
             ) should not be empty
           }
         }

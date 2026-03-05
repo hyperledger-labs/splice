@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.topology.PartyId
@@ -16,9 +17,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
   updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
+  ConfigurableApp,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   TransactionHistoryRequest,
@@ -40,7 +41,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.TopupMemberTrafficTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{blocking, Future}
 import scala.util.{Success, Try}
 
 // this test sets fees to zero, and that only works from 0.1.14 onwards
@@ -132,6 +133,9 @@ class ScanIntegrationTest
         scan.amuletRules should be(amuletRules.toHttp)
         scan.dsoRules should be(dsoRules.toHttp)
         scan.svNodeStates should be(svNodeStates.map(_._2.toHttp))
+    }
+    clue("Returns physical synchronizer id") {
+      sv1ScanBackend.getActivePhysicalSynchronizerSerial() shouldBe NonNegativeInt.zero
     }
     // sanity checks
     scan.dsoRules.contract.contractId should be(

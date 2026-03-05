@@ -512,7 +512,7 @@ class JoiningNodeInitializer(
       "Reconnecting to all domains if participant hosts or is not in the process to host the dsoParty.",
       for {
         decentralizedSynchronizerId <- participantAdminConnection
-          .getPhysicalSynchronizerIdWithoutConnecting(
+          .getPhysicalSynchronizerId(
             config.domains.global.alias
           )
         participantId <- participantAdminConnection.getParticipantId()
