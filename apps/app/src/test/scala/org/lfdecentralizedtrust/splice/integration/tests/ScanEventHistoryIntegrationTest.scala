@@ -50,7 +50,6 @@ class ScanEventHistoryIntegrationTest
   private val pageLimit = 1000
 
   "should provide new events with verdicts" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val (aliceParty, _) = onboardAliceAndBob()
@@ -121,8 +120,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
-    initDsoWithSv1Only()
-
     // Disable mediator admin connectivity via proxy before starting scan
     toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
 
@@ -242,7 +239,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should return event for valid updateId and 404 for missing updateId" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
@@ -293,7 +289,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
