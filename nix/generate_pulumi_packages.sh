@@ -29,6 +29,8 @@ plugins=(
   "pulumi/random=4.18.2"
   "pulumi/auth0=3.21.0"
   "pulumi/command=1.1.0"
+  # idk why is this needed
+  "pulumi/gcp=8.32.1"
 )
 
 function genSrc() {
