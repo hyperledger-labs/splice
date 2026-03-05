@@ -2,20 +2,20 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.config.SequencerTrafficIngestionConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 
 class ScanEventHistoryExtraDataIntegrationTest
-    extends IntegrationTestWithIsolatedEnvironment
+    extends IntegrationTest
     with ScanTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition: SpliceEnvironmentDefinition =
+  override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
@@ -30,8 +30,6 @@ class ScanEventHistoryExtraDataIntegrationTest
   private val pageLimit = 1000
 
   "should ingest and serve traffic summaries" in { implicit env =>
-    startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
-
     val _ = onboardAliceAndBob()
 
     val cursorBeforeTap = eventuallySucceeds() { latestEventHistoryCursor(sv1ScanBackend) }
