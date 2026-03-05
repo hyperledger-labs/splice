@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.scan.config.SequencerTrafficIngestionConf
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
-import definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
@@ -43,46 +42,54 @@ class ScanEventHistoryExtraDataIntegrationTest
 
     val cursorBeforeTap = eventuallySucceeds() { latestEventHistoryCursor(sv1ScanBackend) }
 
-    aliceWalletClient.tap(1)
+    val (_, eventsWithTrafficSummary) = actAndCheck(
+      "alice taps",
+      aliceWalletClient.tap(1),
+    )(
+      "event history includes events with traffic summaries",
+      _ => {
+        val eventHistory = sv1ScanBackend.getEventHistory(
+          count = pageLimit,
+          after = Some(cursorBeforeTap),
+          encoding = CompactJson,
+        )
+        eventHistory should not be empty
 
-    // Wait for event history to include events with traffic summaries
-    val eventsWithTrafficSummary = eventually() {
-      val eventHistory = sv1ScanBackend.getEventHistory(
-        count = pageLimit,
-        after = Some(cursorBeforeTap),
-        encoding = CompactJson,
-      )
-      eventHistory should not be empty
-
-      val withSummary = eventHistory.filter(_.trafficSummary.isDefined)
-      withSummary should not be empty
-      withSummary
-    }
+        val withSummary = eventHistory.filter(_.trafficSummary.isDefined)
+        withSummary should not be empty
+        withSummary
+      },
+    )
 
     withClue("Traffic summary structure should be valid") {
       eventsWithTrafficSummary.foreach { item =>
         item.trafficSummary.foreach { summary =>
-          summary.totalTrafficCost should be >= 0L
+          summary.totalTrafficCost should be > 0L
           summary.envelopeTrafficCosts should not be empty
           summary.envelopeTrafficCosts.foreach { env =>
-            env.trafficCost should be >= 0L
+            env.trafficCost should be > 0L
           }
         }
       }
     }
 
+    withClue("Traffic summaries should be on verdict-only events") {
+      eventsWithTrafficSummary.foreach { item =>
+        item.verdict shouldBe defined
+        item.update shouldBe empty
+      }
+    }
+
     withClue("Traffic summary should also be present via getEventById") {
-      val txItemO = eventsWithTrafficSummary.find(_.update.exists {
-        case UpdateHistoryTransactionV2(_) => true; case _ => false
-      })
-      txItemO.foreach { txItem =>
-        txItem.update.foreach {
-          case UpdateHistoryTransactionV2(tx) =>
-            val eventById = sv1ScanBackend
-              .getEventById(tx.updateId, Some(CompactJson))
-              .getOrElse(fail(s"Expected event for update id ${tx.updateId}"))
-            eventById.trafficSummary shouldBe defined
-          case _ =>
+      val verdictItems = eventsWithTrafficSummary.filter(_.verdict.isDefined)
+      verdictItems should not be empty
+
+      Seq(verdictItems.head, verdictItems.last).distinct.foreach { item =>
+        item.verdict.fold(fail("Expected verdict")) { verdict =>
+          val eventById = sv1ScanBackend
+            .getEventById(verdict.updateId, Some(CompactJson))
+            .getOrElse(fail(s"Expected event for update id ${verdict.updateId}"))
+          eventById.trafficSummary shouldBe defined
         }
       }
     }
