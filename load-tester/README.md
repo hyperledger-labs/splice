@@ -44,7 +44,8 @@ The load test is deployed as a Kubernetes `Deployment` in the `load-tester` name
 
 To enable the load tester for a cluster, set `loadTester.enable: true` in the cluster's config YAML.
 
-To temporarily stop a running load test, delete the pod via k9s or `kubectl delete pod -n load-tester -l app=load-tester`. The Deployment will restart it.
+
+To temporarily stop a running load test, scale down the Deployment via k9s or `kubectl scale deployment -n load-tester load-tester --replicas=0`. Scale back to 1 to resume.
 
 To permanently disable the load tester for a cluster, set `loadTester.enable: false` (or remove the `loadTester` section) in the cluster's config YAML.
 
@@ -59,21 +60,11 @@ This allows the test to find the maximum sustainable throughput for the cluster.
 
 ### Configuration
 
-The adaptive scenario is configured in the cluster's config YAML under `loadTester.adaptiveScenario`:
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| `enabled` | `false` | Enable the adaptive controller |
-| `maxVUs` | `50` | Maximum virtual users |
-| `minVUs` | `0` | Minimum virtual users (floor for scale-down) |
-| `scaleUpStep` | `2` | VUs added per scale-up interval |
-| `scaleDownStep` | `5` | VUs removed on failure detection |
-| `duration` | `"2h"` | Duration of the adaptive k6 scenario |
-| `scheduledStartTimeUTC` | `"03:00"` | UTC time of day to start the test |
+The adaptive scenario is configured in the cluster's `config.yaml` under `loadTester.adaptiveScenario`:
 
 ### Scheduled Start Time
 
-When `scheduledStartTimeUTC` is set (default: `"03:00"`), the load tester waits until that UTC time before starting k6. This is designed for CILR clusters where an automatic upgrade runs at 02:00 UTC -- the load test starts after the upgrade completes, giving a clean daily performance signal.
+When `scheduledStartTimeUTC` is set (default: `"03:00"`), the load tester waits until that UTC time before starting k6. This is designed for test clusters where an automatic upgrade runs at a known time -- the load test starts after the upgrade (likely) completes, giving a clean daily performance signal.
 
 ### Forcing an Immediate Ramp-Up
 
