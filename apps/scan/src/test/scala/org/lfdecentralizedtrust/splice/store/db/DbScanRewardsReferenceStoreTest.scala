@@ -81,24 +81,6 @@ class DbScanRewardsReferenceStoreTest
         _ = resultAt300.map(_.contract) shouldBe Seq(omr2)
       } yield succeed
     }
-
-    "lookupAmuletRulesAsOf returns AmuletRules active at given time" in {
-      val store = mkStore()
-      val createTime = CantonTimestamp.ofEpochSecond(100)
-      val archiveTime = CantonTimestamp.ofEpochSecond(300)
-      val ar = amuletRules().copy(createdAt = createTime.toInstant)
-      for {
-        _ <- initWithAcs()(store.multiDomainAcsStore)
-        _ <- d1.create(ar, recordTime = createTime.toInstant)(store.multiDomainAcsStore)
-        _ <- d1.archive(ar, recordTime = archiveTime.toInstant)(store.multiDomainAcsStore)
-        resultAt50 <- store.lookupAmuletRulesAsOf(CantonTimestamp.ofEpochSecond(50))
-        _ = resultAt50 shouldBe None
-        resultAt200 <- store.lookupAmuletRulesAsOf(CantonTimestamp.ofEpochSecond(200))
-        _ = resultAt200.map(_.contract) shouldBe Some(ar)
-        resultAt300 <- store.lookupAmuletRulesAsOf(CantonTimestamp.ofEpochSecond(300))
-        _ = resultAt300 shouldBe None
-      } yield succeed
-    }
   }
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile

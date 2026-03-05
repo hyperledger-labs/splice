@@ -41,9 +41,6 @@ object ScanRewardsReferenceStore {
     MultiDomainAcsStore.SimpleContractFilter(
       key.dsoParty,
       Map(
-        mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
-          ScanRewardsReferenceStoreRowData(_)
-        ),
         mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanRewardsReferenceStoreRowData(
             contract = contract,

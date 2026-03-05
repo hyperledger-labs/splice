@@ -11,7 +11,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
@@ -97,11 +96,4 @@ class DbScanRewardsReferenceStore(
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
     listContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId, limit)
-
-  def lookupAmuletRulesAsOf(
-      asOf: CantonTimestamp
-  )(implicit
-      tc: TraceContext
-  ): Future[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]] =
-    listContractsAsOf(AmuletRules.COMPANION, asOf, synchronizerId, defaultLimit).map(_.headOption)
 }
