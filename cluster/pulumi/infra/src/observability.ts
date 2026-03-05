@@ -116,8 +116,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     }
   );
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '77.12.1';
-  const prometheusStackCrdVersion = '0.85.0';
+  const stackVersion = '82.9.0';
+  const prometheusStackCrdVersion = '0.89.0';
   const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const migrationSnapshots = getVolumeSnapshotsForHyperdiskMigration();
