@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.config
 
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
@@ -56,8 +57,7 @@ case class ScanAppBackendConfig(
     override val storage: DbConfig,
     svUser: String,
     override val participantClient: ParticipantClientConfig,
-    sequencerAdminClient: FullClientConfig,
-    mediatorAdminClient: FullClientConfig,
+    synchronizerNodes: ScanSynchronizerNodesConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     isFirstSv: Boolean = false,
@@ -77,6 +77,7 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorageConfig: BulkStorageConfig = BulkStorageConfig(),
+    globalSynchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("global"),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
@@ -84,6 +85,11 @@ case class ScanAppBackendConfig(
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
+
+final case class ScanSynchronizerNodesConfig(
+    current: ScanSynchronizerConfig,
+    successor: Option[ScanSynchronizerConfig],
+)
 
 final case class ScanCacheConfig(
     svNodeState: CacheConfig = CacheConfig(

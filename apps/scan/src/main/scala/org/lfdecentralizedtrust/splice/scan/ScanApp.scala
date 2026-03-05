@@ -19,7 +19,9 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   SequencerAdminConnection,
   SpliceLedgerClient,
+  SynchronizerNodeService,
 }
+import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
@@ -37,7 +39,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanSynchronizerConfig}
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
@@ -108,6 +110,17 @@ class ScanApp(
       connection: BaseLedgerConnection,
       ledgerClient: SpliceLedgerClient,
   )(implicit traceContext: TraceContext) = Future.unit
+
+  def synchronizerNode(config: ScanSynchronizerConfig): ScanSynchronizerNode =
+    new ScanSynchronizerNode(
+      new SequencerAdminConnection(
+        config.sequencer,
+        amuletAppParameters.loggingConfig.api,
+        loggerFactory,
+        nodeMetrics.grpcClientMetrics,
+        retryProvider,
+      )
+    )
 
   override def initialize(
       ledgerClient: SpliceLedgerClient,
@@ -212,12 +225,19 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         loggerFactory,
       )
-      sequencerAdminConnection = new SequencerAdminConnection(
-        config.sequencerAdminClient,
-        amuletAppParameters.loggingConfig.api,
+      syncNodes = LocalSynchronizerNodes(
+        current = synchronizerNode(
+          config.synchronizerNodes.current
+        ),
+        successor = config.synchronizerNodes.successor.map(synchronizerNode(_)),
+        legacy = None,
+      )
+      syncService = new SynchronizerNodeService(
+        syncNodes,
+        participantAdminConnection,
+        config.globalSynchronizerAlias,
+        config.parameters.spliceCachingConfigs.physicalSynchronizerExpiration,
         loggerFactory,
-        nodeMetrics.grpcClientMetrics,
-        retryProvider,
       )
       automation = new ScanAutomationService(
         config,
@@ -298,7 +318,7 @@ class ScanApp(
         config.svUser,
         config.spliceInstanceNames,
         participantAdminConnection,
-        sequencerAdminConnection,
+        syncService,
         automation,
         updateHistory,
         acsSnapshotStore,
@@ -412,7 +432,7 @@ class ScanApp(
     } yield {
       ScanApp.State(
         participantAdminConnection,
-        sequencerAdminConnection,
+        syncNodes,
         storage,
         store,
         automation,
@@ -435,7 +455,7 @@ object ScanApp {
 
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      sequencerAdminConnection: SequencerAdminConnection,
+      synchronizerNodes: LocalSynchronizerNodes[ScanSynchronizerNode],
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
@@ -458,9 +478,12 @@ object ScanApp {
         verdictAutomation,
         store,
         storage,
-        sequencerAdminConnection,
+        synchronizerNodes.current,
         participantAdminConnection,
       )(logger)
+      synchronizerNodes.successor.foreach(
+        LifeCycle.close(_)(logger)
+      )
     }
   }
 }

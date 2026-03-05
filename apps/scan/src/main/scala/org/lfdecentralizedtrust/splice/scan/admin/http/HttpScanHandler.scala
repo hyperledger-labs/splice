@@ -35,6 +35,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
   ParticipantAdminConnection,
   SequencerAdminConnection,
+  SynchronizerNodeService,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
@@ -53,6 +54,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
+import org.lfdecentralizedtrust.splice.scan.ScanSynchronizerNode
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
   ScanEventStore,
@@ -125,7 +127,7 @@ class HttpScanHandler(
     svUserName: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection: SequencerAdminConnection,
+    synchronizerNodeService: SynchronizerNodeService[ScanSynchronizerNode],
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
@@ -2231,7 +2233,9 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
             )
         }
-        actual <- sequencerAdminConnection.getSequencerTrafficControlState(member)
+        actual <- synchronizerNodeService
+          .sequencerAdminConnection()
+          .flatMap(_.getSequencerTrafficControlState(member))
         actualConsumed = actual.extraTrafficConsumed.value
         actualLimit = actual.extraTrafficLimit.value
         targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(member, domain)
@@ -2267,11 +2271,15 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
         }
-        response <- sequencerAdminConnection.getPartyToParticipant(
-          domain,
-          party,
-          topologyTransactionType = AuthorizedState,
-        )
+        response <- synchronizerNodeService
+          .sequencerAdminConnection()
+          .flatMap(
+            _.getPartyToParticipant(
+              domain,
+              party,
+              topologyTransactionType = AuthorizedState,
+            )
+          )
         participantId <- response.mapping.participantIds match {
           case Seq() =>
             Future.failed(

@@ -58,7 +58,7 @@ class ScanVerdictStoreIngestion(
 
   private val mediatorClient =
     new MediatorVerdictsClient(
-      config.mediatorAdminClient,
+      config.synchronizerNodes.current.mediator,
       this,
       grpcClientMetrics,
       context.loggerFactory,

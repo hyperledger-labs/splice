@@ -112,10 +112,31 @@ spec:
         {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: SPLICE_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | quote }}
+        {{- if .Values.synchronizers }}
+        - name: SPLICE_APP_SCAN_SEQUENCER_ADDRESS
+          value: {{ .Values.synchronizers.current.sequencer | quote }}
+        - name: SPLICE_APP_SCAN_MEDIATOR_ADDRESS
+          value: {{ .Values.synchronizers.current.mediator | quote }}
+        {{- with .Values.synchronizers.successor }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_SUCCESSOR
+          value: |
+            canton.scan-apps.scan-app.synchronizer-nodes.successor {
+              sequencer {
+                address = "{{ .sequencer }}"
+                port = 5009
+              }
+              mediator {
+                address = "{{ .mediator }}"
+                port = 5007
+              }
+            }
+        {{- end }}
+        {{- else }}
         - name: SPLICE_APP_SCAN_SEQUENCER_ADDRESS
           value: {{ .Values.sequencerAddress | quote }}
         - name: SPLICE_APP_SCAN_MEDIATOR_ADDRESS
           value: {{ .Values.mediatorAddress | quote }}
+        {{- end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         - name: SPLICE_APP_UI_NETWORK_NAME

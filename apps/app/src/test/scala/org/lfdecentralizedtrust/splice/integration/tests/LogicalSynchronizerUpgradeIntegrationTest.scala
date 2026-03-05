@@ -85,8 +85,25 @@ class LogicalSynchronizerUpgradeIntegrationTest
               scheduledLsu = Some(
                 scheduledLsu
               ),
+              parameters = config.parameters.copy(
+                spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
+                  physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
+                )
+              ),
             )
           }
+          .andThen(ConfigTransforms.updateAllScanAppConfigs { (_, config) =>
+            config.copy(
+              synchronizerNodes = config.synchronizerNodes.copy(
+                successor = Some(config.synchronizerNodes.current)
+              ),
+              parameters = config.parameters.copy(
+                spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
+                  physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
+                )
+              ),
+            )
+          })
           .andThen(ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000))(config)
       })
       .addConfigTransform((_, config) =>
@@ -443,11 +460,25 @@ class LogicalSynchronizerUpgradeIntegrationTest
             }
           }
         }
+        val expectedTrafficPurchased =
+          trafficStateBefore.extraTrafficPurchased + NonNegativeLong.tryCreate(
+            trafficPurchaseAmount
+          )
         clue("Sequencer updates traffic state") {
           eventually() {
             val trafficStateAfter = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
-            trafficStateAfter.extraTrafficPurchased shouldBe trafficStateBefore.extraTrafficPurchased + NonNegativeLong
-              .tryCreate(trafficPurchaseAmount)
+            trafficStateAfter.extraTrafficPurchased shouldBe expectedTrafficPurchased
+          }
+        }
+        clue("Scan updates traffic state") {
+          eventually() {
+            sv1ScanBackend
+              .getMemberTrafficStatus(
+                decentralizedSynchronizerId,
+                aliceValidatorBackend.participantClient.id,
+              )
+              .actual
+              .totalLimit shouldBe expectedTrafficPurchased.unwrap
           }
         }
       }
