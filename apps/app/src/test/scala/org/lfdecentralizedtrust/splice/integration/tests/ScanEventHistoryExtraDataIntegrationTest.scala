@@ -11,9 +11,7 @@ import definitions.DamlValueEncoding.members.CompactJson
 class ScanEventHistoryExtraDataIntegrationTest
     extends IntegrationTest
     with ScanTestUtil
-    with WalletTestUtil
-    with WalletTxLogTestUtil
-    with TimeTestUtil {
+    with WalletTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
