@@ -52,7 +52,7 @@ class HttpSvOperatorHandler(
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     config: SvAppBackendConfig,
     clock: Clock,
-    synchronizerNodeService: Option[SynchronizerNodeService[LocalSynchronizerNode]],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     override protected val packageVersionSupport: PackageVersionSupport,
     override protected val timeouts: ProcessingTimeout,
@@ -506,38 +506,31 @@ class HttpSvOperatorHandler(
   private def withClientOrNotFound[T](
       notFound: definitions.ErrorResponse => T
   )(call: CometBftClient => Future[T])(implicit tc: TraceContext) =
-    synchronizerNodeService match {
-      case None =>
-        notFound(definitions.ErrorResponse("CometBFT is not configured.")).pure[Future]
-      case Some(service) =>
-        service.activeSynchronizerNode().flatMap { node =>
-          node.cometbftNode.map(_.cometBftClient) match {
-            case None =>
-              notFound(definitions.ErrorResponse("CometBFT is not configured.")).pure[Future]
-            case Some(client) => call(client)
-          }
-        }
+    synchronizerNodeService.activeSynchronizerNode().flatMap { node =>
+      node.cometbftNode.map(_.cometBftClient) match {
+        case None =>
+          notFound(definitions.ErrorResponse("CometBFT is not configured.")).pure[Future]
+        case Some(client) => call(client)
+      }
     }
 
   private def withSequencerConnectionOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: SequencerAdminConnection => Future[T])(implicit tc: TraceContext) =
-    synchronizerNodeService match {
-      case None =>
-        notFound(definitions.ErrorResponse("Sequencer is not configured.")).pure[Future]
-      case Some(service) =>
-        service.activeSynchronizerNode().flatMap(node => call(node.sequencerAdminConnection))
-    }
+  )(call: SequencerAdminConnection => Future[T])(implicit tc: TraceContext) = {
+    val _ = notFound
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap(node => call(node.sequencerAdminConnection))
+  }
 
   private def withMediatorConnectionOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: MediatorAdminConnection => Future[T])(implicit tc: TraceContext) =
-    synchronizerNodeService match {
-      case None =>
-        notFound(definitions.ErrorResponse("Mediator is not configured.")).pure[Future]
-      case Some(service) =>
-        service.activeSynchronizerNode().flatMap(node => call(node.mediatorAdminConnection))
-    }
+  )(call: MediatorAdminConnection => Future[T])(implicit tc: TraceContext) = {
+    val _ = notFound
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap(node => call(node.mediatorAdminConnection))
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
     mutex.exclusive {

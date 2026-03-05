@@ -609,10 +609,6 @@ object SpliceConfig {
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
           }
-        // We support joining nodes without sequencers/mediators but
-        // sv1 must alway configure one to bootstrap the domain.
-        val sv1NodeHasSynchronizerConfig =
-          checkFoundDsoConfig((conf, _) => conf.localSynchronizerNodes.current.isDefined)
         // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
         val sv1NodeHasNoSequencerUrl =
           checkFoundDsoConfig((conf, _) => conf.domains.global.url.isEmpty)
@@ -625,11 +621,6 @@ object SpliceConfig {
             validateInitialPackageConfigDependencies(foundDsoConf.initialPackageConfig)
           )
         for {
-          _ <- Either.cond(
-            sv1NodeHasSynchronizerConfig,
-            (),
-            ConfigValidationFailed("SV1 must always specify a domain config"),
-          )
           _ <- Either.cond(
             sv1NodeHasNoSequencerUrl,
             (),

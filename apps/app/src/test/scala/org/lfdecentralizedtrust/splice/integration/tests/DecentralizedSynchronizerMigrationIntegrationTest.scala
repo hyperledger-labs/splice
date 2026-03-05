@@ -1309,7 +1309,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   }
 
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String =
-    sv.config.localSynchronizerNodes.current.value.sequencer.externalPublicApiUrl
+    sv.config.localSynchronizerNodes.current.sequencer.externalPublicApiUrl
 
   private def createSomeParticipantUsersState(
       participant: ParticipantClientReference,

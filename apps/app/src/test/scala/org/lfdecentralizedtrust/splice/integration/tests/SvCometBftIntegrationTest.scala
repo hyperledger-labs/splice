@@ -61,9 +61,7 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
               config
                 .focus(_.localSynchronizerNodes.current)
                 .modify(
-                  _.map(
-                    _.focus(_.cometBftConfig).replace(Some(cometBftCfg))
-                  )
+                  _.focus(_.cometBftConfig).replace(Some(cometBftCfg))
                 )
                 .focus(_.automation.enableCometbftReconciliation)
                 .replace(true)
@@ -77,10 +75,8 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
                   .svApps(InstanceName.tryCreate("sv2"))
                   .focus(_.localSynchronizerNodes.current)
                   .modify(
-                    _.map(
-                      _.focus(_.cometBftConfig).modify(
-                        _.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:26657"))
-                      )
+                    _.focus(_.cometBftConfig).modify(
+                      _.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:26657"))
                     )
                   )
               }) +
@@ -89,10 +85,8 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
                   .svApps(InstanceName.tryCreate("sv3"))
                   .focus(_.localSynchronizerNodes.current)
                   .modify(
-                    _.map(
-                      _.focus(_.cometBftConfig).modify(
-                        _.map(_.focus(_.governanceKey).replace(Some(sv3CometBftGovernanceKey)))
-                      )
+                    _.focus(_.cometBftConfig).modify(
+                      _.map(_.focus(_.governanceKey).replace(Some(sv3CometBftGovernanceKey)))
                     )
                   )
               })
@@ -237,10 +231,7 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
   private def cometbftClientForSvApp(sv: SvAppBackendReference) = {
     new CometBftHttpRpcClient(
       CometBftConnectionConfig(
-        sv.config.localSynchronizerNodes.current
-          .flatMap(_.cometBftConfig)
-          .value
-          .connectionUri
+        sv.config.localSynchronizerNodes.current.cometBftConfig.value.connectionUri
       ),
       NamedLoggerFactory.root,
     )

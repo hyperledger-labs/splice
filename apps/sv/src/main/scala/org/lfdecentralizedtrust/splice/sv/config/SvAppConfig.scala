@@ -495,7 +495,7 @@ final case class SvSynchronizerNodeConfig(
 )
 
 final case class SvSynchronizerNodesConfig(
-    current: Option[SvSynchronizerNodeConfig],
+    current: SvSynchronizerNodeConfig,
     successor: Option[SvSynchronizerNodeConfig],
     legacy: Option[SvSynchronizerNodeConfig] = None,
 )

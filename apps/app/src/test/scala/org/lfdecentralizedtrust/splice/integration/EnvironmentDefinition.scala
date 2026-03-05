@@ -302,7 +302,7 @@ case class EnvironmentDefinition(
   ): EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllSvAppConfigs_(
-        _.focus(_.localSynchronizerNodes.current).some
+        _.focus(_.localSynchronizerNodes.current)
           .modify(
             _.focus(_.sequencer.sequencerAvailabilityDelay)
               .replace(duration)
@@ -443,11 +443,9 @@ case class EnvironmentDefinition(
           .updateAllSvAppConfigs_(
             _.focus(_.localSynchronizerNodes.current)
               .modify(
-                _.map(
-                  _.focus(_.topologyChangeDelayDuration)
-                    // same as canton for sim time
-                    .replace(NonNegativeFiniteDuration.Zero)
-                )
+                _.focus(_.topologyChangeDelayDuration)
+                  // same as canton for sim time
+                  .replace(NonNegativeFiniteDuration.Zero)
               )
           )(conf)
       )

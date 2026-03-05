@@ -32,7 +32,6 @@ class SequencerPruningIntegrationTest
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes
                 .focus(_.current)
-                .some
                 .modify(
                   _.focus(_.sequencer.pruning).replace(
                     Some(

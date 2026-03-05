@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.splice.auth.{
   RSAVerifier,
 }
 import org.lfdecentralizedtrust.splice.automation.{
+  AutomationService,
   DomainParamsAutomationService,
   DomainTimeAutomationService,
 }
@@ -227,14 +228,13 @@ class SvApp(
       )
     }
 
-    config.localSynchronizerNodes.current
-      .traverse { currentNodeConfig =>
-        (
-          localSyncNodeFromConfig(currentNodeConfig),
-          config.localSynchronizerNodes.successor.traverse(localSyncNodeFromConfig),
-          config.localSynchronizerNodes.legacy.traverse(localSyncNodeFromConfig),
-        ).mapN(SynchronizerNode.LocalSynchronizerNodes(_, _, _))
-      }
+    (
+      localSyncNodeFromConfig(
+        config.localSynchronizerNodes.current
+      ),
+      config.localSynchronizerNodes.successor.traverse(localSyncNodeFromConfig),
+      config.localSynchronizerNodes.legacy.traverse(localSyncNodeFromConfig),
+    ).mapN(SynchronizerNode.LocalSynchronizerNodes(_, _, _))
       .recoverWith { case err =>
         // TODO(#879) Replace this by a more general solution for closing resources on
         // init failures.
@@ -248,11 +248,9 @@ class SvApp(
           localSynchronizerNodes,
         )
           .recoverWith { case err =>
-            localSynchronizerNodes.foreach { nodes =>
-              nodes.current.close()
-              nodes.successor.foreach(_.close())
-              nodes.legacy.foreach(_.close())
-            }
+            localSynchronizerNodes.current.close()
+            localSynchronizerNodes.successor.foreach(_.close())
+            localSynchronizerNodes.legacy.foreach(_.close())
             Future.failed(err)
           }
       )
@@ -261,7 +259,7 @@ class SvApp(
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: SpliceLedgerClient,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+      localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     for {
       participantId <- appInitStep("Get participant ID") {
@@ -289,11 +287,19 @@ class SvApp(
         retryProvider,
         loggerFactory,
       )
+
+      synchronizerNodeService = new SynchronizerNodeService[LocalSynchronizerNode](
+        localSynchronizerNodes,
+        participantAdminConnection,
+        config.domains.global.alias,
+        loggerFactory,
+      )
+
       newJoiningNodeInitializer = (
         joiningConfig: Option[SvOnboardingConfig.JoinWithKey]
       ) =>
         new JoiningNodeInitializer(
-          localSynchronizerNodes,
+          synchronizerNodeService,
           joiningConfig,
           participantId,
           config,
@@ -326,10 +332,7 @@ class SvApp(
         case Some(sv1Config: SvOnboardingConfig.FoundDso) =>
           appInitStep("SV1Initializer bootstrapping Dso") {
             val initializer = new SV1Initializer(
-              localSynchronizerNodes
-                .getOrElse(
-                  sys.error("SV1 must always specify a domain config")
-                ),
+              synchronizerNodeService,
               sv1Config,
               participantId,
               config,
@@ -357,10 +360,7 @@ class SvApp(
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
             new DomainMigrationInitializer(
-              localSynchronizerNodes
-                .getOrElse(
-                  sys.error("It must always specify a domain config for Domain Migration")
-                ),
+              synchronizerNodeService,
               domainMigrationConfig,
               participantId,
               config,
@@ -448,31 +448,29 @@ class SvApp(
         },
         appInitStep("Wait until configured onboarding contracts have been created") {
           waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
-        },
-        localSynchronizerNodes.map(_.current) match {
-          case Some(node) =>
-            if (!config.shouldSkipSynchronizerInitialization) {
-              for {
-                _ <- appInitStep(
-                  "Ensure that the local mediators's sequencer request amplification config is up to date"
-                ) {
-                  // Normally we set this up during mediator init
-                  // but if the config changed without a mediator reset we need to update it here.
-                  node.ensureMediatorSequencerRequestAmplification()
-                }
-                _ <- appInitStep(
-                  "Ensure that the local mediators's pruning config is up to date"
-                ) {
-                  node.ensureMediatorPruningSchedule()
-                }
-              } yield ()
-            } else {
-              logger.info(
-                "Skipping mediator configuration because skipSynchronizerInitialization is enabled"
-              )
-              Future.unit
-            }
-          case None => Future.unit
+        }, {
+          val node = localSynchronizerNodes.current
+          if (!config.shouldSkipSynchronizerInitialization) {
+            for {
+              _ <- appInitStep(
+                "Ensure that the local mediators's sequencer request amplification config is up to date"
+              ) {
+                // Normally we set this up during mediator init
+                // but if the config changed without a mediator reset we need to update it here.
+                node.ensureMediatorSequencerRequestAmplification()
+              }
+              _ <- appInitStep(
+                "Ensure that the local mediators's pruning config is up to date"
+              ) {
+                node.ensureMediatorPruningSchedule()
+              }
+            } yield ()
+          } else {
+            logger.info(
+              "Skipping mediator configuration because skipSynchronizerInitialization is enabled"
+            )
+            Future.unit
+          }
         },
       ).tupled
 
@@ -494,15 +492,6 @@ class SvApp(
             RSAVerifier.TimeoutsConfig(connectionTimeout, readTimeout),
           )
       }
-
-      synchronizerNodeService = localSynchronizerNodes.map(
-        new SynchronizerNodeService[LocalSynchronizerNode](
-          _,
-          participantAdminConnection,
-          config.domains.global.alias,
-          loggerFactory,
-        )
-      )
 
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
@@ -560,12 +549,7 @@ class SvApp(
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
-          localSynchronizerNodes
-            .map(_.current)
-            .getOrElse(
-              sys.error("SV app should always have a sequencer connection for domain migrations")
-            )
-            .sequencerAdminConnection,
+          localSynchronizerNodes.current.sequencerAdminConnection,
           dsoStore,
           new AcsExporter(
             participantAdminConnection,
@@ -684,7 +668,9 @@ class SvApp(
 
   override lazy val ports: Map[String, RequireTypes.Port] = Map("admin" -> config.adminApi.port)
 
-  protected[this] override def automationServices(st: SvApp.State) =
+  protected[this] override def automationServices(
+      st: SvApp.State
+  ): Seq[AutomationService.OrCompanion] =
     Seq(DsoDelegateBasedAutomationService, st.svAutomation, st.dsoAutomation)
 
   private def newTrafficBalanceService(participantAdminConnection: ParticipantAdminConnection) = {
@@ -794,7 +780,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+      localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
       storage: DbStorage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
@@ -816,11 +802,10 @@ object SvApp {
     override def closeAsync(): Seq[AsyncOrSyncCloseable] =
       Seq(
         SyncCloseable(
-          s"Domain connections",
-          localSynchronizerNodes.foreach { nodes =>
-            nodes.current.close()
-            nodes.successor.foreach(_.close())
-            nodes.legacy.foreach(_.close())
+          s"Domain connections", {
+            localSynchronizerNodes.current.close()
+            localSynchronizerNodes.successor.foreach(_.close())
+            localSynchronizerNodes.legacy.foreach(_.close())
           },
         ),
         SyncCloseable(

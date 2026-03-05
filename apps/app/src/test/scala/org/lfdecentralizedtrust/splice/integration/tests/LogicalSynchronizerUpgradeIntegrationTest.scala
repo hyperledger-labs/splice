@@ -1,10 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
@@ -80,7 +81,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .updateAllSvAppConfigs { (_, config) =>
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes.copy(successor =
-                config.localSynchronizerNodes.current
+                config.localSynchronizerNodes.current.some
               ),
               scheduledLsu = Some(
                 scheduledLsu
@@ -244,8 +245,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue("new nodes are initialized") {
         allBackends.map { backend =>
-          val upgradeSequencerClient = backend.sequencerClientFor(_.successor)
-          val upgradeMediatorClient = backend.mediatorClientFor(_.successor)
+          val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
+          val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
             eventuallySucceeds(2.minutes) {
               upgradeSequencerClient.topology.transactions

@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.data.{EitherT, OptionT}
-import cats.implicits.toTraverseOps
 import cats.syntax.applicative.*
 import cats.syntax.option.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -55,7 +54,7 @@ class HttpSvPublicHandler(
     config: SvAppBackendConfig,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    synchronizerNodeService: Option[SynchronizerNodeService[LocalSynchronizerNode]],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     dsoPartyMigration: DsoPartyMigration,
     protected val loggerFactory: NamedLoggerFactory,
@@ -526,45 +525,44 @@ class HttpSvPublicHandler(
   )(extracted: TraceContext): Future[r0.OnboardSvSequencerResponse] = {
     implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
-      (for {
-        sequencerId <- Codec.decode(Codec.Sequencer)(body.sequencerId)
-        synchronizerNode <- synchronizerNodeService
-          .toRight("Onboarding sequencer configured to use X nodes but sponsoring SV is not")
-      } yield {
-        synchronizerNode
-          .activeSynchronizerNode()
-          .flatMap(node =>
-            getSequencerOnboardingState(
-              node.config.sequencer.isBftSequencer,
-              node.sequencerAdminConnection,
-              sequencerId,
+      Codec.decode(Codec.Sequencer)(body.sequencerId) match {
+        case Left(err) => Future.failed(HttpErrorHandler.badRequest(err))
+        case Right(sequencerId) =>
+          synchronizerNodeService
+            .activeSynchronizerNode()
+            .flatMap(node =>
+              getSequencerOnboardingState(
+                node.config.sequencer.isBftSequencer,
+                node.sequencerAdminConnection,
+                sequencerId,
+              )
             )
-          )
-      }).fold(
-        errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
-        _.map(onboardingState =>
-          r0.OnboardSvSequencerResponseOK(
-            definitions.OnboardSvSequencerResponse(
-              Base64.getEncoder.encodeToString(onboardingState.toByteArray)
+            .map(onboardingState =>
+              r0.OnboardSvSequencerResponseOK(
+                definitions.OnboardSvSequencerResponse(
+                  Base64.getEncoder.encodeToString(onboardingState.toByteArray)
+                )
+              )
             )
-          )
-        ),
-      )
+      }
     }
   }
 
   private def withClientOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: CometBftClient => Future[T])(implicit tc: TraceContext) = synchronizerNodeService
-    .traverse(_.activeSynchronizerNode())
-    .flatMap {
-      _.flatMap(_.cometbftNode.map(_.cometBftClient)).fold {
-        notFound(definitions.ErrorResponse("CometBFT is not configured."))
-          .pure[Future]
-      } {
-        call
+  )(call: CometBftClient => Future[T])(implicit tc: TraceContext) =
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap { node =>
+        node.cometbftNode
+          .map(_.cometBftClient)
+          .fold {
+            notFound(definitions.ErrorResponse("CometBFT is not configured."))
+              .pure[Future]
+          } {
+            call
+          }
       }
-    }
 
   private def isOnboardingConfirmed(party: PartyId)(implicit tc: TraceContext): Future[Boolean] = {
     // wait for a bit as it is possible the store ingression is not complete

@@ -685,9 +685,11 @@ class SV1Initializer(
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
-          synchronizerNodeService.sequencerAdminConnection.flatMap(
-            _.listSequencerTrafficControlState()
-          ),
+          synchronizerNodeService
+            .sequencerAdminConnection()
+            .flatMap(
+              _.listSequencerTrafficControlState()
+            ),
           dsoStore.lookupAmuletRules(),
           dsoStore.lookupDsoRulesWithStateWithOffset(),
         ).tupled

@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
-  SequencerAdminConnection,
   SynchronizerNodeService,
 }
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode

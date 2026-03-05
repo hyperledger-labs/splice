@@ -40,7 +40,7 @@ class HttpSvAdminHandler(
     optDomainMigrationDumpConfig: Option[Path],
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
-    synchronizerNodeService: Option[SynchronizerNodeService[LocalSynchronizerNode]],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
     domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -93,42 +93,33 @@ class HttpSvAdminHandler(
   )()(extracted: AdminUserRequest): Future[r0.GetDomainMigrationDumpResponse] = {
     val AdminUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getDomainMigrationDump") { implicit tc => _ =>
-      synchronizerNodeService match {
-        case Some(service) =>
-          service.activeSynchronizerNode().flatMap { synchronizerNode =>
-            dsoStore.getDsoRules().flatMap { dsoRules =>
-              dsoRules.payload.config.nextScheduledSynchronizerUpgrade.toScala match {
-                case Some(scheduled) =>
-                  DomainMigrationDump
-                    .getDomainMigrationDump(
-                      config.domains.global.alias,
-                      svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
-                      participantAdminConnection,
-                      synchronizerNode,
-                      loggerFactory,
-                      dsoStore,
-                      scheduled.migrationId,
-                      domainDataSnapshotGenerator,
-                    )
-                    .map { response =>
-                      r0.GetDomainMigrationDumpResponse
-                        .OK(response.toHttp(outputDirectory = None))
-                    }
-                case None =>
-                  Future.failed(
-                    HttpErrorHandler.internalServerError(
-                      s"Could not get DomainMigrationDump because migration is not scheduled"
-                    )
-                  )
-              }
-            }
+      synchronizerNodeService.activeSynchronizerNode().flatMap { synchronizerNode =>
+        dsoStore.getDsoRules().flatMap { dsoRules =>
+          dsoRules.payload.config.nextScheduledSynchronizerUpgrade.toScala match {
+            case Some(scheduled) =>
+              DomainMigrationDump
+                .getDomainMigrationDump(
+                  config.domains.global.alias,
+                  svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Medium),
+                  participantAdminConnection,
+                  synchronizerNode,
+                  loggerFactory,
+                  dsoStore,
+                  scheduled.migrationId,
+                  domainDataSnapshotGenerator,
+                )
+                .map { response =>
+                  r0.GetDomainMigrationDumpResponse
+                    .OK(response.toHttp(outputDirectory = None))
+                }
+            case None =>
+              Future.failed(
+                HttpErrorHandler.internalServerError(
+                  s"Could not get DomainMigrationDump because migration is not scheduled"
+                )
+              )
           }
-        case None =>
-          Future.failed(
-            HttpErrorHandler.internalServerError(
-              s"Could not prepare DomainMigrationDump because domain node is not configured"
-            )
-          )
+        }
       }
     }(traceContext, tracer)
   }
@@ -178,30 +169,19 @@ class HttpSvAdminHandler(
   ): Future[r0.GetSynchronizerNodeIdentitiesDumpResponse] = {
     val AdminUserRequest(traceContext) = tuser
     withSpan(s"$workflowId.getSynchronizerNodeIdentitiesDump") { implicit tc => _ =>
-      synchronizerNodeService match {
-        case Some(service) =>
-          service.activeSynchronizerNode().flatMap { synchronizerNode =>
-            SynchronizerNodeIdentities
-              .getSynchronizerNodeIdentities(
-                participantAdminConnection,
-                synchronizerNode,
-                dsoStore,
-                config.domains.global.alias,
-                loggerFactory,
-              )
-              .map { response =>
-                r0.GetSynchronizerNodeIdentitiesDumpResponse.OK(
-                  definitions.GetSynchronizerNodeIdentitiesDumpResponse(response.toHttp())
-                )
-              }
-          }
-        case None =>
-          Future.failed(
-            HttpErrorHandler.internalServerError(
-              s"Could not prepare SynchronizerNodeIdentitiesDump because domain node is not configured"
-            )
+      SynchronizerNodeIdentities
+        .getSynchronizerNodeIdentities(
+          participantAdminConnection,
+          synchronizerNodeService.nodes.current,
+          dsoStore,
+          config.domains.global.alias,
+          loggerFactory,
+        )
+        .map { response =>
+          r0.GetSynchronizerNodeIdentitiesDumpResponse.OK(
+            definitions.GetSynchronizerNodeIdentitiesDumpResponse(response.toHttp())
           )
-      }
+        }
     }(traceContext, tracer)
   }
 
@@ -211,77 +191,68 @@ class HttpSvAdminHandler(
       request: TriggerDomainMigrationDumpRequest
   )(extracted: AdminUserRequest): Future[r0.TriggerDomainMigrationDumpResponse] = {
     withSpan(s"$workflowId.triggerDomainMigrationDump") { implicit tc => _ =>
-      synchronizerNodeService match {
-        case Some(service) =>
-          service.activeSynchronizerNode().flatMap { synchronizerNode =>
-            optDomainMigrationDumpConfig match {
-              case Some(dumpPath) =>
-                val exportAt = request.timestamp.map(Instant.parse)
-                val dumpRequest = exportAt match {
-                  case Some(at) =>
-                    logger.info(
-                      s"Triggering synchronizer migration dump for possibly unpaused synchronizer at $at"
-                    )
-                    DomainMigrationDump.getDomainMigrationDumpUnsafe(
-                      config.domains.global.alias,
-                      svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
-                      participantAdminConnection,
-                      synchronizerNode,
-                      loggerFactory,
-                      dsoStore,
-                      request.migrationId,
-                      domainDataSnapshotGenerator,
-                      at,
-                    )
-                  case None =>
-                    logger.info("Triggering synchronizer migration dump for expected synchronizer")
-                    DomainMigrationDump
-                      .getDomainMigrationDump(
-                        config.domains.global.alias,
-                        svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
-                        participantAdminConnection,
-                        synchronizerNode,
-                        loggerFactory,
-                        dsoStore,
-                        request.migrationId,
-                        domainDataSnapshotGenerator,
-                      )
-                }
-                for {
-                  dump <- dumpRequest
-                } yield {
-                  import io.circe.syntax.*
-                  val pathForTheFiles = exportAt.fold(dumpPath.getParent)(at =>
-                    dumpPath.getParent
-                      .createChild(
-                        s"export_at_${at.toEpochMilli}",
-                        asDirectory = true,
-                        createParents = true,
-                      )
-                      .path
-                  )
-                  logger.info(s"Writing dump at $pathForTheFiles")
-                  val path = BackupDump.writeToPath(
-                    (pathForTheFiles / dumpPath.name).path,
-                    dump.toHttp(outputDirectory = Some(pathForTheFiles.toString)).asJson.noSpaces,
-                  )
-                  logger.info(s"Wrote domain migration dump at path $path")
-                  r0.TriggerDomainMigrationDumpResponseOK
-                }
-              case None =>
-                Future.failed(
-                  HttpErrorHandler.internalServerError(
-                    s"Could not trigger DomainMigrationDump because dump path is not configured"
-                  )
+      synchronizerNodeService.activeSynchronizerNode().flatMap { synchronizerNode =>
+        optDomainMigrationDumpConfig match {
+          case Some(dumpPath) =>
+            val exportAt = request.timestamp.map(Instant.parse)
+            val dumpRequest = exportAt match {
+              case Some(at) =>
+                logger.info(
+                  s"Triggering synchronizer migration dump for possibly unpaused synchronizer at $at"
                 )
+                DomainMigrationDump.getDomainMigrationDumpUnsafe(
+                  config.domains.global.alias,
+                  svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
+                  participantAdminConnection,
+                  synchronizerNode,
+                  loggerFactory,
+                  dsoStore,
+                  request.migrationId,
+                  domainDataSnapshotGenerator,
+                  at,
+                )
+              case None =>
+                logger.info("Triggering synchronizer migration dump for expected synchronizer")
+                DomainMigrationDump
+                  .getDomainMigrationDump(
+                    config.domains.global.alias,
+                    svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
+                    participantAdminConnection,
+                    synchronizerNode,
+                    loggerFactory,
+                    dsoStore,
+                    request.migrationId,
+                    domainDataSnapshotGenerator,
+                  )
             }
-          }
-        case None =>
-          Future.failed(
-            HttpErrorHandler.internalServerError(
-              s"Could not trigger DomainMigrationDump because domain node is not configured"
+            for {
+              dump <- dumpRequest
+            } yield {
+              import io.circe.syntax.*
+              val pathForTheFiles = exportAt.fold(dumpPath.getParent)(at =>
+                dumpPath.getParent
+                  .createChild(
+                    s"export_at_${at.toEpochMilli}",
+                    asDirectory = true,
+                    createParents = true,
+                  )
+                  .path
+              )
+              logger.info(s"Writing dump at $pathForTheFiles")
+              val path = BackupDump.writeToPath(
+                (pathForTheFiles / dumpPath.name).path,
+                dump.toHttp(outputDirectory = Some(pathForTheFiles.toString)).asJson.noSpaces,
+              )
+              logger.info(s"Wrote domain migration dump at path $path")
+              r0.TriggerDomainMigrationDumpResponseOK
+            }
+          case None =>
+            Future.failed(
+              HttpErrorHandler.internalServerError(
+                s"Could not trigger DomainMigrationDump because dump path is not configured"
+              )
             )
-          )
+        }
       }
     }(extracted.traceContext, tracer)
   }

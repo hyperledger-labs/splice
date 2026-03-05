@@ -423,15 +423,12 @@ class SvAppBackendReference(
     sequencerClientFor(_.current)
 
   def sequencerClientFor(
-      node: SvSynchronizerNodesConfig => Option[SvSynchronizerNodeConfig]
+      node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig
   ): SequencerClientReference = {
     new SequencerClientReference(
       consoleEnvironment,
       s"sequencer client for $name",
-      node(config.localSynchronizerNodes)
-        .getOrElse(throw new RuntimeException("no current node config"))
-        .sequencer
-        .toCantonConfig,
+      node(config.localSynchronizerNodes).sequencer.toCantonConfig,
     )
   }
 
@@ -439,14 +436,14 @@ class SvAppBackendReference(
     mediatorClientFor(_.current)
 
   def mediatorClientFor(
-      node: SvSynchronizerNodesConfig => Option[SvSynchronizerNodeConfig]
+      node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig
   ): MediatorClientReference = {
     new MediatorClientReference(
       consoleEnvironment,
       s"mediator client for $name",
       node(
         config.localSynchronizerNodes
-      ).getOrElse(throw new RuntimeException("no current node configured")).mediator.toCantonConfig,
+      ).mediator.toCantonConfig,
     )
   }
 }

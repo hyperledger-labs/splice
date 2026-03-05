@@ -346,7 +346,7 @@ class SvOffboardingIntegrationTest
 
             if (IsTheCantonSequencerBFTEnabled) {
               clue("check sequencer offboarded from p2p connections") {
-                sv3Backend.appState.localSynchronizerNodes.value.current.sequencerAdminConnection
+                sv3Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection
                   .listCurrentPeerEndpoints()
                   .futureValue
                   .size shouldBe 2

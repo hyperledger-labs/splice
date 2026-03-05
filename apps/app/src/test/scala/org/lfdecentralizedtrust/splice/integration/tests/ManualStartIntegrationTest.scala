@@ -122,9 +122,7 @@ class ManualStartIntegrationTest
       def sequencerAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("sequencer", name)
         new SequencerAdminConnection(
-          FullClientConfig(port =
-            config.localSynchronizerNodes.current.value.sequencer.adminApi.port
-          ),
+          FullClientConfig(port = config.localSynchronizerNodes.current.sequencer.adminApi.port),
           env.environment.config.monitoring.logging.api,
           loggerFactoryWithKey,
           grpcClientMetrics,
@@ -134,9 +132,7 @@ class ManualStartIntegrationTest
       def mediatorAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("mediator", name)
         new MediatorAdminConnection(
-          FullClientConfig(port =
-            config.localSynchronizerNodes.current.value.mediator.adminApi.port
-          ),
+          FullClientConfig(port = config.localSynchronizerNodes.current.mediator.adminApi.port),
           env.environment.config.monitoring.logging.api,
           loggerFactoryWithKey,
           grpcClientMetrics,

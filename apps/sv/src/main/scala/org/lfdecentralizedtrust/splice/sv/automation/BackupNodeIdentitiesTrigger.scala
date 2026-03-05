@@ -58,9 +58,10 @@ final class BackupNodeIdentitiesTrigger(
       s"Attempting to write $fileDesc"
     )
     for {
+      node <- synchronizerNodeService.activeSynchronizerNode()
       identities <- SynchronizerNodeIdentities.getSynchronizerNodeIdentities(
         participantAdminConnection,
-        synchronizerNodeService,
+        node,
         dsoStore,
         synchronizerAlias,
         loggerFactory,

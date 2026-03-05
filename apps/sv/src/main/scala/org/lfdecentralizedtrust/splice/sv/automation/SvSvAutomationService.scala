@@ -5,9 +5,21 @@ package org.lfdecentralizedtrust.splice.sv.automation
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.automation.{AutomationServiceCompanion, SpliceAppAutomationService, SqlIndexInitializationTrigger}
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider, SpliceLedgerClient, SynchronizerNodeService}
-import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.automation.{
+  AutomationServiceCompanion,
+  SpliceAppAutomationService,
+  SqlIndexInitializationTrigger,
+}
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  RetryProvider,
+  SpliceLedgerClient,
+  SynchronizerNodeService,
+}
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
@@ -18,7 +30,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.ExecutionContextExecutor
