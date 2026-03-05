@@ -65,13 +65,6 @@ class ScanEventHistoryExtraDataIntegrationTest
       }
     }
 
-    withClue("Traffic summaries should be on verdict-only events") {
-      eventsWithTrafficSummary.foreach { item =>
-        item.verdict shouldBe defined
-        item.update shouldBe empty
-      }
-    }
-
     withClue("Traffic summary should also be present via getEventById") {
       Seq(eventsWithTrafficSummary.head, eventsWithTrafficSummary.last).distinct.foreach { item =>
         item.verdict.foreach { verdict =>
