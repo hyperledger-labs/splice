@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppRight,
@@ -826,6 +827,7 @@ object HttpScanAppClient {
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
                   DsoSequencer(
                     s.migrationId,
+                    s.synchronizerSerial,
                     sequencerId,
                     s.url,
                     s.svName,
@@ -845,6 +847,7 @@ object HttpScanAppClient {
 
   final case class DsoSequencer(
       migrationId: Long,
+      serial: Option[Long],
       id: SequencerId,
       url: String,
       svName: String,
@@ -2471,6 +2474,28 @@ object HttpScanAppClient {
           ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
         )
         .leftMap(_.toString)
+    }
+  }
+
+  case class GetActivePhysicalSynchronizerSerial()
+      extends InternalBaseCommand[
+        http.GetActivePhysicalSynchronizerSerialResponse,
+        NonNegativeInt,
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetActivePhysicalSynchronizerSerialResponse] =
+      client.getActivePhysicalSynchronizerSerial(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetActivePhysicalSynchronizerSerialResponse.OK(response) =>
+      NonNegativeInt.create(response.serial.toInt).leftMap(_.message)
     }
   }
 }

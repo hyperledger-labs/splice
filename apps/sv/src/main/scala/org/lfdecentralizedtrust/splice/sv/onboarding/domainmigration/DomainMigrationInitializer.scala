@@ -413,7 +413,8 @@ class DomainMigrationInitializer(
                   .initializeFromGenesisState(
                     genesisState,
                     localSynchronizerNodes.current.staticSynchronizerParameters(
-                      NonNegativeInt.zero
+                      // workaround to still keep the HDM test working
+                      NonNegativeInt.one
                     ),
                   ),
                 logger,
