@@ -289,3 +289,65 @@ resource.type="cloudsql_database"
     notificationChannels: [notificationChannel.name],
   });
 }
+
+export function installGcpQuotaAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
+  const displayName = `Quota limits approaching or exceeded in ${CLUSTER_BASENAME}`;
+
+  new gcp.monitoring.AlertPolicy('quotaAlert', {
+    alertStrategy: getAlertStrategy(notificationChannel),
+    combiner: 'OR',
+    conditions: [
+      {
+        // "Quota Full" (Exceeded right now)
+        displayName: `Quota Exceeded in ${CLUSTER_BASENAME}`,
+        conditionThreshold: {
+          aggregations: [
+            {
+              alignmentPeriod: '60s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              groupByFields: ['metric.label.quota_metric'],
+              perSeriesAligner: 'ALIGN_SUM',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          duration: '60s',
+          filter:
+            'resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"',
+          trigger: {
+            count: 1,
+          },
+        },
+      },
+      {
+        // Tracks resources like CPUs, Static IPs, Disk Space
+        displayName: `Allocation Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+        conditionPrometheusQueryLanguage: {
+          query: `
+            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"}
+            / ignoring(limit_name) group_right
+            serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"}
+            > 0.90
+          `,
+          duration: '300s',
+        },
+      },
+      {
+        // Tracks API requests, HSM operations per minute, etc.
+        displayName: `Rate Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+        conditionPrometheusQueryLanguage: {
+          query: `
+            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"}
+            / ignoring(limit_name) group_right
+            serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"}
+            > 0.90
+          `,
+          duration: '300s',
+        },
+      },
+    ],
+    displayName: displayName,
+    notificationChannels: [notificationChannel.name],
+  });
+}
