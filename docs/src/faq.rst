@@ -224,8 +224,8 @@ ______________
       and check them into your own repo.
     * Make sure to only depend on ``splice-token-api-*`` packages for your main files. These are guaranteed to be stable.
     * Put your Daml script tests for your workflow into separate ``*-test`` daml
-      projects as done `in splice <https://github.com/hyperledger-labs/splice/tree/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test>`__.
-      See the `daml.yaml <https://github.com/hyperledger-labs/splice/blob/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test/daml.yaml>`__
+      projects as done `in splice <https://github.com/hyperledger-labs/splice/tree/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test-v1>`__.
+      See the `daml.yaml <https://github.com/hyperledger-labs/splice/blob/b91cf9a77bad6c513658401a57db87d975f9a526/token-standard/splice-token-standard-test-v1/daml.yaml>`__
       for details.
 
   Is there any open-source wallet implementation for canton coins?

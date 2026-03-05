@@ -6,12 +6,18 @@ module Splice.ExternalPartyAmuletRules where
 
 import DA.Assert
 import DA.Foldable (forA_)
+import DA.List (dedup)
 import DA.Optional
 import qualified DA.TextMap as TextMap
+import qualified DA.Map as Map
+import DA.Text as T
+import DA.Exception
 
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2 (basicAccount, Account(..))
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
 import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
 import Splice.Api.Token.AllocationInstructionV2 as AllocationInstructionV2
 import Splice.Api.Token.UtilsV2
@@ -26,7 +32,6 @@ import Splice.Expiry (maxExpiry)
 import Splice.Types
 import Splice.Util
 
-import DA.Exception
 
 -- | Rules contract that can be used in transactions that require signatures
 -- from an external party. This is intended to get archived and recreated as rarely as possible
@@ -92,6 +97,7 @@ template ExternalPartyAmuletRules
       allocationFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
         pure (view $ toInterface @AllocationFactory this)
+      allocationFactory_settleImpl _self arg = amulet_allocationFactory_settleImpl this arg
 
     interface instance AllocationInstructionV1.AllocationFactory for ExternalPartyAmuletRules where
       view = allocation_factory_view_v2_to_v1 (view (toInterface @AllocationFactory this))
@@ -400,15 +406,18 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
   openMiningRound <- fetch paymentContext.context.openMiningRound
 
-  let sender = creator
-  let amount = allocationAmount sender arg.allocation
+  -- FIXME: rename creator to authorizer
+  let authorizer = creator
+  let amount = netAllocationAmount authorizer arg.allocation.transferLegs
 
-  let 
+  let
     deadline = fromOptional maxTime allocation.settlement.settlementDeadline
-    expiresAt = if amount == 0.0
+
+    -- FIXME: revisit this logic; as the DSO also has to keep around the allocation until the deadline ==> problematic for ACS sizes
+    expiresAt = if amount <= 0.0
       then deadline
-      else  min deadline (maxExpiry openMiningRound amount)
-  require "Allocation.settlement.settleAt <= Allocation.expiresAt" 
+      else min deadline (maxExpiry openMiningRound amount)
+  require "Allocation.settlement.settleAt <= Allocation.expiresAt"
     (settlement.settleAt <= expiresAt)
 
   forA_ transferLegs (\transferLeg -> do
@@ -433,12 +442,13 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   assertDeadlineExceeded "requestedAt" requestedAt
 
   -- inputHoldingCids:
-  require "At least one input holding must be provided" (amount == 0.0 || not (null inputHoldingCids))
+  require "At least one input holding must be provided when net amount is negative" (amount >= 0.0 || not (null inputHoldingCids))
 
   -- lock the funds
-  let twoStepTransfer = allocationToTwoStepTransfer sender arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
+  let twoStepTransfer = allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
 
-  (lockedAmulet, senderChangeCids, meta) <- if amount == 0.0 
+  (lockedAmulet, senderChangeCids, meta) <-
+    if amount >= 0.0
     then return (None, [], emptyMetadata)
     else do
       (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
@@ -448,7 +458,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
     allocation = arg.allocation
     lockedAmulet
     admin = dso
-    sender
+    authorizer
     expiresAt
 
   -- finaly done: return the result
@@ -459,3 +469,71 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
 requireExpectedAdminMatch : Party -> Party -> Update ()
 requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
+
+
+amulet_allocationFactory_settleImpl : ExternalPartyAmuletRules -> AllocationFactory_SettleBatch -> Update AllocationFactory_SettleBatchResult
+amulet_allocationFactory_settleImpl this AllocationFactory_SettleBatch {..} = do
+  let dso = this.dso
+  -- validate call to factory and retrieve context
+  requireExpectedAdminMatch expectedAdmin dso
+
+  -- fetch and validate all allocations
+  allocations <- forA allocationCids $ \allocationCid -> do
+    allocation <- fetchChecked @AmuletAllocation (ForDso with dso) (fromInterfaceContractId allocationCid)
+    require "Allocation executor matches" (allocation.allocation.settlement.executor == executor)
+    -- FIXME: consider what other validation is missing
+    pure allocation
+
+  let allocatedLegs = Map.fromList $ do
+        allocation <- allocations
+        let authorizer = basicAccount (allocation.authorizer)
+        case allocation.allocation.transferLegs of
+          [] -> error "Unexpected empty transfer legs in allocation"
+          (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
+  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
+  validateExpectedTransfers ppLeg expectedLegs allocatedLegs
+
+  -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
+  -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
+
+  -- settle all allocations
+  -- FIXME: settle sorted by authorizer to improve view compression, and merge holdings for the same owner to auto-reduce ACS size.
+  newHoldingCidss <- forA allocationCids $ \allocationCid -> do
+    result <- exercise allocationCid AllocationV2.Allocation_Settle with extraArgs
+    pure result.newHoldingCids
+
+  -- return result
+  pure AllocationFactory_SettleBatchResult with
+    newHoldingCids = foldl (Map.unionWith (++)) Map.empty newHoldingCidss
+    meta = emptyMetadata
+
+
+validateExpectedTransfers
+  : (Show leg, Ord leg) => (leg -> Text) -> [leg] -> Map.Map leg [leg] -> Update ()
+validateExpectedTransfers pp [] allocated
+  | Map.null allocated  =  pure ()
+  | otherwise = abort $ "Unexpected remaining allocated transfer legs:\n" <> ppMap pp allocated
+validateExpectedTransfers pp (expected :: expectedRest) allocated =
+  case Map.lookup expected allocated of
+    None -> abort $ T.unlines
+      [ "No matching allocations for expected transfer leg: "
+      , pp expected
+      , "with open allocations: "
+      , ppMap pp allocated
+      , "remaining expected legs: "
+      , T.unlines (map pp expectedRest)
+      ]
+    Some [] -> validateExpectedTransfers pp expectedRest (Map.delete expected allocated)
+    Some (newExpected::newRemaining) ->
+      validateExpectedTransfers pp expectedRest $
+        Map.insert newExpected newRemaining $ Map.delete expected allocated
+
+-- FIXME: cleanup this debug pretty-printing code
+ppMap : (leg -> Text) -> Map.Map leg [leg] -> Text
+ppMap pp m = T.unlines $ concat [ pp k :: map (\v -> "  " <> pp v) vs  | (k, vs) <- Map.toList m ]
+
+ppLeg : (Account, AllocationV2.TransferLeg) -> Text
+ppLeg (authorizer, leg) =
+  -- show (authorizer.owner, leg.sender.owner, leg.receiver.owner, leg.amount)
+  show (authorizer, leg)
+

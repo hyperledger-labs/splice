@@ -49,6 +49,8 @@ interface AllocationRequest where
 -- Implementations SHOULD make sure that at least all senders of the transfer legs
 -- are observers of the implementing contract, so that their wallet can show
 -- the request to them.
+--
+-- FIXME: consider allowing requesting a batch of allocations in a single request.
 data AllocationRequestView = AllocationRequestView with
     settlement : SettlementInfo
       -- ^ Settlement for which the assets are requested to be allocated.

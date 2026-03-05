@@ -9,16 +9,11 @@
 module Splice.Api.Token.AllocationV2 where
 
 import DA.List (dedup, dedupSort)
-import DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
-import qualified DA.Foldable as F
-import DA.Assert ((===))
-import DA.Optional (isSome, fromOptional, optionalToList)
-import DA.Map as Map (insert, toList, lookup, fromList, Map)
-import DA.Action (foldlA)
-import qualified DA.Set as Set
+import DA.Optional (optionalToList)
+import DA.Map as Map
 
 -- | A generic type to refer to data defined within an app.
 
@@ -38,6 +33,7 @@ data SettlementInfo = SettlementInfo
   with
     executor : Party
       -- ^ The party that is responsible for executing the settlement.
+      -- FIXME: consider supporting multiple executors instead of controller overrides. The executors are the ones ensuring atomicity across different instrument admins.
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
     requestedAt : Time
@@ -50,7 +46,7 @@ data SettlementInfo = SettlementInfo
       -- ^ Additional metadata about the settlement, used for extensibility.
     controllerOverride : Optional [Party]
       -- ^ Additional party signatures in addition to executor that need to authorize
-      -- choices on the Allocation. Defaults to senders and receivers across all 
+      -- choices on the Allocation. Defaults to senders and receivers across all
       -- transferLegs.
     settlementDeadline : Optional Time
       -- ^ The latest point at which settlement will occur. This allows registries
@@ -100,22 +96,12 @@ data AllocationView = AllocationView with
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
-    sender : Account
-      -- ^ The sender of this allocation
+    authorizer : Account
+      -- ^ The authorizer authorizing the transfer legs of the allocation to be executed.
     expiresAt : Optional Time
     -- ^ A time at which this allocation expires. SHOULD be as close as the
     -- registry can make it to the settlementInfo's settlementDeadline.
   deriving (Show, Eq)
-
--- | View of a delegated authority from the signer to the executor to settle given transfer legs.
--- authorizers are always the signatories so not made available in the viewtype.
-data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView with
-  settlement : SettlementInfo
-  transferLegs : [TransferLeg]
-  authorizer : Account
-  -- ^ the settlement to which this authorization applies.
-    deriving (Eq, Show)
-
 
 
 -- Allocation
@@ -136,6 +122,10 @@ allocationControllers alloc@AllocationSpecification{..} =
     (\override -> dedup $ settlement.executor :: override)
     settlement.controllerOverride
 
+allocationSettlementControllers : AllocationSpecification -> [Party]
+allocationSettlementControllers alloc@AllocationSpecification{..} =
+  settlement.executor :: [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
+
 -- | Convenience to get the allocation admin
 allocationAdmin : AllocationSpecification -> Party
 allocationAdmin AllocationSpecification{..} = admin
@@ -145,43 +135,30 @@ allocationAdmin AllocationSpecification{..} = admin
       [a] -> a
       _ -> error "Allocations must involve instruments from exactly one admin"
 
--- | A contract representing an allocation of some amount of asset holdings to
--- a specific leg of a settlement.
+-- | A contract representing the approval of the authorizer to send or receive
+-- the net amount of assets of the transfer legs as part of a settlement where
+-- the executor and instrument admin check that every transfer leg has a matching
+-- authorization from the counterparty.
 interface Allocation where
   viewtype AllocationView
 
-  allocation_executeTransferImpl : ContractId Allocation -> Allocation_ExecuteTransfer -> Update Allocation_ExecuteTransferResult
   allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update Allocation_CancelResult
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
-  allocation_getTransferAuthorizationsImpl : ContractId Allocation -> Allocation_GetTransferAuthorizations -> Update(TextMap (ContractId AllocationTransferAuthorization))
+  allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
 
-  choice Allocation_GetTransferAuthorizations : TextMap (ContractId AllocationTransferAuthorization)
-  -- ^ Transfer the authority from this Allocation to AllocationTransferAuthorizations which
-  -- can then be used in conjunction with other AllocationTransferAuthorizations to execute
-  -- transfers. The return type is a map from transferLegId to authorizations. The key in which
-  -- an authorization is returned is the id of the _first_ transferLeg that it covers.
-  -- If receiver authorizations are required, the receiver authorization must be returned on
-  -- the same key as the sender authorization, and cover the same sets of legs.
-  -- The standard algorithm under which the authorizations must be settleable is implemented in
-  -- `settleAllocations`.
+  choice Allocation_Settle : Allocation_SettleResult
+    -- ^ Settle the allocation by moving the net amount of the transfer legs.
+    --
+    -- Requires authorization from the settlement executor and the instrument
+    -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
+    -- settlements of other legs of the same admins.
+    --
+    -- FIXME: adjust comments to call out that all legs must have the same instrument admin
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationControllers (view this).allocation
-    do allocation_getTransferAuthorizationsImpl this self arg
-
-  choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
-    -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
-    -- This choice SHOULD succeed provided the `settlement.settleBefore` deadline has not yet passed.
-    -- This function exists for backwards compatibility and is less general then going via the
-    -- settlement flow enabled by Allocation_GetTransferAuthorizations. In particular, it is only
-    -- guaranteed to work if none of the transfer legs require receiver authorization, and if the
-    -- provided holdingCids cover all the transferLegs.
-    with
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller allocationControllers (view this).allocation
-    do allocation_executeTransferImpl this self arg
+    controller allocationSettlementControllers (view this).allocation
+    do allocation_settleImpl this self arg
 
   choice Allocation_Cancel : Allocation_CancelResult
     -- ^ Cancel the allocation. Requires authorization from sender, receiver, and
@@ -204,47 +181,17 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).sender.owner::(optionalToList (view this).sender.provider)
+    controller (view this).authorizer.owner::(optionalToList (view this).authorizer.provider)
     do allocation_withdrawImpl this self arg
 
--- AllocationTransferAuthorization
-----------------------------------
 
--- | A contract representing a delegated authority from the signatories to the executor to settle 
--- given transfer legs.
-interface AllocationTransferAuthorization where
-  viewtype AllocationTransferAuthorizationView
-
-  allocationTransferAuthorization_transferImpl : ContractId AllocationTransferAuthorization -> AllocationTransferAuthorization_Transfer -> Update Allocation_ExecuteTransferResult
-
-  choice AllocationTransferAuthorization_Transfer : Allocation_ExecuteTransferResult
-  -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
-  -- This choice SHOULD succeed provided the `settlement.settleBefore` deadline has not yet passed.
-    with
-      receiverAuth : Optional (ContractId AllocationTransferAuthorization)
-        -- ^ A receiver authorization if needed
-      holdingCids : [ContractId Holding]
-        -- ^ The holdingCids to use for the settlement
-      extraObservers : [Party]
-        -- ^ Extra observers to optimize views
-    observer extraObservers
-    controller allocationControllers (AllocationSpecification (view this).settlement (view this).transferLegs)
-    do allocationTransferAuthorization_transferImpl this self arg
-
--- Result types
----------------
-
--- | The result of the `Allocation_ExecuteTransfer` choice.
-data Allocation_ExecuteTransferResult = Allocation_ExecuteTransferResult
-  with
-    senderHoldingCids : [ContractId Holding]
-      -- ^ The holdings that were created for the sender. Can be used to return
-      -- "change" to the sender if required.
-    receiverHoldingCids : [ContractId Holding]
-      -- ^ The holdings that were created for the receiver.
+-- FIXME: comment
+data Allocation_SettleResult = Allocation_SettleResult with
+    newHoldingCids : Map.Map InstrumentId [ContractId Holding]
+      -- ^ New holdings created as part of the settlement.
     meta : Metadata
-      -- ^ Additional metadata specific to the transfer instruction, used for extensibility.
-  deriving (Show, Eq)
+      -- ^ Additional metadata specific to the settlement, used for extensibility.
+  deriving (Eq, Show)
 
 -- | The result of the `Allocation_Cancel` choice.
 data Allocation_CancelResult = Allocation_CancelResult
@@ -263,176 +210,3 @@ data Allocation_WithdrawResult = Allocation_WithdrawResult
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
-
-
--- Utility for matching with metadata
--------------------------------------
-
--- If an app has an expected allocation and receives a allocation, it needs
--- to check whether they match. The received may have extra metadata so a simple
--- equality check is insufficient. This function checks that the received
--- has only _additional_ metadata.
-
-matchMeta : Metadata -> Metadata -> Either Text ()
-matchMeta expected received = do
-  F.forA_ (TextMap.toList expected.values) (\(k, v) -> do
-      case TextMap.lookup k received.values of
-        None -> abort ("Entry missing in received metadata: " <> k)
-        Some w
-          | w == v -> return ()
-          | otherwise -> abort ("Matadata entry " <> k <> "doesn't match.\nExpected: " <> v <> "\nReceived: " <> w)
-    )
-
-matchLegs : [TransferLeg] -> [TransferLeg] -> Either Text ()
-matchLegs expected received = do
-  assertMsg 
-    ("Expected " <> show (length expected) <> " transfer legs. Received " <> show (length received))
-    (length expected == length received)
-  F.forA_ (zip expected received) (\(e, r) -> do
-      assertMsg
-        ("Expected transfer leg Id " <> r.transferLegId <> ", but got " <> e.transferLegId)
-        (e.transferLegId == r.transferLegId)
-      let
-        baseExpected = e with meta = emptyMetadata 
-        baseReceived = r with meta = emptyMetadata
-      baseExpected === baseReceived
-      matchMeta e.meta r.meta
-    )
-
-matchAllocationWithMeta : AllocationSpecification -> AllocationSpecification -> Either Text ()
-matchAllocationWithMeta expected received = do
-  let
-    baseExpected = expected with
-      transferLegs = []
-      settlement = expected.settlement with
-        meta = emptyMetadata
-    baseReceived = received with
-      transferLegs = []
-      settlement = received.settlement with
-        meta = emptyMetadata
-  baseExpected === baseReceived
-  matchMeta expected.settlement.meta received.settlement.meta
-  matchLegs expected.transferLegs received.transferLegs
-
--- Utility for settling allocations using the recommended algorithm
---------------------------------------------------------------------
--- TODO: Move away from interfaces to make easier to upgrade?
-
-settleAllocations : 
-  [TransferLeg] ->
-  Map (InstrumentId, Account) [ContractId Holding] ->
-  Map (Party, Account) (ContractId Allocation, ExtraArgs) ->
-  Update ((Map (InstrumentId, Account) [ContractId Holding]), [Metadata])
-settleAllocations 
-  transferLegs 
-  -- ^ transferLegs specifies he execution order of transfer legs.
-  -- The boolean indicates whether receiver auth is needed.
-  holdings
-  -- ^ holdings are all input holdings, sorted by instrumentId. Typically these
-  -- match the instrumentIds on the allocations.
-  allocationsWithContext 
-  -- ^ these are the allocations to be used, grouped by admin and account.
-  = do
-    -- Start by sorting all transferauthorizations into a map.
-    -- authsByLeg : Map (TransferLeg, Account) (ContractId AllocationTransferAuthorization)
-    authsByLeg <- Map.fromList . concat <$>
-      mapA (\((_, account), (aCid, extraArgs)) -> do
-        auths <- exercise aCid Allocation_GetTransferAuthorizations with extraArgs
-        return (map (\(tlId, authCid) -> ((tlId, account), authCid)) (TextMap.toList auths)) 
-        ) 
-        (Map.toList allocationsWithContext)
-    settleAuthorizations transferLegs holdings authsByLeg
-
-settleAuthorizations :
-  [TransferLeg] ->
-  Map (InstrumentId, Account) [ContractId Holding] ->
-  Map (Text, Account) (ContractId AllocationTransferAuthorization) ->
-  Update ((Map (InstrumentId, Account) [ContractId Holding]), [Metadata])
-settleAuthorizations   
-  transferLegs 
-  -- ^ transferLegs specifies he execution order of transfer legs.
-  -- The boolean indicates whether receiver auth is needed.
-  holdings
-  -- ^ holdings are all input holdings, sorted by instrumentId. Typically these
-  -- match the instrumentIds on the allocations.
-  authsByLeg
-  -- ^ The needed AllocationTransferAuthorizations soted by leg and authorizer.
- = do
-  (res_holdings, res_metas, _) <- foldlA (\(hs, ms, stls) tl -> 
-    if tl.transferLegId `elem` stls
-      then return (hs, ms, stls) -- Already settled. Do nothing.
-      else do
-        -- Get a receiver authorization as needed
-        let auth_r = Map.lookup (tl.transferLegId, tl.receiver) authsByLeg
-        -- Get input holdings
-        let h = fromOptional [] (Map.lookup (tl.instrumentId, tl.sender) hs)
-
-        (res, settled_legs) <- case Map.lookup (tl.transferLegId, tl.sender) authsByLeg of
-          None -> abort ("No sender authorization found for transferLeg " <> show tl)
-          Some auth_s -> do
-            auth <- fetch auth_s
-            let sls = map (.transferLegId) (view auth).transferLegs
-            r <- exercise auth_s AllocationTransferAuthorization_Transfer with
-              receiverAuth = auth_r
-              holdingCids = h
-              extraObservers = if isSome auth_r then tl.receiver.owner::(optionalToList tl.receiver.provider) else []
-            return (r, sls)
-        -- Update the holdings maps
-        let 
-          hs' =
-            Map.insert (tl.instrumentId, tl.sender) res.senderHoldingCids $
-            Map.insert (tl.instrumentId, tl.receiver) 
-              (res.receiverHoldingCids ++ fromOptional [] (Map.lookup (tl.instrumentId, tl.receiver) hs)) $
-            hs
-          stls' = dedupSort (settled_legs ++ stls)
-          
-        return (hs', res.meta::ms, stls')
-    )
-    (holdings, [], [])
-    transferLegs
-  return (res_holdings, res_metas)
-
-
-default_allocation_executeTransferImpl : Allocation -> ContractId Allocation -> Allocation_ExecuteTransfer -> Update Allocation_ExecuteTransferResult
-default_allocation_executeTransferImpl this self args = do
-  let
-    holdings = 
-      Map.fromList $
-        map
-          (\(instrumentId, hs) -> ((instrumentId, (view this).sender), hs))
-          (Map.toList (view this).holdingCids)
-  
-    allocationsWithContext = (Map.fromList [((allocationAdmin (view this).allocation, (view this).sender), (self, args.extraArgs))])
-  
-  authsByLeg <- Map.fromList . concat <$>
-    mapA (\((_, account), (_, extraArgs)) -> do
-      auths <- allocation_getTransferAuthorizationsImpl this self (Allocation_GetTransferAuthorizations with extraArgs)
-      return (map (\(tlId, authCid) -> ((tlId, account), authCid)) (TextMap.toList auths)) 
-      ) 
-      (Map.toList allocationsWithContext)
-
-  (hs, ms) <- settleAuthorizations
-    (view this).allocation.transferLegs
-    holdings
-    authsByLeg
-
-  let
-    (receiverHoldingCids, senderHoldingCids) = foldl
-      (\(r, s) ((_, account), h) -> 
-        if account == (view this).sender
-          then (r, s ++ h)
-          else (r ++ h, s)
-      )
-      ([], [])
-      (Map.toList hs)
-
-    meta = case ms of
-      [meta] -> meta
-      _ -> Metadata with 
-        values = TextMap.fromList $ 
-          concatMap (\(tl, m) -> map (\(k, v) -> (tl.transferLegId <> "/" <> k, v)) (TextMap.toList m.values)) (zip (view this).allocation.transferLegs ms)
-
-  return Allocation_ExecuteTransferResult with
-    receiverHoldingCids
-    senderHoldingCids
-    meta
