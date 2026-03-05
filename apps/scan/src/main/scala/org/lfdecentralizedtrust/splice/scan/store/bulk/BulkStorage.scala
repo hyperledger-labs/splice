@@ -4,11 +4,15 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.UniqueKillSwitch
-import org.apache.pekko.stream.scaladsl.{Keep, Sink}
+import org.lfdecentralizedtrust.splice.PekkoRetryableInfiniteService
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection, UpdateHistory}
@@ -23,14 +27,18 @@ class BulkStorage(
     currentMigrationId: Long,
     kvProvider: ScanKeyValueProvider,
     metricsFactory: LabeledMetricsFactory,
+    automationConfig: AutomationConfig,
+    backoffClock: Clock,
+    override protected val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
+)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
-    with AutoCloseable {
+    with FlagCloseableAsync
+    with RetryProvider.Has {
 
-  private val killSwitches = appConfig.s3.fold {
+  private val services = appConfig.s3.fold {
     logger.debug("s3 connection not configured, not dumping to bulk storage")
-    Seq.empty[UniqueKillSwitch]
+    Seq.empty[PekkoRetryableInfiniteService[?]]
   } { s3Config =>
     val s3Connection = S3BucketConnection(s3Config, loggerFactory)
     val historyMetrics = HistoryMetrics(metricsFactory, currentMigrationId)
@@ -45,7 +53,7 @@ class BulkStorage(
         kvProvider,
         historyMetrics,
         loggerFactory,
-      ).getSource().toMat(Sink.ignore)(Keep.left).run(),
+      ).asRetryableService(automationConfig, backoffClock, retryProvider),
       new UpdateHistoryBulkStorage(
         storageConfig,
         appConfig,
@@ -55,12 +63,10 @@ class BulkStorage(
         s3Connection,
         historyMetrics,
         loggerFactory,
-      ).getSource().toMat(Sink.ignore)(Keep.left).run(),
+      ).asRetryableService(automationConfig, backoffClock, retryProvider),
     )
-
   }
-  override def close(): Unit = {
-    killSwitches.foreach(_.shutdown())
+  final override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    services.flatMap(_.closeAsync())
   }
-
 }

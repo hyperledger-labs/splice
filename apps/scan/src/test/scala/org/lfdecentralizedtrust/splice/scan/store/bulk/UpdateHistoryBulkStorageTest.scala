@@ -4,19 +4,21 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.Keep
-import org.apache.pekko.stream.testkit.TestSubscriber
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
-import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
@@ -32,6 +34,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
 import java.nio.ByteBuffer
+import scala.util.Using
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -181,93 +184,98 @@ class UpdateHistoryBulkStorageTest
         initialStoreSize,
         i => genesisInstant.plusSeconds(i * 10),
       )
+      val kvProvider = mkProvider.futureValue
 
-      for {
-        kvProvider <- mkProvider
-      } yield {
-        def newUpdatesBulkStorageFlow(
-            migrationId: Long
-        ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
-          new UpdateHistoryBulkStorage(
-            bulkStorageTestConfig,
-            appConfig,
-            mockStore.store,
-            kvProvider,
-            migrationId,
-            bucketConnection,
-            new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
-            loggerFactory,
-          ).getSource()
-            .toMat(TestSink.probe[UpdatesSegment])(Keep.both)
-            .run()
-        }
+      def newRetryProviderAndUpdatesBulkStorageService(migrationId: Long) = {
 
-        val (killSwitch, probe) = newUpdatesBulkStorageFlow(0L)
+        val retryProvider =
+          RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
 
-        probe.request(4)
-        val seg1 = UpdatesSegment(
-          TimestampWithMigrationId(CantonTimestamp.MinValue, 0),
+        val svc = new UpdateHistoryBulkStorage(
+          bulkStorageTestConfig,
+          appConfig,
+          mockStore.store,
+          kvProvider,
+          migrationId,
+          bucketConnection,
+          new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+          loggerFactory,
+        ).asRetryableService(
+          AutomationConfig(pollingInterval =
+            NonNegativeFiniteDuration.ofSeconds(1)
+          ), // Fast retries
+          new WallClock(timeouts, loggerFactory),
+          retryProvider,
+        )
+
+        (retryProvider, svc)
+      }
+
+      def assertLatestSegmentInDb(
+          fromHour: Int,
+          fromMigration: Int,
+          toHour: Int,
+          toMigration: Int,
+      ) = {
+        val segment = UpdatesSegment(
           TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
-            0,
+            CantonTimestamp.tryFromInstant(
+              genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
+            ),
+            fromMigration.toLong,
+          ),
+          TimestampWithMigrationId(
+            CantonTimestamp.tryFromInstant(
+              genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
+            ),
+            toMigration.toLong,
           ),
         )
-        probe.expectNext(20.seconds) shouldBe seg1
-        def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) =
-          UpdatesSegment(
-            TimestampWithMigrationId(
-              CantonTimestamp.tryFromInstant(
-                genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
-              ),
-              fromMigration.toLong,
-            ),
-            TimestampWithMigrationId(
-              CantonTimestamp.tryFromInstant(
-                genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
-              ),
-              toMigration.toLong,
-            ),
-          )
+        kvProvider.getLatestUpdatesSegmentInBulkStorage().value.futureValue.value shouldBe segment
+      }
 
-        def assertLatestSegmentInMetrics(hour: Int) =
-          latestSegmentMetrics.get(MetricsContext.Empty).value.value.get()._1 shouldBe genesisDate
-            .atTime(hour, 0)
-            .toInstant(ZoneOffset.UTC)
-            .toEpochMilli * 1000
+      def assertLatestSegmentInMetrics(hour: Int) =
+        latestSegmentMetrics.get(MetricsContext.Empty).value.value.get()._1 shouldBe genesisDate
+          .atTime(hour, 0)
+          .toInstant(ZoneOffset.UTC)
+          .toEpochMilli * 1000
 
+      val (retryProvider, svc) = newRetryProviderAndUpdatesBulkStorageService(0L)
+      Using.resources(
+        svc,
+        retryProvider,
+      ) { (_, _) =>
         clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
-          probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
-          probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
-          assertLatestSegmentInMetrics(8)
-          probe.expectNoMessage(20.seconds)
+          eventually() {
+            assertLatestSegmentInDb(6, 0, 8, 0)
+
+            assertLatestSegmentInMetrics(8)
+          }
         }
 
         clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
           mockStore.mockIngestion(2000)
-          probe.request(2)
-          probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
-          probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
-          assertLatestSegmentInMetrics(12)
-          probe.expectNoMessage(20.seconds)
-        }
+          eventually() {
+            assertLatestSegmentInDb(10, 0, 12, 0)
+            assertLatestSegmentInMetrics(12)
+          }
 
-        // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
-        // then start a new one with the new migration and ingest updates in the new migration
-        killSwitch.shutdown()
-        val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
-        mockStore.mockMigration()
-
-        clue("2000 more updates in the new migration, up to 19:13:50") {
-          mockStore.mockIngestion(2000)
-          probe1.request(4)
-          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
-          assertLatestSegmentInMetrics(18)
-          probe1.expectNoMessage(20.seconds)
         }
-        killSwitch1.shutdown()
-        succeed
+      }
+
+      // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
+      // then start a new one with the new migration and ingest updates in the new migration
+
+      mockStore.mockMigration()
+      val (retryProvider1, svc1) = newRetryProviderAndUpdatesBulkStorageService(1L)
+      Using.resources(svc1, retryProvider1) { (_, _) =>
+        clue("500 more updates in the new migration, up to 15:03") {
+          mockStore.mockIngestion(500)
+          eventually() {
+            assertLatestSegmentInDb(12, 0, 14, 1)
+            assertLatestSegmentInMetrics(14)
+          }
+        }
       }
     }
   }

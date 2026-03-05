@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class InfiniteServiceWithShutdown {
-  def initiateShutdown(): Unit
+  def initiateShutdown()(implicit tc: TraceContext): Unit
   def completed: Future[Done]
   def isActive: Boolean
 }

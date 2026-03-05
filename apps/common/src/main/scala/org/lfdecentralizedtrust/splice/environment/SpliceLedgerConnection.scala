@@ -735,7 +735,7 @@ class SpliceLedgerSubscription[S](
 
   def isActive: Boolean = !completed_.isCompleted
 
-  def initiateShutdown() =
+  def initiateShutdown()(implicit tc: TraceContext) =
     killSwitch.shutdown()
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {

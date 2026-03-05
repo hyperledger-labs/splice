@@ -64,7 +64,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
@@ -252,6 +252,9 @@ class ScanApp(
         currentMigrationId = migrationInfo.currentMigrationId,
         kvProvider,
         retryProvider.metricsFactory,
+        config.automation,
+        backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),
+        retryProvider,
         loggerFactory,
       )
       scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
