@@ -35,7 +35,10 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
     // per the Canton docs [here](https://docs.digitalasset.com/operate/3.4/howtos/operate/parties/party_replication.html#permission-change-replication-procedure)
 
     aliceParticipant.topology.party_to_participant_mappings
-      .list_hosting_proposals(synchronizerId, bobParticipantId) shouldBe empty
+      .list_hosting_proposals(
+        synchronizerId,
+        bobParticipantId,
+      ) shouldBe empty withClue "multi-hosted party proposals"
 
     val multiHostedParties = Seq(operatorParty, aliceUserParty)
     actAndCheck(
@@ -53,7 +56,7 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
       _ =>
         aliceParticipant.topology.party_to_participant_mappings
           .list_hosting_proposals(synchronizerId, bobParticipantId)
-          .length shouldBe 2,
+          .length shouldBe 2 withClue "multi-hosted party proposals",
     )
 
     clue("Disconnect bobValidator") {
@@ -84,7 +87,7 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
               synchronizerId,
               filterParty = party.toProtoPrimitive,
               filterParticipant = bobParticipantId.toProtoPrimitive,
-            ) should not be empty
+            ) should not be empty withClue "bob mapping after disconnect"
         )
       },
     )
@@ -133,7 +136,7 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
               filterParty = party.toProtoPrimitive,
               filterParticipant = bobParticipantId.toProtoPrimitive,
             )
-          mappings should not be empty
+          mappings should not be empty withClue "bob mapping after reconnect"
           mappings.last.item.participants.last.onboarding shouldBe false
         },
     )
@@ -161,7 +164,7 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
                 filterParty = party.toProtoPrimitive,
                 filterParticipant = bobParticipantId.toProtoPrimitive,
               )
-          mapping should not be empty
+          mapping should not be empty withClue "bob mapping after confirmation rights"
           mapping.last.item.participants.last.permission shouldBe ParticipantPermission.Confirmation
         },
     )
@@ -203,7 +206,9 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
             Limit.DefaultMaxPageSize,
           )
           .flatMap(_.transfer)
-          .filter(tf => tf.description == transferDescription) should not be empty
+          .filter(tf =>
+            tf.description == transferDescription
+          ) should not be empty withClue "transfers splitwell to alice"
       },
     )
   }

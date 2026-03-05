@@ -263,6 +263,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 upgradesConfig,
                 packageVersionSupport,
+                decentralizedSynchronizerId,
                 config.parameters.enabledFeatures,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -299,6 +300,7 @@ class JoiningNodeInitializer(
                 svConnection,
                 joiningConfig,
                 packageVersionSupport,
+                decentralizedSynchronizerId,
               )
           } yield dsoAutomation
         }
@@ -814,6 +816,7 @@ class JoiningNodeInitializer(
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
         packageVersionSupport: PackageVersionSupport,
+        synchronizerId: SynchronizerId,
     ): Future[SvDsoAutomationService] = {
       joiningConfig match {
         case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) =>
@@ -854,6 +857,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNode,
                   upgradesConfig,
                   packageVersionSupport,
+                  synchronizerId,
                   config.parameters.enabledFeatures,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(

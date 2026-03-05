@@ -129,12 +129,12 @@ class ExternalPartySetupProposalIntegrationTest
   "listExternalPartySetupProposals returns an empty array if no contracts exist" in {
     implicit env =>
       aliceValidatorBackend
-        .listExternalPartySetupProposals() shouldBe empty
+        .listExternalPartySetupProposals() shouldBe empty withClue "ExternalPartySetupProposals"
   }
 
   "listTransferPreapprovals returns an empty array if no contracts exist" in { implicit env =>
     aliceValidatorBackend
-      .listTransferPreapprovals() shouldBe empty
+      .listTransferPreapprovals() shouldBe empty withClue "TransferPreapprovals"
   }
 
   "lookupTransferPreapprovalByParty returns None if no contracts exist" in { implicit env =>
@@ -148,7 +148,9 @@ class ExternalPartySetupProposalIntegrationTest
       val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
         onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
       aliceValidatorBackend.participantClient.parties
-        .hosted(filterParty = aliceParty.filterString) should not be empty
+        .hosted(filterParty =
+          aliceParty.filterString
+        ) should not be empty withClue "alice hosted on aliceValidator participant"
       aliceValidatorWalletClient.tap(50.0)
       createAndAcceptExternalPartySetupProposal(
         aliceValidatorBackend,
@@ -156,10 +158,12 @@ class ExternalPartySetupProposalIntegrationTest
         verboseHashing = true,
       )
       eventually() {
-        aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceParty) should not be empty
+        aliceValidatorBackend.lookupTransferPreapprovalByParty(
+          aliceParty
+        ) should not be empty withClue "TransferPreapprovals from validator"
         aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
           aliceParty
-        ) should not be empty
+        ) should not be empty withClue "TransferPreapprovals from scan-proxy"
       }
 
       // Transfer 2000.0 to Alice
@@ -181,7 +185,9 @@ class ExternalPartySetupProposalIntegrationTest
       val onboardingBob @ OnboardingResult(bobParty, _, _) =
         onboardExternalParty(bobValidatorBackend, Some("bobExternal"))
       bobValidatorBackend.participantClient.parties
-        .hosted(filterParty = bobParty.filterString) should not be empty
+        .hosted(filterParty =
+          bobParty.filterString
+        ) should not be empty withClue "bob hosted on bobValidator participant"
       bobValidatorWalletClient.tap(50.0)
       val (cidBob, _) =
         createAndAcceptExternalPartySetupProposal(
@@ -190,8 +196,12 @@ class ExternalPartySetupProposalIntegrationTest
           verboseHashing = true,
         )
       eventually() {
-        bobValidatorBackend.lookupTransferPreapprovalByParty(bobParty) should not be empty
-        bobValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(bobParty) should not be empty
+        bobValidatorBackend.lookupTransferPreapprovalByParty(
+          bobParty
+        ) should not be empty withClue "bobValidator TransferPreapprovals"
+        bobValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
+          bobParty
+        ) should not be empty withClue "bob scan-proxy TransferPreapprovals"
       }
       bobValidatorBackend
         .listTransferPreapprovals()
@@ -256,7 +266,7 @@ class ExternalPartySetupProposalIntegrationTest
           Some("transfer-command-description"),
           verboseHashing = true,
         )
-      prepareSend.hashingDetails should not be empty
+      prepareSend.hashingDetails should not be empty withClue "TransferPreapproval send hashingDetails"
       val (updateId, _) = actAndCheck(
         "Submit signed TransferCommand creation",
         aliceValidatorBackend.submitTransferPreapprovalSend(
@@ -293,7 +303,7 @@ class ExternalPartySetupProposalIntegrationTest
             .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
               aliceParty,
               c => c.data.provider == aliceParty.toProtoPrimitive,
-            ) shouldBe empty
+            ) shouldBe empty withClue "alice AppRewardCoupons"
           // Transfer command counter gets created/incremented
           aliceValidatorBackend.scanProxy
             .lookupTransferCommandCounterByParty(aliceParty)
@@ -367,7 +377,7 @@ class ExternalPartySetupProposalIntegrationTest
             .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
               aliceParty,
               c => c.data.user == aliceParty.toProtoPrimitive,
-            ) shouldBe empty
+            ) shouldBe empty withClue "alice ValidatorRewardCoupons"
 
           // Sanity check that the reward really got collected and not expired.
           val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
@@ -397,7 +407,7 @@ class ExternalPartySetupProposalIntegrationTest
           Some("transfer-command-description"),
           verboseHashing = true,
         )
-      prepareSendFeatured.hashingDetails should not be empty
+      prepareSendFeatured.hashingDetails should not be empty withClue "TransferPreapproval send hashingDetails"
       val (_, _) = actAndCheck(
         "Submit signed TransferCommand creation",
         aliceValidatorBackend.submitTransferPreapprovalSend(
@@ -495,7 +505,7 @@ class ExternalPartySetupProposalIntegrationTest
           2L,
           Some("transfer-command-description"),
         )
-      prepareSendNoPreapproval.hashingDetails shouldBe empty
+      prepareSendNoPreapproval.hashingDetails shouldBe empty withClue "TransferPreapproval send hashingDetails"
 
       // Archive the preapproval
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -548,7 +558,7 @@ class ExternalPartySetupProposalIntegrationTest
               .filterJava(TransferCommand.COMPANION)(
                 aliceParty,
                 c => c.data.sender == aliceParty.toProtoPrimitive,
-              ) shouldBe empty
+              ) shouldBe empty withClue "alice TransferCommands"
             val result = aliceValidatorBackend.scanProxy
               .lookupTransferCommandStatus(
                 aliceParty,

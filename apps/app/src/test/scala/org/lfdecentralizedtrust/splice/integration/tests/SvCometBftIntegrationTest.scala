@@ -125,13 +125,13 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
         .map(_.hcursor.downField("address").as[String].value)
 
     val prevAddresses = getValidatorAddresses()
-    prevAddresses should have size 4
+    prevAddresses should have size 4 withClue "validator addresses before reonboard"
     sv2Backend.stop()
     sv2LocalBackend.startSync()
     eventually() {
       val newAddresses = getValidatorAddresses()
       prevAddresses should not be newAddresses
-      newAddresses should have size 4
+      newAddresses should have size 4 withClue "validator addresses after reonboard"
     }
   }
 
@@ -158,7 +158,7 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
     val trackingCid = sv1Backend.getLatestVoteRequestTrackingCid()
     Seq(sv2Backend, sv3Backend).foreach { sv =>
       eventually() {
-        sv.listVoteRequests() should not be empty
+        sv.listVoteRequests() should not be empty withClue s"${sv.name} VoteRequests"
         sv.castVote(trackingCid, isAccepted = true, "url", "description")
       }
     }
@@ -182,7 +182,7 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
           .loneElement
           .item
           .owners
-          .forgetNE should have size 3
+          .forgetNE should have size 3 withClue "namespace owners"
       }
     }
   }
@@ -239,7 +239,9 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
     val response = sv1Backend.cometBftJsonRpcRequest(id_, method_, params)
     response.id shouldBe id_
     response.jsonrpc shouldBe "2.0"
-    responseKeys.foreach(key => response.result.findAllByKey(key) should not be empty)
+    responseKeys.foreach(key =>
+      response.result.findAllByKey(key) should not be empty withClue s"JSON values for field '$key'"
+    )
   }
 
   private def getCurrentGovernanceKey(sv: SvAppBackendReference) = {
@@ -249,7 +251,7 @@ class SvCometBftIntegrationTest extends IntegrationTest with SvTestUtil {
       case (_, node) =>
         node.cometBft.governanceKeys.asScala.map(_.pubKey)
     }
-    keys should have size 1
+    keys should have size 1 withClue "governanceKeys"
     keys.head
   }
 }

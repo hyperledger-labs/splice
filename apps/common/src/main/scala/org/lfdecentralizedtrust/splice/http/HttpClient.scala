@@ -293,7 +293,7 @@ object HttpClient {
     // so that can't be supported here, if users need this they need to set proxy settings via system properties.
     Try(HttpsProxySettings(ac.settings.config))
       .map { proxyConf =>
-        logger.debug(
+        logger.trace(
           s"Configuring pekko-http client from pekko.http.client.proxy config: host = ${proxyConf.host}, port = ${proxyConf.port}"
         )
         ClientConnectionSettings(ac).withTransport(
@@ -306,18 +306,18 @@ object HttpClient {
         ProxySettings
           .readFromSystemProperties()
           .fold {
-            logger.debug(
+            logger.trace(
               s"Not using a http client proxy for pekko-http client. No proxy settings found in system properties."
             )
             ClientConnectionSettings(ac)
           } { proxySettings =>
             proxySettings.creds.fold {
-              logger.debug(s"${msgPrefix(proxySettings)}, credentials = [redacted]")
+              logger.trace(s"${msgPrefix(proxySettings)}, credentials = [redacted]")
               ClientConnectionSettings(ac).withTransport(
                 ClientTransport.httpsProxy(proxySettings.address)
               )
             } { creds =>
-              logger.debug(s"${msgPrefix(proxySettings)}, no credentials set")
+              logger.trace(s"${msgPrefix(proxySettings)}, no credentials set")
               ClientConnectionSettings(ac).withTransport(
                 ClientTransport.httpsProxy(proxySettings.address, creds)
               )

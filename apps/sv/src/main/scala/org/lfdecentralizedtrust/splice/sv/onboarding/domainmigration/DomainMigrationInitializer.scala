@@ -241,6 +241,7 @@ class DomainMigrationInitializer(
           spliceInstanceNamesConfig,
           loggerFactory,
           packageVersionSupport,
+          decentralizedSynchronizerId,
           enabledFeatures,
         )
       // We register the traffic triggers earlier for domain migrations to ensure that SV nodes obtain

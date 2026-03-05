@@ -91,7 +91,7 @@ class TokenStandardTransferIntegrationTest
           "Alice and Bob see it",
           _ => {
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size i.toLong
+              _.listTokenStandardTransfers() should have size i.toLong withClue "TokenStandardTransfers"
             )
           },
         )._1
@@ -122,7 +122,7 @@ class TokenStandardTransferIntegrationTest
           result => {
             inside(result.output) { case members.TransferInstructionFailed(_) => () }
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size (cids.length.toLong - 1L)
+              _.listTokenStandardTransfers() should have size (cids.length.toLong - 1L) withClue "TokenStandardTransfers"
             )
             bobWalletClient.balance().unlockedQty should be(BigDecimal(0))
           },
@@ -136,7 +136,7 @@ class TokenStandardTransferIntegrationTest
           result => {
             inside(result.output) { case members.TransferInstructionFailed(_) => () }
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size (cids.length.toLong - 2L)
+              _.listTokenStandardTransfers() should have size (cids.length.toLong - 2L) withClue "TokenStandardTransfers"
             )
             bobWalletClient.balance().unlockedQty should be(BigDecimal(0))
           },
@@ -150,7 +150,7 @@ class TokenStandardTransferIntegrationTest
           result => {
             inside(result.output) { case members.TransferInstructionCompleted(_) => () }
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size (cids.length.toLong - 3L)
+              _.listTokenStandardTransfers() should have size (cids.length.toLong - 3L) withClue "TokenStandardTransfers"
             )
             bobWalletClient.balance().unlockedQty should be > BigDecimal(0)
           },
@@ -161,10 +161,10 @@ class TokenStandardTransferIntegrationTest
         eventually() {
           val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
           // tap + 4 transfer instructions + accept + withdraw + reject
-          aliceTxs should have size 8
+          aliceTxs should have size 8 withClue "aliceTxs"
           val bobTxs = bobWalletClient.listTransactions(None, 1000)
           // 4 transfer instructions + accept + withdraw + reject
-          bobTxs should have size 7
+          bobTxs should have size 7 withClue "bobTxs"
           (aliceTxs, bobTxs)
         }
       }
@@ -211,7 +211,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
             logEntry.description shouldBe "Transfer #4"
             // No balance is transferred here so receivers is empty
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             // The wallet counts moving the balance to a locked amulet as a negative balance change
             logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
@@ -222,7 +222,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
             logEntry.description shouldBe "Transfer #3"
             // No balance is transferred here so receivers is empty
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             // The wallet counts moving the balance to a locked amulet as a negative balance change
             logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
@@ -233,7 +233,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
             logEntry.description shouldBe "Transfer #2"
             // No balance is transferred here so receivers is empty
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             // The wallet counts moving the balance to a locked amulet as a negative balance change
             logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
@@ -244,7 +244,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
             logEntry.description shouldBe "Transfer #1"
             // No balance is transferred here so receivers is empty
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             // The wallet counts moving the balance to a locked amulet as a negative balance change
             logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },
@@ -322,7 +322,7 @@ class TokenStandardTransferIntegrationTest
           .listActivity(None, 1000)
           .filter(t => t.transfer.isDefined || t.abortTransferInstruction.isDefined)
         // 4 transfer instructions + accept + withdraw + reject
-        activityTxs should have size (7)
+        activityTxs should have size (7) withClue "activityTxs"
         activityTxs
       }
 
@@ -434,10 +434,10 @@ class TokenStandardTransferIntegrationTest
         eventually() {
           val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
           // tap + transfer instruction + unlock + withdraw
-          aliceTxs should have size 4
+          aliceTxs should have size 4 withClue "aliceTxs"
           val bobTxs = bobWalletClient.listTransactions(None, 1000)
           // transfer instruction + withdraw
-          bobTxs should have size 2
+          bobTxs should have size 2 withClue "bobTxs"
           (aliceTxs, bobTxs)
         }
       }
@@ -461,7 +461,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
             logEntry.description shouldBe "transfer offer description"
             // No balance is transferred here so receivers is empty
-            logEntry.receivers shouldBe empty
+            logEntry.receivers shouldBe empty withClue "receivers"
             // The wallet counts moving the balance to a locked amulet as a negative balance change
             logEntry.sender.value.amount shouldBe (BigDecimal(-10))
           },

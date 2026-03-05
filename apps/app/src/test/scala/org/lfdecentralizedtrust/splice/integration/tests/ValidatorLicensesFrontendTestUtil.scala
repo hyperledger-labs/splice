@@ -15,7 +15,7 @@ trait ValidatorLicensesFrontendTestUtil { self: FrontendIntegrationTest =>
       expectedValidator: PartyId,
   )(implicit webDriver: WebDriverType): Assertion = {
     val newLicenseRows = getLicensesTableRows
-    newLicenseRows should have size (previousSize + 1L)
+    newLicenseRows should have size (previousSize + 1L) withClue "'Validator Licenses' rows"
     forExactly(1, newLicenseRows) { row =>
       val validator =
         seleniumText(row.childElement(className("validator-licenses-validator")))

@@ -44,6 +44,7 @@ import {
   configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installScanBulkStorage,
   installSvLoopback,
   SvParticipant,
   valuesForSvApp,
@@ -60,6 +61,7 @@ import { Resource } from '@pulumi/pulumi';
 import {
   delegatelessAutomationExpectedTaskDuration,
   delegatelessAutomationExpiredRewardCouponBatchSize,
+  delegatelessAutomationExpiredRewardCouponNumBatches,
 } from '../../common/src/automation';
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { configureScanBigQuery } from './bigQuery';
@@ -161,7 +163,16 @@ export async function installSvNode(
     prefix: baseConfig.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
   };
 
-  const config = { ...baseConfig, periodicBackupConfig, identitiesBackupLocation };
+  const bulkStorageBucket = svConfig.scanApp?.bulkStorage
+    ? installScanBulkStorage(xns, svConfig.scanApp.bulkStorage)
+    : undefined;
+
+  const config = {
+    ...baseConfig,
+    periodicBackupConfig,
+    identitiesBackupLocation,
+    bulkStorageBucket,
+  };
 
   const identitiesBackupConfigSecret = installBootstrapDataBucketSecret(
     xns,
@@ -395,6 +406,7 @@ async function installValidator(
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
     logAsync: svConfig.logging?.appsAsync,
+    apiRequestLogLevel: svConfig.logging?.apiRequestLogLevel,
     additionalJvmOptions: svConfig.validatorApp?.additionalJvmOptions || '',
     resources: svConfig.validatorApp?.resources,
     version: svConfig.version,
@@ -493,8 +505,11 @@ function installSvApp(
     delegatelessAutomationExpectedTaskDuration: delegatelessAutomationExpectedTaskDuration,
     delegatelessAutomationExpiredRewardCouponBatchSize:
       delegatelessAutomationExpiredRewardCouponBatchSize,
+    delegatelessAutomationExpiredRewardCouponNumBatches:
+      delegatelessAutomationExpiredRewardCouponNumBatches,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
+    apiRequestLogLevel: config.logging?.apiRequestLogLevel,
     logAsyncFlush: config.logging?.appsAsync,
     resources: config.svApp?.resources,
     periodicTopologySnapshotConfig: config.periodicTopologySnapshotConfig,
@@ -566,9 +581,22 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
+    apiRequestLogLevel: config.logging?.apiRequestLogLevel,
     logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
+    ...(config.bulkStorageBucket
+      ? {
+          bulkStorage: {
+            s3: {
+              region: config.bulkStorageBucket.region,
+              bucketName: config.bulkStorageBucket.bucketName,
+              endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
+              secretName: config.bulkStorageBucket.secretName,
+            },
+          },
+        }
+      : {}),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

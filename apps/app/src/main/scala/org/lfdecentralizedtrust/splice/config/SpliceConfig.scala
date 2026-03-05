@@ -8,14 +8,13 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
-import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageVettingLookupService}
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
   BulkStorageConfig,
   MediatorVerdictIngestionConfig,
-  S3Config,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
@@ -598,6 +597,8 @@ object SpliceConfig {
       deriveReader[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigReader[RangeConfig] =
       deriveReader[RangeConfig]
+    implicit val packageVettingCacheConfig: ConfigReader[PackageVettingLookupService.CacheConfig] =
+      deriveReader[PackageVettingLookupService.CacheConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -922,7 +923,7 @@ object SpliceConfig {
     implicit val BulkStorageConfigWriter: ConfigWriter[BulkStorageConfig] =
       deriveWriter[BulkStorageConfig]
     implicit val S3ConfigWriter: ConfigWriter[S3Config] =
-      deriveWriter[S3Config]
+      confidentialWriter[S3Config](S3Config.hideConfidential)
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 
@@ -1035,6 +1036,8 @@ object SpliceConfig {
       deriveWriter[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigWriter[RangeConfig] =
       deriveWriter[RangeConfig]
+    implicit val packageVettingCacheConfig: ConfigWriter[PackageVettingLookupService.CacheConfig] =
+      deriveWriter[PackageVettingLookupService.CacheConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

@@ -56,7 +56,8 @@ class TestRunner(testNames: String, configPath: Path, updateHistoryDumpPath: Pat
         logger.info(s"Test '$testName' PASSED")
       } catch {
         case NonFatal(ex) =>
-          logger.error(s"Test '$testName' FAILED: ${ex.getMessage}")
+          logger.error(s"Test '$testName' FAILED", ex)
+          throw ex
       }
     }
   }

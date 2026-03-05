@@ -126,7 +126,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
               0L,
             )
             .value
-          result.transferCommandsByContractId should have size 1
+          result.transferCommandsByContractId should have size 1 withClue "transferCommandsByContractId"
           val transferCommandCid = result.transferCommandsByContractId.keys
             .find(_.startsWith(prepareSend.transferCommandContractIdPrefix))
             .value

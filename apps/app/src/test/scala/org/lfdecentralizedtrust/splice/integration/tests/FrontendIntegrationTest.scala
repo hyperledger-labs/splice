@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithIsolatedEnvironment,
   IntegrationTest,
+  IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
   TestCommon,
 }
@@ -39,9 +39,8 @@ import java.util.concurrent.atomic.AtomicLong
 import org.openqa.selenium.firefox.GeckoDriverService
 
 import scala.collection.mutable
-import scala.concurrent.blocking
+import scala.concurrent.{ExecutionContext, Future, TimeoutException, blocking}
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
@@ -317,7 +316,10 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           if (currentUrl != "about:blank") {
             webDriver.getSessionStorage().clear()
             eventually() {
-              webDriver.getSessionStorage().keySet.asScala shouldBe empty
+              webDriver
+                .getSessionStorage()
+                .keySet
+                .asScala shouldBe empty withClue "webDriver sessionStorage"
             }
           }
         }
@@ -549,7 +551,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   ) = {
     find(tagName("h1")) should not be None
     find(tagName("h1")).value.text shouldBe "Welcome"
-    find(cssSelector("div.password")) should not be empty
+    find(cssSelector("div.password")) should not be empty withClue "password div"
   }
 
   private def assertAuth0AuthorizationFormVisible()(implicit
@@ -581,7 +583,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
               Seq(
                 find(id("logout-button")),
                 find(id("oidc-login-button")),
-              ).flatten should have size 1,
+              ).flatten should have size 1 withClue "Login/logout buttons",
           )
 
           if (find(id("logout-button")).isDefined) {
@@ -590,7 +592,10 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
               eventuallyClickOn(id("logout-button")),
             )(
               "Auth0 login: Login button is visible",
-              _ => find(id("oidc-login-button")) should not be empty,
+              _ =>
+                find(
+                  id("oidc-login-button")
+                ) should not be empty withClue "'Log In with OAuth2' button",
             )
           }
 
@@ -704,14 +709,37 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     eventuallyClickOn(query)
   }
 
-  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
+  protected def eventuallyFindBase[T](
+      query: Query,
+      action: Query => T,
+      fallback: Option[() => T] = None,
+      timeUntilSuccess: Option[FiniteDuration],
+  )(implicit
+      driver: WebDriver
+  ): T = {
     clue(s"Waiting for $query to be found") {
-      waitForCondition(query) {
-        ExpectedConditions.visibilityOfElementLocated(_)
+      try {
+        waitForCondition(query, timeUntilSuccess) {
+          ExpectedConditions.visibilityOfElementLocated(_)
+        }
+        action(query)
+      } catch {
+        case e: TimeoutException =>
+          fallback match {
+            case Some(lazyFallback) => lazyFallback()
+            case None => throw e
+          }
       }
     }
-    find(query)
   }
+
+  protected def eventuallyFind(query: Query)(implicit driver: WebDriver) =
+    eventuallyFindBase(query, find, None, None)
+
+  protected def eventuallyFindAll(query: Query, timeUntilSuccess: FiniteDuration = 5.seconds)(
+      implicit driver: WebDriver
+  ) =
+    eventuallyFindBase(query, findAll, Some(() => Iterator.empty), Some(timeUntilSuccess))
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType

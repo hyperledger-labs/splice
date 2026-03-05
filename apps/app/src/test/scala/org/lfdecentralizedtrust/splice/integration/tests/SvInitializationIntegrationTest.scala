@@ -70,7 +70,8 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
     clue("simulate the domain was left disconnected when error occur during party migration.") {
       sv4Backend.participantClient.synchronizers.disconnect_all()
-      sv4Backend.participantClient.synchronizers.list_connected() shouldBe empty
+      sv4Backend.participantClient.synchronizers
+        .list_connected() shouldBe empty withClue "synchronizers"
     }
 
     clue("sv will connect to all domains during initialization.") {
@@ -183,9 +184,13 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     }
     clue("initial open mining rounds are created") {
       eventually() {
-        sv1Backend.listOpenMiningRounds() should have size 3
-        sv1ScanBackend.getOpenAndIssuingMiningRounds()._1 should have size 3
-        sv2ScanBackend.getOpenAndIssuingMiningRounds()._1 should have size 3
+        sv1Backend.listOpenMiningRounds() should have size 3 withClue "sv1 OpenMiningRounds"
+        sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1 should have size 3 withClue "sv1 scan OpenMiningRounds"
+        sv2ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1 should have size 3 withClue "sv2 scan OpenMiningRounds"
       }
     }
     clue("thresholds are set as expected") {

@@ -10,6 +10,7 @@ import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { upOperation, upStack } from './pulumiOperations';
 import { runAllValidatorsUp } from './validator-runbook/pulumiUp';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 const abortController = new PulumiAbortController();
 
@@ -35,6 +36,14 @@ async function runAllStacksUp() {
     false
   );
   operations = operations.concat(cantonStacks);
+  const svStacks = runSvProjectForAllSvs(
+    'up',
+    stack => {
+      return upStack(stack, abortController);
+    },
+    false
+  );
+  operations = operations.concat(svStacks);
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});
     operations.push(upOperation(validator1, abortController));

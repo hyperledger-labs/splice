@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   HistoryMetrics,
+  S3BucketConnection,
   TimestampWithMigrationId,
   UpdateHistory,
 }
@@ -109,11 +110,15 @@ class UpdateHistoryBulkStorage(
       actorSystem: org.apache.pekko.actor.ActorSystem,
   ): Source[UpdatesSegment, Cancellable] = {
 
-    // Wait for history backfilling to complete before starting bulk storage dumps
+    // Wait for update history to initialize and for history backfilling to complete before starting bulk storage dumps
     val backfillingCompleteGate =
       Source
         .tick(0.seconds, appConfig.updatesPollingInterval.underlying, ())
-        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(currentMigrationId))
+        .mapAsync(1)(_ =>
+          if (updateHistory.isReady)
+            updateHistory.isHistoryBackfilled(currentMigrationId)
+          else Future.successful(false)
+        )
         .filter(identity)
         .take(1)
 

@@ -85,13 +85,13 @@ groups:
               maxDataPoints: 43200
               refId: No recent report
               type: threshold
-        dashboardUid: cdlm6c7fn7vuod
+        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
         panelId: 18
         noDataState: $NODATA
         execErrState: Alerting
         for: $NOTIFICATION_DELAY
         annotations:
-          __dashboardUid__: cdlm6c7fn7vuod
+          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "18"
           severity: critical
           description: The SV {{ $labels.report_publisher }} has not submitted a status report recently

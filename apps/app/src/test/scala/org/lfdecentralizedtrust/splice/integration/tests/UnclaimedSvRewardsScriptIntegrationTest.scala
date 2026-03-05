@@ -83,7 +83,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
       }
 
       clue("SV reward coupons for round 0,1,2 have been created") {
-        sv1WalletClient.listSvRewardCoupons() should have size 3
+        sv1WalletClient.listSvRewardCoupons() should have size 3 withClue "sv1 SvRewardCoupons"
       }
 
       val (_, svRewardCoupons) = actAndCheck(
@@ -93,7 +93,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
         "All reward coupons got created",
         _ => {
           val svRewardCoupons = sv1WalletClient.listSvRewardCoupons()
-          svRewardCoupons should have size svRewardCouponsCount
+          svRewardCoupons should have size svRewardCouponsCount withClue "sv1 svRewardCoupons"
           svRewardCoupons
         },
       )
@@ -113,7 +113,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
         "Coupons for round 0,1,2 get expired",
         _ => {
           sv1WalletClient
-            .listSvRewardCoupons() should have size (svRewardCouponsCount - svRewardCouponsExpiredCount)
+            .listSvRewardCoupons() should have size (svRewardCouponsCount - svRewardCouponsExpiredCount) withClue "sv1 SvRewardCoupons"
           // Pause trigger once we have some coupons expired
           expireRewardCouponsTrigger.pause().futureValue
         },
@@ -136,7 +136,8 @@ class UnclaimedSvRewardsScriptIntegrationTest
           _ =>
             sv1WalletClient
               .listSvRewardCoupons() should have size
-              (svRewardCouponsCount - svRewardCouponsExpiredCount - svRewardCouponsClaimedCount),
+              (svRewardCouponsCount - svRewardCouponsExpiredCount - svRewardCouponsClaimedCount)
+              withClue "SvRewardCoupons",
         )
       }
       val svRewardCouponsAfterClaiming = sv1WalletClient.listSvRewardCoupons()
@@ -206,7 +207,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
             .!(errorProcessor)
 
           assert(exitCode == 0, s"Script exited with code $exitCode")
-          readLines.filter(_.startsWith("ERROR:")) shouldBe empty
+          readLines.filter(_.startsWith("ERROR:")) shouldBe empty withClue "ERROR lines"
           forExactly(6, readLines) {
             _ should include("WARNING:global:Invalid weight input for round")
           }
@@ -277,7 +278,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
             .!(errorProcessor)
 
           assert(exitCode == 0, s"Script exited with code $exitCode")
-          readLines.filter(_.startsWith("ERROR:")) shouldBe empty
+          readLines.filter(_.startsWith("ERROR:")) shouldBe empty withClue "ERROR lines"
           forExactly(6, readLines) {
             _ should include("WARNING:global:Invalid weight input for round")
           }
@@ -347,7 +348,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
             .!(errorProcessor)
 
           assert(exitCode == 0, s"Script exited with code $exitCode")
-          readLines.filter(_.startsWith("ERROR:")) shouldBe empty
+          readLines.filter(_.startsWith("ERROR:")) shouldBe empty withClue "ERROR lines"
           forExactly(1, readLines) {
             _ should include(s"reward_expired_count = $svRewardCouponsExpiredCount")
           }

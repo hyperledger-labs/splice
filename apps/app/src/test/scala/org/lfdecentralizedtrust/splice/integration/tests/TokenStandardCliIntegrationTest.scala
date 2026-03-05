@@ -49,7 +49,9 @@ class TokenStandardCliIntegrationTest
 
       // only alice will have a transfer preapproval
       aliceValidatorBackend.participantClient.parties
-        .hosted(filterParty = onboardingAlice.party.filterString) should not be empty
+        .hosted(filterParty =
+          onboardingAlice.party.filterString
+        ) should not be empty withClue "alice hosted"
 
       createAndAcceptExternalPartySetupProposal(
         aliceValidatorBackend,
@@ -60,10 +62,10 @@ class TokenStandardCliIntegrationTest
       eventually() {
         aliceValidatorBackend.lookupTransferPreapprovalByParty(
           onboardingAlice.party
-        ) should not be empty
+        ) should not be empty withClue "alice preapproval"
         aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
           onboardingAlice.party
-        ) should not be empty
+        ) should not be empty withClue "alice scan preapproval"
       }
 
       // Transfers from non-external parties are not supported by the CLI
@@ -174,7 +176,7 @@ class TokenStandardCliIntegrationTest
           listTransferInstructions(
             aliceValidatorBackend.participantClientWithAdminToken,
             bobParty,
-          ) shouldBe empty
+          ) shouldBe empty withClue "bob TransferInstructions"
         },
       )
 

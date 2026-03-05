@@ -50,7 +50,10 @@ class DockerComposeFullNetworkFrontendIntegrationTest
             loginOnCurrentPage(80, "alice", "wallet.localhost"),
           )(
             "Alice can onboard",
-            _ => find(id("onboard-button")).value.text should not be empty,
+            _ =>
+              find(
+                id("onboard-button")
+              ).value.text should not be empty withClue "'Onboard yourself' button",
           )
           actAndCheck(
             "onboard alice",

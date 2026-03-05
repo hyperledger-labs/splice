@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
+import { DecentralizedSynchronizerUpgradeConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { allSvNamesToDeploy } from '../common-sv/src/dsoConfig';
 import { DeploySvRunbook, isDevNet } from '../common/src/config';
@@ -37,6 +38,14 @@ export function runSvProjectForAllSvs<T>(
   // used to ensure down/refresh always takes care of the runbook as well
   forceSvRunbook: boolean = false
 ): { name: string; promise: Promise<T> }[] {
+  const isLsuDeployment =
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
+  // For now we're skipping in all cases. When stack config files are versioned for all clusters and we start using
+  // the sv project regularly we should not skip on the down operation.
+  if (!isLsuDeployment) {
+    console.log('Not an LSU deployment. Skipping sv stacks.');
+    return [];
+  }
   const svsToRunFor = svsToDeploy.concat(
     !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
   );
