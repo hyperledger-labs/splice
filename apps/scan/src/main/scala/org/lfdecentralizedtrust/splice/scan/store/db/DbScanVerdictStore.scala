@@ -4,27 +4,140 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import com.digitalasset.canton.sequencer.admin.{v30 as seqv30}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
 import io.circe.Json
+import io.circe.syntax.*
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
+import slick.dbio.DBIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.NonEmptyList
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 
 object DbScanVerdictStore {
   import com.digitalasset.canton.mediator.admin.{v30}
+  import com.google.protobuf.ByteString
+
+  /** Represents a traffic summary.
+    *
+    * @param totalTrafficCost the total traffic cost
+    * @param envelopeTrafficSummarys the per-envelope traffic summaries
+    */
+  final case class TrafficSummaryT(
+      totalTrafficCost: Long,
+      envelopeTrafficSummarys: Seq[EnvelopeT],
+      sequencingTime: CantonTimestamp, // not written, used in computations, read from VerdictT
+  )
+
+  /** Represents an envelope within a traffic summary.
+    *
+    * @param trafficCost the traffic cost of the envelope
+    * @param viewIds view IDs from the verdict's TransactionViews that correspond to this envelope,
+    *                obtained by correlating the sequencer's view_hashes with the mediator's view data
+    */
+  final case class EnvelopeT(
+      trafficCost: Long,
+      viewIds: Seq[Int],
+  )
+
+  /** Convert a sequencer TrafficSummaryT proto to our storage type, with correlation map lookup.
+    *
+    * This is a convenience method that parses the sequencing time from the proto and looks up
+    * the view hash correlation map automatically.
+    *
+    * @param proto the traffic summary from the sequencer
+    * @param migrationId the current migration id
+    * @param viewHashToViewIdByTime map from sequencing_time to (view_hash -> view_id) for correlating
+    *                               envelope view_hashes with verdict view_ids
+    * @param logger for logging warnings about unmatched view hashes
+    */
+  def fromProtoWithCorrelation(
+      proto: seqv30.TrafficSummary,
+      viewHashToViewIdByTime: Map[CantonTimestamp, Map[ByteString, Int]],
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): TrafficSummaryT = {
+    val sequencingTime = CantonTimestamp
+      .fromProtoTimestamp(proto.getSequencingTime)
+      .getOrElse(throw new IllegalArgumentException("Invalid sequencing_time in traffic summary"))
+    val viewHashToViewId = viewHashToViewIdByTime.getOrElse(sequencingTime, Map.empty)
+    fromProto(proto, sequencingTime, viewHashToViewId, logger)
+  }
+
+  /** Convert a sequencer TrafficSummaryT proto to our storage type.
+    *
+    * @param proto the traffic summary from the sequencer
+    * @param migrationId the current migration id
+    * @param sequencingTime the pre-parsed sequencing time from the proto
+    * @param viewHashToViewId map from view_hash to view_id for correlating envelope view_hashes
+    *                         with verdict view_ids (for this specific sequencing_time)
+    * @param logger for logging warnings about unmatched view hashes
+    */
+  def fromProto(
+      proto: seqv30.TrafficSummary,
+      sequencingTime: CantonTimestamp,
+      viewHashToViewId: Map[ByteString, Int],
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): TrafficSummaryT = {
+
+    val envelopeTrafficSummarys = proto.envelopes.map { env =>
+      val viewIds = env.viewHashes.flatMap { viewHash =>
+        viewHashToViewId.get(viewHash) match {
+          case Some(viewId) => Some(viewId)
+          case None =>
+            logger.warn(
+              s"View hash ${HexString.toHexString(viewHash)} from sequencer traffic summary " +
+                s"at $sequencingTime does not match any view in the verdict"
+            )
+            None
+        }
+      }
+      EnvelopeT(
+        trafficCost = env.envelopeTrafficCost,
+        viewIds = viewIds,
+      )
+    }
+
+    TrafficSummaryT(
+      totalTrafficCost = proto.totalTrafficCost,
+      sequencingTime = sequencingTime,
+      envelopeTrafficSummarys = envelopeTrafficSummarys,
+    )
+  }
+
+  object EnvelopeT {
+
+    def toJson(envelopes: Seq[EnvelopeT]): Json = Json.arr(
+      envelopes.map { env =>
+        Json.obj(
+          "tc" -> env.trafficCost.asJson,
+          "vid" -> env.viewIds.asJson,
+        )
+      }*
+    )
+
+    def fromJson(json: Json): Seq[EnvelopeT] = {
+      json.asArray.getOrElse(Vector.empty).flatMap { obj =>
+        for {
+          trafficCost <- obj.hcursor.get[Long]("tc").toOption
+          viewIds <- obj.hcursor.get[Seq[Int]]("vid").toOption
+        } yield EnvelopeT(trafficCost, viewIds)
+      }
+    }
+  }
 
   final case class TransactionViewT(
       verdictRowId: Long,
@@ -46,6 +159,7 @@ object DbScanVerdictStore {
       updateId: String,
       submittingParties: Seq[String],
       transactionRootViews: Seq[Int],
+      trafficSummaryO: Option[TrafficSummaryT],
   )
 
   object VerdictResultDbValue {
@@ -67,17 +181,103 @@ object DbScanVerdictStore {
     }
   }
 
+  /** Convert a mediator Verdict proto to our storage types.
+    *
+    * @param verdict the verdict from the mediator
+    * @param migrationId the current migration id
+    * @param synchronizerId the synchronizer id
+    * @return a tuple of (VerdictT, function to create TransactionViewT rows given a verdict row id)
+    */
+  def fromProto(
+      verdict: v30.Verdict,
+      migrationId: Long,
+      synchronizerId: SynchronizerId,
+      byTimestamp: Map[CantonTimestamp, TrafficSummaryT],
+  ): (VerdictT, Long => Seq[TransactionViewT]) = {
+    val transactionRootViews = verdict.getTransactionViews.rootViews
+    val resultShort: Short = VerdictResultDbValue.fromProto(verdict.verdict)
+    val recordTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getRecordTime)
+    val row = VerdictT(
+      rowId = 0,
+      migrationId = migrationId,
+      domainId = synchronizerId,
+      recordTime,
+      finalizationTime = CantonTimestamp.tryFromProtoTimestamp(verdict.getFinalizationTime),
+      submittingParticipantUid = verdict.submittingParticipantUid,
+      verdictResult = resultShort,
+      mediatorGroup = verdict.mediatorGroup,
+      updateId = verdict.updateId,
+      submittingParties = verdict.submittingParties,
+      transactionRootViews = transactionRootViews,
+      // TODO(#4060): log an error and fail ingestion if a trafficSummary is missing for a verdict
+      trafficSummaryO = byTimestamp.get(recordTime),
+    )
+
+    val mkViews: Long => Seq[TransactionViewT] = { rowId =>
+      verdict.getTransactionViews.views.map { case (viewId, txView) =>
+        val confirmingPartiesJson: Json = Json.fromValues(
+          txView.confirmingParties.map { q =>
+            Json.obj(
+              "parties" -> Json.fromValues(q.parties.map(Json.fromString)),
+              "threshold" -> Json.fromInt(q.threshold),
+            )
+          }
+        )
+        TransactionViewT(
+          verdictRowId = rowId,
+          viewId = viewId,
+          informees = txView.informees,
+          confirmingParties = confirmingPartiesJson,
+          subViews = txView.subViews,
+        )
+      }.toSeq
+    }
+    (row, mkViews)
+  }
+
+  /** Build sequencing times and a map for correlating sequencer traffic data with verdict views.
+    *
+    * Returns a tuple of:
+    * - sequencing times (record_time) from the verdicts, preserving order
+    * - a map from sequencing_time to (view_hash -> view_id) mappings
+    *
+    * The sequencer provides view_hashes in its traffic summaries, which we map
+    * to view_ids from the verdict's transaction views.
+    */
+  def buildViewHashCorrelation(
+      verdicts: Seq[v30.Verdict]
+  ): (Seq[CantonTimestamp], Map[CantonTimestamp, Map[ByteString, Int]]) = {
+    val pairs = verdicts.map { verdict =>
+      val recordTime = CantonTimestamp
+        .fromProtoTimestamp(verdict.getRecordTime)
+        .getOrElse(throw new IllegalArgumentException("Invalid record_time in verdict"))
+      val viewHashMap: Map[ByteString, Int] = verdict.getTransactionViews.views.collect {
+        case (viewId, txView) if !txView.viewHash.isEmpty =>
+          txView.viewHash -> viewId
+      }.toMap
+      (recordTime, viewHashMap)
+    }
+    (pairs.map(_._1), pairs.toMap)
+  }
+
   def apply(
       storage: com.digitalasset.canton.resource.DbStorage,
       updateHistory: UpdateHistory,
+      appActivityRecordStoreO: Option[DbAppActivityRecordStore],
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): DbScanVerdictStore =
-    new DbScanVerdictStore(storage, updateHistory, loggerFactory)
+    new DbScanVerdictStore(
+      storage,
+      updateHistory,
+      appActivityRecordStoreO,
+      loggerFactory,
+    )
 }
 
 class DbScanVerdictStore(
     storage: DbStorage,
     updateHistory: UpdateHistory,
+    appActivityRecordStoreO: Option[DbAppActivityRecordStore],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -122,11 +322,15 @@ class DbScanVerdictStore(
 
   private implicit val GetResultVerdictRow: GetResult[VerdictT] = GetResult { prs =>
     import prs.*
+    val rowId = <<[Long]
+    val migrationId = <<[Long]
+    val domainId = <<[SynchronizerId]
+    val recordTime = <<[CantonTimestamp]
     VerdictT(
-      <<[Long],
-      <<[Long],
-      <<[SynchronizerId],
-      <<[CantonTimestamp],
+      rowId,
+      migrationId,
+      domainId,
+      recordTime,
       <<[CantonTimestamp],
       <<[String],
       <<[Short],
@@ -135,6 +339,12 @@ class DbScanVerdictStore(
       // Arrays
       stringArrayGetResult(prs).toSeq,
       intArrayGetResult(prs).toSeq,
+      // TrafficSummaryT
+      parseTrafficSummary(
+        <<?[Long],
+        <<?[Json],
+        recordTime,
+      ),
     )
   }
 
@@ -149,7 +359,24 @@ class DbScanVerdictStore(
     )
   }
 
+  private def parseTrafficSummary(
+      totalTrafficCostO: Option[Long],
+      envelopesJsonO: Option[Json],
+      recordTime: CantonTimestamp,
+  ): Option[DbScanVerdictStore.TrafficSummaryT] = {
+    for {
+      total <- totalTrafficCostO
+      json <- envelopesJsonO
+      sequencingTime = recordTime
+    } yield DbScanVerdictStore.TrafficSummaryT(
+      total,
+      DbScanVerdictStore.EnvelopeT.fromJson(json),
+      sequencingTime,
+    )
+  }
+
   private def sqlInsertVerdictReturningId(rowT: VerdictT) = {
+    val envelopesO = rowT.trafficSummaryO.map(_.envelopeTrafficSummarys)
     sql"""
       insert into #${Tables.verdicts}(
         history_id,
@@ -162,7 +389,9 @@ class DbScanVerdictStore(
         mediator_group,
         update_id,
         submitting_parties,
-        transaction_root_views
+        transaction_root_views,
+        total_traffic_cost,
+        envelope_traffic_costs
       ) values (
         $historyId,
         ${rowT.migrationId},
@@ -174,7 +403,9 @@ class DbScanVerdictStore(
         ${rowT.mediatorGroup},
         ${rowT.updateId},
         ${rowT.submittingParties.map(lengthLimited).toSeq},
-        ${rowT.transactionRootViews.toSeq}
+        ${rowT.transactionRootViews.toSeq},
+        ${rowT.trafficSummaryO.map(_.totalTrafficCost)},
+        ${envelopesO.map(seq => DbScanVerdictStore.EnvelopeT.toJson(seq))}::jsonb
       ) returning row_id
     """.as[Long].headOption
   }
@@ -197,19 +428,15 @@ class DbScanVerdictStore(
       """.asUpdate
   }
 
-  /** Insert multiple verdicts and their transaction views in a single transaction.
+  /** Returns a DBIO action for inserting verdicts and their transaction views.
     *
-    * Similar to insertItems of UpdateHistory, we check whether the first verdict's
-    * update_id already exists. If it does, we assume this batch has been
-    * inserted already and skip all inserts.
+    * Returns a map from verdict record_time to its generated row_id, which can be used
+    * to insert related records (e.g., app activity records) that reference the verdict by row_id.
     */
-  def insertVerdictAndTransactionViews(
+  def insertVerdictAndTransactionViewsDBIO(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
-  )(implicit tc: TraceContext): Future[Unit] = {
-    import slick.dbio.DBIO
-    import profile.api.jdbcActionExtensionMethods
-
-    if (items.isEmpty) Future.unit
+  )(implicit tc: TraceContext): DBIO[Map[CantonTimestamp, Long]] = {
+    if (items.isEmpty) DBIO.successful(Map.empty)
     else {
       val checkExist = (sql"""
                select update_id
@@ -218,13 +445,13 @@ class DbScanVerdictStore(
                  and """ ++ inClause("update_id", items.map(t => lengthLimited(t._1.updateId))))
         .as[String]
 
-      val action: DBIO[Unit] = for {
+      for {
         alreadyExisting <- checkExist.map(_.toSet)
         nonExisting = items.filter(item => !alreadyExisting.contains(item._1.updateId))
         _ = logger.info(
           s"Already ingested verdicts: $alreadyExisting. Non-existing: ${nonExisting.map(_._1.updateId)}."
         )
-        _ <-
+        rowIdMap <-
           if (nonExisting.nonEmpty) {
             DBIO
               .sequence(nonExisting.map { case (verdict, mkViews) =>
@@ -237,24 +464,75 @@ class DbScanVerdictStore(
                   }
                   views = mkViews(rowId)
                   _ <- DBIO.sequence(views.map(sqlInsertView)).map(_ => ())
-                } yield ()
+                } yield verdict.recordTime -> rowId
               })
-              .map(_ => ())
+              .map(_.toMap)
           } else {
-            DBIO.successful(())
+            DBIO.successful(Map.empty[CantonTimestamp, Long])
           }
-      } yield ()
+      } yield rowIdMap
+    }
+  }
 
+  /** Insert multiple verdicts and their transaction views in a single transaction.
+    *
+    * We check whether a verdict's update_id already exists. If it does, then we assume this
+    * is a retry by the DB layer of this very statement, and skip the ingestion.
+    * This works as the ingestion itself ensures that there never are overlapping batches.
+    */
+  def insertVerdictAndTransactionViews(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    if (items.isEmpty) Future.unit
+    else {
       futureUnlessShutdownToFuture(
         storage
           .queryAndUpdate(
-            action.transactionally,
+            insertVerdictAndTransactionViewsDBIO(items).map(_ => ()).transactionally,
             "scanVerdict.insertVerdictAndTransactionViews.batch",
           )
       ).map { _ =>
         val maxRt = items.map(_._1.recordTime).maxOption
         maxRt.foreach(advanceLastIngestedRecordTime)
       }
+    }
+  }
+
+  /** Insert multiple verdicts, their transaction views and app activity records in a single transaction.
+    *
+    * Verdicts are inserted first to obtain their generated row_ids. The placeholder
+    * verdictRowId (= 0) in each pending app activity record is then resolved to the
+    * actual row_id (matched by sequencingTime) before insertion.
+    *
+    * @param items verdicts with their transaction view constructors
+    * @param pendingAppActivity pre-computed activity records paired with their sequencingTime;
+    *                           each record has verdictRowId = 0 as a placeholder
+    */
+  def insertVerdictsWithAppActivityRecords(
+      items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
+      pendingAppActivity: Seq[(CantonTimestamp, AppActivityRecordT)],
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    val combinedAction = for {
+      rowIdByTime <- insertVerdictAndTransactionViewsDBIO(items)
+      // Resolve placeholder verdictRowId (= 0) to actual row_ids from the inserted verdicts
+      appActivityRecords = pendingAppActivity.flatMap { case (sequencingTime, record) =>
+        rowIdByTime.get(sequencingTime).map(rowId => record.copy(verdictRowId = rowId))
+      }
+      _ <- insertAppActivityRecordsDBIO(appActivityRecords)
+    } yield ()
+
+    futureUnlessShutdownToFuture(
+      storage.queryAndUpdate(
+        combinedAction.transactionally,
+        "scanVerdict.insertVerdictsWithAppActivityRecords",
+      )
+    ).map { _ =>
+      val maxRt = items.map(_._1.recordTime).maxOption
+      maxRt.foreach(advanceLastIngestedRecordTime)
     }
   }
 
@@ -275,7 +553,9 @@ class DbScanVerdictStore(
               mediator_group,
               update_id,
               submitting_parties,
-              transaction_root_views
+              transaction_root_views,
+              total_traffic_cost,
+              envelope_traffic_costs
             from #${Tables.verdicts}
             where history_id = $historyId and update_id = $updateId
             limit 1
@@ -283,6 +563,15 @@ class DbScanVerdictStore(
         "scanVerdict.getVerdictByUpdateId",
       )
       .value
+  }
+
+  private def insertAppActivityRecordsDBIO(
+      items: Seq[AppActivityRecordT]
+  )(implicit tc: TraceContext): DBIO[Unit] = {
+    appActivityRecordStoreO match {
+      case None => DBIO.successful(())
+      case Some(s) => s.insertAppActivityRecordsDBIO(items)
+    }
   }
 
   private def afterFilters(
@@ -319,7 +608,9 @@ class DbScanVerdictStore(
         mediator_group,
         update_id,
         submitting_parties,
-        transaction_root_views
+        transaction_root_views,
+        total_traffic_cost,
+        envelope_traffic_costs
       from #${Tables.verdicts}
       where history_id = $historyId and """ ++ afterFilter ++
         sql" order by " ++ orderBy ++ sql" limit $limit)"
