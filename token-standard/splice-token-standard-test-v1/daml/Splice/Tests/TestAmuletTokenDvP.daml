@@ -17,7 +17,7 @@ import Daml.Script
 
 import DA.Action (unless, when)
 import DA.Assert
-import DA.Foldable (forA_, foldMap)
+import DA.Foldable (foldMap)
 import DA.Optional (isSome)
 import DA.TextMap as TextMap hiding (filter)
 import DA.Time
@@ -54,7 +54,8 @@ data AllocatedOTCTrade = AllocatedOTCTrade
 
 setupOtcTrade : Script AllocatedOTCTrade
 setupOtcTrade  = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
   let amuletId = registry.instrumentId
 
   alice <- allocatePartyExact "alice"
@@ -114,9 +115,6 @@ setupOtcTrade  = do
 
   -- alice accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
-  holdings <- WalletClient.listHoldings alice amuletId
-  debug holdings
-
   now <- getTime
 
   -- test that using the wrong admin party fails
@@ -131,14 +129,13 @@ setupOtcTrade  = do
 
   -- alice accepts allocation request directly via her wallet
   -- TODO(tech-debt): test here and for all steps that the expected ledger time bounds are present on the submissions
-  debug inputHoldingCids
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
     inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
-  result <- submitWithDisclosures' alice enrichedChoice.disclosures $
+  submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- check metadata
@@ -150,7 +147,7 @@ setupOtcTrade  = do
         expiresAt = Some settleBefore
         expiresAfter = None
         holders = [registry.dso]
-        context = Some "allocation for transfer leg \"leg0\" to 'bob'"
+        context = Some "allocation for settlement OTCTradeProposal"
   lockedHolding.lock === expectedLock
 
   -- Bob sees the allocation request in his wallet as well
@@ -208,7 +205,7 @@ testDvP = script do
     pure (context.disclosures, (allocCid, extraArgs))
   let disclosures = foldMap fst richAllocationsWithContext
 
-  results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
+  submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
     allocationsWithContext = fmap snd richAllocationsWithContext
 
   -- check metadata
@@ -218,8 +215,8 @@ testDvP = script do
   WalletClient.checkHoldingWithAmountExists alice amuletId 20.0
   WalletClient.checkHoldingWithAmountExists bob amuletId 100.0
 
-  WalletClient.checkBalanceApprox alice amuletId 919.0 -- around 1 $ of fees paid
-  WalletClient.checkBalanceApprox bob amuletId 1079.8  -- around 0.2 $ of fees paid
+  WalletClient.checkBalance alice amuletId 920.0
+  WalletClient.checkBalance bob amuletId 1080.0
 
   -- check that the provider got their featured app reward coupons
   AmuletRegistry.convertAllFeaturedAppActivityMarkers registry.dso

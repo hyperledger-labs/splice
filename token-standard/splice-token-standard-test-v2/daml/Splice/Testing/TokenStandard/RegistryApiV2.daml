@@ -32,6 +32,11 @@ class RegistryApi app where
     : app -> AllocationFactory_Allocate
     -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_Allocate)
 
+  -- FIXME: better name
+  getAllocationFactory_SettleBatch
+    : app -> AllocationFactory_SettleBatch
+    -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_SettleBatch)
+
   getAllocation_TransferContext
     : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
 
