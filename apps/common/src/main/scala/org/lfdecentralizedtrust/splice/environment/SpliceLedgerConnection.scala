@@ -18,13 +18,7 @@ import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  FutureUnlessShutdown,
-  SyncCloseable,
-}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
@@ -33,16 +27,15 @@ import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, Uni
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
+import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.pattern.CircuitBreakerOpenException
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
-import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
-import org.apache.pekko.{Done, NotUsed}
-import org.lfdecentralizedtrust.splice.automation.InfiniteServiceWithShutdown
+import org.apache.pekko.stream.{KillSwitch, KillSwitches}
+import org.apache.pekko.NotUsed
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   DedupConfig,
   DedupOffset,
@@ -64,7 +57,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.implicitNotFound
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
@@ -662,98 +655,6 @@ class BaseLedgerConnection(
             Seq.empty
         },
       logger,
-    )
-  }
-}
-
-/** An infinite service that reads from a Pekko source, and runs an async function on it.
-  *  Optimized for closing the source quickly, so should be used in cases where the source may be closing in parallel
-  *  to the service itself, thus might cause shutdown noise. Currently, this is true for ledger ingestion services
-  *  (hence the name).
-  */
-class SpliceLedgerSubscription[S](
-    source: Source[S, NotUsed],
-    map: S => Future[Unit],
-    override protected[this] val retryProvider: RetryProvider,
-    override protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, mat: Materializer)
-    extends InfiniteServiceWithShutdown
-    with RetryProvider.Has
-    with FlagCloseableAsync
-    with NamedLogging {
-
-  import TraceContext.Implicits.Empty.*
-
-  case object SubscriptionShutDown
-  private val lastFutureFinished
-      : AtomicReference[Either[SubscriptionShutDown.type, Promise[Done]]] = new AtomicReference(
-    Right(Promise.successful(Done))
-  )
-
-  private val (killSwitch, completed_) = PekkoUtil.runSupervised(
-    source
-      // we place the kill switch before the map operator, such that
-      // we can shut down the operator quickly and signal upstream to cancel further sending
-      .viaMat(KillSwitches.single)(Keep.right)
-      .viaMat(Flow[S].mapAsync(1) { el =>
-        // map(el) *immediately* launches the future, so it needs to be done after setting the promise,
-        // and only if we're not shutting down.
-        val myPromise = Promise[Done]()
-        val previousState = lastFutureFinished.getAndSet(Right(myPromise))
-        previousState match {
-          case Left(SubscriptionShutDown) =>
-            Future.successful(Done)
-          case Right(_) =>
-            map(el).andThen { case _ =>
-              myPromise.success(Done)
-            }
-        }
-      })(Keep.left)
-      // and we get the Future[Done] as completed from the sink so we know when the last message
-      // was processed... except when a Failure from the source happens (e.g., `STALE_STREAM_AUTHORIZATION`),
-      // in which case the stream will be reported as completed with a failure, while the Future is running.
-      // Therefore, we also keep track of the last running future and include that in the completed check.
-      // If we didn't, we'd get situations where e.g. two ingestions are running simultaneously (and break a lot).
-      // For more information, see https://github.com/DACH-NY/canton-network-node/issues/10126.
-      .toMat(Sink.ignore)(Keep.both),
-    errorLogMessagePrefix = if (retryProvider.isClosing) {
-      "Ignoring failure to handle transaction, as we are shutting down"
-    } else {
-      "Fatally failed to handle transaction"
-    },
-  )
-
-  def completed: Future[Done] =
-    completed_.transformWith { result =>
-      (lastFutureFinished.getAndSet(Left(SubscriptionShutDown)) match {
-        case Left(_) => Future.successful(Done)
-        case Right(runningFuture) => runningFuture.future
-      }).transformWith(_ =>
-        Future.fromTry(result)
-      ) // Keep whatever the original reason for failure was
-    }
-
-  def isActive: Boolean = !completed_.isCompleted
-
-  def initiateShutdown()(implicit tc: TraceContext) =
-    killSwitch.shutdown()
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    import TraceContext.Implicits.Empty.*
-    List[AsyncOrSyncCloseable](
-      SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
-      AsyncCloseable(
-        s"ledger api stream terminated",
-        completed.transform {
-          case Success(v) => Success(v)
-          case Failure(_: StatusRuntimeException) =>
-            // don't fail to close if there was a grpc status runtime exception
-            // this can happen (i.e. server not available etc.)
-            Success(Done)
-          case Failure(ex) => Failure(ex)
-        },
-        timeouts.shutdownShort,
-      ),
     )
   }
 }

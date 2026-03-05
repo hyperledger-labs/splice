@@ -18,7 +18,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class InfiniteServiceWithShutdown {
+abstract class ServiceWithShutdown {
   def initiateShutdown()(implicit tc: TraceContext): Unit
   def completed: Future[Done]
   def isActive: Boolean
@@ -27,7 +27,7 @@ abstract class InfiniteServiceWithShutdown {
 /** Abstract class to share the retry and shutdown logic between different infinite services,
   * e.g. ones for ingesting ledger data using a subscription to a Ledger API stream.
   */
-abstract class RetryableInfiniteService(
+abstract class RetryingService(
     config: AutomationConfig,
     backoffClock: Clock,
     description: String,
@@ -43,28 +43,28 @@ abstract class RetryableInfiniteService(
   /** Allocate a new instance of the service. */
   protected def instantiateService()(implicit
       traceContext: TraceContext
-  ): Future[InfiniteServiceWithShutdown]
+  ): Future[ServiceWithShutdown]
 
-  // Note that we are tracking the current subscription outside the retry loop instead of just
-  // calling 'runOnShutdown' on every newly acquired subscription, as that would leak memory.
+  // Note that we are tracking the current instance of the service outside the retry loop instead of just
+  // calling 'runOnShutdown' on every newly acquired instantiation, as that would leak memory.
   private val currentServiceInstance =
-    new AtomicReference[Option[InfiniteServiceWithShutdown]](None)
+    new AtomicReference[Option[ServiceWithShutdown]](None)
   private val serviceTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
   retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"terminate service $description"
-    // this is not perfectly precise, but SpliceLedgerSubscription.initiateShutdown is idempotent
+    // this is not perfectly precise, but `initiateShutdown`s should be idempotent
     override def done: Boolean = false
     override def run()(implicit tc: TraceContext): Unit = currentServiceInstance
       .get()
-      .foreach(subscription => {
+      .foreach(instance => {
         logger
           .debug(s"Terminating service $description, as we are shutting down.")(TraceContext.empty)
-        subscription.initiateShutdown()
+        instance.initiateShutdown()
       })
   })(TraceContext.empty)
 
-  protected def startIngestion(): Unit = {
+  protected def start(): Unit = {
     withNewTrace(description)(implicit traceContext =>
       _ => {
         logger.debug(s"Starting service $description")
@@ -82,10 +82,10 @@ abstract class RetryableInfiniteService(
                 // 2. If we get very infrequent errors (e.g. stale stream authorization on user addition), no error is logged an we get fast retries
                 //    instead of sleeping for the polling interval just because a certain number of users got allocated.
                 RetryFor.LongRunningAutomation,
-                "infinite_service",
+                "service",
                 description, {
                   instantiateService().flatMap(service => {
-                    // Smuggle the current subscription out of the body here, so that we can use
+                    // Smuggle the current instance out of the body here, so that we can use
                     // runOnShutdown outside to signal the termination via a call to .initiateShutdown().
                     currentServiceInstance.set(Some(service))
                     // The creation of the new service races with the call to close the content of `currentServiceInstance`, which is issued
@@ -98,7 +98,7 @@ abstract class RetryableInfiniteService(
                       service.initiateShutdown()
                     }
                     // The actual return value of the future being retried is the future inside the SpliceLedgerConnection,
-                    // which signals when the subscription terminated.
+                    // which signals when the instance terminated.
                     service.completed.map(_ =>
                       if (retryProvider.isClosing)
                         Done // This is the normal path that we hit when we are shutting down.
@@ -107,7 +107,7 @@ abstract class RetryableInfiniteService(
                         // We consider it transient error that we want to retry on in the hope of hitting a live server.
                         throw Status.ABORTED
                           .withDescription(
-                            "Unexpected closing of subscription, likely due to server shutdown."
+                            "Unexpected closing of a service instance, likely due to server shutdown."
                           )
                           .asRuntimeException()
                       }
@@ -143,7 +143,7 @@ abstract class RetryableInfiniteService(
   }
 
   final override def isHealthy: Boolean =
-    // Healthy if there's an active subscription
+    // Healthy if there's an active instance
     currentServiceInstance.get().exists(_.isActive)
 
   final override def closeAsync(): Seq[AsyncOrSyncCloseable] = {

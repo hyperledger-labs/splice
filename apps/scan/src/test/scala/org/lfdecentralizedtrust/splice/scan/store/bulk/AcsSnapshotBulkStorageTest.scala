@@ -10,6 +10,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.WallClock
@@ -44,6 +45,7 @@ import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 import org.mockito.invocation.InvocationOnMock
+import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -185,8 +187,17 @@ class AcsSnapshotBulkStorageTest
         clue(
           "Add another snapshot to the store, which is not yet dumped because of the longer period on bulk storage"
         ) {
-          store.addSnapshot(ts2)
-          // TODO: assert that we log that we're skipping this snapshot
+          loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
+            store.addSnapshot(ts2),
+            logEntries => {
+              forExactly(
+                1,
+                logEntries,
+              )(logEntry =>
+                logEntry.message should (include(s"Skipping snapshot at timestamp $ts2"))
+              )
+            },
+          )
           assertLatestSnapshotInMetrics(ts1)
         }
 

@@ -11,16 +11,13 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.KillSwitches
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
-import org.lfdecentralizedtrust.splice.automation.{
-  InfiniteServiceWithShutdown,
-  RetryableInfiniteService,
-}
+import org.lfdecentralizedtrust.splice.automation.{ServiceWithShutdown, RetryingService}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PekkoRetryableInfiniteService[S](
+class PekkoRetryingService[S](
     source: Source[S, ?],
     // Note that the killSwitch for termination will be placed between the source and the sink.
     sink: Sink[Any, Future[Done]],
@@ -30,13 +27,13 @@ class PekkoRetryableInfiniteService[S](
     override protected val retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit as: ActorSystem, ec: ExecutionContext, tracer: Tracer)
-    extends RetryableInfiniteService(automationConfig, backoffClock, description)
+    extends RetryingService(automationConfig, backoffClock, description)
     with NamedLogging {
 
-  // TODO: don't we always just want to do that in the constructor of RetryableInfiniteService?
-  startIngestion()
+  // kick-off processing
+  start()
 
-  private class PekkoInfiniteServiceWithShutdown extends InfiniteServiceWithShutdown {
+  private class PekkoServiceWithShutdown extends ServiceWithShutdown {
 
     private val (killSwitch, done) =
       source.viaMat(KillSwitches.single)(Keep.right).toMat(sink)(Keep.both).run()
@@ -53,6 +50,6 @@ class PekkoRetryableInfiniteService[S](
 
   override protected def instantiateService()(implicit
       traceContext: TraceContext
-  ): Future[InfiniteServiceWithShutdown] = Future.successful(new PekkoInfiniteServiceWithShutdown())
+  ): Future[ServiceWithShutdown] = Future.successful(new PekkoServiceWithShutdown())
 
 }

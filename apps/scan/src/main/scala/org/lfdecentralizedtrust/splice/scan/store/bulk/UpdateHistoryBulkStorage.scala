@@ -11,7 +11,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.pattern.after
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
 import org.apache.pekko.stream.scaladsl.{Source, Sink}
-import org.lfdecentralizedtrust.splice.PekkoRetryableInfiniteService
+import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -165,9 +165,9 @@ class UpdateHistoryBulkStorage(
       automationConfig: AutomationConfig,
       backoffClock: Clock,
       retryProvider: RetryProvider,
-  )(implicit tracer: Tracer): PekkoRetryableInfiniteService[UpdatesSegment] = {
+  )(implicit tracer: Tracer): PekkoRetryingService[UpdatesSegment] = {
     val src = mksrc()
-    new PekkoRetryableInfiniteService(
+    new PekkoRetryingService(
       src,
       Sink.ignore,
       automationConfig,

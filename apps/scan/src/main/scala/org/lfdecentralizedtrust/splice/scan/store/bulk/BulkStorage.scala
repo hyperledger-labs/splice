@@ -10,7 +10,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.lfdecentralizedtrust.splice.PekkoRetryableInfiniteService
+import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -38,7 +38,7 @@ class BulkStorage(
 
   private val services = appConfig.s3.fold {
     logger.debug("s3 connection not configured, not dumping to bulk storage")
-    Seq.empty[PekkoRetryableInfiniteService[?]]
+    Seq.empty[PekkoRetryingService[?]]
   } { s3Config =>
     val s3Connection = S3BucketConnection(s3Config, loggerFactory)
     val historyMetrics = HistoryMetrics(metricsFactory, currentMigrationId)

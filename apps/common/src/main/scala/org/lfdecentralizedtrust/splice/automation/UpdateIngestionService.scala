@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTr
 import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerConnection,
-  SpliceLedgerSubscription,
+  ServiceWithGuaranteedShutdown,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
@@ -41,7 +41,7 @@ class UpdateIngestionService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends RetryableInfiniteService(config, backoffClock, "update ingestion") {
+) extends RetryingService(config, backoffClock, "update ingestion") {
 
   private val filter = ingestionSink.ingestionFilter
 
@@ -50,7 +50,7 @@ class UpdateIngestionService(
 
   override protected def instantiateService()(implicit
       traceContext: TraceContext
-  ): Future[SpliceLedgerSubscription[?]] =
+  ): Future[ServiceWithGuaranteedShutdown[?]] =
     for {
       ingestionStart <- ingestionSink.initialize()
       subscribeFrom <- ingestionStart match {
@@ -85,7 +85,7 @@ class UpdateIngestionService(
             _ <- ingestAcsAndInFlight(acsOffset)
           } yield acsOffset
       }
-    } yield new SpliceLedgerSubscription(
+    } yield new ServiceWithGuaranteedShutdown(
       source = batchSource(connection.updates(subscribeFrom, filter)),
       map = process,
       retryProvider = retryProvider,
@@ -123,7 +123,7 @@ class UpdateIngestionService(
     source.batch(config.ingestion.maxBatchSize.toLong, Vector(_))(_ :+ _)
 
   // Kick-off the ingestion
-  startIngestion()
+  start()
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile

@@ -12,7 +12,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.pattern.after
-import org.lfdecentralizedtrust.splice.PekkoRetryableInfiniteService
+import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -144,9 +144,9 @@ class AcsSnapshotBulkStorage(
       automationConfig: AutomationConfig,
       backoffClock: Clock,
       retryProvider: RetryProvider,
-  )(implicit tracer: Tracer): PekkoRetryableInfiniteService[TimestampWithMigrationId] = {
+  )(implicit tracer: Tracer): PekkoRetryingService[TimestampWithMigrationId] = {
     val src = mksrc()
-    new PekkoRetryableInfiniteService(
+    new PekkoRetryingService(
       src,
       Sink.ignore,
       automationConfig,
