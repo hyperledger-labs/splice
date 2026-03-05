@@ -124,7 +124,8 @@ loadTester:
   adaptiveScenario:
     enabled: true
     scaleUpStep: 3
-    scheduledStartTimeUTC: "02:30"
+    windowStartUTC: "02:30"
+    windowDurationMinutes: 150
 svs:
   default:
     pruning:

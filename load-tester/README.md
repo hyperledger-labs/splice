@@ -62,18 +62,15 @@ This allows the test to find the maximum sustainable throughput for the cluster.
 
 The adaptive scenario is configured in the cluster's `config.yaml` under `loadTester.adaptiveScenario`:
 
-### Scheduled Start Time
+### Active Window
 
-When `scheduledStartTimeUTC` is set (default: `"03:00"`), the load tester waits until that UTC time before starting k6. This is designed for test clusters where an automatic upgrade runs at a known time -- the load test starts after the upgrade (likely) completes, giving a clean daily performance signal.
+The adaptive controller only ramps up during a daily time window, configured by `windowStartUTC` (default: `"03:00"`) and `windowDurationMinutes` (default: `120`). Outside this window, adaptive VUs are scaled to 0.
+
+This is designed for test clusters where an automatic upgrade runs at a known time (e.g., CILR upgrades at 02:00 UTC) -- the adaptive test window starts after the upgrade completes, giving a clean daily performance signal. The baseline `generate_load` scenario continues running at all times.
 
 ### Forcing an Immediate Ramp-Up
 
-To trigger the adaptive load test immediately (without waiting for the scheduled time):
-
-1. Edit the load-tester Deployment to change `scheduledStartTimeUTC` to a few minutes in the future.
-2. The pod will restart and begin the test once that time is reached.
-
-Note: if the scheduled time has already passed for today, the test will wait until that time tomorrow (~24h). To bypass the wait entirely, temporarily set `scheduledStartTimeUTC` to `""` (empty string) or remove it from the config and redeploy.
+To trigger the adaptive load test immediately, edit the Deployment to set `windowStartUTC` to the current time (or a few minutes in the future). The controller re-evaluates the window on every loop iteration, so the change takes effect after the current sleep cycle (at most 5 minutes).
 
 ## Multi-Validators
 

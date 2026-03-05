@@ -12,8 +12,8 @@ export const LoadTesterAdaptiveScenarioConfigSchema = z.object({
   enabled: z.boolean().default(false),
   scaleDownStep: z.number().default(5),
   scaleUpStep: z.number().default(2),
-  duration: z.string().default('2h'),
-  scheduledStartTimeUTC: z.string().default('03:00'),
+  windowStartUTC: z.string().default('03:00'),
+  windowDurationMinutes: z.number().default(120),
 });
 
 export const LoadTesterConfigSchema = z.object({

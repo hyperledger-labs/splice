@@ -11,34 +11,52 @@ MAX_VUS=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.maxVUs // 50')
 MIN_VUS=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.minVUs // 0')
 SCALE_DOWN_STEP=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.scaleDownStep // 5')
 SCALE_UP_STEP=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.scaleUpStep // 2')
-SCHEDULED_START_TIME_UTC=$(echo "$EXTERNAL_CONFIG" | jq -r '.adaptiveScenario.scheduledStartTimeUTC // "03:00"')
+WINDOW_START_UTC=$(echo "$EXTERNAL_CONFIG" | jq -r '.adaptiveScenario.windowStartUTC // "03:00"')
+WINDOW_DURATION_MINUTES=$(echo "$EXTERNAL_CONFIG" | jq '.adaptiveScenario.windowDurationMinutes // 120')
 
-# --- Wait for scheduled start time ---
-wait_for_scheduled_time() {
-  local target_time="$1"
-  local target_hour target_minute
-  target_hour=$(echo "$target_time" | cut -d: -f1)
-  target_minute=$(echo "$target_time" | cut -d: -f2)
+# --- Window helpers ---
+# Returns 0 (true) if the current UTC time is inside the configured window.
+is_inside_window() {
+  local start_hour start_minute
+  start_hour=$(echo "$WINDOW_START_UTC" | cut -d: -f1)
+  start_minute=$(echo "$WINDOW_START_UTC" | cut -d: -f2)
 
-  local now_epoch target_epoch
+  local now_epoch window_start_epoch window_end_epoch
   now_epoch=$(date -u +%s)
-  target_epoch=$(date -u -d "$(date -u +%Y-%m-%d) ${target_hour}:${target_minute}:00" +%s)
+  window_start_epoch=$(date -u -d "$(date -u +%Y-%m-%d) ${start_hour}:${start_minute}:00" +%s)
+  window_end_epoch=$(( window_start_epoch + WINDOW_DURATION_MINUTES * 60 ))
 
-  # If target time has already passed today, wait until tomorrow
-  if [ "$target_epoch" -le "$now_epoch" ]; then
-    target_epoch=$(( target_epoch + 86400 ))
+  # Handle case where the window started yesterday and hasn't ended yet
+  # (e.g., window starts at 23:00 for 180 min, it's now 01:00)
+  local yesterday_start_epoch yesterday_end_epoch
+  yesterday_start_epoch=$(( window_start_epoch - 86400 ))
+  yesterday_end_epoch=$(( yesterday_start_epoch + WINDOW_DURATION_MINUTES * 60 ))
+
+  if [ "$now_epoch" -ge "$window_start_epoch" ] && [ "$now_epoch" -lt "$window_end_epoch" ]; then
+    return 0
+  elif [ "$now_epoch" -ge "$yesterday_start_epoch" ] && [ "$now_epoch" -lt "$yesterday_end_epoch" ]; then
+    return 0
+  else
+    return 1
   fi
-
-  local wait_seconds=$(( target_epoch - now_epoch ))
-  echo "Scheduled start time is ${target_time} UTC. Current time is $(date -u +%H:%M:%S) UTC."
-  echo "Waiting ${wait_seconds} seconds ($(( wait_seconds / 3600 ))h $(( (wait_seconds % 3600) / 60 ))m) until scheduled start..."
-  sleep "$wait_seconds"
-  echo "Scheduled start time reached. Proceeding."
 }
 
-if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ] && [ -n "$SCHEDULED_START_TIME_UTC" ]; then
-  wait_for_scheduled_time "$SCHEDULED_START_TIME_UTC"
-fi
+# Prints the number of seconds until the next window opens.
+seconds_until_window() {
+  local start_hour start_minute
+  start_hour=$(echo "$WINDOW_START_UTC" | cut -d: -f1)
+  start_minute=$(echo "$WINDOW_START_UTC" | cut -d: -f2)
+
+  local now_epoch window_start_epoch
+  now_epoch=$(date -u +%s)
+  window_start_epoch=$(date -u -d "$(date -u +%Y-%m-%d) ${start_hour}:${start_minute}:00" +%s)
+
+  if [ "$window_start_epoch" -le "$now_epoch" ]; then
+    window_start_epoch=$(( window_start_epoch + 86400 ))
+  fi
+
+  echo $(( window_start_epoch - now_epoch ))
+}
 
 # --- Script State ---
 CURRENT_VUS=1
@@ -71,8 +89,33 @@ sleep 3
 # --- Conditionally run the controller loop ---
 if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ]; then
   echo "Controller loop is enabled and running..."
+  echo "Adaptive window: ${WINDOW_START_UTC} UTC for ${WINDOW_DURATION_MINUTES} minutes."
 
   while true; do
+    # --- Check if we are inside the active window ---
+    if ! is_inside_window; then
+      # Outside the window: scale adaptive VUs to 0 and wait
+      if [ "$CURRENT_VUS" -gt 0 ]; then
+        echo "Outside adaptive window. Scaling adaptive VUs to 0."
+        k6 scale --vus=0
+        CURRENT_VUS=0
+        PREVIOUS_FAILED_TRANSFERS=""
+      fi
+
+      WAIT_SECS=$(seconds_until_window)
+      echo "Next window opens at ${WINDOW_START_UTC} UTC. Waiting ${WAIT_SECS} seconds ($(( WAIT_SECS / 3600 ))h $(( (WAIT_SECS % 3600) / 60 ))m)..."
+      sleep "$WAIT_SECS"
+
+      # Start fresh at 1 VU when the window opens
+      echo "Adaptive window opened. Starting ramp-up."
+      CURRENT_VUS=1
+      k6 scale --vus=1
+      PREVIOUS_FAILED_TRANSFERS=""
+      continue
+    fi
+
+    # --- Inside the window: run adaptive scaling logic ---
+
     # --- 1. Read the cumulative failure count from the k6 API ---
     API_RESPONSE=$(curl -s http://localhost:6565/v1/metrics/transfers_failed)
     CURRENT_FAILS=$(echo "$API_RESPONSE" | jq '.data.attributes.sample.count // 0')
@@ -93,13 +136,13 @@ if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ]; then
       if [ "$DELTA" -eq "0" ]; then
         # If delta is zero and max VUs not reached, scale up
         if [ "$CURRENT_VUS" -lt "$MAX_VUS" ]; then
-          echo "✅ No new failures. Scaling up by ${SCALE_UP_STEP} VU(s)."
+          echo "No new failures. Scaling up by ${SCALE_UP_STEP} VU(s)."
           NEW_VUS=$(( CURRENT_VUS + SCALE_UP_STEP ))
           if [ "$NEW_VUS" -gt "$MAX_VUS" ]; then NEW_VUS=$MAX_VUS; fi
           k6 scale --vus="$NEW_VUS"
           CURRENT_VUS=$NEW_VUS
         else
-          echo "👌 No new failures. Already at max VUs ($MAX_VUS)."
+          echo "No new failures. Already at max VUs ($MAX_VUS)."
         fi
 
         # --- Wait for 5 minutes before the next check ---
@@ -107,7 +150,7 @@ if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ]; then
         sleep 300
       elif [ "$DELTA" -gt "0" ]; then
         if [ "$CURRENT_VUS" -gt "$MIN_VUS" ]; then
-          echo "🔥 New failures detected! Scaling down by ${SCALE_DOWN_STEP} VUs."
+          echo "New failures detected! Scaling down by ${SCALE_DOWN_STEP} VUs."
           NEW_VUS=$(( CURRENT_VUS - SCALE_DOWN_STEP ))
           if [ "$NEW_VUS" -lt "$MIN_VUS" ]; then NEW_VUS=$MIN_VUS; fi
           k6 scale --vus="$NEW_VUS"
@@ -116,7 +159,7 @@ if [ "$ADAPTIVE_SCENARIO_ENABLED" = "true" ]; then
           echo "Sleeping for 1 minute..."
           sleep 60
         else
-          echo "⚠️ New failures detected, but already at min VUs ($MIN_VUS)."
+          echo "New failures detected, but already at min VUs ($MIN_VUS)."
 
           echo "Sleeping for 5 minutes (300 seconds)..."
           sleep 300
