@@ -19,6 +19,22 @@ data InstrumentId = InstrumentId
       -- This identifier MUST be unique and unambiguous per instrument admin.
   deriving (Eq, Ord, Show)
 
+-- | A data type to represent an on-chain managed account,
+--   for example in a traditional accounting structure, or simply a delegation
+--   to a provider to perform some services.
+data Account = Account
+  with
+    provider : Optional Party
+    -- ^ The provider of the account.
+    id : Optional Text
+    -- ^ Account number or similar. Should be unique per provider.
+    owner: Party
+    -- ^ The party that owns the account.
+  deriving (Eq, Show, Ord)
+
+basicAccount : Party -> Account
+basicAccount p = Account None None p
+
 -- | Details of a lock.
 data Lock = Lock
   with
@@ -48,8 +64,8 @@ interface Holding where viewtype HoldingView
 -- | View for `Holding`.
 data HoldingView = HoldingView
   with
-    owner : Party
-      -- ^ Owner of the holding.
+    account : Account
+      -- ^ Account in which the holding is held.
     instrumentId : InstrumentId
       -- ^ Instrument being held.
     amount : Decimal

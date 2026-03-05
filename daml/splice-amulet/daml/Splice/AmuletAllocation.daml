@@ -3,35 +3,61 @@
 
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
+  netAllocationAmount,
   allocationToTwoStepTransfer,
 ) where
 
+import DA.Foldable (forA_)
+import DA.Optional (isNone, isSome)
 import DA.Text as Text
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
-import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationV2
+import Splice.Api.Token.UtilsV2
 
 import Splice.Amulet
+import Splice.AmuletRules
 import Splice.Amulet.TwoStepTransfer
+import Splice.Amulet.TokenApiUtils
+import Splice.ExternalPartyConfigState
+import Splice.Fees (expiringAmount)
+import Splice.Types
+import Splice.Util
 
+import qualified DA.Map as Map
 
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
   with
-    lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
+    lockedAmulet : Optional (ContractId LockedAmulet)
+    -- ^ Locked amulet that holds the funds for the allocation.
+    -- Empty if no outgoing legs.
     allocation : AllocationSpecification
+    authorizer : Party
+    admin : Party
+    expiresAt : Time
   where
-    signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
+    signatory admin, authorizer
     observer allocation.settlement.executor
+
+    ensure
+      all
+        (\tl -> (
+            -- Authorizer needs to appear as sender or receiver of each leg.
+            authorizer `elem` [tl.sender.owner, tl.receiver.owner])
+            -- Only one admin Id allowed.
+            && tl.instrumentId.admin == admin)
+        allocation.transferLegs
 
     interface instance Allocation for AmuletAllocation where
       view = AllocationView with
         allocation
-        holdingCids = [toInterfaceContractId lockedAmulet]
+        holdingCids = Map.fromList $ optional [] (\la -> [(amuletInstrumentId admin, [toInterfaceContractId la])]) lockedAmulet
         meta = emptyMetadata
-
-      allocation_executeTransferImpl _self Allocation_ExecuteTransfer{..} = transferAmuletAllocation this extraArgs
+        authorizer = basicAccount authorizer
+        expiresAt = Some expiresAt
 
       allocation_withdrawImpl _self Allocation_Withdraw{..} = do
         senderHoldingCids <- unlockAmuletAllocation this extraArgs
@@ -47,40 +73,132 @@ template AmuletAllocation
             senderHoldingCids
             meta = emptyMetadata
 
-allocationInstrumentAdmin : AllocationSpecification -> Party
-allocationInstrumentAdmin AllocationSpecification{..} = transferLeg.instrumentId.admin
+      allocation_settleImpl _self Allocation_Settle{..} = do
+        -- compute total funds to move
+        let netAmount = netAllocationAmount authorizer allocation.transferLegs
+        if netAmount >= 0.0 then do
+          require "No locked amulet expected for non-negative net amount" (isNone lockedAmulet)
+          if netAmount > 0.0
+            then do
+              -- Net credit of Amulet ==> create the holding
 
+              -- FIXME: share context fetching code once rebased on Moritz's 24h changes
+              externalPartyConfigStateCid <- getFromContextU @(ContractId ExternalPartyConfigState) extraArgs.context externalPartyConfigStateContextKey
+              externalPartyConfigState <- fetchChecked (ForDso with dso = admin) externalPartyConfigStateCid
+              let config = scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) $ externalPartyConfigState.transferConfig
+              let holdingFeeAmulet = config.holdingFee
+
+              newHoldingCid <- create Amulet with
+                dso = admin
+                owner = authorizer
+                amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
+
+              pure Allocation_SettleResult with
+                newHoldingCids = Map.singleton (amuletInstrumentId admin) [toInterfaceContractId newHoldingCid]
+                meta = emptyMetadata
+          else
+            pure Allocation_SettleResult with
+              newHoldingCids = Map.empty
+              meta = emptyMetadata
+        else do
+          -- Net debit of Amulet ==> archive the locked amulet
+          require "Locked amulet expected for negative net amount" (isSome lockedAmulet)
+          forA_ lockedAmulet $ \cid -> do
+             lockedAmulet <- fetchAndArchive (ForOwner with dso = admin; owner = authorizer) cid
+             require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
+
+          pure Allocation_SettleResult with
+            newHoldingCids = Map.empty
+            meta = emptyMetadata
+
+    interface instance AllocationV1.Allocation for AmuletAllocation where
+      view = allocation_view_v2_to_v1 (view (toInterface @Allocation this))
+
+      AllocationV1.allocation_executeTransferImpl _self arg = transferAmuletAllocation this arg
+      AllocationV1.allocation_withdrawImpl = allocation_v1_withdrawImpl (toInterface @Allocation this)
+      AllocationV1.allocation_cancelImpl = allocation_v1_cancelImpl (toInterface @Allocation this)
 
 -- Allocation usage
 -------------------
 
-allocationToTwoStepTransfer : AllocationSpecification -> TwoStepTransfer
-allocationToTwoStepTransfer allocation =
+-- FIXME: consider lifting out to utils
+netAllocationAmount : Party -> [TransferLeg] -> Decimal
+netAllocationAmount authorizer transferLegs =
+    sum $ map legAmount transferLegs
+  where
+    legAmount tl = case (tl.sender.owner == authorizer, tl.receiver.owner == authorizer) of
+      (True, True) -> 0.0
+      (True, False) -> negate tl.amount
+      (False, True) -> tl.amount
+      (False, False) -> error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
+
+allocationToTwoStepTransfer : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
+allocationToTwoStepTransfer sender transferLegs admin expiresAt settlement =
   TwoStepTransfer with
-    dso = allocationInstrumentAdmin allocation
-    sender = allocation.transferLeg.sender
-    receiver = allocation.transferLeg.receiver
-    amount = allocation.transferLeg.amount
-    provider = allocation.settlement.executor
-    transferBefore = allocation.settlement.settleBefore
-    transferBeforeDeadline = "allocation.settlement.settleBefore"
+    dso = admin
+    sender
+    -- Note: we use a single leg to the sender to get the right locking behavior as part of preparing the two-step transfer
+    -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
+    -- FIXME: improve representation once the design for batch settlement is definite
+    receiver = sender
+    amount = negate (netAllocationAmount sender transferLegs)
+    provider = settlement.executor
+    transferBefore = expiresAt
+    transferBeforeDeadline = "allocation.expiresAt"
     allowFeaturing = True
     lockContext = Text.implode
       -- We don't show more context to avoid bloating the response here.
-      ["allocation for transfer leg ", show allocation.transferLegId, " to ", show allocation.transferLeg.receiver]
+      ["allocation for settlement ", settlement.settlementRef.id]
 
-transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
-transferAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
+allocationToTwoStepTransfer_v1 : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
+allocationToTwoStepTransfer_v1 sender transferLegs admin expiresAt settlement =
+  case transferLegs of
+    [leg] | leg.sender.owner == sender ->
+      TwoStepTransfer with
+        dso = admin
+        sender
+        receiver = leg.receiver.owner
+        amount = leg.amount
+          -- Note: that this works as for a single leg allocation by the sender,
+          -- `negate netAllocationAmount` is equal to leg.amount
+        provider = settlement.executor
+        transferBefore = expiresAt
+        transferBeforeDeadline = "allocation.expiresAt"
+        allowFeaturing = True
+        lockContext = Text.implode
+          -- We don't show more context to avoid bloating the response here.
+          ["allocation for settlement ", settlement.settlementRef.id]
+    _ -> error "AllocationV1 interfaces only support sender-side, single leg transfers"
+
+transferAmuletAllocation : AmuletAllocation -> AllocationV1.Allocation_ExecuteTransfer -> Update AllocationV1.Allocation_ExecuteTransferResult
+transferAmuletAllocation aa AllocationV1.Allocation_ExecuteTransfer{..} = do
+  let
+    TransferLeg{sender}::_ = aa.allocation.transferLegs
+    twoStepTransfer = allocationToTwoStepTransfer_v1
+      sender.owner
+      aa.allocation.transferLegs
+      aa.admin
+      aa.expiresAt
+      aa.allocation.settlement
   (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
-  pure Allocation_ExecuteTransferResult
+    case aa.lockedAmulet of
+      Some laCid -> executeTwoStepTransfer twoStepTransfer laCid extraArgs
+      None -> abort "invariant violation: v1 allocations must always have a locked amulet"
+        -- FIXME: revisit this from the perspective of using v2 APIs to allocate a v1 allocation -- if that is even required
+  pure AllocationV1.Allocation_ExecuteTransferResult
     with
-      senderHoldingCids
-      receiverHoldingCids
+      senderHoldingCids = map coerceContractId senderHoldingCids
+      receiverHoldingCids = map coerceContractId receiverHoldingCids
       meta
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId Holding]
 unlockAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
-  abortTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+  case amuletAllocation.lockedAmulet of
+    None -> return []
+    Some la -> do
+      let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.authorizer amuletAllocation.allocation.transferLegs amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation.settlement
+      abortTwoStepTransfer twoStepTransfer la extraArgs
+
+
+instance HasCheckedFetch AmuletAllocation ForDso where
+  contractGroupId AmuletAllocation{..} = ForDso with dso = admin

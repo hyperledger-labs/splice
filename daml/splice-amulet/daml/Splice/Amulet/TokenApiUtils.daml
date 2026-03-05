@@ -14,7 +14,7 @@ import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.FeaturedAppRightV1
-import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
 
 
 splicePrefix : Text
@@ -24,9 +24,9 @@ amuletPrefix : Text
 amuletPrefix = "amulet." <> splicePrefix
 
 -- | Shared definition of the instrument-id used for amulets.
-amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
+amuletInstrumentId : Party -> Api.Token.HoldingV2.InstrumentId
 amuletInstrumentId dso =
-  Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
+  Api.Token.HoldingV2.InstrumentId with admin = dso; id = "Amulet"
 
 -- | Add an optional metadata entry.
 optionalMetadata : Text -> (a -> Text) -> Optional a -> TextMap Text -> TextMap Text
