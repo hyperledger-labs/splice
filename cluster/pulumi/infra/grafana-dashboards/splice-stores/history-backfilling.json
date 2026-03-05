@@ -1699,7 +1699,9 @@
       },
       {
         "current": {
-          "text": "All",
+          "text": [
+            "All"
+          ],
           "value": [
             "$__all"
           ]
@@ -1708,14 +1710,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(splice_history_txlog_backfilling_completed,migration)",
+        "definition": "label_values(splice_history_txlog_backfilling_latest_record_time,migration)",
         "includeAll": true,
         "multi": true,
         "name": "migration",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(splice_history_txlog_backfilling_completed,migration)",
+          "query": "label_values(splice_history_txlog_backfilling_latest_record_time,migration)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1743,12 +1745,12 @@
     ]
   },
   "time": {
-    "from": "now-2d",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "History backfiling",
   "uid": "fe12ejqgwdlvke",
-  "version": 3
+  "version": 4
 }
