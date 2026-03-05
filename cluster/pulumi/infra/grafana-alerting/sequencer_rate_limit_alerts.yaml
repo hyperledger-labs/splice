@@ -1,0 +1,117 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: sequencer-rate-limits
+    folder: canton
+    interval: 1m
+    rules:
+      - uid: a3f7c8e1d492
+        title: Sequencer Throughput Cap Rejections
+        condition: rejection_rate_threshold
+        data:
+          - refId: rejection_rate
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (namespace, job)(rate(daml_sequencer_throughput_cap_confirmation_request_rejections_total[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: rejection_rate
+          - refId: rejection_rate_threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - 0
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: rejection_rate
+              hide: false
+              refId: rejection_rate_threshold
+              type: threshold
+        dashboardUid: eb26bc60-6c26-408a-b0de-befc19f6915c
+        panelId: 3
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: eb26bc60-6c26-408a-b0de-befc19f6915c
+          __panelId__: "3"
+          description: Sequencer throughput cap is rejecting confirmation requests on namespace {{ $labels.namespace }} job {{ $labels.job }}. This means members are exceeding their rate limits.
+          severity: warning
+          summary: Sequencer throughput cap rejections detected on {{ $labels.namespace }} {{ $labels.job }}
+        labels: {}
+        isPaused: false
+      - uid: b4e8d9f2e5a3
+        title: Sequencer Circuit Breaker Open
+        condition: circuit_breaker_threshold
+        data:
+          - refId: circuit_breaker_state
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (namespace, job)(daml_sequencer_circuit_breaker_confirmation_request_state)
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: circuit_breaker_state
+          - refId: circuit_breaker_threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - 0.5
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: circuit_breaker_state
+              hide: false
+              refId: circuit_breaker_threshold
+              type: threshold
+        dashboardUid: eb26bc60-6c26-408a-b0de-befc19f6915c
+        panelId: 10
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: eb26bc60-6c26-408a-b0de-befc19f6915c
+          __panelId__: "10"
+          description: Sequencer circuit breaker for confirmation requests is open on namespace {{ $labels.namespace }} job {{ $labels.job }}. The sequencer is rejecting all incoming confirmation requests.
+          severity: critical
+          summary: Sequencer circuit breaker OPEN on {{ $labels.namespace }} {{ $labels.job }}
+        labels: {}
+        isPaused: false

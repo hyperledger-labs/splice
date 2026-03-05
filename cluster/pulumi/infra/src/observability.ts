@@ -900,6 +900,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
               'sequencer_connection_pool_alerts.yaml'
             ),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
+            'sequencer_rate_limit_alerts.yaml': readGrafanaAlertingFile(
+              'sequencer_rate_limit_alerts.yaml'
+            ),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
