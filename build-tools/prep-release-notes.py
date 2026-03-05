@@ -106,7 +106,14 @@ def create_branch_and_push():
     branch = repo.create_head(branch_name)
     repo.head.reference = branch
     repo.git.add(update=True)
-    repo.index.commit(f"[static] release notes for {new_version}", skip_hooks=True)
+    config_reader = repo.config_reader()
+    email = config_reader.get_value("user", "email")
+    username = config_reader.get_value("user", "name")
+    msg = f"""[static] release notes for {new_version}
+
+Signed-off-by: {username} <{email}>
+"""
+    repo.index.commit(msg, skip_hooks=True)
     origin = repo.remote(name='origin')
     origin.push(f"{branch_name}:{branch_name}")
 
