@@ -441,7 +441,8 @@ class SvDsoAutomationService(
           internalClientConfig.sequencerInternalConfig,
           config.participantClient.sequencerRequestAmplification,
           config.domainMigrationId,
-          newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
+          reconnectOnSynchronizerConfigurationChange =
+            enabledFeatures.reconnectOnSynchronizerConfigurationChange,
         )
       )
     }
