@@ -24,8 +24,7 @@ class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
     with WalletTestUtil
-    with WalletTxLogTestUtil
-    with TimeTestUtil {
+    with WalletTxLogTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
