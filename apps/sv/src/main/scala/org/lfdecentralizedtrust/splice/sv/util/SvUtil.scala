@@ -21,10 +21,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRulesConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{cometbft, dso}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.environment.{
-  MediatorAdminConnection,
-  SequencerAdminConnection,
-}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{BeneficiaryConfig, SvScanConfig}
@@ -35,7 +31,6 @@ import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpParameters
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
@@ -82,7 +77,7 @@ object SvUtil {
         acc: Map[PartyId, Long],
     ): Map[PartyId, Long] =
       if (remainder <= 0) {
-        if (!remainingBeneficiaries.isEmpty) {
+        if (remainingBeneficiaries.nonEmpty) {
           logger.info(
             s"Total SV weight $memberSvRewardWeightBps does not cover the following beneficiaries: $remainingBeneficiaries"
           )
@@ -342,22 +337,4 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
-
-  def getSequencerAdminConnection(
-      primarySequencerAdminConnection: Option[SequencerAdminConnection]
-  ): SequencerAdminConnection =
-    primarySequencerAdminConnection.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No sequencer admin connection configured for SV App")
-        .asRuntimeException()
-    )
-
-  def getMediatorAdminConnection(
-      primaryMediatorAdminConnection: Option[MediatorAdminConnection]
-  ): MediatorAdminConnection =
-    primaryMediatorAdminConnection.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No mediator admin connection configured for SV App")
-        .asRuntimeException()
-    )
 }

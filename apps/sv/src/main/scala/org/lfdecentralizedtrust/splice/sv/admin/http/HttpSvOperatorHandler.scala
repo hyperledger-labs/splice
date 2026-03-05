@@ -52,9 +52,8 @@ class HttpSvOperatorHandler(
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     config: SvAppBackendConfig,
     clock: Clock,
-    localSynchronizerNode: Option[LocalSynchronizerNode],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
-    cometBftClient: Option[CometBftClient],
     override protected val packageVersionSupport: PackageVersionSupport,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -392,7 +391,7 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
-      withSequencerConnectionOrNotFound(respond.NotFound)(
+      withSequencerConnection(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
@@ -405,7 +404,7 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
-      withMediatorConnectionOrNotFound(respond.NotFound)(
+      withMediatorConnection(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
     }
@@ -418,7 +417,7 @@ class HttpSvOperatorHandler(
   ): Future[r0.GetPartyToParticipantResponse] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
-      withSequencerConnectionOrNotFound(respond.NotFound) { sequencerConnection =>
+      withSequencerConnection { sequencerConnection =>
         for {
           party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
             case Right(party) => Future.successful(party)
@@ -506,31 +505,30 @@ class HttpSvOperatorHandler(
 
   private def withClientOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: CometBftClient => Future[T]) = cometBftClient
-    .fold {
-      notFound(definitions.ErrorResponse("CometBFT is not configured."))
-        .pure[Future]
-    } {
-      call
+  )(call: CometBftClient => Future[T])(implicit tc: TraceContext) =
+    synchronizerNodeService.activeSynchronizerNode().flatMap { node =>
+      node.cometbftNode.map(_.cometBftClient) match {
+        case None =>
+          notFound(definitions.ErrorResponse("CometBFT is not configured.")).pure[Future]
+        case Some(client) => call(client)
+      }
     }
 
-  private def withSequencerConnectionOrNotFound[T](
-      notFound: definitions.ErrorResponse => T
-  )(call: SequencerAdminConnection => Future[T]) = localSynchronizerNode
-    .map(_.sequencerAdminConnection)
-    .fold {
-      notFound(definitions.ErrorResponse("Sequencer is not configured."))
-        .pure[Future]
-    } { call }
+  private def withSequencerConnection[T](
+      call: SequencerAdminConnection => Future[T]
+  )(implicit tc: TraceContext) = {
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap(node => call(node.sequencerAdminConnection))
+  }
 
-  private def withMediatorConnectionOrNotFound[T](
-      notFound: definitions.ErrorResponse => T
-  )(call: MediatorAdminConnection => Future[T]) = localSynchronizerNode
-    .map(_.mediatorAdminConnection)
-    .fold {
-      notFound(definitions.ErrorResponse("Mediator is not configured."))
-        .pure[Future]
-    } { call }
+  private def withMediatorConnection[T](
+      call: MediatorAdminConnection => Future[T]
+  )(implicit tc: TraceContext) = {
+    synchronizerNodeService
+      .activeSynchronizerNode()
+      .flatMap(node => call(node.mediatorAdminConnection))
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
     mutex.exclusive {

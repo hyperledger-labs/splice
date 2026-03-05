@@ -15,7 +15,7 @@ import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 
 class SynchronizerNodeService[T <: SynchronizerNode](
-    nodes: SynchronizerNode.LocalSynchronizerNodes[T],
+    val nodes: SynchronizerNode.LocalSynchronizerNodes[T],
     participantAdminConnection: ParticipantAdminConnection,
     globalSynchronizerAlias: SynchronizerAlias,
     cacheExpiration: NonNegativeFiniteDuration,
@@ -70,7 +70,7 @@ class SynchronizerNodeService[T <: SynchronizerNode](
         } yield successorPSId.map(_.serial).contains(global.physicalSynchronizerId.serial)
     }
 
-  private def synchronizerNode()(implicit tc: TraceContext) =
+  def activeSynchronizerNode()(implicit tc: TraceContext): Future[T] =
     nodes.successor match {
       case None => Future.successful(nodes.current)
       case Some(successor) =>
@@ -84,5 +84,5 @@ class SynchronizerNodeService[T <: SynchronizerNode](
     }
 
   def sequencerAdminConnection()(implicit tc: TraceContext): Future[SequencerAdminConnection] =
-    synchronizerNode().map(_.sequencerAdminConnection)
+    activeSynchronizerNode().map(_.sequencerAdminConnection)
 }

@@ -43,7 +43,6 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -58,7 +57,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected val domainTimeSync: DomainTimeSynchronization
   protected val domainUnpausedSync: DomainUnpausedSynchronization
   protected val participantAdminConnection: ParticipantAdminConnection
-  protected val cometBftNode: Option[CometBftNode]
   protected val ledgerClient: SpliceLedgerClient
   protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig
 
@@ -88,7 +86,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       dsoStore: SvDsoStore,
       ledgerClient: SpliceLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+      synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -106,7 +104,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       storage,
       ledgerClient,
       participantAdminConnection,
-      localSynchronizerNodes,
+      synchronizerNodeService,
       retryProvider,
       config.topologySnapshotConfig,
       loggerFactory,
@@ -138,7 +136,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def newSvDsoAutomationService(
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
-      localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+      synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
       synchronizerId: SynchronizerId,
@@ -161,8 +159,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ledgerClient,
       participantAdminConnection,
       retryProvider,
-      cometBftNode,
-      localSynchronizerNodes,
+      synchronizerNodeService,
       upgradesConfig,
       spliceInstanceNamesConfig,
       loggerFactory,
@@ -180,16 +177,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     retryProvider,
     loggerFactory,
   )
-
-  protected def rotateGenesisGovernanceKeyForSV1(
-      cometBftNode: Option[CometBftNode],
-      name: String,
-  )(implicit tc: TraceContext): Future[Unit] =
-    cometBftNode match {
-      case Some(cometBftNode) =>
-        cometBftNode.rotateGenesisGovernanceKeyForSV1(name)
-      case _ => Future.unit
-    }
 
   protected def ensureCometBftGovernanceKeysAreSet(
       cometBftNode: Option[CometBftNode],

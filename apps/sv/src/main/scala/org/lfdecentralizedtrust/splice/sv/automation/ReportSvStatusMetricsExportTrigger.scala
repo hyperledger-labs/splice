@@ -13,12 +13,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatusReport
-import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import org.lfdecentralizedtrust.splice.environment.{SpliceMetrics, SynchronizerNodeService}
 import org.lfdecentralizedtrust.splice.sv.automation.ReportSvStatusMetricsExportTrigger.{
   SvCometBftMetrics,
   SvStatusMetrics,
 }
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
@@ -29,6 +28,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{blocking, ExecutionContext, Future}
@@ -39,7 +39,7 @@ import scala.jdk.OptionConverters.*
 class ReportSvStatusMetricsExportTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
-    cometBftNode: Option[CometBftNode],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -98,7 +98,8 @@ class ReportSvStatusMetricsExportTrigger(
     _ = closeAllOffboardedSvMetrics(svIdsFromDsoRules)
     report = task.payload
     svId = ReportSvStatusMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
-    (earliestBlockHeight, latestBlockHeight) <- cometBftNode match {
+    currentNode <- synchronizerNodeService.activeSynchronizerNode()
+    (earliestBlockHeight, latestBlockHeight) <- currentNode.cometbftNode match {
       case None => Future.successful((0L, 0L))
       case Some(cometBftNode) =>
         for {

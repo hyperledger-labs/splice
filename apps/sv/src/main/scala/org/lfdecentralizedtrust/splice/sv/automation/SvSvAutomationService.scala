@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryProvider,
   SpliceLedgerClient,
+  SynchronizerNodeService,
 }
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -29,7 +30,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
-import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.ExecutionContextExecutor
@@ -44,7 +44,7 @@ class SvSvAutomationService(
     storage: DbStorage,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -89,12 +89,7 @@ class SvSvAutomationService(
         config.domains.global.alias,
         topologySnapshotConfig,
         triggerContext,
-        localSynchronizerNodes
-          .getOrElse(
-            sys.error("Cannot take topology snapshot with no localSynchronizerNode")
-          )
-          .current
-          .sequencerAdminConnection,
+        synchronizerNodeService,
         participantAdminConnection,
         clock,
       )
@@ -108,11 +103,7 @@ class SvSvAutomationService(
         dsoStore,
         backupConfig,
         participantAdminConnection,
-        localSynchronizerNodes
-          .getOrElse(
-            sys.error("Cannot dump identities with no localSynchronizerNode")
-          )
-          .current,
+        synchronizerNodeService,
         triggerContext,
       )
     )

@@ -63,7 +63,7 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
           .focus(_.svApps)
           .modify(_.updatedWith(InstanceName.tryCreate("sv4")) {
             _.map(
-              _.focus(_.localSynchronizerNodes.current).some.modify(
+              _.focus(_.localSynchronizerNodes.current).modify(
                 _.focus(_.sequencer.externalPublicApiUrl)
                   .replace("http://example.com")
               )

@@ -246,7 +246,7 @@ class SvReonboardingIntegrationTest
         val (sv1MediatorId, sv2MediatorId, sv3MediatorId, sv4MediatorId) =
           inside(
             Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(
-              _.appState.localSynchronizerNodes.value.current.mediatorAdminConnection.getMediatorId.futureValue
+              _.appState.localSynchronizerNodes.current.mediatorAdminConnection.getMediatorId.futureValue
             )
           ) { case Seq(sv1, sv2, sv3, sv4) =>
             (sv1, sv2, sv3, sv4)
@@ -254,7 +254,7 @@ class SvReonboardingIntegrationTest
         val (sv1SequencerId, sv2SequencerId, sv3SequencerId, sv4SequencerId) =
           inside(
             Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(
-              _.appState.localSynchronizerNodes.value.current.sequencerAdminConnection.getSequencerId.futureValue
+              _.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
             )
           ) { case Seq(sv1, sv2, sv3, sv4) =>
             (sv1, sv2, sv3, sv4)
@@ -440,9 +440,9 @@ class SvReonboardingIntegrationTest
           sv4ReonboardBackend.participantClient.id,
         )
         val sv4MediatorIdNew =
-          sv4ReonboardBackend.appState.localSynchronizerNodes.value.current.mediatorAdminConnection.getMediatorId.futureValue
+          sv4ReonboardBackend.appState.localSynchronizerNodes.current.mediatorAdminConnection.getMediatorId.futureValue
         val sv4SequencerIdNew =
-          sv4ReonboardBackend.appState.localSynchronizerNodes.value.current.sequencerAdminConnection.getSequencerId.futureValue
+          sv4ReonboardBackend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
         sv1Backend.appState.participantAdminConnection
           .getMediatorSynchronizerState(decentralizedSynchronizerId)
           .futureValue

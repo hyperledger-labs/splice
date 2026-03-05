@@ -452,7 +452,6 @@ object ConfigTransforms {
             .focus(_.domains.global.url)
             .modify(_.map(bumpUrl(bump, _)))
             .focus(_.localSynchronizerNodes.current)
-            .some
             .modify(portTransform(bump, _))
         else conf
       ),
@@ -571,7 +570,6 @@ object ConfigTransforms {
           .focus(_.participantClient.adminApi.port)
           .modify(setPortPrefix(range))
           .focus(_.localSynchronizerNodes.current)
-          .some
           .modify(setSvSynchronizerConfigPortsPrefix(range, _))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
@@ -718,7 +716,6 @@ object ConfigTransforms {
   def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
     config
       .focus(_.localSynchronizerNodes.current)
-      .some
       .modify(
         _.focus(_.sequencer).modify(
           _.copy(

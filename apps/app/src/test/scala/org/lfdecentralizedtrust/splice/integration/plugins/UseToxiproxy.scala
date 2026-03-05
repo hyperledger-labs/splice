@@ -223,7 +223,6 @@ case class UseToxiproxy(
                 (
                   n,
                   c.focus(_.localSynchronizerNodes.current)
-                    .some
                     .modify(_.focus(_.sequencer).modify(addSequencerProxy(n.unwrap, _))),
                 )
               }
@@ -242,7 +241,6 @@ case class UseToxiproxy(
                 (
                   n,
                   c.focus(_.localSynchronizerNodes.current)
-                    .some
                     .modify(_.focus(_.mediator).modify(addMediatorProxy(n.unwrap, _))),
                 )
               }

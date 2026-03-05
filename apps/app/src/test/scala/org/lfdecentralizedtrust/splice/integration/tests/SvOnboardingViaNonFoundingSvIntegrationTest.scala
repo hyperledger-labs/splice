@@ -140,10 +140,10 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               }
             endpoints.toSet shouldBe Set(
               LocalSynchronizerNode.toEndpoint(
-                sv1Backend.config.localSynchronizerNodes.current.value.sequencer.internalApi
+                sv1Backend.config.localSynchronizerNodes.current.sequencer.internalApi
               ),
               LocalSynchronizerNode.toEndpoint(
-                sv2Backend.config.localSynchronizerNodes.current.value.sequencer.internalApi
+                sv2Backend.config.localSynchronizerNodes.current.sequencer.internalApi
               ),
             )
             sv2Backend.participantClient.synchronizers.is_connected(
@@ -223,7 +223,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .item
               .allSequencers
               .toIndexedSeq should have size 1 withClue "sole sequencers"
-            sv2Backend.appState.localSynchronizerNodes.value.current.sequencerAdminConnection
+            sv2Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection
               .getSequencerOrderingTopology()
               .futureValue
               .sequencerIds should have size 1 withClue "sole sequencerId"

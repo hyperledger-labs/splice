@@ -296,7 +296,6 @@ case class SvAppBackendConfig(
     svPartyHint: Option[String] = None,
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
-    cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNodes: SvSynchronizerNodesConfig,
     scheduledLsu: Option[ScheduledLsuConfig],
     scan: SvScanConfig,
@@ -495,6 +494,7 @@ final case class SvScanConfig(
 final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
+    cometBftConfig: Option[SvCometBftConfig] = None,
     protocolVersion: ProtocolVersion = ProtocolVersion.v34,
     serial: Option[NonNegativeInt],
     // We want to be able to override this for simtime tests
@@ -502,7 +502,7 @@ final case class SvSynchronizerNodeConfig(
 )
 
 final case class SvSynchronizerNodesConfig(
-    current: Option[SvSynchronizerNodeConfig],
+    current: SvSynchronizerNodeConfig,
     successor: Option[SvSynchronizerNodeConfig],
     legacy: Option[SvSynchronizerNodeConfig] = None,
 )

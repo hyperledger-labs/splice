@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.lsu
 
-import cats.implicits.showInterpolator
+import cats.implicits.{catsSyntaxOptionId, showInterpolator, toTraverseOps}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.admin.api.client.data.SequencerHealthStatus.implicitPrettyString
@@ -26,25 +26,28 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, StatusAdminConnection}
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import java.net.URI
 import scala.concurrent.{ExecutionContext, Future}
 
 class LogicalSynchronizerUpgradeTrigger(
     baseContext: TriggerContext,
-    currentSynchronizerNode: SvSynchronizerNode,
-    successorSynchronizerNode: LocalSynchronizerNode,
     reconciler: SynchronizerNodeReconciler,
-    localSynchronizerNodes: Option[LocalSynchronizerNodes[LocalSynchronizerNode]],
+    localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
+    successorSynchronizerNode: LocalSynchronizerNode,
+    store: SvDsoStore,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[LsuTransferTask] {
+
+  private val currentSynchronizerNode = localSynchronizerNodes.current
 
   private val exporter =
     new LsuStateExporter(
@@ -141,6 +144,14 @@ class LogicalSynchronizerUpgradeTrigger(
   ): Future[TaskOutcome] = {
     logger.info(s"Running LSU state transfer for $task")
     (for {
+      rulesAndState <- store.getDsoRulesWithSvNodeStates()
+      owningNodeSvName <- rulesAndState.getSvNameInDso(store.key.svParty)
+      _ <- successorSynchronizerNode.cometbftNode.traverse(
+        _.rotateGenesisGovernanceKeyForSV1(owningNodeSvName)
+      )
+      _ <- successorSynchronizerNode.cometbftNode.traverse(
+        _.reconcileNetworkConfig(owningNodeSvName, rulesAndState)
+      )
       state <- exporter.exportLSUState(task.work.announcement.upgradeTime)
       _ = logger.info("Initializing sequencer and mediators from the data of the old nodes")
       _ <- newMediatorInitializer.initializeFromDump(state.nodeIdentities.mediator)
@@ -209,7 +220,7 @@ class LogicalSynchronizerUpgradeTrigger(
             connection = successorConnection,
           )
         _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
-          localSynchronizerNodes,
+          localSynchronizerNodes.some,
           psid.logical,
           OnboardedImmediately,
         )

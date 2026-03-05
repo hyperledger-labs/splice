@@ -23,7 +23,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerEnabledSynchronization,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SequencerConfig
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SynchronizerNodeService,
+}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
@@ -36,7 +39,7 @@ class LocalSequencerConnectionsTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     decentralizedSynchronizerAlias: SynchronizerAlias,
     store: SvDsoStore,
-    localSynchronizerNode: LocalSynchronizerNode,
+    synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     sequencerRequestAmplification: SubmissionRequestAmplification,
     migrationId: Long,
     newSequencerConnectionPool: Boolean,
@@ -51,6 +54,7 @@ class LocalSequencerConnectionsTrigger(
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
+      localSynchronizerNode <- synchronizerNodeService.activeSynchronizerNode()
       sequencerPSId <- localSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
       participantConnectedPSId <- participantAdminConnection.getPhysicalSynchronizerId(
         decentralizedSynchronizerAlias
@@ -116,8 +120,8 @@ class LocalSequencerConnectionsTrigger(
             )
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
-            PositiveInt.tryCreate(1),
             // We only have a single connection here.
+            PositiveInt.tryCreate(1),
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
             // TODO(#2666) Make the delays configurable.
