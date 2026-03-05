@@ -33,7 +33,7 @@ import Splice.Amulet
 import Splice.Amulet.TokenApiUtils (burnedMetaKey)
 
 import Splice.Testing.Apps.TradingApp hiding (require)
-import Splice.Testing.Utils
+import Splice.Testing.UtilsV2
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
