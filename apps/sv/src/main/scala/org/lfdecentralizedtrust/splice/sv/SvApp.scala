@@ -292,6 +292,7 @@ class SvApp(
         localSynchronizerNodes,
         participantAdminConnection,
         config.domains.global.alias,
+        config.parameters.spliceCachingConfigs.physicalSynchronizerExpiration,
         loggerFactory,
       )
 
