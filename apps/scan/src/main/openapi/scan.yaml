@@ -3868,14 +3868,14 @@ components:
         Traffic summary data from the sequencer for a given event.
       required:
         - total_traffic_cost
-        - envelope_traffic_costs
+        - envelope_traffic_summaries
       properties:
         total_traffic_cost:
           description: |
             Total traffic cost of the message paid by the sender.
           type: integer
           format: int64
-        envelope_traffic_costs:
+        envelope_traffic_summaries:
           description: |
             Per-envelope traffic cost breakdown.
           type: array

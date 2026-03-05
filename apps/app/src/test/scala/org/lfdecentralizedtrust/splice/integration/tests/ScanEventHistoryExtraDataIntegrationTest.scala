@@ -57,8 +57,8 @@ class ScanEventHistoryExtraDataIntegrationTest
       eventsWithTrafficSummary.foreach { item =>
         item.trafficSummary.foreach { summary =>
           summary.totalTrafficCost should be > 0L
-          summary.envelopeTrafficCosts should not be empty
-          summary.envelopeTrafficCosts.foreach { env =>
+          summary.envelopeTrafficSummaries should not be empty
+          summary.envelopeTrafficSummaries.foreach { env =>
             env.trafficCost should be > 0L
           }
         }
