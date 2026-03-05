@@ -515,7 +515,7 @@ object ScanHttpEncodings {
     }.toVector
     definitions.EventHistoryTrafficSummary(
       totalTrafficCost = summary.totalTrafficCost,
-      envelopeTrafficCosts = envelopes,
+      envelopeTrafficSummaries = envelopes,
     )
   }
 

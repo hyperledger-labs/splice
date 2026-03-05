@@ -611,13 +611,13 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     val encoded = ScanHttpEncodings.encodeTrafficSummary(summary)
 
     encoded.totalTrafficCost shouldBe 500L
-    encoded.envelopeTrafficCosts.size shouldBe 2
+    encoded.envelopeTrafficSummaries.size shouldBe 2
 
-    encoded.envelopeTrafficCosts(0).trafficCost shouldBe 300L
-    encoded.envelopeTrafficCosts(0).viewIds shouldBe Vector(0, 2)
+    encoded.envelopeTrafficSummaries(0).trafficCost shouldBe 300L
+    encoded.envelopeTrafficSummaries(0).viewIds shouldBe Vector(0, 2)
 
-    encoded.envelopeTrafficCosts(1).trafficCost shouldBe 200L
-    encoded.envelopeTrafficCosts(1).viewIds shouldBe Vector(1)
+    encoded.envelopeTrafficSummaries(1).trafficCost shouldBe 200L
+    encoded.envelopeTrafficSummaries(1).viewIds shouldBe Vector(1)
   }
 
   "encode traffic summary with empty envelopes" in {
@@ -630,6 +630,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     val encoded = ScanHttpEncodings.encodeTrafficSummary(summary)
 
     encoded.totalTrafficCost shouldBe 0L
-    encoded.envelopeTrafficCosts shouldBe empty
+    encoded.envelopeTrafficSummaries shouldBe empty
   }
 }
