@@ -1113,7 +1113,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     inside(sv1ScanLocalBackend.listDsoSequencers()) {
                       case Seq(DomainSequencers(synchronizerId, sequencers)) =>
                         synchronizerId shouldBe decentralizedSynchronizerId
-                        sequencers.map { sequencer =>
+                        val migrationSeqeuncers = sequencers.filter(_.serial.isEmpty)
+                        migrationSeqeuncers.map { sequencer =>
                           (sequencer.migrationId, sequencer.url)
                         }.toSet shouldBe Set(
                           (1L, getPublicSequencerUrl(sv1LocalBackend)),
