@@ -1351,10 +1351,11 @@ function subcmd_ts2_create_base() {
   simple_rename '(?<![Mm]etadata-)(?<![Mm]etadata/)(?<![Mm]etadata)(?<! )v1///v2' "-i 'token-standard/*-v2/*'"
   simple_rename '(?<![Mm]etadata-)(?<![Mm]etadata/)(?<![Mm]etadata)(?<! )V1///V2' "-i 'token-standard/*-v2/*'"
 
-  simple_rename 'AmuletRegistry(?!V2)///AmuletRegistryV2' "-i 'token-standard/*-v2/*'"
-  simple_rename 'RegistryApi(?!V2)///RegistryApiV2' "-i 'token-standard/*-v2/*'"
-  simple_rename 'WalletClient(?!V2)///WalletClientV2' "-i 'token-standard/*-v2/*'"
-  simple_rename '(?<!TokenApi)Utils(?!V2)///UtilsV2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<=[./])AmuletRegistry(?!V2)///AmuletRegistryV2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<=[./])RegistryApi(?!V2)///RegistryApiV2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<=[./])WalletClient(?!V2)///WalletClientV2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<!TokenApi)(?<=[./])Utils(?!V2)///UtilsV2' "-i 'token-standard/*-v2/*'"
+  simple_rename '(?<=[./])TradingApp(?!V2)///TradingAppV2' "-i 'token-standard/*-v2/*'"
 
 }
 
