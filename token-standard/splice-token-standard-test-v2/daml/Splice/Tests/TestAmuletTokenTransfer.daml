@@ -24,7 +24,7 @@ import Splice.Amulet (AppRewardCoupon(..), FeaturedAppActivityMarker(..))
 import Splice.Amulet.TokenApiUtils (createdInRoundMetaKey, ratePerRoundMetaKey, burnedMetaKey)
 
 import Splice.Testing.Utils
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
 
@@ -33,7 +33,7 @@ import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
 --------------------
 
 data TestSetup = TestSetup with
-  registry : AmuletRegistry.AmuletRegistry
+  registry : AmuletRegistry.AmuletRegistryV2
   alice : Party
   aliceValidator : Party
   bob : Party

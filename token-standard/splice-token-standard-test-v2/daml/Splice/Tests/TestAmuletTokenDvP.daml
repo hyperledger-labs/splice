@@ -34,7 +34,7 @@ import Splice.Amulet.TokenApiUtils (burnedMetaKey)
 
 import Splice.Testing.Apps.TradingApp hiding (require)
 import Splice.Testing.Utils
-import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
 
@@ -46,7 +46,7 @@ data AllocatedOTCTrade = AllocatedOTCTrade
     providerBeneficiary1 : Party
     providerBeneficiary2 : Party
     providerBeneficiaries : [(Party, Decimal)]
-    registry : AmuletRegistry.AmuletRegistry
+    registry : AmuletRegistry.AmuletRegistryV2
     otcTradeCid : ContractId OTCTrade
     otcTrade : OTCTrade
     amuletId : InstrumentId
