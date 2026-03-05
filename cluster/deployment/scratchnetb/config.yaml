@@ -1,6 +1,1 @@
-!include(../../configs/shared/scratchnet.yaml)
-svs:
-  default:
-    logging:
-      appsLogLevel: INFO
-      cantonLogLevel: INFO
+!include(../../configs/shared/scratchnet.yaml) {}
