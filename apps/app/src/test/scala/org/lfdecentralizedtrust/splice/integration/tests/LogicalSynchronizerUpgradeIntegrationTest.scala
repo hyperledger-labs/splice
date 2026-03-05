@@ -4,7 +4,7 @@ import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
@@ -17,18 +17,18 @@ import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.lfdecentralizedtrust.splice.sv.config.{
   ScheduledLsuConfig,
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
@@ -134,9 +134,15 @@ class LogicalSynchronizerUpgradeIntegrationTest
         inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(synchronizerId, sequencers)) =>
             synchronizerId shouldBe decentralizedSynchronizerId
-            sequencers should have size 4
+            sequencers should have size 8
             sequencers.foreach { sequencer =>
-              sequencer.migrationId shouldBe 0
+              sequencer.serial match {
+                case Some(serial) =>
+                  serial shouldBe 0
+                  sequencer.migrationId shouldBe -1
+                case None =>
+                  sequencer.migrationId shouldBe 0
+              }
             }
         }
       }
@@ -331,6 +337,33 @@ class LogicalSynchronizerUpgradeIntegrationTest
         eventually() {
           Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
             scan.getActivePhysicalSynchronizerSerial() shouldBe NonNegativeInt.one
+          }
+        }
+      }
+
+      clue("LSU sequencers are registered") {
+        eventually() {
+          inside(sv1ScanBackend.listDsoSequencers()) {
+            case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+              synchronizerId shouldBe decentralizedSynchronizerId
+              sequencers should have size 12
+              sequencers.groupBy(_.svName).foreach { case (sv, sequencers) =>
+                clue(s"check sequencers for $sv") {
+                  sequencers.size shouldBe 3
+                  forExactly(1, sequencers) { sequencer =>
+                    sequencer.serial.value shouldBe 0
+                    sequencer.migrationId shouldBe -1
+                  }
+                  forExactly(1, sequencers) { sequencer =>
+                    sequencer.serial.value shouldBe 1
+                    sequencer.migrationId shouldBe -1
+                  }
+                  forExactly(1, sequencers) { sequencer =>
+                    sequencer.serial should be(empty)
+                    sequencer.migrationId shouldBe 0
+                  }
+                }
+              }
           }
         }
       }

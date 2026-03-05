@@ -374,9 +374,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+            val migrationSequencers = sequencers.filter(_.serial.isEmpty)
             synchronizerId shouldBe decentralizedSynchronizerId
-            sequencers should have size 4
-            sequencers.foreach { sequencer =>
+            migrationSequencers should have size 4
+            migrationSequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
             }
         }

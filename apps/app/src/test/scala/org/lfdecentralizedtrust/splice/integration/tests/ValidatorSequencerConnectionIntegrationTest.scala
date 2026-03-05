@@ -77,11 +77,11 @@ class ValidatorSequencerConnectionIntegrationTest
       // her validator app will crash on startup to prevent operating with insufficient trust.
       withClue("Wait for all 4 SV sequencers to be available and valid in Scan") {
         eventually(60.seconds, 1.second) {
-          val allDomains = sv1ScanBackend.listDsoSequencers()
+          val allSequencers = sv1ScanBackend.listDsoSequencers()
           val now = env.environment.clock.now
           val availableSequencers = for {
-            domain <- allDomains
-            sequencer <- domain.sequencers
+            domain <- allSequencers
+            sequencer <- domain.sequencers.filter(_.serial.isDefined)
             if sequencer.url.nonEmpty && !now.toInstant.isBefore(sequencer.availableAfter)
           } yield sequencer
           availableSequencers.size shouldBe 4
