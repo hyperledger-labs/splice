@@ -39,18 +39,6 @@
         were incorrectly retuning LedgerEffects events (i.e., ``CreatedEvent`` and ``ExercisedEvent``). They are now corrected to return
         AcsDelta (flat) events (i.e., ``CreatedEvent`` and ``ArchivedEvent``).
 
-      - Corrected the OpenAPI and AsyncAPI specification files to properly reflect field requirements as defined in the Ledger API `.proto` files.
-        Additionally, specification files now include the Canton version in their filenames (e.g., `openapi-3.4.11.yaml`).
-        If you regenerate client code from these updated specifications, your code may require changes due to corrected field optionality. You have two options:
-            - **Keep using the old specification** - The JSON API server maintains backward compatibility with previous specification versions.
-            - **Upgrade to the new specification** - Update your client code to handle the corrected optional/required fields:
-                - **Java (OpenAPI Generator)**: Code compiles without changes, but static analysis tools may flag nullability differences.
-                - **TypeScript**: Handle optional fields using `!` or `??` operators as needed.
-        The JSON API server remains compatible with specification files from all 3.4.x versions (e.g., 3.4.9).
-
-      - `GetUpdatesRequest.updateFormat` now appears marked as required in the OpenAPI/AsyncAPI specs even though it was previously optional.
-        This is a specification fix to align with the actual behavior of the API, which requires this field.
-        If your client code was previously omitting this field, you will need to update it to include a valid value.
 
   - Sequencer
 
