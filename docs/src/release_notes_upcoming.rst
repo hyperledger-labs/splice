@@ -25,6 +25,12 @@
        in this case the main (asymmetric) encryption keys are usually already available in memory (in addition to being stored inside the participant database).
        We encourage operators of KMS-enabled participants to review the updated sections on KMS usage for :ref:`validator participants <validator-kms-config>` and :ref:`SV participants <sv-kms-participant>` for more pointers about the security impact of session key caching and ways to tweak the relevant parameters to individual needs.
 
+   - SV app
+
+     - Improve the automation for converting featured app activity
+       markers to handle batches of markers for nodes that have not
+       vetted the same version of the amulet package.
+
    - Scan
 
      - **Experimental**: Added an optional ``traffic_summary`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
