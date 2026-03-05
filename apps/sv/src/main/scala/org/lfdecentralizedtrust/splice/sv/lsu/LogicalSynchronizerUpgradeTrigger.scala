@@ -149,6 +149,9 @@ class LogicalSynchronizerUpgradeTrigger(
       _ <- successorSynchronizerNode.cometbftNode.traverse(
         _.rotateGenesisGovernanceKeyForSV1(owningNodeSvName)
       )
+      _ <- successorSynchronizerNode.cometbftNode.traverse(
+        _.reconcileNetworkConfig(owningNodeSvName, rulesAndState)
+      )
       state <- exporter.exportLSUState(task.work.announcement.upgradeTime)
       _ = logger.info("Initializing sequencer and mediators from the data of the old nodes")
       _ <- newMediatorInitializer.initializeFromDump(state.nodeIdentities.mediator)
