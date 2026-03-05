@@ -63,7 +63,7 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new ExpiredAmuletTrigger(config, triggerContext, svTaskContext))
     registerTrigger(new ExpiredLockedAmuletTrigger(config, triggerContext, svTaskContext))
     registerTrigger(
-      new ExpiredAmuletTransferInstructionTrigger(config, triggerContext, svTaskContext)
+      new ExpiredAmuletTransferInstructionTrigger(config, clock, triggerContext, svTaskContext)
     )
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))

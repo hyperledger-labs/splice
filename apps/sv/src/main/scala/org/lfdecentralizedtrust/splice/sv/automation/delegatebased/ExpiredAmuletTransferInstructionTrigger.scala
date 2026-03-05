@@ -12,16 +12,17 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredAmuletTransferInstructionTrigger.*
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import com.digitalasset.canton.time.Clock
 
 import scala.jdk.CollectionConverters.*
 
 class ExpiredAmuletTransferInstructionTrigger(
     svConfig: SvAppBackendConfig,
+    clock: Clock,
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
@@ -35,7 +36,7 @@ class ExpiredAmuletTransferInstructionTrigger(
       svTaskContext.dsoStore.multiDomainAcsStore,
       svConfig.delegatelessAutomationExpiredAmuletTransferInstructionBatchSize,
       svTaskContext.dsoStore
-        .listExpiredAmuletTransferInstructions(context.config.ignoredExpiredAmuletPartyIds),
+        .listExpiredAmuletTransferInstructions(context.config.ignoredExpiredAmuletTransferInstructionPartyIds),
       splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
@@ -57,14 +58,14 @@ class ExpiredAmuletTransferInstructionTrigger(
 
           svTaskContext.packageVersionSupport
             .isPackageSupported(
-              Seq(PackageIdResolver.Package.SpliceAmulet -> Seq(sender, receiver)),
-              CantonTimestamp.now(),
+              Seq(PackageIdResolver.Package.SpliceAmulet -> Seq(sender, receiver, store.key.dsoParty)),
+              clock.now,
               DarResources.amulet_current.metadata,
             )
             .map(_.supported)
             .flatMap { areVetted =>
               if (!areVetted) {
-                logger.debug(
+                logger.info(
                   s"Skipping expiry of transfer instruction ${contract.contractId} because sender $sender or receiver $receiver have not vetted the required Amulet package."
                 )
                 Future.successful(None)

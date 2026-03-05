@@ -929,7 +929,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       trackingId = "tracking-id-2"
     )
 
-    aliceWalletClient.listTokenStandardTransfers()  should have length 2
     aliceWalletClient.list().lockedAmulets should have length 2
 
     advanceTime(Duration.ofMinutes(10))
@@ -962,6 +961,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       "One lock is gone",
       _ => aliceWalletClient.list().lockedAmulets should have length 1
     )
+
+    aliceWalletClient.listTokenStandardTransfers()  should have length 2
 
     sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTransferInstructionTrigger].resume()
 
