@@ -73,14 +73,12 @@ class ScanEventHistoryExtraDataIntegrationTest
     }
 
     withClue("Traffic summary should also be present via getEventById") {
-      eventsWithTrafficSummary should not be empty
-
       Seq(eventsWithTrafficSummary.head, eventsWithTrafficSummary.last).distinct.foreach { item =>
         item.verdict.foreach { verdict =>
           val eventById = sv1ScanBackend
             .getEventById(verdict.updateId, Some(CompactJson))
             .getOrElse(fail(s"Expected event for update id ${verdict.updateId}"))
-          eventById.trafficSummary shouldBe defined
+          eventById.trafficSummary shouldBe item.trafficSummary
         }
       }
     }
