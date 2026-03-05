@@ -353,6 +353,9 @@ spec:
         - containerPort: 5003
           name: val-http
           protocol: TCP
+        - containerPort: 10013
+          name: metrics-api
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /api/validator/livez
