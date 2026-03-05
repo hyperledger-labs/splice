@@ -111,7 +111,7 @@ def create_branch_and_push():
     username = config_reader.get_value("user", "name")
     msg = f"""[static] release notes for {new_version}
 
-    Signed-off-by: {username} <{email}>
+Signed-off-by: {username} <{email}>
 """
     repo.index.commit(msg, skip_hooks=True)
     origin = repo.remote(name='origin')

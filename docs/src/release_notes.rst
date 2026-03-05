@@ -18,6 +18,8 @@
 
 .. _release_notes:
 
+.. release-notes:: ORIOL-TEST2
+
 .. release-notes:: ORIOL-TEST
 
 .. release-notes:: 0.5.14
