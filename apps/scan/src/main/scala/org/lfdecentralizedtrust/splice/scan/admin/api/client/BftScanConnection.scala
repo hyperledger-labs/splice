@@ -971,7 +971,7 @@ object BftScanConnection {
           (scan.svName, scan.publicUrl.toString)
         )
 
-        _ <- scanUrlsChangedCallback(dsoScanSeq)
+        _ = scanUrlsChangedCallback(dsoScanSeq)
 
         newState <- computeNewState(retriedCurrentState, filteredScans)
       } yield {
