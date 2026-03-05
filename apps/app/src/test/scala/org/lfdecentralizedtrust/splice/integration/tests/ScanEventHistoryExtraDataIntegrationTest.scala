@@ -8,8 +8,6 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-
 class ScanEventHistoryExtraDataIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
@@ -23,9 +21,6 @@ class ScanEventHistoryExtraDataIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
           scanConfig.copy(
-            mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
-              restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            ),
             sequencerTrafficIngestion = SequencerTrafficIngestionConfig(enabled = true),
             serveTrafficSummaries = true,
           )
