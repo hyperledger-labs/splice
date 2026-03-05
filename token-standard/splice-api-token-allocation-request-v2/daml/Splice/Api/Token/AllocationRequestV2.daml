@@ -4,12 +4,12 @@
 -- | This module defines the interface for an `AllocationRequest`, which is an interface that can
 -- be implemented by an app to request specific allocations from their users
 -- for the purpose of settling a DvP or a payment as part of an app's workflow.
-module Splice.Api.Token.AllocationRequestV1 where
+module Splice.Api.Token.AllocationRequestV2 where
 
 import DA.TextMap (TextMap)
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.AllocationV2
 
 -- | A request by an app for allocations to be created to enable the execution of a settlement.
 --

@@ -2,12 +2,12 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Instruct transfers of holdings between parties.
-module Splice.Api.Token.TransferInstructionV1 where
+module Splice.Api.Token.TransferInstructionV2 where
 
 import qualified DA.Map as Map
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2
 
 -- | A specification of a transfer of holdings between two parties.
 data Transfer = Transfer with
