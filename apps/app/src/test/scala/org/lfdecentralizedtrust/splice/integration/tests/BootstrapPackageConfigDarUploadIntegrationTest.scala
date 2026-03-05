@@ -148,25 +148,31 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       packageResource: PackageResource,
       requiredVersion: String,
   ): Unit = {
-    withClue(
-      s"dars for package ${packageResource.latest.metadata.name} should be up to $requiredVersion"
+    val dars =
+      uploadedDars.filter { case (name, _) =>
+        name == packageResource.latest.metadata.name
+      }
+    clue(
+      s"versions for package ${packageResource.latest.metadata.name} should be up to $requiredVersion"
     ) {
-      val dars =
-        uploadedDars.filter { case (name, _) =>
-          name == packageResource.latest.metadata.name
-        }
       dars should not be empty withClue s"dars for ${packageResource.latest.metadata.name}"
       dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
-      clue("versions older than minimumInitialization should not be vetted") {
-        dars.map(_._2) shouldBe DarResources
-          .getRequiredPackageVersions(
-            packageResource.latest.metadata.name,
-            PackageVersion.assertFromString(requiredVersion),
-          )
-          .map(_.metadata.version)
-        dars.map(_._2) should contain noElementsOf DarResources.packageResources.view.flatMap { p =>
-          p.all.filter(pkg => pkg.metadata.version < p.minimumInitialization.metadata.version)
-        }
+    }
+    clue(
+      s"versions for package ${packageResource.latest.metadata.name} should strictly contain the required ones"
+    ) {
+      dars.map(_._2) shouldBe DarResources
+        .getRequiredPackageVersions(
+          packageResource.latest.metadata.name,
+          PackageVersion.assertFromString(requiredVersion),
+        )
+        .map(_.metadata.version)
+    }
+    clue(
+      s"versions older than minimumInitialization for package ${packageResource.latest.metadata.name} should not be vetted"
+    ) {
+      dars.map(_._2) should contain noElementsOf DarResources.packageResources.view.flatMap { p =>
+        p.all.filter(pkg => pkg.metadata.version < p.minimumInitialization.metadata.version)
       }
     }
   }

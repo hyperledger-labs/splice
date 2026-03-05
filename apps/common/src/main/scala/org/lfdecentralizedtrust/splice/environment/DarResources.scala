@@ -6615,15 +6615,17 @@ object DarResources {
   def getRequiredPackageVersions(
       name: PackageName,
       upToRequiredVersion: PackageVersion,
+      latestPackagesOnly: Boolean = false,
   ): Seq[DarResource] = {
     val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
     packageResources.view
       .flatMap(_.all)
       .toSeq
       .filter(_.metadata.name == name)
-      .filter(pkg =>
-        minimumInitializationVersion <= pkg.metadata.version && pkg.metadata.version <= upToRequiredVersion
-      )
+      .filter(pkg => {
+        val version = pkg.metadata.version
+        (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
+      })
       .distinct
   }
 

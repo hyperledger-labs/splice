@@ -610,24 +610,19 @@ class SV1Initializer(
     }
   }
 
-  // MODIFY
   private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
-    def darsUpToInitialConfig(packageResource: PackageResource, required: String) = {
-      packageResource.all
-        .filter { darResource =>
-          val requiredVersionMin = packageResource.minimumInitialization.metadata.version
-          val requiredVersionMax = PackageVersion.assertFromString(required)
-          darResource.metadata.version == requiredVersionMax || !config.latestPackagesOnly && (requiredVersionMin <= darResource.metadata.version && darResource.metadata.version < requiredVersionMax)
-        }
-        .map(UploadablePackage.fromResource)
-    }
-
     Seq(
       DarResources.amulet -> initialPackageConfig.amuletVersion,
       DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
       DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
-    ).flatMap { case (packageResource, required) =>
-      darsUpToInitialConfig(packageResource, required)
+    ).flatMap { case (packageResource, requiredVersion) =>
+      DarResources
+        .getRequiredPackageVersions(
+          packageResource.latest.metadata.name,
+          PackageVersion.assertFromString(requiredVersion),
+          config.latestPackagesOnly,
+        )
+        .map(UploadablePackage.fromResource)
     }
   }
 
