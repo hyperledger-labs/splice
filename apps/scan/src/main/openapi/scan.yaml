@@ -3741,6 +3741,8 @@ components:
         traffic_summary:
           description: |
             **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
+
+            This is our current best guess for how the summaries are served, but there remains a chance that the API needs to be adjusted.
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
           nullable: true
     EventHistoryVerdict:
@@ -3865,19 +3867,19 @@ components:
     EventHistoryTrafficSummary:
       type: object
       description: |
-        Traffic summary data from the sequencer for a given event.
+        Traffic summary data from the sequencer for the confirmation request corresponding to an event.
       required:
         - total_traffic_cost
         - envelope_traffic_summaries
       properties:
         total_traffic_cost:
           description: |
-            Total traffic cost of the message paid by the sender.
+            Total traffic cost of the confirmation request paid by the validator node that submitted it.
           type: integer
           format: int64
         envelope_traffic_summaries:
           description: |
-            Per-envelope traffic cost breakdown.
+            Summary of traffic-related data for all envelopes in the confirmation request.
           type: array
           items:
             $ref: "#/components/schemas/EnvelopeTrafficCost"
