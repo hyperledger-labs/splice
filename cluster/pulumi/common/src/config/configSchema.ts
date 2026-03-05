@@ -31,7 +31,7 @@ export const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
-const SingleResourceSchema = z
+export const SingleResourceSchema = z
   .object({
     memory: z.string().optional(),
     cpu: z.string().optional(),

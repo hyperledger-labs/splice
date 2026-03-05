@@ -14,6 +14,24 @@ jest.mock('./config', () => ({
     githubRepo: 'https://dummy-gh-repo.com',
     runnerVersion: '1.2',
     runnerHookVersion: '1.1',
+    runnerScaleSetVersion: '1.1',
+    runnerSpecs: [
+      {
+        name: 'dummy',
+        k8s: false,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '0.5',
+            memory: '512Mi',
+          },
+          limits: {
+            cpu: '0.5',
+            memory: '512Mi',
+          },
+        },
+      },
+    ],
   },
 }));
 jest.mock('@lfdecentralizedtrust/splice-pulumi-common', () => ({

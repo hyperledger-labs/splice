@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
+  S3BucketConnection,
   TimestampWithMigrationId,
   UpdateHistory,
 }
@@ -75,11 +76,15 @@ class AcsSnapshotBulkStorage(
     */
   private def mksrc(): Source[TimestampWithMigrationId, Cancellable] = {
 
-    // Wait for history backfilling to complete before starting bulk storage dumps
+    // Wait for update history to initialize and for history backfilling to complete before starting bulk storage dumps
     val backfillingCompleteGate =
       Source
         .tick(0.seconds, appConfig.snapshotPollingInterval.underlying, ())
-        .mapAsync(1)(_ => updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId))
+        .mapAsync(1)(_ =>
+          if (updateHistory.isReady)
+            updateHistory.isHistoryBackfilled(acsSnapshotStore.currentMigrationId)
+          else Future.successful(false)
+        )
         .filter(identity)
         .take(1)
 

@@ -19,7 +19,6 @@ import {
   RouterProvider,
   createBrowserRouter,
   createRoutesFromElements,
-  useLocation,
   useNavigate,
 } from 'react-router';
 
@@ -29,7 +28,6 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from './contexts/SvAppVotesHooksContext';
-import { betaTheme } from './beta-theme';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
 import Dso from './routes/dso';
@@ -75,21 +73,6 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
-const ConditionalThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const location = useLocation();
-  const isNewGovernancePath =
-    location.pathname === '/governance' || location.pathname.startsWith('/governance/');
-
-  const currentTheme = isNewGovernancePath ? betaTheme : theme;
-
-  return (
-    <ThemeProvider theme={currentTheme}>
-      <CssBaseline />
-      {children}
-    </ThemeProvider>
-  );
-};
-
 const App: React.FC = () => {
   const config = useSvConfig();
   const router = createBrowserRouter(
@@ -98,9 +81,10 @@ const App: React.FC = () => {
         errorElement={<ErrorRouterPage />}
         element={
           <Providers>
-            <ConditionalThemeProvider>
+            <ThemeProvider theme={theme}>
+              <CssBaseline />
               <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
-            </ConditionalThemeProvider>
+            </ThemeProvider>
           </Providers>
         }
       >
