@@ -80,7 +80,7 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
                   -totalCostCc - smallAmount,
                   -totalCostCc,
                 )
-                logEntry.receivers shouldBe empty
+                logEntry.receivers shouldBe empty withClue "receivers"
               },
               { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
@@ -115,7 +115,7 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
                   -totalCostCc - smallAmount,
                   -totalCostCc,
                 )
-                logEntry.receivers shouldBe empty
+                logEntry.receivers shouldBe empty withClue "receivers"
               },
               { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto

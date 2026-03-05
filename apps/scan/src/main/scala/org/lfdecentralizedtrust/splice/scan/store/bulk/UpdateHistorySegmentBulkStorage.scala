@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   HistoryMetrics,
+  S3BucketConnection,
   TimestampWithMigrationId,
   TreeUpdateWithMigrationId,
   UpdateHistory,

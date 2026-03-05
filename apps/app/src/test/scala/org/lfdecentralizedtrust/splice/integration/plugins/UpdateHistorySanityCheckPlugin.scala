@@ -1,7 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.plugins
 
 import cats.data.Chain
-import com.daml.ledger.javaapi.data.Identifier
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
@@ -12,7 +11,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2.m
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
-import org.lfdecentralizedtrust.splice.util.{QualifiedName, TriggerTestUtil}
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
 import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -26,23 +25,12 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Span}
 
-import java.io.File
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.concurrent.duration.*
-import scala.sys.process.ProcessLogger
-import scala.util.Try
-import scala.util.control.NonFatal
 
-/** Runs `scripts/scan-txlog/scan_txlog.py`, to make sure that we have no transactions that would break it.
-  *
-  * @param ignoredRootCreates some tests create contracts directly via ledger_api_extensions.commands.
-  *                            This is a list of TemplateIds that are created in such a way,
-  *                            which won't cause an error in the script.
+/** Compares the update history and ACS snapshots between the SVs
   */
 class UpdateHistorySanityCheckPlugin(
-    ignoredRootCreates: Seq[Identifier],
-    ignoredRootExercises: Seq[(Identifier, String)],
     skipAcsSnapshotChecks: Boolean,
     protected val loggerFactory: SuppressingLogger,
 ) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
@@ -100,12 +88,6 @@ class UpdateHistorySanityCheckPlugin(
             if (!skipAcsSnapshotChecks) {
               compareSnapshots(founder, scansInDsoRules)
             }
-            initializedScans.foreach(checkScanTxLogScript)
-          } else {
-            // Just call the /updates endpoint, make sure whatever happened in the test doesn't blow it up,
-            // and that pagination works as intended.
-            // Without backfilling, history only works on the founding SV
-            initializedScans.filter(_.config.isFirstSv).foreach(checkScanTxLogScript)
           }
         }
     }
@@ -169,80 +151,6 @@ class UpdateHistorySanityCheckPlugin(
             }
           different should be(empty)
         }
-      }
-    }
-  }
-
-  private def checkScanTxLogScript(scan: ScanAppBackendReference)(implicit tc: TraceContext) = {
-    val snapshotRecordTime = scan.forceAcsSnapshotNow()
-    val amuletRules = scan.getAmuletRules()
-    val amuletIncludesFees: Boolean =
-      amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet
-        .split("\\.")
-        .toList match {
-        case major :: minor :: patch :: _ =>
-          major.toInt == 0 && minor.toInt == 1 && patch.toInt <= 13
-        case _ =>
-          throw new IllegalArgumentException(
-            s"Amulet package version is ${amuletRules.contract.payload.configSchedule.initialValue.packageConfig.amulet}, which is not x.y.z"
-          )
-      }
-    // some tests have temporary participants, so the request won't always manage to resolve package support
-    val compareBalancesWithTotalSupply = loggerFactory.suppressWarningsAndErrors(
-      Try(scan.lookupInstrument("Amulet")).toOption.flatten.flatMap(_.totalSupply).isDefined
-    )
-
-    val readLines = mutable.Buffer[String]()
-    val errorProcessor = ProcessLogger(line => readLines.append(line))
-    val csvTempFile = File.createTempFile("scan_txlog", ".csv")
-    // The script fails if the file already exists so delete it here.
-    csvTempFile.delete()
-    try {
-      scala.sys.process
-        .Process(
-          Seq(
-            "python",
-            "scripts/scan-txlog/scan_txlog.py",
-            scan.httpClientConfig.url.toString(),
-            "--loglevel",
-            "DEBUG",
-            "--report-output",
-            csvTempFile.toString,
-            "--stop-at-record-time",
-            snapshotRecordTime.toInstant.toString,
-            "--compare-acs-with-snapshot",
-            snapshotRecordTime.toInstant.toString,
-          ) ++ Option
-            .when(compareBalancesWithTotalSupply && !amuletIncludesFees)(
-              "--compare-balances-with-total-supply"
-            )
-            .toList ++ ignoredRootCreates.flatMap { templateId =>
-            Seq("--ignore-root-create", QualifiedName(templateId).toString)
-          } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
-            Seq("--ignore-root-exercise", s"${QualifiedName(templateId).toString}:$choice")
-          }
-        )
-        .!(errorProcessor)
-    } catch {
-      case NonFatal(ex) =>
-        logger.error("Failed to run scan_txlog.py. Dumping output.", ex)
-        readLines.foreach(logger.error(_))
-        throw new RuntimeException("scan_txlog.py failed.", ex)
-    }
-
-    withClue(readLines) {
-      val lines = readLines.filter { log =>
-        log.contains("ERROR:") || log.contains("WARNING:")
-      }
-      if (lines.nonEmpty) {
-        val message = s"${this.getClass} contains errors: $lines, exiting test."
-        logger.error(message)
-        System.err.println(message)
-        sys.exit(1)
-      }
-      lines should be(empty)
-      forExactly(1, readLines) { line =>
-        line should include("Reached end of stream")
       }
     }
   }

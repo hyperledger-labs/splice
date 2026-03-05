@@ -34,7 +34,11 @@ import org.lfdecentralizedtrust.splice.config.{
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
+import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
+  DarResources,
+  PackageVettingLookupService,
+}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
@@ -331,6 +335,7 @@ case class SvAppBackendConfig(
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
+    delegatelessAutomationExpiredRewardCouponNumBatches: Int = 20,
     // What batch size to target for converting app activity markers
     delegatelessAutomationFeaturedAppActivityMarkerBatchSize: Int = 100,
     // how long to wait before forcing a conversion even though the batch size is not full
@@ -372,6 +377,8 @@ case class SvAppBackendConfig(
     convertFeaturedAppActivityMarkerObservers: Boolean = true,
     // Whether to ensure that heuristic free confirmation responses get enabled on the synchronizer via the ReconcileDynamicSynchronizerConfigTrigger.
     enableFreeConfirmationResponses: Boolean = true,
+    packageVettingCache: PackageVettingLookupService.CacheConfig =
+      PackageVettingLookupService.CacheConfig(),
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization: Boolean =

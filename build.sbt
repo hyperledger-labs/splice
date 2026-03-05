@@ -88,6 +88,7 @@ lazy val root: Project = (project in file("."))
     `apps-sv`,
     `apps-app`,
     `apps-metrics-docs`,
+    `apps-dar-resources-generator`,
     `apps-wallet`,
     `apps-frontends`,
     `splice-util-daml`,
@@ -943,6 +944,9 @@ lazy val `apps-common` =
         pekko_spray_json,
         Dependencies.parallel_collections,
         pekko_connectors_google_cloud_storage,
+        zstd,
+        aws_s3,
+        s3mock_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
@@ -1088,9 +1092,6 @@ lazy val `apps-scan` =
         pekko_http_cors,
         scalapb_runtime_grpc,
         scalapb_runtime,
-        zstd,
-        aws_s3,
-        s3mock_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -1938,6 +1939,40 @@ lazy val `apps-metrics-docs` =
       Headers.ApacheDAHeaderSettings,
     )
 
+lazy val `apps-dar-resources-generator` =
+  project
+    .in(file("apps/dar-resources-generator"))
+    .dependsOn(
+      `canton-util-external`,
+      // We include all DARs here to make sure they are available as resources.
+      `splice-amulet-daml`,
+      `splice-amulet-name-service-daml`,
+      `splitwell-daml`,
+      `splice-dso-governance-daml`,
+      `splice-validator-lifecycle-daml`,
+      `splice-wallet-daml`,
+      `splice-wallet-payments-daml`,
+      `splice-api-token-metadata-v1-daml`,
+      `splice-api-token-holding-v1-daml`,
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `splice-api-token-allocation-v1-daml`,
+      `splice-api-token-allocation-request-v1-daml`,
+      `splice-api-token-allocation-instruction-v1-daml`,
+      `splice-token-test-dummy-holding-daml`,
+      `splice-token-test-trading-app-daml`,
+      `splice-featured-app-api-v1-daml`,
+      `splice-featured-app-api-v2-daml`,
+      `splice-util-batched-markers-daml`,
+    )
+    .settings(
+      Headers.ApacheDAHeaderSettings,
+      libraryDependencies ++= Seq(
+        Dependencies.better_files,
+        Dependencies.daml_lf_archive_reader,
+        CantonDependencies.cats,
+      ),
+    )
+
 lazy val `apps-app`: Project =
   project
     .in(file("apps/app"))
@@ -2056,11 +2091,10 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
-  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
-  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
-  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
-  def isLocalNetTest(name: String): Boolean =
+  def isWithDockerWithoutCantonTest(name: String): Boolean =
     name.contains("LocalNet") || name.contains("BulkStorageTest")
+  def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
+    name contains "ScanTimeBasedIntegrationTest"
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
@@ -2093,9 +2127,9 @@ updateTestConfigForParallelRuns := {
       (t: String) => isManualSignatureIntegrationTest(t),
     ),
     (
-      "tests for localnet",
-      "test-full-class-names-local-net-based.log",
-      (t: String) => isLocalNetTest(t),
+      "tests with docker, without canton",
+      "test-full-class-names-docker-no-canton.log",
+      (t: String) => isWithDockerWithoutCantonTest(t),
     ),
     (
       "Unit tests",
@@ -2206,6 +2240,11 @@ updateTestConfigForParallelRuns := {
       "tests to check dynamic synchronizer parameter reconciliation",
       "test-full-class-names-dynamic-synchronizer-params-reconciliation.log",
       (t: String) => isDynamicSynchronizerParamsReconciliationTest(t),
+    ),
+    (
+      "tests with simulated time and docker",
+      "test-full-class-names-sim-time-docker.log",
+      (t: String) => isWithDockerWithSimtimeCantonTest(t),
     ),
     (
       "tests with simulated time",

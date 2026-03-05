@@ -83,7 +83,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "Alice sees no transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 0
+            txs should have size 0 withClue "txs"
           },
         )
 
@@ -127,7 +127,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "Alice sees the transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 6
+            txs should have size 6 withClue "txs"
             txs
           },
         )
@@ -187,7 +187,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         txs
           .map(row => {
             val updateId = readTransactionFromRow(row).updateId
-            updateId should not be empty
+            updateId should not be empty withClue "updateId"
             updateId
           })
           // remove the balance change tx for scan comparison
@@ -269,7 +269,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         )(
           "Alice sees no transactions",
           _ => {
-            txRows should have size 0
+            txRows should have size 0 withClue "txs"
           },
         )
 
@@ -456,7 +456,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         "The coupon is created",
         _ => {
           aliceWalletClient
-            .listActiveDevelopmentFundCoupons() should have size 1
+            .listActiveDevelopmentFundCoupons() should have size 1 withClue "ActiveDevelopmentFundCoupons"
         },
       )
 

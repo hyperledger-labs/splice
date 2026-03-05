@@ -228,6 +228,7 @@ class DomainMigrationInitializer(
         synchronizerNodeService,
         upgradesConfig,
         packageVersionSupport,
+        decentralizedSynchronizerId,
         enabledFeatures,
         synchronizerNodeReconciler,
       )

@@ -178,10 +178,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )(
         "Bob's preapproval is visible",
         bob => {
-          bobValidatorBackend.lookupTransferPreapprovalByParty(bob.partyId) should not be empty
+          bobValidatorBackend.lookupTransferPreapprovalByParty(
+            bob.partyId
+          ) should not be empty withClue "bob preapproval"
           bobValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
             bob.partyId
-          ) should not be empty
+          ) should not be empty withClue "bob scan preapproval"
         },
       )
 
@@ -202,7 +204,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         bobValidatorBackend.cancelTransferPreapprovalByParty(bob.partyId),
       )(
         "Bob's preapproval is no longer visible",
-        _ => bobValidatorBackend.lookupTransferPreapprovalByParty(bob.partyId) shouldBe empty,
+        _ =>
+          bobValidatorBackend.lookupTransferPreapprovalByParty(
+            bob.partyId
+          ) shouldBe empty withClue "bob TransferPreapproval",
       )
 
       // Onboard alice as a local party
@@ -307,7 +312,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob.partyId,
                 )
-                instructions should have size 5
+                instructions should have size 5 withClue "TransferInstructions"
                 instructions.map(_._1)
               },
             )
@@ -352,7 +357,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob.partyId,
                 )
-                instructions should have size 2
+                instructions should have size 2 withClue "TransferInstructions"
                 getBobPartyBalance().unlockedQty should beAround(BigDecimal("1000.0"))
                 inside(aliceWalletClient.balance()) { aliceBalance =>
                   aliceBalance.unlockedQty should beWithin(
@@ -436,15 +441,15 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                     aliceValidatorBackend.participantClientWithAdminToken,
                     alice.partyId,
                   )
-                  instructions should have size 3
+                  instructions should have size 3 withClue "TransferInstructions"
                   val bobHoldings = listHoldings(
                     bobValidatorBackend.participantClientWithAdminToken,
                     bob.partyId,
                   )
                   val (unlockedHoldings, lockedHoldings) =
                     bobHoldings.partition(h => h._2.lock.isEmpty)
-                  unlockedHoldings should have size 4
-                  lockedHoldings should have size 1
+                  unlockedHoldings should have size 4 withClue "unlocked holdings"
+                  lockedHoldings should have size 1 withClue "locked holdings"
                 },
               )
             }
@@ -469,7 +474,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 listHoldings(
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob.partyId,
-                ) should have size 3
+                ) should have size 3 withClue "holdings"
                 inside(getBobPartyBalance()) { balance =>
                   balance.unlockedQty should beWithin(
                     BigDecimal("450.0"),
@@ -511,7 +516,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 listHoldings(
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice.partyId,
-                ) should have size 3
+                ) should have size 3 withClue "holdings"
                 inside(aliceWalletClient.balance()) { aliceBalance =>
                   aliceBalance.unlockedQty should beWithin(
                     BigDecimal("4100.0"),
@@ -561,7 +566,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice.partyId,
                 )
-                instructions should have size 2
+                instructions should have size 2 withClue "TransferInstructions"
               },
             )
 
@@ -611,12 +616,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val activeHoldingsResponse =
               listContractsOfInterface(alice, holdingv1.Holding.TEMPLATE_ID)
 
-            activeHoldingsResponse should have size 6 // 3 unlocked amulets, 1 locked amulet, 2 sample holdings
+            activeHoldingsResponse should have size 6 withClue "3 unlocked + 1 locked + 2 sample holdings"
 
             val activeTransferInstructionsResponse =
               listContractsOfInterface(bob, transferinstructionv1.TransferInstruction.TEMPLATE_ID)
 
-            activeTransferInstructionsResponse should have size 2
+            activeTransferInstructionsResponse should have size 2 withClue "TransferInstructions"
 
             val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequestRW(
               GetUpdatesRequest(

@@ -118,7 +118,7 @@ class AnsIntegrationTest
                 DsoAnsResolver.svAnsNameSuffix(ansAcronym)
               ) && entry.name != DsoAnsResolver.dsoAnsName(ansAcronym)
             )
-          userEntries shouldBe empty
+          userEntries shouldBe empty withClue "user entries"
         }
 
         clue("Creating an ANS entry that expires immediately") {
@@ -253,12 +253,14 @@ class AnsIntegrationTest
         requestEntry(aliceRefs, testEntryName),
       )(
         "alice sees subscription request",
-        _ => aliceRefs.wallet.listSubscriptionRequests() should have size 1,
+        _ =>
+          aliceRefs.wallet
+            .listSubscriptionRequests() should have size 1 withClue "alice SubscriptionRequests",
       )
       aliceRefs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(codegen.AnsEntryContext.COMPANION)(
           aliceRefs.userParty
-        ) should have size 1
+        ) should have size 1 withClue "AnsEntryContext"
       actAndCheck(
         "alice rejects subscription request",
         aliceWalletClient.rejectSubscriptionRequest(subscriptionRequest),
@@ -268,7 +270,7 @@ class AnsIntegrationTest
           aliceRefs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(codegen.AnsEntryContext.COMPANION)(
               aliceRefs.userParty
-            ) should have size 0,
+            ) should have size 0 withClue "AnsEntryContext",
       )
     }
 
@@ -316,12 +318,12 @@ class AnsIntegrationTest
           )
         }
         clue("Checking payload of new entry") {
-          entry.contractId should not be empty
+          entry.contractId should not be empty withClue "contractId"
           entry.user shouldBe aliceUserParty.toProtoPrimitive
           entry.name shouldBe testEntryName
           entry.url shouldBe testEntryUrl
           entry.description shouldBe testEntryDescription
-          entry.expiresAt should not be empty
+          entry.expiresAt should not be empty withClue "expiresAt"
         }
 
         aliceSubscriptionReadyForPaymentTrigger.resume()
@@ -398,11 +400,11 @@ class AnsIntegrationTest
         )
 
         eventually() {
-          lookupEntryByName(testEntryName) shouldBe empty
+          lookupEntryByName(testEntryName) shouldBe empty withClue s"ANS entry $testEntryName"
         }
         withClue("subscription expires even with disabled trigger") {
           eventually() {
-            aliceWalletClient.listSubscriptions() shouldBe empty
+            aliceWalletClient.listSubscriptions() shouldBe empty withClue "alice Subscriptions"
           }
         }
         setTriggersWithin(
@@ -445,7 +447,7 @@ class AnsIntegrationTest
         DsoAnsResolver.dsoAnsName(ansAcronym)
       ) shouldBe expectedDsoEntry
       sv1ScanBackend.lookupEntryByParty(dsoParty).value shouldBe expectedDsoEntry
-      sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
+      sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry) withClue "ANS entries"
     }
 
     "an SV's ANS entry can be seen via scan api" in { implicit env =>
@@ -458,7 +460,7 @@ class AnsIntegrationTest
         sv1ScanBackend
           .lookupEntryByParty(PartyId.tryFromProtoPrimitive(svParty))
           .value shouldBe expectedSvEntry
-        sv1ScanBackend.listEntries("", 100) should contain(expectedSvEntry)
+        sv1ScanBackend.listEntries("", 100) should contain(expectedSvEntry) withClue "ANS entries"
       }
     }
   }

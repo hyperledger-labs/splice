@@ -45,7 +45,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
         eventuallyClickOn(id("logout-button"))
       }
       silentClue("Waiting for login page to be ready") {
-        waitForCondition(id("user-id-field"), timeUntilSuccess = Some(1.seconds)) {
+        waitForCondition(id("user-id-field"), timeUntilSuccess = Some(3.seconds)) {
           ExpectedConditions.elementToBeClickable(_)
         }
       }

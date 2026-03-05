@@ -344,6 +344,7 @@ class SV1Initializer(
         synchronizerNodeService,
         upgradesConfig,
         packageVersionSupport,
+        decentralizedSynchronizer,
         enabledFeatures,
         new SynchronizerNodeReconciler(
           dsoStore,

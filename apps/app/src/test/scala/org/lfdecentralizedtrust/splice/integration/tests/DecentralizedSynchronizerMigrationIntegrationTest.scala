@@ -163,6 +163,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
                   .copy(domainMigrationId = 1L),
                 migrationId = 1L,
+                basePort = 5010,
               )
           ),
           validatorApps = config.validatorApps + (
@@ -375,7 +376,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           case Seq(DomainSequencers(synchronizerId, sequencers)) =>
             val migrationSequencers = sequencers.filter(_.serial.isEmpty)
             synchronizerId shouldBe decentralizedSynchronizerId
-            migrationSequencers should have size 4
+            migrationSequencers should have size 4 withClue "migrationSequencers"
             migrationSequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
             }
@@ -427,10 +428,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       createTransferPreapprovalEnsuringItExists(walletClient, validatorBackend)
       createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
       eventually() {
-        validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty
+        validatorBackend.lookupTransferPreapprovalByParty(
+          externalParty
+        ) should not be empty withClue "TransferPreapproval from validator"
         validatorBackend.scanProxy.lookupTransferPreapprovalByParty(
           externalParty
-        ) should not be empty
+        ) should not be empty withClue "TransferPreapproval from scan-proxy"
       }
       validatorBackend
         .getExternalPartyBalance(externalParty)
@@ -520,7 +523,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 aliceValidatorBackend.participantClientWithAdminToken,
                 decentralizedSynchronizerAlias,
               )
-            urlSet should have size 4
+            urlSet should have size 4 withClue "sequencer URLs"
             urlSet
           }
         }
@@ -686,7 +689,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )
               ) should contain theSameElementsAs triggersBefore.filter(t =>
                 t != "org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger"
-              )
+              ) withClue "triggers"
             }
 
             // Pause the triggers because they'll otherwise try to fight the manual modification of the decentralized namespace.
@@ -751,7 +754,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .futureValue
                   .mapping
                   .owners
-                  .forgetNE should have size 4
+                  .forgetNE should have size 4 withClue "sequencer owners"
                 upgradeSynchronizerNode1.oldParticipantConnection
                   .getSynchronizerParametersState(
                     decentralizedSynchronizerId
@@ -903,7 +906,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   aliceValidatorLocal.participantClientWithAdminToken,
                   decentralizedSynchronizerAlias,
                 )
-                sequencerUrlSet should have size 4
+                sequencerUrlSet should have size 4 withClue "sequencer URLs"
                 sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
               }
             }
@@ -914,9 +917,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   aliceValidatorLocal.participantClient,
                   discardAnnotations = Some("acs_import"),
                 )
-              aliceIdpcsAfterMigration should contain theSameElementsAs aliceIdpcsBeforeMigration
-              aliceUsersAfterMigration should contain theSameElementsAs aliceUsersBeforeMigration
-              aliceRightsAfterMigration should contain theSameElementsAs aliceRightsBeforeMigration
+              aliceIdpcsAfterMigration should contain theSameElementsAs aliceIdpcsBeforeMigration withClue "aliceIdpcs"
+              aliceUsersAfterMigration should contain theSameElementsAs aliceUsersBeforeMigration withClue "aliceUsers"
+              aliceRightsAfterMigration should contain theSameElementsAs aliceRightsBeforeMigration withClue "aliceRights"
             }
 
             clue("SV2's participant users state was preserved") {
@@ -925,9 +928,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   sv2LocalBackend.participantClient,
                   discardAnnotations = Some("network.canton.global"),
                 )
-              sv2IdpcsAfterMigration should contain theSameElementsAs sv2IdpcsBeforeMigration
-              sv2UsersAfterMigration should contain theSameElementsAs sv2UsersBeforeMigration
-              sv2RightsAfterMigration should contain theSameElementsAs sv2RightsBeforeMigration
+              sv2IdpcsAfterMigration should contain theSameElementsAs sv2IdpcsBeforeMigration withClue "sv2Idpcs"
+              sv2UsersAfterMigration should contain theSameElementsAs sv2UsersBeforeMigration withClue "sv2Users"
+              sv2RightsAfterMigration should contain theSameElementsAs sv2RightsBeforeMigration withClue "sv2Rights"
             }
 
             startValidatorAndTapAmulet(
@@ -995,7 +998,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       onlyReq.contractId
                     )
                     .payload
-                    .votes should have size 1
+                    .votes should have size 1 withClue "votes"
                 },
             )
 
@@ -1015,7 +1018,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 case TreeUpdateWithMigrationId(tree, migrationId)
                     if tree.update.recordTime == CantonTimestamp.MinValue && migrationId == 1L =>
                   tree
-              } should not be empty
+              } should not be empty withClue "ACS import updates"
             }
 
             withClueAndLog("ACS snapshot includes the ACS import") {
@@ -1040,15 +1043,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )
                 .valueOrFail(s"Snapshot was just taken but not returned.")
 
-              snapshot.createdEvents.map(_.contractId) should contain(
+              snapshot.createdEvents
+                .map(_.contractId) should contain(
                 dsoInfo.dsoRules.contract.contractId
-              )
-              snapshot.createdEvents.map(_.contractId) should contain(
+              ) withClue "has DsoRules"
+              snapshot.createdEvents
+                .map(_.contractId) should contain(
                 dsoInfo.amuletRules.contract.contractId
-              )
-              snapshot.createdEvents.map(_.contractId) should contain(
+              ) withClue "has AmuletRules"
+              snapshot.createdEvents
+                .map(_.contractId) should contain(
                 ansRules.contractId.contractId
-              )
+              ) withClue "has AnsRules"
             }
 
             withClueAndLog("3rd party app works after domain migration") {
@@ -1227,7 +1233,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
       actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
         "Alice sees 'group1'",
-        _ => aliceSplitwellClient.listGroups() should have size 1,
+        _ => aliceSplitwellClient.listGroups() should have size 1 withClue "alice Groups",
       )
 
       // Wait for the group contract to be visible to Alice's Ledger API
@@ -1246,7 +1252,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
       actAndCheck("charlie asks to join 'group1'", charlieSplitwellClient.acceptInvite(invite))(
         "alice sees the accepted invite",
-        _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
+        _ =>
+          aliceSplitwellClient.listAcceptedGroupInvites(
+            group
+          ) should not be empty withClue "alice group1 AcceptedGroupInvites",
       )
 
       actAndCheck(
@@ -1257,8 +1266,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       )(
         "charlie is in 'group1'",
         _ => {
-          charlieSplitwellClient.listGroups() should have size 1
-          aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
+          charlieSplitwellClient.listGroups() should have size 1 withClue "charlie Groups"
+          aliceSplitwellClient.listAcceptedGroupInvites(group) should be(
+            empty
+          ) withClue "alice AcceptedGroupInvites"
         },
       )
 

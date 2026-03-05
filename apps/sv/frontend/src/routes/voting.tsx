@@ -22,7 +22,7 @@ const Voting: React.FC = () => {
   if (!dsoInfosQuery.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  return <Box>{<VoteRequest />}</Box>;
+  return <Box sx={{ p: 4 }}>{<VoteRequest />}</Box>;
 };
 
 export default Voting;

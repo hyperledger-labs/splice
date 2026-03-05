@@ -41,7 +41,13 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
 }
 import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanSynchronizerConfig}
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanEventStore,
+  ScanKeyValueProvider,
+  ScanKeyValueStore,
+  ScanStore,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanVerdictStore,
   ScanAggregatesReader,
@@ -71,6 +77,8 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 /** Class representing a Scan app instance.
@@ -254,6 +262,18 @@ class ScanApp(
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
       )
+      kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
+      kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
+      bulkStorage = new BulkStorage(
+        scanStorageConfigV1,
+        config.bulkStorage,
+        acsSnapshotStore,
+        updateHistory,
+        currentMigrationId = migrationInfo.currentMigrationId,
+        kvProvider,
+        retryProvider.metricsFactory,
+        loggerFactory,
+      )
       scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
       scanEventStore = new ScanEventStore(
         scanVerdictStore,
@@ -436,6 +456,7 @@ class ScanApp(
         storage,
         store,
         automation,
+        bulkStorage,
         verdictAutomation,
         scanEventStore,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
@@ -459,6 +480,7 @@ object ScanApp {
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
+      bulkStorage: BulkStorage,
       verdictAutomation: ScanVerdictAutomationService,
       eventStore: ScanEventStore,
       logger: TracedLogger,
@@ -474,6 +496,7 @@ object ScanApp {
       LifeCycle.close(bftSequencersAdminConnections*)(logger)
       LifeCycle.close(cleanups*)(logger)
       LifeCycle.close(
+        bulkStorage,
         automation,
         verdictAutomation,
         store,

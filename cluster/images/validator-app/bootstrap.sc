@@ -13,7 +13,6 @@ def main() {
     logger.info("No DARs specified to upload")
   } else {
     logger.info("Waiting for validator to finish init...")
-    logger.debug(s"Loaded environment: ${sys.env}")
     validator_backend.waitForInitialization(timeoutMinutes.minutes)
 
     logger.info(s"Uploading DARs: ${dars}")

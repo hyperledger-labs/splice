@@ -371,6 +371,7 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
    If you change any of them, then you can propagate these changes across the .dars as follows:
    1. redo Step 2
     3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
+7. When updating a DAR, make sure to run `sbt updateDarResuorces` before running integration tests. CI enforces that this is always done.
 
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.

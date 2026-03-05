@@ -2,7 +2,8 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.scan.config.S3Config
+import org.lfdecentralizedtrust.splice.config.S3Config
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.regions.Region
@@ -75,7 +76,6 @@ class S3BucketConnectionForUnitTests(
 object S3BucketConnectionForUnitTests {
   def apply(
       s3Config: S3Config,
-      bucketName: String,
       loggerFactory: NamedLoggerFactory,
   ): S3BucketConnection = {
     new S3BucketConnectionForUnitTests(
@@ -91,7 +91,7 @@ object S3BucketConnectionForUnitTests {
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),
-      bucketName,
+      s3Config.bucketName,
       loggerFactory,
     )
   }

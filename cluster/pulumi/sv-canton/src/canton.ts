@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   auth0UserNameEnvVarSource,
@@ -12,6 +13,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   InstalledMigrationSpecificSv,
+  installParticipant,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -22,7 +24,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
 
 import { spliceConfig } from '../../common/src/config/config';
-import { installSvParticipant } from './participant';
 
 export function installCantonComponents(
   xns: ExactNamespace,
@@ -78,17 +79,6 @@ export function installCantonComponents(
   const version = isActiveMigration
     ? (svConfig.versionOverride ?? migrationInfo.version)
     : migrationInfo.version;
-  const participantPg =
-    dbs?.participant ||
-    installPostgres(
-      xns,
-      `participant-${migrationId}-pg`,
-      `participant-pg`,
-      version,
-      svConfig.participant?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
-      true,
-      { isActive: migrationStillRunning, migrationId, disableProtection }
-    );
   const mediatorPostgres =
     dbs?.mediator ||
     installPostgres(
@@ -115,18 +105,27 @@ export function installCantonComponents(
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     );
+  const { chart: participant } = !migrationInfo.enableLogicalSynchronizerDeploymentMode
+    ? installParticipant(
+        {
+          xns,
+          participant: svConfig.participant,
+          logging: svConfig.logging,
+          version,
+          auth0: auth0Config,
+          existingDb: dbs?.participant,
+          disableProtection,
+          participantAdminUserNameFrom: ledgerApiUserSecretSource,
+          imagePullServiceAccountName,
+          migration: {
+            id: migrationId,
+            isStillRunning: migrationStillRunning,
+          },
+        },
+        withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
+      )
+    : { chart: undefined };
   if (migrationStillRunning) {
-    const participant = installSvParticipant(
-      xns,
-      svConfig,
-      migrationId,
-      auth0Config,
-      participantPg,
-      version,
-      ledgerApiUserSecretSource,
-      imagePullServiceAccountName,
-      withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
-    );
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(
           svConfig,
@@ -162,10 +161,16 @@ export function installCantonComponents(
         );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,
-      participant: {
-        asDependencies: [participant],
-        internalClusterAddress: participant.name,
-      },
+      participant:
+        participant !== undefined
+          ? {
+              asDependencies: [participant],
+              internalClusterAddress: participant.name,
+            }
+          : {
+              asDependencies: [],
+              internalClusterAddress: pulumi.output('participant'),
+            },
     };
   } else {
     return undefined;

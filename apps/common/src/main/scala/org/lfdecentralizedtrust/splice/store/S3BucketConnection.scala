@@ -1,38 +1,27 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.scan.store.bulk
+package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.scan.config.S3Config
+import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import software.amazon.awssdk.services.s3.model.{
-  CompleteMultipartUploadRequest,
-  CompletedMultipartUpload,
-  CompletedPart,
-  CreateMultipartUploadRequest,
-  GetObjectRequest,
-  GetObjectResponse,
-  ListObjectsRequest,
-  ListObjectsResponse,
-  PutObjectRequest,
-  UploadPartRequest,
-}
 
-import scala.jdk.FutureConverters.*
-import scala.jdk.CollectionConverters.*
 import java.net.URI
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 
 class S3BucketConnection(
-    s3Client: S3AsyncClient,
+    val s3Client: S3AsyncClient,
     bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
@@ -163,7 +152,6 @@ class S3BucketConnection(
 object S3BucketConnection {
   def apply(
       s3Config: S3Config,
-      bucketName: String,
       loggerFactory: NamedLoggerFactory,
   ): S3BucketConnection = {
     new S3BucketConnection(
@@ -181,7 +169,7 @@ object S3BucketConnection {
         // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),
-      bucketName,
+      s3Config.bucketName,
       loggerFactory,
     )
   }

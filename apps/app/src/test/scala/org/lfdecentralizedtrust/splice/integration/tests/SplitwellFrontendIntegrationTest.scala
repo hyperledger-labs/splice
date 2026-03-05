@@ -142,7 +142,7 @@ class SplitwellFrontendIntegrationTest
 
           eventually() {
             val rows = findAll(className("balance-updates-list-item")).toSeq
-            rows should have size 4
+            rows should have size 4 withClue "'Balance Updates' list items"
             // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
             forExactly(1, rows)(row =>
               matchRow(
@@ -319,20 +319,24 @@ class SplitwellFrontendIntegrationTest
       // Alice accepts all requests
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
         eventually(timeUntilSuccess = 20.minute) {
-          findAll(className("add-user-link")) should have length 4
-          getGroupContractIds() should have size 3
+          findAll(
+            className("add-user-link")
+          ) should have length 4 withClue "'Add' button in 'Membership Requests'"
+          getGroupContractIds() should have size 3 withClue "Group contractIds"
         }
         val allLinks = findAll(className("add-user-link")).toSeq
         (allLinks zip (4L to 1 by -1)).foreach { case (elem, i) =>
           val groupsBefore = getGroupContractIds()
-          groupsBefore should have size 3
+          groupsBefore should have size 3 withClue "groups before click"
           click on elem
           // Wait for the join to finish. Otherwise we get contention on the group contract.
           eventually() {
-            findAll(className("add-user-link")) should have length i - 1
+            findAll(
+              className("add-user-link")
+            ) should have length (i - 1) withClue "'Add' button in 'Membership Requests'"
             // Wait for the contract id to change.
             val groupsAfter = getGroupContractIds()
-            groupsAfter should have size 3
+            groupsAfter should have size 3 withClue "groups after click"
             groupsAfter should not equal groupsBefore
           }
         }

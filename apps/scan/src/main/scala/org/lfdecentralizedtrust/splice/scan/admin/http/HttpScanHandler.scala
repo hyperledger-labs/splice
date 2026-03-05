@@ -908,11 +908,20 @@ class HttpScanHandler(
       request: UpdateHistoryRequestV2
   )(extracted: TraceContext): Future[ScanResource.GetUpdateHistoryV2Response] = {
     implicit val tc: TraceContext = extracted
+    val encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson)
+    def afterMsg = request.after
+      .map(a =>
+        s": afterMigrationId = ${a.afterMigrationId}, afterRecordTime = ${a.afterRecordTime},"
+      )
+      .getOrElse(":")
+    logger.debug(
+      s"Requesting updateHistory${afterMsg} pageSize = ${request.pageSize}, encoding = $encoding"
+    )
     withSpan(s"$workflowId.getUpdateHistoryV2") { _ => _ =>
       getUpdateHistory(
         after = request.after,
         pageSize = request.pageSize,
-        encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+        encoding = encoding,
         consistentResponses = true,
         includeImportUpdates = false,
         extracted,

@@ -123,6 +123,77 @@ ${Object.keys(logAlerts)
   });
 }
 
+export function installLoggedSecretsAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
+  const loggedSecretsFilter = monitoringConfig.alerting.loggedSecretsFilter!;
+  const filter = `resource.labels.cluster_name="${CLUSTER_NAME}"
+${ensureTrailingNewline(loggedSecretsFilter)}`;
+
+  const loggedSecretsMetric = new gcp.logging.Metric('logged_secrets', {
+    name: `logged_secrets_${CLUSTER_BASENAME}`,
+    description: 'Logs containing secrets (JWTs, Bearer tokens, passwords, etc.)',
+    filter: filter,
+    labelExtractors: {
+      cluster: 'EXTRACT(resource.labels.cluster_name)',
+      namespace: 'EXTRACT(resource.labels.namespace_name)',
+    },
+    metricDescriptor: {
+      labels: [
+        {
+          description: 'Pod namespace',
+          key: 'namespace',
+        },
+        {
+          description: 'Cluster name',
+          key: 'cluster',
+        },
+      ],
+      metricKind: 'DELTA',
+      valueType: 'INT64',
+    },
+  });
+
+  const displayName = `Logged secrets detected in ${CLUSTER_BASENAME}`;
+  new gcp.monitoring.AlertPolicy('loggedSecretsAlert', {
+    alertStrategy: {
+      autoClose: '3600s',
+      notificationChannelStrategies: [
+        {
+          notificationChannelNames: [notificationChannel.name],
+          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+        },
+      ],
+    },
+    combiner: 'OR',
+    conditions: [
+      {
+        conditionThreshold: {
+          aggregations: [
+            {
+              //query period
+              alignmentPeriod: '600s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              groupByFields: ['metric.label.cluster'],
+              perSeriesAligner: 'ALIGN_SUM',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          // No retest period -- any secret in logs is critical
+          duration: '0s',
+          filter: pulumi.interpolate`resource.type="k8s_container" AND metric.type = "logging.googleapis.com/user/${loggedSecretsMetric.name}"`,
+          trigger: {
+            count: 1,
+          },
+        },
+        displayName: displayName,
+      },
+    ],
+    displayName: displayName,
+    notificationChannels: [notificationChannel.name],
+  });
+}
+
 // https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#control_plane_upgrade_logs
 export function installClusterMaintenanceUpdateAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel

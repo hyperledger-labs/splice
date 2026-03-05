@@ -316,7 +316,7 @@ class SvReonboardingIntegrationTest
 
           Seq(sv2Backend, sv3Backend).foreach { sv =>
             eventually() {
-              sv.listVoteRequests() should have size 1
+              sv.listVoteRequests() should have size 1 withClue s"${sv.name} VoteRequests"
             }
             eventuallySucceeds() {
               sv.castVote(voteRequestCid, true, "url", "description")

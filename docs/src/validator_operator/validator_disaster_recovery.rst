@@ -198,7 +198,11 @@ Limitations and Troubleshooting
 
 In some non-standard cases, the automated re-onboarding from key backup might not succeed in migrating (i.e., recovering) a party.
 Please check the logs of the validator for warnings or error entries that may give clues.
-Among other things, the following types of parties will not be migrated by default:
+
+Parties not migrated automatically
+""""""""""""""""""""""""""""""""""
+
+The following types of parties will not be migrated by default:
 
 * Parties that are hosted on multiple participants.
   These may get unhosted from the original (failed) participant, but will remain hosted on any other participants.
@@ -210,6 +214,9 @@ In some cases you might want to force the migration attempt for a set of parties
 To do so, you can set the ``parties-to-migrate`` :ref:`configuration option <configuration>` on your validator app.
 A migration will be attempted for each party that you pass to this option.
 The initialization of the validator app will be interrupted on the first failed migration attempt.
+
+Troubleshooting failed ACS imports
+"""""""""""""""""""""""""""""""""""
 
 If you still observe issues, in particular you observe
 ``ACS_COMMITMENT_MISMATCH`` warnings in your participant logs,
@@ -273,6 +280,42 @@ To address a failed :term:`ACS` import, you can usually:
    You can obtain the ``id`` in the correct format by, for example, running ``participant.id.toProtoPrimitive`` in a Canton console to the participant.
    You can now take down the node to which you originally tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different participant ID prefix
    (i.e., a different ``newParticipantIdentifier`` / ``<new_participant_id>`` depending on your deployment model).
+
+Troubleshooting rejected topology snapshots
+""""""""""""""""""""""""""""""""""""""""""""
+
+In rare cases, the re-onboarding process may fail at the ``ImportTopologySnapshot`` step
+because an ``OwnerToKeyMapping`` for the old participant ID has an insufficient number of
+signatures in the topology snapshot. This only affects validators that were originally
+onboarded on Splice 0.4.1 or earlier, which used a Canton version that did not require
+the mapped keys to co-sign ``OwnerToKeyMapping`` transactions.
+You can identify this issue by looking for the following messages in your participant logs:
+
+.. code::
+
+   Missing authorizers: ReferencedAuthorizations(extraKeys = <key-id>...)
+   Rejected transaction ... OwnerToKeyMapping(...) ... due to Not authorized
+
+To work around this, follow these steps:
+
+1. Start only the new participant (without the validator app). Do not wipe its state from
+   the previous (failed) re-onboarding attempt.
+
+2. Open a :ref:`Canton console <console_access>` to the new participant and run the following
+   commands to propose the corrected ``OwnerToKeyMapping``. Replace the key ID prefixes with
+   those from the rejected ``OwnerToKeyMapping`` in your participant logs, and replace the
+   old participant ID with your actual old participant ID:
+
+   .. code::
+
+      val keys = Seq("<signing-key-id-prefix>", "<encryption-key-id-prefix>").map(prefix =>
+        participant.keys.public.list().filter(_.publicKey.id.toProtoPrimitive.startsWith(prefix)).head.publicKey)
+
+      val oldParticipantId = ParticipantId.fromProtoPrimitive("<old-participant-id>", "participant").toOption.get
+      val otk = OwnerToKeyMapping(member = oldParticipantId, keys = NonEmpty.from(keys).get)
+      participant.topology.owner_to_key_mappings.propose(otk, force = ForceFlag.AlienMember)
+
+3. Start the validator app using your original identities dump configuration.
 
 .. _validator_recover_external_party:
 

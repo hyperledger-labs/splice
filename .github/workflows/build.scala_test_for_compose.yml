@@ -28,6 +28,12 @@ on:
         description: "Splice version from which the initial-package-config should be chosen"
         type: string
         required: true
+      with_docker_images:
+        description: "Whether to build docker images for the tests"
+        required: false
+        type: boolean
+        default: true
+
 
 
 jobs:
@@ -101,7 +107,7 @@ jobs:
           test_names: ${{ needs.split_tests.outputs.test_names }}
           runner_index: ${{ matrix.runner-index }}
           with_frontend_creds: true
-          with_docker_images: true
+          with_docker_images: ${{ inputs.with_docker_images }}
           auth0_management_api_client_id: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }}
           auth0_management_api_client_secret: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
           compose_validator_web_ui_password: ${{ secrets.COMPOSE_VALIDATOR_WEB_UI_PASSWORD }}
