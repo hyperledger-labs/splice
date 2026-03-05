@@ -14,13 +14,13 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
     env.svs.local.foreach { sv =>
       val rights = sv.participantClient.ledger_api.users.rights.list(sv.config.ledgerApiUser)
       rights.actAs should contain(dsoParty)
-      rights.readAs shouldBe empty
+      rights.readAs shouldBe empty withClue "readAs"
     }
     actAndCheck(
       "creating a `ValidatorOnboarding` contract readable only by sv3", {
         val sv = sv3Backend // it doesn't really matter which sv we pick
         val svParty = sv.getDsoInfo().svParty
-        sv.listOngoingValidatorOnboardings() shouldBe empty
+        sv.listOngoingValidatorOnboardings() shouldBe empty withClue "ValidatorOnboardings"
         sv.participantClient.ledger_api_extensions.commands.submitWithResult(
           sv.config.ledgerApiUser,
           actAs = Seq(svParty),
@@ -154,7 +154,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             synchronizerId = decentralizedSynchronizerId,
             filterParty = dsoPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
-          ) should have size 1
+          ) should have size 1 withClue "sv1's dso-to-sv3 mapping"
 
         sv3Participant.topology.party_to_participant_mappings
           .list(
@@ -162,14 +162,15 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             synchronizerId = decentralizedSynchronizerId,
             filterParty = dsoPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
-          ) should have size 1
+          ) should have size 1 withClue "sv3's dso-to-sv3 mapping"
         val amuletFromsv3Participant = getAmulets(sv3Participant, dsoParty)
         val amuletFromSv1Participant = getAmulets(sv1Participant, dsoParty)
 
-        amuletFromsv3Participant should have size 2
+        amuletFromsv3Participant should have size 2 withClue "sv3 amulet"
         amuletFromsv3Participant shouldBe amuletFromSv1Participant
 
-        sv3Participant.ledger_api.state.acs.of_party(dsoParty) should not be empty
+        sv3Participant.ledger_api.state.acs
+          .of_party(dsoParty) should not be empty withClue "sv3 ACS for dsoParty"
       }
 
       clue(

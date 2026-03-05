@@ -14,7 +14,7 @@ export const FormLayout: React.FC<FormLayoutProps> = props => {
   const { children, form, id } = props;
 
   return (
-    <Box sx={{ mt: 10 }} data-testid={id} id={id}>
+    <Box data-testid={id} id={id}>
       <Paper
         sx={{
           bgcolor: 'background.paper',

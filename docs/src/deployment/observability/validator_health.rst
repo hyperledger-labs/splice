@@ -19,13 +19,13 @@ endpoints, which are used for readiness and liveness probes.
 
     .. code-block:: yaml
 
-        kubectl exec <pod-name> -n <namespace> -- curl -v https://localhost:5003/api/validator/readyz
+        kubectl exec <pod-name> -n <namespace> -- curl -v http://localhost:5003/api/validator/readyz
 
   * In Docker: run for example this command to check validator liveness inside a container:
 
     .. code-block:: yaml
 
-        docker exec <container-name> -- curl -v https://localhost:5003/api/validator/livez
+        docker exec <container-name> -- curl -v http://localhost:5003/api/validator/livez
 
   You should expect in both case HTTP status code 200 if the validator is ready and live.
 

@@ -63,7 +63,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
         "Two reward states get created",
         _ => {
           val newRewardStates = getRewardStates()
-          newRewardStates should have size 2
+          newRewardStates should have size 2 withClue "SvRewardStates"
         },
       )
       loggerFactory.assertLogs(
@@ -72,7 +72,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
           clue("Trigger merges SvRewardState contracts") {
             eventually() {
               val newRewardStates = getRewardStates()
-              newRewardStates should have size 1
+              newRewardStates should have size 1 withClue "SvRewardStates"
             }
           }
         },

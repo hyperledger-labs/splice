@@ -577,3 +577,27 @@ function subcmd_pulumi_up_canton() {
   _info "Updating sv-canton stacks"
   _pulumi_automation_run_up "sv-canton"
 }
+
+###
+subcommand_whitelist[pulumi_preview_svs]="Preview the changes for the sv stacks"
+
+function subcmd_pulumi_preview_svs() {
+  npm --prefix "${SPLICE_ROOT}/cluster/pulumi/sv" run preview
+}
+
+###
+subcommand_whitelist[pulumi_down_svs]="Down the sv stacks"
+
+function subcmd_pulumi_down_svs() {
+  _info "Resetting sv stacks"
+  export SPLICE_DEPLOY_SV_RUNBOOK=true
+  _pulumi_automation_run_down "sv"
+}
+
+###
+subcommand_whitelist[pulumi_up_svs]="Up the sv stacks"
+
+function subcmd_pulumi_up_svs() {
+  _info "Updating sv stacks"
+  _pulumi_automation_run_up "sv"
+}

@@ -11,7 +11,7 @@ import {
   ProposalVotingInformation,
   SupportedActionTag,
 } from '../utils/types';
-import { Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { useSvConfig } from '../utils';
 import {
   actionTagToTitle,
@@ -114,12 +114,14 @@ export const VoteRequestDetails: React.FC = () => {
   });
 
   return (
-    <ProposalDetailsContent
-      currentSvPartyId={svPartyId}
-      contractId={ccid as ContractId<VoteRequest>}
-      proposalDetails={proposalDetails}
-      votingInformation={votingInformation}
-      votes={votes}
-    />
+    <Box sx={{ p: 4 }}>
+      <ProposalDetailsContent
+        currentSvPartyId={svPartyId}
+        contractId={ccid as ContractId<VoteRequest>}
+        proposalDetails={proposalDetails}
+        votingInformation={votingInformation}
+        votes={votes}
+      />
+    </Box>
   );
 };

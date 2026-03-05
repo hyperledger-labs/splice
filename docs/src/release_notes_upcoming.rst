@@ -9,37 +9,17 @@
 
 .. release-notes:: Upcoming
 
-    - SV Participant
+  - Participant
 
-      - Participant pruning for super validators is now supported and
-        recommended. Follow the :ref:`documentation
-        <sv_participant_pruning>` for instructions on how to enable
-        it.
+    - Increase default retention parameters of the `session encryption keys cache <https://docs.digitalasset.com/operate/3.4/howtos/optimize/session_keys.html#configure-session-keys>`__.
+      Most notably, increase the lifetime of session encryption keys from 10 minutes to 1 hour,
+      to improve performance and reduce (KMS) costs throughout the network.
+      This change has no practical security implication for participants that are not using an external KMS:
+      in this case the main (asymmetric) encryption keys are usually already available in memory (in addition to being stored inside the participant database).
+      We encourage operators of KMS-enabled participants to review the updated sections on KMS usage for :ref:`validator participants <validator-kms-config>` and :ref:`SV participants <sv-kms-participant>` for more pointers about the security impact of session key caching and ways to tweak the relevant parameters to individual needs.
 
-    - Canton
+   - SV app
 
-      - JSON Ledger API OpenAPI/AsyncAPI Specification Updates
-         We've corrected the OpenAPI and AsyncAPI specification files to properly reflect field requirements as defined in the Ledger API ``.proto`` files. Additionally, specification files now include the Canton version in their filenames (e.g., ``openapi-3.4.11.yaml``).
-
-          - Impact and Migration
-            If you regenerate client code from these updated specifications, your code may require changes due to corrected field optionality. You have two options:
-
-            - **Keep using the old specification** - The JSON API server maintains backward compatibility with previous specification versions.
-            - **Upgrade to the new specification** - Update your client code to handle the corrected optional/required fields:
-
-              - **Java (OpenAPI Generator)**: Code compiles without changes, but static analysis tools may flag nullability differences.
-              - **TypeScript**: Handle optional fields using ``!`` or ``??`` operators as needed.
-
-            The JSON API server remains compatible with specification files from all 3.4.x versions (e.g., 3.4.9).
-
-      - Minor Improvements
-        - New connection pool:
-
-          - The connections gRPC channels are now correctly using the defined client keep-alive configuration. **If you had disabled
-            the new connection pools because of issues before, please reenable them and report any issues.**
-          - The connections gRPC channels are now configured with a ``maxInboundMessageSize`` set to ``MaxInt`` instead of the default 4MB (this will be improved in the future to use the dynamic synchronizer parameter ``maxRequestSize``).
-
-      - Bugfixes
-
-        - Switched the gRPC service ``SequencerService.subscribe`` and ``SequencerService.downloadTopologyStateForInit`` to manual
-          control flow, so that the sequencer doesn't crash with an ``OutOfMemoryError`` when responding to slow clients.
+     - Improve the automation for converting featured app activity
+       markers to handle batches of markers for nodes that have not
+       vetted the same version of the amulet package.

@@ -251,7 +251,7 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
 
   return (
     <>
-      <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="json tabs">
           <Tab label="General" {...tabProps('general')} />
           <Tab label="DSO Info" {...tabProps('dso-info')} />

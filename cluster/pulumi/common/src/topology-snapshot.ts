@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { BackupConfig, bootstrapDataBucketSpec } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { GCPBucketSchema } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { TopologySnapshotSchema } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { z } from 'zod';
 
 export async function topologySnapshotConfig(
-  configuration: z.infer<typeof GCPBucketSchema>,
+  configuration: z.infer<typeof TopologySnapshotSchema>,
   prefix: string
 ): Promise<BackupConfig> {
   const bucketSpec = await bootstrapDataBucketSpec(

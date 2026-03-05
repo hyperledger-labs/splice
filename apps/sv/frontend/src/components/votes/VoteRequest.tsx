@@ -248,7 +248,7 @@ export const CreateVoteRequest: React.FC = () => {
   ];
 
   return (
-    <Stack mt={4} spacing={4} direction="column" justifyContent="center">
+    <Stack spacing={4} direction="column" justifyContent="center">
       <Typography mt={4} variant="h4">
         Create Vote Request
       </Typography>

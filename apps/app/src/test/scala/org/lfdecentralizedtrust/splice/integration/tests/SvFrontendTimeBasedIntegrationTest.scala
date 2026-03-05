@@ -18,7 +18,7 @@ class SvFrontendTimeBasedIntegrationTest
 
   def assertRowContentsMatch(key: String, value: String)(implicit webDriver: WebDriver): Unit = {
     val queryResult = find(id(key))
-    queryResult should not be empty
+    queryResult should not be empty withClue s"$key ID'd element"
     inside(queryResult) {
       case Some(queryRow) => {
         queryRow.childElement(className("general-dso-key-name")).text should matchText(key)
@@ -31,7 +31,7 @@ class SvFrontendTimeBasedIntegrationTest
 
   def assertRowContentsDiffer(key: String, value: String)(implicit webDriver: WebDriver): Unit = {
     val queryResult = find(id(key))
-    queryResult should not be empty
+    queryResult should not be empty withClue s"$key ID'd element"
     inside(queryResult) {
       case Some(queryRow) => {
         queryRow.childElement(className("general-dso-key-name")).text should matchText(

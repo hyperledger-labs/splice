@@ -167,19 +167,25 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
   ): ExternalPartySetupProposal.ContractId = {
-    val (proposal, _) = actAndCheck(
-      s"Create external party proposal for ${externalPartyOnboarding.party}", {
-        provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
-      },
-    )(
-      s"External party proposal for ${externalPartyOnboarding.party} was created",
-      proposal => {
-        provider
-          .listExternalPartySetupProposals()
-          .map(_.contract.contractId.contractId) should contain(proposal.contractId)
-      },
-    )
-    proposal
+    provider
+      .listExternalPartySetupProposals()
+      .find(_.payload.user == externalPartyOnboarding.party.toProtoPrimitive) match {
+      case Some(proposal) => proposal.contractId // this will happen on retries
+      case None =>
+        val (proposal, _) = actAndCheck(
+          s"Create external party proposal for ${externalPartyOnboarding.party}", {
+            provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
+          },
+        )(
+          s"External party proposal for ${externalPartyOnboarding.party} was created",
+          proposal => {
+            provider
+              .listExternalPartySetupProposals()
+              .map(_.contract.contractId.contractId) should contain(proposal.contractId)
+          },
+        )
+        proposal
+    }
   }
 
   protected def acceptExternalPartySetupProposal(
@@ -214,12 +220,12 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
     )(
       s"acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party} prepared",
       prepare => {
-        prepare.txHash should not be empty
-        prepare.transaction should not be empty
-        if (verboseHashing)
-          prepare.hashingDetails should not be empty
-        else
-          prepare.hashingDetails shouldBe empty
+        prepare.txHash should not be empty withClue "txHash"
+        prepare.transaction should not be empty withClue "transaction"
+        (if (verboseHashing)
+           prepare.hashingDetails should not be empty
+         else
+           prepare.hashingDetails shouldBe empty) withClue "hashingDetails"
       },
     )
     prepare
@@ -252,8 +258,8 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       s"acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party} submitted",
       submitResult => {
         val (transferPreapprovalCid, updateId) = submitResult
-        transferPreapprovalCid.contractId should not be empty
-        updateId should not be empty
+        transferPreapprovalCid.contractId should not be empty withClue "TransferPreapproval contractId"
+        updateId should not be empty withClue "AcceptExternalPartySetupProposal updateId"
         checkExternalPartyExists(provider, externalPartyOnboarding.party)
         submitResult
       },
@@ -265,7 +271,11 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalParty: PartyId,
   ) = {
-    provider.lookupTransferPreapprovalByParty(externalParty) should not be empty
-    provider.scanProxy.lookupTransferPreapprovalByParty(externalParty) should not be empty
+    provider.lookupTransferPreapprovalByParty(
+      externalParty
+    ) should not be empty withClue s"TransferPreapproval for $externalParty"
+    provider.scanProxy.lookupTransferPreapprovalByParty(
+      externalParty
+    ) should not be empty withClue s"TransferPreapproval for $externalParty via scan-proxy"
   }
 }

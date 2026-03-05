@@ -7,7 +7,7 @@ import ValidatorOnboardingSecrets from '../components/ValidatorOnboardingSecrets
 
 const ValidatorOnboarding: React.FC = () => {
   return (
-    <Box>
+    <Box sx={{ p: 4 }}>
       <ValidatorOnboardingSecrets />
       <Divider sx={{ position: 'absolute', left: 0, width: '100vw' }} />
       <ValidatorLicenses />

@@ -230,7 +230,7 @@ class WalletManualRoundsIntegrationTest
         )(
           "SubscriptionInitialPayment is created",
           _ => {
-            aliceWalletClient.listSubscriptions() shouldBe empty
+            aliceWalletClient.listSubscriptions() shouldBe empty withClue "Subscriptions"
             inside(aliceWalletClient.listSubscriptionInitialPayments()) {
               case Seq(initialPayment) => initialPayment
             }
@@ -287,7 +287,8 @@ class WalletManualRoundsIntegrationTest
             )(
               "The payment is rejected due to the round for collecting payment is no longer active",
               _ => {
-                aliceWalletClient.listSubscriptionInitialPayments() shouldBe empty
+                aliceWalletClient
+                  .listSubscriptionInitialPayments() shouldBe empty withClue "SubscriptionInitialPayments"
               },
             )
           },
@@ -318,7 +319,7 @@ class WalletManualRoundsIntegrationTest
       val initialAppRewardCoupons = aliceValidatorWalletClient.listAppRewardCoupons()
 
       clue("Check that no payment requests exist") {
-        aliceWalletClient.listAppPaymentRequests() shouldBe empty
+        aliceWalletClient.listAppPaymentRequests() shouldBe empty withClue "AppPaymentRequests"
       }
 
       actAndCheck(

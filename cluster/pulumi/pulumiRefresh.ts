@@ -4,6 +4,7 @@ import { runSvCantonForAllMigrations } from '@lfdecentralizedtrust/splice-pulumi
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { refreshOperation, refreshStack } from './pulumiOperations';
+import { runSvProjectForAllSvs } from '@lfdecentralizedtrust/splice-pulumi-sv/pulumi';
 
 const abortController = new PulumiAbortController();
 
@@ -36,6 +37,16 @@ export async function runStacksRefresh(): Promise<void> {
       false,
       true
     )
+  );
+  operations = operations.concat(
+    runSvProjectForAllSvs(
+      'refresh',
+      stack => {
+        return refreshStack(stack, abortController);
+      },
+      false,
+      true,
+    ),
   );
   await awaitAllOrThrowAllExceptions(operations);
 }

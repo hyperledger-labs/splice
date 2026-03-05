@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import { DecentralizedSynchronizerMigrationConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
@@ -9,7 +10,6 @@ import {
   sv1Config,
   svRunbookConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
-import { Output } from '@pulumi/pulumi';
 
 export function installCanton(
   onboardingName: string,
@@ -38,7 +38,10 @@ export function installCanton(
         ),
     participant: {
       asDependencies: [],
-      internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
+      internalClusterAddress: decentralizedSynchronizerMigrationConfig.active
+        .enableLogicalSynchronizerDeploymentMode
+        ? pulumi.output('participant')
+        : pulumi.output(`participant-${activeMigrationId}`),
     },
   };
 }

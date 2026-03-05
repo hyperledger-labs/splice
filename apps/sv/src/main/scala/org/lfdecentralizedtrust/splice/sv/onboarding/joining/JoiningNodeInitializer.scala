@@ -285,6 +285,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNodes,
                 upgradesConfig,
                 packageVersionSupport,
+                decentralizedSynchronizerId,
                 config.parameters.enabledFeatures,
                 synchronizerNodeReconciler,
               )
@@ -322,6 +323,7 @@ class JoiningNodeInitializer(
                 svConnection,
                 joiningConfig,
                 packageVersionSupport,
+                decentralizedSynchronizerId,
               )
           } yield dsoAutomation
         }
@@ -829,6 +831,7 @@ class JoiningNodeInitializer(
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
         packageVersionSupport: PackageVersionSupport,
+        synchronizerId: SynchronizerId,
     ): Future[SvDsoAutomationService] = {
       joiningConfig match {
         case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) =>
@@ -880,6 +883,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNodes,
                   upgradesConfig,
                   packageVersionSupport,
+                  synchronizerId,
                   config.parameters.enabledFeatures,
                   synchronizerNodeReconciler,
                 )
