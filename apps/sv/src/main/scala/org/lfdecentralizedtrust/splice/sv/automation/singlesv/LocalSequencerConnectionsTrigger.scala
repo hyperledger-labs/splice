@@ -106,6 +106,9 @@ class LocalSequencerConnectionsTrigger(
         case _: GrpcSequencerConnection
             if publishedSequencerInfo.availableAfter.toScala
               .exists(availableAfter => domainTime.isAfter(availableAfter)) =>
+          // connect to the sequencer with internal client config here instead of the public url to avoid
+          // - installing loopback in each SV namespace to work around traffic being blocked by cluster whitelisting
+          // - network traffic going all the way through cluster load balancer / ingress routing while the sequencer is in the same namespace
           val localEndpoint = LocalSynchronizerNode.toEndpoint(internalSequencerClientConfig)
           val localSequencerConnection =
             new GrpcSequencerConnection(
@@ -117,9 +120,11 @@ class LocalSequencerConnectionsTrigger(
             )
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
+            // We only have a single connection here.
             PositiveInt.tryCreate(1),
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
+            // TODO(#2666) Make the delays configurable.
             sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           )
           if (

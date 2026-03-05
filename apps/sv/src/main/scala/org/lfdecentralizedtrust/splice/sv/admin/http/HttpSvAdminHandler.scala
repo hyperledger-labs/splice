@@ -109,6 +109,7 @@ class HttpSvAdminHandler(
                   domainDataSnapshotGenerator,
                 )
                 .map { response =>
+                  // DR endpoint does not support separate output files so set outputDirectory = None
                   r0.GetDomainMigrationDumpResponse
                     .OK(response.toHttp(outputDirectory = None))
                 }

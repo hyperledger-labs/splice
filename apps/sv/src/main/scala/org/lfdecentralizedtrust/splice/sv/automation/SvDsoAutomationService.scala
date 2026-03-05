@@ -261,6 +261,15 @@ class SvDsoAutomationService(
       )
     )
 
+    registerTrigger(
+      new LogicalSynchronizerUpgradeAnnouncementTrigger(
+        triggerContext,
+        config.scheduledLsu,
+        participantAdminConnection,
+        config.domains.global.alias,
+      )
+    )
+
     lazy val aggregatingScanConnection = new AggregatingScanConnection(
       dsoStore,
       upgradesConfig,
@@ -271,14 +280,6 @@ class SvDsoAutomationService(
     // TODO(#564) - account for PSID in the reconciliation
     // TODO(#564) - add check for sequencer status in the triggers
     def registerTriggersForSynchronizers(current: LocalSynchronizerNode): Unit = {
-      registerTrigger(
-        new LogicalSynchronizerUpgradeAnnouncementTrigger(
-          triggerContext,
-          config.scheduledLsu,
-          participantAdminConnection,
-          config.domains.global.alias,
-        )
-      )
       current.sequencerConfig match {
         case BftSequencerConfig() =>
           registerTrigger(

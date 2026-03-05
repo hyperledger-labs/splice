@@ -391,8 +391,8 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
-      withSequencerConnectionOrNotFound(respond.NotFound)(
-        _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
+      withSequencerConnection(
+        _.getStatus.map(SpliceStatus.toHttpNodeStatus)
       )
     }
   }
@@ -404,8 +404,8 @@ class HttpSvOperatorHandler(
   ] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
-      withMediatorConnectionOrNotFound(respond.NotFound)(
-        _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
+      withMediatorConnection(
+        _.getStatus.map(SpliceStatus.toHttpNodeStatus)
       )
     }
   }
@@ -417,7 +417,7 @@ class HttpSvOperatorHandler(
   ): Future[r0.GetPartyToParticipantResponse] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
-      withSequencerConnectionOrNotFound(respond.NotFound) { sequencerConnection =>
+      withSequencerConnection { sequencerConnection =>
         for {
           party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
             case Right(party) => Future.successful(party)
@@ -514,19 +514,17 @@ class HttpSvOperatorHandler(
       }
     }
 
-  private def withSequencerConnectionOrNotFound[T](
-      notFound: definitions.ErrorResponse => T
-  )(call: SequencerAdminConnection => Future[T])(implicit tc: TraceContext) = {
-    val _ = notFound
+  private def withSequencerConnection[T](
+      call: SequencerAdminConnection => Future[T]
+  )(implicit tc: TraceContext) = {
     synchronizerNodeService
       .activeSynchronizerNode()
       .flatMap(node => call(node.sequencerAdminConnection))
   }
 
-  private def withMediatorConnectionOrNotFound[T](
-      notFound: definitions.ErrorResponse => T
-  )(call: MediatorAdminConnection => Future[T])(implicit tc: TraceContext) = {
-    val _ = notFound
+  private def withMediatorConnection[T](
+      call: MediatorAdminConnection => Future[T]
+  )(implicit tc: TraceContext) = {
     synchronizerNodeService
       .activeSynchronizerNode()
       .flatMap(node => call(node.mediatorAdminConnection))
