@@ -35,7 +35,7 @@ import java.util.Optional
 import scala.jdk.OptionConverters._
 
 class DevelopmentFundFrontendTimeBasedIntegrationTest
-    extends FrontendIntegrationTest("alice", "bob", "charlie")
+    extends FrontendIntegrationTest("alice", "bob", "sv1")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil
@@ -341,8 +341,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     "handle DFM transition correctly" in { implicit env =>
 
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val user2Party = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
       clue("Set alice (wallet user) as initial DFM via governance vote") {
         changeDevelopmentFundManager(aliceParty)
@@ -350,11 +349,10 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val bobDamlUser = bobWalletClient.config.ledgerApiUser
-      val charlieDamlUser = charlieWalletClient.config.ledgerApiUser
 
-      val charlieCollectRewardsTrigger =
-        aliceValidatorBackend
-          .userWalletAutomation(charlieDamlUser)
+      val bobCollectRewardsTrigger =
+        bobValidatorBackend
+          .userWalletAutomation(bobDamlUser)
           .futureValue
           .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
@@ -384,7 +382,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
       setTriggersWithin(
         triggersToPauseAtStart =
-          Seq(charlieCollectRewardsTrigger) ++ expiredDevelopmentFundCouponTriggers
+          Seq(bobCollectRewardsTrigger) ++ expiredDevelopmentFundCouponTriggers
       ) {
         withFrontEnd("alice") { implicit webDriver =>
           browseToAliceWallet(aliceDamlUser)
@@ -396,8 +394,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               "user_1 allocates coupon 1", {
                 setAnsField(
                   textField(id("development-fund-allocation-beneficiary")),
-                  charlieParty.toProtoPrimitive,
-                  charlieParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
                 )
                 eventuallyClickOn(id("development-fund-allocation-amount"))
                 textField(id("development-fund-allocation-amount")).underlying.clear()
@@ -422,11 +420,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
 
-            charlieCollectRewardsTrigger.resume()
+            bobCollectRewardsTrigger.resume()
             eventually() {
               aliceWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
             }
-            charlieCollectRewardsTrigger.pause().futureValue
+            bobCollectRewardsTrigger.pause().futureValue
 
             webDriver.navigate().refresh()
             waitForQuery(id("development-fund-allocation-beneficiary"))
@@ -437,8 +435,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               "user_1 allocates coupon 2", {
                 setAnsField(
                   textField(id("development-fund-allocation-beneficiary")),
-                  charlieParty.toProtoPrimitive,
-                  charlieParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
                 )
                 eventuallyClickOn(id("development-fund-allocation-amount"))
                 textField(id("development-fund-allocation-amount")).underlying.clear()
@@ -496,8 +494,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               "user_1 allocates coupon 3", {
                 setAnsField(
                   textField(id("development-fund-allocation-beneficiary")),
-                  charlieParty.toProtoPrimitive,
-                  charlieParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
+                  bobParty.toProtoPrimitive,
                 )
                 eventuallyClickOn(id("development-fund-allocation-amount"))
                 textField(id("development-fund-allocation-amount")).underlying.clear()
@@ -529,7 +527,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         // ===================================================================
 
         clue("Change DFM from user_1 to user_2 via governance") {
-          changeDevelopmentFundManager(user2Party)
+          changeDevelopmentFundManager(bobParty)
 
           eventually() {
             val amuletRules = sv1ScanBackend.getAmuletRules()
@@ -537,7 +535,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               amuletRules.payload.configSchedule.initialValue.optDevelopmentFundManager
                 .map(PartyId.tryFromProtoPrimitive)
                 .toScala
-            currentDfm shouldBe Some(user2Party)
+            currentDfm shouldBe Some(bobParty)
           }
 
           // Advance sim time to expire the amulet rules cache (TTL=1s) on validator scan proxies
@@ -608,8 +606,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 "user_2 allocates a new coupon", {
                   setAnsField(
                     textField(id("development-fund-allocation-beneficiary")),
-                    charlieParty.toProtoPrimitive,
-                    charlieParty.toProtoPrimitive,
+                    aliceParty.toProtoPrimitive,
+                    aliceParty.toProtoPrimitive,
                   )
                   eventuallyClickOn(id("development-fund-allocation-amount"))
                   textField(id("development-fund-allocation-amount")).underlying.clear()
@@ -631,7 +629,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                   eventually() {
                     val coupons = bobWalletClient.listActiveDevelopmentFundCoupons()
                     coupons should have size 1
-                    coupons.head.payload.fundManager shouldBe user2Party.toProtoPrimitive
+                    coupons.head.payload.fundManager shouldBe bobParty.toProtoPrimitive
                   }
                 },
               )
@@ -647,25 +645,24 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     "show appropriate restrictions for non-DFM users" in { implicit env =>
 
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       clue("Set alice (wallet user) as DFM via governance vote") {
         changeDevelopmentFundManager(aliceParty)
       }
 
-      val charlieDamlUser = charlieWalletClient.config.ledgerApiUser
+      val sv1DamlUser = sv1WalletClient.config.ledgerApiUser
 
       // ===================================================================
-      // As user_3 (normal user - not DFM, no coupons)
+      // As sv1 (normal user - not DFM, no coupons)
       // ===================================================================
 
-      clue("As user_3 (normal user)") {
-        clue("Check via API: user_3's Active List is empty") {
-          charlieWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+      clue("As sv1 (non-DFM user)") {
+        clue("Check via API: sv1's Active List is empty") {
+          sv1WalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
         }
 
-        withFrontEnd("charlie") { implicit webDriver =>
-          browseToCharlieWallet(charlieDamlUser)
+        withFrontEnd("sv1") { implicit webDriver =>
+          browseToSv1Wallet(sv1DamlUser)
           eventuallyClickOn(id("navlink-development-fund"))
 
           clue("Check: Warning text is shown for non-DFM user") {
