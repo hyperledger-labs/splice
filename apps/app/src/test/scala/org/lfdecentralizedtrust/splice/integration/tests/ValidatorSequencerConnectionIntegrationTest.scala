@@ -14,7 +14,9 @@ import scala.jdk.OptionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
+  PhysicalSynchronizerNodeConfig,
   SequencerConfig,
+  SequencerNodeConfig,
   SynchronizerNodeConfig,
 }
 
@@ -189,11 +191,10 @@ class ValidatorSequencerConnectionIntegrationTest
       rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
 
-      synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala
-        .get(synchronizerId.toProtoPrimitive)
-        .getOrElse(
-          sys.error(s"No config found for synchronizer $synchronizerId")
-        )
+      synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala.getOrElse(
+        synchronizerId.toProtoPrimitive,
+        sys.error(s"No config found for synchronizer $synchronizerId"),
+      )
 
       existingSequencerConfig = synchronizerNodeConfig.sequencer.toScala
         .getOrElse(
@@ -210,10 +211,28 @@ class ValidatorSequencerConnectionIntegrationTest
       newNodeConfig = new SynchronizerNodeConfig(
         synchronizerNodeConfig.cometBft,
         Some(updatedSequencerConfig).toJava,
-        synchronizerNodeConfig.mediator.toScala.toJava,
-        synchronizerNodeConfig.scan.toScala.toJava,
-        synchronizerNodeConfig.legacySequencerConfig.toScala.toJava,
-        synchronizerNodeConfig.physicalSynchronizers,
+        synchronizerNodeConfig.mediator,
+        synchronizerNodeConfig.scan,
+        synchronizerNodeConfig.legacySequencerConfig,
+        synchronizerNodeConfig.physicalSynchronizers.toScala
+          .map(
+            _.asScala
+              .map { case (long, config) =>
+                long -> new PhysicalSynchronizerNodeConfig(
+                  Some(
+                    new SequencerNodeConfig(
+                      existingSequencerConfig.sequencerId,
+                      newUrl,
+                      existingSequencerConfig.availableAfter,
+                    )
+                  ).toJava,
+                  config.mediator,
+                )
+              }
+              .toMap
+              .asJava
+          )
+          .toJava,
       )
 
       cmd = rulesAndState.dsoRules.exercise(

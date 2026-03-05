@@ -875,13 +875,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
                   case Seq(DomainSequencers(synchronizerId, sequencers)) =>
                     synchronizerId shouldBe decentralizedSynchronizerId
-                    sequencers.foreach { sequencer =>
+                    val sequencersWithMigration = sequencers.filter(_.serial.isEmpty)
+                    sequencersWithMigration.foreach { sequencer =>
                       if (sequencer.migrationId != 0 && sequencer.migrationId != 1)
                         throw new RuntimeException(
                           s"Expected sequencer migrationId to be either 0 or 1, but got ${sequencer.migrationId}"
                         )
                     }
-                    sequencers.map { sequencer =>
+                    sequencersWithMigration.map { sequencer =>
                       (sequencer.migrationId, sequencer.url)
                     }.toSet shouldBe Set(
                       (0L, getPublicSequencerUrl(sv1Backend)),
