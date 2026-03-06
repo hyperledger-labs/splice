@@ -295,8 +295,16 @@ class ValidatorApp(
                   }
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
-                    domainConnector
-                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock)
+                    retryProvider.retry(
+                      RetryFor.WaitingOnInitDependency,
+                      "ensure_synchronizer_registered",
+                      "registering decentralized synchronizer",
+                      domainConnector
+                        .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(
+                          clock
+                        ),
+                      logger,
+                    )
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
@@ -306,7 +314,13 @@ class ValidatorApp(
             // before the automation kicks in.
             _ <- appInitStep("Vet packages") {
               for {
-                amuletRules <- scanConnection.getAmuletRules()
+                amuletRules <- retryProvider.retry(
+                  RetryFor.WaitingOnInitDependency,
+                  "get_amulet_rules_init",
+                  "retrieving AmuletRules from scan",
+                  scanConnection.getAmuletRules(),
+                  logger,
+                )
                 globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
                   traceContext
                 )
