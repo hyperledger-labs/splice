@@ -18,6 +18,24 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.5.15
+
+  - SV and Validator app
+
+    - Going forward unsupported splice DARs will no longer be uploaded or vetted.
+      The minimum supported versions are:
+
+        ================== =======
+        name               version
+        ================== =======
+        amulet             0.1.10
+        amuletNameService  0.1.10
+        dsoGovernance      0.1.14
+        validatorLifecycle 0.1.3
+        wallet             0.1.10
+        walletPayments     0.1.10
+        ================== =======
+
 .. release-notes:: 0.5.14
 
   - Participant
