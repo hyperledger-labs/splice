@@ -293,10 +293,14 @@ resource.type="cloudsql_database"
 export function installGcpQuotaAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
+  const quotaUsageThreshold = 0.9;
+  const quotaUsageThresholdPercent = quotaUsageThreshold * 100;
+
   const baseArgs = {
     alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     notificationChannels: [notificationChannel.name],
+    userLabels: { cluster: CLUSTER_BASENAME },
   };
 
   new gcp.monitoring.AlertPolicy('quotaExceededAlert', {
@@ -327,19 +331,24 @@ export function installGcpQuotaAlerts(
     ],
   });
 
+  // Allocation quotas track consumed capacity (for example CPUs, IPs, disk)
+  // against fixed limits, while rate quotas track request throughput over time
+  // windows (for example API calls per minute). These are tracked separately so
+  // we have separate alerts for them
+
   new gcp.monitoring.AlertPolicy('quotaAllocationAlert', {
     ...baseArgs,
-    displayName: `Allocation Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+    displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
     conditions: [
       {
         // Tracks resources like CPUs, Static IPs, Disk Space
-        displayName: `Allocation Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+        displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
             serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"}
             / ignoring(limit_name) group_right()
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
-            > 0.90
+            > ${quotaUsageThreshold}
           `,
           duration: '300s',
         },
@@ -349,17 +358,17 @@ export function installGcpQuotaAlerts(
 
   new gcp.monitoring.AlertPolicy('quotaRateAlert', {
     ...baseArgs,
-    displayName: `Rate Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+    displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
     conditions: [
       {
         // Tracks API requests, HSM operations per minute, etc.
-        displayName: `Rate Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+        displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
             serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"}
             / ignoring(limit_name) group_right()
             (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
-            > 0.90
+            > ${quotaUsageThreshold}
           `,
           duration: '300s',
         },
