@@ -96,6 +96,7 @@ class UpdateHistory(
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
     metrics: HistoryMetrics,
+    externalTransactionHashThresholdTimestamp: Option[CantonTimestamp] = None,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -1615,6 +1616,16 @@ class UpdateHistory(
     }
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
 
+    // Only include the external transaction hash for transactions recorded on or after the threshold date.
+    val externalTransactionHash: ByteString =
+      externalTransactionHashThresholdTimestamp match {
+        case Some(threshold) if updateRow.recordTime < threshold =>
+          ByteString.EMPTY
+        case _ =>
+          // TODO(#3408): Read from DB
+          ByteString.EMPTY
+      }
+
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         new Transaction(
@@ -1627,7 +1638,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
+          /*externalTransactionHash = */ externalTransactionHash,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),

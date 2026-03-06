@@ -554,6 +554,7 @@ class TxLogBackfillingStoreTest
       party: PartyId,
       migrationId: Long,
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
+      externalTransactionHashThresholdDate: Option[CantonTimestamp] = None,
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
@@ -569,6 +570,7 @@ class TxLogBackfillingStoreTest
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
       HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
+      externalTransactionHashThresholdTimestamp = externalTransactionHashThresholdDate,
     )
   }
 

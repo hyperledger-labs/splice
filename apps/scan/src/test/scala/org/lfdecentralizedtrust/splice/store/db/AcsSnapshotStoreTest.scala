@@ -1037,6 +1037,7 @@ class AcsSnapshotStoreTest
       participantId: String = "whatever",
       // Default to backfilling being always complete, to avoid unnecessary complexity in the tests
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
+      externalTransactionHashThresholdDate: Option[CantonTimestamp] = None,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
       storage.underlying, // not under test
@@ -1049,6 +1050,7 @@ class AcsSnapshotStoreTest
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
       HistoryMetrics(NoOpMetricsFactory, migrationId),
+      externalTransactionHashThresholdTimestamp = externalTransactionHashThresholdDate,
     )
     updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }

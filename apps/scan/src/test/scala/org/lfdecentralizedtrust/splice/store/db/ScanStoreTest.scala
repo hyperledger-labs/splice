@@ -1526,7 +1526,8 @@ abstract class ScanStoreTest
   ): Future[ScanStore]
 
   protected def mkUpdateHistory(
-      migrationId: Long
+      migrationId: Long,
+      externalTransactionHashThresholdDate: Option[CantonTimestamp] = None,
   ): Future[UpdateHistory]
 
   private lazy val user1 = userParty(1)
@@ -2015,7 +2016,8 @@ class DbScanStoreTest
   }
 
   override def mkUpdateHistory(
-      migrationId: Long
+      migrationId: Long,
+      externalTransactionHashThresholdDate: Option[CantonTimestamp] = None,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
       storage.underlying, // not under test
@@ -2028,6 +2030,7 @@ class DbScanStoreTest
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
       HistoryMetrics(NoOpMetricsFactory, migrationId),
+      externalTransactionHashThresholdTimestamp = externalTransactionHashThresholdDate,
     )
     updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }
