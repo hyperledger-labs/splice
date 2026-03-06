@@ -312,7 +312,7 @@ export function installGcpQuotaAlerts(
               alignmentPeriod: '60s',
               crossSeriesReducer: 'REDUCE_SUM',
               groupByFields: ['metric.label.quota_metric'],
-              perSeriesAligner: 'ALIGN_SUM',
+              perSeriesAligner: 'ALIGN_COUNT_TRUE',
             },
           ],
           comparison: 'COMPARISON_GT',
