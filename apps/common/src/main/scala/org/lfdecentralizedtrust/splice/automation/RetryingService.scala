@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class ServiceWithShutdown {
-  def initiateShutdown()(implicit tc: TraceContext): Unit
+  def initiateShutdown(): Unit
   def completed: Future[Done]
   def isActive: Boolean
 }
@@ -82,8 +82,8 @@ abstract class RetryingService(
                 // 2. If we get very infrequent errors (e.g. stale stream authorization on user addition), no error is logged an we get fast retries
                 //    instead of sleeping for the polling interval just because a certain number of users got allocated.
                 RetryFor.LongRunningAutomation,
-                "service",
-                description, {
+                description,
+                s"$description service", {
                   instantiateService().flatMap(service => {
                     // Smuggle the current instance out of the body here, so that we can use
                     // runOnShutdown outside to signal the termination via a call to .initiateShutdown().

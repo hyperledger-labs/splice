@@ -91,8 +91,7 @@ class ServiceWithGuaranteedShutdown[S](
 
   def isActive: Boolean = !completed_.isCompleted
 
-  def initiateShutdown()(implicit tc: TraceContext) =
-    killSwitch.shutdown()
+  def initiateShutdown() = killSwitch.shutdown()
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*

@@ -13,7 +13,7 @@ import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
+  PageLimit,
   HistoryMetrics,
   S3BucketConnection,
   TimestampWithMigrationId,
@@ -62,7 +62,7 @@ class UpdateHistorySegmentBulkStorage(
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
-        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
+        PageLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
         TimestampWithMigrationId(
@@ -149,7 +149,7 @@ class UpdateHistorySegmentBulkStorage(
           loggerFactory,
         )
       )
-      .map((o: S3ZstdObjects.Output) => {
+      .map((o: GroupedWeightS3Object.Output) => {
         historyMetrics.BulkStorage.incUpdateObjects()
         UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
       })
