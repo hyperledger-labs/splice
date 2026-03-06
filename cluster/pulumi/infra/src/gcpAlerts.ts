@@ -293,11 +293,15 @@ resource.type="cloudsql_database"
 export function installGcpQuotaAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
-  const displayName = `Quota limits approaching or exceeded in ${CLUSTER_BASENAME}`;
-
-  new gcp.monitoring.AlertPolicy('quotaAlert', {
+  const baseArgs = {
     alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
+    notificationChannels: [notificationChannel.name],
+  };
+
+  new gcp.monitoring.AlertPolicy('quotaExceededAlert', {
+    ...baseArgs,
+    displayName: `Quota Exceeded in ${CLUSTER_BASENAME}`,
     conditions: [
       {
         // "Quota Full" (Exceeded right now)
@@ -320,6 +324,13 @@ export function installGcpQuotaAlerts(
           },
         },
       },
+    ],
+  });
+
+  new gcp.monitoring.AlertPolicy('quotaAllocationAlert', {
+    ...baseArgs,
+    displayName: `Allocation Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+    conditions: [
       {
         // Tracks resources like CPUs, Static IPs, Disk Space
         displayName: `Allocation Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
@@ -333,6 +344,13 @@ export function installGcpQuotaAlerts(
           duration: '300s',
         },
       },
+    ],
+  });
+
+  new gcp.monitoring.AlertPolicy('quotaRateAlert', {
+    ...baseArgs,
+    displayName: `Rate Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
+    conditions: [
       {
         // Tracks API requests, HSM operations per minute, etc.
         displayName: `Rate Quota approaching limit (>90%) in ${CLUSTER_BASENAME}`,
@@ -347,7 +365,5 @@ export function installGcpQuotaAlerts(
         },
       },
     ],
-    displayName: displayName,
-    notificationChannels: [notificationChannel.name],
   });
 }
