@@ -52,6 +52,8 @@ export interface MintingDelegationProposalWithStatus {
 
 import {
   BalanceChange,
+  CouponHistoryEvent,
+  DevelopmentFundCoupon,
   ListAcceptedTransferOffersResponse,
   ListResponse,
   ListSubscriptionRequestsResponse,
@@ -64,6 +66,13 @@ import {
   Notification,
   ListTokenStandardTransfersResponse,
 } from '../models/models';
+import {
+  mockAllocateDevelopmentFundCoupon,
+  mockGetDevelopmentFundTotal,
+  mockListActiveDevelopmentFundCoupons,
+  mockListCouponHistoryEvents,
+  mockWithdrawDevelopmentFundCoupon,
+} from './WalletServiceContextMocks';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 import { ContractId } from '@daml/types';
@@ -143,15 +152,33 @@ export interface WalletClient {
   selfGrantFeaturedAppRights: () => Promise<void>;
 
   featureSupport: () => Promise<WalletFeatureSupportResponse>;
+
+  // Development Fund methods
+  getDevelopmentFundTotal: () => Promise<BigNumber>;
+  allocateDevelopmentFundCoupon: (
+    beneficiary: string,
+    amount: BigNumber,
+    expiresAt: Date,
+    reason: string
+  ) => Promise<void>;
+  listActiveDevelopmentFundCoupons: (pageSize: number, offset: number) => Promise<{
+    coupons: DevelopmentFundCoupon[];
+    total: number;
+  }>;
+  listCouponHistoryEvents: (pageSize: number, offset: number) => Promise<{
+    events: CouponHistoryEvent[];
+    total: number;
+  }>;
+  withdrawDevelopmentFundCoupon: (couponId: string, reason: string) => Promise<void>;
 }
 
 class ApiMiddleware
   extends BaseApiMiddleware<RequestContext, ResponseContext>
-  implements Middleware {}
+  implements Middleware { }
 
 class ExternalApiMiddleware
   extends BaseApiMiddleware<external.RequestContext, external.ResponseContext>
-  implements external.Middleware {}
+  implements external.Middleware { }
 
 export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>> = ({
   url,
@@ -418,13 +445,13 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             const subscription = Contract.decodeOpenAPI(sub.subscription, Subscription);
             const state = sub.state.payment
               ? {
-                  type: 'payment' as const,
-                  value: Contract.decodeOpenAPI(sub.state.payment!, SubscriptionPayment),
-                }
+                type: 'payment' as const,
+                value: Contract.decodeOpenAPI(sub.state.payment!, SubscriptionPayment),
+              }
               : {
-                  type: 'idle' as const,
-                  value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
-                };
+                type: 'idle' as const,
+                value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
+              };
             return { subscription, state };
           }),
         };
@@ -447,6 +474,13 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       featureSupport: async (): Promise<WalletFeatureSupportResponse> => {
         return await walletClient.featureSupport();
       },
+
+      // Development Fund mock methods
+      getDevelopmentFundTotal: mockGetDevelopmentFundTotal,
+      allocateDevelopmentFundCoupon: mockAllocateDevelopmentFundCoupon,
+      listActiveDevelopmentFundCoupons: mockListActiveDevelopmentFundCoupons,
+      listCouponHistoryEvents: mockListCouponHistoryEvents,
+      withdrawDevelopmentFundCoupon: mockWithdrawDevelopmentFundCoupon,
     };
   }, [url, userAccessToken]);
 
