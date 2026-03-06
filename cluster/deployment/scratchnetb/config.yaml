@@ -1,4 +1,8 @@
 # TODO(#2942) reduce duplication between all scratchnet configs
+!include(../scratch-default-synchronizer-migration.yaml;../scratch-default-operator.yaml)
+synchronizerMigration:
+  active:
+    enableLogicalSynchronizerDeploymentMode: true
 infra:
   prometheus:
     retentionDuration: "30d"
