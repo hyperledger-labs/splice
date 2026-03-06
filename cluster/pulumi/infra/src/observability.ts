@@ -902,7 +902,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'sequencer_rate_limit_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_rate_limit_alerts.yaml'
-            ),
+            )
+              .replace(
+                '$SEQUENCER_RATE_LIMIT_REJECTION_RATE_THRESHOLD',
+                monitoringConfig.alerting.alerts.sequencerRateLimits.rejectionRateThreshold.toString()
+              )
+              .replace(
+                '$SEQUENCER_RATE_LIMIT_CIRCUIT_BREAKER_STATE_THRESHOLD',
+                monitoringConfig.alerting.alerts.sequencerRateLimits.circuitBreakerStateThreshold.toString()
+              ),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',

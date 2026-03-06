@@ -68,6 +68,10 @@ const MonitoringConfigSchema = z
         sequencerClientDelay: z.object({
           seconds: z.number(),
         }),
+        sequencerRateLimits: z.object({
+          rejectionRateThreshold: z.number(),
+          circuitBreakerStateThreshold: z.number(),
+        }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),

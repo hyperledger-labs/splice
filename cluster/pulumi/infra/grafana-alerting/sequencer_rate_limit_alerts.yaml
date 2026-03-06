@@ -29,7 +29,7 @@ groups:
               conditions:
                   - evaluator:
                       params:
-                          - 0
+                          - $SEQUENCER_RATE_LIMIT_REJECTION_RATE_THRESHOLD
                       type: gt
                     operator:
                       type: and
@@ -84,7 +84,7 @@ groups:
               conditions:
                   - evaluator:
                       params:
-                          - 0.5
+                          - $SEQUENCER_RATE_LIMIT_CIRCUIT_BREAKER_STATE_THRESHOLD
                       type: gt
                     operator:
                       type: and
