@@ -68,6 +68,9 @@ const MonitoringConfigSchema = z
         sequencerClientDelay: z.object({
           seconds: z.number(),
         }),
+        gcpQuotas: z.object({
+          enabled: z.boolean(),
+        }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),

@@ -47,6 +47,8 @@ monitoring:
         thresholdPerNamespace: 0.05
       deployment:
         pendingPeriodMinutes: 5
+      gcpQuotas:
+        enabled: false
       ingestion:
         thresholdEntriesPerBatch: 80
       loadTester:
