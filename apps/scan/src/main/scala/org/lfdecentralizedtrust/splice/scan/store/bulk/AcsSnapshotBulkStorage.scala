@@ -5,12 +5,16 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
-import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.pattern.after
-import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
+import org.lfdecentralizedtrust.splice.PekkoRetryingService
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{
@@ -136,18 +140,20 @@ class AcsSnapshotBulkStorage(
     }
   }
 
-  /**  wraps mksrc (where the main pipeline logic is implemented) in a retry loop, to retry upon failures.
-    */
-  def getSource(): Source[TimestampWithMigrationId, UniqueKillSwitch] = {
-    val restartSettings = RestartSettings(
-      minBackoff = 3.seconds,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.1,
+  def asRetryableService(
+      automationConfig: AutomationConfig,
+      backoffClock: Clock,
+      retryProvider: RetryProvider,
+  )(implicit tracer: Tracer): PekkoRetryingService[TimestampWithMigrationId] = {
+    val src = mksrc()
+    new PekkoRetryingService(
+      src,
+      Sink.ignore,
+      automationConfig,
+      backoffClock,
+      "ACS Snapshot Bulk Storage",
+      retryProvider,
+      loggerFactory,
     )
-
-    RestartSource
-      .withBackoff(restartSettings)(() => mksrc())
-      .viaMat(KillSwitches.single)(Keep.right)
-
   }
 }
