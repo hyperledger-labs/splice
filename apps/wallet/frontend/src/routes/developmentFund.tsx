@@ -18,8 +18,13 @@ const DevelopmentFund: React.FC = () => {
   return (
     <Box marginTop={4}>
       <Stack spacing={4}>
-        {!isFundManager && (
+        {isFundManager ? (
           <Alert severity="info">
+            Your party is the development fund manager designated by the CF foundation. Use this
+            page to manage development fund allocations and review their history.
+          </Alert>
+        ) : (
+          <Alert severity="warning">
             Your party is not the development fund manager designated by the CF foundation. If your
             party was formerly the development fund manager you can use this page to manage your
             active development fund allocations and review the history of your past allocations.

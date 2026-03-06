@@ -12,7 +12,6 @@ const useGetAmuletRules = (): UseQueryResult<ContractWithState<AmuletRules>> => 
 
   return useQuery({
     queryKey: ['scan-api', 'getAmuletRules', AmuletRules],
-    staleTime: 0,
     gcTime: 0,
     queryFn: async () => {
       const response = await scanClient.getAmuletRules();

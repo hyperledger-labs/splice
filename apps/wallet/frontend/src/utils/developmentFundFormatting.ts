@@ -2,20 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { ArchivedDevelopmentFundCouponStatusEnum } from '../models/models';
 
-export const formatDate = (date: Date): string => {
-  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-};
-
-export const formatDateTime = (date: Date): string => {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
 export const getDevelopmentFundEventTypeLabel = (
   status: ArchivedDevelopmentFundCouponStatusEnum
 ): string => {

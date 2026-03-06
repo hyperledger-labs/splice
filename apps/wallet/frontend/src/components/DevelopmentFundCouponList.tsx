@@ -1,14 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import React, { useState } from 'react';
+import React from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useDevelopmentFund } from '../hooks/useDevelopmentFund';
 import {
-  formatDate,
-  formatDateTime,
   getDevelopmentFundEventTypeLabel,
 } from '../utils/developmentFundFormatting';
+import { useWalletConfig } from '../utils/config';
 import {
   Alert,
   Box,
@@ -30,15 +29,21 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import { DateDisplay, DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsEntry from './BftAnsEntry';
 
 // Active Coupons Table Component
 const ActiveCouponsTable: React.FC = () => {
   const { withdrawDevelopmentFundCoupon } = useWalletClient();
   const {
+    spliceInstanceNames: { amuletNameAcronym },
+  } = useWalletConfig();
+  const {
     coupons: {
       coupons,
+      isLoading,
+      isError,
+      error,
       hasNextPage,
       hasPreviousPage,
       currentPage,
@@ -48,8 +53,20 @@ const ActiveCouponsTable: React.FC = () => {
     invalidateAll,
   } = useDevelopmentFund();
 
-  const [selectedCoupon, setSelectedCoupon] = useState<string | null>(null);
-  const [withdrawalReason, setWithdrawalReason] = useState('');
+  if (isLoading) {
+    return <Loading />;
+  }
+
+  if (isError) {
+    return (
+      <Alert severity="error">
+        Error loading active development fund allocations: {JSON.stringify(error)}
+      </Alert>
+    );
+  }
+
+  const [selectedCoupon, setSelectedCoupon] = React.useState<string | null>(null);
+  const [withdrawalReason, setWithdrawalReason] = React.useState('');
 
   const withdrawMutation = useMutation({
     mutationFn: async (reason: string) => {
@@ -76,6 +93,12 @@ const ActiveCouponsTable: React.FC = () => {
     if (withdrawalReason.trim()) {
       withdrawMutation.mutate(withdrawalReason);
     }
+  };
+
+  const handleReasonChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setWithdrawalReason(event.target.value);
   };
 
   return (
@@ -106,12 +129,18 @@ const ActiveCouponsTable: React.FC = () => {
                 ) : (
                   coupons.map(coupon => (
                     <TableRow key={coupon.id}>
-                      <TableCell>{formatDate(coupon.createdAt)}</TableCell>
+                      <TableCell>
+                        <DateDisplay datetime={coupon.createdAt} format="MMMM d, yyyy" />
+                      </TableCell>
                       <TableCell>
                         <BftAnsEntry partyId={coupon.beneficiary} />
                       </TableCell>
-                      <TableCell>{coupon.amount.toFixed(4)} CC</TableCell>
-                      <TableCell>{formatDate(coupon.expiresAt)}</TableCell>
+                      <TableCell>
+                        {coupon.amount.toFixed(4)} {amuletNameAcronym}
+                      </TableCell>
+                      <TableCell>
+                        <DateDisplay datetime={coupon.expiresAt} format="MMMM d, yyyy" />
+                      </TableCell>
                       <TableCell>{coupon.reason}</TableCell>
                       <TableCell>
                         <Button
@@ -162,7 +191,7 @@ const ActiveCouponsTable: React.FC = () => {
               rows={3}
               fullWidth
               value={withdrawalReason}
-              onChange={event => setWithdrawalReason(event.target.value)}
+              onChange={handleReasonChange}
               placeholder="Enter the reason for withdrawal"
             />
           </Stack>
@@ -193,6 +222,9 @@ const ActiveCouponsTable: React.FC = () => {
 
 // Coupon History Table Component
 const CouponHistoryTable: React.FC = () => {
+  const {
+    spliceInstanceNames: { amuletNameAcronym },
+  } = useWalletConfig();
   const {
     history: {
       historyEvents,
@@ -246,18 +278,22 @@ const CouponHistoryTable: React.FC = () => {
               ) : (
                 historyEvents.map(event => (
                   <TableRow key={event.id} className={`history-event-${event.eventType}`}>
-                    <TableCell>{formatDateTime(event.timestamp)}</TableCell>
+                    <TableCell>
+                      <DateDisplay datetime={event.timestamp} format="MMM d, yyyy hh:mm a" />
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={getDevelopmentFundEventTypeLabel(event.eventType)}
                         size="small"
-                        sx={{ color: 'black' }}
+                        color="primary"
                       />
                     </TableCell>
                     <TableCell>
                       <BftAnsEntry partyId={event.beneficiary} />
                     </TableCell>
-                    <TableCell>{event.amount.toFixed(4)} CC</TableCell>
+                    <TableCell>
+                      {event.amount.toFixed(4)} {amuletNameAcronym}
+                    </TableCell>
                     <TableCell>
                       <Typography variant="body2">{event.allocationReason}</Typography>
                     </TableCell>

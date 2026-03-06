@@ -506,18 +506,21 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         );
         const events: CouponHistoryEvent[] =
           response.development_fund_coupon_history.map(
-            (item: ArchivedDevelopmentFundCoupon, index: number) => ({
-              id: `${item.archivedAt.getTime()}-${index}`,
-              couponId: `${item.createdAt.getTime()}-${item.beneficiary}`,
-              eventType: item.status,
-              timestamp: item.archivedAt,
-              fundManager: item.fund_manager,
-              beneficiary: item.beneficiary,
-              amount: new BigNumber(item.amount),
-              allocationReason: item.reason,
-              withdrawalReason: item.rejection_or_withdrawal_reason,
-            })
-          );
+            (item: ArchivedDevelopmentFundCoupon) => {
+              const stableCouponId = `${item.createdAt.getTime()}-${item.fund_manager}-${item.beneficiary}`;
+              const stableEventId = `${stableCouponId}-${item.archivedAt.getTime()}-${item.status}`;
+              return {
+                id: stableEventId,
+                couponId: stableCouponId,
+                eventType: item.status,
+                timestamp: item.archivedAt,
+                fundManager: item.fund_manager,
+                beneficiary: item.beneficiary,
+                amount: new BigNumber(item.amount),
+                allocationReason: item.reason,
+                withdrawalReason: item.rejection_or_withdrawal_reason,
+              };
+            });
         return {
           events,
           nextPageToken: response.next_page_token,

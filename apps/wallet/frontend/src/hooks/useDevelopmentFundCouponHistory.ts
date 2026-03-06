@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useCallback, useMemo, useState } from 'react';
+import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { CouponHistoryEvent } from '../models/models';
@@ -21,13 +21,11 @@ export interface UseDevelopmentFundCouponHistoryResult {
   invalidateHistory: () => void;
 }
 
-export const useDevelopmentFundCouponHistory = (
-  fundManager?: string
-): UseDevelopmentFundCouponHistoryResult => {
+export const useDevelopmentFundCouponHistory = (): UseDevelopmentFundCouponHistoryResult => {
   const { listCouponHistoryEvents } = useWalletClient();
   const queryClient = useQueryClient();
 
-  const [cursorStack, setCursorStack] = useState<(number | undefined)[]>([undefined]);
+  const [cursorStack, setCursorStack] = React.useState<(number | undefined)[]>([undefined]);
   const currentCursor = cursorStack[cursorStack.length - 1];
 
   const historyQuery = useQuery({
@@ -35,37 +33,33 @@ export const useDevelopmentFundCouponHistory = (
     queryFn: () => listCouponHistoryEvents(PAGE_SIZE, currentCursor),
   });
 
-  const rawEvents = historyQuery.data?.events || [];
-  const events = useMemo(() => {
-    if (!fundManager) return rawEvents;
-    return rawEvents.filter((e: CouponHistoryEvent) => e.fundManager === fundManager);
-  }, [rawEvents, fundManager]);
+  const historyEvents = historyQuery.data?.events || [];
   const nextPageToken = historyQuery.data?.nextPageToken;
 
-  const goToNextHistoryPage = useCallback(() => {
-    if (nextPageToken !== undefined && rawEvents.length === PAGE_SIZE) {
+  const goToNextHistoryPage = React.useCallback(() => {
+    if (nextPageToken !== undefined && historyEvents.length === PAGE_SIZE) {
       setCursorStack(prev => [...prev, nextPageToken]);
     }
-  }, [nextPageToken, rawEvents.length]);
+  }, [nextPageToken, historyEvents.length]);
 
-  const goToPreviousHistoryPage = useCallback(() => {
+  const goToPreviousHistoryPage = React.useCallback(() => {
     if (cursorStack.length > 1) {
       setCursorStack(prev => prev.slice(0, -1));
     }
   }, [cursorStack.length]);
 
   const hasNextHistoryPage =
-    nextPageToken !== undefined && rawEvents.length === PAGE_SIZE;
+    nextPageToken !== undefined && historyEvents.length === PAGE_SIZE;
   const hasPreviousHistoryPage = cursorStack.length > 1;
   const currentHistoryPage = cursorStack.length;
 
-  const invalidateHistory = useCallback(() => {
+  const invalidateHistory = React.useCallback(() => {
     setCursorStack([undefined]);
     queryClient.invalidateQueries({ queryKey: DEVELOPMENT_FUND_QUERY_KEYS.couponHistory });
   }, [queryClient]);
 
   return {
-    historyEvents: events,
+    historyEvents,
     isLoadingHistory: historyQuery.isLoading,
     isHistoryError: historyQuery.isError,
     historyError: historyQuery.error,
