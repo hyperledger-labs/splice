@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -18,6 +17,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpiredDevelopmentFundCouponTrigger,
+  MergeUnclaimedDevelopmentFundCouponsTrigger,
 }
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
@@ -65,22 +65,13 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     if (wallClock.isAfter(ledgerTime)) wallClock else ledgerTime
   }
 
-  private def waitForStableUnclaimedTotal()(implicit webDriver: WebDriver): BigDecimal = {
-    eventually() {
-      val val1 = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
-      Threading.sleep(2000)
-      val val2 = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
-      val1 shouldBe val2
-      val1
-    }
-  }
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+            .withPausedTrigger[MergeUnclaimedDevelopmentFundCouponsTrigger]
         )(config)
       )
       .addConfigTransform((_, config) =>
@@ -765,7 +756,15 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             )
 
             val totalUnclaimedBefore = clue("Check: Total unclaimed should be positive and stable") {
-              waitForStableUnclaimedTotal()
+              eventually() {
+                val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
+                  .map(c => BigDecimal(c.contract.payload.amount))
+                  .sum
+                val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+                // The UI rounds to 4 decimal places
+                displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
+                displayed
+              }
             }
 
             val allocationAmount = BigDecimal(10)
@@ -810,7 +809,15 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               },
             )
 
-            val totalUnclaimedBeforeWithdrawal = waitForStableUnclaimedTotal()
+            val totalUnclaimedBeforeWithdrawal = eventually() {
+              val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
+                .map(c => BigDecimal(c.contract.payload.amount))
+                .sum
+              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+              // The UI rounds to 4 decimal places
+              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
+              displayed
+            }
 
             // ===================================================================
             // Section: Withdrawal via UI
@@ -872,7 +879,15 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
 
-            totalUnclaimedBeforeAllocation = waitForStableUnclaimedTotal()
+            totalUnclaimedBeforeAllocation = eventually() {
+              val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
+                .map(c => BigDecimal(c.contract.payload.amount))
+                .sum
+              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+              // The UI rounds to 4 decimal places
+              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
+              displayed
+            }
 
             actAndCheck(
               "Alice allocates a coupon for claiming test", {
@@ -952,7 +967,15 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
 
-            totalUnclaimedBeforeAllocation = waitForStableUnclaimedTotal()
+            totalUnclaimedBeforeAllocation = eventually() {
+              val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
+                .map(c => BigDecimal(c.contract.payload.amount))
+                .sum
+              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+              // The UI rounds to 4 decimal places
+              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
+              displayed
+            }
 
             actAndCheck(
               "Alice allocates a coupon with expiration", {
