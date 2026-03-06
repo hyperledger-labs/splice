@@ -125,7 +125,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
               BigDecimal(
                 LockedAmulet
                   .jsonDecoder()
-                  .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+                  .decode(new JsonLfReader(createdEvent.createArguments.value))
                   .amulet
                   .amount
                   .initialAmount
@@ -134,7 +134,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
               BigDecimal(
                 Amulet
                   .jsonDecoder()
-                  .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+                  .decode(new JsonLfReader(createdEvent.createArguments.value))
                   .amount
                   .initialAmount
               )

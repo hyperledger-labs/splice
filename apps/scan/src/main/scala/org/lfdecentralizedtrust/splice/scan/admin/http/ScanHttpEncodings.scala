@@ -10,7 +10,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
-import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
@@ -386,59 +385,59 @@ sealed trait ScanHttpEncodings {
     new javaApi.Identifier(packageId, moduleName, entityName)
   }
 
-  private def failedToWriteToJson(err: String): Nothing =
-    throw new IllegalStateException(s"Failed to write to JSON: $err")
-
-  /** Parses a string that is known to contain a valid JSON value to io.circe.Json */
-  protected def tryParseJson(validJsonString: String): io.circe.Json =
-    io.circe.parser
-      .parse(validJsonString)
-      .fold(err => failedToWriteToJson(err.message), identity)
-
   def encodeContractPayload(event: javaApi.CreatedEvent)(implicit
       elc: ErrorLoggingContext
-  ): io.circe.Json
+  ): definitions.RawJson
 
-  def decodeContractPayload(templateId: javaApi.Identifier, json: io.circe.Json): javaApi.DamlRecord
+  def decodeContractPayload(
+      templateId: javaApi.Identifier,
+      rawJson: definitions.RawJson,
+  ): javaApi.DamlRecord
 
   def encodeChoiceArgument(event: javaApi.ExercisedEvent)(implicit
       elc: ErrorLoggingContext
-  ): io.circe.Json
+  ): definitions.RawJson
 
   def decodeChoiceArgument(
       templateId: javaApi.Identifier,
       interfaceId: Option[javaApi.Identifier],
       choice: String,
-      json: io.circe.Json,
+      rawJson: definitions.RawJson,
   ): javaApi.Value
 
   def encodeExerciseResult(event: javaApi.ExercisedEvent)(implicit
       elc: ErrorLoggingContext
-  ): io.circe.Json
+  ): definitions.RawJson
 
   def decodeExerciseResult(
       templateId: javaApi.Identifier,
       interfaceId: Option[javaApi.Identifier],
       choice: String,
-      json: io.circe.Json,
+      rawJson: definitions.RawJson,
   ): javaApi.Value
 
   protected def encodeValueFallback(
       error: String,
       value: com.daml.ledger.javaapi.data.Value,
-  )(implicit elc: ErrorLoggingContext): io.circe.Json = {
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson = {
     import io.circe.syntax.*
-    val fallbackValue = tryParseJson(
-      ApiCodecCompressed
-        .apiValueToJsValue(Contract.javaValueToLfValue(value))
-        .compactPrint
+    val fallbackValue = ApiCodecCompressed
+      .apiValueToJsValue(Contract.javaValueToLfValue(value))
+      .compactPrint
+    definitions.RawJson(
+      io.circe
+        .JsonObject(
+          "error" -> io.circe.Json.fromString(error),
+          "value" -> io.circe.parser
+            .parse(fallbackValue)
+            .fold(
+              err => throw new IllegalStateException(s"Failed to write to JSON: ${err.message}"),
+              identity,
+            ),
+        )
+        .asJson
+        .noSpaces
     )
-    io.circe
-      .JsonObject(
-        "error" -> io.circe.Json.fromString(error),
-        "value" -> fallbackValue,
-      )
-      .asJson
   }
 }
 
@@ -714,7 +713,7 @@ case class CompactJsonScanHttpEncodings(
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecCodegen
   override def encodeContractPayload(
       event: javaApi.CreatedEvent
-  )(implicit elc: ErrorLoggingContext): Json =
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson =
     ValueJsonCodecCodegen
       .serializableContractPayload(event)
       .fold(
@@ -722,12 +721,12 @@ case class CompactJsonScanHttpEncodings(
           elc.error(s"Failed to encode contract payload: $err")
           encodeValueFallback(err, event.getArguments)
         },
-        tryParseJson,
+        definitions.RawJson(_),
       )
 
   override def encodeChoiceArgument(
       event: javaApi.ExercisedEvent
-  )(implicit elc: ErrorLoggingContext): Json =
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson =
     ValueJsonCodecCodegen
       .serializeChoiceArgument(event)
       .fold(
@@ -735,12 +734,12 @@ case class CompactJsonScanHttpEncodings(
           elc.error(s"Failed to encode choice argument: $err")
           encodeValueFallback(err, event.getChoiceArgument)
         },
-        tryParseJson,
+        definitions.RawJson(_),
       )
 
   override def encodeExerciseResult(
       event: javaApi.ExercisedEvent
-  )(implicit elc: ErrorLoggingContext): Json =
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson =
     ValueJsonCodecCodegen
       .serializeChoiceResult(event)
       .fold(
@@ -748,19 +747,19 @@ case class CompactJsonScanHttpEncodings(
           elc.error(s"Failed to encode exercise result: $err")
           encodeValueFallback(err, event.getExerciseResult)
         },
-        tryParseJson,
+        definitions.RawJson(_),
       )
 
   override def decodeContractPayload(
       templateId: javaApi.Identifier,
-      json: Json,
+      rawJson: definitions.RawJson,
   ): javaApi.DamlRecord =
     ValueJsonCodecCodegen
-      .deserializableContractPayload(templateId, json.noSpaces)
+      .deserializableContractPayload(templateId, rawJson.value)
       .fold(
         error =>
           throw new RuntimeException(
-            s"Failed to decode contract payload '${json.noSpaces}': $error"
+            s"Failed to decode contract payload '${rawJson.value}': $error"
           ),
         transformRecord,
       )
@@ -769,14 +768,14 @@ case class CompactJsonScanHttpEncodings(
       templateId: javaApi.Identifier,
       interfaceId: Option[javaApi.Identifier],
       choice: String,
-      json: Json,
+      rawJson: definitions.RawJson,
   ): javaApi.Value =
     ValueJsonCodecCodegen
-      .deserializeChoiceArgument(templateId, interfaceId, choice, json.noSpaces)
+      .deserializeChoiceArgument(templateId, interfaceId, choice, rawJson.value)
       .fold(
         error =>
           throw new RuntimeException(
-            s"Failed to decode choice argument '${json.noSpaces}': $error"
+            s"Failed to decode choice argument '${rawJson.value}': $error"
           ),
         transformValue,
       )
@@ -785,13 +784,13 @@ case class CompactJsonScanHttpEncodings(
       templateId: javaApi.Identifier,
       interfaceId: Option[javaApi.Identifier],
       choice: String,
-      json: Json,
+      rawJson: definitions.RawJson,
   ): javaApi.Value =
     ValueJsonCodecCodegen
-      .deserializeChoiceResult(templateId, interfaceId, choice, json.noSpaces)
+      .deserializeChoiceResult(templateId, interfaceId, choice, rawJson.value)
       .fold(
         error =>
-          throw new RuntimeException(s"Failed to decode choice result '${json.noSpaces}': $error"),
+          throw new RuntimeException(s"Failed to decode choice result '${rawJson.value}': $error"),
         transformValue,
       )
 }
@@ -806,49 +805,49 @@ case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobuf
   override def encodeContractPayload(
       event: javaApi.CreatedEvent
-  )(implicit elc: ErrorLoggingContext): Json =
-    tryParseJson(
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson =
+    definitions.RawJson(
       ValueJsonCodecProtobuf
         .serializeValue(event.getArguments)
     )
 
   override def encodeChoiceArgument(
       event: javaApi.ExercisedEvent
-  )(implicit elc: ErrorLoggingContext): Json =
-    tryParseJson(
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson =
+    definitions.RawJson(
       ValueJsonCodecProtobuf
         .serializeValue(event.getChoiceArgument)
     )
 
   override def encodeExerciseResult(
       event: javaApi.ExercisedEvent
-  )(implicit elc: ErrorLoggingContext): Json =
-    tryParseJson(
+  )(implicit elc: ErrorLoggingContext): definitions.RawJson =
+    definitions.RawJson(
       ValueJsonCodecProtobuf
         .serializeValue(event.getExerciseResult)
     )
 
   override def decodeContractPayload(
       templateId: javaApi.Identifier,
-      json: Json,
+      rawJson: definitions.RawJson,
   ): javaApi.DamlRecord =
-    ValueJsonCodecProtobuf.deserializeValue(json.toString()).asRecord().get()
+    ValueJsonCodecProtobuf.deserializeValue(rawJson.value).asRecord().get()
 
   override def decodeChoiceArgument(
       templateId: javaApi.Identifier,
       interfaceId: Option[javaApi.Identifier],
       choice: String,
-      json: Json,
+      rawJson: definitions.RawJson,
   ): javaApi.Value =
-    ValueJsonCodecProtobuf.deserializeValue(json.toString())
+    ValueJsonCodecProtobuf.deserializeValue(rawJson.value)
 
   override def decodeExerciseResult(
       templateId: javaApi.Identifier,
       interfaceId: Option[javaApi.Identifier],
       choice: String,
-      json: Json,
+      rawJson: definitions.RawJson,
   ): javaApi.Value =
-    ValueJsonCodecProtobuf.deserializeValue(json.toString())
+    ValueJsonCodecProtobuf.deserializeValue(rawJson.value)
 }
 
 object FaucetProcessor {

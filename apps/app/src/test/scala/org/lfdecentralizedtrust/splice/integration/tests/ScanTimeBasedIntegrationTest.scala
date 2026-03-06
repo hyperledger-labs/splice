@@ -482,12 +482,12 @@ class ScanTimeBasedIntegrationTest
         )
       val entry = AnsEntry
         .jsonDecoder()
-        .decode(new JsonLfReader(entries.loneElement.createArguments.noSpaces))
+        .decode(new JsonLfReader(entries.loneElement.createArguments.value))
       entry.name shouldBe perTestCaseName("snapshot")
       forAll(coins) { createdEvent =>
         Amulet
           .jsonDecoder()
-          .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+          .decode(new JsonLfReader(createdEvent.createArguments.value))
           .owner should be(aliceUserParty.toProtoPrimitive)
       }
       val snapshotAfterCts = CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant)

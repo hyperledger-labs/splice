@@ -2488,7 +2488,8 @@ components:
           description: |
             The arguments that have been used to create the contract, in the
             form of JSON representation of a Daml record.
-          type: object
+          type: string
+          x-scala-type: org.lfdecentralizedtrust.splice.http.v0.definitions.RawJson
         created_at:
           description: |
             Ledger effective time of the transaction that created the contract.
@@ -2551,7 +2552,8 @@ components:
             representation of a Daml value. This is usually a record with field
             names being the argument names, even in the case of a single apparent
             choice argument, which is represented as a single-element Daml record.
-          type: object
+          type: string
+          x-scala-type: org.lfdecentralizedtrust.splice.http.v0.definitions.RawJson
         child_event_ids:
           description: |
             References to further events in the same transaction that appeared as a result of this ExercisedEvent.
@@ -2564,7 +2566,8 @@ components:
           description: |
             The result of exercising the choice, as the JSON representation of a
             Daml value.
-          type: object
+          type: string
+          x-scala-type: org.lfdecentralizedtrust.splice.http.v0.definitions.RawJson
         consuming:
           description: |
             If true, the target contract may no longer be exercised.

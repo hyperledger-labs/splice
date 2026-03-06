@@ -224,7 +224,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     val rightChildId1 = originalEventIds(4)
     val rightChildId2 = originalEventIds(5)
 
-    val simpleDamlValue = io.circe.Json.obj("record" -> io.circe.Json.obj())
+    val simpleDamlValue = httpApi.RawJson("""{"record":{}}""")
 
     def mkCreate(eventId: String) = httpApi.TreeEvent.fromCreatedEvent(
       httpApi.CreatedEvent(
