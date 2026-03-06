@@ -61,6 +61,29 @@ object DarResourcesGenerator {
        |
        |  def lookupAllPackageVersions(name: PackageName): Seq[DarResource] =
        |    packageResources.view.flatMap(_.all).toSeq.filter(_.metadata.name == name)
+       |
+       |  def getRequiredPackageVersions(
+       |      name: PackageName,
+       |      upToRequiredVersion: PackageVersion,
+       |      latestPackagesOnly: Boolean = false,
+       |  ): Seq[DarResource] = {
+       |    val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
+       |    packageResources.view
+       |      .flatMap(_.all)
+       |      .toSeq
+       |      .filter(_.metadata.name == name)
+       |      .filter(pkg => {
+       |        val version = pkg.metadata.version
+       |        (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
+       |      })
+       |      .distinct
+       |  }
+       |
+       |  private def lookupMinimumPackageResource(name: PackageName): DarResource =
+       |    packageResources
+       |      .find(_.latest.metadata.name == name)
+       |      .getOrElse(throw new NoSuchElementException(s"Could not find PackageResource for $name."))
+       |      .minimumInitialization
        |}""".stripMargin
     lines.mkString("\n")
   }
