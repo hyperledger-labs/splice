@@ -26,7 +26,6 @@ import scala.concurrent.ExecutionContext
   * know when each segment/snapshot is complete).
   */
 
-// FIXME: might not even deserve a class any more.....
 class S3ZstdObjects(
     storageConfig: ScanStorageConfig,
     appConfig: BulkStorageConfig,

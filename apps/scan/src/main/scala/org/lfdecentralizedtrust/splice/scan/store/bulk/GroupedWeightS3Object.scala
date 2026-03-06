@@ -14,6 +14,14 @@ import GroupedWeightS3Object.Output
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
+/** A Pekko GraphStage that takes a stream of bytestrings, slices them into objects such that every object is slightly
+  * larger than maxObjectSize (i.e. the cut is at the end of the byteString that passes that threshold), and uploads them
+  * to an S3. Multiple input ByteStrings may be uplaoded in parallel using multi-part upload, up to `maxParallelPartUploads`
+  * in parallel. Whenever an object is finished, this GraphStage emits the key of that object, and a flag of whether this is
+  * the last object before closing the stream.
+  * On upstream errors, any partially-uploaded object is discarded.
+  */
+
 case class GroupedWeightS3Object(
     s3Connection: S3BucketConnection,
     getObjectKey: Int => String,
@@ -70,15 +78,26 @@ case class GroupedWeightS3Object(
       private val state: AtomicReference[State] = new AtomicReference[State](State.initial())
       private val upstreamFinished: AtomicBoolean = new AtomicBoolean(false)
 
+      private def objectDone =
+        upstreamFinished.get() || state.get().currentObjectSize >= maxObjectSize
+
       private val uploadCallback = getAsyncCallback[Unit] { _ =>
         state.set(state.get().completePart())
         logger.debug(
           s"Part upload completed, waiting for ${state.get().numPendingPartUploads} more"
         )
-        if (state.get().numPendingPartUploads == 0) {
-          if (upstreamFinished.get() || state.get().currentObjectSize > maxObjectSize) {
+        if (state.get().numPendingPartUploads == maxParallelPartUploads - 1) {
+          if (!objectDone) {
             logger.debug(
-              s"This part was last in the stream, or the object reached its size cutoff, finishing upload of ${state.get().currentObject.key}"
+              "More parallel upload capacity freed up, and we're not done yet, pull more input"
+            )
+            pull(in)
+          }
+        }
+        if (state.get().numPendingPartUploads == 0) {
+          if (objectDone) {
+            logger.debug(
+              s"Finishing upload of ${state.get().currentObject.key}"
             )
             finishCurrentObject()
           }
@@ -119,15 +138,16 @@ case class GroupedWeightS3Object(
           case Success(_) => uploadCallback.invoke(())
           case Failure(ex) => failStage(ex)
         }
-        if (!elem.isLast && curState.currentObjectSize + elem.bytes.length <= maxObjectSize) {
+        if (!objectDone) {
           logger.debug(
-            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.bytes.length}, less than the size cutoff"
+            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.bytes.length}, not done with it yet"
           )
-          // TODO: limit the parallelism
-          pull(in)
+          if (state.get().numPendingPartUploads < maxParallelPartUploads) {
+            pull(in)
+          }
         } else {
           logger.debug(
-            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.bytes.length}, reached the size cutoff"
+            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.bytes.length}, done with this object"
           )
         }
       }
