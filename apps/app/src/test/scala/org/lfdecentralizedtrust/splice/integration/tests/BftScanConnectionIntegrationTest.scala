@@ -266,12 +266,14 @@ class BftScanConnectionIntegrationTest
       aliceValidatorBackend.stop()
     }
 
-    clue("Reboot Alice validator and verify it can initialize using the other 3 Scans") {
-      eventuallySucceeds() {
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        // need to supress due to connection attempts to failed scan of Sv1
         aliceValidatorBackend.startSync()
         aliceValidatorBackend.onboardUser("Test")
-      }
-    }
+      },
+      _ => succeed,
+    )
   }
 
   private val bootstrapsWith1UrlLog =
