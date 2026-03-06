@@ -44,6 +44,16 @@ const DevelopmentFundAllocation: React.FC = () => {
 
   const disabled = !isFundManager;
 
+  const amountHelperText = React.useMemo(() => {
+    if (amountExceedsAvailable) {
+      return `Available: ${unclaimedTotal.toFixed(4)} ${config.spliceInstanceNames.amuletNameAcronym}`;
+    }
+    if (amountNum?.isZero()) {
+      return 'Amount must be greater than 0';
+    }
+    return undefined;
+  }, [amountExceedsAvailable, amountNum, unclaimedTotal, config.spliceInstanceNames.amuletNameAcronym]);
+
   return (
     <Stack spacing={2}>
       <Typography variant="h4">Development Fund Allocation</Typography>
@@ -80,11 +90,7 @@ const DevelopmentFundAllocation: React.FC = () => {
                   onChange={event => setAmount(event.target.value)}
                   disabled={disabled}
                   error={amount !== '' && (!isAmountValid || amountExceedsAvailable)}
-                  helperText={
-                    amountExceedsAvailable
-                      ? `Available: ${unclaimedTotal.toFixed(4)} ${config.spliceInstanceNames.amuletNameAcronym}`
-                      : undefined
-                  }
+                  helperText={amountHelperText}
                   slotProps={{
                     htmlInput: {
                       'aria-label': 'amount',
