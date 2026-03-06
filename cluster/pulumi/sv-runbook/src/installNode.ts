@@ -385,6 +385,27 @@ async function installSvAndValidator(
   );
   const externalSequencerP2pAddress = (canton.active as unknown as CantonBftSynchronizerNode)
     .externalSequencerP2pAddress;
+  const synchronizerValues = decentralizedSynchronizerMigrationConfig.lsuEnabled
+    ? {
+        synchronizers: {
+          current: {
+            sequencer: canton.active.namespaceInternalSequencerAddress,
+            mediator: canton.active.namespaceInternalMediatorAddress,
+          },
+          ...(canton.upgrade
+            ? {
+                successor: {
+                  sequencer: canton.upgrade.namespaceInternalSequencerAddress,
+                  mediator: canton.upgrade.namespaceInternalMediatorAddress,
+                },
+              }
+            : {}),
+        },
+      }
+    : {
+        sequencerAddress: canton.active.namespaceInternalSequencerAddress,
+        mediatorAddress: canton.active.namespaceInternalMediatorAddress,
+      };
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
@@ -392,6 +413,7 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
+    ...synchronizerValues,
     ...(useCantonBft
       ? {
           bftSequencers: [

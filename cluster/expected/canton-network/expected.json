@@ -2971,7 +2971,6 @@
         "isFirstSv": true,
         "logAsyncFlush": false,
         "logLevel": "WARN",
-        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
@@ -2996,7 +2995,6 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -3004,6 +3002,16 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
+        },
+        "synchronizers": {
+          "current": {
+            "mediator": "global-domain-3-mediator",
+            "sequencer": "global-domain-3-sequencer"
+          },
+          "successor": {
+            "mediator": "global-domain-4-mediator",
+            "sequencer": "global-domain-4-sequencer"
+          }
         },
         "tolerations": [
           {
@@ -3934,7 +3942,6 @@
         "isFirstSv": false,
         "logAsyncFlush": false,
         "logLevel": "INFO",
-        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
@@ -3959,7 +3966,6 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -3967,6 +3973,16 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
+        },
+        "synchronizers": {
+          "current": {
+            "mediator": "global-domain-3-mediator",
+            "sequencer": "global-domain-3-sequencer"
+          },
+          "successor": {
+            "mediator": "global-domain-4-mediator",
+            "sequencer": "global-domain-4-sequencer"
+          }
         },
         "tolerations": [
           {

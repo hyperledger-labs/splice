@@ -602,6 +602,16 @@
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
         },
+        "synchronizers": {
+          "current": {
+            "mediator": "global-domain-3-mediator",
+            "sequencer": "global-domain-3-sequencer"
+          },
+          "successor": {
+            "mediator": "global-domain-4-mediator",
+            "sequencer": "global-domain-4-sequencer"
+          }
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
