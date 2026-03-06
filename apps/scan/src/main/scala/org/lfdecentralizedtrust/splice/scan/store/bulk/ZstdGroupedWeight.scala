@@ -118,8 +118,8 @@ case class ZstdGroupedWeight(minSize: Long)
       override def onUpstreamFinish(): Unit = {
         if (state.get().bytes.nonEmpty) {
           state.set(state.get().append(zstd.get().zstdFinish()))
-          push(out, ByteStringWithTermination(state.get().bytes, true))
         }
+        push(out, ByteStringWithTermination(state.get().bytes, true))
         completeStage()
       }
 

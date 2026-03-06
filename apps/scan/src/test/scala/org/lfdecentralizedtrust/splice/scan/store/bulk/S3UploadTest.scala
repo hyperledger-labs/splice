@@ -17,19 +17,25 @@ import org.scalatest.Assertion
 class S3UploadTest extends StoreTestBase with HasS3Mock {
   "GroupedWeightS3Object" should {
 
-    def testWithInput(inputSizes: Seq[Int], expectedObjectSizes: Seq[Int], injectError: Boolean = false): Future[Assertion] = {
+    def testWithInput(
+        inputSizes: Seq[Int],
+        expectedObjectSizes: Seq[Int],
+        injectError: Boolean = false,
+    ): Future[Assertion] = {
       val data = ByteString(Random.nextBytes(100))
       val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
 
       val (pub, sub) = TestSource
         .probe[ByteStringWithTermination]
-        .via(GroupedWeightS3Object(
-          bucketConnection,
-          getObjectKey = i => s"test_$i",
-          maxObjectSize = 10L,
-          maxParallelPartUploads = 2,
-          loggerFactory,
-        ))
+        .via(
+          GroupedWeightS3Object(
+            bucketConnection,
+            getObjectKey = i => s"test_$i",
+            maxObjectSize = 10L,
+            maxParallelPartUploads = 2,
+            loggerFactory,
+          )
+        )
         .toMat(TestSink.probe[GroupedWeightS3Object.Output])(Keep.both)
         .run()
 
@@ -37,19 +43,18 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       def sendBytes(n: Int, isLast: Boolean) =
         pub.sendNext(ByteStringWithTermination(it.getByteString(n), isLast))
 
-      inputSizes.zipWithIndex.foreach {
-        case(size, i) => sendBytes(
+      inputSizes.zipWithIndex.foreach { case (size, i) =>
+        sendBytes(
           size,
-          isLast = i == inputSizes.length-1 && !injectError
+          isLast = i == inputSizes.length - 1 && !injectError,
         )
       }
 
       sub.request(expectedObjectSizes.length.toLong)
-      expectedObjectSizes.zipWithIndex.foreach {
-        case(size, i) =>
-          val next = sub.expectNext(20.seconds)
-          next.objectKey shouldBe s"test_$i"
-          next.isLastObject shouldBe (i == expectedObjectSizes.length-1 && !injectError)
+      expectedObjectSizes.zipWithIndex.foreach { case (size, i) =>
+        val next = sub.expectNext(20.seconds)
+        next.objectKey shouldBe s"test_$i"
+        next.isLastObject shouldBe (i == expectedObjectSizes.length - 1 && !injectError)
       }
       if (injectError) {
         sub.request(1)
@@ -61,16 +66,18 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       }
       val s3Objects = bucketConnection.listObjects.futureValue
       val s3ObjKeys = s3Objects.contents.asScala.sortBy(_.key())
-      val s3ObjData = s3ObjKeys.map {obj => bucketConnection.readFullObject(obj.key()).futureValue}.toSeq
+      val s3ObjData = s3ObjKeys.map { obj =>
+        bucketConnection.readFullObject(obj.key()).futureValue
+      }.toSeq
       s3ObjData.map(_.remaining()) shouldBe expectedObjectSizes
-      val dataFromS3 = s3ObjData.foldLeft(ByteString.empty) { (acc, buf) => acc ++ ByteString(buf)}
+      val dataFromS3 = s3ObjData.foldLeft(ByteString.empty) { (acc, buf) => acc ++ ByteString(buf) }
       dataFromS3 shouldBe data.take(expectedObjectSizes.sum)
     }
 
     "just work" in {
       val inputSizes =
         Seq.fill(9)(3) :+ // 9 inputs of size 3, to test the basic functionality
-          7 :+  // add 7 to exactly hit the edge of the object size (10)
+          7 :+ // add 7 to exactly hit the edge of the object size (10)
           25 :+ // add an input that does not fit
           1 // finish with a tiny input
       val expectedObjectSizes = Seq(12, 12, 10, 25, 1)
