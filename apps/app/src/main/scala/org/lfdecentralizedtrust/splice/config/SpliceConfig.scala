@@ -607,8 +607,6 @@ object SpliceConfig {
       deriveReader[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigReader[RangeConfig] =
       deriveReader[RangeConfig]
-    implicit val scheduledLsuConfigReader: ConfigReader[ScheduledLsuConfig] =
-      deriveReader[ScheduledLsuConfig]
     implicit val packageVettingCacheConfig: ConfigReader[PackageVettingLookupService.CacheConfig] =
       deriveReader[PackageVettingLookupService.CacheConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
@@ -1048,8 +1046,6 @@ object SpliceConfig {
       deriveWriter[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigWriter[RangeConfig] =
       deriveWriter[RangeConfig]
-    implicit val scheduledLsuConfigWriter: ConfigWriter[ScheduledLsuConfig] =
-      deriveWriter[ScheduledLsuConfig]
     implicit val packageVettingCacheConfig: ConfigWriter[PackageVettingLookupService.CacheConfig] =
       deriveWriter[PackageVettingLookupService.CacheConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
