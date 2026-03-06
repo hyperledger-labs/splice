@@ -11,7 +11,7 @@ pulumiProjectConfig:
 synchronizerMigration:
   active:
     id: 0
-    version: 0.5.13-tomtantillo-dirty
+    version: 0.6.0-tomtantillo-dirty
     sequencer:
       enableBftSequencer: true
     releaseReference:
