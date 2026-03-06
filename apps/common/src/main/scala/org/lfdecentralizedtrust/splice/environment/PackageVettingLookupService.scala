@@ -88,14 +88,23 @@ class PackageVettingLookupService(
       )
   }
 
-  def splitBatch[T](pkg: PackageIdResolver.Package, informees: T => Seq[PartyId], batch: Seq[T])(
-      implicit tc: TraceContext
-  ): Future[Map[Option[PackageVersion], Seq[T]]] =
+  def splitBatch[T](
+      pkg: PackageIdResolver.Package,
+      informees: T => Seq[PartyId],
+      batch: Seq[T],
+      batchSize: Int,
+  )(implicit
+      tc: TraceContext
+  ): Future[Map[Option[PackageVersion], Seq[Seq[T]]]] =
     for {
       versionedBatch <- MonadUtil.sequentialTraverse(batch)(t =>
         lookupVettingState(informees(t), pkg).map(_ -> t)
       )
-    } yield versionedBatch.groupMapReduce(_._1)(p => Seq(p._2))(_ ++ _)
+    } yield versionedBatch
+      .groupMapReduce(_._1)(p => Seq(p._2))(_ ++ _)
+      .view
+      .mapValues(_.grouped(batchSize).toSeq)
+      .toMap
 
   override def onClosed() = {
     metrics.closeAcquired()

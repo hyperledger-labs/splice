@@ -404,9 +404,9 @@ svs:
     logging:
       apiRequestLogLevel: 'DEBUG'
       appsAsync: false
-      appsLogLevel: 'INFO'
+      appsLogLevel: 'DEBUG'
       cantonAsync: false
-      cantonLogLevel: 'INFO'
+      cantonLogLevel: 'DEBUG'
       cometbftLogLevel: 'debug'
     mediator:
       resources:
