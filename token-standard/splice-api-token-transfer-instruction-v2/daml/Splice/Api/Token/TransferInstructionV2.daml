@@ -78,18 +78,18 @@ data TransferInstructionResult_Output
 -- TransferInstruction
 ------------------------
 
--- | Status of a transfer instruction.
-data TransferInstructionStatus
-  = TransferPendingReceiverAcceptance
-      -- ^ The transfer is pending acceptance by the receiver.
-  | TransferPendingInternalWorkflow
-      -- ^ The transfer is pending actions to be taken as part of registry internal workflows.
-      with
-        pendingActions : Map.Map Party Text
-          -- ^ The actions that a party could take to advance the transfer.
-          --
-          -- This field can by used to inform wallet users whether they need to take an action or not.
-  deriving (Show, Eq)
+-- | Actions to advance the state of a transfer instruction.
+data TransferInstructionAction
+    = TIA_Accept
+    | TIA_Reject
+    | TIA_Withdraw
+    | TIA_Custom with
+        id : Text
+          -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
+          -- Namespaced analogously to metadata keys.
+        description : Text
+          -- ^ Human-readable description of the action for display in the wallet.
+    deriving (Show, Eq)
 
 -- | View for `TransferInstruction`.
 data TransferInstructionView = TransferInstructionView with
@@ -97,11 +97,13 @@ data TransferInstructionView = TransferInstructionView with
       -- ^ The contract id of the original transfer instruction contract.
       -- Used by the wallet to track the lineage of transfer instructions through multiple steps.
       --
-      -- Only set if the registry evolves the transfer instruction in multiple steps.
+      -- Only set if the registry evolved the transfer instruction in multiple steps.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
-    status : TransferInstructionStatus
-      -- ^ The status of the transfer instruction.
+    availableActions : Map.Map Party [TransferInstructionAction]
+      -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
+      --
+      -- This field can by used to inform wallet users whether they can take an action or not.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
@@ -123,9 +125,6 @@ interface TransferInstruction where
 
   choice TransferInstruction_Accept : TransferInstructionResult
     -- ^ Accept the transfer as the receiver.
-    --
-    -- This choice is only available if the instruction is in
-    -- `TransferPendingReceiverAcceptance` state.
     --
     -- Note that while implementations will typically return `TransferInstructionResult_Completed`,
     -- this is not guaranteed. The result of the choice is implementation-specific and MAY
@@ -166,12 +165,12 @@ interface TransferInstruction where
     -- execute registry internal workflow steps that advance the state of the
     -- transfer instruction. A reason may be communicated via the metadata.
     with
-      extraActors : [Party]
-        -- ^ Extra actors authorizing the update. Implementations MUST check that
+      actors : [Party]
+        -- ^ Actors authorizing the update. Implementations MUST check that
         -- this field contains the expected actors for the specific update.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.instrumentId.admin, extraActors
+    controller actors
     do transferInstruction_updateImpl this self arg
 
 

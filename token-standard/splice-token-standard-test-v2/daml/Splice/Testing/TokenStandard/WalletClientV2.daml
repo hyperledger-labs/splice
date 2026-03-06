@@ -30,6 +30,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
 import DA.Action (unless)
 import DA.Optional (isSome)
+import DA.Map qualified as Map
 
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 import Splice.Api.Token.AllocationRequestV2 qualified as AllocationRequestV2
@@ -110,7 +111,7 @@ listTransferOffers p instrumentId = do
   let pendingOffers = do
         (cid, Some instr) <- instrs
         guard (instr.transfer.instrumentId == instrumentId)
-        guard (instr.status == TransferInstructionV2.TransferPendingReceiverAcceptance)
+        guard (p `Map.member` instr.availableActions)
         guard (p == instr.transfer.sender.owner || p == instr.transfer.receiver.owner)
         pure (cid, instr)
   pure pendingOffers
