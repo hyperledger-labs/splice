@@ -85,7 +85,7 @@ for example, this command (requires installing `jq <https://jqlang.org/>`_):
 
 .. parsed-literal::
 
-    curl -X POST --header "Content-Type: application/json" -d "{}" |gsf_scan_url|/api/scan/v0/amulet-rules | jq ".amulet_rules_update.contract.payload.configSchedule.initialValue.decentralizedSynchronizer.fees"
+    curl -X POST --header "Content-Type: application/json" --header "Accept: application/json" -d "{}" |gsf_scan_url|/api/scan/v0/amulet-rules | jq ".amulet_rules_update.contract.payload.configSchedule.initialValue.decentralizedSynchronizer.fees"
 
 Above command will return a JSON object similar to the following:
 
@@ -126,7 +126,7 @@ To give an overview here:
 
   .. parsed-literal::
 
-     curl -X POST --header "Content-Type: application/json" -d "{\"cached_open_mining_round_contract_ids\":[], \"cached_issuing_round_contract_ids\":[]}" |gsf_scan_url|/api/scan/v0/open-and-issuing-mining-rounds | jq ".open_mining_rounds | values[] | .contract.payload | {round, amuletPrice}"
+     curl -X POST --header "Content-Type: application/json" --header "Accept: application/json" -d "{\"cached_open_mining_round_contract_ids\":[], \"cached_issuing_round_contract_ids\":[]}" |gsf_scan_url|/api/scan/v0/open-and-issuing-mining-rounds | jq ".open_mining_rounds | values[] | .contract.payload | {round, amuletPrice}"
 
 - ``readVsWriteScalingFactor``: specifies the weight of additional traffic balance subtractions (from a sender's balance)
   for delivering a synchronizer message to each of its recipients.
