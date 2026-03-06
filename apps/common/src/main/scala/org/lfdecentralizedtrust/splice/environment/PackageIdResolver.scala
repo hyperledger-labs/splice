@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.daml.lf.data.Ref.{IdString, PackageName, PackageVersion}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -51,7 +52,7 @@ object PackageIdResolver {
     PackageVersion.assertFromString(version)
   }
 
-  sealed abstract class Package extends Product with Serializable {
+  sealed abstract class Package extends Product with Serializable with PrettyPrinting {
     def packageName: IdString.PackageName = {
       val clsName = this.productPrefix
       // Turn CantonAmulet into canton-amulet
@@ -60,6 +61,9 @@ object PackageIdResolver {
           .replaceAllIn(clsName, m => (if (m.start != 0) "-" else "") + m.matched.toLowerCase())
       )
     }
+
+    override def pretty: Pretty[this.type] =
+      prettyOfString(_.packageName)
   }
 
   object Package {

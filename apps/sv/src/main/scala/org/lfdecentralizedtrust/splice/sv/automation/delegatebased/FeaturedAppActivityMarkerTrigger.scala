@@ -80,7 +80,7 @@ class FeaturedAppActivityMarkerTrigger(
   def splitBatchByVettingState(
       batch: CrossVersionBatch
   )(implicit tc: TraceContext): Future[Seq[Task]] =
-    svTaskContext.vettingService
+    svTaskContext.vettingLookupService
       .splitBatch[Contract[
         amulet.FeaturedAppActivityMarker.ContractId,
         amulet.FeaturedAppActivityMarker,
