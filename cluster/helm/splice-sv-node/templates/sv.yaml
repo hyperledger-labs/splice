@@ -197,8 +197,8 @@ spec:
                     }
                   }
                 }
-            {{- else if .Values.localSynchronizers }}
-            {{- range $syncName, $sync := .Values.localSynchronizers }}
+            {{- else if .Values.synchronizers }}
+            {{- range $syncName, $sync := .Values.synchronizers }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN_{{ $syncName | upper }}
               #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
@@ -274,7 +274,7 @@ spec:
             {{- if (.Values.cometBFT).externalGovernanceKey }}
               {{- $anyGovernanceKey = true }}
             {{- end }}
-            {{- range $syncName, $sync := .Values.localSynchronizers }}
+            {{- range $syncName, $sync := .Values.synchronizers }}
               {{- if ($sync.cometBftConfig).externalGovernanceKey }}
                 {{- $anyGovernanceKey = true }}
               {{- end }}

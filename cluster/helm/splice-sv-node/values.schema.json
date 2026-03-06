@@ -46,11 +46,11 @@
         {
           "required": ["domain"],
           "not": {
-            "required": ["localSynchronizers"]
+            "required": ["synchronizers"]
           }
         },
         {
-          "required": ["localSynchronizers"],
+          "required": ["synchronizers"],
           "not": {
             "required": ["domain"]
           }
@@ -230,7 +230,7 @@
             }
           }
         },
-        "localSynchronizers": {
+        "synchronizers": {
           "type": "object",
           "additionalProperties": false,
           "properties": {

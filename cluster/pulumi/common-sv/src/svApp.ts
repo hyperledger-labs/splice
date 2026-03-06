@@ -50,7 +50,7 @@ export function valuesForSvApp(
   ingressName: string
 ): {
   domain?: object;
-  localSynchronizers?: object;
+  synchronizers?: object;
   additionalEnvVars: EnvVarConfig[];
   cometBFT?: object;
   pvc: object;
@@ -85,11 +85,11 @@ export function valuesForSvApp(
 
   const lsuEnabled = decentralizedSynchronizerMigrationConfig.lsuEnabled;
 
-  // When lsuEnabled and synchronizerNodes are provided, emit a localSynchronizers map
+  // When lsuEnabled, emit a synchronizers map
   // (current = active, successor = upgrade, legacy = legacy) instead of the single domain field.
-  const synchronizerDomainValues: { domain?: object; localSynchronizers?: object } = lsuEnabled
+  const synchronizerDomainValues: { domain?: object; synchronizers?: object } = lsuEnabled
     ? {
-        localSynchronizers: {
+        synchronizers: {
           current: localSynchronizerNodeValues(
             synchronizerNodes.active,
             decentralizedSynchronizerMigrationConfig.active.id,
