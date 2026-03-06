@@ -11,7 +11,7 @@ import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
+  PageLimit,
   HistoryMetrics,
   S3BucketConnection,
   TimestampWithMigrationId,
@@ -55,7 +55,7 @@ class SingleAcsSnapshotBulkStorage(
         timestamp.migrationId,
         snapshot = timestamp.timestamp,
         after,
-        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
+        PageLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
         Seq.empty,
         Seq.empty,
       )
