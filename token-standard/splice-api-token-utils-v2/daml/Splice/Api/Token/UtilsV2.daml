@@ -453,6 +453,7 @@ transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
         id = TextMap.lookup "canton.network/receiver.id" meta.values
         owner = receiver
 
+{-
 transfer_instruction_status_v1_to_v2 : TransferInstructionV1.TransferInstructionStatus -> TransferInstructionV2.TransferInstructionStatus
 transfer_instruction_status_v1_to_v2 tis = case tis of
   TransferInstructionV1.TransferPendingReceiverAcceptance ->
@@ -467,7 +468,7 @@ transfer_instruction_view_v1_to_v2 TransferInstructionV1.TransferInstructionView
     transfer = transfer_v1_to_v2 transfer
     status = transfer_instruction_status_v1_to_v2 status
     meta
-
+-}
 
 -- Downcast
 transfer_v2_to_v1 : TransferInstructionV2.Transfer -> TransferInstructionV1.Transfer
@@ -491,6 +492,7 @@ transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
         insertOptional "canton.network/receiver.id" (receiver.id) $
         meta.values
 
+{-
 transfer_instruction_status_v2_to_v1 : TransferInstructionV2.TransferInstructionStatus -> TransferInstructionV1.TransferInstructionStatus
 transfer_instruction_status_v2_to_v1 tis = case tis of
   TransferInstructionV2.TransferPendingReceiverAcceptance ->
@@ -505,6 +507,7 @@ transfer_instruction_view_v2_to_v1 TransferInstructionV2.TransferInstructionView
     transfer = transfer_v2_to_v1 transfer
     status = transfer_instruction_status_v2_to_v1 status
     meta
+-}
 
 -- Choices
 
@@ -551,6 +554,8 @@ transferInstruction_v1_withdrawImpl this self TransferInstructionV1.TransferInst
     (TransferInstructionV2.TransferInstruction_Withdraw{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
+{- FIXME: consider whether to provide this
+
 transferInstruction_v1_updateImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Update -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_updateImpl this self TransferInstructionV1.TransferInstruction_Update{..} = do
   resv2 <- TransferInstructionV2.transferInstruction_updateImpl
@@ -558,6 +563,8 @@ transferInstruction_v1_updateImpl this self TransferInstructionV1.TransferInstru
     (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self)
     (TransferInstructionV2.TransferInstruction_Update{..})
   return (transfer_instruction_result_v2_to_v1 resv2)
+
+-}
 
 -- TransferFactory
 ------------------
