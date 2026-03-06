@@ -22,7 +22,6 @@ const Hero: React.FC = () => {
   const isLoading =
     balanceQuery.isPending || amuletPriceQuery.isPending || featureSupport.isLoading;
   const isError = balanceQuery.isError || amuletPriceQuery.isError || featureSupport.isError;
-  console.log('Feature support data:', featureSupport.data);
 
   if (location.pathname.includes('development-fund')) {
     return null;
