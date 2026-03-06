@@ -326,8 +326,8 @@ export function installGcpQuotaAlerts(
         conditionPrometheusQueryLanguage: {
           query: `
             serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"}
-            / ignoring(limit_name) group_right
-            serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"}
+            / ignoring(limit_name) group_right()
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
             > 0.90
           `,
           duration: '300s',
@@ -339,8 +339,8 @@ export function installGcpQuotaAlerts(
         conditionPrometheusQueryLanguage: {
           query: `
             serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"}
-            / ignoring(limit_name) group_right
-            serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"}
+            / ignoring(limit_name) group_right()
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
             > 0.90
           `,
           duration: '300s',
