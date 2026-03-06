@@ -92,7 +92,7 @@ case class GroupedWeightS3Object(
           out,
           Output(
             objectKey = state.get().currentObject.key,
-            isLastObject = !upstreamFinished.get(),
+            isLastObject = upstreamFinished.get(),
           ),
         )
         if (upstreamFinished.get()) {
