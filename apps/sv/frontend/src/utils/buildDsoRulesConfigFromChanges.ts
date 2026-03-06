@@ -86,6 +86,7 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
       upgradeTime && upgradeTime !== ''
         ? { time: upgradeTime, migrationId: upgradeMigrationId }
         : null,
+    nextScheduledLogicalSynchronizerUpgrade: null,
     voteCooldownTime:
       voteCooldownTime && voteCooldownTime !== '' ? { microseconds: voteCooldownTime } : null,
   };

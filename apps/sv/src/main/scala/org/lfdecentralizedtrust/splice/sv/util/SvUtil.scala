@@ -254,8 +254,9 @@ object SvUtil {
       synchronizerId,
       acsCommitmentReconciliationInterval,
     ), // decentralizedSynchronizerConfig
-    Optional.empty(), // nextScheduledHardDomainMigration
+    Optional.empty(), // nextScheduledSynchronizerUpgrade
     voteCooldownTime.map(t => new RelTime(t.duration.toMicros)).toJava,
+    Optional.empty(), // nextScheduledLogicalSynchronizerUpgrade
   )
 
   def keyPairMatches(
