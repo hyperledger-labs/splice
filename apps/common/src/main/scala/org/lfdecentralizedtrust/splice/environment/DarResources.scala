@@ -6631,7 +6631,7 @@ object DarResources {
 
   private def lookupMinimumPackageResource(name: PackageName): DarResource =
     packageResources
-      .find(_.minimumInitialization.metadata.name == name)
-      .getOrElse(throw new NoSuchElementException("Could not find PackageResource for this name."))
+      .find(_.latest.metadata.name == name)
+      .getOrElse(throw new NoSuchElementException(s"Could not find PackageResource for $name."))
       .minimumInitialization
 }
