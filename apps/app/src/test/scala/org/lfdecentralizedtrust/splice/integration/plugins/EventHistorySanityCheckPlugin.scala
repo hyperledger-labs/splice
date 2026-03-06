@@ -79,7 +79,7 @@ class EventHistorySanityCheckPlugin(
                 case TreeEvent.members.ExercisedEvent(exercised)
                     if exercised.choice == "DsoRules_AddSv" =>
                   DsoRules_AddSv
-                    .fromJson(exercised.choiceArgument.noSpaces)
+                    .fromJson(exercised.choiceArgument.value)
                     .newSvParty == otherScan
                     .getDsoInfo()
                     .svPartyId
