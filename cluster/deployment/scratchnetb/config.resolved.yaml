@@ -507,6 +507,11 @@ synchronizerMigration:
       repoUrl: 'https://github.com/hyperledger-labs/splice'
       spliceRoot: 'splice'
     version: 'local'
+  lsuEnabled: true
+  upgrade:
+    enableLogicalSynchronizerDeploymentMode: true
+    id: 1
+    version: 'local'
 validator1:
   deduplicationDuration: '30m'
   logging:

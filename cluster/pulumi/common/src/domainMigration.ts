@@ -19,6 +19,7 @@ export class DecentralizedSynchronizerMigrationConfig {
   // used to configure  the CN apps for the migration
   migratingFromActiveId?: DomainMigrationIndex;
   activeDatabaseId?: DomainMigrationIndex;
+  lsuEnabled: boolean;
   public archived: MigrationInfo[];
 
   constructor(config: Config) {
@@ -29,6 +30,7 @@ export class DecentralizedSynchronizerMigrationConfig {
     this.migratingFromActiveId = synchronizerMigration.active.migratingFrom;
     this.activeDatabaseId = synchronizerMigration.activeDatabaseId;
     this.archived = synchronizerMigration.archived || [];
+    this.lsuEnabled = synchronizerMigration.lsuEnabled;
   }
 
   runningMigrations(): MigrationInfo[] {

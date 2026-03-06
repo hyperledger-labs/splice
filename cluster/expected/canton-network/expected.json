@@ -313,6 +313,7 @@
             }
           }
         ],
+        "lsuEnabled": true,
         "upgrade": {
           "enableLogicalSynchronizerDeploymentMode": false,
           "id": 4,
@@ -3121,14 +3122,6 @@
         "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-3-mediator",
-          "sequencerAddress": "global-domain-3-sequencer",
-          "sequencerPruningConfig": {
-            "enabled": true,
-            "pruningInterval": "1 hour",
-            "retentionPeriod": "30 days"
-          },
-          "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
           "skipInitialization": true
         },
         "enablePostgresMetrics": true,
@@ -3176,6 +3169,36 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "localSynchronizers": {
+          "current": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+              "enabled": true
+            },
+            "mediatorAddress": "global-domain-3-mediator",
+            "sequencerAddress": "global-domain-3-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
+          },
+          "successor": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+              "enabled": true
+            },
+            "mediatorAddress": "global-domain-4-mediator",
+            "sequencerAddress": "global-domain-4-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-4.sv-2.mock.global.canton.network.digitalasset.com"
+          }
+        },
         "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
@@ -4068,14 +4091,6 @@
         "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-3-mediator",
-          "sequencerAddress": "global-domain-3-sequencer",
-          "sequencerPruningConfig": {
-            "enabled": true,
-            "pruningInterval": "1 hour",
-            "retentionPeriod": "30 days"
-          },
-          "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com",
           "skipInitialization": true
         },
         "enablePostgresMetrics": true,
@@ -4095,6 +4110,38 @@
         "isDevNet": false,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
+        "localSynchronizers": {
+          "current": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+              "enabled": true,
+              "externalGovernanceKey": true
+            },
+            "mediatorAddress": "global-domain-3-mediator",
+            "sequencerAddress": "global-domain-3-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com"
+          },
+          "successor": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+              "enabled": true,
+              "externalGovernanceKey": true
+            },
+            "mediatorAddress": "global-domain-4-mediator",
+            "sequencerAddress": "global-domain-4-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-4.sv-1.mock.global.canton.network.digitalasset.com"
+          }
         },
         "logAsyncFlush": false,
         "logLevel": "INFO",

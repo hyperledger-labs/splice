@@ -43,10 +43,10 @@ import {
   CantonBftSynchronizerNode,
   configForSv,
   DecentralizedSynchronizerNode,
-  InstalledMigrationSpecificSv,
   installScanBulkStorage,
   installSvLoopback,
   SvParticipant,
+  SynchronizerNodes,
   valuesForSvApp,
   valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -65,7 +65,6 @@ import {
 } from '../../common/src/automation';
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { configureScanBigQuery } from './bigQuery';
-import { buildCrossStackCantonDependencies } from './canton';
 import { installInfo } from './info';
 
 export function installSvKeySecret(
@@ -118,8 +117,7 @@ export type InstalledSv = {
   validatorApp: Resource;
   svApp: InstalledHelmChart;
   scan: InstalledHelmChart;
-  decentralizedSynchronizer: DecentralizedSynchronizerNode;
-  participant: SvParticipant;
+  canton: SynchronizerNodes;
   ingress: Resource;
 };
 
@@ -252,17 +250,13 @@ export async function installSvNode(
       }
     );
 
-  const canton = buildCrossStackCantonDependencies(
+  const canton = new SynchronizerNodes(
     decentralizedSynchronizerUpgradeConfig,
     {
-      name: config.nodeName,
-      onboardingName: config.onboardingName,
-      nodeConfigs: {
-        ...config.nodeConfigs,
-        self: { ...config.cometBft, nodeName: config.nodeName },
-      },
+      ...config.nodeConfigs,
+      self: { ...config.cometBft, nodeName: config.nodeName },
     },
-    config
+    config.ingressName
   );
 
   const svApp = installSvApp(
@@ -271,8 +265,7 @@ export async function installSvNode(
     xns,
     dependsOn,
     appsPostgres,
-    canton.participant,
-    canton.decentralizedSynchronizer
+    canton
   );
 
   const scan = installScan(
@@ -280,7 +273,7 @@ export async function installSvNode(
     config,
     decentralizedSynchronizerUpgradeConfig,
     dependsOn,
-    canton.decentralizedSynchronizer,
+    canton.active,
     svApp,
     canton.participant,
     appsPostgres
@@ -342,7 +335,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return { ...canton, validatorApp, svApp, scan, ingress };
+  return { canton, validatorApp, svApp, scan, ingress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -364,7 +357,7 @@ async function installValidator(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   svConfig: SvConfig,
   backupConfigSecret: Resource | undefined,
-  sv: InstalledMigrationSpecificSv,
+  sv: SynchronizerNodes,
   svApp: Resource,
   scan: Resource
 ) {
@@ -423,14 +416,24 @@ function installSvApp(
   xns: ExactNamespace,
   dependsOn: CnInput<Resource>[],
   postgres: Postgres,
-  participant: SvParticipant,
-  decentralizedSynchronizer: DecentralizedSynchronizerNode
+  synchronizerNodes: SynchronizerNodes
 ) {
+  const { participant } = synchronizerNodes;
+  const decentralizedSynchronizer = synchronizerNodes.active;
+  const allSynchronizerDependencies = [
+    synchronizerNodes.active,
+    synchronizerNodes.legacy,
+    synchronizerNodes.upgrade,
+  ]
+    .filter((n): n is NonNullable<typeof n> => n !== undefined)
+    .flatMap(n => n.dependencies);
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
   const commonSvAppValues = valuesForSvApp(
     decentralizedSynchronizerMigrationConfig,
-    config,
-    decentralizedSynchronizer
+    { ...config, skipInitialization: svsConfig?.synchronizer?.skipInitialization },
+    decentralizedSynchronizer,
+    synchronizerNodes,
+    config.ingressName
   );
 
   const svValues = {
@@ -455,18 +458,6 @@ function installSvApp(
       config.onboarding.type == 'found-dso'
         ? undefined
         : decentralizedSynchronizer.sv1InternalSequencerAddress,
-    domain:
-      // defaults for ports and address are fine,
-      // we need to include a dummy value though
-      // because helm does not distinguish between an empty object and unset.
-      {
-        ...(commonSvAppValues.domain || {}),
-        sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
-        mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
-        // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
-        skipInitialization: svsConfig?.synchronizer?.skipInitialization,
-      },
     scan: {
       publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
       internalUrl: internalScanUrl(config),
@@ -531,7 +522,7 @@ function installSvApp(
       dependsOn: dependsOn
         .concat([postgres])
         .concat(participant.asDependencies)
-        .concat(decentralizedSynchronizer.dependencies),
+        .concat(allSynchronizerDependencies),
     },
     undefined,
     appsAffinityAndTolerations
