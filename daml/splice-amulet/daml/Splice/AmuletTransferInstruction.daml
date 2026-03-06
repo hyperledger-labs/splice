@@ -6,6 +6,8 @@ module Splice.AmuletTransferInstruction (
   standardTransferToTwoStepTransfer,
 ) where
 
+import DA.Map qualified as Map
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2
@@ -20,6 +22,7 @@ template AmuletTransferInstruction
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for executing the transfer upon acceptance
     transfer : Splice.Api.Token.TransferInstructionV2.Transfer
+    -- FIXME: consider backing this via the v1 transfer, as we don't have accountable holdings for Amulet
   where
     signatory transfer.instrumentId.admin, transfer.sender.owner
     observer transfer.receiver.owner
@@ -28,7 +31,10 @@ template AmuletTransferInstruction
       view = TransferInstructionView with
         originalInstructionCid = None
         transfer
-        status = TransferPendingReceiverAcceptance
+        availableActions = Map.fromList
+          [ (transfer.sender.owner, [TIA_Withdraw])
+          , (transfer.receiver.owner, [TIA_Accept, TIA_Reject])
+          ]
         meta = emptyMetadata
 
       transferInstruction_acceptImpl _self arg =
@@ -44,11 +50,16 @@ template AmuletTransferInstruction
         abortAmuletTransferInstruction this arg.extraArgs
 
     interface instance TransferInstructionV1.TransferInstruction for AmuletTransferInstruction where
-      view = transfer_instruction_view_v2_to_v1 (view (toInterface @TransferInstruction this))
+      view = TransferInstructionV1.TransferInstructionView with
+        originalInstructionCid = None
+        transfer = transfer_v2_to_v1 transfer
+        status = TransferInstructionV1.TransferPendingReceiverAcceptance
+        meta = emptyMetadata
 
       TransferInstructionV1.transferInstruction_acceptImpl = transferInstruction_v1_acceptImpl (toInterface @TransferInstruction this)
       TransferInstructionV1.transferInstruction_rejectImpl = transferInstruction_v1_rejectImpl (toInterface @TransferInstruction this)
-      TransferInstructionV1.transferInstruction_updateImpl = transferInstruction_v1_updateImpl (toInterface @TransferInstruction this)
+      TransferInstructionV1.transferInstruction_updateImpl _self _arg =
+        fail "AmuletTransferInstruction.updateImpl: not used, and thus not implemented"
       TransferInstructionV1.transferInstruction_withdrawImpl = transferInstruction_v1_withdrawImpl (toInterface @TransferInstruction this)
 
 

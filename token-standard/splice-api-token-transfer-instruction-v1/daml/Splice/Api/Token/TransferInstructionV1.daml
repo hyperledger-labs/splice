@@ -159,12 +159,12 @@ interface TransferInstruction where
     -- execute registry internal workflow steps that advance the state of the
     -- transfer instruction. A reason may be communicated via the metadata.
     with
-      extraActors : [Party]
-        -- ^ Extra actors authorizing the update. Implementations MUST check that
+      actors : [Party]
+        -- ^ Actors authorizing the update. Implementations MUST check that
         -- this field contains the expected actors for the specific update.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.instrumentId.admin, extraActors
+    controller actors
     do transferInstruction_updateImpl this self arg
 
 
