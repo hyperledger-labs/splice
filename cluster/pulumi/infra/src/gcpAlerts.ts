@@ -296,7 +296,10 @@ export function installGcpQuotaAlerts(
   const quotaUsageThreshold = 0.9;
   const quotaUsageThresholdPercent = quotaUsageThreshold * 100;
 
-  const baseArgs = {
+  const baseArgs: Pick<
+    gcp.monitoring.AlertPolicyArgs,
+    'alertStrategy' | 'combiner' | 'notificationChannels' | 'userLabels'
+  > = {
     alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     notificationChannels: [notificationChannel.name],
