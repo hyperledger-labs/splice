@@ -21,7 +21,7 @@ class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
     timeTrackerObservationLatency: NonNegativeFiniteDuration,
-    @unused newSequencerConnectionPool: Boolean,
+    @unused reconnectOnSynchronizerConfigurationChange: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -72,7 +72,7 @@ class DomainDataRestorer(
         _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           synchronizerAlias,
           // TODO(#3455) re-enable based on config flag once it's fixed
-          newSequencerConnectionPool = false,
+          reconnectOnSynchronizerConfigurationChange = true,
           config => Some(config.copy(manualConnect = false)),
         )
       } yield ()

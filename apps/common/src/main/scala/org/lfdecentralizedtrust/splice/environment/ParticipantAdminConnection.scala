@@ -286,7 +286,7 @@ class ParticipantAdminConnection(
   def ensureDomainRegisteredAndConnected(
       config: SynchronizerConnectionConfig,
       overwriteExistingConnection: Boolean,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
     _ <- retryProvider
@@ -313,7 +313,7 @@ class ParticipantAdminConnection(
             case Some(_) =>
               modifySynchronizerConnectionConfigAndReconnect(
                 config.synchronizerAlias,
-                newSequencerConnectionPool,
+                reconnectOnSynchronizerConfigurationChange,
                 _ => Some(config),
               )
                 .map(_ => ())
@@ -492,7 +492,7 @@ class ParticipantAdminConnection(
 
   private def modifyOrRegisterSynchronizerConnectionConfig(
       config: SynchronizerConnectionConfig,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Boolean] =
@@ -509,7 +509,7 @@ class ParticipantAdminConnection(
           ensureDomainRegisteredAndConnected(
             config,
             overwriteExistingConnection = true,
-            newSequencerConnectionPool = newSequencerConnectionPool,
+            reconnectOnSynchronizerConfigurationChange = reconnectOnSynchronizerConfigurationChange,
             retryFor = retryFor,
           ).map(_ => false)
       }
@@ -517,13 +517,13 @@ class ParticipantAdminConnection(
 
   def modifySynchronizerConnectionConfigAndReconnect(
       domain: SynchronizerAlias,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       configModified <- modifySynchronizerConnectionConfig(domain, f)
       _ <-
-        if (configModified && !newSequencerConnectionPool) {
+        if (configModified && reconnectOnSynchronizerConfigurationChange) {
           logger.info(
             s"reconnect to the domain $domain for new sequencer configuration to take effect"
           )
@@ -533,19 +533,19 @@ class ParticipantAdminConnection(
 
   def modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
       config: SynchronizerConnectionConfig,
-      newSequencerConnectionPool: Boolean,
+      reconnectOnSynchronizerConfigurationChange: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       configModified <- modifyOrRegisterSynchronizerConnectionConfig(
         config,
-        newSequencerConnectionPool,
+        reconnectOnSynchronizerConfigurationChange,
         f,
         retryFor,
       )
       _ <-
-        if (configModified && !newSequencerConnectionPool) {
+        if (configModified && reconnectOnSynchronizerConfigurationChange) {
           logger.info(
             s"reconnect to the domain ${config.synchronizerAlias} for new sequencer configuration to take effect"
           )

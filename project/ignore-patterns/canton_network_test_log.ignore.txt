@@ -134,7 +134,7 @@ Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 Index .* should be created and is invalid, dropping it
 
 # Injected errors in s3Mock
-Simulated S3 write error
+Simulated S3 error
 
 # Shutdown issues
 Previous channel ManagedChannelImpl.* was garbage collected without being shut down!

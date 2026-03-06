@@ -116,7 +116,8 @@ class DomainMigrationInitializer(
     participantAdminConnection,
     config.timeTrackerMinObservationDuration,
     config.timeTrackerObservationLatency,
-    newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
+    reconnectOnSynchronizerConfigurationChange =
+      enabledFeatures.reconnectOnSynchronizerConfigurationChange,
     loggerFactory,
   )
 
