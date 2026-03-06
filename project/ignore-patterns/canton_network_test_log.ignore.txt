@@ -134,7 +134,7 @@ Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 Index .* should be created and is invalid, dropping it
 
 # Injected errors in s3Mock
-Simulated S3 write error
+Simulated S3 error
 
 # Warnings in s3Mock log (which we redirect to our logs), that we don't care about
 \[s3Mock\].*Ignoring option --illegal-access=warn

@@ -2,7 +2,7 @@
 
 This directory contains the code for the Splice Load Tester, built around `k6.io` scripts.
 
-Currently there is only one test, `generate-load.js`, whose purpose is to generate Splice app load via repeated taps. It is deployed & run perpetually in Splice clusters that have enabled the `K6_ENABLE_LOAD_GENERATOR` environment flag.
+Currently there is only one test, `generate-load.js`, whose purpose is to generate Splice app load via repeated transfers. It is deployed as a Kubernetes Deployment in Splice clusters that have `loadTester.enable: true` in their cluster config YAML. An optional adaptive controller can automatically scale load to find maximum throughput (see Adaptive Load Testing below).
 
 It is possible to run this script in a developer initiated, ad-hoc manner via `cncluster load_test`.
 
@@ -34,39 +34,50 @@ To run this test from your machine:
 3. Run `cncluster load_test` from the cluster's deployment directory
 4. Visit `https://grafana.<HOSTNAME>/d/ccbb2351-2ae2-462f-ae0e-f2c893ad1028/k6-prometheus` to view results
 
-The current test runs a workload of 10 users per validator that iteratively perform p2p transfers for the total duration specified in K6_TEST_DURATION. The rate at which users conduct transfers amongst each other is controlled by setting the iterations per minute.
+The current test runs a workload of 10 users per validator that iteratively perform transfers for the total duration specified in K6_TEST_DURATION. The rate at which users conduct transfers amongst each other is controlled by setting the iterations per minute.
 
 These options are configured by passing in a JSON string via the environment, and parsed in `src/settings.ts`.
 
 ## Cluster Deployment
 
-The load test is used to generate continuous load against a Splice cluster that has it enabled. To enable it, the env flag `K6_ENABLE_LOAD_GENERATOR` must be set to `true`.
+The load test is deployed as a Kubernetes `Deployment` in the `load-tester` namespace, running continuously in clusters that have it enabled. Configuration is managed via `cluster/pulumi/canton-network/src/scheduleLoadGenerator.ts` and the cluster's YAML config.
 
-Eventually we plan to run the load generator on the following clusters:
+To enable the load tester for a cluster, set `loadTester.enable: true` in the cluster's config YAML.
 
-- `cidaily`
-- `cilr`
-- `devnet`
-- `testnet`
 
-The load test config does not support an infinite duration, so the test is run repeatedly.
+To temporarily stop a running load test, scale down the Deployment via k9s or `kubectl scale deployment -n load-tester load-tester --replicas=0`. Scale back to 1 to resume.
 
-The test runs a k8s `Job` that is scheduled via a `CronJob` in the `load-tester` namespace. See `cluster/pulumi/canton-network/src/scheduleLoadGenerator.ts` for details.
+To permanently disable the load tester for a cluster, set `loadTester.enable: false` (or remove the `loadTester` section) in the cluster's config YAML.
 
-The `CronJob` is configured to start a new `Job` instance of the test every hour. The test itself is then configured to run for 58 minutes, so that each `Job` completes before the next one begins.
+## Adaptive Load Testing
 
-To temporarily stop a currently running load test, first suspend the `CronJob` via the k9s CLI or `kubectl patch cronjobs <cronjob-name> -p '{"spec" : {"suspend" : true }}'`.
+When `adaptiveScenario.enabled` is set to `true`, the load tester runs an adaptive controller (see `cluster/images/load-tester/entrypoint.sh`) that automatically scales virtual users (VUs) up and down based on transfer failure rates:
 
-After that, delete the currently running `Job` via the k9s CLI or `kubectl delete job <job-name>`.
+- **Scale up:** Every 5 minutes with no new failures, VUs increase by `scaleUpStep` (default: 2), up to `maxVUs`.
+- **Scale down:** When failures are detected, VUs decrease by `scaleDownStep` (default: 5), down to `minVUs`.
 
-To permanently disable the load tester for a cluster, set (or remove) its `K6_ENABLE_LOAD_GENERATOR=false` in its directory's `.envrc`.
+This allows the test to find the maximum sustainable throughput for the cluster.
+
+### Configuration
+
+The adaptive scenario is configured in the cluster's `config.yaml` under `loadTester.adaptiveScenario`:
+
+### Active Window
+
+The adaptive controller only ramps up during a daily time window, configured by `windowStartUTC` (default: `"03:00"`) and `windowDurationMinutes` (default: `120`). Outside this window, adaptive VUs are scaled to 0.
+
+This is designed for test clusters where an automatic upgrade runs at a known time (e.g., CILR upgrades at 02:00 UTC) -- the adaptive test window starts after the upgrade completes, giving a clean daily performance signal. The baseline `generate_load` scenario continues running at all times.
+
+### Forcing an Immediate Ramp-Up
+
+To trigger the adaptive load test immediately, edit the Deployment to set `windowStartUTC` to the current time (or a few minutes in the future). The controller re-evaluates the window on every loop iteration, so the change takes effect after the current sleep cycle (at most 5 minutes).
 
 ## Multi-Validators
 
 Running the load tester with _many_ validators:
 
 1. Set the cluster vars
-    - `K6_ENABLE_LOAD_GENERATOR=true`
+    - `loadTester.enable: true` in the cluster's config YAML
     - `MULTIVALIDATOR_SIZE=<num>` (see cluster/README.md)
 2. Deploy the base cluster
 3. Apply the `multi-validator` stack (`cncluster apply_multi`)

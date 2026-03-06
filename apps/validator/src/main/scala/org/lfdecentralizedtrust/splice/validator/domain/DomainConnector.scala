@@ -120,7 +120,8 @@ class DomainConnector(
     participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
       overwriteExistingConnection = true,
-      newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
+      reconnectOnSynchronizerConfigurationChange =
+        config.parameters.enabledFeatures.reconnectOnSynchronizerConfigurationChange,
       retryFor = RetryFor.WaitingOnInitDependency,
     )
   }

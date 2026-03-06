@@ -227,7 +227,8 @@ class ValidatorAutomationService(
         domainConnector,
         sequencerSubmissionAmplificationPatience,
         initialSynchronizerTime,
-        newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
+        reconnectOnSynchronizerConfigurationChange =
+          enabledFeatures.reconnectOnSynchronizerConfigurationChange,
       )
     )
 
