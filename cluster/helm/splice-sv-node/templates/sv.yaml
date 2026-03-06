@@ -229,6 +229,20 @@ spec:
                       port = 5007
                     }
                   }
+                  {{- with $sync.cometBftConfig }}
+                  comet-bft-config {
+                    enabled = {{ .enabled }}
+                    {{- if .connectionUri }}
+                    connection-uri = {{ .connectionUri | quote }}
+                    {{- end }}
+                    {{- if .externalGovernanceKey }}
+                    governance-key {
+                      public-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY}
+                      private-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY}
+                    }
+                    {{- end }}
+                  }
+                  {{- end }}
                 }
             {{- end }}
             {{- end }}
@@ -237,22 +251,35 @@ spec:
               value: {{ .Values.decentralizedSynchronizerUrl | quote }}
             {{- end }}
             {{- if (.Values.cometBFT).enabled }}
-            - name: SPLICE_APP_SV_COMETBFT_ENABLED
-              value: {{ (.Values.cometBFT).enabled | quote }}
-            {{- end }}
-            {{- if (.Values.cometBFT).connectionUri }}
-            - name: SPLICE_APP_SV_COMETBFT_CONNECTION_URI
-              value: {{ (.Values.cometBFT).connectionUri }}
+            - name: ADDITIONAL_CONFIG_SV_COMETBFT
+              value: |
+                canton.sv-apps.sv.local-synchronizer-nodes.current.comet-bft-config {
+                  enabled = {{ (.Values.cometBFT).enabled }}
+                  {{- if (.Values.cometBFT).connectionUri }}
+                  connection-uri = "{{ (.Values.cometBFT).connectionUri }}"
+                  {{- end }}
+                }
             {{- end }}
             {{- if (.Values.cometBFT).externalGovernanceKey }}
             - name: ADDITIONAL_CONFIG_SV_COMETBFT_GOVERNANCE_KEY
               value: |
-                _comet_bft_config {
+                canton.sv-apps.sv.local-synchronizer-nodes.current.comet-bft-config {
                   governance-key {
                     public-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY}
                     private-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY}
                   }
                 }
+            {{- end }}
+            {{- $anyGovernanceKey := false }}
+            {{- if (.Values.cometBFT).externalGovernanceKey }}
+              {{- $anyGovernanceKey = true }}
+            {{- end }}
+            {{- range $syncName, $sync := .Values.localSynchronizers }}
+              {{- if ($sync.cometBftConfig).externalGovernanceKey }}
+                {{- $anyGovernanceKey = true }}
+              {{- end }}
+            {{- end }}
+            {{- if $anyGovernanceKey }}
             - name: SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
