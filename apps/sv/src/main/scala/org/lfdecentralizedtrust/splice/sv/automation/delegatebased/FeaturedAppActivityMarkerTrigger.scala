@@ -90,14 +90,15 @@ class FeaturedAppActivityMarkerTrigger(
           Seq(c.payload.provider, c.payload.beneficiary, c.payload.dso)
             .map(PartyId.tryFromProtoPrimitive(_)),
         batch.markers,
+        batchSize,
       )
       .map {
         _.toSeq.flatMap {
-          case (Some(version), markers) =>
-            Seq(
+          case (Some(version), markerBatches) =>
+            markerBatches.map(
               Task(
                 batch.retrievalKind,
-                markers,
+                _,
                 version,
               )
             )

@@ -58,14 +58,14 @@ abstract class BatchedMultiDomainExpiredContractTrigger[
         PackageIdResolver.Package.SpliceAmulet,
         c => stakeholders(c.payload),
         expiredContracts,
+        batchSize,
       )
       .map {
         _.toSeq.flatMap {
-          case (Some(version), contracts) =>
-            contracts.grouped(batchSize).map(Batch(pkg, version, _))
+          case (Some(version), contractBatches) => contractBatches.map(Batch(pkg, version, _))
           case (None, contracts) =>
             logger.warn(
-              show"No vetted $pkg version for ${contracts.map { _.contractId.contractId }}"
+              show"No vetted $pkg version for ${contracts.flatten.map { _.contractId.contractId }}"
             )
             Seq.empty
         }
