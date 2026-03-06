@@ -358,8 +358,9 @@ object SpliceUtil {
       dummyDomain.toProtoPrimitive, // lastDomainId
       dummyDomain.toProtoPrimitive, // activeSynchronizer
     ), // decentralizedSynchronizerConfig
-    Optional.empty(), // nextScheduledHardDomainMigration
+    Optional.empty(), // nextScheduledSynchronizerUpgrade
     Optional.empty(), // voteCooldownTime
+    Optional.empty(), // nextScheduledLogicalSynchronizerUpgrade
   )
 
   def defaultAmuletConfig(
