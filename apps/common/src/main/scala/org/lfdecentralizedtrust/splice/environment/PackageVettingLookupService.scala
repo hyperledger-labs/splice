@@ -88,11 +88,8 @@ class PackageVettingLookupService(
       )
   }
 
-  def splitBatch[T](
-      pkg: PackageIdResolver.Package,
-      informees: T => Seq[PartyId],
-      batch: Seq[T],
-      batchSize: Int,
+  def splitBatch[T](pkg: PackageIdResolver.Package, batch: Seq[T], batchSize: Int)(
+      informees: T => Seq[PartyId]
   )(implicit
       tc: TraceContext
   ): Future[Map[Option[PackageVersion], Seq[Seq[T]]]] =
