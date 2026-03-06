@@ -113,6 +113,8 @@ monitoring:
         pendingPeriodMinutes: 5
       sequencerClientDelay:
         seconds: 90
+      gcpQuotas:
+        enabled: false
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
