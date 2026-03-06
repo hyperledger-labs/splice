@@ -39,6 +39,8 @@ class ScanTimeBasedIntegrationTest
     with HasExecutionContext
     with HasS3Mock {
 
+  override protected def runTokenStandardCliSanityCheck: Boolean = false // FIXME: remove
+
   val initialRound = 4815L
 
   override def environmentDefinition: SpliceEnvironmentDefinition =

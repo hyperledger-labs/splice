@@ -91,7 +91,7 @@ class SingleAcsSnapshotBulkStorage(
       )
       .wireTap(_ => historyMetrics.BulkStorage.incAcsSnapshotObjects())
       // emit back the timestamp w. migrationId upon completion
-      .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
+      .collect { case GroupedWeightS3Object.Output(_, isLast) if isLast => timestamp }
 
   }
 }
