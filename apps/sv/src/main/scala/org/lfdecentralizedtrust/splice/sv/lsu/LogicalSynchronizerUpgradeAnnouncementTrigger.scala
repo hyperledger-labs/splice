@@ -3,11 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.sv.lsu
 
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.SynchronizerAlias
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -17,16 +19,18 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
-import org.lfdecentralizedtrust.splice.sv.config.ScheduledLsuConfig
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeAnnouncementTrigger.LsuAnnouncementTask
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 
 class LogicalSynchronizerUpgradeAnnouncementTrigger(
-    val context: TriggerContext,
-    lsuAnnouncementConfig: Option[ScheduledLsuConfig],
+    override protected val context: TriggerContext,
+    store: SvDsoStore,
     connection: ParticipantAdminConnection,
     syncAlias: SynchronizerAlias,
 )(implicit
@@ -38,52 +42,55 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[LsuAnnouncementTask]] = {
-    lsuAnnouncementConfig match {
-      case Some(config) if !now.toInstant.isBefore(config.freezeTime) =>
-        for {
-          psid <- connection.getPhysicalSynchronizerId(syncAlias)
-          existingAnnouncement <- connection.lookupSynchronizerLsuAnnouncement(
-            psid.logical,
-            TimeQuery.HeadState,
-            TopologyTransactionType.AuthorizedState,
-          )
-        } yield {
-          if (psid.serial >= config.psid) { Seq.empty }
-          else {
-            existingAnnouncement match {
-              case Some(announcement)
-                  if announcement.mapping.successorSynchronizerId.serial == config.psid =>
-                Seq.empty
-              case _ =>
-                Seq(LsuAnnouncementTask(psid.logical, config))
+    store.getDsoRules().flatMap {
+      _.payload.config.nextScheduledLogicalSynchronizerUpgrade.toScala match {
+        case Some(schedule) if !now.toInstant.isBefore(schedule.topologyFreezeTime) =>
+          for {
+            psid <- connection.getPhysicalSynchronizerId(syncAlias)
+            existingAnnouncement <- connection.lookupSynchronizerLsuAnnouncement(
+              psid.logical,
+              TimeQuery.HeadState,
+              TopologyTransactionType.AuthorizedState,
+            )
+          } yield {
+            val scheduleSerial =
+              NonNegativeInt.tryCreate(schedule.newPhysicalSynchronizerSerial.toInt)
+            if (psid.serial >= scheduleSerial) { Seq.empty }
+            else {
+              existingAnnouncement match {
+                case Some(announcement)
+                    if announcement.mapping.successorSynchronizerId.serial == scheduleSerial =>
+                  Seq.empty
+                case _ =>
+                  Seq(LsuAnnouncementTask(psid.logical, schedule))
+              }
             }
           }
-        }
-      case _ => Future.successful(Seq.empty)
+        case _ => Future.successful(Seq.empty)
+      }
     }
   }
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[LsuAnnouncementTask]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val config = task.work.config
-    val upgradeTime = CantonTimestamp.assertFromInstant(config.upgradeTime)
+    val schedule = task.work.schedule
+    val upgradeTime = CantonTimestamp.assertFromInstant(schedule.upgradeTime)
     for {
       _ <- connection.ensureLsuAnnouncement(
         task.work.synchronizerId,
         upgradeTime,
-        config.psid,
-        config.protocolVersion,
+        task.work.serial,
+        ProtocolVersion.tryCreate(schedule.newPhysicalSynchronizerProtocolVersion),
       )
     } yield TaskSuccess(
-      s"Published LSU announcement for upgrade at $upgradeTime with psid ${config.psid}"
+      s"Published LSU announcement for upgrade at $upgradeTime with psid ${schedule.newPhysicalSynchronizerSerial}"
     )
   }
 
   override protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[LsuAnnouncementTask]
   )(implicit tc: TraceContext): Future[Boolean] = {
-    val config = task.work.config
     for {
       existingAnnouncement <- connection.lookupSynchronizerLsuAnnouncement(
         task.work.synchronizerId,
@@ -91,7 +98,7 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
         TopologyTransactionType.AuthorizedState,
       )
     } yield existingAnnouncement.exists(
-      _.mapping.successorSynchronizerId.serial == config.psid
+      _.mapping.successorSynchronizerId.serial == task.work.serial
     )
   }
 
@@ -99,13 +106,19 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
 
 object LogicalSynchronizerUpgradeAnnouncementTrigger {
 
-  case class LsuAnnouncementTask(synchronizerId: SynchronizerId, config: ScheduledLsuConfig)
-      extends PrettyPrinting {
+  case class LsuAnnouncementTask(
+      synchronizerId: SynchronizerId,
+      schedule: LogicalSynchronizerUpgradeSchedule,
+  ) extends PrettyPrinting {
+    val serial = NonNegativeInt.tryCreate(schedule.newPhysicalSynchronizerSerial.toInt)
     override def pretty: Pretty[this.type] = prettyOfClass(
-      param("freezeTime", _.config.freezeTime.toString.unquoted),
-      param("upgradeTime", _.config.upgradeTime.toString.unquoted),
-      param("psid", _.config.psid),
-      param("protocolVersion", _.config.protocolVersion),
+      param("toologyFreezeTime", _.schedule.topologyFreezeTime.toString.unquoted),
+      param("upgradeTime", _.schedule.upgradeTime.toString.unquoted),
+      param("newPhysicalSynchronizerSerial", _.schedule.newPhysicalSynchronizerSerial),
+      param(
+        "newPhysicalSynchronizerProtocolVersion",
+        _.schedule.newPhysicalSynchronizerProtocolVersion.unquoted,
+      ),
     )
   }
 

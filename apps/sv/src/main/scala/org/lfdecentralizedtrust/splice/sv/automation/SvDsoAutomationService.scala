@@ -279,7 +279,7 @@ class SvDsoAutomationService(
     registerTrigger(
       new LogicalSynchronizerUpgradeAnnouncementTrigger(
         triggerContext,
-        config.scheduledLsu,
+        dsoStore,
         participantAdminConnection,
         config.domains.global.alias,
       )
