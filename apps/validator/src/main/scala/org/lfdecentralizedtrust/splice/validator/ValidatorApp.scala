@@ -295,16 +295,8 @@ class ValidatorApp(
                   }
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
-                    retryProvider.retry(
-                      RetryFor.WaitingOnInitDependency,
-                      "ensure_synchronizer_registered",
-                      "registering decentralized synchronizer",
-                      domainConnector
-                        .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(
-                          clock
-                        ),
-                      logger,
-                    )
+                    domainConnector
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock)
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
