@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
   DbAppStore,
+  DbMultiDomainAcsStore,
   DbTransferInputQueries,
 }
 import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers}
@@ -60,6 +61,12 @@ class DbExternalPartyWalletStore(
       ),
       domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          WalletTables.externalPartyArchivedAcsTableName,
+          WalletTables.ExternalPartyWalletAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with ExternalPartyWalletStore
     with DbTransferInputQueries

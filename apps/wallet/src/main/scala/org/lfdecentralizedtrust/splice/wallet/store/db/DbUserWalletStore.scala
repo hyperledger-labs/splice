@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
+  DbMultiDomainAcsStore,
   DbTransferInputQueries,
   DbTxLogAppStore,
   TxLogQueries,
@@ -116,6 +117,12 @@ class DbUserWalletStore(
       ),
       domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          WalletTables.archivedAcsTableName,
+          WalletTables.UserWalletAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with UserWalletStore
     with DbTransferInputQueries

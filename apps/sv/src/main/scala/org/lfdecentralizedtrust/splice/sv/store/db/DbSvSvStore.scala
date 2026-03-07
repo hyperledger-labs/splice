@@ -11,7 +11,12 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsQueries,
+  AcsTables,
+  DbAppStore,
+  DbMultiDomainAcsStore,
+}
 import org.lfdecentralizedtrust.splice.store.{Limit, MultiDomainAcsStore, StoreErrors}
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
@@ -59,6 +64,12 @@ class DbSvSvStore(
       ),
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+          DbSvSvStore.archivedTableName,
+          SvTables.SvAcsStoreRowData.hasIndexColumns.indexColumnNames,
+        )
+      ),
     )
     with SvSvStore
     with AcsTables
@@ -132,5 +143,6 @@ class DbSvSvStore(
 object DbSvSvStore {
 
   val tableName = "sv_acs_store"
+  val archivedTableName = "sv_acs_store_archived"
 
 }
