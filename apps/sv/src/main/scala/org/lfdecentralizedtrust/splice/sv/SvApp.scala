@@ -565,6 +565,7 @@ class SvApp(
           svAutomation,
           dsoAutomation,
           participantAdminConnection,
+          ledgerClient,
           retryProvider,
           dsoPartyHosting,
           loggerFactory,
