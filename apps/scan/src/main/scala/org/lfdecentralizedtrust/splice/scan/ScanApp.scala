@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
@@ -215,6 +216,8 @@ class ScanApp(
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore.history,
+        externalTransactionHashThresholdTimestamp = config.externalTransactionHashThresholdDate
+          .map(s => CantonTimestamp.assertFromInstant(java.time.Instant.parse(s))),
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
