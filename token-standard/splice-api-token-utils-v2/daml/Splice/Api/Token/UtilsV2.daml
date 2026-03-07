@@ -42,15 +42,10 @@ insertOptional : Text -> Optional a -> TextMap.TextMap a -> TextMap.TextMap a
 insertOptional k ov m = case ov of
   None -> m
   Some v -> TextMap.insert k v m
+
+
 -- Holding
 ----------
-
--- Upcast
-instrumentId_v1_to_v2 : HoldingV1.InstrumentId -> HoldingV2.InstrumentId
-instrumentId_v1_to_v2 HoldingV1.InstrumentId{..} = HoldingV2.InstrumentId with ..
-
-lock_v1_to_v2 : HoldingV1.Lock -> HoldingV2.Lock
-lock_v1_to_v2 HoldingV1.Lock{..} = HoldingV2.Lock with ..
 
 holdingv1_to_v2 : HoldingV1.HoldingView -> HoldingV2.HoldingView
 holdingv1_to_v2 v1 = v2
@@ -60,9 +55,9 @@ holdingv1_to_v2 v1 = v2
         provider = (TextMap.lookup "canton.network/account.provider" v1.meta.values) >>= partyFromText
         id = TextMap.lookup "canton.network/account.id" v1.meta.values
         owner = v1.owner
-      instrumentId = instrumentId_v1_to_v2 v1.instrumentId
+      instrumentId = v1.instrumentId
       amount = v1.amount
-      lock = fmap lock_v1_to_v2 v1.lock
+      lock = v1.lock
       meta = v1.meta
 
 -- Downcast
@@ -112,7 +107,7 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
 transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> Text -> AllocationV2.TransferLeg
 transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId =
   AllocationV2.TransferLeg with
-    instrumentId = instrumentId_v1_to_v2 instrumentId
+    instrumentId = instrumentId
     sender = senderAccount
     receiver = receiverAccount
     ..
@@ -143,7 +138,7 @@ allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.Allocatio
 allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
   AllocationV2.AllocationView with
     allocation = allocation_specification_v1_to_v2 allocation
-    holdingCids = Map.fromList [(instrumentId_v1_to_v2 allocation.transferLeg.instrumentId, map coerceInterfaceContractId holdingCids)]
+    holdingCids = Map.fromList [(allocation.transferLeg.instrumentId, map coerceInterfaceContractId holdingCids)]
     meta
     authorizer
     expiresAt
@@ -420,7 +415,7 @@ transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
     sender = senderAccount
     receiver = receiverAccount
     amount
-    instrumentId = instrumentId_v1_to_v2 instrumentId
+    instrumentId = instrumentId
     requestedAt
     executeBefore
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
