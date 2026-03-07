@@ -27,6 +27,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
+import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -45,6 +46,7 @@ class ScanAutomationService(
     svName: String,
     upgradesConfig: UpgradesConfig,
     initialRound: Long,
+    metrics: ScanAppMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -93,12 +95,23 @@ class ScanAutomationService(
       snapshotStore,
       updateHistory,
       scanStorageConfigV1,
-      // The acs snapshot trigger should not attempt to backfill snapshots unless the backfilling
-      // UpdateHistory is fully enabled and complete.
-      config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled,
+      metrics.dbScanStore.history.AcsSnapshots,
       triggerContext,
     )
   )
+  // The acs snapshot backfilling trigger should not attempt to backfill snapshots unless the
+  // backfilling UpdateHistory is fully enabled and complete.
+  if (config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled) {
+    registerTrigger(
+      new AcsSnapshotBackfillingTrigger(
+        snapshotStore,
+        updateHistory,
+        scanStorageConfigV1,
+        metrics.dbScanStore.history.AcsSnapshotsBackfilling,
+        triggerContext,
+      )
+    )
+  }
   if (config.updateHistoryBackfillImportUpdatesEnabled) {
     registerTrigger(
       new DeleteCorruptAcsSnapshotTrigger(
