@@ -208,6 +208,7 @@ object SpliceUtil {
       validatorPercentage: Double,
       appPercentage: Double,
       developmentFundPercentage: Option[BigDecimal] = None,
+      validatorFaucetCap: Option[BigDecimal] = Some(BigDecimal(2.85)),
   ): splice.issuance.IssuanceConfig = new IssuanceConfig(
     damlDecimal(amuletsToIssuePerYear),
     damlDecimal(validatorPercentage),
@@ -223,7 +224,7 @@ object SpliceUtil {
     damlDecimal(0.6),
 
     // validatorFaucetCap
-    Some(damlDecimal(2.85)).toJava,
+    validatorFaucetCap.map(damlDecimal).toJava,
 
     // developmentFundPercentage
     developmentFundPercentage.map(damlDecimal).toJava,
@@ -232,20 +233,27 @@ object SpliceUtil {
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
 
   def defaultIssuanceCurve(
-      developmentFundPercentage: Option[BigDecimal] = None
+      developmentFundPercentage: Option[BigDecimal] = None,
+      validatorFaucetCap: Option[BigDecimal] = Some(BigDecimal(2.85)),
   ): splice.schedule.Schedule[RelTime, IssuanceConfig] =
     new Schedule(
-      issuanceConfig(40e9, 0.05, 0.15, developmentFundPercentage),
+      issuanceConfig(40e9, 0.05, 0.15, developmentFundPercentage, validatorFaucetCap),
       Seq(
-        new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4, developmentFundPercentage)),
+        new Tuple2(
+          hours(365 * 12),
+          issuanceConfig(20e9, 0.12, 0.4, developmentFundPercentage, validatorFaucetCap),
+        ),
         new Tuple2(
           hours(3 * 365 * 12),
-          issuanceConfig(10e9, 0.18, 0.62, developmentFundPercentage),
+          issuanceConfig(10e9, 0.18, 0.62, developmentFundPercentage, validatorFaucetCap),
         ),
-        new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69, developmentFundPercentage)),
+        new Tuple2(
+          hours(5 * 365 * 24),
+          issuanceConfig(5e9, 0.21, 0.69, developmentFundPercentage, validatorFaucetCap),
+        ),
         new Tuple2(
           hours(10 * 365 * 24),
-          issuanceConfig(2.5e9, 0.20, 0.75, developmentFundPercentage),
+          issuanceConfig(2.5e9, 0.20, 0.75, developmentFundPercentage, validatorFaucetCap),
         ),
       ).asJava,
     )
@@ -379,13 +387,14 @@ object SpliceUtil {
       nextSynchronizerId: Option[SynchronizerId] = None,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      validatorFaucetCap: Option[BigDecimal] = Some(BigDecimal(2.85)),
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
       defaultTransferConfig(initialMaxNumInputs, holdingFee, zeroTransferFees = zeroTransferFees),
 
       // issuance curve
-      defaultIssuanceCurve(developmentFundPercentage),
+      defaultIssuanceCurve(developmentFundPercentage, validatorFaucetCap),
 
       // global domain config
       defaultDecentralizedSynchronizerConfig(

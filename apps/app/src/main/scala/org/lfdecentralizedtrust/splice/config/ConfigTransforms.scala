@@ -729,6 +729,9 @@ object ConfigTransforms {
   def withDevelopmentFundManager(fundManager: PartyId): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundManager = Some(fundManager)))
 
+  def withValidatorFaucetCap(cap: BigDecimal): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(validatorFaucetCap = Some(cap)))
+
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 
