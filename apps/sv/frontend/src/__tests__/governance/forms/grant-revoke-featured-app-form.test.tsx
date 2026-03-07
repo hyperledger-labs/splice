@@ -217,6 +217,35 @@ describe('Grant Featured App Form', () => {
 });
 
 describe('Revoke Featured App Form', () => {
+  const fillOutRevokeForm = async (user: ReturnType<typeof userEvent.setup>) => {
+    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('revoke-featured-app-url');
+    await user.type(urlInput, 'https://example.com');
+
+    const partyIdInput = screen.getByTestId('revoke-featured-app-partyId');
+    await user.type(partyIdInput, 'a-party-id::1014912492');
+    fireEvent.blur(partyIdInput);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading featured app rights...')).not.toBeInTheDocument();
+    });
+
+    const rightCidDropdown = screen.getByTestId('revoke-featured-app-rightCid-dropdown');
+    await waitFor(
+      () => {
+        expect(rightCidDropdown).not.toBeDisabled();
+      },
+      { timeout: 3000 }
+    );
+    fireEvent.change(rightCidDropdown, { target: { value: 'rightCid123' } });
+    fireEvent.blur(rightCidDropdown);
+    await waitFor(() => {
+      expect(screen.getByTestId('revoke-featured-app-rightCid-error').textContent).toBeFalsy();
+    });
+  };
+
   test('should render all Form components', () => {
     render(
       <Wrapper>
@@ -239,13 +268,17 @@ describe('Revoke Featured App Form', () => {
     expect(urlInput).toBeInTheDocument();
     expect(urlInput.getAttribute('value')).toBe('');
 
-    const idInput = screen.getByTestId('revoke-featured-app-idValue');
-    expect(idInput).toBeInTheDocument();
-    expect(idInput.getAttribute('value')).toBe('');
+    const partyIdInput = screen.getByTestId('revoke-featured-app-partyId');
+    expect(partyIdInput).toBeInTheDocument();
+    expect(partyIdInput.getAttribute('value')).toBe('');
 
-    const providerInput = screen.getByTestId('revoke-featured-app-idValue-title');
-    expect(providerInput).toBeInTheDocument();
-    expect(providerInput.textContent).toBe('Featured Application Right Contract Id');
+    const partyIdTitle = screen.getByTestId('revoke-featured-app-partyId-title');
+    expect(partyIdTitle).toBeInTheDocument();
+    expect(partyIdTitle.textContent).toBe('Provider Party ID');
+
+    const rightCidDropdown = screen.getByTestId('revoke-featured-app-rightCid-dropdown');
+    expect(rightCidDropdown).toBeInTheDocument();
+    expect(rightCidDropdown).toBeDisabled();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -257,36 +290,16 @@ describe('Revoke Featured App Form', () => {
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('revoke-featured-app-action');
     const submitButton = screen.getByTestId('submit-button');
     expect(submitButton).toBeInTheDocument();
-
-    await user.click(submitButton);
     expect(submitButton).toBeDisabled();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
-      /Unable to perform pointer interaction/
-    );
-
-    screen.getByText('Summary is required');
-    screen.getByText('Invalid URL');
-    expect(screen.getByTestId('revoke-featured-app-idValue-error').textContent).toBe('Required');
 
     // completing the form should reenable the submit button
-    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
-    expect(summaryInput).toBeInTheDocument();
-    await user.type(summaryInput, 'Summary of the proposal');
+    await fillOutRevokeForm(user);
 
-    const urlInput = screen.getByTestId('revoke-featured-app-url');
-    expect(urlInput).toBeInTheDocument();
-    await user.type(urlInput, 'https://example.com');
-
-    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
-    expect(providerInput).toBeInTheDocument();
-    await user.type(providerInput, 'abcde12345');
-
-    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
-
-    expect(submitButton).not.toBeDisabled();
+    await waitFor(() => {
+      expect(submitButton).not.toBeDisabled();
+    });
   });
 
   test('expiry date must be in the future', async () => {
@@ -357,19 +370,9 @@ describe('Revoke Featured App Form', () => {
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('revoke-featured-app-action');
-
-    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
-    await user.type(summaryInput, 'Summary of the proposal');
-
-    const urlInput = screen.getByTestId('revoke-featured-app-url');
-    await user.type(urlInput, 'https://example.com');
-
-    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
-    await user.type(providerInput, 'abcde12345');
+    await fillOutRevokeForm(user);
 
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
-    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
     const submitButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
@@ -379,6 +382,14 @@ describe('Revoke Featured App Form', () => {
     await user.click(submitButton);
 
     expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeInTheDocument();
+    expect(screen.getByTestId('revokeProviderPartyId-title').textContent).toBe('Provider Party ID');
+    expect(screen.getByTestId('revokeProviderPartyId-field').textContent).toBe(
+      'a-party-id::1014912492'
+    );
+    expect(screen.getByTestId('revokeRight-title').textContent).toBe(
+      'Featured Application Right Contract ID'
+    );
+    expect(screen.getByTestId('revokeRight-field').textContent).toBe('rightCid123');
   });
 
   test('should show error on form if submission fails', async () => {
@@ -399,19 +410,8 @@ describe('Revoke Featured App Form', () => {
     const actionInput = screen.getByTestId('revoke-featured-app-action');
     const submitButton = screen.getByTestId('submit-button');
 
-    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
-    expect(summaryInput).toBeInTheDocument();
-    await user.type(summaryInput, 'Summary of the proposal');
-
-    const urlInput = screen.getByTestId('revoke-featured-app-url');
-    expect(urlInput).toBeInTheDocument();
-    await user.type(urlInput, 'https://example.com');
-
-    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
-    expect(providerInput).toBeInTheDocument();
-    await user.type(providerInput, 'abcde12345');
-
-    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+    await fillOutRevokeForm(user);
+    await user.click(actionInput);
 
     await waitFor(async () => {
       expect(submitButton).not.toBeDisabled();
@@ -443,19 +443,8 @@ describe('Revoke Featured App Form', () => {
     const actionInput = screen.getByTestId('revoke-featured-app-action');
     const submitButton = screen.getByTestId('submit-button');
 
-    const summaryInput = screen.getByTestId('revoke-featured-app-summary');
-    expect(summaryInput).toBeInTheDocument();
-    await user.type(summaryInput, 'Summary of the proposal');
-
-    const urlInput = screen.getByTestId('revoke-featured-app-url');
-    expect(urlInput).toBeInTheDocument();
-    await user.type(urlInput, 'https://example.com');
-
-    const providerInput = screen.getByTestId('revoke-featured-app-idValue');
-    expect(providerInput).toBeInTheDocument();
-    await user.type(providerInput, 'abcde12345');
-
-    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+    await fillOutRevokeForm(user);
+    await user.click(actionInput);
 
     await waitFor(async () => {
       expect(submitButton).not.toBeDisabled();

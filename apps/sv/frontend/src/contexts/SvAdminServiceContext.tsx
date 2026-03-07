@@ -18,6 +18,7 @@ import {
   ListOpenMiningRoundsResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  ListFeaturedAppRightsByProviderResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
@@ -85,6 +86,9 @@ export interface SvAdminClient {
   getMediatorNodeStatus: () => Promise<openapi.NodeStatus>;
   featureSupport: () => Promise<openapi.FeatureSupportResponse>;
   getPartyToParticipant: (partyId: string) => Promise<GetPartyToParticipantResponse>;
+  listFeaturedAppRightsByProvider: (
+    providerPartyId: string
+  ) => Promise<ListFeaturedAppRightsByProviderResponse>;
 }
 
 class ApiMiddleware
@@ -215,6 +219,11 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       getPartyToParticipant: async (partyId: string): Promise<GetPartyToParticipantResponse> => {
         return await svAdminClient.getPartyToParticipant(partyId);
+      },
+      listFeaturedAppRightsByProvider: async (
+        providerPartyId: string
+      ): Promise<ListFeaturedAppRightsByProviderResponse> => {
+        return await svAdminClient.listFeaturedAppRightsByProvider(providerPartyId);
       },
     };
   }, [url, userAccessToken]);
