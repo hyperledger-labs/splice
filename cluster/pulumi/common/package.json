@@ -20,7 +20,7 @@
     "node-fetch": "^2.7.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "zod": "^3.23.8"
+    "zod": "^4.3.6"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
