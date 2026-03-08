@@ -34,7 +34,6 @@ import scala.util.{Failure, Success}
 abstract class AcsSnapshotTriggerBase(
     store: AcsSnapshotStore,
     updateHistory: UpdateHistory,
-    snapshotMetrics: AcsSnapshotsMetrics,
     protected val context: TriggerContext,
 )(implicit
     ec: ExecutionContext,
@@ -44,6 +43,8 @@ abstract class AcsSnapshotTriggerBase(
 ) extends PollingParallelTaskExecutionTrigger[AcsSnapshotTriggerBase.Task] {
 
   protected val snapshotTable: IncrementalAcsSnapshotTable
+
+  protected def snapshotMetrics: AcsSnapshotsMetrics
 
   // The time interval to process per trigger invocation.
   // Setting this to a large value allows snapshot generation to catch up faster when it's behind,

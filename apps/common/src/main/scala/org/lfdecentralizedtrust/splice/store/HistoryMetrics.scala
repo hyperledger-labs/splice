@@ -146,7 +146,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       SpliceMetrics.cantonTimestampGauge(
         metricsFactory,
         MetricInfo(
-          name = acsSnapshotsPrefix :+ "latest-record-time",
+          name = acsSnapshotsPrefix :+ "latest-record-time-save",
           summary = "The record time of the latest acs snapshot",
           Traffic,
         ),
@@ -157,7 +157,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       SpliceMetrics.cantonTimestampGauge(
         metricsFactory,
         MetricInfo(
-          name = acsSnapshotsPrefix :+ "latest-record-time",
+          name = acsSnapshotsPrefix :+ "latest-record-time-update",
           summary = "The record time of the latest incremental acs snapshot",
           Traffic,
         ),
@@ -200,7 +200,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       SpliceMetrics.cantonTimestampGauge(
         metricsFactory,
         MetricInfo(
-          name = acsSnapshotsPrefix :+ "latest-record-time",
+          name = acsSnapshotsPrefix :+ "latest-record-time-save",
           summary = "The record time of the latest backfilled acs snapshot",
           Traffic,
         ),
@@ -211,7 +211,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       SpliceMetrics.cantonTimestampGauge(
         metricsFactory,
         MetricInfo(
-          name = acsSnapshotsPrefix :+ "latest-record-time",
+          name = acsSnapshotsPrefix :+ "latest-record-time-update",
           summary = "The record time of the latest incremental acs snapshot for backfilling",
           Traffic,
         ),

@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
@@ -10,7 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   IncrementalAcsSnapshot,
   IncrementalAcsSnapshotTable,
 }
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
@@ -35,21 +36,21 @@ class AcsSnapshotBackfillingTrigger(
     store: AcsSnapshotStore,
     updateHistory: UpdateHistory,
     storageConfig: ScanStorageConfig,
-    snapshotMetrics: AcsSnapshotsMetrics,
     override protected val context: TriggerContext,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
     mat: Materializer,
-) extends AcsSnapshotTriggerBase(store, updateHistory, snapshotMetrics, context) {
+) extends AcsSnapshotTriggerBase(store, updateHistory, context) {
 
   override val snapshotTable: IncrementalAcsSnapshotTable =
     AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
 
-  private val isDone: AtomicBoolean = new AtomicBoolean(false)
+  override val snapshotMetrics: AcsSnapshotsMetrics = new HistoryMetrics(context.metricsFactory)(
+    MetricsContext.Empty
+  ).AcsSnapshotsBackfilling
 
-  private[automation] def isDoneBackfillingAcsSnapshots =
-    isDone.get()
+  private val isDone: AtomicBoolean = new AtomicBoolean(false)
 
   override def retrieveTasks()(implicit
       tc: TraceContext
