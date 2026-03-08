@@ -1,0 +1,50 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorPermission where
+
+import DA.Time
+import Splice.Types
+import Splice.Util
+
+data ValidatorPermission_SetRevocationStateResult = ValidatorPermission_SetRevocationStateResult with
+    permissionCid : ContractId ValidatorPermission
+  deriving (Eq, Show)
+
+-- | A contract representing the permission for a validator to connect to the synchronizer.
+-- Created by the sponsor SV via a DsoRules choice.
+template ValidatorPermission
+  with
+    dso : Party
+    sponsor : Party -- The SV node that sponsored the onboarding.
+    validator : Party -- The validator (party) being permissioned.
+    validatorParticipantId : Text -- The participant ID of the validator, needed to grant ParticipantSynchronizerPermission.
+    loginAfter : Optional Time -- Timestamp until which the validator's permission is revoked.
+    isRevoked : Bool -- Flag indicating if the validator's permission is fully revoked.
+  where
+    signatory dso
+
+    -- The validator is explicitly NOT an observer to avoid a bootstrap problem, as the validator party is not yet fully onboarded to the network at this stage.
+
+    ensure
+      validatorParticipantId /= ""
+
+    -- Choice to update the revocation.
+    choice ValidatorPermission_SetRevocationState : ValidatorPermission_SetRevocationStateResult
+      with
+        newLoginAfter : Optional Time
+        newIsRevoked : Bool
+      controller dso
+      do
+        permissionCid <- create this with
+          loginAfter = newLoginAfter
+          isRevoked = newIsRevoked
+        pure (ValidatorPermission_SetRevocationStateResult permissionCid)
+
+
+
+-- instances
+------------
+
+instance HasCheckedFetch ValidatorPermission ForDso where
+  contractGroupId ValidatorPermission{..} = ForDso with dso
