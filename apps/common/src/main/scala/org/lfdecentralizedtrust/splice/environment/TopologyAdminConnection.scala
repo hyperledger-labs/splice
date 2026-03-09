@@ -1335,7 +1335,16 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Init
         .InitId(id.uid.identifier.toProtoPrimitive, id.uid.namespace.toProtoPrimitive, Seq.empty)
-    )
+    ).map(_ => ()).recover {
+      // We catch the FAILED_PRECONDITION error specifically when it mentions being already initialized
+      case e: io.grpc.StatusRuntimeException
+          if e.getStatus.getCode == io.grpc.Status.Code.FAILED_PRECONDITION &&
+            e.getMessage.contains("Already initialised") =>
+        logger.info(
+          "initId called on an already initialized participant; treating as success (likely resumed from backup)."
+        )
+        ()
+    }
   }
 
   def identity()(implicit
