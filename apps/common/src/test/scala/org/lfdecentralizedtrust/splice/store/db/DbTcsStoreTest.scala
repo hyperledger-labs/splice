@@ -341,7 +341,9 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
             HardLimit.tryCreate(10),
           )
         }
-        rangeError.getMessage should include("listContractsInAsOfRange requires an AcsArchiveConfig")
+        rangeError.getMessage should include(
+          "listContractsInAsOfRange requires an AcsArchiveConfig"
+        )
       }
     }
   }
