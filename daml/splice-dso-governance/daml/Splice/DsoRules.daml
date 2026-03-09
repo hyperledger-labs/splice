@@ -36,6 +36,7 @@ import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
+import Splice.ValidatorPermission
 
 
 -- Types
@@ -206,6 +207,10 @@ data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResu
 
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
     validatorLicense : ContractId ValidatorLicense
+
+data DsoRules_GrantValidatorPermissionResult = DsoRules_GrantValidatorPermissionResult with
+    permissionCid : ContractId ValidatorPermission
+  deriving (Eq, Show)    
 
 data DsoRules_MergeValidatorLicenseResult = DsoRules_MergeValidatorLicenseResult with
     validatorLicense : ContractId ValidatorLicense
@@ -966,6 +971,27 @@ template DsoRules with
 
     -- Validator onboarding
     -----------------------
+
+    nonconsuming choice DsoRules_GrantValidatorPermission : DsoRules_GrantValidatorPermissionResult
+      with
+        sponsor : Party
+        validator : Party
+        validatorParticipantId : Text
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        
+        -- Create the ValidatorPermission with default revocation states
+        permissionCid <- create ValidatorPermission with
+          dso
+          sponsor
+          validator
+          validatorParticipantId
+          loginAfter = None
+          isRevoked = False
+          
+        return DsoRules_GrantValidatorPermissionResult with ..
+
 
     nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
