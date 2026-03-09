@@ -13,7 +13,6 @@ import {
   CrossStackCometBftDecentralizedSynchronizerNode,
   CrossStackDecentralizedSynchronizerNode,
   DecentralizedSynchronizerNode,
-  InstalledMigrationSpecificSv,
   SvParticipant,
 } from './decentralizedSynchronizerNode';
 
@@ -36,10 +35,6 @@ function buildDecentralizedSynchronizerNode(
       );
 }
 
-/**
- * Represents the cross-stack Canton dependencies for an SV node, with a single top-level
- * participant and one decentralized synchronizer node per running migration.
- */
 export class SynchronizerNodes {
   readonly participant: SvParticipant;
   readonly active: DecentralizedSynchronizerNode;
@@ -91,16 +86,5 @@ export class SynchronizerNodes {
         ingressName
       );
     }
-  }
-
-  /**
-   * Returns the active migration as an InstalledMigrationSpecificSv for backward compatibility
-   * with APIs that expect the old shape.
-   */
-  asInstalledMigrationSpecificSv(): InstalledMigrationSpecificSv {
-    return {
-      decentralizedSynchronizer: this.active,
-      participant: this.participant,
-    };
   }
 }
