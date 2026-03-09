@@ -161,7 +161,7 @@ template Amulet
         meta = amuletMetadata this
 
     interface instance Api.Token.HoldingV1.Holding for Amulet where
-      view = holding_v2_to_v1 (view (toInterface @Api.Token.HoldingV2.Holding this))
+      view = downcast (view (toInterface @Api.Token.HoldingV2.Holding this))
 
 amuletMetadata : Amulet -> Api.Token.MetadataV1.Metadata
 amuletMetadata Amulet{..} =
@@ -177,7 +177,7 @@ template LockedAmulet
     lock : TimeLock
   where
     signatory lock.holders, signatory amulet
-    
+
     interface instance Api.Token.HoldingV2.Holding for LockedAmulet where
       view = Api.Token.HoldingV2.HoldingView with
         account = Api.Token.HoldingV2.Account with
@@ -194,7 +194,7 @@ template LockedAmulet
         meta = amuletMetadata amulet
 
     interface instance Api.Token.HoldingV1.Holding for LockedAmulet where
-      view = holding_v2_to_v1 (view (toInterface @Api.Token.HoldingV2.Holding this))
+      view = downcast (view (toInterface @Api.Token.HoldingV2.Holding this))
 
     choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
       with

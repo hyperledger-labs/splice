@@ -43,44 +43,65 @@ insertOptional k ov m = case ov of
   None -> m
   Some v -> TextMap.insert k v m
 
+v2Namespace : Text
+v2Namespace = "cip-TOKEN-STANDARD-V2/"
+  -- FIXME: update with actual CIP number once it's available.
 
--- Holding
-----------
+accountToMeta : Text -> HoldingV2.Account -> Metadata -> Metadata
+accountToMeta field account meta =
+  Metadata $
+  insertOptional (v2Namespace <> field <> ".provider") (partyToText <$> account.provider) $
+  insertOptional (v2Namespace <> field <> ".id") account.id $
+  meta.values
 
-holdingv1_to_v2 : HoldingV1.HoldingView -> HoldingV2.HoldingView
-holdingv1_to_v2 v1 = v2
-  where
-    v2 = HoldingV2.HoldingView with
-      account = HoldingV2.Account with
-        provider = (TextMap.lookup "canton.network/account.provider" v1.meta.values) >>= partyFromText
-        id = TextMap.lookup "canton.network/account.id" v1.meta.values
-        owner = v1.owner
-      instrumentId = v1.instrumentId
-      amount = v1.amount
-      lock = v1.lock
-      meta = v1.meta
+accountFromMeta : Party -> Text -> Metadata -> HoldingV2.Account
+accountFromMeta owner field meta =
+  HoldingV2.Account with
+    provider = (TextMap.lookup (v2Namespace <> field <> ".provider") meta.values) >>= partyFromText
+    id = TextMap.lookup (v2Namespace <> field <> ".id") meta.values
+    owner
 
--- Downcast
-instrumentId_v2_to_v1 : HoldingV2.InstrumentId -> HoldingV1.InstrumentId
-instrumentId_v2_to_v1 HoldingV2.InstrumentId{..} = HoldingV1.InstrumentId with ..
+-- Class based conversion
+---------------------------
 
-lock_v2_to_v1 : HoldingV2.Lock -> HoldingV1.Lock
-lock_v2_to_v1 HoldingV2.Lock{..} = HoldingV1.Lock with ..
+-- | A backwards compatible API upgrade from v1 to v2.
+class BackwardCompatible v1 v2 where
+  upcast : v1 -> v2
 
-holding_v2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
-holding_v2_to_v1 v2 = v1
-  where
-    meta' = Metadata with
-      values =
-        insertOptional "canton.network/account.provider" (partyToText <$> v2.account.provider) $
-        insertOptional "canton.network/account.id" (v2.account.id) $
-        v2.meta.values
-    v1 = HoldingV1.HoldingView with
-      owner = v2.account.owner
-      instrumentId = instrumentId_v2_to_v1 v2.instrumentId
-      amount = v2.amount
-      lock = fmap lock_v2_to_v1 v2.lock
-      meta = meta'
+  partialDowncast : v2 -> Update v1
+
+  default partialDowncast : ForwardCompatible v1 v2 => v2 -> Update v1
+  partialDowncast = pure . downcast
+
+
+class ForwardCompatible v1 v2 where
+  downcast : v2 -> v1
+
+
+instance ForwardCompatible (ContractId HoldingV1.Holding) (ContractId HoldingV2.Holding) where
+  downcast = coerceInterfaceContractId
+
+instance BackwardCompatible (ContractId HoldingV1.Holding) (ContractId HoldingV2.Holding) where
+  upcast = coerceInterfaceContractId
+
+instance ForwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
+  downcast v2 = HoldingV1.HoldingView with
+    owner = v2.account.owner
+    instrumentId = v2.instrumentId
+    amount = v2.amount
+    lock = v2.lock
+    meta = accountToMeta "account" v2.account v2.meta
+
+instance BackwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
+  upcast v1 = HoldingV2.HoldingView with
+    account = accountFromMeta v1.owner "account" v1.meta
+    instrumentId = v1.instrumentId
+    amount = v1.amount
+    lock = v1.lock
+    meta = v1.meta
+
+
+
 
 -- Allocation
 -------------
@@ -178,7 +199,7 @@ settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
 transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
 transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} =
   AllocationV1.TransferLeg with
-    instrumentId = instrumentId_v2_to_v1 instrumentId
+    instrumentId = instrumentId
     sender = sender.owner
     receiver = receiver.owner
     meta = meta'
@@ -455,7 +476,7 @@ transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
     sender = sender.owner
     receiver = receiver.owner
     amount
-    instrumentId = instrumentId_v2_to_v1 instrumentId
+    instrumentId = instrumentId
     requestedAt
     executeBefore
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
