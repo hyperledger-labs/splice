@@ -34,7 +34,7 @@ export class DecentralizedSynchronizerMigrationConfig {
     this.lsuEnabled = synchronizerMigration.lsuEnabled;
     this.frozenMigrationId = synchronizerMigration.frozenMigrationId;
     if (this.lsuEnabled && this.frozenMigrationId == undefined) {
-      throw new Error('frozen migration mist be defined when LSU is enabled');
+      throw new Error('frozen migration must be defined when LSU is enabled');
     }
   }
 
