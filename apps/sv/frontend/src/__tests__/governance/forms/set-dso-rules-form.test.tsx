@@ -403,7 +403,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
 
     fireEvent.change(effectiveDateInput, { target: { value: tenDaysFromNow } });
 
-    const defaultTimeDisplay = screen.getByTestId('next-scheduled-upgrade-time-default');
+    const defaultTimeDisplay = screen.getByTestId('nextScheduledSynchronizerUpgradeTime-default');
     expect(defaultTimeDisplay).toBeInTheDocument();
 
     // The default should be effective date + 1 hour in UTC format
@@ -526,6 +526,232 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
 
     await waitFor(() => {
       expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+  });
+});
+
+describe('Next Scheduled Logical Synchronizer Upgrade', () => {
+  test('render default times for next scheduled logical upgrade', async () => {
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
+    expect(effectiveDateInput).toBeInTheDocument();
+
+    const tenDaysFromNow = dayjs().add(10, 'day').format(dateTimeFormatISO);
+
+    fireEvent.change(effectiveDateInput, { target: { value: tenDaysFromNow } });
+
+    const defaultUpgradeTimeDisplay = screen.getByTestId(
+      'nextScheduledLogicalSynchronizerUpgradeUpgradeTime-default'
+    );
+    expect(defaultUpgradeTimeDisplay).toBeInTheDocument();
+
+    // The default should be effective date + 1 hour in UTC format
+    await waitFor(() => {
+      const expectedDefaultTime = dayjs(tenDaysFromNow)
+        .utc()
+        .add(1, 'hour')
+        .add(1, 'day')
+        .format(nextScheduledSynchronizerUpgradeFormat);
+
+      expect(defaultUpgradeTimeDisplay.textContent).toContain(`Default: ${expectedDefaultTime}`);
+    });
+
+    const defaultFreezeTimeDisplay = screen.getByTestId(
+      'nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime-default'
+    );
+    expect(defaultFreezeTimeDisplay).toBeInTheDocument();
+
+    // The default should be effective date + 1 hour in UTC format
+    await waitFor(() => {
+      const expectedDefaultTime = dayjs(tenDaysFromNow)
+        .utc()
+        .add(1, 'hour')
+        .format(nextScheduledSynchronizerUpgradeFormat);
+
+      expect(defaultFreezeTimeDisplay.textContent).toContain(`Default: ${expectedDefaultTime}`);
+    });
+  });
+
+  test('no validation for logical synchronizer upgrade fields if none is provided', async () => {
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    expect(
+      screen.queryByText(
+        'Topology freeze time, upgrade time, new physical synchronizer serial, and new physical synchronizer protocol version are required for a Scheduled Logical Synchronizer Upgrade'
+      )
+    ).toBeNull();
+  });
+
+  test('show error if only one of the parameters is set', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+    const errorMessage =
+      'Topology freeze time, upgrade time, new physical synchronizer serial, and new physical synchronizer protocol version are required for a Scheduled Logical Synchronizer Upgrade';
+
+    expect(screen.queryByText(errorMessage)).toBeNull();
+
+    // serial field only - should show error
+    const serialInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial'
+    );
+    expect(serialInput).toBeInTheDocument();
+
+    await user.type(serialInput, '12345');
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
+    });
+
+    // Error should be gone when serial is cleared
+    await user.clear(serialInput);
+    await user.click(screen.getByTestId('set-dso-config-rules-action'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+
+    // protocol version field only - should show error
+    const protocolVersionInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion'
+    );
+    expect(protocolVersionInput).toBeInTheDocument();
+
+    await user.type(protocolVersionInput, '12345');
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
+    });
+
+    // Error should be gone when protocol version is cleared
+    await user.clear(protocolVersionInput);
+    await user.click(screen.getByTestId('set-dso-config-rules-action'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+
+    const topologyFreezeTimeInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime'
+    );
+    expect(topologyFreezeTimeInput).toBeInTheDocument();
+
+    const futureTime = dayjs().add(2, 'hour').format(dateTimeFormatISO);
+    await user.type(topologyFreezeTimeInput, futureTime);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
+    });
+
+    // Error should be gone when topology freeze time is cleared
+    await user.clear(topologyFreezeTimeInput);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+
+    const topologyUpgradeTimeInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeUpgradeTime'
+    );
+    expect(topologyUpgradeTimeInput).toBeInTheDocument();
+
+    await user.type(topologyUpgradeTimeInput, futureTime);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
+    });
+
+    // Error should be gone when upgrade time is cleared
+    await user.clear(topologyUpgradeTimeInput);
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
+    });
+  });
+
+  test('show error on form if times do not match constraints', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    const topologyFreezeTimeErrorMessage =
+      'Topology Freeze Time must be at least 1 hour after the Effective Date';
+    const upgradeTimeErrorMessage = 'Upgrade Time must be after Topology Freeze Time';
+
+    const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
+    const effectiveDate = dayjs().add(10, 'day').format(dateTimeFormatISO);
+
+    fireEvent.change(effectiveDateInput, { target: { value: effectiveDate } });
+
+    expect(screen.queryByText(topologyFreezeTimeErrorMessage)).toBeNull();
+
+    const topologyFreezeTimeInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime'
+    );
+    const upgradeTimeInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeUpgradeTime'
+    );
+    const serialInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial'
+    );
+    const protocolVersionInput = screen.getByTestId(
+      'config-field-nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion'
+    );
+
+    // Set time to be only 30 minutes after effective date (should fail validation)
+    const invalidTopologyFreezeTime = dayjs(effectiveDate)
+      .utc()
+      .add(30, 'minute')
+      .format(nextScheduledSynchronizerUpgradeFormat);
+    const invalidUpgradeTime = invalidTopologyFreezeTime;
+    await user.type(topologyFreezeTimeInput, invalidTopologyFreezeTime);
+    await user.type(upgradeTimeInput, invalidUpgradeTime);
+    await user.type(serialInput, '1');
+    await user.type(protocolVersionInput, '35');
+
+    await waitFor(() => {
+      expect(screen.queryByText(topologyFreezeTimeErrorMessage)).toBeInTheDocument();
+    });
+
+    // Set freeze time to be more than 1 hour after effective date - error should disappear
+    const validTopologyFreezeTime = dayjs(effectiveDate)
+      .utc()
+      .add(2, 'hours')
+      .format(nextScheduledSynchronizerUpgradeFormat);
+    await user.clear(topologyFreezeTimeInput);
+    await user.type(topologyFreezeTimeInput, validTopologyFreezeTime);
+
+    await waitFor(() => {
+      expect(screen.queryByText(topologyFreezeTimeErrorMessage)).toBeNull();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(upgradeTimeErrorMessage)).toBeInTheDocument();
+    });
+    // Set upgrade time to be more than 1 hour after effective date - error should disappear
+    const validUpgradeTime = dayjs(effectiveDate)
+      .utc()
+      .add(3, 'hours')
+      .format(nextScheduledSynchronizerUpgradeFormat);
+    await user.clear(upgradeTimeInput);
+    await user.type(upgradeTimeInput, validUpgradeTime);
+    await waitFor(() => {
+      expect(screen.queryByText(upgradeTimeErrorMessage)).toBeNull();
     });
   });
 });
