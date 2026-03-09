@@ -53,13 +53,9 @@ export class ValidatorClient {
     // -*--- VALIDATOR APIS -------------------------------------------------------*-
     register: async (): Promise<void> => {
       try {
-        await this.http.post.success(
-          `${this.validatorBaseUrl}/api/validator/v0/register`,
-          null,
-          {
-            headers: this.headers(),
-          },
-        );
+        await this.http.post.success(`${this.validatorBaseUrl}/api/validator/v0/register`, null, {
+          headers: this.headers(),
+        });
       } catch (error) {
         throw new Error(`Error registering validator: ${error}`);
       }
