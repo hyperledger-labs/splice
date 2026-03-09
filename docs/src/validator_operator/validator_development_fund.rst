@@ -17,7 +17,7 @@ to the Development Fund, as defined by ``IssuanceConfig.optDevelopmentFundPercen
 
 For every issuance round:
 
-- The Development Fund share (5%) is computed as part of the round's CC available to mint.
+- The Development Fund share (default: 5%) is computed as part of the round's CC available to mint.
 - The corresponding amount is recorded as an unclaimed entitlement under the contract
   ``Splice.Amulet.UnclaimedDevelopmentFundCoupon``.
 - The remaining minting tranches are reduced proportionally.
