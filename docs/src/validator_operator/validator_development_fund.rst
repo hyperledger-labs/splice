@@ -19,7 +19,7 @@ For every issuance round:
 - The Development Fund share (5%) is computed as part of the round's CC available to mint.
 - The corresponding amount is recorded as an unclaimed entitlement under the contract
   ``Splice.Amulet.UnclaimedDevelopmentFundCoupon``.
-- The remaining issuance streams are reduced proportionally.
+- The remaining minting tranches are reduced proportionally.
 
 Over time, multiple ``Splice.Amulet.UnclaimedDevelopmentFundCoupon`` contracts may accumulate.
 An automation in the SV app periodically merges small unclaimed coupons to keep the number
