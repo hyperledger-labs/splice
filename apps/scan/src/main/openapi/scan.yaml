@@ -3746,6 +3746,8 @@ components:
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
           nullable: true
         app_activity_record:
+          description: |
+            **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
           $ref: "#/components/schemas/EventHistoryAppActivityRecord"
           nullable: true
     EventHistoryVerdict:
