@@ -19,18 +19,18 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
   "GroupedWeightS3Object" should {
 
     def testWithInput(
-                       inputSizes: Seq[Int],
-                       expectedObjectSizes: Seq[Int],
-                       checkStreamOutput: (GroupedWeightS3ObjectFlow.Output, Int) => Assertion,
-                       runAfterInputs: (
+        inputSizes: Seq[Int],
+        expectedObjectSizes: Seq[Int],
+        checkStreamOutput: (GroupedWeightS3ObjectFlow.Output, Int) => Assertion,
+        runAfterInputs: (
             TestPublisher.Probe[ByteStringWithTermination],
             TestSubscriber.Probe[GroupedWeightS3ObjectFlow.Output],
         ) => Assertion,
-                       runAfterOutputs: (
+        runAfterOutputs: (
             TestPublisher.Probe[ByteStringWithTermination],
             TestSubscriber.Probe[GroupedWeightS3ObjectFlow.Output],
         ) => Assertion,
-                       labelLast: Boolean = true,
+        labelLast: Boolean = true,
     ): Future[Assertion] = {
       val data = ByteString(Random.nextBytes(100))
       val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
