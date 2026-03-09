@@ -142,7 +142,6 @@ class LogicalSynchronizerUpgradeTrigger(
   protected def completeTask(task: ScheduledTaskTrigger.ReadyTask[LsuTransferTask])(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    logger.info(s"Running LSU state transfer for $task")
     (for {
       rulesAndState <- store.getDsoRulesWithSvNodeStates()
       owningNodeSvName <- rulesAndState.getSvNameInDso(store.key.svParty)
