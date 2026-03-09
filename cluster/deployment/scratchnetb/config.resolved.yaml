@@ -431,6 +431,9 @@ svs:
           cpu: '1'
           memory: '2Gi'
     participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS'
+          value: "canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
       bftSequencerConnection: true
       resources:
         limits:
