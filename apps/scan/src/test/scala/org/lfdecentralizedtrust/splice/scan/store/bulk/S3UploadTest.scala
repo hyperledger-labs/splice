@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import org.apache.pekko.stream.scaladsl.Keep
+import org.apache.pekko.stream.testkit.{TestPublisher, TestSubscriber}
 import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.store.{HasS3Mock, StoreTestBase}
@@ -20,7 +21,16 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
     def testWithInput(
         inputSizes: Seq[Int],
         expectedObjectSizes: Seq[Int],
-        injectError: Boolean = false,
+        checkStreamOutput: (GroupedWeightS3Object.Output, Int) => Assertion,
+        runAfterInputs: (
+            TestPublisher.Probe[ByteStringWithTermination],
+            TestSubscriber.Probe[GroupedWeightS3Object.Output],
+        ) => Assertion,
+        runAfterOutputs: (
+            TestPublisher.Probe[ByteStringWithTermination],
+            TestSubscriber.Probe[GroupedWeightS3Object.Output],
+        ) => Assertion,
+        labelLast: Boolean = true,
     ): Future[Assertion] = {
       val data = ByteString(Random.nextBytes(100))
       val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
@@ -46,24 +56,17 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       inputSizes.zipWithIndex.foreach { case (size, i) =>
         sendBytes(
           size,
-          isLast = i == inputSizes.length - 1 && !injectError,
+          isLast = i == inputSizes.length - 1 && labelLast,
         )
       }
+      runAfterInputs(pub, sub)
 
       sub.request(expectedObjectSizes.length.toLong)
-      expectedObjectSizes.zipWithIndex.foreach { case (size, i) =>
+      expectedObjectSizes.zipWithIndex.foreach { case (_, i) =>
         val next = sub.expectNext(20.seconds)
-        next.objectKey shouldBe s"test_$i"
-        next.isLastObject shouldBe (i == expectedObjectSizes.length - 1 && !injectError)
+        checkStreamOutput(next, i)
       }
-      if (injectError) {
-        sub.request(1)
-        sub.expectNoMessage(20.seconds)
-        pub.sendError(new RuntimeException("Injected error"))
-        sub.expectError()
-      } else {
-        sub.expectComplete()
-      }
+      runAfterOutputs(pub, sub)
       val s3Objects = bucketConnection.listObjects.futureValue
       val s3ObjKeys = s3Objects.contents.asScala.sortBy(_.key())
       val s3ObjData = s3ObjKeys.map { obj =>
@@ -81,13 +84,63 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
           25 :+ // add an input that does not fit
           1 // finish with a tiny input
       val expectedObjectSizes = Seq(12, 12, 10, 25, 1)
-      testWithInput(inputSizes, expectedObjectSizes)
+      testWithInput(
+        inputSizes,
+        expectedObjectSizes,
+        checkStreamOutput = { (out, i) =>
+          out.objectKey shouldBe s"test_$i"
+          out.isLastObject shouldBe (i == expectedObjectSizes.length - 1)
+        },
+        runAfterInputs = { (_, _) => succeed },
+        runAfterOutputs = { (_, sub) =>
+          sub.expectComplete()
+          succeed
+        },
+      )
     }
 
     "handle errors correctly" in {
       val inputSizes = Seq(6, 6, 3)
       val expectedObjectSizes = Seq(12)
-      testWithInput(inputSizes, expectedObjectSizes, injectError = true)
+      testWithInput(
+        inputSizes,
+        expectedObjectSizes,
+        { (out, i) =>
+          out.objectKey shouldBe s"test_$i"
+          out.isLastObject shouldBe false
+        },
+        runAfterInputs = { (_, _) => succeed },
+        runAfterOutputs = { (pub, sub) =>
+          sub.request(1)
+          sub.expectNoMessage(20.seconds)
+          pub.sendError(new RuntimeException("Injected error"))
+          sub.expectError()
+          succeed
+        },
+        labelLast = false,
+      )
+    }
+
+    "supports an empty final input" in {
+      val inputSizes = Seq(6, 6, 3)
+      val expectedObjectSizes = Seq(12, 3)
+      testWithInput(
+        inputSizes,
+        expectedObjectSizes,
+        checkStreamOutput = { (out, i) =>
+          out.objectKey shouldBe s"test_$i"
+          out.isLastObject shouldBe (i == expectedObjectSizes.length - 1)
+        },
+        runAfterInputs = { (pub, _) =>
+          pub.sendNext(ByteStringWithTermination(ByteString.empty, isLast = true))
+          succeed
+        },
+        runAfterOutputs = { (_, sub) =>
+          sub.expectComplete()
+          succeed
+        },
+        labelLast = false,
+      )
     }
   }
 }

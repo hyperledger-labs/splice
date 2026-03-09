@@ -136,7 +136,6 @@ case class GroupedWeightS3Object(
         }
         if (elem.bytes.isEmpty) {
           // Upstream is allowed to send one last empty input with isLast if they did not recognize termination when creating their last non-empty element
-          // TODO: add a test for this
           if (!elem.isLast) {
             throw new RuntimeException("Received an empty element that is not last")
           }
