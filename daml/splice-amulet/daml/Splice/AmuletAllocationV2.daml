@@ -1,0 +1,158 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.AmuletAllocationV2 (
+  AmuletAllocationV2(..),
+  netAllocationAmount,
+  allocationToTwoStepTransfer,
+) where
+
+import DA.Foldable (forA_)
+import DA.Optional (isNone, isSome)
+import DA.Text as Text
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV2
+import Splice.Api.Token.UtilsV2
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Amulet.TwoStepTransfer
+import Splice.Amulet.TokenApiUtils
+import Splice.ExternalPartyConfigState
+import Splice.Fees (expiringAmount)
+import Splice.Types
+import Splice.Util
+
+import qualified DA.Map as Map
+
+-- | Amulet allocated in locked form to a trade.
+template AmuletAllocationV2
+  with
+    lockedAmulet : Optional (ContractId LockedAmulet)
+    -- ^ Locked amulet that holds the funds for the allocation.
+    -- Empty if no outgoing legs.
+    allocation : AllocationSpecification
+    authorizer : Party
+    dso : Party
+    expiresAt : Time
+  where
+    signatory dso, authorizer
+    observer allocation.settlement.executor
+
+    ensure
+      all
+        (\tl -> (
+            -- Authorizer needs to appear as sender or receiver of each leg.
+            authorizer `elem` [tl.sender.owner, tl.receiver.owner])
+            -- Only one admin Id allowed.
+            && tl.instrumentId.admin == dso)
+        allocation.transferLegs
+
+    interface instance Allocation for AmuletAllocationV2 where
+      view = AllocationView with
+        authorizer = basicAccount authorizer
+        expiresAt = Some expiresAt
+        allocation
+        holdingCids = case lockedAmulet of
+          None -> Map.empty
+          Some cid -> Map.fromList [(upcast (amuletInstrumentId dso), [toInterfaceContractId cid])]
+        meta = emptyMetadata
+
+      allocation_withdrawImpl _self Allocation_Withdraw{..} = do
+        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+        pure Allocation_WithdrawResult
+          with
+            senderHoldingCids
+            meta = emptyMetadata
+
+      allocation_cancelImpl _self Allocation_Cancel{..} = do
+        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+        pure Allocation_CancelResult
+          with
+            senderHoldingCids
+            meta = emptyMetadata
+
+      allocation_settleImpl _self Allocation_Settle{..} = do
+        -- compute total funds to move
+        let netAmount = netAllocationAmount authorizer allocation.transferLegs
+        if netAmount >= 0.0 then do
+          require "No locked amulet expected for non-negative net amount" (isNone lockedAmulet)
+          if netAmount > 0.0
+            then do
+              -- Net credit of Amulet ==> create the holding
+
+              -- FIXME: share context fetching code once rebased on Moritz's 24h changes
+              externalPartyConfigStateCid <- getFromContextU @(ContractId ExternalPartyConfigState) extraArgs.context externalPartyConfigStateContextKey
+              externalPartyConfigState <- fetchChecked (ForDso with dso = dso) externalPartyConfigStateCid
+              let config = scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) $ externalPartyConfigState.transferConfig
+              let holdingFeeAmulet = config.holdingFee
+
+              newHoldingCid <- create Amulet with
+                dso
+                owner = authorizer
+                amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
+
+              pure Allocation_SettleResult with
+                newHoldingCids = Map.singleton (upcast (amuletInstrumentId dso)) [toInterfaceContractId newHoldingCid]
+                meta = emptyMetadata
+          else
+            pure Allocation_SettleResult with
+              newHoldingCids = Map.empty
+              meta = emptyMetadata
+        else do
+          -- Net debit of Amulet ==> archive the locked amulet
+          require "Locked amulet expected for negative net amount" (isSome lockedAmulet)
+          forA_ lockedAmulet $ \cid -> do
+             lockedAmulet <- fetchAndArchive (ForOwner with dso = dso; owner = authorizer) cid
+             require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
+
+          pure Allocation_SettleResult with
+            newHoldingCids = Map.empty
+            meta = emptyMetadata
+
+
+-- Allocation usage
+-------------------
+
+-- FIXME: consider lifting out to utils
+netAllocationAmount : Party -> [TransferLeg] -> Decimal
+netAllocationAmount authorizer transferLegs =
+    sum $ map legAmount transferLegs
+  where
+    legAmount tl = case (tl.sender.owner == authorizer, tl.receiver.owner == authorizer) of
+      (True, True) -> 0.0
+      (True, False) -> negate tl.amount
+      (False, True) -> tl.amount
+      (False, False) -> error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
+
+allocationToTwoStepTransfer : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
+allocationToTwoStepTransfer sender transferLegs dso expiresAt settlement =
+  TwoStepTransfer with
+    dso
+    sender
+    -- Note: we use a single leg to the sender to get the right locking behavior as part of preparing the two-step transfer
+    -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
+    -- FIXME: improve representation once the design for batch settlement is definite
+    receiver = sender
+    amount = negate (netAllocationAmount sender transferLegs)
+    provider = settlement.executor
+    transferBefore = expiresAt
+    transferBeforeDeadline = "allocation.expiresAt"
+    allowFeaturing = True
+    lockContext = Text.implode
+      -- We don't show more context to avoid bloating the response here.
+      ["allocation for settlement ", settlement.settlementRef.id]
+
+unlockAmuletAllocation : AmuletAllocationV2 -> ExtraArgs -> Update [ContractId Holding]
+unlockAmuletAllocation amuletAllocation extraArgs = do
+  case amuletAllocation.lockedAmulet of
+    None -> return []
+    Some la -> do
+      let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.authorizer amuletAllocation.allocation.transferLegs amuletAllocation.dso amuletAllocation.expiresAt amuletAllocation.allocation.settlement
+      map upcast <$> abortTwoStepTransfer twoStepTransfer la extraArgs
+
+
+instance HasCheckedFetch AmuletAllocationV2 ForDso where
+  contractGroupId AmuletAllocationV2{..} = ForDso with dso

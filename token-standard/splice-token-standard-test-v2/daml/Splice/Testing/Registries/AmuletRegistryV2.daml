@@ -49,7 +49,7 @@ import Splice.Api.Token.UtilsV2 (upcast)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletAllocation
+import Splice.AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
 import Splice.Expiry
@@ -250,7 +250,7 @@ registryApi_getAllocationFactory_SettleBatch registry arg = do
   transferC <- getExternalPartyConfigStateContext registry
 
   lockedDs <- forA arg.allocationCids $ \allocCid -> do
-    Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
+    Some amuletAlloc <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
     -- need to disclose the amulet contract, as the executor has no visibility into it
     case amuletAlloc.lockedAmulet of
       None -> return mempty
@@ -266,7 +266,7 @@ registryApi_getAllocationTransferContext
   : AmuletRegistry -> ContractId Allocation -> Script OpenApiChoiceContext
 registryApi_getAllocationTransferContext registry allocCid = do
   transferC <- getExternalPartyConfigStateContext registry
-  Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
+  Some amuletAlloc <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
   featuredAppRightC <- getFeaturedAppRightContext registry amuletAlloc.allocation.settlement.executor
   -- need to disclose the amulet contract, as the executor has no visibility into it
   lockedAmuletD <- case amuletAlloc.lockedAmulet of
@@ -312,7 +312,7 @@ registryApi_getAllocation_abortTwoStepTransferContext
 registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
   -- check whether the locked amulet is still active, so that aborts still work
   -- even if the owner of the LockedAmulet expired it
-  Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId instrCid)
+  Some amuletAlloc <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId instrCid)
   case amuletAlloc.lockedAmulet of
     None -> pure emptyOpenApiChoiceContext
     Some la -> do

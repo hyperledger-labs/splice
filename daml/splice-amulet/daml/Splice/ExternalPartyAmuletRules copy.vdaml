@@ -5,28 +5,28 @@
 module Splice.ExternalPartyAmuletRules where
 
 import DA.Assert
-import DA.Exception
 import DA.Foldable (forA_)
 import DA.List (dedup)
-import qualified DA.Map as Map
 import DA.Optional
-import qualified DA.Text as T
 import qualified DA.TextMap as TextMap
+import qualified DA.Map as Map
+import DA.Text as T
 import DA.Time
+import DA.Exception
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
-import Splice.Api.Token.AllocationInstructionV1 qualified as V1
-import Splice.Api.Token.HoldingV2 qualified as V2
-import Splice.Api.Token.AllocationV2 qualified as V2
-import Splice.Api.Token.TransferInstructionV2 qualified as V2
-import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.HoldingV2 (basicAccount, Account(..))
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+import Splice.Api.Token.AllocationInstructionV2 as AllocationInstructionV2
 import Splice.Api.Token.UtilsV2
+
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Amulet.TwoStepTransfer
-import Splice.AmuletAllocation as AmuletAllocationV1
-import Splice.AmuletAllocationV2 as AmuletAllocationV2
+import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
 import Splice.Types
@@ -72,44 +72,40 @@ template ExternalPartyAmuletRules
            description
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
 
-    interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
-      view = Api.Token.TransferInstructionV1.TransferFactoryView with
+    interface instance TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
+      view = TransferInstructionV1.TransferFactoryView with
         admin = dso
         meta = emptyMetadata
 
       transferFactory_transferImpl self arg = amulet_transferFactory_transferImpl this self arg
       transferFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @Api.Token.TransferInstructionV1.TransferFactory this)
+        pure (view (toInterface @TransferInstructionV1.TransferFactory this))
 
-    interface instance V2.TransferFactory for ExternalPartyAmuletRules where
-      view = V2.TransferFactoryView with
+    interface instance TransferInstructionV2.TransferFactory for ExternalPartyAmuletRules where
+      view = TransferInstructionV2.TransferFactoryView with
         admin = dso
         meta = emptyMetadata
 
       transferFactory_transferImpl = transferFactory_v2_senderActor_transferImpl
       transferFactory_publicFetchImpl = transferFactory_v2_publicFetchImpl (toInterface this)
 
-    interface instance V1.AllocationFactory for ExternalPartyAmuletRules where
-      view = V1.AllocationFactoryView with
-        admin = dso
-        meta = emptyMetadata
-
-      allocationFactory_allocateImpl self arg = amulet_allocationFactoryV1_allocateImpl this self arg
-      allocationFactory_publicFetchImpl _self arg = do
-        requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @V1.AllocationFactory this)
-
-    interface instance V2.AllocationFactory for ExternalPartyAmuletRules where
-      view = V2.AllocationFactoryView with
+    interface instance AllocationFactory for ExternalPartyAmuletRules where
+      view = AllocationFactoryView with
         admin = dso
         meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
-      allocationFactory_settleImpl _self arg = amulet_allocationFactoryV2_settleImpl this arg
       allocationFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @V2.AllocationFactory this)
+        pure (view $ toInterface @AllocationFactory this)
+      allocationFactory_settleImpl _self arg = amulet_allocationFactoryV2_settleImpl this arg
+
+    interface instance AllocationInstructionV1.AllocationFactory for ExternalPartyAmuletRules where
+      view = allocation_factory_view_v2_to_v1 (view (toInterface @AllocationFactory this))
+
+      allocationFactory_allocateImpl = allocationFactory_v1_allocateImpl (toInterface @AllocationFactory this)
+      allocationFactory_publicFetchImpl = allocationFactory_v1_publicFetchImpl (toInterface @AllocationFactory this)
 
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
@@ -274,11 +270,11 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 
 amulet_transferFactory_transferImpl
   : ExternalPartyAmuletRules
-  -> ContractId Api.Token.TransferInstructionV1.TransferFactory
-  -> Api.Token.TransferInstructionV1.TransferFactory_Transfer
-  -> Update Api.Token.TransferInstructionV1.TransferInstructionResult
+  -> ContractId TransferInstructionV1.TransferFactory
+  -> TransferInstructionV1.TransferFactory_Transfer
+  -> Update TransferInstructionV1.TransferInstructionResult
 amulet_transferFactory_transferImpl this _self arg = do
-  let Api.Token.TransferInstructionV1.TransferFactory_Transfer {transfer, extraArgs} = arg
+  let TransferInstructionV1.TransferFactory_Transfer {transfer, extraArgs} = arg
   let dso = this.dso
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch arg.expectedAdmin dso
@@ -293,7 +289,7 @@ amulet_transferFactory_transferImpl this _self arg = do
   let expectedInstrumentId = amuletInstrumentId this.dso
   require
     ("Expected instrumentId " <> show expectedInstrumentId <> " matches actual instrumentId " <> show transfer.instrumentId)
-    (expectedInstrumentId == transfer.instrumentId)
+    (expectedInstrumentId == transfer.instrumentId) -- TODO - remove
   -- amount:
   require "Amount must be positive" (transfer.amount > 0.0)
   -- requestedAt:
@@ -311,7 +307,7 @@ amulet_transferFactory_transferImpl this _self arg = do
       | transfer.receiver == transfer.sender -> do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
+          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) (map coerceInterfaceContractId transfer.inputHoldingCids)
           result <- executeExternalPartyTransfer dso paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
@@ -322,10 +318,10 @@ amulet_transferFactory_transferImpl this _self arg = do
               receiverFeeRatio = 0.0
               lock = None ]
             beneficiaries = None
-          pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+          pure TransferInstructionV1.TransferInstructionResult with
             senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
-            output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
-              receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
+            output = TransferInstructionV1.TransferInstructionResult_Completed with
+              receiverHoldingCids = (coerceInterfaceContractId . createdAmuletToHolding) <$> result.createdAmulets
             meta = fromOptional emptyMetadata result.meta
 
       | otherwise -> do
@@ -340,9 +336,9 @@ amulet_transferFactory_transferImpl this _self arg = do
               inputHoldingCids = [toInterfaceContractId lockedAmulet] -- report the locked holding backing the transfer
             lockedAmulet
           -- return result
-          pure Api.Token.TransferInstructionV1.TransferInstructionResult with
-            senderChangeCids
-            output = Api.Token.TransferInstructionV1.TransferInstructionResult_Pending
+          pure TransferInstructionV1.TransferInstructionResult with
+            senderChangeCids = senderChangeCids
+            output = TransferInstructionV1.TransferInstructionResult_Pending
               with
                 transferInstructionCid
             meta
@@ -351,7 +347,7 @@ amulet_transferFactory_transferImpl this _self arg = do
       -- use a payment context with featuring so the preapproval provider can be featured
       paymentContext <- externalPartyTransferFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
-      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
+      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) (map coerceInterfaceContractId transfer.inputHoldingCids)
       result <- exercise preapprovalCid TransferPreapproval_SendV2
         with
           sender = transfer.sender
@@ -361,86 +357,15 @@ amulet_transferFactory_transferImpl this _self arg = do
           description = reason
 
       -- return result
-      pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+      pure TransferInstructionV1.TransferInstructionResult with
         senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
-        output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
+        output = TransferInstructionV1.TransferInstructionResult_Completed with
           receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
         meta = result.meta
 
 
 -- Token standard allocation factory
 ------------------------------------
-
-amulet_allocationFactoryV1_allocateImpl
-  : ExternalPartyAmuletRules
-  -> ContractId V1.AllocationFactory
-  -> V1.AllocationFactory_Allocate
-  -> Update V1.AllocationInstructionResult
-amulet_allocationFactoryV1_allocateImpl externalAmuletRules _self arg = do
-  let dso = externalAmuletRules.dso
-  let V1.AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids, extraArgs} = arg
-  -- validate call to factory and retrieve context
-  requireExpectedAdminMatch arg.expectedAdmin dso
-
-  -- We are using an unfeatured payment context, as the locking to self should not be featured.
-  -- Ideally we could feature the 'settlement.executor', but at this point we don't have the
-  -- necessary authorization from them.
-  --
-  -- The latter transfer that happens as part of the settlement will feature the 'settlement.executor',
-  -- which is what we want: incentivize successful settlements.
-  paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-
-  -- == validate each field of the requested allocation
-  let settlement = allocation.settlement
-  let transferLeg = allocation.transferLeg
-
-  -- settlement.executor: no check
-  -- settlement.settlementRef: no check
-  -- settlement.requestedAt:
-  assertDeadlineExceeded "Allocation.settlement.requestedAt" settlement.requestedAt
-  -- settlement.allocateBefore:
-  assertWithinDeadline "Allocation.settlement.allocateBefore" settlement.allocateBefore
-  -- settlement.settleBefore:
-  require "Allocation.settlement.allocateBefore <= Allocation.settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
-
-  -- transferLegId: no check
-
-  -- transferLeg.sender: no check
-  -- transferLeg.receiver: nothing to check
-  -- transferLeg.amount
-  require "Transfer amount must be positive" (transferLeg.amount > 0.0)
-  -- transferLeg.instrumentId
-  require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
-  -- transferLeg.meta: no check
-
-  -- requestedAt (of the allocation instruction itself):
-  assertDeadlineExceeded "requestedAt" requestedAt
-
-  -- inputHoldingCids:
-  require "At least one input holding must be provided" (not $ null inputHoldingCids)
-
-  -- lock the funds
-  let twoStepTransfer = AmuletAllocationV1.allocationToTwoStepTransfer arg.allocation
-  (lockedAmulet, senderChangeCids, meta) <-
-    prepareTwoStepTransfer twoStepTransfer arg.requestedAt inputHoldingCids paymentContext
-  -- create the amulet allocation
-  allocationCid <- toInterfaceContractId <$> create AmuletAllocation with
-    allocation = arg.allocation
-    lockedAmulet
-
-  -- finaly done: return the result
-  pure V1.AllocationInstructionResult with
-    senderChangeCids
-    output = V1.AllocationInstructionResult_Completed with allocationCid
-    meta
-
-requireExpectedAdminMatch : Party -> Party -> Update ()
-requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
-
-
-
--- Token standard allocation factory V2
----------------------------------------
 
 amulet_allocationFactoryV2_allocateImpl
   : ExternalPartyAmuletRules
@@ -449,7 +374,7 @@ amulet_allocationFactoryV2_allocateImpl
   -> Update V2.AllocationInstructionResult
 amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   let dso = externalAmuletRules.dso
-  let (V2.AllocationFactory_Allocate with allocation, requestedAt, inputHoldingCids, extraArgs, creator) = arg
+  let AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids, extraArgs, creator} = arg
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch arg.expectedAdmin dso
 
@@ -510,7 +435,7 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   require "At least one input holding must be provided when net amount is negative" (amount >= 0.0 || not (null inputHoldingCids))
 
   -- lock the funds
-  let twoStepTransfer = AmuletAllocationV2.allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
+  let twoStepTransfer = allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
 
   (lockedAmulet, senderChangeCids, meta) <-
     if amount >= 0.0
@@ -519,39 +444,42 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
       (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map downcast inputHoldingCids) paymentContext
       return (Some la, cids, m)
   -- create the amulet allocation
-  allocationCid <- toInterfaceContractId <$> create AmuletAllocationV2 with
+  allocationCid <- toInterfaceContractId <$> create AmuletAllocation with
     allocation = arg.allocation
     lockedAmulet
-    dso
+    admin = dso
     authorizer
     expiresAt
 
   -- finaly done: return the result
-  pure V2.AllocationInstructionResult with
+  pure AllocationInstructionResult with
     senderChangeCids = map upcast senderChangeCids
-    output = V2.AllocationInstructionResult_Completed with allocationCid
+    output = AllocationInstructionResult_Completed with allocationCid
     meta
+
+requireExpectedAdminMatch : Party -> Party -> Update ()
+requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
 
 
 amulet_allocationFactoryV2_settleImpl
   : ExternalPartyAmuletRules
-  -> V2.AllocationFactory_SettleBatch
-  -> Update V2.AllocationFactory_SettleBatchResult
-amulet_allocationFactoryV2_settleImpl this V2.AllocationFactory_SettleBatch {..} = do
+  -> AllocationFactory_SettleBatch
+  -> Update AllocationFactory_SettleBatchResult
+amulet_allocationFactoryV2_settleImpl this AllocationFactory_SettleBatch {..} = do
   let dso = this.dso
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch expectedAdmin dso
 
   -- fetch and validate all allocations
   allocations <- forA allocationCids $ \allocationCid -> do
-    allocation <- fetchChecked @AmuletAllocationV2 (ForDso with dso) (fromInterfaceContractId allocationCid)
+    allocation <- fetchChecked @AmuletAllocation (ForDso with dso) (fromInterfaceContractId allocationCid)
     require "Allocation executor matches" (allocation.allocation.settlement.executor == executor)
     -- FIXME: consider what other validation is missing
     pure allocation
 
   let allocatedLegs = Map.fromList $ do
         allocation <- allocations
-        let authorizer = V2.basicAccount (allocation.authorizer)
+        let authorizer = basicAccount (allocation.authorizer)
         case allocation.allocation.transferLegs of
           [] -> error "Unexpected empty transfer legs in allocation"
           (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
@@ -564,11 +492,11 @@ amulet_allocationFactoryV2_settleImpl this V2.AllocationFactory_SettleBatch {..}
   -- settle all allocations
   -- FIXME: settle sorted by authorizer to improve view compression, and merge holdings for the same owner to auto-reduce ACS size.
   newHoldingCidss <- forA allocationCids $ \allocationCid -> do
-    result <- exercise allocationCid V2.Allocation_Settle with extraArgs
+    result <- exercise allocationCid AllocationV2.Allocation_Settle with extraArgs
     pure result.newHoldingCids
 
   -- return result
-  pure V2.AllocationFactory_SettleBatchResult with
+  pure AllocationFactory_SettleBatchResult with
     newHoldingCids = foldl (Map.unionWith (++)) Map.empty newHoldingCidss
     meta = emptyMetadata
 
@@ -597,7 +525,7 @@ validateExpectedTransfers pp (expected :: expectedRest) allocated =
 ppMap : (leg -> Text) -> Map.Map leg [leg] -> Text
 ppMap pp m = T.unlines $ concat [ pp k :: map (\v -> "  " <> pp v) vs  | (k, vs) <- Map.toList m ]
 
-ppLeg : (V2.Account, V2.TransferLeg) -> Text
+ppLeg : (Account, AllocationV2.TransferLeg) -> Text
 ppLeg (authorizer, leg) =
   -- show (authorizer.owner, leg.sender.owner, leg.receiver.owner, leg.amount)
   show (authorizer, leg)
