@@ -495,7 +495,6 @@ svs:
       walletUser: 'auth0|68c2c41e6470184569e4521e'
 synchronizerMigration:
   active:
-    enableLogicalSynchronizerDeploymentMode: true
     id: 0
     releaseReference:
       deploymentDir: 'cluster/deployment'
@@ -507,7 +506,6 @@ synchronizerMigration:
       repoUrl: 'https://github.com/hyperledger-labs/splice'
       spliceRoot: 'splice'
     version: 'local'
-  lsuEnabled: true
 validator1:
   deduplicationDuration: '30m'
   logging:

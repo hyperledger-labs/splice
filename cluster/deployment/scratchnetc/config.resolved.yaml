@@ -496,7 +496,7 @@ svs:
 synchronizerMigration:
   active:
     enableLogicalSynchronizerDeploymentMode: true
-    id: 0
+    id: 1
     releaseReference:
       deploymentDir: 'cluster/deployment'
       gitReference: 'refs/heads/main'
@@ -508,11 +508,11 @@ synchronizerMigration:
       spliceRoot: 'splice'
     version: 'local'
   frozenMigrationId: 0
-  lsuEnabled: true
-  upgrade:
+  legacy:
     enableLogicalSynchronizerDeploymentMode: true
-    id: 1
+    id: 0
     version: 'local'
+  lsuEnabled: true
 validator1:
   deduplicationDuration: '30m'
   logging:

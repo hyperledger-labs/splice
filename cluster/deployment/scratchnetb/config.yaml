@@ -1,13 +1,5 @@
 # TODO(#2942) reduce duplication between all scratchnet configs
 !include(../scratch-default-synchronizer-migration.yaml;../scratch-default-operator.yaml)
-synchronizerMigration:
-  lsuEnabled: true
-  active:
-    enableLogicalSynchronizerDeploymentMode: true
-#  upgrade:
-#    id: 1
-#    enableLogicalSynchronizerDeploymentMode: true
-#    version: "local"
 infra:
   prometheus:
     retentionDuration: "30d"

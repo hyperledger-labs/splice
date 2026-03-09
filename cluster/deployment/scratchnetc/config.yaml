@@ -3,9 +3,11 @@
 synchronizerMigration:
   lsuEnabled: true
   frozenMigrationId: 0
-  active:
+  legacy:
+    id: 0
     enableLogicalSynchronizerDeploymentMode: true
-  upgrade:
+    version: "local"
+  active:
     id: 1
     enableLogicalSynchronizerDeploymentMode: true
     version: "local"
