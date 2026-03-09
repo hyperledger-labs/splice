@@ -139,16 +139,24 @@ class UpdateHistorySegmentBulkStorage(
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(
-        S3ZstdObjects(
-          storageConfig,
-          appConfig,
-          s3Connection,
-          { objIdx =>
-            s"${storageConfig.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
-          },
-          loggerFactory,
+        // We use lazyFlow, so that in the case where no updates are emitted, we don't instantiate the S3ZstdObjects at all,
+        // since it assumes that it gets at least one chunk to write.
+        Flow.lazyFlow(() =>
+          S3ZstdObjects(
+            storageConfig,
+            appConfig,
+            s3Connection,
+            { objIdx =>
+              s"${storageConfig.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
+            },
+            loggerFactory,
+          )
         )
       )
+      .orElse(Source.lazySource { () =>
+        logger.warn(s"No updates found in segment ${segment.fromTimestamp}-${segment.toTimestamp}")
+        Source.empty
+      })
       .map((o: GroupedWeightS3ObjectFlow.Output) => {
         historyMetrics.BulkStorage.incUpdateObjects()
         UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)

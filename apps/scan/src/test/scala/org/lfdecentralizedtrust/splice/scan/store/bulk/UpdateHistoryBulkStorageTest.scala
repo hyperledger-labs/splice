@@ -10,6 +10,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.WallClock
@@ -27,6 +28,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKey
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import org.slf4j.event.Level
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
@@ -166,6 +168,49 @@ class UpdateHistoryBulkStorageTest
             ) should contain theSameElementsInOrderAs segmentUpdates
         }
       }
+    }
+
+    "successfully handle an empty segment" in {
+      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val mockStore =
+        new MockUpdateHistoryStore(10, { i => Instant.ofEpochMilli(i + 1000) })
+      val fromTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(100L))
+      val toTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(200L))
+
+      val segment = UpdatesSegment(
+        TimestampWithMigrationId(fromTimestamp, 0),
+        TimestampWithMigrationId(toTimestamp, 0),
+      )
+      val metricsFactory = new InMemoryMetricsFactory
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+        {
+          val probe = UpdateHistorySegmentBulkStorage
+            .asSource(
+              bulkStorageTestConfig,
+              appConfig,
+              mockStore.store,
+              bucketConnection,
+              segment,
+              new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+              loggerFactory,
+            )
+            .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
+            .run()
+          probe.request(1)
+
+          probe.expectComplete()
+        },
+        logEntries =>
+          forExactly(1, logEntries)(logEntry =>
+            logEntry.message should (include("No updates found in segment"))
+          ),
+      )
+
+      succeed
+
     }
 
     "successfully dump all segments" in {
