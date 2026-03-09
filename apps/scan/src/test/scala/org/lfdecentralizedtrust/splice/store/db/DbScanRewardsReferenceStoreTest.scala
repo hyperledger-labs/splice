@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanRewardsReferenceStore
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase, TcsStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import slick.jdbc.JdbcProfile
 
@@ -26,12 +26,14 @@ class DbScanRewardsReferenceStoreTest
 
   "DbScanRewardsReferenceStore" should {
 
-    "lookupFeaturedAppRightsAsOf returns all active FeaturedAppRights at given time" in {
+    "lookupFeaturedAppRightsAsOf and lookupFeaturedAppRightsInAsOfRange return correct contracts" in {
       val store = mkStore()
       val far1 = featuredAppRight(userParty(1))
         .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val far2 = featuredAppRight(userParty(2))
         .copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
+      val far3 = featuredAppRight(userParty(3))
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
       for {
         _ <- initWithAcs()(store.multiDomainAcsStore)
         _ <- d1.create(far1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
@@ -40,26 +42,106 @@ class DbScanRewardsReferenceStoreTest
         _ <- d1.create(far2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
           store.multiDomainAcsStore
         )
+        _ <- d1.create(far3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.multiDomainAcsStore
+        )
         _ <- d1.archive(far1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.multiDomainAcsStore
         )
-        farBefore <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(50))
-        _ = farBefore shouldBe empty
+        _ <- d1.archive(far3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
+          store.multiDomainAcsStore
+        )
+
+        // lookupFeaturedAppRightsAsOf point-in-time checks
+        resultAt50 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(50))
+        _ = resultAt50 shouldBe empty
+
         resultAt100 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(100))
         _ = resultAt100.map(_.contract) shouldBe Seq(far1)
+
         resultAt250 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(250))
-        _ = resultAt250.map(_.contract) should contain theSameElementsAs Seq(far1, far2)
+        _ = resultAt250.map(_.contract).toSet shouldBe Set(far1, far2)
+
         resultAt300 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(300))
-        _ = resultAt300.map(_.contract) shouldBe Seq(far2)
+        _ = resultAt300.map(_.contract).toSet shouldBe Set(far2, far3)
+
+        resultAt400 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(400))
+        _ = resultAt400.map(_.contract) shouldBe Seq(far2)
+
+        // lookupFeaturedAppRightsInAsOfRange: [100, 400] should return all 3 contracts
+        resultRange_100_400 <- store.lookupFeaturedAppRightsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(100),
+          CantonTimestamp.ofEpochSecond(400),
+        )
+        _ = resultRange_100_400
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(far1, far2, far3)
+
+        // contractsAsOf on the range result should match lookupFeaturedAppRightsAsOf
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(100),
+          ) shouldBe resultAt100
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(250),
+          ) shouldBe resultAt250
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(300),
+          ) shouldBe resultAt300
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(400),
+          ) shouldBe resultAt400
+
+        // Also confirm lookupFeaturedAppRightsInAsOfRange for various ranges
+        resultRange_100_200 <- store.lookupFeaturedAppRightsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(100),
+          CantonTimestamp.ofEpochSecond(200),
+        )
+        _ = resultRange_100_200
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(far1, far2)
+
+        resultRange_100_300 <- store.lookupFeaturedAppRightsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(100),
+          CantonTimestamp.ofEpochSecond(300),
+        )
+        _ = resultRange_100_300
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(far1, far2, far3)
+
+        resultRange_200_300 <- store.lookupFeaturedAppRightsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(200),
+          CantonTimestamp.ofEpochSecond(300),
+        )
+        _ = resultRange_200_300
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(far1, far2, far3)
+
+        resultRange_300_400 <- store.lookupFeaturedAppRightsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(300),
+          CantonTimestamp.ofEpochSecond(400),
+        )
+        _ = resultRange_300_400
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(far2, far3)
       } yield succeed
     }
 
-    "lookupOpenMiningRoundsAsOf returns all active OpenMiningRounds at given time" in {
+    "lookupOpenMiningRoundsAsOf and lookupOpenMiningRoundsInAsOfRange return correct contracts" in {
       val store = mkStore()
       val omr1 = openMiningRound(dsoParty, round = 3, amuletPrice = 1.0)
         .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val omr2 = openMiningRound(dsoParty, round = 4, amuletPrice = 1.5)
         .copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
+      val omr3 = openMiningRound(dsoParty, round = 5, amuletPrice = 2.0)
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
       for {
         _ <- initWithAcs()(store.multiDomainAcsStore)
         _ <- d1.create(omr1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
@@ -68,17 +150,95 @@ class DbScanRewardsReferenceStoreTest
         _ <- d1.create(omr2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
           store.multiDomainAcsStore
         )
+        _ <- d1.create(omr3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.multiDomainAcsStore
+        )
         _ <- d1.archive(omr1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.multiDomainAcsStore
         )
-        omrBefore <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(50))
-        _ = omrBefore shouldBe empty
+        _ <- d1.archive(omr3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
+          store.multiDomainAcsStore
+        )
+
+        // lookupOpenMiningRoundsAsOf point-in-time checks
+        resultAt50 <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(50))
+        _ = resultAt50 shouldBe empty
+
         resultAt100 <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(100))
         _ = resultAt100.map(_.contract) shouldBe Seq(omr1)
+
         resultAt250 <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(250))
-        _ = resultAt250.map(_.contract) should contain theSameElementsAs Seq(omr1, omr2)
+        _ = resultAt250.map(_.contract).toSet shouldBe Set(omr1, omr2)
+
         resultAt300 <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(300))
-        _ = resultAt300.map(_.contract) shouldBe Seq(omr2)
+        _ = resultAt300.map(_.contract).toSet shouldBe Set(omr2, omr3)
+
+        resultAt400 <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(400))
+        _ = resultAt400.map(_.contract) shouldBe Seq(omr2)
+
+        // lookupOpenMiningRoundsInAsOfRange: [100, 400] should return all 3 contracts
+        resultRange_100_400 <- store.lookupOpenMiningRoundsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(100),
+          CantonTimestamp.ofEpochSecond(400),
+        )
+        _ = resultRange_100_400
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(omr1, omr2, omr3)
+
+        // contractsAsOf on the range result should match lookupOpenMiningRoundsAsOf
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(100),
+          ) shouldBe resultAt100
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(250),
+          ) shouldBe resultAt250
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(300),
+          ) shouldBe resultAt300
+        _ = TcsStore
+          .contractsAsOf(
+            resultRange_100_400,
+            CantonTimestamp.ofEpochSecond(400),
+          ) shouldBe resultAt400
+
+        // Also confirm lookupOpenMiningRoundsInAsOfRange for various ranges
+        resultRange_100_200 <- store.lookupOpenMiningRoundsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(100),
+          CantonTimestamp.ofEpochSecond(200),
+        )
+        _ = resultRange_100_200
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(omr1, omr2)
+
+        resultRange_100_300 <- store.lookupOpenMiningRoundsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(100),
+          CantonTimestamp.ofEpochSecond(300),
+        )
+        _ = resultRange_100_300
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(omr1, omr2, omr3)
+
+        resultRange_200_300 <- store.lookupOpenMiningRoundsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(200),
+          CantonTimestamp.ofEpochSecond(300),
+        )
+        _ = resultRange_200_300
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(omr1, omr2, omr3)
+
+        resultRange_300_400 <- store.lookupOpenMiningRoundsInAsOfRange(
+          CantonTimestamp.ofEpochSecond(300),
+          CantonTimestamp.ofEpochSecond(400),
+        )
+        _ = resultRange_300_400
+          .map(_.contractWithState.contract)
+          .toSet shouldBe Set(omr2, omr3)
       } yield succeed
     }
   }

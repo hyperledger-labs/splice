@@ -81,6 +81,40 @@ class DbScanRewardsReferenceStore(
   ): Future[Seq[ContractWithState[TCid, T]]] =
     multiDomainAcsStore.listContractsAsOf(companion, asOf, synchronizerId, limit)
 
+  override def listContractsInAsOfRange[C, TCid <: ContractId[?], T](
+      companion: C,
+      minAsOf: CantonTimestamp,
+      maxAsOf: CantonTimestamp,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] =
+    multiDomainAcsStore.listContractsInAsOfRange(companion, minAsOf, maxAsOf, synchronizerId, limit)
+
+  def lookupFeaturedAppRightsInAsOfRange(
+      minAsOf: CantonTimestamp,
+      maxAsOf: CantonTimestamp,
+      limit: Limit = defaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[TcsStore.TemporalContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]
+  ] =
+    listContractsInAsOfRange(FeaturedAppRight.COMPANION, minAsOf, maxAsOf, synchronizerId, limit)
+
+  def lookupOpenMiningRoundsInAsOfRange(
+      minAsOf: CantonTimestamp,
+      maxAsOf: CantonTimestamp,
+      limit: Limit = defaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[TcsStore.TemporalContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]
+  ] =
+    listContractsInAsOfRange(OpenMiningRound.COMPANION, minAsOf, maxAsOf, synchronizerId, limit)
+
   def lookupFeaturedAppRightsAsOf(
       asOf: CantonTimestamp,
       limit: Limit = defaultLimit,
