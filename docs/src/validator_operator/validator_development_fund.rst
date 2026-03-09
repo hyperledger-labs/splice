@@ -55,7 +55,7 @@ Once allocated:
 
 The Development Fund Manager is responsible for managing allocations in accordance with governance decisions defined in CIP-0082.
 
-Managing Development Fund
+Managing Development Fund Allocations
 ++++++++++++++++++++++++++
 
 Development Fund allocations are managed through the **Development Fund** tab
