@@ -362,6 +362,7 @@ class ScanApp(
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
         config.serveTrafficSummaries,
+        config.serveAppActivityRecords,
         clock,
         loggerFactory,
         packageVersionSupport,

@@ -128,6 +128,7 @@ class HttpScanHandler(
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
     serveTrafficSummaries: Boolean,
+    serveAppActivityRecords: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
@@ -858,11 +859,14 @@ class HttpScanHandler(
         case Some((verdictWithViewsO, updateO)) =>
           val verdictRowIdO = verdictWithViewsO.map { case (v, _) => v.rowId }
           for {
-            appActivityRecordO <- verdictRowIdO match {
-              case Some(rowId) =>
-                eventStore.getAppActivityRecords(Seq(rowId)).map(_.get(rowId))
-              case None => Future.successful(None)
-            }
+            appActivityRecordO <-
+              if (serveAppActivityRecords)
+                verdictRowIdO match {
+                  case Some(rowId) =>
+                    eventStore.getAppActivityRecords(Seq(rowId)).map(_.get(rowId))
+                  case None => Future.successful(None)
+                }
+              else Future.successful(None)
           } yield {
             val encodedUpdateV2 = updateO
               .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
@@ -932,7 +936,9 @@ class HttpScanHandler(
         verdictRowIds = events.flatMap { case (verdictWithViewsO, _) =>
           verdictWithViewsO.map { case (v, _) => v.rowId }
         }
-        appActivityRecordMap <- eventStore.getAppActivityRecords(verdictRowIds)
+        appActivityRecordMap <-
+          if (serveAppActivityRecords) eventStore.getAppActivityRecords(verdictRowIds)
+          else Future.successful(Map.empty[Long, eventStore.AppActivityRecordT])
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
           .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
@@ -940,9 +946,12 @@ class HttpScanHandler(
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
         }
-        val trafficSummaryEncoded = verdictWithViewsO.flatMap { case (v, _) =>
-          v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
-        }
+        val trafficSummaryEncoded =
+          if (serveTrafficSummaries)
+            verdictWithViewsO.flatMap { case (v, _) =>
+              v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+            }
+          else None
         val appActivityRecordEncoded = verdictWithViewsO.flatMap { case (v, _) =>
           appActivityRecordMap.get(v.rowId).map(ScanHttpEncodings.encodeAppActivityRecord)
         }
