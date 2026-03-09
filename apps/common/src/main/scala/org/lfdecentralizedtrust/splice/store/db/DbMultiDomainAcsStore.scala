@@ -287,6 +287,48 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
+  override def listContractsInAsOfRange[C, TCid <: ContractId[?], T](
+      companion: C,
+      minAsOf: CantonTimestamp,
+      maxAsOf: CantonTimestamp,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] = {
+    val archiveConfig = requireArchiveConfig("listContractsInAsOfRange")
+    waitUntilAcsIngested {
+      waitUntilRecordTimeReached(synchronizerId, maxAsOf).flatMap { _ =>
+        val templateId = companionClass.typeId(companion)
+        val opName = s"listContractsInAsOfRange:${templateId.getEntityName}"
+        for {
+          result <- storage.query(
+            selectFromTcsTableWithStateInAsOfRange(
+              acsTableName,
+              archiveConfig.archiveTableName,
+              acsStoreId,
+              domainMigrationId,
+              companion,
+              minAsOf,
+              maxAsOf,
+              orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
+            ),
+            opName,
+          )
+          limited = applyLimit(opName, limit, result)
+          withState = limited.map { row =>
+            TcsStore.TemporalContractWithState(
+              contractWithState = contractWithStateFromRow(companion)(row.withStateRow),
+              createdAt = CantonTimestamp.assertFromLong(row.withStateRow.acsRow.createdAt.micros),
+              archivedAt = row.archivedAt,
+            )
+          }
+        } yield withState
+      }
+    }
+  }
+
   /** Returns any contract of the same template as the passed companion.
     */
   override def findAnyContractWithOffset[C, TCid <: ContractId[?], T](companion: C)(implicit

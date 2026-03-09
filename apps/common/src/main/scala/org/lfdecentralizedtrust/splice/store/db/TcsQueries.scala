@@ -15,9 +15,21 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
 import slick.dbio.Effect
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
+import slick.jdbc.{GetResult, PositionedResult}
 import slick.sql.SqlStreamingAction
 
 trait TcsQueries extends AcsQueries {
+
+  implicit val GetResultSelectFromTcsTableRangeResult
+      : GetResult[TcsQueries.SelectFromTcsTableRangeResult] =
+    GetResult { (prs: PositionedResult) =>
+      val withStateRow = prs.<<[SelectFromAcsTableWithStateResult]
+      val archivedAtMicros = prs.<<[Option[Long]]
+      TcsQueries.SelectFromTcsTableRangeResult(
+        withStateRow,
+        archivedAtMicros.map(CantonTimestamp.assertFromLong),
+      )
+    }
 
   /** Builds a UNION ALL query across live and archive tables for point-in-time queries.
     * Live table: contracts created at or before asOf (still active).
@@ -107,4 +119,52 @@ trait TcsQueries extends AcsQueries {
       orderLimit,
     ).as[SelectFromAcsTableWithStateResult]
   }
+
+  /** Builds a UNION ALL query across live and archive tables for range queries.
+    * Returns all contracts alive during some part of [minAsOf, maxAsOf],
+    * together with their archived_at timestamp (None for still-active contracts).
+    */
+  protected def selectFromTcsTableWithStateInAsOfRange[C, TCid <: ContractId[?], T](
+      acsTableName: String,
+      archiveTableName: String,
+      storeId: AcsStoreId,
+      migrationId: Long,
+      companion: C,
+      minAsOf: CantonTimestamp,
+      maxAsOf: CantonTimestamp,
+      orderLimit: SQLActionBuilder = sql"",
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): SqlStreamingAction[Vector[
+    TcsQueries.SelectFromTcsTableRangeResult
+  ], TcsQueries.SelectFromTcsTableRangeResult, Effect.Read] = {
+    val packageQualifiedName = companionClass.packageQualifiedName(companion)
+    val columns = SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()
+    (sql"""(
+       select #$columns, null::bigint as archived_at
+       from #$acsTableName acs
+       where acs.store_id = $storeId
+         and acs.migration_id = $migrationId
+         and acs.package_name = ${packageQualifiedName.packageName}
+         and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
+         and acs.created_at <= $maxAsOf
+       )
+       UNION ALL
+       (
+       select #$columns, acs.archived_at
+       from #$archiveTableName acs
+       where acs.store_id = $storeId
+         and acs.migration_id = $migrationId
+         and acs.package_name = ${packageQualifiedName.packageName}
+         and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
+         and acs.created_at <= $maxAsOf
+         and acs.archived_at > $minAsOf
+       )
+       """ ++ orderLimit).toActionBuilder.as[TcsQueries.SelectFromTcsTableRangeResult]
+  }
+}
+
+object TcsQueries {
+  case class SelectFromTcsTableRangeResult(
+      withStateRow: SelectFromAcsTableWithStateResult,
+      archivedAt: Option[CantonTimestamp],
+  )
 }

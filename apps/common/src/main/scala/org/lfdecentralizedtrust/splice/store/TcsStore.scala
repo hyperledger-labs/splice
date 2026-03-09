@@ -30,4 +30,35 @@ trait TcsStore {
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]]
+
+  def listContractsInAsOfRange[C, TCid <: ContractId[?], T](
+      companion: C,
+      minAsOf: CantonTimestamp,
+      maxAsOf: CantonTimestamp,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]]
+}
+
+object TcsStore {
+
+  /** A contract with its temporal bounds from the TCS range query. */
+  case class TemporalContractWithState[TCid, T](
+      contractWithState: ContractWithState[TCid, T],
+      createdAt: CantonTimestamp,
+      archivedAt: Option[CantonTimestamp],
+  )
+
+  /** Pure function: filter contracts alive at a specific timestamp. */
+  def contractsAsOf[TCid, T](
+      contracts: Seq[TemporalContractWithState[TCid, T]],
+      asOf: CantonTimestamp,
+  ): Seq[ContractWithState[TCid, T]] =
+    contracts.collect {
+      case tc if tc.createdAt <= asOf && tc.archivedAt.forall(_ > asOf) =>
+        tc.contractWithState
+    }
 }
