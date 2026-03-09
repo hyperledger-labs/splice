@@ -21,3 +21,6 @@
      - **Experimental**: Added an optional ``traffic_summary`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
        When enabled by SV configuration, traffic summaries are included alongside verdicts in event history items.
        This is part of the CIP-104 preview and is subject to change.
+
+       Traffic summaries will be enabled step-by-step on Dev/Test/MainNet,
+       once the SVs have successfully concluded their performance testing.
