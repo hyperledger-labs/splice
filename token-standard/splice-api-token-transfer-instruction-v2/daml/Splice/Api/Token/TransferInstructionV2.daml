@@ -8,7 +8,7 @@ import qualified DA.Map as Map
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
-import DA.Optional (fromOptional)
+
 
 -- | A specification of a transfer of holdings between parties parties.
 data Transfer = Transfer with
@@ -100,10 +100,13 @@ data TransferInstructionView = TransferInstructionView with
       -- Only set if the registry evolved the transfer instruction in multiple steps.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
-    availableActions : Map.Map Party [TransferInstructionAction]
+    availableActions : Map.Map [Party] [TransferInstructionAction]
       -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
       --
       -- This field can by used to inform wallet users whether they can take an action or not.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate delegation contracts to be in place.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
@@ -134,11 +137,11 @@ interface TransferInstruction where
     -- this is not guaranteed. The result of the choice is implementation-specific and MAY
     -- be any of the three possible results.
     with
-      actor : Optional Party
-        -- ^ The party calling Accept, if different from the owner or the recipient account
+      actors : [Party]
+        -- ^ The parties calling Accept, if different from the owner or the recipient account
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller fromOptional (view this).transfer.receiver.owner actor
+    controller withDefaultActor (view this).transfer.receiver.owner actors
     do transferInstruction_acceptImpl this self arg
 
   nonconsuming choice TransferInstruction_Reject : TransferInstructionResult
@@ -151,11 +154,11 @@ interface TransferInstruction where
     -- This choice is only available if the instruction is in
     -- `TransferPendingReceiverAcceptance` state.
     with
-      actor : Optional Party
-        -- ^ The party calling Reject, if different from the owner or the recipient account
+      actors : [Party]
+        -- ^ The parties calling Reject, if different from the owner or the recipient account
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller fromOptional (view this).transfer.receiver.owner actor
+    controller withDefaultActor (view this).transfer.receiver.owner actors
     do transferInstruction_rejectImpl this self arg
 
   nonconsuming choice TransferInstruction_Withdraw : TransferInstructionResult
@@ -165,11 +168,11 @@ interface TransferInstruction where
     -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Withdraw`
     -- where possible to maximize compatibility with v1 transaction parsers.
     with
-      actor : Optional Party
-        -- ^ The party calling Withdraw, if different from the owner or the source account
+      actors : [Party]
+        -- ^ The parties calling Withdraw, if different from the owner or the source account
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller fromOptional (view this).transfer.sender.owner actor
+    controller withDefaultActor (view this).transfer.sender.owner actors
     do transferInstruction_withdrawImpl this self arg
 
   nonconsuming choice TransferInstruction_Update : TransferInstructionResult
@@ -187,7 +190,7 @@ interface TransferInstruction where
         -- this field contains the expected actors for the specific update.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller actors
+    controller withDefaultActor (view this).transfer.instrumentId.admin actors
     do transferInstruction_updateImpl this self arg
 
 
@@ -215,11 +218,11 @@ interface TransferFactory where
         -- that check the expected admin party.
       transfer : Transfer
         -- ^ The transfer to execute.
-      actor : Optional Party
-        -- ^ The party instructing the transfer, if different from the owner or the source account
+      actors : [Party]
+        -- ^ The parties instructing the transfer, if different from the owner or the source account
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
-    controller fromOptional transfer.sender.owner actor
+    controller withDefaultActor transfer.sender.owner actors
     do transferFactory_transferImpl this self arg
 
   nonconsuming choice TransferFactory_PublicFetch : TransferFactoryView
@@ -247,3 +250,12 @@ data TransferFactoryView = TransferFactoryView
     meta : Metadata
       -- ^ Additional metadata specific to the transfer factory, used for extensibility.
   deriving (Show, Eq)
+
+
+-- | Set a default actor if the list of actors is empty to simplify calling the choices
+-- for the common cases.
+--
+-- FIXME: consider removing this defaulting. The empty list reads weird in the choice argument, and callers having to think about the actors they set seems valuable.
+withDefaultActor : Party -> [Party] -> [Party]
+withDefaultActor defaultActor [] = [defaultActor]
+withDefaultActor _ actors = actors

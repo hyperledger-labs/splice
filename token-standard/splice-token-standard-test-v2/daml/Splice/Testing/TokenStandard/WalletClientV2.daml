@@ -111,7 +111,7 @@ listTransferOffers p instrumentId = do
   let pendingOffers = do
         (cid, Some instr) <- instrs
         guard (instr.transfer.instrumentId == instrumentId)
-        guard (p `Map.member` instr.availableActions)
+        guard ([p] `Map.member` instr.availableActions)
         guard (p == instr.transfer.sender.owner || p == instr.transfer.receiver.owner)
         pure (cid, instr)
   pure pendingOffers

@@ -143,7 +143,7 @@ setupTwoStepTransfer = do
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
 
   TextMap.size enrichedChoice.arg.extraArgs.context.values === 1
   Map.size enrichedChoice.disclosures.disclosures === 2
@@ -189,7 +189,7 @@ test_happy_path_self = script do
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
 
   debug enrichedChoice.arg
 
@@ -227,7 +227,7 @@ test_happy_path_direct = script do
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
 
   TextMap.size enrichedChoice.arg.extraArgs.context.values === 3
   Map.size enrichedChoice.disclosures.disclosures === 4
@@ -259,6 +259,9 @@ test_happy_path_direct = script do
 -- Testing two-step transfers
 -----------------------------
 
+
+-- FIXME: test that transfer instructions get archived
+
 test_two_step_success : Script ()
 test_two_step_success = do
   (TestSetup {..}, aliceInstrCid) <- setupTwoStepTransfer
@@ -285,7 +288,7 @@ test_two_step_success = do
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
-    actor = None
+    actors = []
 
   TransferInstructionResult_Completed receiverHoldingCids <- pure result.output
   result.senderChangeCids === []
@@ -318,7 +321,7 @@ test_two_step_withdraw = do
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
-    actor = None
+    actors = []
 
 
   case result.senderChangeCids of
@@ -360,7 +363,7 @@ test_two_step_withdraw_locked_amulet_gone = do
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
-    actor = None
+    actors = []
 
   -- move time back to the future (TM) so withdrawal can complete
   setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
@@ -371,7 +374,7 @@ test_two_step_withdraw_locked_amulet_gone = do
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
-    actor = None
+    actors = []
 
   result.senderChangeCids === []
   result.output === TransferInstructionResult_Failed
@@ -399,7 +402,7 @@ test_two_step_reject = do
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
-    actor = None
+    actors = []
 
   case result.senderChangeCids of
     [holdingCid] ->
@@ -435,7 +438,7 @@ test_two_step_reject_locked_amulet_gone = do
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
-    actor = None
+    actors = []
 
   result.senderChangeCids === []
   result.output === TransferInstructionResult_Failed
@@ -462,7 +465,7 @@ test_no_holdings = script do
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
 
   -- Show that the actual transfer choice fails
   submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -481,7 +484,7 @@ test_expired = script do
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
 
   -- Show that the actual transfer choice fails
   submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -501,7 +504,7 @@ test_wrong_admin = script do
     expectedAdmin = alice -- set the wrong admin
     transfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
 
   -- Show that the actual transfer choice fails
   submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -517,7 +520,7 @@ test_factory_PublicFetch = do
     expectedAdmin = registry.dso
     transfer = defaultTransfer
     extraArgs = emptyExtraArgs
-    actor = None
+    actors = []
   view <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid TransferFactory_PublicFetch
     with
       expectedAdmin = registry.dso

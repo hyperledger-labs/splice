@@ -65,9 +65,11 @@ accountFromMeta owner field meta =
     id = TextMap.lookup (v2Namespace <> field <> ".id") meta.values
     owner
 
-ensureActorIs : Party -> Optional Party -> Update ()
-ensureActorIs p (Some actor) | actor /= p = fail ("actor must be " <> show p)
-ensureActorIs _ _ = pure ()
+ensureActorIsDefault : Party -> [Party] -> Update ()
+ensureActorIsDefault _ [] = pure ()
+ensureActorIsDefault p actors
+  | [p] == actors = pure ()
+  | otherwise = fail $ "Expected default actor " <> show p <> ", but got " <> show actors
 
 dropAccountMeta : Text -> Metadata -> Metadata
 dropAccountMeta fieldName meta =
@@ -547,7 +549,7 @@ transferInstruction_v2_receiverActor_acceptImpl
   -> TransferInstructionV2.TransferInstruction_Accept
   -> Update TransferInstructionV2.TransferInstructionResult
 transferInstruction_v2_receiverActor_acceptImpl receiver self arg = do
-  ensureActorIs receiver arg.actor
+  ensureActorIsDefault receiver arg.actors
   upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
     TransferInstructionV1.TransferInstruction_Accept with
       extraArgs = arg.extraArgs
@@ -559,7 +561,7 @@ transferInstruction_v2_receiverActor_rejectImpl
   -> TransferInstructionV2.TransferInstruction_Reject
   -> Update TransferInstructionV2.TransferInstructionResult
 transferInstruction_v2_receiverActor_rejectImpl receiver self arg = do
-  ensureActorIs receiver arg.actor
+  ensureActorIsDefault receiver arg.actors
   upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
     TransferInstructionV1.TransferInstruction_Reject with
       extraArgs = arg.extraArgs
@@ -571,7 +573,7 @@ transferInstruction_v2_senderActor_withdrawImpl
   -> TransferInstructionV2.TransferInstruction_Withdraw
   -> Update TransferInstructionV2.TransferInstructionResult
 transferInstruction_v2_senderActor_withdrawImpl sender self arg = do
-  ensureActorIs sender arg.actor
+  ensureActorIsDefault sender arg.actors
   upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
     TransferInstructionV1.TransferInstruction_Withdraw with
       extraArgs = arg.extraArgs
@@ -616,7 +618,7 @@ transferFactory_v2_senderActor_transferImpl
 transferFactory_v2_senderActor_transferImpl self args = do
   ensureNoAccountMeta "transfer." "sender" args.transfer.meta
   ensureNoAccountMeta "transfer." "receiver" args.transfer.meta
-  ensureActorIs args.transfer.sender.owner args.actor
+  ensureActorIsDefault args.transfer.sender.owner args.actors
   upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferFactory) self) TransferInstructionV1.TransferFactory_Transfer with
     expectedAdmin = args.expectedAdmin
     transfer = downcast args.transfer

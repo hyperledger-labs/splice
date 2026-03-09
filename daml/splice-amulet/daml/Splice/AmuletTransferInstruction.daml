@@ -52,8 +52,8 @@ template AmuletTransferInstruction
         originalInstructionCid = None
         transfer = upcast transfer
         availableActions = Map.fromList
-          [ (transfer.sender, [Api.TransferInstructionV2.TIA_Withdraw])
-          , (transfer.receiver, [Api.TransferInstructionV2.TIA_Accept, Api.TransferInstructionV2.TIA_Reject])
+          [ ([transfer.sender], [Api.TransferInstructionV2.TIA_Withdraw])
+          , ([transfer.receiver], [Api.TransferInstructionV2.TIA_Accept, Api.TransferInstructionV2.TIA_Reject])
           ]
         meta = emptyMetadata
 
