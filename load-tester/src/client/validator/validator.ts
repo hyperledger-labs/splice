@@ -55,7 +55,7 @@ export class ValidatorClient {
       try {
         await this.http.post.success(
           `${this.validatorBaseUrl}/api/validator/v0/register`,
-          undefined,
+          null,
           {
             headers: this.headers(),
           },
@@ -71,7 +71,7 @@ export class ValidatorClient {
         return this.http.post
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/token-standard/transfers/${transferOfferCid}/accept`,
-            undefined,
+            null,
             {
               retry: (_, resp) => {
                 if (resp?.error_code === 404) {
@@ -91,7 +91,7 @@ export class ValidatorClient {
       },
       getBalance: (): GetBalanceResponse | undefined => {
         return this.http.get
-          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/balance`, undefined, {
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/balance`, null, {
             headers: this.headers(),
           })
           .then(resp => jsonStringDecoder(getBalanceResponse, resp.body));
@@ -130,7 +130,7 @@ export class ValidatorClient {
         return this.http.get
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/token-standard/transfers`,
-            undefined,
+            null,
             {
               headers: this.headers(),
             },
@@ -146,7 +146,7 @@ export class ValidatorClient {
       },
       userStatus: (): UserStatusResponse | undefined => {
         return this.http.get
-          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`, undefined, {
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`, null, {
             headers: this.headers(),
           })
           .then(resp => jsonStringDecoder(userStatusResponse, resp.body));
