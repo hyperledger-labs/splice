@@ -74,7 +74,7 @@ class ZstdTest extends StoreTestBase {
 
       val (pub, sub) = TestSource
         .probe[ByteString]
-        .via(ZstdGroupedWeight(zstdChunkSize))
+        .via(ZstdGroupedWeight(3, zstdChunkSize))
         .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
         .run()
 
