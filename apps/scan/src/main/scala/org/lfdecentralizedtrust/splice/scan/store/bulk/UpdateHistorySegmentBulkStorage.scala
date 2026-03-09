@@ -149,7 +149,7 @@ class UpdateHistorySegmentBulkStorage(
           loggerFactory,
         )
       )
-      .map((o: GroupedWeightS3Object.Output) => {
+      .map((o: GroupedWeightS3ObjectFlow.Output) => {
         historyMetrics.BulkStorage.incUpdateObjects()
         UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
       })

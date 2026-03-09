@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
-import GroupedWeightS3Object.Output
+import GroupedWeightS3ObjectFlow.Output
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -21,7 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
   * On upstream errors, any partially-uploaded object is discarded.
   */
 
-case class GroupedWeightS3Object(
+case class GroupedWeightS3ObjectFlow(
     s3Connection: S3BucketConnection,
     getObjectKey: Int => String,
     maxObjectSize: Long,
@@ -189,7 +189,7 @@ case class GroupedWeightS3Object(
   }
 }
 
-object GroupedWeightS3Object {
+object GroupedWeightS3ObjectFlow {
   case class Output(
       objectKey: String,
       isLastObject: Boolean,
