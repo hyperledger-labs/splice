@@ -508,7 +508,7 @@ object ScanHttpEncodings {
       summary: TrafficSummaryT
   ): definitions.EventHistoryTrafficSummary = {
     val envelopes = summary.envelopeTrafficSummarys.map { env =>
-      definitions.EnvelopeTrafficCost(
+      definitions.EnvelopeTrafficSummary(
         trafficCost = env.trafficCost,
         viewIds = env.viewIds.toVector,
       )

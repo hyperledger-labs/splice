@@ -3882,8 +3882,8 @@ components:
             Summary of traffic-related data for all envelopes in the confirmation request.
           type: array
           items:
-            $ref: "#/components/schemas/EnvelopeTrafficCost"
-    EnvelopeTrafficCost:
+            $ref: "#/components/schemas/EnvelopeTrafficSummary"
+    EnvelopeTrafficSummary:
       type: object
       description: |
         Traffic cost for a single envelope and the view IDs contained in it
