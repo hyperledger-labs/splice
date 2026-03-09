@@ -169,9 +169,6 @@ Two optional fields control the behavior of the Development Fund:
 - ``AmuletConfig.optDevelopmentFundManager``
   Designates the party authorized to allocate Development Fund entitlements.
 
-Governance Process
-^^^^^^^^^^^^^^^^^^
-
 Changes to either the Development Fund percentage or the Development Fund Manager
 must be performed through the standard governance process.
 
