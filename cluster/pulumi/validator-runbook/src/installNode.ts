@@ -168,7 +168,7 @@ async function installValidator(
   );
   const participantAddress = installParticipant(
     validatorConfig,
-    DecentralizedSynchronizerUpgradeConfig.active.id,
+    DecentralizedSynchronizerUpgradeConfig.activeMigrationId,
     xns,
     auth0Client.getCfg(),
     false, // We don't currently support non-auth for validator-runbook
@@ -197,7 +197,7 @@ async function installValidator(
     ...loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
+        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.activeMigrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
         YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier || validatorConfig.partyHint,
         TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,

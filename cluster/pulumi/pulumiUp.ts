@@ -55,7 +55,10 @@ async function runAllStacksUp() {
   return awaitAllOrThrowAllExceptions(operations);
 }
 
-runAllStacksUp().catch(() => {
-  console.error('Failed to run up');
+runAllStacksUp().catch((err: unknown) => {
+  console.error(
+    `\nPulumi up finished with errors. See the summary above for details.\n` +
+      (err instanceof Error ? err.message : String(err))
+  );
   process.exit(1);
 });

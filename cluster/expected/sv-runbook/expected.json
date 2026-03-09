@@ -229,7 +229,7 @@
           "synchronizer": {
             "active": {
               "chainIdSuffix": "4",
-              "migrationId": 3
+              "migrationId": 2
             }
           }
         },
@@ -576,7 +576,7 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": 2
         },
         "participantAddress": "participant-3",
         "persistence": {
@@ -601,6 +601,16 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
+        },
+        "synchronizers": {
+          "current": {
+            "mediator": "global-domain-3-mediator",
+            "sequencer": "global-domain-3-sequencer"
+          },
+          "successor": {
+            "mediator": "global-domain-4-mediator",
+            "sequencer": "global-domain-4-sequencer"
+          }
         },
         "tolerations": [
           {
@@ -1531,16 +1541,6 @@
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "enableBftSequencer": false,
-          "mediatorAddress": "global-domain-3-mediator",
-          "sequencerAddress": "global-domain-3-sequencer",
-          "sequencerAvailabilityDelay": "60 seconds",
-          "sequencerPruningConfig": {
-            "enabled": true,
-            "pruningInterval": "1 hour",
-            "retentionPeriod": "30 days"
-          },
-          "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com",
           "skipInitialization": true
         },
         "enablePostgresMetrics": true,
@@ -1563,7 +1563,7 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": 2
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
@@ -1598,6 +1598,36 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
+        },
+        "synchronizers": {
+          "current": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+              "enabled": true
+            },
+            "mediatorAddress": "global-domain-3-mediator",
+            "sequencerAddress": "global-domain-3-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com"
+          },
+          "successor": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+              "enabled": true
+            },
+            "mediatorAddress": "global-domain-4-mediator",
+            "sequencerAddress": "global-domain-4-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-4.sv.mock.global.canton.network.digitalasset.com"
+          }
         },
         "tolerations": [
           {
@@ -1887,10 +1917,10 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
