@@ -14,6 +14,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppFoundDsoConfigs_
 import org.lfdecentralizedtrust.splice.console.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
@@ -24,7 +25,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.sv.config.{
-  ScheduledLsuConfig,
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
@@ -34,7 +34,6 @@ import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
 import java.time.{Duration, Instant}
-import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
@@ -64,13 +63,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
   // update history sanity plugin wil fail.
   override lazy val skipAcsSnapshotChecks = true
 
-  lazy val scheduledLsu = ScheduledLsuConfig(
-    Instant.now().plusSeconds(250).truncatedTo(ChronoUnit.SECONDS),
-    Instant.now().plusSeconds(450).truncatedTo(ChronoUnit.SECONDS),
-    NonNegativeInt.one,
-    ProtocolVersion.v34,
-  )
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -81,9 +73,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes.copy(successor =
                 config.localSynchronizerNodes.current.some
-              ),
-              scheduledLsu = Some(
-                scheduledLsu
               ),
               parameters = config.parameters.copy(
                 spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
@@ -226,6 +215,22 @@ class LogicalSynchronizerUpgradeIntegrationTest
     val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
+    val topologyFreezeTime = CantonTimestamp.now()
+    // We need to give enough time for the new Canton instance to startup
+    // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
+    val upgradeTime = CantonTimestamp.now().plusSeconds(120)
+    clue("Schedule logical synchronizer upgrade") {
+      scheduleLogicalSynchronizerUpgrade(
+        sv1Backend,
+        Seq(sv2Backend, sv3Backend),
+        new LogicalSynchronizerUpgradeSchedule(
+          topologyFreezeTime.toInstant,
+          upgradeTime.toInstant,
+          1L,
+          ProtocolVersion.v34.toString,
+        ),
+      )
+    }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
     withCantonSvNodes(
       (
@@ -276,8 +281,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      clue(s"wait for upgrade time ${scheduledLsu.upgradeTime}") {
-        Threading.sleep(Duration.between(Instant.now(), scheduledLsu.upgradeTime).toMillis.abs)
+      clue(s"wait for upgrade time ${upgradeTime}") {
+        Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
       }
 
       val newSequencerUrls = allBackends.map { backend =>
