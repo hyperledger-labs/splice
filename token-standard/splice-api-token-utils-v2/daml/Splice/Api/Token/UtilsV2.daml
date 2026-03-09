@@ -16,6 +16,7 @@ import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructi
 import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructionV2
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+
 import DA.Time
 import DA.Date
 import DA.Text (parseInt)
@@ -429,29 +430,39 @@ allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.Allocatio
 -- TransferInstruction
 ----------------------
 
--- Upcast
-transfer_v1_to_v2 : TransferInstructionV1.Transfer -> TransferInstructionV2.Transfer
-transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
-  TransferInstructionV2.Transfer with
-    sender = senderAccount
-    receiver = receiverAccount
-    amount
-    instrumentId = instrumentId
-    requestedAt
-    executeBefore
-    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
-    meta
-  where
-    senderAccount = HoldingV2.Account
-      with
-        provider = (TextMap.lookup "canton.network/sender.provider" meta.values) >>= partyFromText
-        id = TextMap.lookup "canton.network/sender.id" meta.values
-        owner = sender
-    receiverAccount = HoldingV2.Account
-      with
-        provider = (TextMap.lookup "canton.network/receiver.provider" meta.values) >>= partyFromText
-        id = TextMap.lookup "canton.network/receiver.id" meta.values
-        owner = receiver
+instance ForwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
+  downcast v2 = TransferInstructionV1.Transfer with
+    sender = v2.sender.owner
+    receiver = v2.receiver.owner
+    amount = v2.amount
+    instrumentId = v2.instrumentId
+    requestedAt = v2.requestedAt
+    executeBefore = v2.executeBefore
+    inputHoldingCids = map coerceInterfaceContractId v2.inputHoldingCids
+    meta =
+      accountToMeta "sender" v2.sender $
+      accountToMeta "receiver" v2.receiver $
+      v2.meta
+
+instance BackwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
+  upcast v1 = TransferInstructionV2.Transfer with
+    sender = accountFromMeta v1.sender "sender" v1.meta
+    receiver = accountFromMeta v1.receiver "receiver" v1.meta
+    amount = v1.amount
+    instrumentId = v1.instrumentId
+    requestedAt = v1.requestedAt
+    executeBefore = v1.executeBefore
+    inputHoldingCids = map coerceInterfaceContractId v1.inputHoldingCids
+    meta =
+      dropAccountMeta "sender" $
+      dropAccountMeta "receiver" $
+      v1.meta
+
+instance ForwardCompatible (ContractId TransferInstructionV1.TransferInstruction) (ContractId TransferInstructionV2.TransferInstruction) where
+  downcast = coerceInterfaceContractId
+
+instance BackwardCompatible (ContractId TransferInstructionV1.TransferInstruction) (ContractId TransferInstructionV2.TransferInstruction) where
+  upcast = coerceInterfaceContractId
 
 {-
 transfer_instruction_status_v1_to_v2 : TransferInstructionV1.TransferInstructionStatus -> TransferInstructionV2.TransferInstructionStatus
@@ -470,27 +481,6 @@ transfer_instruction_view_v1_to_v2 TransferInstructionV1.TransferInstructionView
     meta
 -}
 
--- Downcast
-transfer_v2_to_v1 : TransferInstructionV2.Transfer -> TransferInstructionV1.Transfer
-transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
-  TransferInstructionV1.Transfer with
-    sender = sender.owner
-    receiver = receiver.owner
-    amount
-    instrumentId = instrumentId
-    requestedAt
-    executeBefore
-    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
-    meta = meta'
-    ..
-  where
-   meta' = Metadata with
-      values =
-        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
-        insertOptional "canton.network/sender.id" (sender.id) $
-        insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
-        insertOptional "canton.network/receiver.id" (receiver.id) $
-        meta.values
 
 {-
 transfer_instruction_status_v2_to_v1 : TransferInstructionV2.TransferInstructionStatus -> TransferInstructionV1.TransferInstructionStatus
@@ -511,32 +501,75 @@ transfer_instruction_view_v2_to_v1 TransferInstructionV2.TransferInstructionView
 
 -- Choices
 
-transfer_instruction_result_output_v2_to_v1 : TransferInstructionV2.TransferInstructionResult_Output -> TransferInstructionV1.TransferInstructionResult_Output
-transfer_instruction_result_output_v2_to_v1 tiro = case tiro of
-  TransferInstructionV2.TransferInstructionResult_Pending with transferInstructionCid ->
-    TransferInstructionV1.TransferInstructionResult_Pending with
-      transferInstructionCid = (coerceInterfaceContractId transferInstructionCid)
-  TransferInstructionV2.TransferInstructionResult_Completed with receiverHoldingCids ->
-    TransferInstructionV1.TransferInstructionResult_Completed with
-      receiverHoldingCids = (map coerceInterfaceContractId receiverHoldingCids)
-  TransferInstructionV2.TransferInstructionResult_Failed  ->
-    TransferInstructionV1.TransferInstructionResult_Failed
+instance ForwardCompatible TransferInstructionV1.TransferInstructionResult_Output TransferInstructionV2.TransferInstructionResult_Output where
+  downcast tio = case tio of
+    TransferInstructionV2.TransferInstructionResult_Pending cid ->
+      TransferInstructionV1.TransferInstructionResult_Pending (downcast cid)
+    TransferInstructionV2.TransferInstructionResult_Completed receiverHoldingCids ->
+      TransferInstructionV1.TransferInstructionResult_Completed (map downcast receiverHoldingCids)
+    TransferInstructionV2.TransferInstructionResult_Failed ->
+      TransferInstructionV1.TransferInstructionResult_Failed
 
-transfer_instruction_result_v2_to_v1 : TransferInstructionV2.TransferInstructionResult -> TransferInstructionV1.TransferInstructionResult
-transfer_instruction_result_v2_to_v1 TransferInstructionV2.TransferInstructionResult{..} =
-  TransferInstructionV1.TransferInstructionResult with
-    output = transfer_instruction_result_output_v2_to_v1 output
-    senderChangeCids = map coerceInterfaceContractId senderChangeCids
-    meta
+instance BackwardCompatible TransferInstructionV1.TransferInstructionResult_Output TransferInstructionV2.TransferInstructionResult_Output where
+  upcast tio = case tio of
+    TransferInstructionV1.TransferInstructionResult_Pending cid ->
+      TransferInstructionV2.TransferInstructionResult_Pending (upcast cid)
+    TransferInstructionV1.TransferInstructionResult_Completed receiverHoldingCids ->
+      TransferInstructionV2.TransferInstructionResult_Completed (map upcast receiverHoldingCids)
+    TransferInstructionV1.TransferInstructionResult_Failed ->
+      TransferInstructionV2.TransferInstructionResult_Failed
 
-transferInstruction_v1_acceptImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Accept -> Update TransferInstructionV1.TransferInstructionResult
-transferInstruction_v1_acceptImpl this self TransferInstructionV1.TransferInstruction_Accept{..} = do
-  resv2 <- TransferInstructionV2.transferInstruction_acceptImpl
-    this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self)
-    (TransferInstructionV2.TransferInstruction_Accept{actor = None; ..})
-  return (transfer_instruction_result_v2_to_v1 resv2)
+instance ForwardCompatible TransferInstructionV1.TransferInstructionResult TransferInstructionV2.TransferInstructionResult where
+  downcast tir = TransferInstructionV1.TransferInstructionResult with
+    output = downcast tir.output
+    senderChangeCids = map downcast tir.senderChangeCids
+    meta = tir.meta
 
+instance BackwardCompatible TransferInstructionV1.TransferInstructionResult TransferInstructionV2.TransferInstructionResult where
+  upcast TransferInstructionV1.TransferInstructionResult{..} =
+    TransferInstructionV2.TransferInstructionResult with
+      output = upcast output
+      senderChangeCids = map upcast senderChangeCids
+      meta
+
+transferInstruction_v2_receiverActor_acceptImpl
+  : Party
+  -> ContractId TransferInstructionV2.TransferInstruction
+  -> TransferInstructionV2.TransferInstruction_Accept
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_receiverActor_acceptImpl receiver self arg = do
+  ensureActorIs receiver arg.actor
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
+    TransferInstructionV1.TransferInstruction_Accept with
+      extraArgs = arg.extraArgs
+
+ensureActorIs : Party -> Optional Party -> Update ()
+ensureActorIs p (Some actor) | actor /= p = fail ("actor must be " <> show p)
+ensureActorIs _ _ = pure ()
+
+transferInstruction_v2_receiverActor_rejectImpl
+  : Party
+  -> ContractId TransferInstructionV2.TransferInstruction
+  -> TransferInstructionV2.TransferInstruction_Reject
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_receiverActor_rejectImpl receiver self arg = do
+  ensureActorIs receiver arg.actor
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
+    TransferInstructionV1.TransferInstruction_Reject with
+      extraArgs = arg.extraArgs
+
+transferInstruction_v2_senderActor_withdrawImpl
+  : Party
+  -> ContractId TransferInstructionV2.TransferInstruction
+  -> TransferInstructionV2.TransferInstruction_Withdraw
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_senderActor_withdrawImpl sender self arg = do
+  ensureActorIs sender arg.actor
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
+    TransferInstructionV1.TransferInstruction_Withdraw with
+      extraArgs = arg.extraArgs
+
+{-
 
 transferInstruction_v1_rejectImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Reject -> Update TransferInstructionV1.TransferInstructionResult
 transferInstruction_v1_rejectImpl this self TransferInstructionV1.TransferInstruction_Reject{..} = do
@@ -554,6 +587,54 @@ transferInstruction_v1_withdrawImpl this self TransferInstructionV1.TransferInst
     (TransferInstructionV2.TransferInstruction_Withdraw{actor = None; ..})
   return (transfer_instruction_result_v2_to_v1 resv2)
 
+
+transferInstruction_v2_acceptImpl : TransferInstructionV1.TransferInstruction -> ContractId TransferInstructionV2.TransferInstruction -> TransferInstructionV2.TransferInstruction_Accept -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_acceptImpl this self TransferInstructionV2.TransferInstruction_Accept{..} = do
+  ensureActorIs (view this).transfer.receiver actor
+  resv2 <- TransferInstructionV1.transferInstruction_acceptImpl
+    this
+    (coerceInterfaceContractId @TransferInstructionV1.TransferInstruction self)
+    (TransferInstructionV1.TransferInstruction_Accept {..})
+  return (transfer_instruction_result_v1_to_v2 resv2)
+
+transferInstruction_v2_rejectImpl : TransferInstructionV1.TransferInstruction -> ContractId TransferInstructionV2.TransferInstruction -> TransferInstructionV2.TransferInstruction_Reject -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_rejectImpl this self TransferInstructionV2.TransferInstruction_Reject{..} = do
+  ensureActorIs (view this).transfer.receiver actor
+  resv2 <- TransferInstructionV1.transferInstruction_rejectImpl
+    this
+    (coerceInterfaceContractId @TransferInstructionV1.TransferInstruction self)
+    (TransferInstructionV1.TransferInstruction_Reject{..})
+  return (transfer_instruction_result_v1_to_v2 resv2)
+
+transferInstruction_v2_withdrawImpl : TransferInstructionV1.TransferInstruction -> ContractId TransferInstructionV2.TransferInstruction -> TransferInstructionV2.TransferInstruction_Withdraw -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_withdrawImpl this self TransferInstructionV2.TransferInstruction_Withdraw{..} = do
+  ensureActorIs (view this).transfer.sender actor
+  resv2 <- TransferInstructionV1.transferInstruction_withdrawImpl
+    this
+    (coerceInterfaceContractId @TransferInstructionV1.TransferInstruction self)
+    (TransferInstructionV1.TransferInstruction_Withdraw{..})
+  return (transfer_instruction_result_v1_to_v2 resv2)
+
+
+transfer_instruction_result_output_v1_to_v2 : TransferInstructionV1.TransferInstructionResult_Output -> TransferInstructionV2.TransferInstructionResult_Output
+transfer_instruction_result_output_v1_to_v2 tiro = case tiro of
+  TransferInstructionV1.TransferInstructionResult_Pending with transferInstructionCid ->
+    TransferInstructionV2.TransferInstructionResult_Pending with
+      transferInstructionCid = (coerceInterfaceContractId transferInstructionCid)
+  TransferInstructionV1.TransferInstructionResult_Completed with receiverHoldingCids ->
+    TransferInstructionV2.TransferInstructionResult_Completed with
+      receiverHoldingCids = (map coerceInterfaceContractId receiverHoldingCids)
+  TransferInstructionV1.TransferInstructionResult_Failed  ->
+    TransferInstructionV2.TransferInstructionResult_Failed
+
+transfer_instruction_result_v1_to_v2 : TransferInstructionV1.TransferInstructionResult -> TransferInstructionV2.TransferInstructionResult
+transfer_instruction_result_v1_to_v2 TransferInstructionV1.TransferInstructionResult{..} =
+  TransferInstructionV2.TransferInstructionResult with
+    output = transfer_instruction_result_output_v1_to_v2 output
+    senderChangeCids = map coerceInterfaceContractId senderChangeCids
+    meta
+-}
+
 {- FIXME: consider whether to provide this
 
 transferInstruction_v1_updateImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Update -> Update TransferInstructionV1.TransferInstructionResult
@@ -569,40 +650,80 @@ transferInstruction_v1_updateImpl this self TransferInstructionV1.TransferInstru
 -- TransferFactory
 ------------------
 
--- Updast
-transfer_factory_view_v1_to_v2 : TransferInstructionV1.TransferFactoryView -> TransferInstructionV2.TransferFactoryView
-transfer_factory_view_v1_to_v2 TransferInstructionV1.TransferFactoryView{..} =
-  TransferInstructionV2.TransferFactoryView with ..
+instance ForwardCompatible TransferInstructionV1.TransferFactoryView TransferInstructionV2.TransferFactoryView where
+  downcast v1 = TransferInstructionV1.TransferFactoryView with
+    admin = v1.admin
+    meta = v1.meta
 
--- Downcast
-transfer_factory_view_v2_to_v1 : TransferInstructionV2.TransferFactoryView -> TransferInstructionV1.TransferFactoryView
-transfer_factory_view_v2_to_v1 TransferInstructionV2.TransferFactoryView{..} =
-  TransferInstructionV1.TransferFactoryView with ..
+instance BackwardCompatible TransferInstructionV1.TransferFactoryView TransferInstructionV2.TransferFactoryView where
+  upcast v1 = TransferInstructionV2.TransferFactoryView with
+    admin = v1.admin
+    meta = v1.meta
+
+instance ForwardCompatible TransferInstructionV1.TransferFactory_PublicFetch TransferInstructionV2.TransferFactory_PublicFetch where
+  downcast v2 = TransferInstructionV1.TransferFactory_PublicFetch with
+    actor = v2.actor
+    expectedAdmin = v2.expectedAdmin
+
+instance BackwardCompatible TransferInstructionV1.TransferFactory_PublicFetch TransferInstructionV2.TransferFactory_PublicFetch where
+  upcast v1 = TransferInstructionV2.TransferFactory_PublicFetch with
+    actor = v1.actor
+    expectedAdmin = v1.expectedAdmin
+
+instance ForwardCompatible (ContractId TransferInstructionV1.TransferFactory) (ContractId TransferInstructionV2.TransferFactory) where
+  downcast = coerceInterfaceContractId
 
 -- Choices
 
-transfer_factory_transfer_v1_to_v2 : TransferInstructionV1.TransferFactory_Transfer -> TransferInstructionV2.TransferFactory_Transfer
-transfer_factory_transfer_v1_to_v2 TransferInstructionV1.TransferFactory_Transfer{..} =
-  TransferInstructionV2.TransferFactory_Transfer with
-    expectedAdmin
-    transfer = transfer_v1_to_v2 transfer
-    actor = None
-    extraArgs
+transferFactory_v2_senderActor_transferImpl
+  :  ContractId TransferInstructionV2.TransferFactory
+  -> TransferInstructionV2.TransferFactory_Transfer
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferFactory_v2_senderActor_transferImpl self args = do
+  ensureNoAccountMeta "sender" args.transfer.meta
+  ensureNoAccountMeta "receiver" args.transfer.meta
+  ensureActorIs args.transfer.sender.owner args.actor
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferFactory) self) TransferInstructionV1.TransferFactory_Transfer with
+    expectedAdmin = args.expectedAdmin
+    transfer = downcast args.transfer
+    extraArgs = args.extraArgs
 
-transferFactory_v1_transferImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_Transfer -> Update TransferInstructionV1.TransferInstructionResult
-transferFactory_v1_transferImpl this self args = do
-  resv2 <- TransferInstructionV2.transferFactory_transferImpl
-    this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self)
-    (transfer_factory_transfer_v1_to_v2 args)
-  return (transfer_instruction_result_v2_to_v1 resv2)
 
-transferFactory_v1_publicFetchImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_PublicFetch -> Update TransferInstructionV1.TransferFactoryView
-transferFactory_v1_publicFetchImpl this self TransferInstructionV1.TransferFactory_PublicFetch{..} = do
-  resv2 <- TransferInstructionV2.transferFactory_publicFetchImpl
-    this
-    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self)
-    TransferInstructionV2.TransferFactory_PublicFetch with ..
-  return (transfer_factory_view_v2_to_v1 resv2)
+transferFactory_v2_publicFetchImpl
+  : TransferInstructionV1.TransferFactory
+  -> ContractId TransferInstructionV2.TransferFactory
+  -> TransferInstructionV2.TransferFactory_PublicFetch
+  -> Update TransferInstructionV2.TransferFactoryView
+transferFactory_v2_publicFetchImpl this self arg =
+  upcast <$> TransferInstructionV1.transferFactory_publicFetchImpl this (downcast self) (downcast arg)
 
+
+
+-- Choices
+
+dropAccountMeta : Text -> Metadata -> Metadata
+dropAccountMeta fieldName meta =
+  Metadata $
+  TextMap.delete (v2Namespace <> fieldName <> ".provider") $
+  TextMap.delete (v2Namespace <> fieldName <> ".id") $
+  meta.values
+
+ensureNoAccountMeta : Text -> Metadata -> Update ()
+ensureNoAccountMeta fieldName meta = do
+    checkNoDuplicate (v2Namespace <> fieldName <> ".provider")
+    checkNoDuplicate (v2Namespace <> fieldName <> ".id")
+  where
+    checkNoDuplicate k = case TextMap.lookup k meta.values of
+      None -> pure ()
+      Some v -> fail $ "Duplicate account information on v2 choice for '" <> fieldName <> "': " <> show v
+
+
+ensureBasicAccount : Text -> HoldingV2.Account -> Update ()
+ensureBasicAccount fieldName account = do
+  case account.provider of
+    None -> pure ()
+    Some x -> fail ("self-custodied accounts do not support:" <> fieldName <> ".provider set to '" <> show x <> "'")
+  case account.id of
+    None -> pure ()
+    Some x -> fail ("self-custodied accounts do not support:" <> fieldName <> ".id set to '" <> show x <> "'")
 

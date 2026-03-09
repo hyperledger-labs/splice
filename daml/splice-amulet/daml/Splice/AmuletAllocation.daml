@@ -197,7 +197,7 @@ unlockAmuletAllocation amuletAllocation extraArgs = do
     None -> return []
     Some la -> do
       let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.authorizer amuletAllocation.allocation.transferLegs amuletAllocation.admin amuletAllocation.expiresAt amuletAllocation.allocation.settlement
-      abortTwoStepTransfer twoStepTransfer la extraArgs
+      map upcast <$> abortTwoStepTransfer twoStepTransfer la extraArgs
 
 
 instance HasCheckedFetch AmuletAllocation ForDso where
