@@ -3732,6 +3732,7 @@ components:
 
         This support is experimental while the preview phase of CIP-104 is running.
         An app activity record is present when the verdict is successful and involves app providers.
+        When present, both the traffic summary and app activity record correspond to the verdict's record_time.
       properties:
         update:
           $ref: "#/components/schemas/UpdateHistoryItemV2"
@@ -3932,7 +3933,7 @@ components:
     AppActivityEntry:
       type: object
       description: |
-        A single app provider's activity weight for a given record_time.
+        A single app provider's activity weight.
       required:
         - party
         - weight
