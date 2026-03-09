@@ -11,8 +11,9 @@ Development Fund
 Overview
 ++++++++
 
-The Development Fund is a protocol-level mechanism introduced by CIP-0082.
-From its activation onward, 5% of all future mint emissions in each issuance round are allocated to the Development Fund.
+The Development Fund is a protocol-level mechanism introduced by `CIP-0082 <https://github.com/canton-foundation/cips/blob/main/cip-0082/cip-0082.md>`_.
+From its activation onward, a configurable percentage of all future mint emissions in each issuance round are allocated
+to the Development Fund, as defined by ``IssuanceConfig.optDevelopmentFundPercentage`` (default: 5%).
 
 For every issuance round:
 
@@ -36,9 +37,10 @@ When this condition is met:
 Larger coupons are intentionally left untouched to reduce contention with externally
 prepared transactions that may reference their contract IDs.
 
-The available Development Funds are tracked by the DSO party.
-Instead, the designated on-chain party, the **Development Fund Manager**, can allocate portions
-of the accumulated entitlement to specific beneficiaries.
+The available Development Funds are tracked by the DSO party. Governance decisions regarding Development
+Fund allocations are made off-ledger as defined in `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_.
+The designated on-ledger party, the Development Fund Manager,
+effectuates these decisions by allocating portions of the accumulated entitlement to specific beneficiaries.
 An allocation results in the creation of a ``Splice.Amulet.DevelopmentFundCoupon`` contract for the beneficiary.
 
 Once allocated:
@@ -53,13 +55,14 @@ Once allocated:
   Expiration archives the ``Splice.Amulet.DevelopmentFundCoupon`` and creates a new
   ``Splice.Amulet.UnclaimedDevelopmentFundCoupon`` for the same amount.
 
-The Development Fund Manager is responsible for managing allocations in accordance with governance decisions defined in CIP-0082.
+The Development Fund Manager is responsible for managing allocations in accordance with governance decisions
+defined in `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_.
 
 Managing Development Fund Allocations
-++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++
 
-Development Fund allocations are managed through the **Development Fund** tab
-in the wallet UI.
+Development Fund allocations are managed through the **Development Fund** tab in the wallet UI, which serves to effectuate the
+allocations decided in accordance with `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_.
 
 This tab provides visibility into the current Development Fund balance and
 allows the Development Fund Manager to allocate and manage coupons.
