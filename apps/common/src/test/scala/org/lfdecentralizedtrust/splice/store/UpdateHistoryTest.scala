@@ -430,7 +430,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               .futureValue
           result.lastOption match {
             case None => acc // done
-            case Some(TreeUpdateWithMigrationId(last, migrationId)) =>
+            case Some(TreeUpdateWithMigrationId(last, migrationId, _)) =>
               last.update match {
                 case tree: TransactionTreeUpdate =>
                   allHistoryPaginated(
@@ -492,7 +492,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             (1 to 10).map(i =>
               (2L, CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong)))
             ))
-          all.map { case TreeUpdateWithMigrationId(u, migrationId) =>
+          all.map { case TreeUpdateWithMigrationId(u, migrationId, _) =>
             (migrationId, u.update.recordTime)
           } shouldBe expected
         }

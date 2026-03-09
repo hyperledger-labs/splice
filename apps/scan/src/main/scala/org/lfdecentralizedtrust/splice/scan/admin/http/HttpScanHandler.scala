@@ -741,17 +741,20 @@ class HttpScanHandler(
       )
     }
     confirmBackfillingIsCompleteThen(updateHistory) {
+      val valueDeserializer = ScanHttpEncodings.valueDeserializerFor(encoding)
       for {
         txs <-
           if (includeImportUpdates)
             updateHistory.getAllUpdates(
               afterO,
               PageLimit.tryCreate(pageSize),
+              valueDeserializer = valueDeserializer,
             )
           else
             updateHistory.getUpdatesWithoutImportUpdates(
               afterO,
               PageLimit.tryCreate(pageSize),
+              valueDeserializer = valueDeserializer,
             )
       } yield txs
         .map(
@@ -1761,7 +1764,7 @@ class HttpScanHandler(
   ): Future[Either[ErrorResponse, UpdateHistoryItem]] = {
     implicit val tc = extracted
     for {
-      tx <- updateHistory.getUpdate(updateId)
+      tx <- updateHistory.getUpdate(updateId, ScanHttpEncodings.valueDeserializerFor(encoding))
     } yield {
       tx.fold[Either[ErrorResponse, UpdateHistoryItem]](
         Left(
@@ -2100,6 +2103,7 @@ class HttpScanHandler(
           atOrAfterRecordTime =
             body.atOrAfter.map(x => CantonTimestamp.assertFromInstant(x.toInstant)),
           limit = PageLimit.tryCreate(body.count),
+          valueDeserializer = UpdateHistory.noValueDeserialization,
         )
         .map { txs =>
           definitions.GetUpdatesBeforeResponse(
@@ -2127,6 +2131,7 @@ class HttpScanHandler(
           migrationId = body.migrationId,
           afterUpdateId = body.afterUpdateId,
           limit = PageLimit.tryCreate(body.limit),
+          valueDeserializer = UpdateHistory.noValueDeserialization,
         )
         .map { txs =>
           definitions.GetImportUpdatesResponse(

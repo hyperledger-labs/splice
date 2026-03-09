@@ -7,6 +7,7 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.ledger.javaapi.{data as javaApi}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
 import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
@@ -1090,6 +1091,7 @@ class UpdateHistory(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
       limit: Limit,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
       sql"""
@@ -1121,13 +1123,16 @@ class UpdateHistory(
       exercises <- queryExerciseEvents(rows.map(_.rowId))
     } yield {
       rows.map { row =>
+        val (response, rawData) = decodeTransaction(
+          row,
+          creates.getOrElse(row.rowId, Seq.empty),
+          exercises.getOrElse(row.rowId, Seq.empty),
+          valueDeserializer,
+        )
         TreeUpdateWithMigrationId(
-          decodeTransaction(
-            row,
-            creates.getOrElse(row.rowId, Seq.empty),
-            exercises.getOrElse(row.rowId, Seq.empty),
-          ),
+          response,
           row.migrationId,
+          rawProtobufJsonEventData = rawData,
         )
       }
     }
@@ -1137,6 +1142,7 @@ class UpdateHistory(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
       limit: Limit,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
@@ -1176,7 +1182,10 @@ class UpdateHistory(
           "getAssignmentUpdates",
         )
     } yield {
-      rows.map { row => TreeUpdateWithMigrationId(decodeAssignment(row), row.migrationId) }
+      rows.map { row =>
+        val (response, rawData) = decodeAssignment(row, valueDeserializer)
+        TreeUpdateWithMigrationId(response, row.migrationId, rawProtobufJsonEventData = rawData)
+      }
     }
   }
 
@@ -1220,12 +1229,13 @@ class UpdateHistory(
   def getUpdatesWithoutImportUpdates(
       afterO: Option[(Long, CantonTimestamp)],
       limit: Limit,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     val filters = afterFilters(afterO, includeImportUpdates = false)
     val orderBy = sql"migration_id, record_time, domain_id"
     for {
-      txs <- getTxUpdates(filters, orderBy, limit)
-      assignments <- getAssignmentUpdates(filters, orderBy, limit)
+      txs <- getTxUpdates(filters, orderBy, limit, valueDeserializer)
+      assignments <- getAssignmentUpdates(filters, orderBy, limit, valueDeserializer)
       unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
     } yield {
       (txs ++ assignments ++ unassignments).sorted.take(limit.limit)
@@ -1251,14 +1261,15 @@ class UpdateHistory(
   def getAllUpdates(
       afterO: Option[(Long, CantonTimestamp)],
       limit: PageLimit,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     val filters = afterFilters(afterO, includeImportUpdates = true)
     // With import updates, we have to include the update id to get a deterministic order.
     // We don't have an index for this order, but this is only used in test code and deprecated scan endpoints.
     val orderBy = sql"migration_id, record_time, domain_id, update_id"
     for {
-      txs <- getTxUpdates(filters, orderBy, limit)
-      assignments <- getAssignmentUpdates(filters, orderBy, limit)
+      txs <- getTxUpdates(filters, orderBy, limit, valueDeserializer)
+      assignments <- getAssignmentUpdates(filters, orderBy, limit, valueDeserializer)
       unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
     } yield {
       (txs ++ assignments ++ unassignments).sorted.take(limit.limit)
@@ -1271,12 +1282,13 @@ class UpdateHistory(
       beforeRecordTime: CantonTimestamp,
       atOrAfterRecordTime: Option[CantonTimestamp],
       limit: PageLimit,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     val filters = beforeFilters(migrationId, synchronizerId, beforeRecordTime, atOrAfterRecordTime)
     val orderBy = sql"record_time desc"
     for {
-      txs <- getTxUpdates(filters, orderBy, limit)
-      assignments <- getAssignmentUpdates(filters, orderBy, limit)
+      txs <- getTxUpdates(filters, orderBy, limit, valueDeserializer)
+      assignments <- getAssignmentUpdates(filters, orderBy, limit, valueDeserializer)
       unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
     } yield {
       (txs ++ assignments ++ unassignments).sorted.reverse.take(limit.limit)
@@ -1302,6 +1314,7 @@ class UpdateHistory(
       migrationId: Long,
       afterUpdateId: String,
       limit: PageLimit,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     val query =
       sql"""
@@ -1344,18 +1357,19 @@ class UpdateHistory(
         )
     } yield {
       rows.map { row =>
+        val (response, rawData) = decodeImportTransaction(row, valueDeserializer)
         TreeUpdateWithMigrationId(
-          decodeImportTransaction(
-            row
-          ),
+          response,
           row.migrationId,
+          rawProtobufJsonEventData = rawData,
         )
       }
     }
   }
 
   def getUpdate(
-      updateId: String
+      updateId: String,
+      valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue,
   )(implicit tc: TraceContext): Future[Option[TreeUpdateWithMigrationId]] = {
     val safeUpdateId = lengthLimited(updateId)
     val query =
@@ -1386,13 +1400,16 @@ class UpdateHistory(
       exercises <- queryExerciseEvents(rows.map(_.rowId))
     } yield {
       rows.map { row =>
+        val (response, rawData) = decodeTransaction(
+          row,
+          creates.getOrElse(row.rowId, Seq.empty),
+          exercises.getOrElse(row.rowId, Seq.empty),
+          valueDeserializer,
+        )
         TreeUpdateWithMigrationId(
-          decodeTransaction(
-            row,
-            creates.getOrElse(row.rowId, Seq.empty),
-            exercises.getOrElse(row.rowId, Seq.empty),
-          ),
+          response,
           row.migrationId,
+          rawProtobufJsonEventData = rawData,
         )
       }.headOption
     }
@@ -1514,13 +1531,13 @@ class UpdateHistory(
     * warnings until all SV nodes have deployed the new version.
     */
   private def decodeImportTransaction(
-      updateRow: SelectFromImportUpdates
-  ): UpdateHistoryResponse = {
+      updateRow: SelectFromImportUpdates,
+      valueDeserializer: String => Option[javaApi.Value],
+  ): (UpdateHistoryResponse, Map[Int, RawProtobufJsonEventData]) = {
     // We don't use any prefix so that we can use an index on contract ids when fetching import updates.
     val updateId = updateRow.contractId
     val eventNodeId = 0
-    // The prefix needs to be preserved, because we're relying on it to determine whether a given update
-    // was an import update.
+    // ...existing code...
     val workflowId = s"${IMPORT_ACS_WORKFLOW_ID_PREFIX}-${updateId}"
     // Command id and participant offset are not included in API responses,
     // but we're making them consistent anyway.
@@ -1538,11 +1555,13 @@ class UpdateHistory(
       ),
       /* packageName = */ updateRow.packageName,
       /*contractId = */ updateRow.contractId,
-      /*arguments = */ ProtobufCodec.deserializeValue(updateRow.createArguments).asRecord().get(),
+      /*arguments = */ valueDeserializer(updateRow.createArguments)
+        .map(_.asRecord().get())
+        .getOrElse(UpdateHistory.emptyRecord),
       /*createdEventBlob = */ ByteString.EMPTY,
       /*interfaceViews = */ java.util.Collections.emptyMap(),
       /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-      /*contractKey = */ updateRow.contractKey.map(ProtobufCodec.deserializeValue).toJava,
+      /*contractKey = */ updateRow.contractKey.flatMap(valueDeserializer).toJava,
       /*signatories = */ updateRow.signatories.getOrElse(missingStringSeq).asJava,
       /*observers = */ updateRow.observers.getOrElse(missingStringSeq).asJava,
       /*createdAt = */ updateRow.createdAt.toInstant,
@@ -1550,7 +1569,7 @@ class UpdateHistory(
       /*representativePackageId = */ updateRow.templatePackageId,
     )
 
-    UpdateHistoryResponse(
+    val response = UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         new Transaction(
           /*updateId = */ updateId,
@@ -1567,15 +1586,28 @@ class UpdateHistory(
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
     )
+
+    val rawData = Map(
+      eventNodeId -> RawProtobufJsonEventData(createArguments = Some(updateRow.createArguments))
+    )
+    (response, rawData)
   }
 
   private def decodeTransaction(
       updateRow: SelectFromTransactions,
       createRows: Seq[SelectFromCreateEvents],
       exerciseRows: Seq[SelectFromExerciseEvents],
-  ): UpdateHistoryResponse = {
+      valueDeserializer: String => Option[javaApi.Value],
+  ): (UpdateHistoryResponse, Map[Int, RawProtobufJsonEventData]) = {
 
-    val createEvents = createRows.map(_.toCreatedEvent.event)
+    val createEvents = createRows.map(_.toCreatedEvent(valueDeserializer).event)
+
+    val createRawData: Map[Int, RawProtobufJsonEventData] = createRows.map { row =>
+      EventId.nodeIdFromEventId(row.eventId) -> RawProtobufJsonEventData(
+        createArguments = Some(row.createArguments)
+      )
+    }.toMap
+
     // TODO(#640) - remove this conversion as it's costly
     val nodesWithChildren = exerciseRows
       .map(exercise =>
@@ -1602,20 +1634,28 @@ class UpdateHistory(
         ).toJava,
         /*contractId = */ row.contractId,
         /*choice = */ row.choice,
-        /*choiceArgument = */ ProtobufCodec.deserializeValue(row.argument),
+        /*choiceArgument = */ valueDeserializer(row.argument).getOrElse(UpdateHistory.emptyRecord),
         /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
         /*consuming = */ row.consuming,
         /*lastDescendedNodeId = */ Integer.valueOf(
           EventId.lastDescendedNodeFromChildNodeIds(nodeId, nodesWithChildren)
         ),
-        /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
+        /*exerciseResult = */ valueDeserializer(row.result).getOrElse(UpdateHistory.emptyRecord),
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
         /*acsDelta = */ false,
       )
     }
+
+    val exerciseRawData: Map[Int, RawProtobufJsonEventData] = exerciseRows.map { row =>
+      EventId.nodeIdFromEventId(row.eventId) -> RawProtobufJsonEventData(
+        choiceArgument = Some(row.argument),
+        exerciseResult = Some(row.result),
+      )
+    }.toMap
+
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
 
-    UpdateHistoryResponse(
+    val response = UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         new Transaction(
           /*updateId = */ updateRow.updateId,
@@ -1632,12 +1672,16 @@ class UpdateHistory(
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
     )
+
+    (response, createRawData ++ exerciseRawData)
   }
 
   private def decodeAssignment(
-      row: SelectFromAssignments
-  ): UpdateHistoryResponse = {
-    UpdateHistoryResponse(
+      row: SelectFromAssignments,
+      valueDeserializer: String => Option[javaApi.Value],
+  ): (UpdateHistoryResponse, Map[Int, RawProtobufJsonEventData]) = {
+    val nodeId = EventId.nodeIdFromEventId(row.eventId)
+    val response = UpdateHistoryResponse(
       ReassignmentUpdate(
         Reassignment[Assign](
           updateId = row.updateId,
@@ -1651,7 +1695,7 @@ class UpdateHistory(
             createdEvent = new CreatedEvent(
               /*witnessParties = */ java.util.Collections.emptyList(),
               /*offset = */ 0, // not populated
-              /*nodeId = */ EventId.nodeIdFromEventId(row.eventId),
+              /*nodeId = */ nodeId,
               /*templateId = */ tid(
                 row.templatePackageId,
                 row.templateModuleName,
@@ -1659,7 +1703,9 @@ class UpdateHistory(
               ),
               /*packageName = */ row.packageName,
               /*contractId = */ row.contractId,
-              /*arguments = */ ProtobufCodec.deserializeValue(row.createArguments).asRecord().get(),
+              /*arguments = */ valueDeserializer(row.createArguments)
+                .map(_.asRecord().get())
+                .getOrElse(UpdateHistory.emptyRecord),
               /*createdEventBlob = */ ByteString.EMPTY,
               /*interfaceViews = */ java.util.Collections.emptyMap(),
               /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
@@ -1676,6 +1722,10 @@ class UpdateHistory(
       ),
       row.synchronizerId,
     )
+    val rawData = Map(
+      nodeId -> RawProtobufJsonEventData(createArguments = Some(row.createArguments))
+    )
+    (response, rawData)
   }
 
   private def decodeUnassignment(
@@ -2358,6 +2408,20 @@ class UpdateHistory(
 
 object UpdateHistory {
 
+  /** A value deserializer that skips deserialization entirely.
+    * Use this when the deserialized Value objects are not needed (e.g., when serving
+    * ProtobufJson-encoded responses where the raw DB strings are passed through directly).
+    */
+  val noValueDeserialization: String => Option[javaApi.Value] = _ => None
+
+  /** The default value deserializer that performs real protobuf JSON deserialization. */
+  val deserializeValue: String => Option[javaApi.Value] = s =>
+    Some(ProtobufCodec.deserializeValue(s))
+
+  /** Provides a dummy empty DamlRecord when deserialization is skipped. */
+  private[store] val emptyRecord: javaApi.DamlRecord =
+    new javaApi.DamlRecord(new java.util.ArrayList[javaApi.DamlRecord.Field]())
+
   // Separate method so we can use this without a full UpdateHistory instance.
   // Since we're interested in the highest known migration id, we don't need to filter by anything
   // (store ID, participant ID, etc. are not even known at the time we want to call this).
@@ -2456,7 +2520,7 @@ object UpdateHistory {
         companion: Contract.Companion.Template[TCId, T]
     ): Contract[TCId, T] = {
       Contract
-        .fromCreatedEvent(companion)(this.toCreatedEvent.event)
+        .fromCreatedEvent(companion)(this.toCreatedEvent().event)
         .getOrElse(
           throw new IllegalStateException(
             s"Stored a contract that cannot be decoded as ${companion.TEMPLATE_ID}: $this"
@@ -2464,7 +2528,9 @@ object UpdateHistory {
         )
     }
 
-    def toCreatedEvent: SpliceCreatedEvent = {
+    def toCreatedEvent(
+        valueDeserializer: String => Option[javaApi.Value] = UpdateHistory.deserializeValue
+    ): SpliceCreatedEvent = {
       SpliceCreatedEvent(
         eventId,
         new CreatedEvent(
@@ -2478,11 +2544,13 @@ object UpdateHistory {
           ),
           /* packageName = */ packageName,
           /*contractId = */ contractId,
-          /*arguments = */ ProtobufCodec.deserializeValue(createArguments).asRecord().get(),
+          /*arguments = */ valueDeserializer(createArguments)
+            .map(_.asRecord().get())
+            .getOrElse(UpdateHistory.emptyRecord),
           /*createdEventBlob = */ ByteString.EMPTY,
           /*interfaceViews = */ java.util.Collections.emptyMap(),
           /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-          /*contractKey = */ contractKey.map(ProtobufCodec.deserializeValue).toJava,
+          /*contractKey = */ contractKey.flatMap(valueDeserializer).toJava,
           /*signatories = */ signatories.getOrElse(missingStringSeq).asJava,
           /*observers = */ observers.getOrElse(missingStringSeq).asJava,
           /*createdAt = */ createdAt.toInstant,
@@ -2625,9 +2693,23 @@ object TimestampWithMigrationId {
     Ordering.by(x => (x.migrationId, x.timestamp))
 }
 
+/** Raw protobuf-JSON strings from the database for a single event.
+  * Used to skip unnecessary deserialization/serialization roundtrips
+  * when serving ProtobufJson-encoded responses.
+  */
+final case class RawProtobufJsonEventData(
+    createArguments: Option[String] = None,
+    choiceArgument: Option[String] = None,
+    exerciseResult: Option[String] = None,
+)
+
 final case class TreeUpdateWithMigrationId(
     update: UpdateHistory.UpdateHistoryResponse,
     migrationId: Long,
+    // Raw protobuf-JSON strings from the DB, keyed by event node ID.
+    // When available, ProtobufJsonScanHttpEncodings can use these directly
+    // instead of deserializing and re-serializing javaapi.data.Value objects.
+    rawProtobufJsonEventData: Map[Int, RawProtobufJsonEventData] = Map.empty,
 )
 
 object TreeUpdateWithMigrationId {

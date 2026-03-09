@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.daml.ledger.javaapi.data as javaApi
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
@@ -352,6 +353,7 @@ class UpdateHistoryBulkStorageTest
         store.getUpdatesWithoutImportUpdates(
           any[Option[(Long, CantonTimestamp)]],
           any[Limit],
+          any[String => Option[javaApi.Value]],
         )(any[TraceContext])
       ).thenAnswer {
         (

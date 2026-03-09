@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.ledger.javaapi.data as javaApi
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.Transaction
 import com.daml.metrics.api.noop.NoOpMetricsFactory
@@ -59,6 +60,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, lastSnapshotTime.plusSeconds(3600L)))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
 
@@ -100,6 +102,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
 
@@ -116,6 +119,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
@@ -135,6 +139,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, firstSnapshotTime))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
 
@@ -151,6 +156,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
@@ -171,6 +177,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, firstSnapshotTime))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
@@ -200,6 +207,7 @@ class AcsSnapshotTriggerTest
             updateHistory.getUpdatesWithoutImportUpdates(
               eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
               eqTo(PageLimit.tryCreate(1)),
+              any[String => Option[javaApi.Value]],
             )(any[TraceContext])
           ).thenReturn(
             Future.successful(
@@ -227,6 +235,7 @@ class AcsSnapshotTriggerTest
             updateHistory.getUpdatesWithoutImportUpdates(
               eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
               eqTo(PageLimit.tryCreate(1)),
+              any[String => Option[javaApi.Value]],
             )(any[TraceContext])
           ).thenReturn(
             Future.successful(
@@ -259,6 +268,7 @@ class AcsSnapshotTriggerTest
             updateHistory.getUpdatesWithoutImportUpdates(
               eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
               eqTo(PageLimit.tryCreate(1)),
+              any[String => Option[javaApi.Value]],
             )(any[TraceContext])
           ).thenReturn(
             Future.successful(
@@ -292,6 +302,7 @@ class AcsSnapshotTriggerTest
             updateHistory.getUpdatesWithoutImportUpdates(
               eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
               eqTo(PageLimit.tryCreate(1)),
+              any[String => Option[javaApi.Value]],
             )(any[TraceContext])
           ).thenReturn(
             Future.successful(
@@ -314,6 +325,7 @@ class AcsSnapshotTriggerTest
             updateHistory.getUpdatesWithoutImportUpdates(
               eqTo(Some((currentMigrationId, firstSnapshotTime))),
               eqTo(PageLimit.tryCreate(1)),
+              any[String => Option[javaApi.Value]],
             )(any[TraceContext])
           ).thenReturn(
             Future.successful(
@@ -518,6 +530,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
@@ -538,6 +551,7 @@ class AcsSnapshotTriggerTest
           updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, firstSnapshotTime))),
             eqTo(PageLimit.tryCreate(1)),
+            any[String => Option[javaApi.Value]],
           )(any[TraceContext])
         ).thenReturn(
           Future.successful(
@@ -690,6 +704,7 @@ class AcsSnapshotTriggerTest
         updateHistory.getUpdatesWithoutImportUpdates(
           eqTo(Some((migrationId, queryRecordTime))),
           eqTo(PageLimit.tryCreate(1)),
+          any[String => Option[javaApi.Value]],
         )(any[TraceContext])
       ).thenReturn(
         Future.successful(

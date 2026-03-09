@@ -22,7 +22,8 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
   VerdictResultDbValue,
   VerdictT,
 }
-import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
+import org.lfdecentralizedtrust.splice.store.{RawProtobufJsonEventData, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOffset, Trees}
 
@@ -43,6 +44,8 @@ sealed trait ScanHttpEncodings {
       updateWithMigrationId: TreeUpdateWithMigrationId,
       eventIdBuilder: (String, Int) => String,
   )(implicit elc: ErrorLoggingContext): httpApi.UpdateHistoryItem = {
+
+    val rawDataMap = updateWithMigrationId.rawProtobufJsonEventData
 
     updateWithMigrationId.update.update match {
       case ledgerApi.TransactionTreeUpdate(tree) =>
@@ -66,6 +69,7 @@ sealed trait ScanHttpEncodings {
                   eventId,
                   treeEvent,
                   eventIdBuilder,
+                  rawDataMap,
                 )
               }.toMap,
             )
@@ -94,6 +98,7 @@ sealed trait ScanHttpEncodings {
                   javaToHttpCreatedEvent(
                     eventIdBuilder(update.updateId, createdEvent.getNodeId),
                     createdEvent,
+                    rawDataMap.get(createdEvent.getNodeId),
                   ),
                   counter,
                 ),
@@ -132,15 +137,17 @@ sealed trait ScanHttpEncodings {
       eventId: String,
       treeEvent: javaApi.Event,
       eventIdBuild: (String, Int) => String,
+      rawDataMap: Map[Int, RawProtobufJsonEventData],
   )(implicit
       elc: ErrorLoggingContext
   ): httpApi.TreeEvent = {
     treeEvent match {
       case event: javaApi.CreatedEvent =>
         httpApi.TreeEvent.fromCreatedEvent(
-          javaToHttpCreatedEvent(eventId, event)
+          javaToHttpCreatedEvent(eventId, event, rawDataMap.get(event.getNodeId))
         )
       case event: javaApi.ExercisedEvent =>
+        val rawData = rawDataMap.get(event.getNodeId)
         httpApi.TreeEvent.fromExercisedEvent(
           httpApi
             .ExercisedEvent(
@@ -150,7 +157,7 @@ sealed trait ScanHttpEncodings {
               templateIdString(event.getTemplateId),
               event.getPackageName,
               event.getChoice,
-              encodeChoiceArgument(event),
+              encodeChoiceArgument(event, rawData),
               tree
                 .getChildNodeIds(event)
                 .asScala
@@ -158,7 +165,7 @@ sealed trait ScanHttpEncodings {
                   eventIdBuild(tree.getUpdateId, _)
                 )
                 .toVector,
-              encodeExerciseResult(event),
+              encodeExerciseResult(event, rawData),
               event.isConsuming,
               event.getActingParties.asScala.toVector,
               event.getInterfaceId.map(templateIdString(_)).toScala,
@@ -169,7 +176,11 @@ sealed trait ScanHttpEncodings {
     }
   }
 
-  def javaToHttpCreatedEvent(eventId: String, event: javaApi.CreatedEvent)(implicit
+  def javaToHttpCreatedEvent(
+      eventId: String,
+      event: javaApi.CreatedEvent,
+      rawEventData: Option[RawProtobufJsonEventData] = None,
+  )(implicit
       elc: ErrorLoggingContext
   ): httpApi.CreatedEvent = {
     event.getContractKey.toScala.foreach { _ =>
@@ -184,7 +195,7 @@ sealed trait ScanHttpEncodings {
         event.getContractId,
         templateIdString(event.getTemplateId),
         event.getPackageName,
-        encodeContractPayload(event),
+        encodeContractPayload(event, rawEventData),
         event.getCreatedAt.atOffset(ZoneOffset.UTC),
         event.getSignatories.asScala.toVector.sorted,
         event.getObservers.asScala.toVector.sorted,
@@ -396,13 +407,19 @@ sealed trait ScanHttpEncodings {
       .parse(validJsonString)
       .fold(err => failedToWriteToJson(err.message), identity)
 
-  def encodeContractPayload(event: javaApi.CreatedEvent)(implicit
+  def encodeContractPayload(
+      event: javaApi.CreatedEvent,
+      rawEventData: Option[RawProtobufJsonEventData] = None,
+  )(implicit
       elc: ErrorLoggingContext
   ): io.circe.Json
 
   def decodeContractPayload(templateId: javaApi.Identifier, json: io.circe.Json): javaApi.DamlRecord
 
-  def encodeChoiceArgument(event: javaApi.ExercisedEvent)(implicit
+  def encodeChoiceArgument(
+      event: javaApi.ExercisedEvent,
+      rawEventData: Option[RawProtobufJsonEventData] = None,
+  )(implicit
       elc: ErrorLoggingContext
   ): io.circe.Json
 
@@ -413,7 +430,10 @@ sealed trait ScanHttpEncodings {
       json: io.circe.Json,
   ): javaApi.Value
 
-  def encodeExerciseResult(event: javaApi.ExercisedEvent)(implicit
+  def encodeExerciseResult(
+      event: javaApi.ExercisedEvent,
+      rawEventData: Option[RawProtobufJsonEventData] = None,
+  )(implicit
       elc: ErrorLoggingContext
   ): io.circe.Json
 
@@ -519,6 +539,20 @@ object ScanHttpEncodings {
     )
   }
 
+  /** Returns the appropriate value deserializer for the given encoding.
+    * For ProtobufJson, returns None (skips the costly deserialization since
+    * the raw DB strings are passed through directly).
+    * For CompactJson, returns the real deserializer wrapped in Some since re-encoding is needed.
+    */
+  def valueDeserializerFor(
+      encoding: definitions.DamlValueEncoding
+  ): String => Option[javaApi.Value] = encoding match {
+    case definitions.DamlValueEncoding.members.ProtobufJson =>
+      UpdateHistory.noValueDeserialization
+    case definitions.DamlValueEncoding.members.CompactJson =>
+      UpdateHistory.deserializeValue
+  }
+
   def encodeUpdate(
       update: TreeUpdateWithMigrationId,
       encoding: definitions.DamlValueEncoding,
@@ -557,7 +591,20 @@ object ScanHttpEncodings {
   def makeConsistentAcrossSvs(
       update: TreeUpdateWithMigrationId
   ): TreeUpdateWithMigrationId = {
-    update.copy(update = makeConsistentAcrossSvs(update.update))
+    update.update.update match {
+      case ledgerApi.TransactionTreeUpdate(tree) =>
+        val mapping = Trees.getLocalEventIndices(tree)
+        val remappedRawData = update.rawProtobufJsonEventData.map { case (nodeId, data) =>
+          mapping.getOrElse(nodeId, nodeId) -> data
+        }
+        update.copy(
+          update = makeConsistentAcrossSvs(update.update),
+          rawProtobufJsonEventData = remappedRawData,
+        )
+      case _ =>
+        // For reassignments, node IDs don't change
+        update.copy(update = makeConsistentAcrossSvs(update.update))
+    }
   }
 
   def makeConsistentAcrossSvs(
@@ -729,7 +776,8 @@ case class CompactJsonScanHttpEncodings(
 ) extends ScanHttpEncodings {
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecCodegen
   override def encodeContractPayload(
-      event: javaApi.CreatedEvent
+      event: javaApi.CreatedEvent,
+      rawEventData: Option[RawProtobufJsonEventData],
   )(implicit elc: ErrorLoggingContext): Json =
     ValueJsonCodecCodegen
       .serializableContractPayload(event)
@@ -742,7 +790,8 @@ case class CompactJsonScanHttpEncodings(
       )
 
   override def encodeChoiceArgument(
-      event: javaApi.ExercisedEvent
+      event: javaApi.ExercisedEvent,
+      rawEventData: Option[RawProtobufJsonEventData],
   )(implicit elc: ErrorLoggingContext): Json =
     ValueJsonCodecCodegen
       .serializeChoiceArgument(event)
@@ -755,7 +804,8 @@ case class CompactJsonScanHttpEncodings(
       )
 
   override def encodeExerciseResult(
-      event: javaApi.ExercisedEvent
+      event: javaApi.ExercisedEvent,
+      rawEventData: Option[RawProtobufJsonEventData],
   )(implicit elc: ErrorLoggingContext): Json =
     ValueJsonCodecCodegen
       .serializeChoiceResult(event)
@@ -821,27 +871,33 @@ object CompactJsonScanHttpEncodings {
 case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobuf
   override def encodeContractPayload(
-      event: javaApi.CreatedEvent
+      event: javaApi.CreatedEvent,
+      rawEventData: Option[RawProtobufJsonEventData],
   )(implicit elc: ErrorLoggingContext): Json =
     tryParseJson(
-      ValueJsonCodecProtobuf
-        .serializeValue(event.getArguments)
+      rawEventData
+        .flatMap(_.createArguments)
+        .getOrElse(ValueJsonCodecProtobuf.serializeValue(event.getArguments))
     )
 
   override def encodeChoiceArgument(
-      event: javaApi.ExercisedEvent
+      event: javaApi.ExercisedEvent,
+      rawEventData: Option[RawProtobufJsonEventData],
   )(implicit elc: ErrorLoggingContext): Json =
     tryParseJson(
-      ValueJsonCodecProtobuf
-        .serializeValue(event.getChoiceArgument)
+      rawEventData
+        .flatMap(_.choiceArgument)
+        .getOrElse(ValueJsonCodecProtobuf.serializeValue(event.getChoiceArgument))
     )
 
   override def encodeExerciseResult(
-      event: javaApi.ExercisedEvent
+      event: javaApi.ExercisedEvent,
+      rawEventData: Option[RawProtobufJsonEventData],
   )(implicit elc: ErrorLoggingContext): Json =
     tryParseJson(
-      ValueJsonCodecProtobuf
-        .serializeValue(event.getExerciseResult)
+      rawEventData
+        .flatMap(_.exerciseResult)
+        .getOrElse(ValueJsonCodecProtobuf.serializeValue(event.getExerciseResult))
     )
 
   override def decodeContractPayload(

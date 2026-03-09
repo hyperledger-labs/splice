@@ -331,7 +331,7 @@ class AcsSnapshotStore(
         )
     } yield {
       val eventsInPage =
-        applyLimitOrFail("queryAcsSnapshot", limit, events.map(_._2.toCreatedEvent))
+        applyLimitOrFail("queryAcsSnapshot", limit, events.map(_._2.toCreatedEvent()))
       val afterToken = if (eventsInPage.size == limit.limit) events.lastOption.map(_._1) else None
       QueryAcsSnapshotResult(
         migrationId = migrationId,

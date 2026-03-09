@@ -1013,7 +1013,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getAllUpdates(None, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {
-                case TreeUpdateWithMigrationId(tree, migrationId)
+                case TreeUpdateWithMigrationId(tree, migrationId, _)
                     if tree.update.recordTime == CantonTimestamp.MinValue && migrationId == 1L =>
                   tree
               } should not be empty withClue "ACS import updates"
