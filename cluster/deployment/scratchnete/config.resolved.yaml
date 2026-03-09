@@ -507,7 +507,7 @@ synchronizerMigration:
       spliceRoot: 'splice'
     sequencer:
       enableBftSequencer: true
-    version: '0.5.13-tomtantillo-dirty'
+    version: '0.6.0-snapshot.20260306.2097.0.vfcd9d2af'
 validator1:
   deduplicationDuration: '30m'
   logging:
