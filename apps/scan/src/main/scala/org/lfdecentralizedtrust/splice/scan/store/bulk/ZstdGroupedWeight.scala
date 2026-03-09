@@ -19,8 +19,10 @@ case class ByteStringWithTermination(
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
   * Somewhat similar to Pekko's built-in GroupedWeight, but outputs valid zstd compressed objects.
   */
-case class ZstdGroupedWeight(minSize: Long)
-    extends GraphStage[FlowShape[ByteString, ByteStringWithTermination]] {
+case class ZstdGroupedWeight(
+    compressionLevel: Int,
+    minSize: Long,
+) extends GraphStage[FlowShape[ByteString, ByteStringWithTermination]] {
   require(minSize > 0, "minSize must be greater than 0")
 
   val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
@@ -84,7 +86,7 @@ case class ZstdGroupedWeight(minSize: Long)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
-      private val zstd = new AtomicReference[ZSTD](new ZSTD(3))
+      private val zstd = new AtomicReference[ZSTD](new ZSTD(compressionLevel))
       private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
 
       override def postStop(): Unit = {
