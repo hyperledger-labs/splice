@@ -36,7 +36,7 @@ When this condition is met:
 Larger coupons are intentionally left untouched to reduce contention with externally
 prepared transactions that may reference their contract IDs.
 
-The Development Fund entitlement is not minted directly to a final recipient during the issuance round.
+The available Development Funds are tracked by the DSO party.
 Instead, the designated on-chain party, the **Development Fund Manager**, can allocate portions
 of the accumulated entitlement to specific beneficiaries.
 An allocation results in the creation of a ``Splice.Amulet.DevelopmentFundCoupon`` contract for the beneficiary.
