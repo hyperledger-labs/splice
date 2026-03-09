@@ -1,7 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
+import { allowDowngrade } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 import {
   CLUSTER_BASENAME,
   PULUMI_STACKS_DIR,
@@ -9,8 +11,21 @@ import {
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import {spliceEnvConfig} from "@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig";
-import {allowDowngrade} from "@lfdecentralizedtrust/splice-pulumi-common";
+
+const PULUMI_OUTPUT_DIR = path.join(__dirname, '.pulumi');
+
+function cleanOutputDir(): void {
+  if (fs.existsSync(PULUMI_OUTPUT_DIR)) {
+    fs.rmSync(PULUMI_OUTPUT_DIR, { recursive: true, force: true });
+  }
+  fs.mkdirSync(PULUMI_OUTPUT_DIR, { recursive: true });
+}
+
+function writeOperationErrorOutput(opName: string, output: string): void {
+  const safeFileName = opName.replace(/[/\\:*?"<>|]/g, '_');
+  const filePath = path.join(PULUMI_OUTPUT_DIR, safeFileName);
+  fs.writeFileSync(filePath, output, 'utf-8');
+}
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
@@ -60,7 +75,9 @@ export function pulumiOptsWithPrefix(
     },
     signal: abortSignal,
     color: 'always',
-    policyPacks: allowDowngrade ? [] : [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
+    policyPacks: allowDowngrade
+      ? []
+      : [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
   };
 }
 
@@ -173,7 +190,7 @@ export function printOperationsSummary(summary: OperationsSummary): void {
   const total = summary.succeeded.length + summary.failed.length;
   const divider = '─'.repeat(60);
   console.error(`\n${divider}`);
-  console.error(`  Pulumi Up Summary  (${total} operations)`);
+  console.error(`  Pulumi Operation Summary  (${total} operations)`);
   console.error(divider);
   if (summary.succeeded.length > 0) {
     console.error(`  ✅ Succeeded (${summary.succeeded.length}):`);
@@ -184,7 +201,7 @@ export function printOperationsSummary(summary: OperationsSummary): void {
     summary.failed.forEach(({ name, reason }) => {
       const detail =
         reason instanceof automation.CommandError
-          ? 'Pulumi CommandError'
+          ? `Pulumi CommandError`
           : reason instanceof Error
             ? reason.message
             : String(reason);
@@ -195,6 +212,8 @@ export function printOperationsSummary(summary: OperationsSummary): void {
 }
 
 export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Promise<void> {
+  cleanOutputDir();
+
   const data = await Promise.allSettled(
     operations.map(op => {
       console.error(`Running operation ${op.name}`);
@@ -202,7 +221,13 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
         () => console.error(`Operation ${op.name} succeeded.`),
         err => {
           if (err instanceof automation.CommandError) {
-            console.error(`Operation ${op.name} failed.`);
+            console.error(`Operation ${op.name} failed`);
+            const cmdResult = (err as any).commandResult;
+            const output =
+              cmdResult !== undefined
+                ? (cmdResult.stdout as string) + (cmdResult.stderr as string)
+                : err.message;
+            writeOperationErrorOutput(op.name, output);
           } else {
             console.error(`Operation ${op.name} failed with an unknown error.`);
           }
@@ -213,9 +238,7 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
   );
 
   const summary: OperationsSummary = {
-    succeeded: operations
-      .filter((_, i) => data[i].status === 'fulfilled')
-      .map(op => op.name),
+    succeeded: operations.filter((_, i) => data[i].status === 'fulfilled').map(op => op.name),
     failed: operations
       .filter((_, i) => data[i].status === 'rejected')
       .map(op => {
