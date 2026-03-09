@@ -315,6 +315,9 @@ async function installSvAndValidator(
       migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
         ? true
         : valuesFromYamlFile.migration.migrating,
+      ...(decentralizedSynchronizerMigrationConfig.lsuEnabled
+        ? { id: decentralizedSynchronizerMigrationConfig.activeMigrationId }
+        : {}),
     },
     metrics: {
       enable: true,
@@ -413,13 +416,21 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
+    ...(decentralizedSynchronizerMigrationConfig.lsuEnabled
+      ? {
+          migration: {
+            ...defaultScanValues.migration,
+            id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
+          },
+        }
+      : {}),
     ...synchronizerValues,
     ...(useCantonBft
       ? {
           bftSequencers: [
             {
               p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              migrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId,
               sequencerAddress: canton.active.namespaceInternalSequencerAddress,
             },
           ],
@@ -465,7 +476,7 @@ async function installSvAndValidator(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.activeMigrationId.toString(),
         YOUR_SV_NAME: onboardingName,
         TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       }
@@ -538,7 +549,7 @@ function installInfoEndpoint(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/info-values.yaml`,
     {
       TARGET_CLUSTER: clusterNetwork,
-      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.activeMigrationId.toString(),
       MD5_HASH_OF_ALLOWED_IP_RANGES: `"${createHash('md5')
         .update(readFileOrEmptyString(externalIpRangesFile()))
         .digest('hex')}"`,

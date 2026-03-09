@@ -55,5 +55,6 @@ export const SynchronizerMigrationSchema = z
     activeDatabaseId: z.number().optional(),
     attachPvc: z.boolean().default(true),
     lsuEnabled: z.boolean().default(false),
+    frozenMigrationId: z.number().optional(),
   })
   .strict();

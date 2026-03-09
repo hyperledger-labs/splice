@@ -229,7 +229,7 @@
           "synchronizer": {
             "active": {
               "chainIdSuffix": "4",
-              "migrationId": 3
+              "migrationId": 2
             }
           }
         },
@@ -576,7 +576,7 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": 2
         },
         "participantAddress": "participant-3",
         "persistence": {
@@ -1563,7 +1563,7 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": 2
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
@@ -1917,10 +1917,10 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

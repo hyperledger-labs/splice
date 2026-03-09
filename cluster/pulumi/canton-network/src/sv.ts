@@ -368,7 +368,7 @@ async function installValidator(
     xns,
     ...commonValidatorAppValues,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.active.id,
+      id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
     },
     validatorWalletUsers: svUserIds(svConfig.auth0Client.getCfg()).apply(ids =>
       ids.concat(svConfig.validatorWalletUser ? [svConfig.validatorWalletUser] : [])
@@ -575,7 +575,7 @@ function installScan(
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     participantAddress: participant.internalClusterAddress,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.active.id,
+      id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
     },
     ...synchronizerValues,
     ...(useCantonBft
@@ -583,7 +583,7 @@ function installScan(
           bftSequencers: [
             {
               p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              migrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId,
               sequencerAddress: active.namespaceInternalSequencerAddress,
             },
           ],

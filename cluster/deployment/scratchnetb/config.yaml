@@ -4,10 +4,10 @@ synchronizerMigration:
   lsuEnabled: true
   active:
     enableLogicalSynchronizerDeploymentMode: true
-  upgrade:
-    id: 1
-    enableLogicalSynchronizerDeploymentMode: true
-    version: "local"
+#  upgrade:
+#    id: 1
+#    enableLogicalSynchronizerDeploymentMode: true
+#    version: "local"
 infra:
   prometheus:
     retentionDuration: "30d"
