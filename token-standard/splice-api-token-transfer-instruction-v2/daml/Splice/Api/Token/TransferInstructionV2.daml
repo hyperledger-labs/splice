@@ -123,8 +123,12 @@ interface TransferInstruction where
   transferInstruction_withdrawImpl : ContractId TransferInstruction -> TransferInstruction_Withdraw -> Update TransferInstructionResult
   transferInstruction_updateImpl : ContractId TransferInstruction -> TransferInstruction_Update -> Update TransferInstructionResult
 
-  choice TransferInstruction_Accept : TransferInstructionResult
+  nonconsuming choice TransferInstruction_Accept : TransferInstructionResult
     -- ^ Accept the transfer as the receiver.
+    --
+    -- Implementations MUST ensure that the transfer instruction is archived upon acceptance.
+    -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Accept`
+    -- where possible to maximize compatibility with v1 transaction parsers.
     --
     -- Note that while implementations will typically return `TransferInstructionResult_Completed`,
     -- this is not guaranteed. The result of the choice is implementation-specific and MAY
@@ -137,8 +141,12 @@ interface TransferInstruction where
     controller fromOptional (view this).transfer.receiver.owner actor
     do transferInstruction_acceptImpl this self arg
 
-  choice TransferInstruction_Reject : TransferInstructionResult
+  nonconsuming choice TransferInstruction_Reject : TransferInstructionResult
     -- ^ Reject the transfer as the receiver.
+    --
+    -- Implementations MUST ensure that the transfer instruction is archived upon rejection.
+    -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Reject`
+    -- where possible to maximize compatibility with v1 transaction parsers.
     --
     -- This choice is only available if the instruction is in
     -- `TransferPendingReceiverAcceptance` state.
@@ -150,8 +158,12 @@ interface TransferInstruction where
     controller fromOptional (view this).transfer.receiver.owner actor
     do transferInstruction_rejectImpl this self arg
 
-  choice TransferInstruction_Withdraw : TransferInstructionResult
+  nonconsuming choice TransferInstruction_Withdraw : TransferInstructionResult
     -- ^ Withdraw the transfer instruction as the sender.
+    --
+    -- Implementations MUST ensure that the transfer instruction is archived upon withdrawal.
+    -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Withdraw`
+    -- where possible to maximize compatibility with v1 transaction parsers.
     with
       actor : Optional Party
         -- ^ The party calling Withdraw, if different from the owner or the source account
@@ -160,10 +172,15 @@ interface TransferInstruction where
     controller fromOptional (view this).transfer.sender.owner actor
     do transferInstruction_withdrawImpl this self arg
 
-  choice TransferInstruction_Update : TransferInstructionResult
+  nonconsuming choice TransferInstruction_Update : TransferInstructionResult
     -- ^ Update the state of the transfer instruction. Used by the registry to
     -- execute registry internal workflow steps that advance the state of the
     -- transfer instruction. A reason may be communicated via the metadata.
+    --
+    -- Implementations MUST ensure that the transfer instruction is archived upon updating.
+    -- They SHOULD do so by calling
+    -- `TransferInstructionV1.TransferInstruction_Update` where possible to maximize
+    -- compatibility with v1 transaction parsers.
     with
       actors : [Party]
         -- ^ Actors authorizing the update. Implementations MUST check that

@@ -12,6 +12,7 @@ import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
 import qualified Splice.Api.Token.AllocationV1
+-- FIXME: add support for allocation v2
 import qualified Splice.Api.Token.AllocationInstructionV1
 import qualified Splice.Api.Token.TransferInstructionV1
 import Splice.Amulet

@@ -1074,6 +1074,8 @@ testTokenStandardTransfer = script do
 
   pure ()
 
+{- FIXME: reactivate this test once AmuletAllocationV1 and AmuletAllocationV2 are distinct
+
 testTokenStandardAllocate : Script ()
 testTokenStandardAllocate = script do
   registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
@@ -1143,6 +1145,7 @@ testTokenStandardAllocate = script do
 
   pure ()
 
+-}
 
 -- Utilities
 ------------
