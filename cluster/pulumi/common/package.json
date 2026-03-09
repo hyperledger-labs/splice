@@ -13,7 +13,7 @@
     "@pulumi/std": "2.3.2",
     "@types/auth0": "^3.3.11",
     "auth0": "^4.28.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.2.4",
     "dotenv-expand": "^11.0.6",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
