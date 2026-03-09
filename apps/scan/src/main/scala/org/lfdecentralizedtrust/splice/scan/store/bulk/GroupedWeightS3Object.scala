@@ -13,7 +13,7 @@ import GroupedWeightS3Object.Output
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
-/** A Pekko GraphStage that takes a stream of bytestrings, slices them into objects such that every object is slightly
+/** A Pekko Flow GraphStage that takes a stream of bytestrings, slices them into objects such that every object is slightly
   * larger than maxObjectSize (i.e. the cut is at the end of the byteString that passes that threshold), and uploads them
   * to an S3 compatible bucket. Multiple input ByteStrings may be uploaded in parallel using multi-part upload, up to `maxParallelPartUploads`
   * in parallel. Whenever an object is finished, this GraphStage emits the key of that object, and a flag of whether this is
