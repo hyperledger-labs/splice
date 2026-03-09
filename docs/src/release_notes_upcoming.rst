@@ -24,3 +24,7 @@
 
        Traffic summaries will be enabled step-by-step on Dev/Test/MainNet,
        once the SVs have successfully concluded their performance testing.
+
+   - Docs
+
+     - Add a new :ref:`development_fund` page documenting the Development Fund.
