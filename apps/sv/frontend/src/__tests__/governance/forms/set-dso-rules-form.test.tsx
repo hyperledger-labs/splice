@@ -55,7 +55,7 @@ describe('Set DSO Config Rules Form', () => {
 
     const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
     expect(summaryInput).toBeInTheDocument();
-    expect(summaryInput.getAttribute('value')).toBeNull();
+    expect(summaryInput.getAttribute('value')).not.toBeInTheDocument();
 
     const urlInput = screen.getByTestId('set-dso-config-rules-url');
     expect(urlInput).toBeInTheDocument();
@@ -107,7 +107,7 @@ describe('Set DSO Config Rules Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBeNull();
+    expect(submitButton.getAttribute('disabled')).not.toBeInTheDocument();
   });
 
   test('expiry date must be in the future', async () => {
@@ -224,7 +224,7 @@ describe('Set DSO Config Rules Form', () => {
 
     const submitButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton.getAttribute('disabled')).not.toBeInTheDocument();
     });
 
     await user.click(submitButton);
@@ -266,7 +266,7 @@ describe('Set DSO Config Rules Form', () => {
     const submitButton = screen.getByTestId('submit-button');
 
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton.getAttribute('disabled')).not.toBeInTheDocument();
     });
 
     await user.click(submitButton); // review proposal
@@ -310,7 +310,7 @@ describe('Set DSO Config Rules Form', () => {
 
     const submitButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton.getAttribute('disabled')).not.toBeInTheDocument();
     });
 
     await user.click(submitButton); //review proposal
@@ -348,7 +348,7 @@ describe('Set DSO Config Rules Form', () => {
 
     const reviewButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
-      expect(reviewButton.getAttribute('disabled')).toBeNull();
+      expect(reviewButton.getAttribute('disabled')).not.toBeInTheDocument();
     });
 
     expect(jsonDiffs).toBeInTheDocument();
@@ -428,7 +428,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
       screen.queryByText(
         'Upgrade Time and Migration ID are required for a Scheduled Synchronizer Upgrade'
       )
-    ).toBeNull();
+    ).not.toBeInTheDocument();
   });
 
   test('show error if only one of time or migrationId is provided', async () => {
@@ -441,7 +441,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     const errorMessage =
       'Upgrade Time and Migration ID are required for a Scheduled Synchronizer Upgrade';
 
-    expect(screen.queryByText(errorMessage)).toBeNull();
+    expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
 
     // migrationId field only - should show error
     const migrationIdInput = screen.getByTestId(
@@ -460,7 +460,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     await user.click(screen.getByTestId('set-dso-config-rules-action'));
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
 
     const timeInput = screen.getByTestId('config-field-nextScheduledSynchronizerUpgradeTime');
@@ -477,7 +477,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     await user.clear(timeInput);
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
   });
 
@@ -497,7 +497,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
 
     fireEvent.change(effectiveDateInput, { target: { value: effectiveDate } });
 
-    expect(screen.queryByText(errorMessage)).toBeNull();
+    expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
 
     const timeInput = screen.getByTestId('config-field-nextScheduledSynchronizerUpgradeTime');
     const migrationIdInput = screen.getByTestId(
@@ -525,7 +525,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     await user.type(timeInput, validTime);
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
   });
 });
@@ -588,7 +588,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
       screen.queryByText(
         'Topology freeze time, upgrade time, new physical synchronizer serial, and new physical synchronizer protocol version are required for a Scheduled Logical Synchronizer Upgrade'
       )
-    ).toBeNull();
+    ).not.toBeInTheDocument();
   });
 
   test('show error if only one of the parameters is set', async () => {
@@ -601,7 +601,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     const errorMessage =
       'Topology freeze time, upgrade time, new physical synchronizer serial, and new physical synchronizer protocol version are required for a Scheduled Logical Synchronizer Upgrade';
 
-    expect(screen.queryByText(errorMessage)).toBeNull();
+    expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
 
     // serial field only - should show error
     const serialInput = screen.getByTestId(
@@ -620,7 +620,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     await user.click(screen.getByTestId('set-dso-config-rules-action'));
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
 
     // protocol version field only - should show error
@@ -640,7 +640,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     await user.click(screen.getByTestId('set-dso-config-rules-action'));
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
 
     const topologyFreezeTimeInput = screen.getByTestId(
@@ -659,7 +659,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     await user.clear(topologyFreezeTimeInput);
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
 
     const topologyUpgradeTimeInput = screen.getByTestId(
@@ -677,7 +677,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     await user.clear(topologyUpgradeTimeInput);
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeNull();
+      expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
     });
   });
 
@@ -699,7 +699,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
 
     fireEvent.change(effectiveDateInput, { target: { value: effectiveDate } });
 
-    expect(screen.queryByText(topologyFreezeTimeErrorMessage)).toBeNull();
+    expect(screen.queryByText(topologyFreezeTimeErrorMessage)).not.toBeInTheDocument();
 
     const topologyFreezeTimeInput = screen.getByTestId(
       'config-field-nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime'
@@ -738,7 +738,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     await user.type(topologyFreezeTimeInput, validTopologyFreezeTime);
 
     await waitFor(() => {
-      expect(screen.queryByText(topologyFreezeTimeErrorMessage)).toBeNull();
+      expect(screen.queryByText(topologyFreezeTimeErrorMessage)).not.toBeInTheDocument();
     });
     await waitFor(() => {
       expect(screen.queryByText(upgradeTimeErrorMessage)).toBeInTheDocument();
@@ -751,7 +751,7 @@ describe('Next Scheduled Logical Synchronizer Upgrade', () => {
     await user.clear(upgradeTimeInput);
     await user.type(upgradeTimeInput, validUpgradeTime);
     await waitFor(() => {
-      expect(screen.queryByText(upgradeTimeErrorMessage)).toBeNull();
+      expect(screen.queryByText(upgradeTimeErrorMessage)).not.toBeInTheDocument();
     });
   });
 });
