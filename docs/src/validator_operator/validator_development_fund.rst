@@ -16,7 +16,7 @@ From its activation onward, 5% of all future mint emissions in each issuance rou
 
 For every issuance round:
 
-- The Development Fund share (5%) is computed as part of the round’s mint emission.
+- The Development Fund share (5%) is computed as part of the round's CC available to mint.
 - The corresponding amount is recorded as an unclaimed entitlement under the contract
   ``Splice.Amulet.UnclaimedDevelopmentFundCoupon``.
 - The remaining issuance streams are reduced proportionally.
