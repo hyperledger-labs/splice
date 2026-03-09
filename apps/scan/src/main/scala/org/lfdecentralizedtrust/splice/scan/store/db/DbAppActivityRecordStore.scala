@@ -83,6 +83,24 @@ class DbAppActivityRecordStore(
     )
   }
 
+  def getRecordsByVerdictRowIds(
+      verdictRowIds: Seq[Long]
+  )(implicit tc: TraceContext): Future[Map[Long, AppActivityRecordT]] = {
+    if (verdictRowIds.isEmpty) Future.successful(Map.empty)
+    else {
+      storage
+        .query(
+          (sql"""
+          select verdict_row_id, round_number, app_provider_parties, app_activity_weights
+          from #${Tables.appActivityRecords}
+          where """ ++ inClause("verdict_row_id", verdictRowIds))
+            .as[AppActivityRecordT],
+          "appActivity.getRecordsByVerdictRowIds",
+        )
+        .map(rows => rows.map(r => r.verdictRowId -> r).toMap)
+    }
+  }
+
   /** Batch insert app activity records using multi-row INSERT. */
   private def batchInsertAppActivityRecords(items: Seq[AppActivityRecordT]) = {
     if (items.isEmpty) {

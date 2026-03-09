@@ -71,10 +71,27 @@ class DbAppActivityRecordStoreTest
         first <- store.getRecordByVerdictRowId(verdictRowIds(0))
         middle <- store.getRecordByVerdictRowId(verdictRowIds(25))
         last <- store.getRecordByVerdictRowId(verdictRowIds(49))
+        // Batch fetch a subset of records
+        batchIds = Seq(verdictRowIds(0), verdictRowIds(10), verdictRowIds(49))
+        batchResult <- store.getRecordsByVerdictRowIds(batchIds)
+        // Batch fetch with empty input
+        emptyResult <- store.getRecordsByVerdictRowIds(Seq.empty)
+        // Batch fetch with a non-existent id mixed in
+        missingId = -999L
+        partialResult <- store.getRecordsByVerdictRowIds(Seq(verdictRowIds(0), missingId))
       } yield {
         first.value shouldBe records(0)
         middle.value shouldBe records(25)
         last.value shouldBe records(49)
+        // Batch assertions
+        batchResult should have size 3
+        batchResult(verdictRowIds(0)) shouldBe records(0)
+        batchResult(verdictRowIds(10)) shouldBe records(10)
+        batchResult(verdictRowIds(49)) shouldBe records(49)
+        emptyResult shouldBe empty
+        partialResult should have size 1
+        partialResult(verdictRowIds(0)) shouldBe records(0)
+        partialResult.get(missingId) shouldBe None
       }
     }
 
