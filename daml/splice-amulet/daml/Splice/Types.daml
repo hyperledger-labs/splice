@@ -52,6 +52,5 @@ instance HasCheckedFetch TransferInstructionView ForDso where
     dso = transfer.instrumentId.admin
 
 instance HasCheckedFetch AllocationView ForDso where
-  contractGroupId AllocationView {..} =
-    ForDso with dso = allocation.transferLeg.instrumentId.admin
-
+  contractGroupId AllocationView {..} = ForDso with
+    dso = allocation.transferLeg.instrumentId.admin
