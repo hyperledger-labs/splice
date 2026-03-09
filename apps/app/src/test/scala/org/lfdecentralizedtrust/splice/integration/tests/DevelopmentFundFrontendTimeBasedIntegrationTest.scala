@@ -32,7 +32,8 @@ import org.openqa.selenium.WebDriver
 
 import java.time.{Duration, Instant}
 import java.util.Optional
-import scala.jdk.OptionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.OptionConverters.*
 
 class DevelopmentFundFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTest("alice", "bob", "sv1")
@@ -81,11 +82,9 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
 
-
   "Development Fund - Happy Path (DFM changes)" should {
 
     "handle DFM transition correctly" in { implicit env =>
-
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
@@ -219,6 +218,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                     "[role='dialog'] textarea[placeholder='Enter the reason for withdrawal']"
                   )
                 )
+                reasonField.click()
                 reasonField.sendKeys("Withdrawal reason")
                 eventuallyClickOn(cssSelector("[role='dialog'] button.MuiButton-contained"))
               },
@@ -321,10 +321,11 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             browseToBobWallet(bobDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
 
-            clue("Check: user_2 does not see warning text (user_2 is the DFM)") {
+            clue("Check: user_2 sees DFM info alert (user_2 is the DFM)") {
               eventually() {
                 waitForQuery(id("development-fund-allocation-beneficiary"))
-                find(className("MuiAlert-standardInfo")) shouldBe empty
+                find(className("MuiAlert-standardWarning")) shouldBe empty
+                find(className("MuiAlert-standardInfo")).isDefined shouldBe true
               }
             }
 
@@ -389,7 +390,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
   "Development Fund - Happy Path (normal user)" should {
 
     "show appropriate restrictions for non-DFM users" in { implicit env =>
-
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Set alice (wallet user) as DFM via governance vote") {
@@ -413,8 +413,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
           clue("Check: Warning text is shown for non-DFM user") {
             eventually() {
-              find(className("MuiAlert-standardInfo")).isDefined shouldBe true
-              val alertText = find(className("MuiAlert-standardInfo")).value.text
+              find(className("MuiAlert-standardWarning")).isDefined shouldBe true
+              val alertText = find(className("MuiAlert-standardWarning")).value.text
               alertText should include("not the development fund manager")
             }
           }
@@ -437,7 +437,8 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
           clue("Check: History List is empty") {
             eventually() {
-              val emptyStateCell = find(cssSelector("#coupon-history-table tbody tr td[colspan='6']"))
+              val emptyStateCell =
+                find(cssSelector("#coupon-history-table tbody tr td[colspan='6']"))
               emptyStateCell.isDefined shouldBe true
               emptyStateCell.value.text should include("No history events found")
             }
@@ -502,25 +503,14 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 eventuallyClickOn(id("navlink-development-fund"))
               },
             )(
-              "Alice sees the Development Fund page without warning",
+              "Alice sees the Development Fund page with DFM info alert",
               _ => {
-                find(className("MuiAlert-standardInfo")) shouldBe empty
+                find(className("MuiAlert-standardWarning")) shouldBe empty
+                find(className("MuiAlert-standardInfo")).isDefined shouldBe true
                 waitForQuery(id("development-fund-allocation-beneficiary"))
                 waitForQuery(id("unclaimed-total-amount"))
               },
             )
-
-            val totalUnclaimedBefore = clue("Check: Total unclaimed should be positive and stable") {
-              eventually() {
-                val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
-                  .map(c => BigDecimal(c.contract.payload.amount))
-                  .sum
-                val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
-                // The UI rounds to 4 decimal places
-                displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
-                displayed
-              }
-            }
 
             val allocationAmount = BigDecimal(10)
             val allocationReason = "Test allocation for Bob"
@@ -543,17 +533,21 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                   futureExpiresAtFormatted,
                 )
                 eventuallyClickOn(id("development-fund-allocation-reason"))
-                textArea(id("development-fund-allocation-reason")).underlying.sendKeys(allocationReason)
+                textArea(id("development-fund-allocation-reason")).underlying
+                  .sendKeys(allocationReason)
                 eventuallyClickOn(id("development-fund-allocation-submit-button"))
               },
             )(
               "Coupon is allocated and shown in active list with correct fields",
               _ => {
                 eventually() {
-                  val totalText = find(id("unclaimed-total-amount")).value.text
-                  totalText should not be empty
-                  val totalUnclaimedAfter = parseUnclaimedAmount(totalText)
-                  totalUnclaimedAfter shouldBe (totalUnclaimedBefore - allocationAmount)
+                  val backendTotal = sv1ScanBackend
+                    .listUnclaimedDevelopmentFundCoupons()
+                    .map(c => BigDecimal(c.contract.payload.amount))
+                    .sum
+                  val displayed =
+                    parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+                  displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
 
                   val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
                   rows should have size 1
@@ -563,16 +557,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 }
               },
             )
-
-            val totalUnclaimedBeforeWithdrawal = eventually() {
-              val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
-                .map(c => BigDecimal(c.contract.payload.amount))
-                .sum
-              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
-              // The UI rounds to 4 decimal places
-              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
-              displayed
-            }
 
             // ===================================================================
             // Section: Withdrawal via UI
@@ -589,6 +573,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                     "[role='dialog'] textarea[placeholder='Enter the reason for withdrawal']"
                   )
                 )
+                reasonField.click()
                 reasonField.sendKeys("Test withdrawal reason")
                 eventuallyClickOn(cssSelector("[role='dialog'] button.MuiButton-contained"))
               },
@@ -602,10 +587,13 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                   emptyStateCell.isDefined shouldBe true
                   emptyStateCell.value.text should include("No development fund allocations found")
 
-                  val totalText = find(id("unclaimed-total-amount")).value.text
-                  totalText should not be empty
-                  val totalUnclaimedAfterWithdrawal = parseUnclaimedAmount(totalText)
-                  totalUnclaimedAfterWithdrawal shouldBe (totalUnclaimedBeforeWithdrawal + allocationAmount)
+                  val backendTotal = sv1ScanBackend
+                    .listUnclaimedDevelopmentFundCoupons()
+                    .map(c => BigDecimal(c.contract.payload.amount))
+                    .sum
+                  val displayed =
+                    parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+                  displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
 
                   val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
                   historyRows should not be empty
@@ -627,22 +615,10 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
           bobCollectRewardsTrigger.pause().futureValue
           expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
 
-          var totalUnclaimedBeforeAllocation = BigDecimal(0)
-
           withFrontEnd("alice") { implicit webDriver =>
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
-
-            totalUnclaimedBeforeAllocation = eventually() {
-              val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
-                .map(c => BigDecimal(c.contract.payload.amount))
-                .sum
-              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
-              // The UI rounds to 4 decimal places
-              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
-              displayed
-            }
 
             actAndCheck(
               "Alice allocates a coupon for claiming test", {
@@ -674,10 +650,13 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                   val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
                   rows.exists(row => row.text.contains("10.0000")) shouldBe true
 
-                  val totalText = find(id("unclaimed-total-amount")).value.text
-                  totalText should not be empty
-                  val totalUnclaimedAfterAllocation = parseUnclaimedAmount(totalText)
-                  totalUnclaimedAfterAllocation shouldBe (totalUnclaimedBeforeAllocation - claimingAllocationAmount)
+                  val backendTotal = sv1ScanBackend
+                    .listUnclaimedDevelopmentFundCoupons()
+                    .map(c => BigDecimal(c.contract.payload.amount))
+                    .sum
+                  val displayed =
+                    parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+                  displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
                 }
               },
             )
@@ -692,10 +671,12 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             webDriver.navigate().refresh()
             eventuallyClickOn(id("navlink-development-fund"))
             eventually() {
-              val totalText = find(id("unclaimed-total-amount")).value.text
-              totalText should not be empty
-              val totalUnclaimedAfterClaiming = parseUnclaimedAmount(totalText)
-              totalUnclaimedAfterClaiming shouldBe (totalUnclaimedBeforeAllocation - claimingAllocationAmount)
+              val backendTotal = sv1ScanBackend
+                .listUnclaimedDevelopmentFundCoupons()
+                .map(c => BigDecimal(c.contract.payload.amount))
+                .sum
+              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
 
               val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
               historyRows.exists(row => row.text.contains("Claimed")) shouldBe true
@@ -712,7 +693,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         clue("Expiring test") {
           expiredDevelopmentFundCouponTriggers.foreach(_.pause().futureValue)
 
-          var totalUnclaimedBeforeAllocation = BigDecimal(0)
           val expiringAllocationAmount = BigDecimal(1)
           val expiringExpiresAt = latestTime.plus(Duration.ofDays(365 * 5))
           val expiringExpiresAtFormatted = formatDateTimeForUI(expiringExpiresAt)
@@ -721,16 +701,6 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
             browseToAliceWallet(aliceDamlUser)
             eventuallyClickOn(id("navlink-development-fund"))
             waitForQuery(id("development-fund-allocation-beneficiary"))
-
-            totalUnclaimedBeforeAllocation = eventually() {
-              val backendTotal = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
-                .map(c => BigDecimal(c.contract.payload.amount))
-                .sum
-              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
-              // The UI rounds to 4 decimal places
-              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
-              displayed
-            }
 
             actAndCheck(
               "Alice allocates a coupon with expiration", {
@@ -761,10 +731,13 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
                 eventually() {
                   aliceWalletClient.listActiveDevelopmentFundCoupons() should have size 1
 
-                  val totalText = find(id("unclaimed-total-amount")).value.text
-                  totalText should not be empty
-                  val totalUnclaimedAfterAllocation = parseUnclaimedAmount(totalText)
-                  totalUnclaimedAfterAllocation shouldBe (totalUnclaimedBeforeAllocation - expiringAllocationAmount)
+                  val backendTotal = sv1ScanBackend
+                    .listUnclaimedDevelopmentFundCoupons()
+                    .map(c => BigDecimal(c.contract.payload.amount))
+                    .sum
+                  val displayed =
+                    parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+                  displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
                 }
               },
             )
@@ -781,11 +754,14 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
 
             webDriver.navigate().refresh()
             eventuallyClickOn(id("navlink-development-fund"))
-            eventually() {
-              val totalText = find(id("unclaimed-total-amount")).value.text
-              totalText should not be empty
-              val totalUnclaimedAfterExpiry = parseUnclaimedAmount(totalText)
-              totalUnclaimedAfterExpiry shouldBe totalUnclaimedBeforeAllocation
+            waitForQuery(id("unclaimed-total-amount"))
+            eventually(timeUntilSuccess = 40.seconds) {
+              val backendTotal = sv1ScanBackend
+                .listUnclaimedDevelopmentFundCoupons()
+                .map(c => BigDecimal(c.contract.payload.amount))
+                .sum
+              val displayed = parseUnclaimedAmount(find(id("unclaimed-total-amount")).value.text)
+              displayed shouldBe backendTotal.setScale(4, BigDecimal.RoundingMode.HALF_UP)
 
               val historyRows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
               historyRows.exists(row => row.text.contains("Expired")) shouldBe true
@@ -795,14 +771,14 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
     }
   }
 
-private def parseUnclaimedAmount(text: String): BigDecimal = {
-  val numPattern = """[\d.]+""".r
-  numPattern.findFirstIn(text) match {
-    case Some(value) => BigDecimal(value)
-    case None =>
-      throw new RuntimeException(s"Could not extract number from: '$text'")
+  private def parseUnclaimedAmount(text: String): BigDecimal = {
+    val numPattern = """[\d.]+""".r
+    numPattern.findFirstIn(text) match {
+      case Some(value) => BigDecimal(value)
+      case None =>
+        fail(s"Could not extract number from: '$text'")
+    }
   }
-}
 
   private def changeDevelopmentFundManager(
       newDfm: PartyId

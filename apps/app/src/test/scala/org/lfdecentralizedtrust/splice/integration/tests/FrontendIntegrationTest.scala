@@ -786,8 +786,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         val actual = dateTimePicker.getAttribute("value").toLowerCase
         val expected = dateTime.toLowerCase
         // MUI picker may display "a"/"p" instead of "am"/"pm"; normalize for comparison
-        val normalizeAmPm = (s: String) =>
-          s.replaceAll("\\b(a)(?![m])", "am").replaceAll("\\b(p)(?![m])", "pm")
+        val normalizeAmPm =
+          (s: String) => s.replaceAll("\\b(a)(?![m])", "am").replaceAll("\\b(p)(?![m])", "pm")
         eventually()(normalizeAmPm(actual) shouldBe normalizeAmPm(expected))
       }
     }
