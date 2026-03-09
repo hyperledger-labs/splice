@@ -94,8 +94,15 @@ class DomainConnector(
               waitForSequencerConnectionsFromScan(clock, serial.serial)
             case None =>
               logger.info("No registered physicial synchronizer id, using active id from scan")
-              scanConnection
-                .getActivePhysicalSynchronizerSerial()
+              retryProvider
+                .getValueWithRetries(
+                  RetryFor.Automation,
+                  "scan_physical_synchronizer_id",
+                  "physical synchronizer id from scan",
+                  scanConnection
+                    .getActivePhysicalSynchronizerSerial(),
+                  logger,
+                )
                 .flatMap(
                   waitForSequencerConnectionsFromScan(clock, _)
                 )

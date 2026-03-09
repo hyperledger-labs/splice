@@ -323,7 +323,7 @@ class SvReonboardingIntegrationTest
             }
           }
 
-          eventually(40.seconds) {
+          eventually(90.seconds) {
             sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
               sv1Party,
               sv2Party,
