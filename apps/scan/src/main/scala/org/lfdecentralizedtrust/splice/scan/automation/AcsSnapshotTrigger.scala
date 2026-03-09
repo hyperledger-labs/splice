@@ -17,16 +17,9 @@ import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
-  DeleteIncrementalSnapshotTask,
-  InitializeIncrementalSnapshotFromImportUpdatesTask,
-  InitializeIncrementalSnapshotTask,
-  SaveIncrementalSnapshotTask,
-  UpdateIncrementalSnapshotTask,
-}
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.RetrieveTaskForMigrationResult
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.store.HistoryMetrics.AcsSnapshotsMetrics
-import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -59,10 +52,10 @@ class AcsSnapshotTrigger(
         .retrieveTaskForCurrentMigration(
           migrationId = store.currentMigrationId,
           isHistoryBackfilled = updateHistory.isHistoryBackfilled,
-          lastIngestedRecordTime = updateHistory.lastIngestedRecordTime,
+          getLastIngestedRecordTime = getLastIngestedRecordTime,
           getIncrementalSnapshot = () => getIncrementalSnapshot(),
           getLatestSnapshot = getLatestSnapshot,
-          getRecordTimeRange = getRecordTimeRange,
+          getMinRecordTime = getMinRecordTime,
           storageConfig = storageConfig,
           updateInterval = updateInterval,
           logger = logger,
@@ -77,10 +70,10 @@ object AcsSnapshotTrigger {
   def retrieveTaskForCurrentMigration(
       migrationId: Long,
       isHistoryBackfilled: (Long) => Future[Boolean],
-      lastIngestedRecordTime: Option[CantonTimestamp],
+      getLastIngestedRecordTime: (Long) => Option[CantonTimestamp],
       getIncrementalSnapshot: () => Future[Option[IncrementalAcsSnapshot]],
       getLatestSnapshot: (Long) => Future[Option[AcsSnapshot]],
-      getRecordTimeRange: (Long) => Future[Option[DomainRecordTimeRange]],
+      getMinRecordTime: (Long) => Future[Option[CantonTimestamp]],
       storageConfig: ScanStorageConfig,
       updateInterval: java.time.Duration,
       logger: TracedLogger,
@@ -90,40 +83,21 @@ object AcsSnapshotTrigger {
   ): Future[Seq[AcsSnapshotTriggerBase.Task]] = {
     AcsSnapshotTriggerBase
       .retrieveTaskForMigration(
-        migrationId,
-        isHistoryBackfilled,
-        getIncrementalSnapshot,
-        getLatestSnapshot,
-        getRecordTimeRange,
-        storageConfig,
-        updateInterval,
-        logger,
+        migrationId = migrationId,
+        isHistoryBackfilled = isHistoryBackfilled,
+        getIncrementalSnapshot = getIncrementalSnapshot,
+        getLatestSnapshot = getLatestSnapshot,
+        getMinRecordTime = getMinRecordTime,
+        getMaxRecordTime = _ => Future.successful(Some(CantonTimestamp.MaxValue)),
+        getLastIngestedRecordTime = getLastIngestedRecordTime,
+        storageConfig = storageConfig,
+        updateInterval = updateInterval,
+        logger = logger,
       )
       .map {
-        case Some(task) if taskBeyondUpdateHistoryEnd(task, lastIngestedRecordTime) =>
-          Seq.empty
-        case Some(task) => Seq(task)
-        case None => Seq.empty
+        case RetrieveTaskForMigrationResult.Task(task) => Seq(task)
+        case RetrieveTaskForMigrationResult.ReachedMigrationEnd => Seq.empty
+        case RetrieveTaskForMigrationResult.Waiting => Seq.empty
       }
-  }
-
-  private def taskBeyondUpdateHistoryEnd(
-      task: AcsSnapshotTriggerBase.Task,
-      lastIngestedRecordTimeO: Option[CantonTimestamp],
-  ): Boolean = {
-    task match {
-      case UpdateIncrementalSnapshotTask(_, updateUntil) =>
-        // Don't move beyond the last ingested record time, otherwise we'll miss updates
-        // between `lastIngestedRecordTime` and `updateUntil`.
-        lastIngestedRecordTimeO.forall(updateUntil.isAfter)
-      case InitializeIncrementalSnapshotFromImportUpdatesTask(_, _, _) =>
-        false
-      case InitializeIncrementalSnapshotTask(_, _) =>
-        false
-      case SaveIncrementalSnapshotTask(_, _) =>
-        false
-      case DeleteIncrementalSnapshotTask(_) =>
-        false
-    }
   }
 }

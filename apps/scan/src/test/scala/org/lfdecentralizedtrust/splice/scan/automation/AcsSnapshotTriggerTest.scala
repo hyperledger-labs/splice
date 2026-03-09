@@ -34,10 +34,10 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = None,
+          getLastIngestedRecordTime = returnForMigrationSync(migration4 -> None),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration4 -> Some(previousSnapshot)),
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -55,10 +55,10 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = None,
+          getLastIngestedRecordTime = returnForMigrationSync(migration4 -> None),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration4 -> None),
-          getRecordTimeRange = returnForMigration(migration4 -> None),
+          getMinRecordTime = returnForMigration(migration4 -> None),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -68,16 +68,15 @@ class AcsSnapshotTriggerTest
 
     "initialize from import updates if there is no existing snapshot" in {
       val migrationBegin = snapshotTime1.minusSeconds(100L)
-      val recordTimeRange = DomainRecordTimeRange(migrationBegin, snapshotTime4)
 
       AcsSnapshotTrigger
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = None,
+          getLastIngestedRecordTime = returnForMigrationSync(migration4 -> None),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration4 -> None),
-          getRecordTimeRange = returnForMigration(migration4 -> Some(recordTimeRange)),
+          getMinRecordTime = returnForMigration(migration4 -> Some(migrationBegin)),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -96,10 +95,10 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> false),
-          lastIngestedRecordTime = None,
+          getLastIngestedRecordTime = returnForMigrationSync(migration4 -> None),
           getIncrementalSnapshot = unused0,
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -122,10 +121,10 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = None,
+          getLastIngestedRecordTime = returnForMigrationSync(migration4 -> None),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -154,10 +153,11 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = Some(lastIngestedRecordTime),
+          getLastIngestedRecordTime =
+            returnForMigrationSync(migration4 -> Some(lastIngestedRecordTime)),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -186,10 +186,11 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = Some(lastIngestedRecordTime),
+          getLastIngestedRecordTime =
+            returnForMigrationSync(migration4 -> Some(lastIngestedRecordTime)),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -220,10 +221,11 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = Some(lastIngestedRecordTime),
+          getLastIngestedRecordTime =
+            returnForMigrationSync(migration4 -> Some(lastIngestedRecordTime)),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -247,10 +249,11 @@ class AcsSnapshotTriggerTest
         .retrieveTaskForCurrentMigration(
           migrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration4 -> true),
-          lastIngestedRecordTime = Some(lastIngestedRecordTime),
+          getLastIngestedRecordTime =
+            returnForMigrationSync(migration4 -> Some(lastIngestedRecordTime)),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
@@ -267,8 +270,7 @@ class AcsSnapshotTriggerTest
   "AcsSnapshotBackfillingTrigger" should {
 
     "start backfilling from an empty incremental snapshot" in {
-      val migrationBegin = snapshotTime1.minusSeconds(100L)
-      val recordTimeRange = DomainRecordTimeRange(migrationBegin, snapshotTime4)
+      val recordTimeRange = DomainRecordTimeRange(snapshotTime1.minusSeconds(100L), snapshotTime4)
 
       // There is no backfilled data at all, initialize from import updates in the previous migration.
       AcsSnapshotBackfillingTrigger
@@ -277,7 +279,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration1 -> None),
-          getRecordTimeRange = returnForMigration(migration1 -> Some(recordTimeRange)),
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.max)),
           getPreviousMigrationId = returnForMigration(migration2 -> Some(migration1)),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -286,7 +289,7 @@ class AcsSnapshotTriggerTest
         .futureValue shouldBe Right(
         Some(
           InitializeIncrementalSnapshotFromImportUpdatesTask(
-            recordTime = migrationBegin.minusSeconds(1L),
+            recordTime = recordTimeRange.min.minusSeconds(1L),
             migration = migration1,
             nextAt = snapshotTime1,
           )
@@ -306,7 +309,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration1 -> Some(snapshot)),
-          getRecordTimeRange = returnForMigration(migration1 -> Some(recordTimeRange)),
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.max)),
           getPreviousMigrationId = returnForMigration(migration2 -> Some(migration1)),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -347,9 +351,13 @@ class AcsSnapshotTriggerTest
             migration2 -> None,
             migration1 -> None,
           ),
-          getRecordTimeRange = returnForMigration(
-            migration2 -> Some(recordTimeRange2),
-            migration1 -> Some(recordTimeRange1),
+          getMinRecordTime = returnForMigration(
+            migration2 -> Some(recordTimeRange2.min),
+            migration1 -> Some(recordTimeRange1.min),
+          ),
+          getMaxRecordTime = returnForMigration(
+            migration2 -> Some(recordTimeRange2.max),
+            migration1 -> Some(recordTimeRange1.max),
           ),
           getPreviousMigrationId = returnForMigration(
             migration3 -> Some(migration2),
@@ -396,9 +404,13 @@ class AcsSnapshotTriggerTest
             migration2 -> Some(lastSnapshotInMigration2),
             migration1 -> None,
           ),
-          getRecordTimeRange = returnForMigration(
-            migration2 -> Some(recordTimeRange2),
-            migration1 -> Some(recordTimeRange1),
+          getMinRecordTime = returnForMigration(
+            migration2 -> Some(recordTimeRange2.min),
+            migration1 -> Some(recordTimeRange1.min),
+          ),
+          getMaxRecordTime = returnForMigration(
+            migration2 -> Some(recordTimeRange2.max),
+            migration1 -> Some(recordTimeRange1.max),
           ),
           getPreviousMigrationId = returnForMigration(
             migration3 -> Some(migration2),
@@ -430,7 +442,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = returnForMigration(migration1 -> false),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = returnForMigration(migration1 -> Some(recordTimeRange1)),
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange1.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange1.max)),
           getPreviousMigrationId = returnForMigration(migration2 -> Some(migration1)),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -446,7 +459,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = unused1,
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = unused1,
+          getMinRecordTime = unused1,
+          getMaxRecordTime = unused1,
           getPreviousMigrationId = returnForMigration(migration1 -> None),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -476,9 +490,13 @@ class AcsSnapshotTriggerTest
             migration2 -> Some(lastSnapshotInMigration2),
             migration1 -> Some(lastSnapshotInMigration1),
           ),
-          getRecordTimeRange = returnForMigration(
-            migration2 -> Some(recordTimeRange),
-            migration1 -> Some(recordTimeRange),
+          getMinRecordTime = returnForMigration(
+            migration2 -> Some(recordTimeRange.min),
+            migration1 -> Some(recordTimeRange.min),
+          ),
+          getMaxRecordTime = returnForMigration(
+            migration2 -> Some(recordTimeRange.max),
+            migration1 -> Some(recordTimeRange.max),
           ),
           getPreviousMigrationId = returnForMigration(
             migration3 -> Some(migration2),
@@ -511,7 +529,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = returnForMigration(migration1 -> Some(recordTimeRange)),
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.max)),
           getPreviousMigrationId = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -546,7 +565,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = returnForMigration(migration1 -> Some(recordTimeRange)),
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.max)),
           getPreviousMigrationId = unused1,
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -586,7 +606,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = unused1,
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = returnForMigration(migration2 -> Some(recordTimeRange2)),
+          getMinRecordTime = returnForMigration(migration2 -> Some(recordTimeRange2.min)),
+          getMaxRecordTime = returnForMigration(migration2 -> Some(recordTimeRange2.max)),
           getPreviousMigrationId = returnForMigration(migration2 -> Some(migration1)),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -625,7 +646,8 @@ class AcsSnapshotTriggerTest
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
-          getRecordTimeRange = returnForMigration(migration1 -> Some(recordTimeRange)),
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.max)),
           getPreviousMigrationId = returnForMigration(migration1 -> None),
           storageConfig = storageConfig,
           updateInterval = java.time.Duration.ofSeconds(30L),
@@ -650,6 +672,10 @@ class AcsSnapshotTriggerTest
   private def unused0[T]: () => Future[T] = () => fail("This argument should not be used")
   private def unused1[T]: Long => Future[T] = _ => fail("This argument should not be used")
 
+  private def returnForMigrationSync[T](arg: (Long, T)): Long => T = {
+    case m if m == arg._1 => arg._2
+    case m => fail(s"Should not be called for migration $m")
+  }
   private def returnForMigration[T](arg: (Long, T)): Long => Future[T] = {
     case m if m == arg._1 => Future.successful(arg._2)
     case m => fail(s"Should not be called for migration $m")
