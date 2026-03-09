@@ -78,6 +78,17 @@ class BackwardCompatible v1 v2 where
 class ForwardCompatible v1 v2 where
   downcast : v2 -> v1
 
+instance ForwardCompatible HoldingV1.InstrumentId HoldingV2.InstrumentId where
+  downcast (HoldingV2.InstrumentId {..}) = HoldingV1.InstrumentId with ..
+
+instance BackwardCompatible HoldingV1.InstrumentId HoldingV2.InstrumentId where
+  upcast (HoldingV1.InstrumentId {..}) = HoldingV2.InstrumentId with ..
+
+instance ForwardCompatible HoldingV1.Lock HoldingV2.Lock where
+  downcast (HoldingV2.Lock {..}) = HoldingV1.Lock with ..
+
+instance BackwardCompatible HoldingV1.Lock HoldingV2.Lock where
+  upcast (HoldingV1.Lock {..}) = HoldingV2.Lock with ..
 
 instance ForwardCompatible (ContractId HoldingV1.Holding) (ContractId HoldingV2.Holding) where
   downcast = coerceInterfaceContractId
@@ -88,17 +99,17 @@ instance BackwardCompatible (ContractId HoldingV1.Holding) (ContractId HoldingV2
 instance ForwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
   downcast v2 = HoldingV1.HoldingView with
     owner = v2.account.owner
-    instrumentId = v2.instrumentId
+    instrumentId = downcast v2.instrumentId
     amount = v2.amount
-    lock = v2.lock
+    lock = downcast <$> v2.lock
     meta = accountToMeta "account" v2.account v2.meta
 
 instance BackwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
   upcast v1 = HoldingV2.HoldingView with
     account = accountFromMeta v1.owner "account" v1.meta
-    instrumentId = v1.instrumentId
+    instrumentId = upcast v1.instrumentId
     amount = v1.amount
-    lock = v1.lock
+    lock = upcast <$> v1.lock
     meta = v1.meta
 
 
@@ -129,7 +140,7 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
 transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> Text -> AllocationV2.TransferLeg
 transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId =
   AllocationV2.TransferLeg with
-    instrumentId = instrumentId
+    instrumentId = upcast instrumentId
     sender = senderAccount
     receiver = receiverAccount
     ..
@@ -160,7 +171,7 @@ allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.Allocatio
 allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
   AllocationV2.AllocationView with
     allocation = allocation_specification_v1_to_v2 allocation
-    holdingCids = Map.fromList [(allocation.transferLeg.instrumentId, map coerceInterfaceContractId holdingCids)]
+    holdingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast holdingCids)]
     meta
     authorizer
     expiresAt
@@ -200,7 +211,7 @@ settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
 transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
 transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} =
   AllocationV1.TransferLeg with
-    instrumentId = instrumentId
+    instrumentId = downcast instrumentId
     sender = sender.owner
     receiver = receiver.owner
     meta = meta'
@@ -435,7 +446,7 @@ instance ForwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.
     sender = v2.sender.owner
     receiver = v2.receiver.owner
     amount = v2.amount
-    instrumentId = v2.instrumentId
+    instrumentId = downcast v2.instrumentId
     requestedAt = v2.requestedAt
     executeBefore = v2.executeBefore
     inputHoldingCids = map coerceInterfaceContractId v2.inputHoldingCids
@@ -449,7 +460,7 @@ instance BackwardCompatible TransferInstructionV1.Transfer TransferInstructionV2
     sender = accountFromMeta v1.sender "sender" v1.meta
     receiver = accountFromMeta v1.receiver "receiver" v1.meta
     amount = v1.amount
-    instrumentId = v1.instrumentId
+    instrumentId = upcast v1.instrumentId
     requestedAt = v1.requestedAt
     executeBefore = v1.executeBefore
     inputHoldingCids = map coerceInterfaceContractId v1.inputHoldingCids

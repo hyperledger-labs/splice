@@ -155,7 +155,7 @@ template Amulet
           owner
           provider = None
           id = None
-        instrumentId = amuletInstrumentId dso
+        instrumentId = upcast (amuletInstrumentId dso)
         amount = amount.initialAmount
         lock = None
         meta = amuletMetadata this
@@ -184,7 +184,7 @@ template LockedAmulet
           owner = amulet.owner
           provider = None
           id = None
-        instrumentId = amuletInstrumentId amulet.dso
+        instrumentId = upcast (amuletInstrumentId amulet.dso)
         amount = amulet.amount.initialAmount
         lock = Some Api.Token.HoldingV2.Lock with
           holders = lock.holders

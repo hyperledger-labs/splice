@@ -54,7 +54,7 @@ template AmuletAllocation
     interface instance Allocation for AmuletAllocation where
       view = AllocationView with
         allocation
-        holdingCids = Map.fromList $ optional [] (\la -> [(amuletInstrumentId admin, [toInterfaceContractId la])]) lockedAmulet
+        holdingCids = Map.fromList $ optional [] (\la -> [(upcast (amuletInstrumentId admin), [toInterfaceContractId la])]) lockedAmulet
         meta = emptyMetadata
         authorizer = basicAccount authorizer
         expiresAt = Some expiresAt
@@ -94,7 +94,7 @@ template AmuletAllocation
                 amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
 
               pure Allocation_SettleResult with
-                newHoldingCids = Map.singleton (amuletInstrumentId admin) [toInterfaceContractId newHoldingCid]
+                newHoldingCids = Map.singleton (upcast (amuletInstrumentId admin)) [toInterfaceContractId newHoldingCid]
                 meta = emptyMetadata
           else
             pure Allocation_SettleResult with

@@ -418,7 +418,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
       -- transferLeg.amount
       require "Transfer amount must be positive" (transferLeg.amount > 0.0)
       -- transferLeg.instrumentId
-      require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
+      require "Instrument-id must match the factory" (transferLeg.instrumentId == upcast (amuletInstrumentId dso))
       -- transferLeg.meta: no check
 
       -- accounts :
