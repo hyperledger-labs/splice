@@ -174,7 +174,7 @@ trait ParticipantAdminDarsConnection {
               ),
             currentVettingState =>
               Right(
-                removeDarsToVettingState(
+                removeDarsFromVettingState(
                   dars = dars,
                   currentVetting = currentVettingState,
                 )
@@ -194,14 +194,16 @@ trait ParticipantAdminDarsConnection {
       ParticipantAdminConnection.LookupDarByteString(mainPackageId)
     )
 
-  private def removeDarsToVettingState(
+  private def removeDarsFromVettingState(
       dars: Seq[DarResource],
       currentVetting: VettedPackages,
   ): VettedPackages = {
     val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
+    // filter out all dependencies that may exist with the resulting packages before removing a package
     val packageIdsToKeep = DarResourcesUtil
       .getDarResources(currentVetting.packages.map(_.packageId))
-      .filterNot(dar => dars.contains(dar))
+      .diff(dars)
+      .flatMap(e => DarResourcesUtil.getDarResources(e.dependencyPackageIds.toSeq))
       .map(_.packageId)
     val safePackageIdsToRemove = packageIdsToRemove.diff(packageIdsToKeep)
     currentVetting

@@ -39,12 +39,12 @@ object DarResourcesGenerator {
        |    DarResources.walletPayments,
        |  )
        |
-       |  private lazy val pkgIdToDarResource: Map[String, DarResource] =
+       |  lazy val pkgIdToDarResource: Map[String, DarResource] =
        |    packageResources.view.flatMap(_.all).map(resource => resource.packageId -> resource).toMap
        |
        |  // We don't index the map by PackageMetadata because that type contains some additional
        |  // fields that don't matter.
-       |  private lazy val pkgMetadataToDarResource: Map[(PackageName, PackageVersion), DarResource] =
+       |  lazy val pkgMetadataToDarResource: Map[(PackageName, PackageVersion), DarResource] =
        |    packageResources.view
        |      .flatMap(_.all)
        |      .map(resource => (resource.metadata.name, resource.metadata.version) -> resource)
