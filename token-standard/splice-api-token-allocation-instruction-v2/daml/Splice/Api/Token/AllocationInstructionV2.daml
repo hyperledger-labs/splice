@@ -1,7 +1,11 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Interfaces to enable wallets to instruct the registry to create allocations.
+-- | V2 interfaces to enable wallets to instruct the registry to create allocations and for
+-- apps to settle them in batches with privacy.
+--
+-- Compared to V1, these interfaces support accountable holdings as well as
+-- batch settlement with privacy.
 module Splice.Api.Token.AllocationInstructionV2 where
 
 import DA.Map qualified as Map
@@ -21,11 +25,13 @@ data AllocationInstructionView = AllocationInstructionView with
       -- ^ The contract id of the original allocation instruction contract.
       -- Used by the wallet to track the lineage of allocation instructions through multiple steps.
       --
-      -- Only set if the registry evolves the allocation instruction in multiple steps.
+      -- Only set if the registry evolved the allocation instruction in multiple steps.
     allocation : AllocationSpecification
       -- ^ The allocation that this instruction should create.
     pendingActions : Map.Map Party Text
       -- ^ The pending actions to be taken by different actors to create the allocation.
+      --
+      -- FIXME: switch to action graph
       --
       -- ^ This field can by used to report on the progress of registry specific
       -- workflows that are required to prepare the allocation.
@@ -129,8 +135,18 @@ interface AllocationFactory where
         -- deliberate contention on holdings to prevent duplicate allocations.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
-      creator : Party
-    controller creator
+      actors : [Party]
+        -- ^ Actors executing the allocation.
+        --
+        -- Registries MUST check their concrete values to avoid unauthorized
+        -- allocation creation.
+        --
+        -- Registries SHOULD allow the initation of the allocation if the `actors`
+        -- is equal to the `authorizer` of the allocation. Likewise, for accounts
+        -- where the account provider has the right to allocate funds, the registry
+        -- SHOULD allow the initiation of the allocation if the `actors` are
+        -- equal to the account provider.
+    controller actors
     do allocationFactory_allocateImpl this self arg
 
   nonconsuming choice AllocationFactory_SettleBatch : AllocationFactory_SettleBatchResult
@@ -145,7 +161,7 @@ interface AllocationFactory where
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
       transferLegs : [TransferLeg]
-        -- ^ The transfer legs to settle in this batch. All legs MUST have the same settlement executors.
+        -- ^ The transfer legs to settle in this batch.
         -- FIXME: improve comment
       allocationCids : [ContractId Allocation]
         -- ^ Allocations to settle. Their instrument admin MUST match the expected admin.
@@ -153,12 +169,18 @@ interface AllocationFactory where
         -- For every leg there must be both a sender and a receiver authorization.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
-      executors : [Party]
-        -- ^ Settlement executors who guarantee atomic settlement across different instrument admins.
+      actors : [Party]
+        -- ^ Actors executing the settlement.
+        --
+        -- Registries MUST check their concrete values to avoid unauthorized
+        -- settlement execution.
+        --
+        -- The `actors` SHOULD at least include all the settlement executors of
+        -- the settled allocations, and registries SHOULD allow successful
+        -- settlement if they do.
 
       -- FIXME: add default choice observers based on choice argument
-    controller executors
-      -- FIXME: should we allow setting extra authorizers here?
+    controller actors
     do allocationFactory_settleImpl this self arg
 
   nonconsuming choice AllocationFactory_PublicFetch : AllocationFactoryView
@@ -172,6 +194,7 @@ interface AllocationFactory where
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
       actor : Party
+        -- ^ Party executing the fetch.
     controller actor
     do allocationFactory_publicFetchImpl this self arg
 
@@ -208,7 +231,7 @@ data AllocationInstructionResult_Output
       -- all holdings reserved for funding the allocation have been released.
   deriving (Show, Eq)
 
-
+-- | Result of settling a batch of allocations.
 data AllocationFactory_SettleBatchResult = AllocationFactory_SettleBatchResult with
     newHoldingCids : Map.Map InstrumentId [ContractId Holding]
       -- ^ New holdings created as part of the batch settlement.

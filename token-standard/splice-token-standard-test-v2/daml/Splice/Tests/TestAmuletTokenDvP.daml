@@ -136,7 +136,7 @@ setupOtcTrade  = do
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
-    creator = alice
+    actors = [alice]
   submitWithDisclosuresMustFail' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
@@ -148,7 +148,7 @@ setupOtcTrade  = do
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
-    creator = alice
+    actors = [alice]
   result <- submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
@@ -178,7 +178,7 @@ setupOtcTrade  = do
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
     requestedAt = now
     extraArgs = emptyExtraArgs
-    creator = bob
+    actors = [bob]
   submitWithDisclosures' bob enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
@@ -189,7 +189,7 @@ setupOtcTrade  = do
     inputHoldingCids = []
     requestedAt = now
     extraArgs = emptyExtraArgs
-    creator = provider
+    actors = [provider]
   submitWithDisclosures' provider enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
@@ -234,7 +234,7 @@ testDvP = script do
         transferLegs
         allocationCids
         extraArgs = emptyExtraArgs
-        executors = [provider]
+        actors = [provider]
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
   let disclosures = foldMap snd settleBatchContexts

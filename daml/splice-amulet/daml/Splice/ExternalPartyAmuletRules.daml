@@ -449,7 +449,7 @@ amulet_allocationFactoryV2_allocateImpl
   -> Update V2.AllocationInstructionResult
 amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   let dso = externalAmuletRules.dso
-  let (V2.AllocationFactory_Allocate with allocation, requestedAt, inputHoldingCids, extraArgs, creator) = arg
+  let (V2.AllocationFactory_Allocate with allocation, requestedAt, inputHoldingCids, extraArgs, actors) = arg
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch arg.expectedAdmin dso
 
@@ -473,8 +473,10 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   whenSome settlement.settlementDeadline \d -> do
       assertWithinDeadline "Allocation.settlement.settlementDeadline" d
 
-  -- FIXME: rename creator to authorizer
-  let authorizer = creator
+  authorizer <- case actors of
+    [authorizer] -> pure authorizer
+    _ -> abort $ "Creating an allocation requires the authorizer as the single actor, but got: " <> show actors
+
   let amount = netAllocationAmount authorizer arg.allocation.transferLegs
 
   let
@@ -545,7 +547,7 @@ amulet_allocationFactoryV2_settleImpl this V2.AllocationFactory_SettleBatch {..}
   -- fetch and validate all allocations
   allocations <- forA allocationCids $ \allocationCid -> do
     allocation <- fetchChecked @AmuletAllocationV2 (ForDso with dso) (fromInterfaceContractId allocationCid)
-    require "Allocation executors match" (allocation.allocation.settlement.executors == executors)
+    require "Actors match allocation executors" (actors == allocation.allocation.settlement.executors)
     -- FIXME: consider what other validation is missing
     pure allocation
 

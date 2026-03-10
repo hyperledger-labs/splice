@@ -108,7 +108,7 @@ template OTCTrade with
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
           exercise factoryCid Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatch with
             expectedAdmin = admin
-            executors = [venue]
+            actors = [venue]
             transferLegs
             allocationCids
             extraArgs

@@ -104,6 +104,8 @@ data AllocationView = AllocationView with
     -- registry can make it to the settlementInfo's settlementDeadline.
   deriving (Show, Eq)
 
+-- FIXME: expose action graph
+
 
 -- Allocation
 ------------------------
@@ -175,6 +177,7 @@ interface Allocation where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller allocationSettlementControllers (view this).allocation
+      -- FIXME: switch to `actors`
     do allocation_cancelImpl this self arg
 
   choice Allocation_Withdraw : Allocation_WithdrawResult
