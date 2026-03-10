@@ -25,6 +25,10 @@ for dir in "${SPLICE_ROOT}"/cluster/images/*; do
         digest=""
       fi
 
+      if [ -n "$digest" ]; then
+        break
+      fi
+
       n=$((n+1))
       if [ $n -ge $MAX_RETRIES ]; then
         break
