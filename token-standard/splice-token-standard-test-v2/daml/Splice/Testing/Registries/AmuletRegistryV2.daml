@@ -50,6 +50,7 @@ import Splice.Api.Token.UtilsV2 (upcast)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
+import Splice.AmuletAllocation
 import Splice.AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
@@ -250,12 +251,19 @@ registryApi_getAllocationFactory_SettleBatch registry arg = do
   -- FIXME: trim context
   transferC <- getExternalPartyConfigStateContext registry
 
+  -- FIXME: cleanup lookup
   lockedDs <- forA arg.allocationCids $ \allocCid -> do
-    Some amuletAlloc <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
-    -- need to disclose the amulet contract, as the executors has no visibility into it
-    case amuletAlloc.lockedAmulet of
-      None -> return mempty
-      Some la -> queryDisclosure' @LockedAmulet registry.dso la
+    v2s <- query @AmuletAllocationV2 registry.dso
+    if (coerceContractId allocCid `notElem` map fst v2s)
+      then do
+        Some v1 <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
+        queryDisclosure' @LockedAmulet registry.dso v1.lockedAmulet
+      else do
+        -- need to disclose the amulet contract, as the executors has no visibility into it
+        Some v2 <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
+        case v2.lockedAmulet of
+          None -> return mempty
+          Some la -> queryDisclosure' @LockedAmulet registry.dso la
   let fullContext = withExtraDisclosures (extAmuletRulesD <> mconcat lockedDs) transferC
 
   pure EnrichedFactoryChoice with

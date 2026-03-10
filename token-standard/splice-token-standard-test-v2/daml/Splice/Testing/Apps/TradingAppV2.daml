@@ -6,15 +6,20 @@
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
 module Splice.Testing.Apps.TradingAppV2 where
 
-import DA.Optional (optionalToList)
+import DA.Optional (optionalToList, fromOptional)
 import DA.Set qualified as Set
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationInstructionV2 as Api.Token.AllocationInstructionV2
 import Splice.Api.Token.AllocationRequestV2
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationRequestV1 qualified as AllocationRequestV1
 import Splice.Api.Token.HoldingV2 (Account)
+import Splice.Api.Token.UtilsV2
+
 import DA.List (dedupSort)
 import DA.Foldable (mapA_)
 import DA.Assert ((===))
@@ -61,6 +66,23 @@ template OTCTradeAllocationRequest with
       allocationRequest_WithdrawImpl _self _extraArgs =
         -- just archiving the trade is enough
         pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+    interface instance AllocationRequestV1.AllocationRequest for OTCTradeAllocationRequest where
+      -- FIXME: package downcast
+      view = AllocationRequestV1.AllocationRequestView with
+        settlement = AllocationV1.SettlementInfo with
+          executor = venue
+          requestedAt = createdAt
+          settlementRef = downcast (makeTradeRef otcTradeCid)
+          allocateBefore = settleAt
+          settleBefore = fromOptional maxTime settlementDeadline
+          meta = emptyMetadata
+        transferLegs = TextMap.fromList $ map (\leg -> (leg.transferLegId, downcast leg)) transferLegs
+        meta = emptyMetadata
+
+      allocationRequest_RejectImpl = error "Not implemented for V1"
+      allocationRequest_WithdrawImpl = error "Not implemented for V1"
+
 
 template OTCTrade with
     venue : Party

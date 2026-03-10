@@ -103,6 +103,7 @@ setupOtcTrade  = do
     settleAt
     createdAt = now
     settlementDeadline = Some deadline
+    extraExecutors = []
 
   let
     settlement = SettlementInfo with

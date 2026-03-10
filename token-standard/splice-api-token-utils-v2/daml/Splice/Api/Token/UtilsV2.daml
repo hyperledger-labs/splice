@@ -295,13 +295,14 @@ allocationFactory_v2_tryAllocateUsingV1 factory factoryCid AllocationInstruction
 tryDowncast_v2_v1_AllocationSpecification : AllocationV2.AllocationSpecification -> Optional AllocationV1.AllocationSpecification
 tryDowncast_v2_v1_AllocationSpecification allocationV2@AllocationV2.AllocationSpecification{..} = do
   guard (isNone $ settlement.controllerOverride)
-  [executor] <- Some settlement.executors
   [transferLeg] <- Some transferLegs
-  -- FIXME: allow downcast of non-basic accounts by pushing them into metadata
+  -- FIXME: consider allowing downcast of non-basic accounts by pushing them into metadata -- need to be careful wrt executor check
   guard (isBasicAccount transferLeg.sender)
   guard (isBasicAccount transferLeg.receiver)
+  guard (transferLeg.sender.owner `elem` settlement.executors)
+  guard (transferLeg.receiver.owner `elem` settlement.executors)
   let settlementInfoV1 = AllocationV1.SettlementInfo with
-        executor
+        executor = error "FIXME: unclear how to determine executor if there are multiple v1 settlements involved"
         settlementRef = downcast settlement.settlementRef
         requestedAt = settlement.requestedAt
         allocateBefore = settlement.settleAt

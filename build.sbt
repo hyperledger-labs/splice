@@ -595,6 +595,7 @@ lazy val `splice-token-standard-test-v2-daml` =
           (`splice-api-token-allocation-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v2-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v2-daml` / Compile / damlBuild).value ++
+          (`splice-token-standard-test-v1-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
@@ -1025,8 +1026,8 @@ lazy val `splice-wallet-test-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := 
-        (`splice-amulet-test-daml` / Compile / damlBuild).value ++ 
+      Compile / damlDependencies :=
+        (`splice-amulet-test-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
