@@ -78,7 +78,8 @@ case class GroupedWeightS3ObjectFlow(
       s3Connection.newAppendWriteObject(getObjectKey(0)),
       MessageDigest.getInstance("SHA-256"),
       0,
-      0)
+      0,
+    )
   }
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = {
@@ -152,7 +153,7 @@ case class GroupedWeightS3ObjectFlow(
           logger.debug("Received a final empty element")
           uploadCallback.invoke(())
         } else {
-          val partNumber = curState.currentObject.prepareUploadNext()
+          val partNumber = curState.currentObject.prepareUploadNext(elem.bytes.asByteBuffer)
           curState.currentObjectDigest.update(elem.bytes.toArray)
           logger.debug(
             s"Received ${elem.bytes.length} bytes (isLast=${elem.isLast}), uploading as part $partNumber of object ${curState.currentObject.key}"
@@ -181,7 +182,7 @@ case class GroupedWeightS3ObjectFlow(
       }
 
       private def finishCurrentObject(): Unit =
-        state.currentObject.finish(state.currentObjectDigest.digest()).onComplete {
+        state.currentObject.finish().onComplete {
           case Success(_) => finishCallback.invoke(())
           case Failure(ex) => failStage(ex)
         }

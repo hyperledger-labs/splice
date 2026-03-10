@@ -64,13 +64,17 @@ class S3BucketConnectionForUnitTests(
   )(implicit
       ec: ExecutionContext
   ) extends AppendWriteObject(key) {
-    override def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
-      // We pad all parts with 5MB of zeros, to guarantee we're above the 5MB
-      // minimum per part (technically, the minimum is "except the last" part,
-      // but we don't really know that a part is last in this API)
-      val paddingSize = 5242880
+
+    // We pad all parts with 5MB of zeros, to guarantee we're above the 5MB
+    // minimum per part (technically, the minimum is "except the last" part,
+    // but we don't really know that a part is last in this API)
+    val paddingSize = 5242880
+
+    override def prepareUploadNext(content: ByteBuffer): Int =
+      super.prepareUploadNext(PaddedData(paddingSize, content).toByteBuffer())
+
+    override def upload(partNumber: Int, content: ByteBuffer): Future[Unit] =
       super.upload(partNumber, PaddedData(paddingSize, content).toByteBuffer())
-    }
   }
 }
 object S3BucketConnectionForUnitTests {
@@ -100,6 +104,7 @@ object S3BucketConnectionForUnitTests {
 case class PaddedData(paddingSize: Int, data: ByteBuffer) {
   def toByteBuffer(): ByteBuffer = {
     val intSize = java.lang.Integer.BYTES
+    println(s"data.remaining before padding: ${data.remaining()}")
     val totalSize = (intSize * 2) + data.remaining() + paddingSize
     val combined = ByteBuffer.allocate(totalSize)
     combined.putInt(data.remaining())

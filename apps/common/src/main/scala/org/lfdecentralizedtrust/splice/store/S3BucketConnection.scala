@@ -12,6 +12,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 
+import java.io.{ByteArrayInputStream, IOException}
 import java.net.URI
 import java.nio.ByteBuffer
 import java.security.MessageDigest
@@ -21,20 +22,43 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
+import scala.sys.process.*
 
 class S3BucketConnection(
     val s3Client: S3AsyncClient,
     bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
+
   // Reads the full content of an s3 object into a ByteBuffer.
   // Use only for testing, when the object size is known to be small
   def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
-    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
-    s3Client
-      .getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse])
-      .asScala
-      .map(_.asByteBuffer())
+    val readRequest = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+    for {
+      data <- s3Client
+        .getObject(readRequest, AsyncResponseTransformer.toBytes[GetObjectResponse])
+        .asScala
+        .map(_.asByteBuffer())
+      checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
+      checksumResponse <- s3Client
+        .getObjectTagging(checksumRequest)
+        .asScala
+      checksum = checksumResponse
+        .tagSet()
+        .asScala
+        .find(_.key() == "splice-checksum")
+        .map(_.value())
+        .getOrElse(throw new RuntimeException("Missing checksum tag"))
+    } yield {
+      val bis = new ByteArrayInputStream(data.array())
+      // We compare the computed & stored checksum to one we independtly compute via the system's `sha256sum` executable for sanity
+      val expectedChecksum =
+        ("sha256sum" #| "awk '{print $1}'" #| "xxd -r -p" #| "base64" #< bis).!!.trim
+      if (checksum != expectedChecksum) {
+        throw new IOException(s"Checksum mismatch. Expected $expectedChecksum, got $checksum")
+      }
+      data
+    }
   }
 
   // Writes a full object from memory into an s3 object
@@ -80,20 +104,24 @@ class S3BucketConnection(
     private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
     private val numParts = new AtomicInteger(0)
     private val parts = TrieMap.empty[Integer, CompletedPart]
+    private val md = MessageDigest.getInstance("SHA-256")
 
     /** Call this once before uploading a new part.
+      *  The content must already be provided for checksums, but will not be uploaded yet.
       */
-    def prepareUploadNext(): Int = numParts.incrementAndGet()
+    def prepareUploadNext(content: ByteBuffer): Int = {
+      md.update(content.duplicate())
+      numParts.incrementAndGet()
+    }
 
     /** Thread safe, may be called in parallel.
       *       partNumber must be an index returned from prepareUploadNext()
       */
     def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       require(numParts.get() >= partNumber)
-      val md = MessageDigest.getInstance("SHA-256")
-      md.update(content)
-      val digest = md.digest()
-      println(s"Digest for part $partNumber: ${Base64.getEncoder.encodeToString(digest)}")
+      val partMd = MessageDigest.getInstance("SHA-256")
+      partMd.update(content.duplicate())
+      val partDigest = partMd.digest()
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -103,13 +131,11 @@ class S3BucketConnection(
           .uploadId(id)
           .partNumber(partNumber)
           .checksumAlgorithm(ChecksumAlgorithm.SHA256)
-          .checksumSHA256(Base64.getEncoder.encodeToString(digest))
+          .checksumSHA256(Base64.getEncoder.encodeToString(partDigest))
           .build()
-        _ = println(s"Uploading part $partNumber")
         response <- s3Client
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
           .asScala
-        _ = println(s"Completing part upload for part $partNumber (returned checksum is: ${response.checksumSHA256()}")
         res <- parts
           .put(
             partNumber,
@@ -131,9 +157,7 @@ class S3BucketConnection(
       }
     }
 
-    // The digest must be computed outside of this class because uploads may be out-of-order, and
-    // we do not want to reorder them here.
-    def finish(digest: Array[Byte]): Future[Unit] = {
+    def finish(): Future[Unit] = {
       require(numParts.get() > 0)
       require(
         parts.size == numParts.get(),
@@ -144,21 +168,37 @@ class S3BucketConnection(
         completedMultipartUpload = CompletedMultipartUpload
           .builder()
           .parts(parts.toSeq.sortBy(_._1).map(_._2).asJava)
-          .build();
+          .build()
 
-        _ = println(s"Completing object multipart upload request. digest in base64 is: ${Base64.getEncoder.encodeToString(digest)}")
         completeRequest = CompleteMultipartUploadRequest
           .builder()
           .bucket(bucketName)
           .key(key)
           .uploadId(id)
           .multipartUpload(completedMultipartUpload)
-          .checksumSHA256("YjllNDI0ZAo=")
           .build()
 
         _ <- s3Client.completeMultipartUpload(completeRequest).asScala
 
-        // TODO(#3429): persist the sha256 digest also in an cloud-agnostic object header
+        taggingRequest = PutObjectTaggingRequest
+          .builder()
+          .bucket(bucketName)
+          .key(key)
+          .tagging(
+            Tagging
+              .builder()
+              .tagSet(
+                Tag
+                  .builder()
+                  .key("splice-checksum")
+                  .value(Base64.getEncoder.encodeToString(md.digest()))
+                  .build()
+              )
+              .build()
+          )
+          .build()
+
+        _ <- s3Client.putObjectTagging(taggingRequest).asScala
 
       } yield {
         ()

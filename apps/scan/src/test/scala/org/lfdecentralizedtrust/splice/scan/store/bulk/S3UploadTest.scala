@@ -16,7 +16,6 @@ import scala.jdk.CollectionConverters.*
 import org.scalatest.Assertion
 
 import java.nio.ByteBuffer
-import java.security.MessageDigest
 
 class S3UploadTest extends StoreTestBase with HasS3Mock {
 
@@ -25,15 +24,15 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
 
       val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val o = bucketConnection.newAppendWriteObject("test")
-      o.prepareUploadNext()
-      o.prepareUploadNext()
-      val md = MessageDigest.getInstance("SHA-256")
-      md.update(ByteBuffer.wrap("helloworld".getBytes("UTF-8")))
-      val digest = md.digest()
+      val part1 = ByteBuffer.wrap("hello".getBytes("UTF-8"))
+      val part2 = ByteBuffer.wrap("world".getBytes("UTF-8"))
+
+      o.prepareUploadNext(part1)
+      o.prepareUploadNext(part2)
       for {
-        _ <- o.upload(1, ByteBuffer.wrap("world".getBytes("UTF-8")))
-        _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
-        _ <- o.finish(digest)
+        _ <- o.upload(1, part1)
+        _ <- o.upload(2, part2)
+        _ <- o.finish()
         content <- bucketConnection.readFullObject("test")
       } yield {
         new String(content.array(), "UTF-8") shouldBe "helloworld"
