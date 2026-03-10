@@ -15,7 +15,32 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.scalatest.Assertion
 
+import java.nio.ByteBuffer
+import java.security.MessageDigest
+
 class S3UploadTest extends StoreTestBase with HasS3Mock {
+
+  "S3 multipart uploads" should {
+    "work (test me)" in {
+
+      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val o = bucketConnection.newAppendWriteObject("test")
+      o.prepareUploadNext()
+      o.prepareUploadNext()
+      val md = MessageDigest.getInstance("SHA-256")
+      md.update(ByteBuffer.wrap("helloworld".getBytes("UTF-8")))
+      val digest = md.digest()
+      for {
+        _ <- o.upload(1, ByteBuffer.wrap("world".getBytes("UTF-8")))
+        _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
+        _ <- o.finish(digest)
+        content <- bucketConnection.readFullObject("test")
+      } yield {
+        new String(content.array(), "UTF-8") shouldBe "helloworld"
+      }
+    }
+  }
+
   "GroupedWeightS3Object" should {
 
     def testWithInput(

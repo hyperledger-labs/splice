@@ -14,6 +14,8 @@ import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 
 import java.net.URI
 import java.nio.ByteBuffer
+import java.security.MessageDigest
+import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
@@ -72,7 +74,8 @@ class S3BucketConnection(
       .builder()
       .bucket(bucketName)
       .key(key)
-      .build();
+      .checksumAlgorithm(ChecksumAlgorithm.SHA256)
+      .build()
 
     private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
     private val numParts = new AtomicInteger(0)
@@ -87,6 +90,10 @@ class S3BucketConnection(
       */
     def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       require(numParts.get() >= partNumber)
+      val md = MessageDigest.getInstance("SHA-256")
+      md.update(content)
+      val digest = md.digest()
+      println(s"Digest for part $partNumber: ${Base64.getEncoder.encodeToString(digest)}")
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -95,10 +102,14 @@ class S3BucketConnection(
           .key(key)
           .uploadId(id)
           .partNumber(partNumber)
+          .checksumAlgorithm(ChecksumAlgorithm.SHA256)
+          .checksumSHA256(Base64.getEncoder.encodeToString(digest))
           .build()
+        _ = println(s"Uploading part $partNumber")
         response <- s3Client
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
           .asScala
+        _ = println(s"Completing part upload for part $partNumber (returned checksum is: ${response.checksumSHA256()}")
         res <- parts
           .put(
             partNumber,
@@ -106,6 +117,7 @@ class S3BucketConnection(
               .builder()
               .partNumber(partNumber)
               .eTag(response.eTag())
+              .checksumSHA256(response.checksumSHA256())
               .build(),
           )
           .fold(
@@ -119,7 +131,9 @@ class S3BucketConnection(
       }
     }
 
-    def finish(): Future[Unit] = {
+    // The digest must be computed outside of this class because uploads may be out-of-order, and
+    // we do not want to reorder them here.
+    def finish(digest: Array[Byte]): Future[Unit] = {
       require(numParts.get() > 0)
       require(
         parts.size == numParts.get(),
@@ -132,17 +146,21 @@ class S3BucketConnection(
           .parts(parts.toSeq.sortBy(_._1).map(_._2).asJava)
           .build();
 
+        _ = println(s"Completing object multipart upload request. digest in base64 is: ${Base64.getEncoder.encodeToString(digest)}")
         completeRequest = CompleteMultipartUploadRequest
           .builder()
           .bucket(bucketName)
           .key(key)
           .uploadId(id)
           .multipartUpload(completedMultipartUpload)
+          .checksumSHA256("YjllNDI0ZAo=")
           .build()
 
         _ <- s3Client.completeMultipartUpload(completeRequest).asScala
+
+        // TODO(#3429): persist the sha256 digest also in an cloud-agnostic object header
+
       } yield {
-        // TODO(#3429): consider checking the checksum from the response
         ()
       }
     }

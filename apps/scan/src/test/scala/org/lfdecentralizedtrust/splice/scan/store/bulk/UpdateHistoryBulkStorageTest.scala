@@ -35,7 +35,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
-import java.nio.ByteBuffer
 import scala.util.Using
 
 class UpdateHistoryBulkStorageTest
@@ -57,21 +56,6 @@ class UpdateHistoryBulkStorageTest
   )
 
   "UpdateHistoryBulkStorage" should {
-
-    "multipart upload works" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-      val o = bucketConnection.newAppendWriteObject("test")
-      o.prepareUploadNext()
-      o.prepareUploadNext()
-      for {
-        _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
-        _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
-        _ <- o.finish()
-        content <- bucketConnection.readFullObject("test")
-      } yield {
-        new String(content.array(), "UTF-8") shouldBe "helloworld"
-      }
-    }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
       val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
