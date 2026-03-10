@@ -12,7 +12,6 @@ import scala.util.{Failure, Success}
 import GroupedWeightS3ObjectFlow.Output
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import java.security.MessageDigest
 
 /** A Pekko Flow GraphStage that takes a stream of bytestrings, slices them into objects such that every object is slightly
   * larger than maxObjectSize (i.e. the cut is at the end of the byteString that passes that threshold), and uploads them
