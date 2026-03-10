@@ -1,0 +1,214 @@
+
+# Reference configuration options
+cluster:
+  nodePools:
+    apps:
+      minNodes: 0
+      # A high max-nodes by default to support large deployments and hard migrations
+      # Should be set to a lower number (currently 8) on CI clusters that do neither of those.
+      maxNodes: 20
+      nodeType: e2-standard-16
+    infra:
+      minNodes: 1
+      maxNodes: 3
+      nodeType: e2-standard-8
+infra:
+  prometheus:
+    retentionDuration: "1y"
+    retentionSize: "1500GB"
+    storageSize: "2Ti"
+  gkeGateway:
+    # swapping this comes with ~5min of downtime
+    # when changing true->false, pulumi gets delete order wrong; try
+    #   cncluster pulumi infra up --target urn:pulumi:infra.$GCP_CLUSTER_BASENAME::infra::kubernetes:gateway.networking.k8s.io/v1:Gateway::cn-gke-l7-gateway --target-dependents
+    # before normal update
+    proxyForIstioHttp: false
+  istio:
+    enableIngressAccessLogging: true
+# configs specific for the pulumi project
+# will be applied to all the stacks in the project
+pulumiProjectConfig:
+  default:
+    # skip helm installs and create only non helm resources.
+    # this for example lets you create the cloud sql instances without having deployments using them, and restoring them from other sources
+    installDataOnly: false
+    isExternalCluster: false
+    hasPublicInfo: false
+    # For long running production clusters this flag can be set to false to remove pulumi dependencies between our apps.
+    # This allows for much faster updates going all at once
+    # We don't want this enabled for the initial deployments in ciclusters as the logs would become a lot noisier
+    interAppsDependencies: true
+    cloudSql:
+      enabled: false
+      protected: true
+      # default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
+      tier: 'db-custom-2-7680'
+      # enable enterprise plus for better performance and faster maintenance
+      enterprisePlus: false
+    skipSynchronizerInitialization: true
+    # default not allowing version downgrades in our apps
+    allowDowngrade: true
+  sv-runbook:
+    cloudSql:
+      enabled: false
+pulumiStacks:
+  default:
+    parallelism: 64
+    resources:
+      requests:
+        memory: '2Gi'
+  canton-network:
+    resources:
+      requests:
+        memory: '4Gi'
+  multi-validator:
+    parallelism: 10
+    resources:
+      requests:
+        memory: '6Gi'
+validator1:
+  logging:
+    level: DEBUG
+# initial round used only on fresh initialization or resets
+# first SV bootstraps the network with it, other SVs learn it via their sponsors
+initialRound: 0
+## in the form <pulumi-project>:
+##                <settings>
+## ex:
+#  canton-network:
+#    installDataOnly: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: false
+    alerts:
+      pruning:
+        participantRetentionDays: 30
+        sequencerRetentionDays: 30
+        mediatorRetentionDays: 30
+      ingestion:
+        thresholdEntriesPerBatch: 80
+      delegatelessContention:
+        thresholdPerNamespace: 0.05
+      trafficWaste:
+        kilobytes: 1
+        overMinutes: 5
+        quantile: 0.95
+      # confirmation requests correspond to new ledger submissions;
+      # we alert if the rate is higher than expected to spot potential overload situations
+      confirmationRequests:
+        total:
+          rate: 25
+          overMinutes: 5
+        perMember:
+          rate: 3
+          overMinutes: 5
+      cloudSql:
+        maintenance: false
+      cometbft:
+        expectedMaxBlocksPerSecond: 3.5
+      loadTester:
+        minRate: 0.95
+      mediators:
+        acknowledgementLagSeconds: 900
+      deployment:
+        pendingPeriodMinutes: 5
+      sequencerClientDelay:
+        seconds: 90
+      sequencerRateLimits:
+        rejectionRateThreshold: 0
+        circuitBreakerStateThreshold: 0.5
+    # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
+    # Key=value secrets (excluding masked values)
+    # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')
+    loggedSecretsFilter: |
+      (
+        (
+          jsonPayload.message=~"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+" AND
+          -jsonPayload.message=~"(?i)(secret|token|(private|secret)(-)?key|password)=(\"\*\*\*\*\"|hidden)"
+        ) OR
+        jsonPayload.message=~"eyJhbGc[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}" OR
+        jsonPayload.message=~"Bearer\s+eyJ[A-Za-z0-9_-]{2,}"
+      )
+cloudArmor:
+  enabled: false
+  allRulesPreviewOnly: true
+  publicEndpoints:
+    publicScan:
+      hostname: scan.sv-2.scratcha.global.canton.network.digitalasset.com
+      pathPrefix: /api/scan
+      throttleAcrossAllEndpointsAllIps:
+        withinIntervalSeconds: 60
+        maxRequestsBeforeHttp429: 0
+multiValidator:
+  postgresPvcSize: '100Gi'
+  resources:
+    participant:
+      requests:
+        cpu: '1'
+        memory: '8Gi'
+      limits:
+        memory: '16Gi'
+    validator:
+      requests:
+        cpu: '0.5'
+        memory: '2400Mi'
+      limits:
+        memory: '8Gi'
+    postgres:
+      requests:
+        memory: '5Gi'
+      limits:
+        memory: '12Gi'
+sv:
+  scan:
+    externalRateLimits:
+      !include(./rate-limits/v0-acs.yaml;./rate-limits/unlimited.yaml;./rate-limits/public-banned.yaml)
+      globalLimits:
+        maxTokens: 2147483647
+        tokensPerFill: 2147483647
+        fillInterval: 60s
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      appsAsync: false
+      cantonLogLevel: DEBUG
+      apiRequestLogLevel: DEBUG
+      cantonAsync: false
+      cometbftLogLevel: debug
+    pruning:
+      sequencer:
+        enabled: false
+      participant:
+        enabled: true
+        cron: '0 /10 * * * ?'
+        maxDuration: 5m
+        retentionPeriod: 30d
+    participant:
+      bftSequencerConnection: true
+      resources:
+        requests:
+          memory: '12Gi'
+        limits:
+          memory: '18Gi'
+      additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_PRUNING_ACS_COMITMENTS
+          value: |
+            canton.participants.participant.parameters.stores.safe-to-prune-commitment-state = "all"
+    validatorApp:
+      additionalEnvVars:
+        # enable https://github.com/hyperledger-labs/splice/pull/2499
+        - name: ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT
+          value: |
+            canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m
+      resources:
+        requests:
+          memory: '2Gi'
+        limits:
+          memory: '4Gi'
+validators:
+  validator-runbook:
+    namespace: validator
+    nodeIdentifier: 'validator-runbook'
+    partyHint: 'digitalasset-testValidator-1'
+    onboardingSecret: 'validatorsecret'
