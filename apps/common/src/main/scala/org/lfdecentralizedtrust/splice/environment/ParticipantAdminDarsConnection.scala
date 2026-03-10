@@ -200,6 +200,7 @@ trait ParticipantAdminDarsConnection {
   ): VettedPackages = {
     val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
     // filter out all dependencies that may exist with the resulting packages before removing a package
+    // See https://github.com/DACH-NY/canton/issues/29834: make it work for validators
     val packageIdsToKeep = DarResourcesUtil
       .getDarResources(currentVetting.packages.map(_.packageId))
       .diff(dars)

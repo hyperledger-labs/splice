@@ -28,6 +28,7 @@ class SvPackageVettingTrigger(
       SvPackageVettingTrigger.packages,
       maxVettingDelay,
       latestPackagesOnly,
+      true,
     ) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =

@@ -239,6 +239,7 @@ class ValidatorAutomationService(
       triggerContext,
       maxVettingDelay,
       latestPackagesOnly,
+      svValidator,
     )
   )
 

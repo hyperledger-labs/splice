@@ -33,11 +33,24 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
       )
       val synchronizerId =
         sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
-      test(sv1Backend.appState.participantAdminConnection, synchronizerId, unsupportedDars)
+      test(
+        sv1Backend.appState.participantAdminConnection,
+        synchronizerId,
+        unsupportedDars,
+        unsupportedDars,
+      )
+      test(
+        sv1ValidatorBackend.appState.participantAdminConnection,
+        synchronizerId,
+        unsupportedDars,
+        unsupportedDars,
+      )
+      // See https://github.com/DACH-NY/canton/issues/29834: set removedDars when unvetting works on non-sv validators
       test(
         aliceValidatorBackend.appState.participantAdminConnection,
         synchronizerId,
         unsupportedDars,
+        Seq.empty,
       )
   }
 
@@ -45,6 +58,7 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
       participantAdminConnection: ParticipantAdminConnection,
       synchronizerId: SynchronizerId,
       unsupportedDars: Seq[DarResource],
+      removedDars: Seq[DarResource],
   ) = {
     val participantId = participantAdminConnection.getParticipantId().futureValue
     val name = participantId.uid.identifier
@@ -75,7 +89,7 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
           .listVettedPackages(participantId, synchronizerId, AuthorizedState)
           .futureValue
           .flatMap(_.mapping.packages)
-          .map(_.packageId) should contain noElementsOf unsupportedDars.map(_.packageId)
+          .map(_.packageId) should contain noElementsOf removedDars.map(_.packageId)
       }
     }
   }

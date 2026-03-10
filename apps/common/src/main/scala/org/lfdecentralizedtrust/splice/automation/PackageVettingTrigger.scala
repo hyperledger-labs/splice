@@ -17,6 +17,7 @@ abstract class PackageVettingTrigger(
     packages: Set[PackageIdResolver.Package],
     maxVettingDelay: NonNegativeFiniteDuration,
     latestPackagesOnly: Boolean,
+    svValidator: Boolean,
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
@@ -66,7 +67,8 @@ abstract class PackageVettingTrigger(
       unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
         vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
       )
-      _ = if (unsupportedPackages.nonEmpty) {
+      // See https://github.com/DACH-NY/canton/issues/29834: make it work for non-sv validators as well
+      _ = if (unsupportedPackages.nonEmpty && svValidator) {
         vetting.unvetPackages(
           domainId,
           unsupportedPackages,
