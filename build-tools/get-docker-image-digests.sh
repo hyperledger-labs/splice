@@ -19,15 +19,25 @@ for dir in "${SPLICE_ROOT}"/cluster/images/*; do
   if [ ! -f "$dir" ] && [ "$app" != "common" ]; then
     n=0
     MAX_RETRIES=5
+    # Client.Timeout from ghcr are not fun
     until [ $n -ge $MAX_RETRIES ]; do
-      # Client.Timeout from ghcr are not fun
-      digest=$(get_digest "$app")
+      if ! digest=$(get_digest "$app" 2>/dev/null); then
+        digest=""
+      fi
+
       if [ -n "$digest" ]; then
         break
       fi
+      echo "Failed to get digest for $app, attempt $((n+1))/$MAX_RETRIES. Retrying in 5 seconds..." >&2
       n=$((n+1))
       sleep 5
     done
+
+    if [ -z "$digest" ]; then
+      echo "Failed to get digest for $app after $MAX_RETRIES attempts" >&2
+      exit 1
+    fi
+
     a=${app//-/_}
     echo "  $a: \"@$digest\""
   fi
