@@ -22,6 +22,7 @@ import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
 import Splice.AmuletRules (AmuletRules)
 import Splice.Types
+import Splice.ValidatorPermission
 
 
 testOnboardValidator : Script ()
@@ -549,4 +550,55 @@ testBootstrapMainNetWithNonZeroRound = do
   earliestRound.round === Round 34
   middleRound.round === Round 35
   latestRound.round === Round 36
+  pure ()
+
+testGrantValidatorPermission : Script ()
+testGrantValidatorPermission = do
+  (app, dso, (sv1, _, _, _)) <- initDevNet
+
+  v1 <- allocateParty "v1"
+
+  -- sv1 grants the validator permission via DsoRules
+  svSubmits app sv1 $ \cid -> exerciseCmd cid $
+    DsoRules_GrantValidatorPermission with
+      sponsor = sv1
+      validator = v1
+      validatorParticipantId = "v1-participant-id"
+
+  -- Verify the ValidatorPermission contract was created with default revocation states
+  [(permissionCid, permission)] <- queryFilter @ValidatorPermission dso (\p -> p.validator == v1)
+  permission === ValidatorPermission with
+    dso
+    sponsor = sv1
+    validator = v1
+    validatorParticipantId = "v1-participant-id"
+    loginAfter = None
+    isRevoked = False
+
+  -- Set up a revocation time
+  now <- getTime
+  let revokeTime = now `addRelTime` (hours 1)
+
+  -- Level 1 Revocation: "Revoke until time X"
+  -- This is controlled by the dso party
+  ValidatorPermission_SetRevocationStateResult updatedPermissionCid <- submit dso $
+    exerciseCmd permissionCid ValidatorPermission_SetRevocationState with
+      newLoginAfter = Some revokeTime
+      newIsRevoked = False
+
+  [(queriedCid1, updatedPermission)] <- queryFilter @ValidatorPermission dso (\p -> p.validator == v1)
+  queriedCid1 === updatedPermissionCid
+  updatedPermission.loginAfter === Some revokeTime
+  updatedPermission.isRevoked === False
+
+  -- Level 2 Revocation: "Fully revoke"
+  ValidatorPermission_SetRevocationStateResult fullyRevokedCid <- submit dso $
+    exerciseCmd updatedPermissionCid ValidatorPermission_SetRevocationState with
+      newLoginAfter = Some revokeTime
+      newIsRevoked = True
+
+  [(queriedCid2, fullyRevokedPermission)] <- queryFilter @ValidatorPermission dso (\p -> p.validator == v1)
+  queriedCid2 === fullyRevokedCid
+  fullyRevokedPermission.isRevoked === True
+
   pure ()
