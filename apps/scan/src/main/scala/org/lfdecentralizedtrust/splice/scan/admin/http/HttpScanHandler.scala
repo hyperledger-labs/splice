@@ -642,13 +642,19 @@ class HttpScanHandler(
         nodeName: String,
         synchronizerConfig: SynchronizerNodeConfig,
     ) = {
+      val identityOpt = synchronizerConfig.sequencerIdentity.toScala
       val sequencers = for {
         sequencer <- synchronizerConfig.sequencer.toScala
-        availableAfter <- sequencer.availableAfter.toScala
+        // Prefer sequencerIdentity for sequencerId and availableAfter if set
+        effectiveSequencerId = identityOpt.map(_.sequencerId).getOrElse(sequencer.sequencerId)
+        effectiveAvailableAfter = identityOpt
+          .flatMap(_.availableAfter.toScala)
+          .orElse(sequencer.availableAfter.toScala)
+        availableAfter <- effectiveAvailableAfter
       } yield definitions.DsoSequencer(
         sequencer.migrationId,
         None,
-        sequencer.sequencerId,
+        effectiveSequencerId,
         sequencer.url,
         nodeName,
         OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),

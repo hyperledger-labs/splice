@@ -77,6 +77,7 @@ class SynchronizerNodeReconciler(
       synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala
         .get(synchronizerId.toProtoPrimitive)
       sequencerConfig = synchronizerNodeConfig.flatMap(_.sequencer.toScala)
+      sequencerIdentityConfig = synchronizerNodeConfig.flatMap(_.sequencerIdentity.toScala)
       mediatorConfig = synchronizerNodeConfig.flatMap(_.mediator.toScala)
       existingScanConfig = synchronizerNodeConfig.flatMap(_.scan.toScala).toJava
       existingSequencerConfig = sequencerConfig.map(c =>
@@ -89,7 +90,10 @@ class SynchronizerNodeReconciler(
       shouldMarkSequencerAsOnboarded = state match {
         case SynchronizerNodeState.OnboardedAfterDelay |
             SynchronizerNodeState.OnboardedImmediately =>
-          sequencerConfig.exists(_.availableAfter.isEmpty)
+          sequencerIdentityConfig
+            .flatMap(_.availableAfter.toScala)
+            .orElse(sequencerConfig.flatMap(_.availableAfter.toScala))
+            .isEmpty
         case SynchronizerNodeState.Onboarding(_) =>
           false
       }
