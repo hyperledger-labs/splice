@@ -17,7 +17,7 @@ synchronizerMigration:
     releaseReference:
       gitReference: "refs/heads/tom-da/basicScratch"
       repoUrl: https://github.com/DACH-NY/canton-network-internal
-      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiStacksDir: "cluster/stacks/scratchnets"
       pulumiBaseDir: "splice/cluster/pulumi"
       deploymentDir: "splice/cluster/deployment"
       spliceRoot: "splice"
