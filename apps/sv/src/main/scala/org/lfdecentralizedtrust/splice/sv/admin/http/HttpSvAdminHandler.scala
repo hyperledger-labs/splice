@@ -88,6 +88,36 @@ class HttpSvAdminHandler(
     }
   }
 
+  override def cancelLogicalSynchronizerUpgrade(
+      respond: r0.CancelLogicalSynchronizerUpgradeResponse.type
+  )()(
+      extracted: AdminUserRequest
+  ): Future[r0.CancelLogicalSynchronizerUpgradeResponse] = {
+    implicit val AdminUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.cancelLogicalSynchronizerUpgrade") { _ => _ =>
+      for {
+        decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
+        existingAnnouncement <- participantAdminConnection.lookupSynchronizerLsuAnnouncement(
+          decentralizedSynchronizer,
+          com.digitalasset.canton.topology.store.TimeQuery.HeadState,
+          org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+        )
+        result <- existingAnnouncement match {
+          case Some(_) =>
+            participantAdminConnection
+              .removeLsuAnnouncement(decentralizedSynchronizer)
+              .map(_ => r0.CancelLogicalSynchronizerUpgradeResponseOK)
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(
+                "No active LSU announcement found."
+              )
+            )
+        }
+      } yield result
+    }
+  }
+
   override def getDomainMigrationDump(
       respond: r0.GetDomainMigrationDumpResponse.type
   )()(extracted: AdminUserRequest): Future[r0.GetDomainMigrationDumpResponse] = {

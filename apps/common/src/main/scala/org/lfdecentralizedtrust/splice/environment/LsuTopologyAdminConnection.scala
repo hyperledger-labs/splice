@@ -89,6 +89,7 @@ trait LsuTopologyAdminConnection {
       synchronizerId: SynchronizerId,
       timeQuery: TimeQuery,
       topologyTransactionType: TopologyTransactionType,
+      operation: TopologyChangeOp = TopologyChangeOp.Replace,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -97,6 +98,7 @@ trait LsuTopologyAdminConnection {
       synchronizerId,
       topologyTransactionType,
       timeQuery,
+      Some(operation),
     )(baseQuery =>
       TopologyAdminCommands.Read.ListLsuAnnouncement(
         baseQuery,
@@ -111,25 +113,75 @@ trait LsuTopologyAdminConnection {
       upgradeTime: CantonTimestamp,
       psid: NonNegativeInt,
       protocolVersion: ProtocolVersion,
-  )(implicit tc: TraceContext, ec: ExecutionContext) = ensureTopologyMappingO(
-    synchronizerId,
-    s"LsuAnnouncement with upgrade time $upgradeTime",
-    topologyType =>
-      EitherT
-        .liftF(lookupSynchronizerLsuAnnouncement(synchronizerId, HeadState, topologyType))
-        .subflatMap {
-          case Some(announcement) if announcement.mapping.successorSynchronizerId.serial == psid =>
-            Right(announcement)
-          case Some(existing) => Left(existing.some)
-          case None => Left(None)
-        },
-    { (_: Option[TopologyMapping]) =>
-      Right(
-        LsuAnnouncement(PhysicalSynchronizerId(synchronizerId, psid, protocolVersion), upgradeTime)
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[TopologyResult[LsuAnnouncement]] =
+    ensureTopologyMappingO(
+      synchronizerId,
+      s"LsuAnnouncement with upgrade time $upgradeTime",
+      topologyType =>
+        EitherT
+          .liftF(lookupSynchronizerLsuAnnouncement(synchronizerId, HeadState, topologyType))
+          .subflatMap {
+            case Some(announcement)
+                if announcement.mapping.successorSynchronizerId.serial == psid =>
+              Right(announcement)
+            case Some(existing) => Left(existing.some)
+            case None => Left(None)
+          },
+      { (_: Option[TopologyMapping]) =>
+        Right(
+          LsuAnnouncement(
+            PhysicalSynchronizerId(synchronizerId, psid, protocolVersion),
+            upgradeTime,
+          )
+        )
+      },
+      isProposal = true,
+      retryFor = RetryFor.Automation,
+    )
+
+  def removeLsuAnnouncement(
+      synchronizerId: SynchronizerId
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    retryProvider.ensureThat(
+      RetryFor.Automation,
+      "remove_lsu_announcement",
+      s"Remove LsuAnnouncement for $synchronizerId",
+      lookupSynchronizerLsuAnnouncement(
+        synchronizerId,
+        HeadState,
+        TopologyTransactionType.AuthorizedState,
+      ).map {
+        case None => Right(())
+        case Some(existing) => Left(existing)
+      },
+      (previous: TopologyResult[LsuAnnouncement]) =>
+        proposeMapping(
+          TopologyStoreId.Synchronizer(synchronizerId),
+          previous.mapping,
+          previous.base.serial + PositiveInt.one,
+          isProposal = true,
+          change = TopologyChangeOp.Remove,
+        ).map(_ => ()),
+      logger,
+    )
+  }
+
+  def wasLsuAnnouncementRemoved(
+      synchronizerId: SynchronizerId,
+      psid: NonNegativeInt,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
+    val removals: Future[Seq[TopologyResult[LsuAnnouncement]]] = runCommand(
+      synchronizerId,
+      TopologyTransactionType.AuthorizedState,
+      TimeQuery.Range(None, None),
+      Some(TopologyChangeOp.Remove),
+    )(baseQuery =>
+      TopologyAdminCommands.Read.ListLsuAnnouncement(
+        baseQuery,
+        filterSynchronizerId = synchronizerId.filterString,
       )
-    },
-    isProposal = true,
-    retryFor = RetryFor.Automation,
-  )
+    )
+    removals.map(_.exists(_.mapping.successorSynchronizerId.serial == psid))
+  }
 
 }
