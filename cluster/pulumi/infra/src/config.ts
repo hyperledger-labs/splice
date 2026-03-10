@@ -44,10 +44,6 @@ const MonitoringConfigSchema = z
             rate: z.number(),
             overMinutes: z.number(),
           }),
-          perMember: z.object({
-            rate: z.number(),
-            overMinutes: z.number(),
-          }),
         }),
         cloudSql: z.object({
           maintenance: z.boolean(),

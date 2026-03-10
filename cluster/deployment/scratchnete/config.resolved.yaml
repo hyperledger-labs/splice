@@ -37,9 +37,6 @@ monitoring:
       cometbft:
         expectedMaxBlocksPerSecond: 3.5
       confirmationRequests:
-        perMember:
-          overMinutes: 5
-          rate: 3
         total:
           overMinutes: 5
           rate: 25
