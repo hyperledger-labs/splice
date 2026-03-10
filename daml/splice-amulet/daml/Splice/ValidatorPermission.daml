@@ -3,7 +3,6 @@
 
 module Splice.ValidatorPermission where
 
-import DA.Time
 import Splice.Types
 import Splice.Util
 
