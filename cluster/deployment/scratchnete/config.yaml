@@ -19,7 +19,7 @@ synchronizerMigration:
       repoUrl: https://github.com/DACH-NY/canton-network-internal
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "splice/cluster/pulumi"
-      deploymentDir: "cluster/deployment"
+      deploymentDir: "splice/cluster/deployment"
       spliceRoot: "splice"
       privateConfigsDir: "cluster/configs/configs-private"
       publicConfigsDir: "cluster/configs/configs"
@@ -94,7 +94,7 @@ operatorDeployment:
     gitReference: refs/heads/tom-da/basicScratch
     pulumiBaseDir: "splice/cluster/pulumi"
     pulumiStacksDir: "cluster/stacks/scratchnets"
-    deploymentDir: "cluster/deployment"
+    deploymentDir: "splice/cluster/deployment"
     spliceRoot: "splice"
     privateConfigsDir: "cluster/configs/configs-private"
     publicConfigsDir: "cluster/configs/configs"
