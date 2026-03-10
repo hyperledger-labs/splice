@@ -1332,19 +1332,26 @@ abstract class TopologyAdminConnection(
     )
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
-    runCmd(
-      TopologyAdminCommands.Init
-        .InitId(id.uid.identifier.toProtoPrimitive, id.uid.namespace.toProtoPrimitive, Seq.empty)
-    ).map(_ => ()).recover {
-      // We catch the FAILED_PRECONDITION error specifically when it mentions being already initialized
-      case e: io.grpc.StatusRuntimeException
-          if e.getStatus.getCode == io.grpc.Status.Code.FAILED_PRECONDITION &&
-            e.getMessage.contains("Already initialised") =>
-        logger.info(
-          "initId called on an already initialized participant; treating as success (likely resumed from backup)."
-        )
-        ()
-    }
+    retryProvider.ensureThatB(
+      RetryFor.WaitingOnInitDependency,
+      "init_id",
+      show"Node is initialized with ID $id",
+      getIdOption().map {
+        case GetIdResult(true, Some(uid)) if uid == id.uid => true
+        case GetIdResult(true, Some(uid)) =>
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Node is already initialized with a different ID: $uid (expected ${id.uid})"
+            )
+            .asRuntimeException()
+        case _ => false
+      },
+      runCmd(
+        TopologyAdminCommands.Init
+          .InitId(id.uid.identifier.toProtoPrimitive, id.uid.namespace.toProtoPrimitive, Seq.empty)
+      ).map(_ => ()),
+      logger,
+    )
   }
 
   def identity()(implicit
