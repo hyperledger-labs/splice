@@ -9,6 +9,7 @@ module Splice.AmuletAllocationV2 (
 
 import DA.Foldable (forA_)
 import DA.Optional (isNone, isSome)
+import DA.List (head)
 import DA.Text as Text
 
 import Splice.Api.Token.MetadataV1
@@ -39,7 +40,7 @@ template AmuletAllocationV2
     expiresAt : Time
   where
     signatory dso, authorizer
-    observer allocation.settlement.executor
+    observer allocation.settlement.executors
 
     ensure
       all
@@ -137,7 +138,12 @@ allocationToTwoStepTransfer sender transferLegs dso expiresAt settlement =
     -- FIXME: improve representation once the design for batch settlement is definite
     receiver = sender
     amount = negate (netAllocationAmount sender transferLegs)
-    provider = settlement.executor
+    provider =
+      if null settlement.executors
+        then error "Unexpected: no executors in settlement"
+        else head settlement.executors
+        -- We only feature the first executor in case of multiple executors,
+        -- as that is easy to implement and should be sufficient for the time until CIP-104 is in effect.
     transferBefore = expiresAt
     transferBeforeDeadline = "allocation.expiresAt"
     allowFeaturing = True

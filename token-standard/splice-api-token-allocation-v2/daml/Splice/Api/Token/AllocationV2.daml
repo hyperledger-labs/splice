@@ -31,8 +31,9 @@ data Reference = Reference with
 -- | The minimal set of information about a settlement that an app would like to execute.
 data SettlementInfo = SettlementInfo
   with
-    executor : Party
-      -- ^ The party that is responsible for executing the settlement.
+    executors : [Party]
+      -- ^ The parties that are responsible for executing the settlement, and
+      -- guaranteeing its atomicity across asset admins.
       -- FIXME: consider supporting multiple executors instead of controller overrides. The executors are the ones ensuring atomicity across different instrument admins.
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
@@ -45,7 +46,7 @@ data SettlementInfo = SettlementInfo
     meta : Metadata
       -- ^ Additional metadata about the settlement, used for extensibility.
     controllerOverride : Optional [Party]
-      -- ^ Additional party signatures in addition to executor that need to authorize
+      -- ^ Additional party signatures in addition to executors that need to authorize
       -- choices on the Allocation. Defaults to senders and receivers across all
       -- transferLegs.
     settlementDeadline : Optional Time
@@ -108,23 +109,23 @@ data AllocationView = AllocationView with
 ------------------------
 
 -- | Convenience function to refer to the union of sender, receiver, and
--- executor of the settlement, which jointly control the execution of the
+-- executors of the settlement, which jointly control the execution of the
 -- allocation.
 defaultAllocationControllers : AllocationSpecification -> [Party]
 defaultAllocationControllers AllocationSpecification{..} =
-  dedup $ settlement.executor :: concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) transferLegs
+  dedup $ settlement.executors <> concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) transferLegs
 
 -- | Convenience function read out the overridden allocation controllers.
 allocationControllers : AllocationSpecification -> [Party]
 allocationControllers alloc@AllocationSpecification{..} =
   optional
     (defaultAllocationControllers alloc)
-    (\override -> dedup $ settlement.executor :: override)
+    (\override -> dedup $ settlement.executors <> override)
     settlement.controllerOverride
 
 allocationSettlementControllers : AllocationSpecification -> [Party]
 allocationSettlementControllers alloc@AllocationSpecification{..} =
-  settlement.executor :: [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
+  settlement.executors <> [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
 
 -- | Convenience to get the allocation admin
 allocationAdmin : AllocationSpecification -> Party
@@ -137,7 +138,7 @@ allocationAdmin AllocationSpecification{..} = admin
 
 -- | A contract representing the approval of the authorizer to send or receive
 -- the net amount of assets of the transfer legs as part of a settlement where
--- the executor and instrument admin check that every transfer leg has a matching
+-- the executors and instrument admin check that every transfer leg has a matching
 -- authorization from the counterparty.
 interface Allocation where
   viewtype AllocationView
@@ -149,7 +150,7 @@ interface Allocation where
   choice Allocation_Settle : Allocation_SettleResult
     -- ^ Settle the allocation by moving the net amount of the transfer legs.
     --
-    -- Requires authorization from the settlement executor and the instrument
+    -- Requires authorization from the settlement executors and the instrument
     -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
     -- settlements of other legs of the same admins.
     --
@@ -162,16 +163,18 @@ interface Allocation where
 
   choice Allocation_Cancel : Allocation_CancelResult
     -- ^ Cancel the allocation. Requires authorization from sender, receiver, and
-    -- executor.
+    -- executors.
+    --
+    -- FIXME: comment
     --
     -- Typically this authorization is granted by sender and receiver to the
-    -- executor as part of the contract coordinating the settlement, so that
-    -- that the executor can release the allocated assets early in case the
+    -- executors as part of the contract coordinating the settlement, so that
+    -- that the executors can release the allocated assets early in case the
     -- settlement is aborted or it has definitely failed.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationControllers (view this).allocation
+    controller allocationSettlementControllers (view this).allocation
     do allocation_cancelImpl this self arg
 
   choice Allocation_Withdraw : Allocation_WithdrawResult
@@ -182,6 +185,7 @@ interface Allocation where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).authorizer.owner::(optionalToList (view this).authorizer.provider)
+      -- FIXME: make configurable
     do allocation_withdrawImpl this self arg
 
 

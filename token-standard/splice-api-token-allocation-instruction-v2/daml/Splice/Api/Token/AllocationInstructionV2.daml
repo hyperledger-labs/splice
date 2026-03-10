@@ -145,19 +145,19 @@ interface AllocationFactory where
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
       transferLegs : [TransferLeg]
-        -- ^ The transfer legs to settle in this batch. All legs MUST have the same settlement executor.
+        -- ^ The transfer legs to settle in this batch. All legs MUST have the same settlement executors.
         -- FIXME: improve comment
       allocationCids : [ContractId Allocation]
         -- ^ Allocations to settle. Their instrument admin MUST match the expected admin.
-        -- Their legs MUST all have the same settlement executor.
+        -- Their legs MUST all have the same settlement executors.
         -- For every leg there must be both a sender and a receiver authorization.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
-      executor : Party
-        -- ^ Settlement executor who guarantees atomic settlement across different instrument admins.
+      executors : [Party]
+        -- ^ Settlement executors who guarantee atomic settlement across different instrument admins.
 
       -- FIXME: add default choice observers based on choice argument
-    controller executor
+    controller executors
       -- FIXME: should we allow setting extra authorizers here?
     do allocationFactory_settleImpl this self arg
 

@@ -106,12 +106,12 @@ setupOtcTrade  = do
 
   let
     settlement = SettlementInfo with
-      executor = provider
+      executors = [provider]
       requestedAt = now
       settlementRef = makeTradeRef otcTradeCid
       settleAt = settleAt
       meta = emptyMetadata
-      controllerOverride = Some [] -- We will settle using only executor authority.
+      controllerOverride = Some [] -- We will settle using only executors authority.
         -- FIXME: decide whether we still need overrides
       settlementDeadline = Some deadline
 
@@ -208,6 +208,8 @@ setupOtcTrade  = do
     feeLeg
 
 
+-- FIXME: test multiple executors
+
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP : Script ()
 testDvP = script do
@@ -232,7 +234,7 @@ testDvP = script do
         transferLegs
         allocationCids
         extraArgs = emptyExtraArgs
-        executor = provider
+        executors = [provider]
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
   let disclosures = foldMap snd settleBatchContexts

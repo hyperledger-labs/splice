@@ -150,6 +150,7 @@ instance BackwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
 -- Allocation
 -------------
 
+{-
 -- FIXME: move to class based conversion
 
 -- Upcast
@@ -163,7 +164,7 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
       None -> None
       Some co -> None -- TODO: Parse controller override.
     v2 = AllocationV2.SettlementInfo with
-      executor
+      executors
       settlementRef = reference_v1_to_v2 settlementRef
       requestedAt
       settleAt = allocateBefore
@@ -235,7 +236,7 @@ settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
         meta.values
 
     v1 = AllocationV1.SettlementInfo with
-      executor
+      executors
       settlementRef = reference_v2_to_v1 settlementRef
       requestedAt
       allocateBefore = settleAt
@@ -471,6 +472,7 @@ allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.Allocatio
     AllocationInstructionV2.AllocationFactory_PublicFetch {..}
   return (allocation_factory_view_v2_to_v1 resv2)
 
+-}
 
 -- TransferInstruction
 ----------------------

@@ -545,7 +545,7 @@ amulet_allocationFactoryV2_settleImpl this V2.AllocationFactory_SettleBatch {..}
   -- fetch and validate all allocations
   allocations <- forA allocationCids $ \allocationCid -> do
     allocation <- fetchChecked @AmuletAllocationV2 (ForDso with dso) (fromInterfaceContractId allocationCid)
-    require "Allocation executor matches" (allocation.allocation.settlement.executor == executor)
+    require "Allocation executors match" (allocation.allocation.settlement.executors == executors)
     -- FIXME: consider what other validation is missing
     pure allocation
 
@@ -562,7 +562,6 @@ amulet_allocationFactoryV2_settleImpl this V2.AllocationFactory_SettleBatch {..}
   -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
 
   -- settle all allocations
-  -- FIXME: settle sorted by authorizer to improve view compression, and merge holdings for the same owner to auto-reduce ACS size.
   newHoldingCidss <- forA allocationCids $ \allocationCid -> do
     result <- exercise allocationCid V2.Allocation_Settle with extraArgs
     pure result.newHoldingCids

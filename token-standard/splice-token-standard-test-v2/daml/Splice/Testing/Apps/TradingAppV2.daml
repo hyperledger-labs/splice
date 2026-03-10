@@ -40,12 +40,12 @@ template OTCTradeAllocationRequest with
     interface instance AllocationRequest for OTCTradeAllocationRequest where
       view = AllocationRequestView with
         settlement = SettlementInfo with
-          executor = venue
+          executors = [venue]
           requestedAt = createdAt
           settlementRef = makeTradeRef otcTradeCid
           settleAt = settleAt
           meta = emptyMetadata
-          controllerOverride = Some [] -- We will settle using only executor authority.
+          controllerOverride = Some [] -- We will settle using only executors authority.
           settlementDeadline = settlementDeadline
         transferLegs = transferLegs
         meta = emptyMetadata
@@ -108,7 +108,7 @@ template OTCTrade with
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
           exercise factoryCid Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatch with
             expectedAdmin = admin
-            executor = venue
+            executors = [venue]
             transferLegs
             allocationCids
             extraArgs
@@ -137,7 +137,7 @@ template OTCTrade with
             alloc <- fetch allocCid
             -- validate the allocation request matches this trade
             (view alloc).allocation.settlement.settlementRef === makeTradeRef self
-            (view alloc).allocation.settlement.executor === venue
+            (view alloc).allocation.settlement.executors === [venue]
             exercise allocCid (Allocation_Cancel extraArgs)
           )
           allocationsWithContext
