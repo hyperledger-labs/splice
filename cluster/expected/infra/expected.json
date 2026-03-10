@@ -3250,7 +3250,6 @@
               }
             },
             "enableFeatures": [
-              "native-histograms",
               "memory-snapshot-on-shutdown",
               "promql-experimental-functions"
             ],
@@ -3269,6 +3268,7 @@
             },
             "retention": "1y",
             "retentionSize": "1500GB",
+            "scrapeNativeHistograms": true,
             "serviceMonitorSelector": {
               "matchLabels": null
             },
