@@ -104,7 +104,6 @@ object S3BucketConnectionForUnitTests {
 case class PaddedData(paddingSize: Int, data: ByteBuffer) {
   def toByteBuffer(): ByteBuffer = {
     val intSize = java.lang.Integer.BYTES
-    println(s"data.remaining before padding: ${data.remaining()}")
     val totalSize = (intSize * 2) + data.remaining() + paddingSize
     val combined = ByteBuffer.allocate(totalSize)
     combined.putInt(data.remaining())
