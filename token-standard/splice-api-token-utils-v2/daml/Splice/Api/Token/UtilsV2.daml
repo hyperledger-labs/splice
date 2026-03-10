@@ -22,7 +22,6 @@ module Splice.Api.Token.UtilsV2 (
 
 ) where
 
-import DA.Action (unless)
 import DA.Date
 import DA.Optional (fromOptional, isNone)
 import qualified DA.Map as Map
@@ -86,6 +85,14 @@ accountFromMeta owner field meta =
     provider = (TextMap.lookup (v2Namespace <> field <> ".provider") meta.values) >>= partyFromText
     id = TextMap.lookup (v2Namespace <> field <> ".id") meta.values
     owner
+
+timeToMeta : Text -> Time -> Metadata -> Metadata
+timeToMeta field t meta =
+  Metadata $ TextMap.insert (v2Namespace <> field) (encodeTime t) meta.values
+
+timeFromMeta : Text -> Metadata -> Optional Time
+timeFromMeta field meta =
+  decodeTime <$> TextMap.lookup (v2Namespace <> field) meta.values
 
 ensureActorIsDefault : Party -> [Party] -> Update ()
 ensureActorIsDefault _ [] = pure ()
@@ -217,6 +224,17 @@ instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.Al
       settlement = upcast_v1_v2_SettlementInfo [transferLeg.sender, transferLeg.receiver] settlement
       transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
 
+instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
+  upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
+    AllocationV2.AllocationView with
+      authorizer = accountFromMeta allocation.transferLeg.sender "sender" meta
+      allocation = upcast allocation
+      holdingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast holdingCids)]
+      expiresAt = Some (allocation.settlement.settleBefore)
+      supportsV1 = True
+      meta
+
+
 instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
   upcast = coerceInterfaceContractId
 
@@ -256,6 +274,9 @@ allocationFactory_v2_tryAllocateUsingV1 factory factoryCid AllocationInstruction
       -- check choice params
       requireExpectedAdminMatch ((view factory).admin) expectedAdmin
       require "Actors match the executor" (actors == [allocationV1.settlement.executor])
+
+      -- FIXME: check that there is no extraneous account metadata on the v2 spec
+
       -- execute the allocation using the V1 API
       result <- exercise factoryCid $ AllocationInstructionV1.AllocationFactory_Allocate with
         expectedAdmin
@@ -282,12 +303,7 @@ tryDowncast_v2_v1_AllocationSpecification allocationV2@AllocationV2.AllocationSp
   let allocationV1 = AllocationV1.AllocationSpecification with
         settlement = settlementInfoV1
         transferLegId = transferLeg.transferLegId
-        transferLeg = AllocationV1.TransferLeg with
-          sender = transferLeg.sender.owner
-          receiver = transferLeg.receiver.owner
-          amount = transferLeg.amount
-          instrumentId = downcast transferLeg.instrumentId
-          meta = dropAccountMeta "sender" $ dropAccountMeta "receiver" transferLeg.meta
+        transferLeg = downcast transferLeg
   -- prudent engineering: check upcast
   let recomputedAllocationV2 = upcast allocationV1
   if allocationV2 == recomputedAllocationV2
@@ -298,6 +314,35 @@ tryDowncast_v2_v1_AllocationSpecification allocationV2@AllocationV2.AllocationSp
       , "Downcasted V1 spec: " <> show allocationV1
       , "Recomputed V2 spec: " <> show recomputedAllocationV2
       ]
+
+-- | Withdraw the allocation using the V1 API.
+allocation_v2_senderActor_withdrawUsingV1
+  : ContractId AllocationV2.Allocation
+  -> AllocationV2.Allocation_Withdraw
+  -> Update AllocationV2.Allocation_WithdrawResult
+allocation_v2_senderActor_withdrawUsingV1 _self AllocationV2.Allocation_Withdraw{..} =  error "Not implemented yet"
+   -- FIXME: implement once we have actors support
+
+
+{-
+allocation_v2_settleImplUsingV1
+  : AllocationV1.Allocation
+  -> ContractId AllocationV1.Allocation
+  -> AllocationV2.Allocation_Settle
+  -> Update AllocationV2.Allocation_SettleResult
+allocation_v2_settleImplUsingV1 allocationCid AllocationV2.Allocation_Settle{..} = do
+  result <- exercise allocationCid $ AllocationV1.Allocation_ExecuteTransfer with
+    extraArgs
+  pure $ AllocationV2.Allocation_SettleResult with
+    newHoldingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast result.senderHol)]
+    receiverHoldingCids = map upcast result.receiverHoldingCids
+    meta = result.meta
+-}
+
+
+
+
+
 
 {-
 -- FIXME: move to class based conversion
