@@ -190,7 +190,6 @@ class SynchronizerNodeReconciler(
                 sequencerAvailableAfter.toJava,
               )
             }.toJava,
-            sequencerIdentityConfig,
             localMediatorConfig
               .map(c =>
                 new MediatorConfig(
@@ -200,6 +199,7 @@ class SynchronizerNodeReconciler(
               .toJava,
             localScanConfig,
             updatedSequencerConfigUpdate.getOrElse(existingLegacySequencerConfig).toJava,
+            sequencerIdentityConfig,
             localPhysicalSynchronizers
               .map(_.asJava)
               .toJava,

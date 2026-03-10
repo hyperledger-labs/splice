@@ -226,9 +226,9 @@ object SvUtil {
         synchronizerId.toProtoPrimitive -> new SynchronizerNodeConfig(
           cometBftConfig,
           sequencerConfig.toJava,
-          Optional.empty(),
           mediatorConfig.toJava,
           Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
+          Optional.empty(),
           Optional.empty(),
           Optional.empty(),
         )

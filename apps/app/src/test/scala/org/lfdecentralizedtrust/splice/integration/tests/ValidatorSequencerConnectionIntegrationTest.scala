@@ -211,10 +211,10 @@ class ValidatorSequencerConnectionIntegrationTest
       newNodeConfig = new SynchronizerNodeConfig(
         synchronizerNodeConfig.cometBft,
         Some(updatedSequencerConfig).toJava,
-        synchronizerNodeConfig.sequencerIdentity,
         synchronizerNodeConfig.mediator,
         synchronizerNodeConfig.scan,
         synchronizerNodeConfig.legacySequencerConfig,
+        synchronizerNodeConfig.sequencerIdentity,
         synchronizerNodeConfig.physicalSynchronizers.toScala
           .map(
             _.asScala
