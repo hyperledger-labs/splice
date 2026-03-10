@@ -49,7 +49,6 @@ object DarResourcesGenerator {
        |      .flatMap(_.all)
        |      .map(resource => (resource.metadata.name, resource.metadata.version) -> resource)
        |      .toMap
-       |
        |}""".stripMargin
     lines.mkString("\n")
   }
