@@ -8,12 +8,8 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
-import org.apache.pekko.Done
-import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
-  DeleteIncrementalSnapshotTask,
-  InitializeIncrementalSnapshotFromImportUpdatesTask,
-  InitializeIncrementalSnapshotTask,
-}
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotBackfillingTrigger.RetrieveTaskForBackfillingMigrationResult
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -44,7 +40,7 @@ class AcsSnapshotTriggerTest
         )
         .futureValue
         .loneElement shouldBe
-        InitializeIncrementalSnapshotTask(
+        AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(
           from = previousSnapshot,
           nextAt = snapshotTime3,
         )
@@ -83,7 +79,7 @@ class AcsSnapshotTriggerTest
         )
         .futureValue
         .loneElement shouldBe
-        InitializeIncrementalSnapshotFromImportUpdatesTask(
+        AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(
           recordTime = migrationBegin.minusSeconds(1L),
           migration = migration4,
           nextAt = snapshotTime1,
@@ -275,7 +271,8 @@ class AcsSnapshotTriggerTest
       // There is no backfilled data at all, initialize from import updates in the previous migration.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration2,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration2,
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration1 -> None),
@@ -286,14 +283,13 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          InitializeIncrementalSnapshotFromImportUpdatesTask(
-            recordTime = recordTimeRange.min.minusSeconds(1L),
-            migration = migration1,
-            nextAt = snapshotTime1,
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(
+          recordTime = recordTimeRange.min.minusSeconds(1L),
+          migration = migration1,
+          nextAt = snapshotTime1,
+        ),
       )
     }
 
@@ -305,7 +301,8 @@ class AcsSnapshotTriggerTest
       // continue where we left off.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration2,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration2,
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = returnForMigration(migration1 -> Some(snapshot)),
@@ -316,13 +313,12 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          InitializeIncrementalSnapshotTask(
-            from = snapshot,
-            nextAt = snapshot.snapshotRecordTime.plusSeconds(3600L),
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(
+          from = snapshot,
+          nextAt = snapshotTime3,
+        ),
       )
     }
 
@@ -341,7 +337,8 @@ class AcsSnapshotTriggerTest
       // Migration 2 was too short, so skip it and start backfilling in migration 1.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration3,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration3,
           isHistoryBackfilled = returnForMigration(
             migration2 -> true,
             migration1 -> true,
@@ -367,14 +364,13 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          InitializeIncrementalSnapshotFromImportUpdatesTask(
-            recordTime = recordTimeRange1.min.minusSeconds(1L),
-            migration = migration1,
-            nextAt = snapshotTime1,
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(
+          recordTime = recordTimeRange1.min.minusSeconds(1L),
+          migration = migration1,
+          nextAt = snapshotTime1,
+        ),
       )
     }
 
@@ -394,7 +390,8 @@ class AcsSnapshotTriggerTest
       // Migration 2 has all non-incremental snapshots, so skip it and start backfilling in migration 1.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration3,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration3,
           isHistoryBackfilled = returnForMigration(
             migration2 -> true,
             migration1 -> true,
@@ -420,14 +417,13 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          InitializeIncrementalSnapshotFromImportUpdatesTask(
-            recordTime = recordTimeRange1.min.minusSeconds(1L),
-            migration = migration1,
-            nextAt = snapshotTime4,
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(
+          recordTime = recordTimeRange1.min.minusSeconds(1L),
+          migration = migration1,
+          nextAt = snapshotTime4,
+        ),
       )
     }
 
@@ -438,7 +434,8 @@ class AcsSnapshotTriggerTest
       )
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration2,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration2,
           isHistoryBackfilled = returnForMigration(migration1 -> false),
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = unused1,
@@ -449,13 +446,14 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(None)
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Waiting(migration1)
     }
 
     "complete backfilling if there is no previous migration" in {
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration1,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration1,
           isHistoryBackfilled = unused1,
           getIncrementalSnapshot = () => Future.successful(None),
           getLatestSnapshot = unused1,
@@ -466,7 +464,7 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Left(Done)
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Done
     }
 
     "complete backfilling if all previous migration are done" in {
@@ -480,7 +478,8 @@ class AcsSnapshotTriggerTest
 
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration3,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration3,
           isHistoryBackfilled = returnForMigration(
             migration2 -> true,
             migration1 -> true,
@@ -507,7 +506,7 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Left(Done)
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Done
     }
 
     "continue backfilling from an existing incremental snapshot" in {
@@ -525,7 +524,8 @@ class AcsSnapshotTriggerTest
       // Update the incremental snapshot with 30sec worth of data.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration3,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
@@ -536,13 +536,12 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
-            snapshot = incrementalSnapshot,
-            updateUntil = incrementalSnapshot.recordTime.plusSeconds(30L),
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
+          snapshot = incrementalSnapshot,
+          updateUntil = incrementalSnapshot.recordTime.plusSeconds(30L),
+        ),
       )
     }
 
@@ -561,7 +560,8 @@ class AcsSnapshotTriggerTest
       // Save incremental snapshot.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration2,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
@@ -572,13 +572,12 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(
-            snapshot = incrementalSnapshot,
-            nextAt = snapshotTime3,
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(
+          snapshot = incrementalSnapshot,
+          nextAt = snapshotTime3,
+        ),
       )
     }
 
@@ -602,8 +601,9 @@ class AcsSnapshotTriggerTest
       // so that the next iteration can initialize a fresh one from import updates.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration3,
-          isHistoryBackfilled = unused1,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration4,
+          isHistoryBackfilled = returnForMigration(migration1 -> true, migration2 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
           getMinRecordTime = returnForMigration(migration2 -> Some(recordTimeRange2.min)),
@@ -613,12 +613,11 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(
-            snapshot = incrementalSnapshot
-          )
-        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(
+          snapshot = incrementalSnapshot
+        ),
       )
     }
 
@@ -638,11 +637,10 @@ class AcsSnapshotTriggerTest
       )
 
       // All migrations are complete, nothing to backfill.
-      // The trigger should delete the incremental snapshot,
-      // and the next iteration should mark the backfilling as done.
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = migration3,
+          backfillingMigrationIdO = None,
+          currentMigrationId = migration4,
           isHistoryBackfilled = returnForMigration(migration1 -> true),
           getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
           getLatestSnapshot = unused1,
@@ -653,11 +651,7 @@ class AcsSnapshotTriggerTest
           updateInterval = java.time.Duration.ofSeconds(30L),
           logger = logger,
         )
-        .futureValue shouldBe Right(
-        Some(
-          DeleteIncrementalSnapshotTask(snapshot = incrementalSnapshot)
-        )
-      )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Done
     }
   }
 

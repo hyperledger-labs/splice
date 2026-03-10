@@ -48,7 +48,7 @@ class AcsSnapshotBackfillingTrigger(
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var earliestKnownBackfilledMigrationId: Long = store.currentMigrationId
+  private var backfillingMigrationIdO: Option[Long] = None
 
   override def retrieveTasks()(implicit
       tc: TraceContext
@@ -61,7 +61,8 @@ class AcsSnapshotBackfillingTrigger(
     } else {
       AcsSnapshotBackfillingTrigger
         .retrieveTaskForBackfillingMigration(
-          earliestKnownBackfilledMigrationId = earliestKnownBackfilledMigrationId,
+          backfillingMigrationIdO = backfillingMigrationIdO,
+          currentMigrationId = store.currentMigrationId,
           isHistoryBackfilled = updateHistory.isHistoryBackfilled,
           getIncrementalSnapshot = () => getIncrementalSnapshot(),
           getLatestSnapshot = getLatestSnapshot,
@@ -75,15 +76,15 @@ class AcsSnapshotBackfillingTrigger(
         .flatMap {
           case RetrieveTaskForBackfillingMigrationResult.Done =>
             logger.info(
-              s"Backfilling incremental ACS snapshots is complete, this trigger won't do any work again."
+              s"Backfilling incremental ACS snapshots is complete, this trigger instance won't do any work again."
             )
             isDone = true
             Future.successful(Seq.empty)
           case RetrieveTaskForBackfillingMigrationResult.Waiting(migrationId) =>
-            earliestKnownBackfilledMigrationId = migrationId
+            backfillingMigrationIdO = Some(migrationId)
             Future.successful(Seq.empty)
           case RetrieveTaskForBackfillingMigrationResult.Task(migrationId, task) =>
-            earliestKnownBackfilledMigrationId = migrationId
+            backfillingMigrationIdO = Some(migrationId)
             Future.successful(Seq(task))
         }
     }
@@ -101,7 +102,8 @@ object AcsSnapshotBackfillingTrigger {
   }
 
   def retrieveTaskForBackfillingMigration(
-      earliestKnownBackfilledMigrationId: Long,
+      backfillingMigrationIdO: Option[Long],
+      currentMigrationId: Long,
       isHistoryBackfilled: (Long) => Future[Boolean],
       getIncrementalSnapshot: () => Future[Option[IncrementalAcsSnapshot]],
       getLatestSnapshot: (Long) => Future[Option[AcsSnapshot]],
@@ -118,6 +120,10 @@ object AcsSnapshotBackfillingTrigger {
     def goForMigration(
         migrationId: Long
     ): Future[RetrieveTaskForBackfillingMigrationResult] = {
+      assert(
+        migrationId < currentMigrationId,
+        "Backfilling must not do any work on the current migration",
+      )
       AcsSnapshotTriggerBase
         .retrieveTaskForMigration(
           migrationId = migrationId,
@@ -152,6 +158,57 @@ object AcsSnapshotBackfillingTrigger {
         }
     }
 
-    goForMigration(earliestKnownBackfilledMigrationId)
+    getBackfillingMigrationId(
+      backfillingMigrationIdO = backfillingMigrationIdO,
+      currentMigrationId = currentMigrationId,
+      getIncrementalSnapshot = getIncrementalSnapshot,
+      getPreviousMigrationId = getPreviousMigrationId,
+      logger = logger,
+    ).flatMap {
+      case Left(done) =>
+        Future.successful(done)
+      case Right(backfillingMigrationId) =>
+        goForMigration(backfillingMigrationId)
+    }
+  }
+
+  def getBackfillingMigrationId(
+      backfillingMigrationIdO: Option[Long],
+      currentMigrationId: Long,
+      getIncrementalSnapshot: () => Future[Option[IncrementalAcsSnapshot]],
+      getPreviousMigrationId: (Long) => Future[Option[Long]],
+      logger: TracedLogger,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Either[RetrieveTaskForBackfillingMigrationResult.Done.type, Long]] = {
+    backfillingMigrationIdO match {
+      case Some(migrationId) =>
+        Future.successful(Right(migrationId))
+      case None =>
+        getIncrementalSnapshot().flatMap {
+          case Some(incrementalSnapshot) =>
+            logger.info(
+              s"Current migration is $currentMigrationId, incremental snapshot $incrementalSnapshot exists." +
+                s"Starting backfilling from snapshot migration ${incrementalSnapshot.migrationId}."
+            )
+            Future.successful(Right(incrementalSnapshot.migrationId))
+          case None =>
+            getPreviousMigrationId(currentMigrationId).map {
+              case Some(previousMigrationId) =>
+                logger.info(
+                  s"Current migration is $currentMigrationId, previous migration is $previousMigrationId, and there is no incremental snapshot." +
+                    s"Starting backfilling from previous migration $previousMigrationId."
+                )
+                Right(previousMigrationId)
+              case None =>
+                logger.info(
+                  s"Current migration is $currentMigrationId, and there is no previous migration." +
+                    s"There is nothing to backfill."
+                )
+                Left(RetrieveTaskForBackfillingMigrationResult.Done)
+            }
+        }
+    }
   }
 }
