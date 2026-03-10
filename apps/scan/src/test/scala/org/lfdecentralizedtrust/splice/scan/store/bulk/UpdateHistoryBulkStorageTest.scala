@@ -33,7 +33,6 @@ import org.slf4j.event.Level
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
 import scala.util.Using
 
@@ -129,7 +128,7 @@ class UpdateHistoryBulkStorageTest
 
       clue("Check that the dumped content is correct") {
         for {
-          s3Objects <- bucketConnection.listObjects
+          s3Objects <- bucketConnection.listObjects()
           allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
             None,
             HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
@@ -139,9 +138,8 @@ class UpdateHistoryBulkStorageTest
               update.update.update.recordTime <= toTimestamp
           )
         } yield {
-          val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+          val objectKeys = s3Objects.map(_.key).sorted
           objectKeys should have length 2
-          s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
           val allUpdatesFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
           )

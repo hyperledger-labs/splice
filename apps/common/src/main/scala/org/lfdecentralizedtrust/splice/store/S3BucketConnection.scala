@@ -42,12 +42,43 @@ class S3BucketConnection(
     .build()
   val bucketName = s3Config.bucketName
 
+  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+    val checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
+    for {
+      checksumResponse <- s3Client
+        .getObjectTagging(checksumRequest)
+        .asScala
+      checksum = checksumResponse
+        .tagSet()
+        .asScala
+        .find(_.key() == "splice-checksum")
+        .map(_.value())
+        .getOrElse(throw new RuntimeException("Missing checksum tag"))
+    } yield checksum
+  }
+
   def newAppendWriteObject(
       key: String
   )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
 
-  def listObjects(prefix: Option[String] = None): Future[ListObjectsResponse] =
-    s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).prefix(prefix.getOrElse("")).build()).asScala
+  // FIXME: handle pagination
+  def listObjects(
+      prefix: Option[String] = None
+  )(implicit ec: ExecutionContext): Future[Seq[S3BucketConnection.ObjectKeyAndChecksum]] = {
+    for {
+      objects <- s3Client
+        .listObjects(
+          ListObjectsRequest.builder().bucket(bucketName).prefix(prefix.getOrElse("")).build()
+        )
+        .asScala
+        .map(_.contents().asScala.toSeq)
+      keysWithChecksums <- Future.sequence(objects.map { obj =>
+        readChecksum(obj.key).map(S3BucketConnection.ObjectKeyAndChecksum(obj.key, _))
+      })
+    } yield {
+      keysWithChecksums
+    }
+  }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */
@@ -168,6 +199,12 @@ class S3BucketConnection(
 }
 
 object S3BucketConnection {
+
+  case class ObjectKeyAndChecksum(
+      key: String,
+      checksum: String,
+  )
+
   def apply(
       s3Config: S3Config,
       loggerFactory: NamedLoggerFactory,

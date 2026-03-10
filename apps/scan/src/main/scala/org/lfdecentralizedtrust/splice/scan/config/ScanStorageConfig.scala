@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import java.time.{Duration, ZoneOffset}
 import java.time.temporal.ChronoField
-import scala.concurrent.Future
 
 /** Note that these configurations must be kept consistent between SVs,
   *  so they are not configured via a local config file in Scan. Instead, they must be voted on.
@@ -61,7 +60,7 @@ case class ScanStorageConfig(
     CantonTimestamp.assertFromInstant(until)
   }
 
-  def computeSnapshotTimeUpTo(
+  def computeSnapshotTimeAtOrBefore(
       upToRecordTime: CantonTimestamp,
       periodHours: Int,
   ): CantonTimestamp = {
@@ -82,8 +81,8 @@ case class ScanStorageConfig(
   def computeBulkSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, bulkAcsSnapshotPeriodHours)
 
-  def computeBulkSnapshotTimeUpTo(upToRecordTime: CantonTimestamp): CantonTimestamp =
-    computeSnapshotTimeUpTo(upToRecordTime, bulkAcsSnapshotPeriodHours)
+  def computeBulkSnapshotTimeAtOrBefore(upToRecordTime: CantonTimestamp): CantonTimestamp =
+    computeSnapshotTimeAtOrBefore(upToRecordTime, bulkAcsSnapshotPeriodHours)
 
   def computeDbSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, dbAcsSnapshotPeriodHours)

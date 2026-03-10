@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.store.{HasS3Mock, StoreTestBase}
 import scala.concurrent.Future
 import scala.util.Random
 import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 import org.scalatest.Assertion
 
 import java.nio.ByteBuffer
@@ -91,10 +90,9 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
         checkStreamOutput(next, i)
       }
       runAfterOutputs(pub, sub)
-      val s3Objects = bucketConnection.listObjects.futureValue
-      val s3ObjKeys = s3Objects.contents.asScala.sortBy(_.key())
+      val s3ObjKeys = bucketConnection.listObjects().futureValue.map(_.key).sorted
       val s3ObjData = s3ObjKeys.map { obj =>
-        bucketConnection.readFullObject(obj.key()).futureValue
+        bucketConnection.readFullObject(obj).futureValue
       }.toSeq
       s3ObjData.map(_.remaining()) shouldBe expectedObjectSizes
       val dataFromS3 = s3ObjData.foldLeft(ByteString.empty) { (acc, buf) => acc ++ ByteString(buf) }

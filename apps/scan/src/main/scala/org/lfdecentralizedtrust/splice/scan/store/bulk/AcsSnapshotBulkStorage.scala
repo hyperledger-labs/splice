@@ -17,12 +17,8 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryMetrics,
-  S3BucketConnection,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -157,9 +153,23 @@ class AcsSnapshotBulkStorage(
     )
   }
 
-  def getAcsSnapshotUpto(upToTimestamp: CantonTimestamp) = {
-    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeUpTo(upToTimestamp)
+  def getAcsSnapshotAtOrBefore(atOrBeforeTimestamp: CantonTimestamp): Future[Seq[ObjectKeyAndChecksum]] = {
+    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
     val prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTimestamp)
-    s3Connection.listObjects(prefix)
+    kvProvider
+      .getLatestAcsSnapshotInBulkStorage()
+      .value
+      .map(_.fold(false)(_.timestamp >= snapshotTimestamp))
+      .flatMap {
+        case false =>
+          throw new NoSuchElementException("bulk storage not caught up to the requested date")
+        case true =>
+          for {
+            objects <- s3Connection.listObjects(Some(prefix))
+            filteredObjects = objects.filter(_.key.matches(".*ACS_\\d+\\.zstd")).toSeq
+          } yield {
+            filteredObjects
+          }
+      }
   }
 }

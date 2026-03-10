@@ -50,7 +50,6 @@ import org.slf4j.event.Level
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*
 import scala.util.Using
 
@@ -92,7 +91,7 @@ class AcsSnapshotBulkStorageTest
           )
           .runWith(Sink.ignore)
 
-        s3Objects <- bucketConnection.listObjects
+        s3Objects <- bucketConnection.listObjects()
         allContracts <- store
           .queryAcsSnapshot(
             0,
@@ -104,10 +103,10 @@ class AcsSnapshotBulkStorageTest
           )
           .map(_.createdEventsInPage)
       } yield {
-        val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+        val objectKeys = s3Objects.map(_.key).sorted
         objectKeys should have length 7
         objectKeys.foreach(
-          _.key() should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
+          _ should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
         )
         val objectCountMetrics = metricsFactory.metrics.counters.get(
           SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count"
@@ -160,7 +159,7 @@ class AcsSnapshotBulkStorageTest
 
       val retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
-      val svc = new AcsSnapshotBulkStorage(
+      val bulkStore = new AcsSnapshotBulkStorage(
         bulkStorageTestConfig,
         appConfig,
         store.store,
@@ -169,7 +168,8 @@ class AcsSnapshotBulkStorageTest
         kvProvider,
         new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
         loggerFactory,
-      ).asRetryableService(
+      )
+      val svc = bulkStore.asRetryableService(
         AutomationConfig(pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)), // Fast retries
         new WallClock(timeouts, loggerFactory),
         retryProvider,
@@ -210,6 +210,21 @@ class AcsSnapshotBulkStorageTest
             assertLatestSnapshotInMetrics(ts3)
           }
         }
+
+        bulkStore
+          .getAcsSnapshotAtOrBefore(ts3)
+          .futureValue.map(_.key) should contain theSameElementsAs (0 to 6).map(i =>
+          s"$ts3-Migration-0-${ts3.add(24.hours)}/ACS_$i.zstd"
+        )
+        bulkStore
+          .getAcsSnapshotAtOrBefore(ts3.minusSeconds(1))
+          .futureValue should contain theSameElementsAs(0 to 6).map(i =>
+          s"$ts1-Migration-0-$ts3/ACS_$i.zstd"
+        )
+        recoverToSucceededIf[NoSuchElementException](
+          bulkStore
+            .getAcsSnapshotAtOrBefore(ts3.add(24.hours))
+        )
 
       }
     }

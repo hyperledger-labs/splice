@@ -29,16 +29,7 @@ class S3BucketConnectionForTests(
         .getObject(readRequest, AsyncResponseTransformer.toBytes[GetObjectResponse])
         .asScala
         .map(_.asByteBuffer())
-      checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
-      checksumResponse <- s3Client
-        .getObjectTagging(checksumRequest)
-        .asScala
-      checksum = checksumResponse
-        .tagSet()
-        .asScala
-        .find(_.key() == "splice-checksum")
-        .map(_.value())
-        .getOrElse(throw new RuntimeException("Missing checksum tag"))
+      checksum <- readChecksum(key)
     } yield {
       val bytes = new Array[Byte](data.remaining)
       data.duplicate.get(bytes)
