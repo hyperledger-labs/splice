@@ -57,6 +57,9 @@ monitoring:
         mediatorRetentionDays: 30
         participantRetentionDays: 30
         sequencerRetentionDays: 30
+      sequencerRateLimits:
+        circuitBreakerStateThreshold: 0.5
+        rejectionRateThreshold: 0
       trafficWaste:
         kilobytes: 1
         overMinutes: 5

@@ -65,6 +65,10 @@ const MonitoringConfigSchema = z
         deployment: z.object({
           pendingPeriodMinutes: z.number(),
         }),
+        sequencerRateLimits: z.object({
+          rejectionRateThreshold: z.number(),
+          circuitBreakerStateThreshold: z.number(),
+        }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),
