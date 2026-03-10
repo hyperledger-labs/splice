@@ -24,11 +24,13 @@ module Splice.Api.Token.UtilsV2 (
 
 ) where
 
+import DA.Action (when)
 import DA.Date
 import DA.Optional (fromOptional, isNone)
-import DA.List (dedup)
+import DA.List (dedup, head)
 import qualified DA.Map as Map
-import DA.Text as T
+import qualified DA.Set as Set
+import DA.Text qualified as T
 import DA.Time
 import DA.TextMap qualified as TextMap
 
@@ -276,7 +278,8 @@ allocationFactory_v2_tryAllocateUsingV1 factory factoryCid AllocationInstruction
     Some allocationV1 -> do
       -- check choice params
       requireExpectedAdminMatch ((view factory).admin) expectedAdmin
-      require "Actors match the executor" (actors == [allocationV1.settlement.executor])
+      -- FIXME: handle non-basic accounts
+      require "Actor matches the sender" (actors == [allocationV1.transferLeg.sender])
 
       -- FIXME: check that there is no extraneous account metadata on the v2 spec
 
@@ -294,6 +297,7 @@ tryDowncast_v2_v1_AllocationSpecification allocationV2@AllocationV2.AllocationSp
   guard (isNone $ settlement.controllerOverride)
   [executor] <- Some settlement.executors
   [transferLeg] <- Some transferLegs
+  -- FIXME: allow downcast of non-basic accounts by pushing them into metadata
   guard (isBasicAccount transferLeg.sender)
   guard (isBasicAccount transferLeg.receiver)
   let settlementInfoV1 = AllocationV1.SettlementInfo with
@@ -361,29 +365,78 @@ amulet_allocationFactoryV2_settleImpl factory AllocationInstructionV2.Allocation
     -- FIXME: consider allowing the caller to pass these in
     require "Actors match allocation executors" (actors == allocation.settlement.executors)
     -- FIXME: consider what other validation is missing
-    pure allocationView
 
-  let allocatedLegs = Map.fromList $ do
-        allocationView <- allocations
+    -- extra v1 allocation validation
+    when (allocationView.supportsV1) $ do
+      require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
+      let tl = head allocation.transferLegs
+      require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.authorizer)
+
+    pure (allocationCid, allocationView)
+
+  -- determine which allocations to settle using v1 and which to settle using v2
+  let (v1Allocations, v2Allocations) = partition (._2.supportsV1) allocations
+
+  let v2Legs = Set.fromList $ do
+        (_, allocationView) <- v2Allocations
+        let authorizer = allocationView.authorizer
+        leg <- allocationView.allocation.transferLegs
+        pure (authorizer, leg)
+
+  let hasMatchingV2Allocation allocationView =
+        let leg = head allocationView._2.allocation.transferLegs
+        in (leg.receiver, leg) `Set.member` v2Legs
+
+  let (matchedV1Allocations, unmatchedV1Allocations) = partition hasMatchingV2Allocation v1Allocations
+
+  let allocationsSettledUsingV1 = unmatchedV1Allocations
+
+  -- We settle V1 allocations that are matched with a V2 allocation using the V2 API to
+  -- avoid having to archive the holding for the receiver that would be created as part of its
+  -- V1 settlement. This seems too finnicky. Wallets will have to use their fallback tx history
+  -- parsing to understand the transfer.
+  let allocationsSettledUsingV2 = matchedV1Allocations ++ v2Allocations
+
+
+  -- check that all legs match up
+  let allocatedV2Legs = Map.fromList $ do
+        (_, allocationView) <- allocationsSettledUsingV2
         let authorizer = allocationView.authorizer
         case allocationView.allocation.transferLegs of
           [] -> error "Unexpected empty transfer legs in allocation"
           (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
+
+  let allocatedV1Legs = Map.fromList $ concat $ do
+        allocationView <- allocationsSettledUsingV1
+        leg <- allocationView._2.allocation.transferLegs
+        pure $ dedup [((leg.sender, leg), []), ((leg.receiver, leg), [])]
+
+
   -- We allow self-transfers as future extensions might customize them via additional metadata.
   let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
-  validateExpectedTransfers ppLeg expectedLegs allocatedLegs
+  validateExpectedTransfers ppLeg expectedLegs (allocatedV1Legs `Map.union` allocatedV2Legs)
 
   -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
   -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
 
-  -- settle all allocations
-  newHoldingCidss <- forA allocationCids $ \allocationCid -> do
+  -- settle all v1 allocations
+  newHoldingCidssV1 <- forA allocationsSettledUsingV1 $ \(allocationCid, allocationView) -> do
+    let (allocationCidV1 : ContractId AllocationV1.Allocation) = coerceContractId allocationCid
+    result <- exercise allocationCidV1 AllocationV1.Allocation_ExecuteTransfer with extraArgs
+    let instrumentId = (head allocationView.allocation.transferLegs).instrumentId
+    let senderHoldingCids = (instrumentId, map upcast result.senderHoldingCids)
+    let receiverHoldingCids = (instrumentId, map upcast result.receiverHoldingCids)
+    pure (Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
+
+
+  -- settle all v2 allocations
+  newHoldingCidssV2 <- forA allocationsSettledUsingV2 $ \(allocationCid, _) -> do
     result <- exercise allocationCid AllocationV2.Allocation_Settle with extraArgs
     pure result.newHoldingCids
 
   -- return result
   pure AllocationInstructionV2.AllocationFactory_SettleBatchResult with
-    newHoldingCids = foldl (Map.unionWith (++)) Map.empty newHoldingCidss
+    newHoldingCids = foldl (Map.unionWith (++)) Map.empty (newHoldingCidssV1 ++ newHoldingCidssV2)
     meta = emptyMetadata
 
 

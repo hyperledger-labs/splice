@@ -153,6 +153,9 @@ interface AllocationFactory where
     -- ^ Settle a batch of allocations for asset from the same instrument admin.
     with
       expectedAdmin : Party
+
+      -- FIXME: pass in the overall allocation to settle as an extra safe-guard
+
         -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
         -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
@@ -233,6 +236,7 @@ data AllocationInstructionResult_Output
 
 -- | Result of settling a batch of allocations.
 data AllocationFactory_SettleBatchResult = AllocationFactory_SettleBatchResult with
+    -- FIXME: add owning accounts
     newHoldingCids : Map.Map InstrumentId [ContractId Holding]
       -- ^ New holdings created as part of the batch settlement.
     meta : Metadata
