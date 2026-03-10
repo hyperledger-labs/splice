@@ -59,6 +59,8 @@ template AmuletAllocationV2
         holdingCids = case lockedAmulet of
           None -> Map.empty
           Some cid -> Map.fromList [(upcast (amuletInstrumentId dso), [toInterfaceContractId cid])]
+        supportsV1 = False
+          -- allocations that support both interfaces are represented using AmuletAllocation.
         meta = emptyMetadata
 
       allocation_withdrawImpl _self Allocation_Withdraw{..} = do

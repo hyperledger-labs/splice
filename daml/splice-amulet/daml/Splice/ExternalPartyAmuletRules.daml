@@ -480,10 +480,9 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   let amount = netAllocationAmount authorizer arg.allocation.transferLegs
 
   let
-    deadline = fromOptional maxTime allocation.settlement.settlementDeadline
-
     -- FIXME: revisit this logic -- 30 days might be too little, but we want protection for the DSO
-    expiresAt = min deadline (requestedAt `addRelTime` days 30)
+    latestExpiresAt = requestedAt `addRelTime` days 30
+    expiresAt = optional latestExpiresAt (min latestExpiresAt) allocation.settlement.settlementDeadline
   require "Allocation.settlement.settleAt <= Allocation.expiresAt"
     (settlement.settleAt <= expiresAt)
 

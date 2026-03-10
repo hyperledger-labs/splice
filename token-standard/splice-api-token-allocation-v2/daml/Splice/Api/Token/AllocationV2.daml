@@ -86,6 +86,8 @@ data AllocationSpecification = AllocationSpecification with
 -- To be standards compliant, an allocation must have a non-zero number of
 -- transfer legs, all with an instrumentId with the same adminId.
 data AllocationView = AllocationView with
+    authorizer : Account
+      -- ^ The authorizer authorizing the transfer legs of the allocation to be executed.
     allocation : AllocationSpecification
       -- ^ The settlement for whose execution the assets are being allocated.
     holdingCids : Map InstrumentId [ContractId Holding]
@@ -95,13 +97,14 @@ data AllocationView = AllocationView with
       -- holdings.
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
-    meta : Metadata
-      -- ^ Additional metadata specific to the allocation, used for extensibility.
-    authorizer : Account
-      -- ^ The authorizer authorizing the transfer legs of the allocation to be executed.
     expiresAt : Optional Time
     -- ^ A time at which this allocation expires. SHOULD be as close as the
     -- registry can make it to the settlementInfo's settlementDeadline.
+    supportsV1 : Bool
+      -- ^ Whether this allocation also supports the V1 allocation interface.
+      -- Provided for debugging purposes.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
 
 -- FIXME: expose action graph

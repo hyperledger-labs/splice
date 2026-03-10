@@ -3,8 +3,31 @@
 
 -- | Conversion functions and standard implementations used to
 -- implement the V1 interfaces from the V2 interfaces.
-module Splice.Api.Token.UtilsV2 where
+module Splice.Api.Token.UtilsV2 (
+  BackwardCompatible(..),
+  ForwardCompatible(..),
 
+  -- * Allocation facctory
+  tryDowncast_v2_v1_AllocationSpecification,
+
+  allocationFactory_v2_tryAllocateUsingV1,
+
+  -- * Transfer instructions
+  transferInstruction_v2_receiverActor_acceptImpl,
+  transferInstruction_v2_receiverActor_rejectImpl,
+  transferInstruction_v2_senderActor_withdrawImpl,
+
+  transferFactory_v2_senderActor_transferImpl,
+  transferFactory_v2_publicFetchImpl,
+
+) where
+
+import DA.Action (unless)
+import DA.Date
+import DA.Optional (fromOptional, isNone)
+import qualified DA.Map as Map
+import DA.Text as T
+import DA.Time
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -17,11 +40,6 @@ import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructi
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 
-import DA.Time
-import DA.Date
-import DA.Text (parseInt)
-import DA.Optional (fromOptional)
-import qualified DA.Map as Map
 
 -- Utils
 --------
@@ -35,7 +53,7 @@ encodeTime : Time -> Text
 encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
 
 decodeTime : Text -> Time
-decodeTime t = case parseInt t of
+decodeTime t = case T.parseInt t of
   Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
   None -> error ("Cannot parse time " <> t)
 
@@ -50,6 +68,10 @@ v2Namespace = "cip-TOKEN-STANDARD-V2/"
 
 -- Account metadata utils
 -------------------------
+
+isBasicAccount : HoldingV2.Account -> Bool
+isBasicAccount (HoldingV2.Account with owner, provider, id) =
+  isNone provider && isNone id
 
 accountToMeta : Text -> HoldingV2.Account -> Metadata -> Metadata
 accountToMeta field account meta =
@@ -149,6 +171,133 @@ instance BackwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
 
 -- Allocation
 -------------
+
+instance ForwardCompatible AllocationV1.Reference AllocationV2.Reference where
+  downcast AllocationV2.Reference{..} = AllocationV1.Reference with ..
+
+instance BackwardCompatible AllocationV1.Reference AllocationV2.Reference where
+  upcast AllocationV1.Reference{..} = AllocationV2.Reference with ..
+
+instance ForwardCompatible AllocationV1.TransferLeg AllocationV2.TransferLeg where
+  downcast (AllocationV2.TransferLeg with sender, receiver, amount, instrumentId, meta) =
+    AllocationV1.TransferLeg with
+      sender = sender.owner
+      receiver = receiver.owner
+      amount
+      instrumentId = downcast instrumentId
+      meta =
+        accountToMeta "sender" sender $
+        accountToMeta "receiver" receiver $
+        meta
+
+upcast_v1_v2_TransferLeg : Text -> AllocationV1.TransferLeg -> AllocationV2.TransferLeg
+upcast_v1_v2_TransferLeg transferLegId (AllocationV1.TransferLeg with sender, receiver, amount, instrumentId, meta) =
+  AllocationV2.TransferLeg with
+    transferLegId
+    sender = accountFromMeta sender "sender" meta
+    receiver = accountFromMeta receiver "receiver" meta
+    amount
+    instrumentId = upcast instrumentId
+    meta = dropAccountMeta "sender" $ dropAccountMeta "receiver" meta
+
+upcast_v1_v2_SettlementInfo : [Party] -> AllocationV1.SettlementInfo -> AllocationV2.SettlementInfo
+upcast_v1_v2_SettlementInfo extraExecutors(AllocationV1.SettlementInfo with executor, settlementRef, requestedAt, allocateBefore, settleBefore, meta) =
+  AllocationV2.SettlementInfo with
+    executors = executor :: extraExecutors
+    settlementRef = upcast settlementRef
+    requestedAt
+    settleAt = allocateBefore
+    settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
+    controllerOverride = None -- V1 does not support controller override.
+    meta
+
+instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
+  upcast (AllocationV1.AllocationSpecification with settlement, transferLegId, transferLeg) =
+    AllocationV2.AllocationSpecification with
+      settlement = upcast_v1_v2_SettlementInfo [transferLeg.sender, transferLeg.receiver] settlement
+      transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
+
+instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
+  upcast = coerceInterfaceContractId
+
+instance BackwardCompatible (ContractId AllocationInstructionV1.AllocationInstruction) (ContractId AllocationInstructionV2.AllocationInstruction) where
+  upcast = coerceInterfaceContractId
+
+instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult_Output AllocationInstructionV2.AllocationInstructionResult_Output where
+  upcast (AllocationInstructionV1.AllocationInstructionResult_Pending with allocationInstructionCid) =
+    AllocationInstructionV2.AllocationInstructionResult_Pending with
+      allocationInstructionCid = upcast allocationInstructionCid
+  upcast (AllocationInstructionV1.AllocationInstructionResult_Completed with allocationCid) =
+    AllocationInstructionV2.AllocationInstructionResult_Completed with
+      allocationCid = upcast allocationCid
+  upcast AllocationInstructionV1.AllocationInstructionResult_Failed =
+    AllocationInstructionV2.AllocationInstructionResult_Failed
+
+
+instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult AllocationInstructionV2.AllocationInstructionResult where
+  upcast (AllocationInstructionV1.AllocationInstructionResult with output, senderChangeCids, meta) =
+    AllocationInstructionV2.AllocationInstructionResult with
+      output = upcast output
+      senderChangeCids = map upcast senderChangeCids
+      meta
+
+-- | Convenience method for V2 factories to first attempt to create the allocation using the V1
+-- API and create a V1 allocation with better compatibility if possible. On a failed downcast,
+-- the caller is expected to fall back to creating a V2 allocation.
+allocationFactory_v2_tryAllocateUsingV1
+  : AllocationInstructionV1.AllocationFactory
+  -> ContractId AllocationInstructionV1.AllocationFactory
+  -> AllocationInstructionV2.AllocationFactory_Allocate
+  -> Update (Optional AllocationInstructionV2.AllocationInstructionResult)
+allocationFactory_v2_tryAllocateUsingV1 factory factoryCid AllocationInstructionV2.AllocationFactory_Allocate{..} = do
+  case tryDowncast_v2_v1_AllocationSpecification allocation of
+    None -> pure None
+    Some allocationV1 -> do
+      -- check choice params
+      requireExpectedAdminMatch ((view factory).admin) expectedAdmin
+      require "Actors match the executor" (actors == [allocationV1.settlement.executor])
+      -- execute the allocation using the V1 API
+      result <- exercise factoryCid $ AllocationInstructionV1.AllocationFactory_Allocate with
+        expectedAdmin
+        allocation = allocationV1
+        requestedAt = requestedAt
+        inputHoldingCids = map downcast inputHoldingCids
+        extraArgs
+      pure $ Some (upcast result)
+
+tryDowncast_v2_v1_AllocationSpecification : AllocationV2.AllocationSpecification -> Optional AllocationV1.AllocationSpecification
+tryDowncast_v2_v1_AllocationSpecification allocationV2@AllocationV2.AllocationSpecification{..} = do
+  guard (isNone $ settlement.controllerOverride)
+  [executor] <- Some settlement.executors
+  [transferLeg] <- Some transferLegs
+  guard (isBasicAccount transferLeg.sender)
+  guard (isBasicAccount transferLeg.receiver)
+  let settlementInfoV1 = AllocationV1.SettlementInfo with
+        executor
+        settlementRef = downcast settlement.settlementRef
+        requestedAt = settlement.requestedAt
+        allocateBefore = settlement.settleAt
+        settleBefore = fromOptional maxTime settlement.settlementDeadline
+        meta = settlement.meta
+  let allocationV1 = AllocationV1.AllocationSpecification with
+        settlement = settlementInfoV1
+        transferLegId = transferLeg.transferLegId
+        transferLeg = AllocationV1.TransferLeg with
+          sender = transferLeg.sender.owner
+          receiver = transferLeg.receiver.owner
+          amount = transferLeg.amount
+          instrumentId = downcast transferLeg.instrumentId
+          meta = dropAccountMeta "sender" $ dropAccountMeta "receiver" transferLeg.meta
+  -- prudent engineering: check upcast
+  let recomputedAllocationV2 = upcast allocationV1
+  if allocationV2 == recomputedAllocationV2
+    then Some allocationV1
+    else error $ T.unlines
+      [ "Invariant violation: upcasting the V1 spec does not result in the original V2 spec:"
+      , "Original V2 spec: " <> show allocationV2
+      , "Downcasted V1 spec: " <> show allocationV1
+      , "Recomputed V2 spec: " <> show recomputedAllocationV2
+      ]
 
 {-
 -- FIXME: move to class based conversion
@@ -637,3 +786,14 @@ transferFactory_v2_publicFetchImpl this self arg =
   upcast <$> TransferInstructionV1.transferFactory_publicFetchImpl this (downcast self) (downcast arg)
 
 
+-- FIXME: consider whether to inline or use from `splice-util`
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
+
+requireExpectedAdminMatch : Party -> Party -> Update ()
+requireExpectedAdminMatch expected actual =
+  require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
