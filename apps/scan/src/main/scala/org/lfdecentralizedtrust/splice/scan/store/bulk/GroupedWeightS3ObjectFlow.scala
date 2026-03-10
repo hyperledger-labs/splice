@@ -41,7 +41,6 @@ case class GroupedWeightS3ObjectFlow(
   private case class State(
       nextObjectIndex: Int,
       currentObject: s3Connection.AppendWriteObject,
-      currentObjectDigest: MessageDigest,
       currentObjectSize: Long, // includes all ongoing pending part uploads
       numPendingPartUploads: Int,
   ) {
@@ -49,7 +48,6 @@ case class GroupedWeightS3ObjectFlow(
     def addPart(size: Int) = State(
       nextObjectIndex,
       currentObject,
-      currentObjectDigest,
       currentObjectSize + size,
       numPendingPartUploads + 1,
     )
@@ -57,7 +55,6 @@ case class GroupedWeightS3ObjectFlow(
     def completePart() = State(
       nextObjectIndex,
       currentObject,
-      currentObjectDigest,
       currentObjectSize,
       numPendingPartUploads - 1,
     )
@@ -65,7 +62,6 @@ case class GroupedWeightS3ObjectFlow(
     def nextObject()(implicit ec: ExecutionContext) = State(
       nextObjectIndex + 1,
       s3Connection.newAppendWriteObject(getObjectKey(nextObjectIndex)),
-      MessageDigest.getInstance("SHA-256"),
       0,
       0,
     )
@@ -76,7 +72,6 @@ case class GroupedWeightS3ObjectFlow(
     def initial() = State(
       1,
       s3Connection.newAppendWriteObject(getObjectKey(0)),
-      MessageDigest.getInstance("SHA-256"),
       0,
       0,
     )
@@ -154,7 +149,6 @@ case class GroupedWeightS3ObjectFlow(
           uploadCallback.invoke(())
         } else {
           val partNumber = curState.currentObject.prepareUploadNext(elem.bytes.asByteBuffer)
-          curState.currentObjectDigest.update(elem.bytes.toArray)
           logger.debug(
             s"Received ${elem.bytes.length} bytes (isLast=${elem.isLast}), uploading as part $partNumber of object ${curState.currentObject.key}"
           )
