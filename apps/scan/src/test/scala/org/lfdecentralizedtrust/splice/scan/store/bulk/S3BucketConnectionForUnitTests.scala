@@ -1,7 +1,6 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.S3Config
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
@@ -49,12 +48,6 @@ class S3BucketConnectionForUnitTests(
         }
     }
   }
-
-  override def writeFullObject(key: String, content: ByteBuffer)(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-      // We don't strictly need any padding here, but easier to use 1 than deal with the special case of zero padding everywhere else
-  ): Future[Unit] = super.writeFullObject(key, PaddedData(1, content).toByteBuffer())
 
   override def newAppendWriteObject(key: String)(implicit ec: ExecutionContext): AppendWriteObject =
     new AppendWriteObjectForUnitTests(key)
