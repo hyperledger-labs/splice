@@ -20,7 +20,7 @@ import java.nio.ByteBuffer
 class S3UploadTest extends StoreTestBase with HasS3Mock {
 
   "S3 multipart uploads" should {
-    "work (test me)" in {
+    "work" in {
 
       val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val o = bucketConnection.newAppendWriteObject("test")
