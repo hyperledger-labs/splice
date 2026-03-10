@@ -12,6 +12,11 @@ on:
         type: string
         required: false
         default: ""
+      protocol_version:
+        description: "Canton protocol version"
+        type: string
+        required: false
+        default: "35"
       oss_only:
         description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (skips tests that do not support running in OSS)"
         required: false
@@ -29,6 +34,11 @@ on:
         type: string
         required: false
         default: ""
+      protocol_version:
+        description: "Canton protocol version"
+        type: string
+        required: false
+        default: "35"
       oss_only:
         description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (skips tests that do not support running in OSS)"
         required: false
@@ -107,6 +117,7 @@ jobs:
       test_name: simtime
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -120,6 +131,7 @@ jobs:
       test_name: resource-intensive
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -133,6 +145,7 @@ jobs:
       test_name: dyn-sync-params-reconciliation
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -146,6 +159,7 @@ jobs:
       test_name: permissioned-synchronizer
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -159,6 +173,7 @@ jobs:
       test_name: disaster-recovery
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -172,6 +187,7 @@ jobs:
       test_name: logical-sync-upgrade
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -185,6 +201,7 @@ jobs:
       test_name: cometbft
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
   scala_test_signatures:
@@ -198,6 +215,7 @@ jobs:
       with_gcp_creds: false
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -214,6 +232,7 @@ jobs:
       skip_if_commit_tag: "bft"
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -230,6 +249,7 @@ jobs:
       run_if_commit_tag: 'bft'
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -244,6 +264,7 @@ jobs:
       is_frontend_test: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -258,6 +279,7 @@ jobs:
       is_frontend_test: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -272,6 +294,7 @@ jobs:
       test_name: docker-compose
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
   scala_test_with_docker_no_canton:
@@ -286,6 +309,7 @@ jobs:
       start_canton_options: ""
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
   scala_test_with_docker_and_canton_simtime:
@@ -300,6 +324,7 @@ jobs:
       test_name: docker-canton-simtime
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       with_docker_images: false
     secrets: inherit
 
@@ -317,6 +342,7 @@ jobs:
       skip_if_files_changed: "nix/canton-sources.json"
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
@@ -332,6 +358,7 @@ jobs:
       with_gcp_creds: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
   ui_tests:
@@ -363,6 +390,7 @@ jobs:
       with_gcp_creds: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      protocol_version: ${{ inputs.protocol_version }}
       oss_only: true
     secrets: inherit
 
