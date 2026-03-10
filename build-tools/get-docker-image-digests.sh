@@ -17,7 +17,17 @@ echo "imageDigests:"
 for dir in "${SPLICE_ROOT}"/cluster/images/*; do
   app=$(basename "$dir");
   if [ ! -f "$dir" ] && [ "$app" != "common" ]; then
-    digest=$(get_digest "$app")
+    n=0
+    MAX_RETRIES=5
+    until [ $n -ge $MAX_RETRIES ]; do
+      # Client.Timeout from ghcr are not fun
+      digest=$(get_digest "$app")
+      if [ -n "$digest" ]; then
+        break
+      fi
+      n=$((n+1))
+      sleep 5
+    done
     a=${app//-/_}
     echo "  $a: \"@$digest\""
   fi
