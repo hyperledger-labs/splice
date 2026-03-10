@@ -150,6 +150,7 @@ object PublishScanConfigTrigger {
       new daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig(
         synchronizerNodeConfig.fold(SvUtil.emptyCometBftConfig)(_.cometBft),
         synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
+        synchronizerNodeConfig.flatMap(_.sequencerIdentity.toScala).toJava,
         synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
         Some(scanConfig).toJava,
         synchronizerNodeConfig.flatMap(_.legacySequencerConfig.toScala).toJava,

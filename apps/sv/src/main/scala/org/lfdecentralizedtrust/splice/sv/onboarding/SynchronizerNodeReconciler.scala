@@ -16,8 +16,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   PhysicalSynchronizerNodeConfig,
   ScanConfig,
   SequencerConfig,
+  SequencerConnectionConfig,
+  SequencerIdentityConfig,
   SynchronizerNodeConfig,
-  SequencerNodeConfig as DamlSequencerNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
@@ -140,31 +141,52 @@ class SynchronizerNodeReconciler(
               .yieldResult()
           }
 
+          val sequencerAvailableAfter: Option[Instant] = localSequencerConfig.flatMap { _ =>
+            val sequencerAvailabilityDelay =
+              currentNode
+                .map(_.sequencerAvailabilityDelay)
+                .getOrElse(
+                  sys.error(
+                    "synchronizerNode is not expected to be empty."
+                  )
+                )
+            state match {
+              case SynchronizerNodeState.OnboardedAfterDelay =>
+                Some(clock.now.toInstant.plus(sequencerAvailabilityDelay))
+              case SynchronizerNodeState.OnboardedImmediately =>
+                Some(clock.now.toInstant)
+              case SynchronizerNodeState.Onboarding(_) =>
+                None
+            }
+          }
+
+          // When physical synchronizers with sequencerIdentity is supported,
+          // prefer setting sequencerIdentity over the legacy sequencer field.
+          val sequencerIdentityConfig: java.util.Optional[SequencerIdentityConfig] =
+            if (localPhysicalSynchronizers.isDefined) {
+              localSequencerConfig
+                .map(c =>
+                  new SequencerIdentityConfig(
+                    c.sequencerId,
+                    sequencerAvailableAfter.toJava,
+                  )
+                )
+                .toJava
+            } else {
+              synchronizerNodeConfig.flatMap(_.sequencerIdentity.toScala).toJava
+            }
+
           val nodeConfig = new SynchronizerNodeConfig(
             synchronizerNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
             localSequencerConfig.map { c =>
-              val sequencerAvailabilityDelay =
-                currentNode
-                  .map(_.sequencerAvailabilityDelay)
-                  .getOrElse(
-                    sys.error(
-                      "synchronizerNode is not expected to be empty."
-                    )
-                  )
               new SequencerConfig(
                 c.migrationId,
                 c.sequencerId,
                 c.url,
-                (state match {
-                  case SynchronizerNodeState.OnboardedAfterDelay =>
-                    Some(clock.now.toInstant.plus(sequencerAvailabilityDelay))
-                  case SynchronizerNodeState.OnboardedImmediately =>
-                    Some(clock.now.toInstant)
-                  case SynchronizerNodeState.Onboarding(_) =>
-                    None
-                }).toJava,
+                sequencerAvailableAfter.toJava,
               )
             }.toJava,
+            sequencerIdentityConfig,
             localMediatorConfig
               .map(c =>
                 new MediatorConfig(
@@ -210,24 +232,17 @@ class SynchronizerNodeReconciler(
         if (hasSupport) {
           val currentEntryFuture =
             synchronizerNodes.map(_.current).traverse { currentNode =>
-              val (availableAfter, serialOverride) = state match {
-                case SynchronizerNodeState.OnboardedAfterDelay =>
-                  Some(clock.now.toInstant.plus(currentNode.sequencerAvailabilityDelay)) -> None
-                case SynchronizerNodeState.OnboardedImmediately =>
-                  Some(clock.now.toInstant) -> None
-                case SynchronizerNodeState.Onboarding(serial) =>
-                  None -> Some(serial)
+              val serialOverride = state match {
+                case SynchronizerNodeState.OnboardedAfterDelay => None
+                case SynchronizerNodeState.OnboardedImmediately => None
+                case SynchronizerNodeState.Onboarding(serial) => Some(serial)
               }
-              buildNodeConfig(existingState, currentNode, availableAfter, serialOverride)
+              buildNodeConfig(currentNode, serialOverride)
             }
 
           val legacyEntryFuture =
             synchronizerNodes.flatMap(_.legacy).traverse { legacyNode =>
-              buildNodeConfig(
-                existingState,
-                legacyNode,
-                availableAfterIfNotAlreadySet = Some(clock.now.toInstant),
-              )
+              buildNodeConfig(legacyNode)
             }
 
           val successorEntryFuture =
@@ -248,11 +263,7 @@ class SynchronizerNodeReconciler(
                     }),
                   {
                     case true =>
-                      buildNodeConfig(
-                        existingState,
-                        successorNode,
-                        availableAfterIfNotAlreadySet = Some(clock.now.toInstant),
-                      ).map(config => Some(Seq(config)))
+                      buildNodeConfig(successorNode).map(config => Some(Seq(config)))
                     case false =>
                       Future.successful(None)
                   },
@@ -272,9 +283,7 @@ class SynchronizerNodeReconciler(
   }
 
   private def buildNodeConfig(
-      existingState: Option[Map[lang.Long, PhysicalSynchronizerNodeConfig]],
       node: LocalSynchronizerNode,
-      availableAfterIfNotAlreadySet: Option[Instant],
       serialOverride: Option[NonNegativeInt] = None,
   )(implicit
       ec: ExecutionContext,
@@ -287,23 +296,13 @@ class SynchronizerNodeReconciler(
     for {
       serial <- serialFuture
       jSerial = lang.Long.valueOf(serial.unwrap.toLong)
-      availableAfterWithExistingState = existingState
-        .flatMap(
-          _.get(jSerial).flatMap(_.sequencer.flatMap(_.availableAfter).toScala)
-        )
-        .orElse(availableAfterIfNotAlreadySet)
-      sequencerId <- node.sequencerAdminConnection.getSequencerId
-      mediatorId <- node.mediatorAdminConnection.getMediatorId
     } yield {
       jSerial -> new PhysicalSynchronizerNodeConfig(
         java.util.Optional.of(
-          new DamlSequencerNodeConfig(
-            sequencerId.toProtoPrimitive,
-            node.sequencerExternalPublicUrl,
-            availableAfterWithExistingState.toJava,
+          new SequencerConnectionConfig(
+            node.sequencerExternalPublicUrl
           )
-        ),
-        java.util.Optional.of(new MediatorConfig(mediatorId.toProtoPrimitive)),
+        )
       )
     }
   }

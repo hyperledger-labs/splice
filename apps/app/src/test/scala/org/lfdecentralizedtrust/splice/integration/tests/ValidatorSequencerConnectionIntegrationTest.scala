@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerC
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   PhysicalSynchronizerNodeConfig,
   SequencerConfig,
-  SequencerNodeConfig,
+  SequencerConnectionConfig,
   SynchronizerNodeConfig,
 }
 
@@ -211,22 +211,20 @@ class ValidatorSequencerConnectionIntegrationTest
       newNodeConfig = new SynchronizerNodeConfig(
         synchronizerNodeConfig.cometBft,
         Some(updatedSequencerConfig).toJava,
+        synchronizerNodeConfig.sequencerIdentity,
         synchronizerNodeConfig.mediator,
         synchronizerNodeConfig.scan,
         synchronizerNodeConfig.legacySequencerConfig,
         synchronizerNodeConfig.physicalSynchronizers.toScala
           .map(
             _.asScala
-              .map { case (long, config) =>
+              .map { case (long, _) =>
                 long -> new PhysicalSynchronizerNodeConfig(
                   Some(
-                    new SequencerNodeConfig(
-                      existingSequencerConfig.sequencerId,
-                      newUrl,
-                      existingSequencerConfig.availableAfter,
+                    new SequencerConnectionConfig(
+                      newUrl
                     )
-                  ).toJava,
-                  config.mediator,
+                  ).toJava
                 )
               }
               .toMap
