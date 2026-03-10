@@ -113,6 +113,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
   private def scheduleLsu(
       topologyFreezeTime: CantonTimestamp,
       upgradeTime: CantonTimestamp,
+      serial: Long,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     scheduleLogicalSynchronizerUpgrade(
       sv1Backend,
@@ -120,7 +121,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       new LogicalSynchronizerUpgradeSchedule(
         topologyFreezeTime.toInstant,
         upgradeTime.toInstant,
-        1L,
+        serial,
         ProtocolVersion.v34.toString,
       ),
     )
@@ -140,7 +141,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     val upgradeTime = CantonTimestamp.now().plusSeconds(120)
 
     clue("Schedule logical synchronizer upgrade") {
-      scheduleLsu(topologyFreezeTime, upgradeTime)
+      scheduleLsu(topologyFreezeTime, upgradeTime, 1L)
     }
 
     clue("Wait for LSU announcement to be proposed") {
@@ -281,7 +282,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
     startValidatorAndTapAmulet(aliceValidatorBackend, aliceValidatorWalletClient)
 
-    val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.one
+    // account for the cancellation
+    val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
     val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
     // Upload after starting validator which connects to global
     // synchronizers as upload_dar_unless_exists vets on all
@@ -295,7 +297,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
     val upgradeTime = CantonTimestamp.now().plusSeconds(120)
     clue("Schedule logical synchronizer upgrade") {
-      scheduleLsu(topologyFreezeTime, upgradeTime)
+      scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
     withCantonSvNodes(

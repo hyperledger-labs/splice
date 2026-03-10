@@ -2494,8 +2494,12 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetActivePhysicalSynchronizerSerialResponse.OK(response) =>
-      NonNegativeInt.create(response.serial.toInt).leftMap(_.message)
+    ) = {
+      case http.GetActivePhysicalSynchronizerSerialResponse.OK(response) =>
+        NonNegativeInt.create(response.serial.toInt).leftMap(_.message)
+      case http.GetActivePhysicalSynchronizerSerialResponse.NotFound(_) =>
+        Left("No active synchronizer serial found")
     }
+
   }
 }
