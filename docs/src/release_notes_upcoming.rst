@@ -27,7 +27,7 @@
 
   - Wallet UI
 
-    - Introduced a new ``/development-fund`` panel providing a complete UI for managing Development Fund allocations.
+    - Introduced a new ``/development-fund`` panel providing a complete UI for managing Development Fund allocations (see `CIP-0082 <https://github.com/canton-foundation/cips/blob/main/cip-0082/cip-0082.md>`_ and `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_ for context).
 
     - The panel includes:
 
