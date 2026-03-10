@@ -91,7 +91,7 @@ svs:
 operatorDeployment:
   reference:
     repoUrl: https://github.com/DACH-NY/canton-network-internal
-    gitReference: tom-da/basicScratch
+    gitReference: refs/heads/tom-da/basicScratch
     pulumiBaseDir: "splice/cluster/pulumi"
     pulumiStacksDir: "cluster/stacks/scratchnets"
     deploymentDir: "cluster/deployment"
