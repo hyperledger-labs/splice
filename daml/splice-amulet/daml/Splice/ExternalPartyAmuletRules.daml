@@ -509,39 +509,15 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   -- inputHoldingCids:
   require "At least one input holding must be provided when net amount is negative" (amount >= 0.0 || not (null inputHoldingCids))
 
-  (lockedAmulet, senderChangeCid, meta) <-
+  -- lock the funds
+  let twoStepTransfer = AmuletAllocationV2.allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
+
+  (lockedAmulet, senderChangeCids, meta) <-
     if amount >= 0.0
-    then return (None, None, emptyMetadata)
+    then return (None, [], emptyMetadata)
     else do
-      -- lock the amulet
-      transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) inputHoldingCids
-      let lockContext = Text.implode
-            -- We don't show more context to avoid bloating the response here.
-            ["allocation for settlement ", settlement.settlementRef.id]
-      let transfer = Splice.AmuletRules.Transfer with
-            sender
-            provider = sender -- the sender is serving as its own "app provider"
-            outputs =
-              [ TransferOutput with
-                  receiver = sender
-                  amount = amount
-                  receiverFeeRatio = 0.0 -- irrelevant as fees are always zero
-                  lock = Some TimeLock with
-                    expiresAt
-                    holders = [dso]
-                    optContext = Some lockContext
-              ]
-            inputs = transferInputs
-            beneficiaries = None
-
-      result <- executeExternalPartyTransfer dso context transfer
-      let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
-      pure
-        ( lockedAmulet
-        , toInterfaceContractId <$> result.senderChangeAmulet
-        , fromOptional emptyMetadata result.meta
-        )
-
+      (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map downcast inputHoldingCids) paymentContext
+      return (Some la, cids, m)
   -- create the amulet allocation
   allocationCid <- toInterfaceContractId <$> create AmuletAllocationV2 with
     allocation = arg.allocation
@@ -552,7 +528,7 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
 
   -- finaly done: return the result
   pure V2.AllocationInstructionResult with
-    senderChangeCids = optionalToList senderChangeCids
+    senderChangeCids = map upcast senderChangeCids
     output = V2.AllocationInstructionResult_Completed with allocationCid
     meta
 
