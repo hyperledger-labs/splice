@@ -378,7 +378,6 @@ describe('Development Fund page', () => {
         currentPage: 1,
         goToNextPage: vi.fn(),
         goToPreviousPage: vi.fn(),
-        invalidate: vi.fn(),
       },
       history: {
         historyEvents: [],
@@ -390,10 +389,11 @@ describe('Development Fund page', () => {
         currentHistoryPage: 1,
         goToNextHistoryPage: vi.fn(),
         goToPreviousHistoryPage: vi.fn(),
-        invalidateHistory: vi.fn(),
       },
       unclaimedTotal: new BigNumber(10),
       isLoadingUnclaimedTotal: false,
+      isUnclaimedTotalError: false,
+      unclaimedTotalError: null,
       invalidateAll: vi.fn(),
     });
 
@@ -509,37 +509,36 @@ describe('Development Fund page', () => {
     const mutate = vi.fn();
     const expiresAt = dayjs().add(2, 'day');
 
-    vi.spyOn(
-      developmentFundAllocationFormHook,
-      'useDevelopmentFundAllocationForm'
-    ).mockReturnValue({
-      formKey: 0,
-      error: null,
-      beneficiary: alicePartyId,
-      setBeneficiary: vi.fn(),
-      amount: '1',
-      setAmount: vi.fn(),
-      expiresAt,
-      setExpiresAt: vi.fn(),
-      reason: 'Valid allocation',
-      setReason: vi.fn(),
-      amountNum: new BigNumber(1),
-      isAmountValid: true,
-      amountExceedsAvailable: false,
-      isExpiryValid: true,
-      expiryError: undefined,
-      isReasonValid: true,
-      isValid: true,
-      resetForm: vi.fn(),
-      allocateMutation: {
-        mutate,
-        isPending: false,
-      } as unknown as ReturnType<
-        typeof developmentFundAllocationFormHook.useDevelopmentFundAllocationForm
-      >['allocateMutation'],
-      isFundManager: true,
-      unclaimedTotal: new BigNumber(100),
-    });
+    const hookSpy = vi
+      .spyOn(developmentFundAllocationFormHook, 'useDevelopmentFundAllocationForm')
+      .mockReturnValue({
+        formKey: 0,
+        error: null,
+        beneficiary: alicePartyId,
+        setBeneficiary: vi.fn(),
+        amount: '1',
+        setAmount: vi.fn(),
+        expiresAt,
+        setExpiresAt: vi.fn(),
+        reason: 'Valid allocation',
+        setReason: vi.fn(),
+        amountNum: new BigNumber(1),
+        isAmountValid: true,
+        amountExceedsAvailable: false,
+        isExpiryValid: true,
+        expiryError: undefined,
+        isReasonValid: true,
+        isValid: true,
+        resetForm: vi.fn(),
+        allocateMutation: {
+          mutate,
+          isPending: false,
+        } as unknown as ReturnType<
+          typeof developmentFundAllocationFormHook.useDevelopmentFundAllocationForm
+        >['allocateMutation'],
+        isFundManager: true,
+        unclaimedTotal: new BigNumber(100),
+      });
 
     const { user } = await loginAndOpenDevelopmentFund();
     const allocateButton = await screen.findByRole('button', { name: 'Allocate' });
@@ -551,5 +550,7 @@ describe('Development Fund page', () => {
       expiresAt: expiresAt.toDate(),
       reason: 'Valid allocation',
     });
+
+    hookSpy.mockRestore();
   });
 });

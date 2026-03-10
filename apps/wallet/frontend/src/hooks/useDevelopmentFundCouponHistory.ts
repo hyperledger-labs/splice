@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { CouponHistoryEvent } from '../models/models';
 import { DEVELOPMENT_FUND_QUERY_KEYS } from '../constants/developmentFundQueryKeys';
@@ -18,12 +18,10 @@ export interface UseDevelopmentFundCouponHistoryResult {
   currentHistoryPage: number;
   goToNextHistoryPage: () => void;
   goToPreviousHistoryPage: () => void;
-  invalidateHistory: () => void;
 }
 
 export const useDevelopmentFundCouponHistory = (): UseDevelopmentFundCouponHistoryResult => {
   const { listCouponHistoryEvents } = useWalletClient();
-  const queryClient = useQueryClient();
 
   const [cursorStack, setCursorStack] = React.useState<(number | undefined)[]>([undefined]);
   const currentCursor = cursorStack[cursorStack.length - 1];
@@ -53,11 +51,6 @@ export const useDevelopmentFundCouponHistory = (): UseDevelopmentFundCouponHisto
   const hasPreviousHistoryPage = cursorStack.length > 1;
   const currentHistoryPage = cursorStack.length;
 
-  const invalidateHistory = React.useCallback(() => {
-    setCursorStack([undefined]);
-    queryClient.invalidateQueries({ queryKey: DEVELOPMENT_FUND_QUERY_KEYS.couponHistory });
-  }, [queryClient]);
-
   return {
     historyEvents,
     isLoadingHistory: historyQuery.isLoading,
@@ -68,6 +61,5 @@ export const useDevelopmentFundCouponHistory = (): UseDevelopmentFundCouponHisto
     currentHistoryPage,
     goToNextHistoryPage,
     goToPreviousHistoryPage,
-    invalidateHistory,
   };
 };

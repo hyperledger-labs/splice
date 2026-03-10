@@ -29,7 +29,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DateDisplay, DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import { DateDisplay, DisableConditionally, extractApiErrorMessage, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsEntry from './BftAnsEntry';
 
 // Active Coupons Table Component
@@ -53,18 +53,6 @@ const ActiveCouponsTable: React.FC = () => {
     invalidateAll,
   } = useDevelopmentFund();
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
-  if (isError) {
-    return (
-      <Alert severity="error">
-        Error loading active development fund allocations: {JSON.stringify(error)}
-      </Alert>
-    );
-  }
-
   const [selectedCoupon, setSelectedCoupon] = React.useState<string | null>(null);
   const [withdrawalReason, setWithdrawalReason] = React.useState('');
 
@@ -84,6 +72,18 @@ const ActiveCouponsTable: React.FC = () => {
       console.error('Failed to withdraw development fund coupon', error);
     },
   });
+
+  if (isLoading) {
+    return <Loading />;
+  }
+
+  if (isError) {
+    return (
+      <Alert severity="error">
+        Error loading active development fund allocations: {JSON.stringify(error)}
+      </Alert>
+    );
+  }
 
   const handleWithdrawClick = (couponId: string) => {
     setSelectedCoupon(couponId);
@@ -246,7 +246,7 @@ const CouponHistoryTable: React.FC = () => {
   if (isHistoryError) {
     return (
       <Alert severity="error">
-        Error loading coupon history: {JSON.stringify(historyError)}
+        Error loading coupon history: {extractApiErrorMessage(historyError)}
       </Alert>
     );
   }

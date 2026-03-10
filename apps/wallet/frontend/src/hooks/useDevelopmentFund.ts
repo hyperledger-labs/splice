@@ -35,6 +35,8 @@ export const useDevelopmentFund = () => {
     history: historyData,
     unclaimedTotal: unclaimedTotalData.data,
     isLoadingUnclaimedTotal: unclaimedTotalData.isLoading,
+    isUnclaimedTotalError: unclaimedTotalData.isError,
+    unclaimedTotalError: unclaimedTotalData.error,
     invalidateAll,
   };
 };

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { DEVELOPMENT_FUND_QUERY_KEYS } from '../constants/developmentFundQueryKeys';
 import { DevelopmentFundCoupon } from '../models/models';
@@ -10,7 +10,6 @@ const PAGE_SIZE = 10;
 
 export const useActiveDevelopmentFundCoupons = (fundManager?: string) => {
   const { listActiveDevelopmentFundCoupons } = useWalletClient();
-  const queryClient = useQueryClient();
 
   const [currentPage, setCurrentPage] = React.useState<number>(1);
 
@@ -50,10 +49,6 @@ export const useActiveDevelopmentFundCoupons = (fundManager?: string) => {
   const hasNextPage = offset + PAGE_SIZE < totalCount;
   const hasPreviousPage = currentPage > 1;
 
-  const invalidate = React.useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: DEVELOPMENT_FUND_QUERY_KEYS.activeCoupons });
-  }, [queryClient]);
-
   return {
     coupons,
     isLoading: couponsQuery.isLoading,
@@ -64,6 +59,5 @@ export const useActiveDevelopmentFundCoupons = (fundManager?: string) => {
     currentPage,
     goToNextPage,
     goToPreviousPage,
-    invalidate,
   };
 };

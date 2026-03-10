@@ -1,11 +1,25 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Card, CardContent, Stack, Typography, CircularProgress } from '@mui/material';
+import { Alert, Card, CardContent, Stack, Typography, CircularProgress } from '@mui/material';
 import { useDevelopmentFund } from '../hooks/useDevelopmentFund';
+import { extractApiErrorMessage } from '@lfdecentralizedtrust/splice-common-frontend';
 
 const DevelopmentFundTotal: React.FC = () => {
-  const { unclaimedTotal, isLoadingUnclaimedTotal } = useDevelopmentFund();
+  const {
+    unclaimedTotal,
+    isLoadingUnclaimedTotal,
+    isUnclaimedTotalError,
+    unclaimedTotalError,
+  } = useDevelopmentFund();
+
+  if (isUnclaimedTotalError) {
+    return (
+      <Alert severity="error">
+        Error loading development fund total: {extractApiErrorMessage(unclaimedTotalError)}
+      </Alert>
+    );
+  }
 
   return (
     <Card variant="outlined">

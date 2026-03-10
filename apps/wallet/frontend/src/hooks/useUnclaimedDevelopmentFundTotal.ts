@@ -14,7 +14,7 @@ export const useUnclaimedDevelopmentFundTotal = () => {
   const scanClient = useValidatorScanProxyClient();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: DEVELOPMENT_FUND_QUERY_KEYS.unclaimedTotal,
     queryFn: async () => {
       const response = await scanClient.listUnclaimedDevelopmentFundCoupons();
@@ -35,6 +35,8 @@ export const useUnclaimedDevelopmentFundTotal = () => {
   return {
     data: data ?? new BigNumber(0),
     isLoading,
+    isError,
+    error,
     invalidate,
   };
 };
