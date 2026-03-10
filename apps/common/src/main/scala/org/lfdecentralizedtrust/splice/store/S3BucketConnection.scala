@@ -49,7 +49,9 @@ class S3BucketConnection(
         .map(_.value())
         .getOrElse(throw new RuntimeException("Missing checksum tag"))
     } yield {
-      val bis = new ByteArrayInputStream(data.array())
+      val bytes = new Array[Byte](data.remaining)
+      data.duplicate.get(bytes)
+      val bis = new ByteArrayInputStream(bytes)
       // We compare the computed & stored checksum to one we independtly compute via the system's `sha256sum` executable for sanity
       val expectedChecksum =
         ("sha256sum" #| "awk '{print $1}'" #| "xxd -r -p" #| "base64" #< bis).!!.trim
