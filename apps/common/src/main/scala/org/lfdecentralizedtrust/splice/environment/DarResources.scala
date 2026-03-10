@@ -6589,49 +6589,14 @@ object DarResources {
       DarResources.walletPayments,
     )
 
-  private lazy val pkgIdToDarResource: Map[String, DarResource] =
+  lazy val pkgIdToDarResource: Map[String, DarResource] =
     packageResources.view.flatMap(_.all).map(resource => resource.packageId -> resource).toMap
 
   // We don't index the map by PackageMetadata because that type contains some additional
   // fields that don't matter.
-  private lazy val pkgMetadataToDarResource: Map[(PackageName, PackageVersion), DarResource] =
+  lazy val pkgMetadataToDarResource: Map[(PackageName, PackageVersion), DarResource] =
     packageResources.view
       .flatMap(_.all)
       .map(resource => (resource.metadata.name, resource.metadata.version) -> resource)
       .toMap
-
-  def lookupPackageId(packageId: String): Option[DarResource] =
-    pkgIdToDarResource.get(packageId)
-
-  def getDarResources(packageIds: Seq[String]): Seq[DarResource] =
-    packageIds.flatMap(lookupPackageId)
-
-  def lookupPackageMetadata(name: PackageName, version: PackageVersion): Option[DarResource] =
-    pkgMetadataToDarResource.get((name, version))
-
-  def lookupAllPackageVersions(name: PackageName): Seq[DarResource] =
-    packageResources.view.flatMap(_.all).toSeq.filter(_.metadata.name == name)
-
-  def getRequiredPackageVersions(
-      name: PackageName,
-      upToRequiredVersion: PackageVersion,
-      latestPackagesOnly: Boolean = false,
-  ): Seq[DarResource] = {
-    val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
-    packageResources.view
-      .flatMap(_.all)
-      .toSeq
-      .filter(_.metadata.name == name)
-      .filter(pkg => {
-        val version = pkg.metadata.version
-        (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
-      })
-      .distinct
-  }
-
-  private def lookupMinimumPackageResource(name: PackageName): DarResource =
-    packageResources
-      .find(_.latest.metadata.name == name)
-      .getOrElse(throw new NoSuchElementException(s"Could not find PackageResource for $name."))
-      .minimumInitialization
 }

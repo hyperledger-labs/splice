@@ -6,8 +6,9 @@ package org.lfdecentralizedtrust.splice.automation
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, PackageVetting}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, DarResourcesUtil, PackageVetting}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -36,6 +37,7 @@ abstract class PackageVettingTrigger(
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
+      // ensure to vet new package versions
       domainId <- getSynchronizerId()
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
@@ -54,6 +56,23 @@ abstract class PackageVettingTrigger(
           Some((context.pollingClock, maxVettingDelay)),
         )
       )
+      // ensure that unsupported versions are not vetted
+      participantId <- participantAdminConnection.getParticipantId()
+      vettedPackages <- participantAdminConnection.listVettedPackages(
+        participantId,
+        domainId,
+        AuthorizedState,
+      )
+      unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
+        vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
+      )
+      _ = if (unsupportedPackages.nonEmpty) {
+        vetting.unvetPackages(
+          domainId,
+          unsupportedPackages,
+          Some((context.pollingClock, maxVettingDelay)),
+        )
+      }
     } yield false
   }
 

@@ -39,7 +39,7 @@ class PackageVetting(
     val currentRequiredPackages =
       packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
-      DarResources
+      DarResourcesUtil
         .getRequiredPackageVersions(pkg.packageName, packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
@@ -56,7 +56,7 @@ class PackageVetting(
         PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
         PackageIdResolver.Package.SpliceUtilBatchedMarkers,
       ).flatMap(pkg =>
-        DarResources
+        DarResourcesUtil
           .getRequiredPackageVersions(
             pkg.packageName,
             PackageIdResolver.readPackageVersion(currentPackageConfig, pkg),
@@ -118,6 +118,22 @@ class PackageVetting(
       .map(_ => ())
   }
 
+  def unvetPackages(
+      domainId: SynchronizerId,
+      resources: Seq[DarResource],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      _ <- withSpan("unvet_dars") { implicit tc => _ =>
+        participantAdminConnection.unvetDars(
+          domainId,
+          resources,
+          maxVettingDelay = maxVettingDelay,
+        )
+      }
+    } yield {}
+  }
+
   private def vetPackages(
       domainId: SynchronizerId,
       packages: Seq[(PackageIdResolver.Package, PackageVersion)],
@@ -150,7 +166,7 @@ class PackageVetting(
     }
     val resources = packagesToProcess.flatMap { case (pkg, packageVersion) =>
       // Upload the version required by current config, and log an error if it is not part of the deployed release
-      DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {
+      DarResourcesUtil.lookupPackageMetadata(pkg.packageName, packageVersion) match {
         case None =>
           validFrom match {
             case Some(time) =>
@@ -213,7 +229,7 @@ class PackageVetting(
         packages.flatMap { pkg =>
           val configPackageVersion = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
           val allPackageVersions =
-            DarResources
+            DarResourcesUtil
               .getRequiredPackageVersions(pkg.packageName, configPackageVersion)
               .map(_.metadata.version)
           allPackageVersions

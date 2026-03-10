@@ -28,7 +28,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
 }
-import org.lfdecentralizedtrust.splice.util.UploadablePackage
+import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, UploadablePackage}
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
@@ -90,7 +90,7 @@ trait ParticipantAdminDarsConnection {
             participantId <- getParticipantId()
             _ <- ensureInitialMapping(
               Right(
-                updateVettingStateForDars(
+                addDarsToVettingState(
                   dars,
                   cantonFromDate,
                   VettedPackages.tryCreate(
@@ -123,9 +123,59 @@ trait ParticipantAdminDarsConnection {
               ),
             currentVettingState =>
               Right(
-                updateVettingStateForDars(
+                addDarsToVettingState(
                   dars = dars,
                   packageValidFrom = cantonFromDate,
+                  currentVetting = currentVettingState,
+                )
+              ),
+            RetryFor.Automation,
+            maxSubmissionDelay = maxVettingDelay,
+          ).map(_ => ())
+      },
+      logger,
+    )
+  }
+
+  def unvetDars(
+      synchronizerId: SynchronizerId,
+      dars: Seq[DarResource],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    retryProvider.retry(
+      RetryFor.Automation,
+      "dar_unvetting",
+      s"dars ${dars.map(_.packageId)} are removed from $synchronizerId",
+      lookupVettingState(
+        Some(synchronizerId),
+        TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+      ).flatMap {
+        case None => Future.unit
+        case Some(_) =>
+          ensureTopologyMapping[VettedPackages](
+            TopologyStoreId.Synchronizer(synchronizerId),
+            s"dars ${dars.map(_.packageId)} are removed from $synchronizerId",
+            topologyTransactionType =>
+              EitherT(
+                getVettingState(synchronizerId, topologyTransactionType).map { vettedPackages =>
+                  if (
+                    dars
+                      .forall(dar =>
+                        !vettedPackages.mapping.packages.exists(_.packageId == dar.packageId)
+                      )
+                  ) {
+                    Right(vettedPackages)
+                  } else {
+                    Left(vettedPackages)
+                  }
+                }
+              ),
+            currentVettingState =>
+              Right(
+                removeDarsToVettingState(
+                  dars = dars,
                   currentVetting = currentVettingState,
                 )
               ),
@@ -143,17 +193,33 @@ trait ParticipantAdminDarsConnection {
     runCmd(
       ParticipantAdminConnection.LookupDarByteString(mainPackageId)
     )
-  private def updateVettingStateForDars(
+
+  private def removeDarsToVettingState(
+      dars: Seq[DarResource],
+      currentVetting: VettedPackages,
+  ): VettedPackages = {
+    val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
+    val packageIdsToKeep = DarResourcesUtil
+      .getDarResources(currentVetting.packages.map(_.packageId))
+      .filterNot(dar => dars.contains(dar))
+      .map(_.packageId)
+    val safePackageIdsToRemove = packageIdsToRemove.diff(packageIdsToKeep)
+    currentVetting
+      .focus(_.packages)
+      .modify(packages => packages.filterNot(pkg => safePackageIdsToRemove.contains(pkg.packageId)))
+  }
+
+  private def addDarsToVettingState(
       dars: Seq[DarResource],
       packageValidFrom: Option[CantonTimestamp],
       currentVetting: VettedPackages,
   ) = {
     dars.foldLeft(currentVetting)((currentVetting, dar) =>
-      updateVettingStateForDar(dar, packageValidFrom, currentVetting)
+      addVettingStateForDar(dar, packageValidFrom, currentVetting)
     )
   }
 
-  private def updateVettingStateForDar(
+  private def addVettingStateForDar(
       dar: DarResource,
       packageValidFrom: Option[CantonTimestamp],
       currentVetting: VettedPackages,
@@ -161,7 +227,7 @@ trait ParticipantAdminDarsConnection {
     currentVetting
       .focus(_.packages)
       .modify(packages => {
-        def updateVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
+        def addVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
           // while the main package is guaranteed to not exist the dependencies might already have been vetted, and they might have been vetted with a later date so we make sure that the dependencies are available as early as we need them
           packages.find(_.packageId == packageId) match {
             case Some(existingVettingState) =>
@@ -188,7 +254,7 @@ trait ParticipantAdminDarsConnection {
             PackageId.assertFromString
           )
           .foldLeft(packages) { case (vettingState, newPackage) =>
-            updateVettingStateForPackage(newPackage, vettingState)
+            addVettingStateForPackage(newPackage, vettingState)
           }
       })
   }

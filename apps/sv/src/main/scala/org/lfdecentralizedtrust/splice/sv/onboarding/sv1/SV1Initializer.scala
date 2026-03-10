@@ -47,6 +47,7 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
+  DarResourcesUtil,
   TemplateJsonDecoder,
   UploadablePackage,
 }
@@ -617,7 +618,7 @@ class SV1Initializer(
       DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
       DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
     ).flatMap { case (packageResource, requiredVersion) =>
-      DarResources
+      DarResourcesUtil
         .getRequiredPackageVersions(
           packageResource.latest.metadata.name,
           PackageVersion.assertFromString(requiredVersion),

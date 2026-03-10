@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
+import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
 
 class BootstrapPackageConfigDarUploadIntegrationTest
@@ -123,7 +123,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       val vettedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
         vettedPackages
           .flatMap { darDesc =>
-            DarResources.lookupPackageId(darDesc.packageId)
+            DarResourcesUtil.lookupPackageId(darDesc.packageId)
           }
           .map(dar => dar.metadata.name -> dar.metadata.version)
       }
@@ -161,7 +161,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
     clue(
       s"versions for package ${packageResource.latest.metadata.name} should strictly contain the required ones"
     ) {
-      dars.map(_._2) shouldBe DarResources
+      dars.map(_._2) shouldBe DarResourcesUtil
         .getRequiredPackageVersions(
           packageResource.latest.metadata.name,
           PackageVersion.assertFromString(requiredVersion),
