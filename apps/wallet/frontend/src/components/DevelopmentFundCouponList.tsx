@@ -55,6 +55,7 @@ const ActiveCouponsTable: React.FC = () => {
 
   const [selectedCoupon, setSelectedCoupon] = React.useState<string | null>(null);
   const [withdrawalReason, setWithdrawalReason] = React.useState('');
+  const [withdrawError, setWithdrawError] = React.useState<string | null>(null);
 
   const withdrawMutation = useMutation({
     mutationFn: async (reason: string) => {
@@ -66,10 +67,12 @@ const ActiveCouponsTable: React.FC = () => {
     onSuccess: () => {
       setSelectedCoupon(null);
       setWithdrawalReason('');
+      setWithdrawError(null);
       invalidateAll();
     },
-    onError: error => {
-      console.error('Failed to withdraw development fund coupon', error);
+    onError: err => {
+      console.error('Failed to withdraw development fund coupon', err);
+      setWithdrawError(extractApiErrorMessage(err));
     },
   });
 
@@ -87,17 +90,22 @@ const ActiveCouponsTable: React.FC = () => {
 
   const handleWithdrawClick = (couponId: string) => {
     setSelectedCoupon(couponId);
+    setWithdrawError(null);
   };
 
   const handleWithdrawConfirm = () => {
     if (withdrawalReason.trim()) {
+      setWithdrawError(null);
       withdrawMutation.mutate(withdrawalReason);
     }
   };
 
-  const handleReasonChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleWithdrawDialogClose = () => {
+    setSelectedCoupon(null);
+    setWithdrawError(null);
+  };
+
+  const handleReasonChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setWithdrawalReason(event.target.value);
   };
 
@@ -176,12 +184,13 @@ const ActiveCouponsTable: React.FC = () => {
       {/* Withdraw Dialog */}
       <Dialog
         open={!!selectedCoupon}
-        onClose={() => setSelectedCoupon(null)}
+        onClose={handleWithdrawDialogClose}
         slotProps={{ paper: { id: 'withdraw-development-fund-dialog' } }}
       >
         <DialogTitle>Withdraw Development Fund Coupon</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
+            {withdrawError && <Alert severity="error">{withdrawError}</Alert>}
             <Typography variant="body2">
               Please provide a reason for withdrawing this development fund allocation.
             </Typography>
@@ -197,7 +206,7 @@ const ActiveCouponsTable: React.FC = () => {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSelectedCoupon(null)}>Cancel</Button>
+          <Button onClick={handleWithdrawDialogClose}>Cancel</Button>
           <DisableConditionally
             conditions={[
               {
