@@ -11,7 +11,7 @@
 -- Note also that the delivery part of a DvP settelement can be both another
 -- token implementing the standard, as well as the creation of on-ledger state
 -- specific to your registry; e.g., a license contract.
-module Splice.Tests.TestAmuletTokenDvP where
+module Splice.Tests.TestAmuletTokenDvP_V1V2Mixed where
 
 import Daml.Script
 
@@ -87,8 +87,7 @@ setupOtcTrade  = do
   -- Note: here we use Amulet as the single asset, as that is all we have available in this repository.
   -- Given that we are using only the DvP interface, that should though be a fine stand-in for
   -- a DvP across two assets from different registries.
-  let aliceLeg = mkTransfer "leg0_a" alice bob 50.0
-      aliceLeg2 = mkTransfer "leg0_b" alice bob 50.0
+  let aliceLeg = mkTransfer "leg0_a" alice bob 100.0
   let bobLeg = mkTransfer "leg1_a" bob alice 10.0
       bobLeg2 = mkTransfer "leg1_b" bob alice 10.0
   let feeLeg = mkTransfer "fee" bob provider 1.0
@@ -99,14 +98,15 @@ setupOtcTrade  = do
       deadline = now `addRelTime` hours 2
   otcTradeCid <- submit provider $ createCmd OTCTrade with
     venue = provider
-    transferLegsByAdmin = groupLegsByAdmin [aliceLeg, aliceLeg2, bobLeg, bobLeg2, feeLeg]
+    transferLegsByAdmin = groupLegsByAdmin [aliceLeg, bobLeg, bobLeg2, feeLeg]
     settleAt
     createdAt = now
     settlementDeadline = Some deadline
+    extraExecutors = [alice, bob] -- FIXME: comment
 
   let
     settlement = SettlementInfo with
-      executors = [provider]
+      executors = [provider, alice, bob]
       requestedAt = now
       settlementRef = makeTradeRef otcTradeCid
       settleAt = settleAt
@@ -123,7 +123,7 @@ setupOtcTrade  = do
 
   -- Alice sees the allocation request in her wallet
   [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
-  aliceAlloc.transferLegs === [aliceLeg, aliceLeg2, bobLeg, bobLeg2]
+  aliceAlloc.transferLegs === [aliceLeg, bobLeg, bobLeg2]
 
   -- alice accepts allocation request directly via her wallet
   inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
@@ -168,7 +168,7 @@ setupOtcTrade  = do
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
-  bobAlloc.transferLegs === [aliceLeg, aliceLeg2, bobLeg, bobLeg2, feeLeg]
+  bobAlloc.transferLegs === [aliceLeg, bobLeg, bobLeg2, feeLeg]
 
   -- bob accepts allocation request directly via his wallet
   inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
@@ -211,8 +211,8 @@ setupOtcTrade  = do
 -- FIXME: test multiple executors
 
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
-testDvP : Script ()
-testDvP = script do
+testDvP_mixed : Script ()
+testDvP_mixed = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
 
   -- assume the time given to prepare has passed
@@ -234,16 +234,16 @@ testDvP = script do
         transferLegs
         allocationCids
         extraArgs = emptyExtraArgs
-        actors = [provider]
+        actors = [provider, alice, bob]
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
   let disclosures = foldMap snd settleBatchContexts
   let allocationBatchesByAdmin = Map.fromList $ map fst settleBatchContexts
 
-
-  results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
-    allocationBatchesByAdmin
-    allocationRequests = requestCids
+  results <- submit (actAs alice <> actAs bob <> actAs provider <> discloseMany (Map.values disclosures.disclosures)) $
+    exerciseCmd otcTradeCid OTCTrade_Settle with
+      allocationBatchesByAdmin
+      allocationRequests = requestCids
 
   -- check metadata
   forA_ results $ \result -> expectNoBurn result.meta
