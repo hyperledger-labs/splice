@@ -59,6 +59,9 @@ monitoring:
         sequencerRetentionDays: 30
       sequencerClientDelay:
         seconds: 90
+      sequencerRateLimits:
+        circuitBreakerStateThreshold: 0.5
+        rejectionRateThreshold: 0
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
