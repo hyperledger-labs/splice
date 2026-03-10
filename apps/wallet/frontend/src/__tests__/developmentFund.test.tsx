@@ -38,7 +38,9 @@ const loginAndOpenDevelopmentFund = async () => {
 };
 
 const buildAllocationFormMock = (
-  overrides: Partial<ReturnType<typeof developmentFundAllocationFormHook.useDevelopmentFundAllocationForm>> = {}
+  overrides: Partial<
+    ReturnType<typeof developmentFundAllocationFormHook.useDevelopmentFundAllocationForm>
+  > = {}
 ): ReturnType<typeof developmentFundAllocationFormHook.useDevelopmentFundAllocationForm> => ({
   formKey: 0,
   error: null,
@@ -74,7 +76,9 @@ describe('Development Fund page', () => {
     await loginAndOpenDevelopmentFund();
 
     expect(
-      await screen.findByText(/Your party is not the development fund manager designated by the CF foundation\./)
+      await screen.findByText(
+        /Your party is not the development fund manager designated by the CF foundation\./
+      )
     ).toBeDefined();
   });
 
@@ -123,7 +127,9 @@ describe('Development Fund page', () => {
 
     const { user } = await loginAndOpenDevelopmentFund();
 
-    expect(await screen.findByRole('heading', { name: 'Development Fund Allocation' })).toBeDefined();
+    expect(
+      await screen.findByRole('heading', { name: 'Development Fund Allocation' })
+    ).toBeDefined();
 
     const amountInput = screen.getByRole('textbox', { name: 'amount' });
     await user.type(amountInput, '11');
@@ -177,7 +183,9 @@ describe('Development Fund page', () => {
 
     const { user } = await loginAndOpenDevelopmentFund();
 
-    expect(await screen.findByRole('heading', { name: 'Development Fund Allocation' })).toBeDefined();
+    expect(
+      await screen.findByRole('heading', { name: 'Development Fund Allocation' })
+    ).toBeDefined();
 
     const amountInput = screen.getByRole('textbox', { name: 'amount' });
     await user.type(amountInput, '0');
@@ -216,7 +224,9 @@ describe('Development Fund page', () => {
 
     const { user } = await loginAndOpenDevelopmentFund();
 
-    expect(await screen.findByRole('heading', { name: 'Development Fund Allocation' })).toBeDefined();
+    expect(
+      await screen.findByRole('heading', { name: 'Development Fund Allocation' })
+    ).toBeDefined();
 
     const invalidExpirationDate = dayjs().subtract(2, 'day').format('MM/DD/YYYY hh:mm A');
     const expiresAtInput = screen.getByRole('textbox', { name: /expires at/i });
@@ -225,7 +235,7 @@ describe('Development Fund page', () => {
 
     await waitFor(() => expect(expiresAtInput).toHaveAttribute('aria-invalid', 'true'));
     expect(screen.getByRole('button', { name: 'Allocate' })).toBeDisabled();
-  })
+  });
 
   test('renders development fund history table view', async () => {
     server.use(
@@ -344,62 +354,68 @@ describe('Development Fund page', () => {
             },
           })
         );
-      }),
+      })
     );
 
     await loginAndOpenDevelopmentFund();
 
-    expect(await screen.findByRole('heading', { name: 'Unclaimed Development Fund Allocations' })).toBeDefined();
+    expect(
+      await screen.findByRole('heading', { name: 'Unclaimed Development Fund Allocations' })
+    ).toBeDefined();
     expect(await screen.findByText('No development fund allocations found')).toBeDefined();
   });
 
   test('renders unclaimed development fund allocations table with items', async () => {
-    const useDevelopmentFundSpy = vi.spyOn(developmentFundHook, 'useDevelopmentFund').mockReturnValue({
-      primaryParty: alicePartyId,
-      isFundManager: true,
-      isLoading: false,
-      coupons: {
-        coupons: [
-          {
-            id: 'dev-fund-coupon-1',
-            createdAt: new Date('2026-01-01T10:00:00.000Z'),
-            fundManager: alicePartyId,
-            beneficiary: alicePartyId,
-            amount: new BigNumber(2.5),
-            expiresAt: new Date('2026-01-10T11:00:00.000Z'),
-            reason: 'Protocol upgrade',
-          },
-        ],
+    const useDevelopmentFundSpy = vi
+      .spyOn(developmentFundHook, 'useDevelopmentFund')
+      .mockReturnValue({
+        primaryParty: alicePartyId,
+        isFundManager: true,
         isLoading: false,
-        isError: false,
-        error: null,
-        hasNextPage: false,
-        hasPreviousPage: false,
-        currentPage: 1,
-        goToNextPage: vi.fn(),
-        goToPreviousPage: vi.fn(),
-      },
-      history: {
-        historyEvents: [],
-        isLoadingHistory: false,
-        isHistoryError: false,
-        historyError: null,
-        hasNextHistoryPage: false,
-        hasPreviousHistoryPage: false,
-        currentHistoryPage: 1,
-        goToNextHistoryPage: vi.fn(),
-        goToPreviousHistoryPage: vi.fn(),
-      },
-      unclaimedTotal: new BigNumber(10),
-      isLoadingUnclaimedTotal: false,
-      isUnclaimedTotalError: false,
-      unclaimedTotalError: null,
-      invalidateAll: vi.fn(),
-    });
+        coupons: {
+          coupons: [
+            {
+              id: 'dev-fund-coupon-1',
+              createdAt: new Date('2026-01-01T10:00:00.000Z'),
+              fundManager: alicePartyId,
+              beneficiary: alicePartyId,
+              amount: new BigNumber(2.5),
+              expiresAt: new Date('2026-01-10T11:00:00.000Z'),
+              reason: 'Protocol upgrade',
+            },
+          ],
+          isLoading: false,
+          isError: false,
+          error: null,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          currentPage: 1,
+          goToNextPage: vi.fn(),
+          goToPreviousPage: vi.fn(),
+        },
+        history: {
+          historyEvents: [],
+          isLoadingHistory: false,
+          isHistoryError: false,
+          historyError: null,
+          hasNextHistoryPage: false,
+          hasPreviousHistoryPage: false,
+          currentHistoryPage: 1,
+          goToNextHistoryPage: vi.fn(),
+          goToPreviousHistoryPage: vi.fn(),
+        },
+        unclaimedTotal: new BigNumber(10),
+        isLoadingUnclaimedTotal: false,
+        isUnclaimedTotalError: false,
+        unclaimedTotalError: null,
+        invalidateAll: vi.fn(),
+      });
 
     await loginAndOpenDevelopmentFund();
 
-    expect(await screen.findByRole('heading', { name: 'Unclaimed Development Fund Allocations' })).toBeDefined();
+    expect(
+      await screen.findByRole('heading', { name: 'Unclaimed Development Fund Allocations' })
+    ).toBeDefined();
     expect(
       await screen.findByText(
         /Your party is the development fund manager designated by the CF foundation\./

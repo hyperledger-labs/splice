@@ -10,7 +10,15 @@ interface UnclaimedDevelopmentFundCouponPayload {
   amount: string;
 }
 
-export const useUnclaimedDevelopmentFundTotal = () => {
+export type UseUnclaimedDevelopmentFundTotalResult = {
+  data: BigNumber;
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  invalidate: () => void;
+};
+
+export const useUnclaimedDevelopmentFundTotal = (): UseUnclaimedDevelopmentFundTotalResult => {
   const scanClient = useValidatorScanProxyClient();
   const queryClient = useQueryClient();
 
@@ -21,7 +29,9 @@ export const useUnclaimedDevelopmentFundTotal = () => {
       const coupons = response.unclaimed_development_fund_coupons || [];
 
       return coupons.reduce((total, coupon) => {
-        const payload = coupon.contract?.payload as UnclaimedDevelopmentFundCouponPayload | undefined;
+        const payload = coupon.contract?.payload as
+          | UnclaimedDevelopmentFundCouponPayload
+          | undefined;
         const amount = new BigNumber(payload?.amount || 0);
         return total.plus(amount);
       }, new BigNumber(0));

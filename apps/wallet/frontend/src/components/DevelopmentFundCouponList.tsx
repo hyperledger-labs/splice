@@ -4,9 +4,7 @@ import React from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useDevelopmentFund } from '../hooks/useDevelopmentFund';
-import {
-  getDevelopmentFundEventTypeLabel,
-} from '../utils/developmentFundFormatting';
+import { getDevelopmentFundEventTypeLabel } from '../utils/developmentFundFormatting';
 import { useWalletConfig } from '../utils/config';
 import {
   Alert,
@@ -29,7 +27,12 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DateDisplay, DisableConditionally, extractApiErrorMessage, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  DateDisplay,
+  DisableConditionally,
+  extractApiErrorMessage,
+  Loading,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsEntry from './BftAnsEntry';
 
 // Active Coupons Table Component

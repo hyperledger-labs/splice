@@ -3,13 +3,33 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useIsDevelopmentFundManager } from './useIsDevelopmentFundManager';
-import { useActiveDevelopmentFundCoupons } from './useActiveDevelopmentFundCoupons';
-import { useDevelopmentFundCouponHistory } from './useDevelopmentFundCouponHistory';
+import {
+  useActiveDevelopmentFundCoupons,
+  UseActiveDevelopmentFundCouponsResult,
+} from './useActiveDevelopmentFundCoupons';
+import {
+  useDevelopmentFundCouponHistory,
+  UseDevelopmentFundCouponHistoryResult,
+} from './useDevelopmentFundCouponHistory';
 import { useUnclaimedDevelopmentFundTotal } from './useUnclaimedDevelopmentFundTotal';
 import { usePrimaryParty } from './usePrimaryParty';
 import { invalidateAllDevelopmentFundQueries } from '../utils/invalidateDevelopmentFundQueries';
+import BigNumber from 'bignumber.js';
 
-export const useDevelopmentFund = () => {
+type UseDevelopmentFundResult = {
+  primaryParty: string | undefined;
+  isFundManager: boolean;
+  isLoading: boolean;
+  coupons: UseActiveDevelopmentFundCouponsResult;
+  history: UseDevelopmentFundCouponHistoryResult;
+  unclaimedTotal: BigNumber;
+  isLoadingUnclaimedTotal: boolean;
+  isUnclaimedTotalError: boolean;
+  unclaimedTotalError: Error | null;
+  invalidateAll: () => void;
+};
+
+export const useDevelopmentFund = (): UseDevelopmentFundResult => {
   const primaryParty = usePrimaryParty();
   const { isFundManager, isLoading: isLoadingFundManager } = useIsDevelopmentFundManager();
   const couponsData = useActiveDevelopmentFundCoupons(primaryParty);

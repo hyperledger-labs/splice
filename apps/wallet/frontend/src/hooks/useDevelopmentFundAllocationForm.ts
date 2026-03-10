@@ -55,11 +55,9 @@ export const useDevelopmentFundAllocationForm = (): UseDevelopmentFundAllocation
   const [reason, setReason] = useState('');
 
   const amountNum = useMemo(() => (amount ? new BigNumber(amount) : null), [amount]);
-  const isAmountValid =
-    amountNum !== null && amountNum.isFinite() && amountNum.gt(0);
+  const isAmountValid = amountNum !== null && amountNum.isFinite() && amountNum.gt(0);
   const amountExceedsAvailable = isAmountValid && amountNum.gt(unclaimedTotal);
-  const isExpiryValid =
-    expiresAt != null && expiresAt.isValid() && expiresAt.isAfter(dayjs());
+  const isExpiryValid = expiresAt != null && expiresAt.isValid() && expiresAt.isAfter(dayjs());
   const expiryError =
     expiresAt != null
       ? !expiresAt.isValid()

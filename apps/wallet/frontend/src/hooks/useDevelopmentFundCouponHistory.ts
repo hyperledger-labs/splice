@@ -46,8 +46,7 @@ export const useDevelopmentFundCouponHistory = (): UseDevelopmentFundCouponHisto
     }
   }, [cursorStack.length]);
 
-  const hasNextHistoryPage =
-    nextPageToken !== undefined && historyEvents.length === PAGE_SIZE;
+  const hasNextHistoryPage = nextPageToken !== undefined && historyEvents.length === PAGE_SIZE;
   const hasPreviousHistoryPage = cursorStack.length > 1;
   const currentHistoryPage = cursorStack.length;
 

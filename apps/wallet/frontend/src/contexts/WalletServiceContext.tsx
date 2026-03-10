@@ -156,7 +156,10 @@ export interface WalletClient {
     reason: string
   ) => Promise<void>;
   listActiveDevelopmentFundCoupons: () => Promise<DevelopmentFundCoupon[]>;
-  listCouponHistoryEvents: (pageSize: number, cursor?: number) => Promise<{
+  listCouponHistoryEvents: (
+    pageSize: number,
+    cursor?: number
+  ) => Promise<{
     events: CouponHistoryEvent[];
     nextPageToken?: number;
   }>;
@@ -165,11 +168,11 @@ export interface WalletClient {
 
 class ApiMiddleware
   extends BaseApiMiddleware<RequestContext, ResponseContext>
-  implements Middleware { }
+  implements Middleware {}
 
 class ExternalApiMiddleware
   extends BaseApiMiddleware<external.RequestContext, external.ResponseContext>
-  implements external.Middleware { }
+  implements external.Middleware {}
 
 export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>> = ({
   url,
@@ -436,13 +439,13 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             const subscription = Contract.decodeOpenAPI(sub.subscription, Subscription);
             const state = sub.state.payment
               ? {
-                type: 'payment' as const,
-                value: Contract.decodeOpenAPI(sub.state.payment!, SubscriptionPayment),
-              }
+                  type: 'payment' as const,
+                  value: Contract.decodeOpenAPI(sub.state.payment!, SubscriptionPayment),
+                }
               : {
-                type: 'idle' as const,
-                value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
-              };
+                  type: 'idle' as const,
+                  value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
+                };
             return { subscription, state };
           }),
         };
@@ -500,27 +503,24 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         pageSize: number,
         cursor?: number
       ): Promise<{ events: CouponHistoryEvent[]; nextPageToken?: number }> => {
-        const response = await walletClient.listDevelopmentFundCouponHistory(
-          pageSize,
-          cursor
+        const response = await walletClient.listDevelopmentFundCouponHistory(pageSize, cursor);
+        const events: CouponHistoryEvent[] = response.development_fund_coupon_history.map(
+          (item: ArchivedDevelopmentFundCoupon) => {
+            const stableCouponId = `${item.createdAt.getTime()}-${item.fund_manager}-${item.beneficiary}`;
+            const stableEventId = `${stableCouponId}-${item.archivedAt.getTime()}-${item.status}`;
+            return {
+              id: stableEventId,
+              couponId: stableCouponId,
+              eventType: item.status,
+              timestamp: item.archivedAt,
+              fundManager: item.fund_manager,
+              beneficiary: item.beneficiary,
+              amount: new BigNumber(item.amount),
+              allocationReason: item.reason,
+              withdrawalReason: item.rejection_or_withdrawal_reason,
+            };
+          }
         );
-        const events: CouponHistoryEvent[] =
-          response.development_fund_coupon_history.map(
-            (item: ArchivedDevelopmentFundCoupon) => {
-              const stableCouponId = `${item.createdAt.getTime()}-${item.fund_manager}-${item.beneficiary}`;
-              const stableEventId = `${stableCouponId}-${item.archivedAt.getTime()}-${item.status}`;
-              return {
-                id: stableEventId,
-                couponId: stableCouponId,
-                eventType: item.status,
-                timestamp: item.archivedAt,
-                fundManager: item.fund_manager,
-                beneficiary: item.beneficiary,
-                amount: new BigNumber(item.amount),
-                allocationReason: item.reason,
-                withdrawalReason: item.rejection_or_withdrawal_reason,
-              };
-            });
         return {
           events,
           nextPageToken: response.next_page_token,

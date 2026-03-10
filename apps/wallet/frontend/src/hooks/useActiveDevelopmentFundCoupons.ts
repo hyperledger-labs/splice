@@ -8,7 +8,21 @@ import { DevelopmentFundCoupon } from '../models/models';
 
 const PAGE_SIZE = 10;
 
-export const useActiveDevelopmentFundCoupons = (fundManager?: string) => {
+export type UseActiveDevelopmentFundCouponsResult = {
+  coupons: DevelopmentFundCoupon[];
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  currentPage: number;
+  goToNextPage: () => void;
+  goToPreviousPage: () => void;
+};
+
+export const useActiveDevelopmentFundCoupons = (
+  fundManager?: string
+): UseActiveDevelopmentFundCouponsResult => {
   const { listActiveDevelopmentFundCoupons } = useWalletClient();
 
   const [currentPage, setCurrentPage] = React.useState<number>(1);
@@ -18,15 +32,14 @@ export const useActiveDevelopmentFundCoupons = (fundManager?: string) => {
     queryFn: () => listActiveDevelopmentFundCoupons(),
   });
 
-  const allCoupons = couponsQuery.data || [];
+  const allCoupons = React.useMemo(() => couponsQuery.data || [], [couponsQuery.data]);
   const filteredCoupons = React.useMemo(() => {
     if (!fundManager) return allCoupons;
     return allCoupons.filter((c: DevelopmentFundCoupon) => c.fundManager === fundManager);
   }, [allCoupons, fundManager]);
 
   const sortedCoupons = React.useMemo(
-    () =>
-      [...filteredCoupons].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    () => [...filteredCoupons].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     [filteredCoupons]
   );
 

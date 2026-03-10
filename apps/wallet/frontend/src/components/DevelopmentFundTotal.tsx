@@ -6,12 +6,8 @@ import { useDevelopmentFund } from '../hooks/useDevelopmentFund';
 import { extractApiErrorMessage } from '@lfdecentralizedtrust/splice-common-frontend';
 
 const DevelopmentFundTotal: React.FC = () => {
-  const {
-    unclaimedTotal,
-    isLoadingUnclaimedTotal,
-    isUnclaimedTotalError,
-    unclaimedTotalError,
-  } = useDevelopmentFund();
+  const { unclaimedTotal, isLoadingUnclaimedTotal, isUnclaimedTotalError, unclaimedTotalError } =
+    useDevelopmentFund();
 
   if (isUnclaimedTotalError) {
     return (

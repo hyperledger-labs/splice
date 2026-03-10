@@ -52,22 +52,20 @@ const DevelopmentFundAllocation: React.FC = () => {
       return 'Amount must be greater than 0';
     }
     return undefined;
-  }, [amountExceedsAvailable, amountNum, unclaimedTotal, config.spliceInstanceNames.amuletNameAcronym]);
+  }, [
+    amountExceedsAvailable,
+    amountNum,
+    unclaimedTotal,
+    config.spliceInstanceNames.amuletNameAcronym,
+  ]);
 
   return (
     <Stack spacing={2}>
       <Typography variant="h4">Development Fund Allocation</Typography>
-      <Card
-        variant="outlined"
-        sx={disabled ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-      >
+      <Card variant="outlined" sx={disabled ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack key={formKey} spacing={3}>
-            {error ? (
-              <Alert severity="error">
-                {error}
-              </Alert>
-            ) : null}
+            {error ? <Alert severity="error">{error}</Alert> : null}
 
             <Typography variant="h6">Beneficiary</Typography>
             <BftAnsField
