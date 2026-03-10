@@ -331,6 +331,16 @@ allocation_v2_senderActor_withdrawUsingV1 _self AllocationV2.Allocation_Withdraw
    -- FIXME: implement once we have actors support
 
 
+allocation_v1_settleImplUsingV2
+  : AllocationV1.Allocation
+  -> ContractId AllocationV2.Allocation
+  -> AllocationV2.Allocation_Settle
+  -> Update AllocationV2.Allocation_SettleResult
+allocation_v1_settleImplUsingV2  = error "FIXME: implement"
+
+
+
+
 {-
 allocation_v2_settleImplUsingV1
   : AllocationV1.Allocation
@@ -350,7 +360,7 @@ amulet_allocationFactoryV2_settleImpl
   : AllocationInstructionV2.AllocationFactory
   -> AllocationInstructionV2.AllocationFactory_SettleBatch
   -> Update AllocationInstructionV2.AllocationFactory_SettleBatchResult
-amulet_allocationFactoryV2_settleImpl factory AllocationInstructionV2.AllocationFactory_SettleBatch {..} = do
+amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.AllocationFactory_SettleBatch {..}) = do
   -- validate call to factory and retrieve context
   let admin = (view factory).admin
   requireExpectedAdminMatch admin expectedAdmin
