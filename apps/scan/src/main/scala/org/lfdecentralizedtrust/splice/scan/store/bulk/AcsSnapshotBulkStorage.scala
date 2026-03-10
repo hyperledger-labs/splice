@@ -156,4 +156,10 @@ class AcsSnapshotBulkStorage(
       loggerFactory,
     )
   }
+
+  def getAcsSnapshotUpto(upToTimestamp: CantonTimestamp) = {
+    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeUpTo(upToTimestamp)
+    val prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTimestamp)
+    s3Connection.listObjects(prefix)
+  }
 }

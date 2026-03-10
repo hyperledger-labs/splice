@@ -46,8 +46,8 @@ class S3BucketConnection(
       key: String
   )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
 
-  def listObjects: Future[ListObjectsResponse] =
-    s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+  def listObjects(prefix: Option[String] = None): Future[ListObjectsResponse] =
+    s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).prefix(prefix.getOrElse("")).build()).asScala
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */

@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import java.time.{Duration, ZoneOffset}
 import java.time.temporal.ChronoField
+import scala.concurrent.Future
 
 /** Note that these configurations must be kept consistent between SVs,
   *  so they are not configured via a local config file in Scan. Instead, they must be voted on.
@@ -60,8 +61,29 @@ case class ScanStorageConfig(
     CantonTimestamp.assertFromInstant(until)
   }
 
+  def computeSnapshotTimeUpTo(
+      upToRecordTime: CantonTimestamp,
+      periodHours: Int,
+  ): CantonTimestamp = {
+    val upToTimeUTC = upToRecordTime.toInstant.atOffset(ZoneOffset.UTC)
+    val hourForSnapshot = timesToDoSnapshot(periodHours)
+      .find(_ <= upToTimeUTC.get(ChronoField.HOUR_OF_DAY))
+      .getOrElse(
+        throw new RuntimeException(
+          s"Unexpectedly could not find a time for a snapshot before ${upToTimeUTC.get(ChronoField.HOUR_OF_DAY)}"
+        )
+      )
+    // TODO: I'm not convinced that the translation to local time and back to UTC is correct here (and in computeSnapshotTimeAfter above)
+    CantonTimestamp.assertFromInstant(
+      upToTimeUTC.toLocalDate.atTime(hourForSnapshot, 0).toInstant(ZoneOffset.UTC)
+    )
+  }
+
   def computeBulkSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, bulkAcsSnapshotPeriodHours)
+
+  def computeBulkSnapshotTimeUpTo(upToRecordTime: CantonTimestamp): CantonTimestamp =
+    computeSnapshotTimeUpTo(upToRecordTime, bulkAcsSnapshotPeriodHours)
 
   def computeDbSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, dbAcsSnapshotPeriodHours)
@@ -79,7 +101,7 @@ case class ScanStorageConfig(
    * If end timestamp is not given, it will be computed from the start timestamp
    * based on the bulkAcsSnapshotPeriodHours period
    */
-  def getSegmentKeyPrefix(
+  def getSegmentFolder(
       segmentStartTimestamp: TimestampWithMigrationId,
       segmentEndTimestamp: Option[TimestampWithMigrationId],
   ): String = {
@@ -89,6 +111,9 @@ case class ScanStorageConfig(
     s"${segmentStartTimestamp.timestamp}-Migration-${segmentStartTimestamp.migrationId}-${endTimestamp}"
   }
 
+  def findSegmentFolderPrefixByStartTimestamp(
+      segmentStartTimestamp: CantonTimestamp
+  ): String = segmentStartTimestamp.toString
 }
 
 object ScanStorageConfigs {
