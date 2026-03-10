@@ -106,7 +106,9 @@ template ExternalPartyAmuletRules
         meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
-      allocationFactory_settleImpl _self arg = amulet_allocationFactoryV2_settleImpl this arg
+      allocationFactory_settleImpl _self arg =
+        amulet_allocationFactoryV2_settleImpl (toInterface @V2.AllocationFactory this) arg
+
       allocationFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
         pure (view $ toInterface @V2.AllocationFactory this)
@@ -532,73 +534,4 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
     senderChangeCids = map upcast senderChangeCids
     output = V2.AllocationInstructionResult_Completed with allocationCid
     meta
-
-
-amulet_allocationFactoryV2_settleImpl
-  : ExternalPartyAmuletRules
-  -> V2.AllocationFactory_SettleBatch
-  -> Update V2.AllocationFactory_SettleBatchResult
-amulet_allocationFactoryV2_settleImpl this V2.AllocationFactory_SettleBatch {..} = do
-  let dso = this.dso
-  -- validate call to factory and retrieve context
-  requireExpectedAdminMatch expectedAdmin dso
-
-  -- fetch and validate all allocations
-  allocations <- forA allocationCids $ \allocationCid -> do
-    allocation <- fetchChecked @AmuletAllocationV2 (ForDso with dso) (fromInterfaceContractId allocationCid)
-    require "Actors match allocation executors" (actors == allocation.allocation.settlement.executors)
-    -- FIXME: consider what other validation is missing
-    pure allocation
-
-  let allocatedLegs = Map.fromList $ do
-        allocation <- allocations
-        let authorizer = V2.basicAccount (allocation.authorizer)
-        case allocation.allocation.transferLegs of
-          [] -> error "Unexpected empty transfer legs in allocation"
-          (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
-  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
-  validateExpectedTransfers ppLeg expectedLegs allocatedLegs
-
-  -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
-  -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
-
-  -- settle all allocations
-  newHoldingCidss <- forA allocationCids $ \allocationCid -> do
-    result <- exercise allocationCid V2.Allocation_Settle with extraArgs
-    pure result.newHoldingCids
-
-  -- return result
-  pure V2.AllocationFactory_SettleBatchResult with
-    newHoldingCids = foldl (Map.unionWith (++)) Map.empty newHoldingCidss
-    meta = emptyMetadata
-
-
-validateExpectedTransfers
-  : (Show leg, Ord leg) => (leg -> Text) -> [leg] -> Map.Map leg [leg] -> Update ()
-validateExpectedTransfers pp [] allocated
-  | Map.null allocated  =  pure ()
-  | otherwise = abort $ "Unexpected remaining allocated transfer legs:\n" <> ppMap pp allocated
-validateExpectedTransfers pp (expected :: expectedRest) allocated =
-  case Map.lookup expected allocated of
-    None -> abort $ T.unlines
-      [ "No matching allocations for expected transfer leg: "
-      , pp expected
-      , "with open allocations: "
-      , ppMap pp allocated
-      , "remaining expected legs: "
-      , T.unlines (map pp expectedRest)
-      ]
-    Some [] -> validateExpectedTransfers pp expectedRest (Map.delete expected allocated)
-    Some (newExpected::newRemaining) ->
-      validateExpectedTransfers pp expectedRest $
-        Map.insert newExpected newRemaining $ Map.delete expected allocated
-
--- FIXME: cleanup this debug pretty-printing code
-ppMap : (leg -> Text) -> Map.Map leg [leg] -> Text
-ppMap pp m = T.unlines $ concat [ pp k :: map (\v -> "  " <> pp v) vs  | (k, vs) <- Map.toList m ]
-
-ppLeg : (V2.Account, V2.TransferLeg) -> Text
-ppLeg (authorizer, leg) =
-  -- show (authorizer.owner, leg.sender.owner, leg.receiver.owner, leg.amount)
-  show (authorizer, leg)
 

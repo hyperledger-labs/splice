@@ -12,6 +12,8 @@ module Splice.Api.Token.UtilsV2 (
 
   allocationFactory_v2_tryAllocateUsingV1,
 
+  amulet_allocationFactoryV2_settleImpl,
+
   -- * Transfer instructions
   transferInstruction_v2_receiverActor_acceptImpl,
   transferInstruction_v2_receiverActor_rejectImpl,
@@ -24,6 +26,7 @@ module Splice.Api.Token.UtilsV2 (
 
 import DA.Date
 import DA.Optional (fromOptional, isNone)
+import DA.List (dedup)
 import qualified DA.Map as Map
 import DA.Text as T
 import DA.Time
@@ -339,7 +342,79 @@ allocation_v2_settleImplUsingV1 allocationCid AllocationV2.Allocation_Settle{..}
     meta = result.meta
 -}
 
+amulet_allocationFactoryV2_settleImpl
+  : AllocationInstructionV2.AllocationFactory
+  -> AllocationInstructionV2.AllocationFactory_SettleBatch
+  -> Update AllocationInstructionV2.AllocationFactory_SettleBatchResult
+amulet_allocationFactoryV2_settleImpl factory AllocationInstructionV2.AllocationFactory_SettleBatch {..} = do
+  -- validate call to factory and retrieve context
+  let admin = (view factory).admin
+  requireExpectedAdminMatch admin expectedAdmin
 
+  -- fetch and validate all allocations
+  allocations <- forA allocationCids $ \allocationCid -> do
+    allocation0 <- fetch allocationCid
+    let allocationView = view allocation0
+    let allocation = allocationView.allocation
+    require "Admin matches expected admin" (admin == AllocationV2.allocationAdmin allocation)
+
+    -- FIXME: consider allowing the caller to pass these in
+    require "Actors match allocation executors" (actors == allocation.settlement.executors)
+    -- FIXME: consider what other validation is missing
+    pure allocationView
+
+  let allocatedLegs = Map.fromList $ do
+        allocationView <- allocations
+        let authorizer = allocationView.authorizer
+        case allocationView.allocation.transferLegs of
+          [] -> error "Unexpected empty transfer legs in allocation"
+          (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
+  -- We allow self-transfers as future extensions might customize them via additional metadata.
+  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
+  validateExpectedTransfers ppLeg expectedLegs allocatedLegs
+
+  -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
+  -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
+
+  -- settle all allocations
+  newHoldingCidss <- forA allocationCids $ \allocationCid -> do
+    result <- exercise allocationCid AllocationV2.Allocation_Settle with extraArgs
+    pure result.newHoldingCids
+
+  -- return result
+  pure AllocationInstructionV2.AllocationFactory_SettleBatchResult with
+    newHoldingCids = foldl (Map.unionWith (++)) Map.empty newHoldingCidss
+    meta = emptyMetadata
+
+
+validateExpectedTransfers
+  : (Show leg, Ord leg) => (leg -> Text) -> [leg] -> Map.Map leg [leg] -> Update ()
+validateExpectedTransfers pp [] allocated
+  | Map.null allocated  =  pure ()
+  | otherwise = abort $ "Unexpected remaining allocated transfer legs:\n" <> ppMap pp allocated
+validateExpectedTransfers pp (expected :: expectedRest) allocated =
+  case Map.lookup expected allocated of
+    None -> abort $ T.unlines
+      [ "No matching allocations for expected transfer leg: "
+      , pp expected
+      , "with open allocations: "
+      , ppMap pp allocated
+      , "remaining expected legs: "
+      , T.unlines (map pp expectedRest)
+      ]
+    Some [] -> validateExpectedTransfers pp expectedRest (Map.delete expected allocated)
+    Some (newExpected::newRemaining) ->
+      validateExpectedTransfers pp expectedRest $
+        Map.insert newExpected newRemaining $ Map.delete expected allocated
+
+-- FIXME: cleanup this debug pretty-printing code
+ppMap : (leg -> Text) -> Map.Map leg [leg] -> Text
+ppMap pp m = T.unlines $ concat [ pp k :: map (\v -> "  " <> pp v) vs  | (k, vs) <- Map.toList m ]
+
+ppLeg : (HoldingV2.Account, AllocationV2.TransferLeg) -> Text
+ppLeg (authorizer, leg) =
+  -- show (authorizer.owner, leg.sender.owner, leg.receiver.owner, leg.amount)
+  show (authorizer, leg)
 
 
 
