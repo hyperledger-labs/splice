@@ -136,9 +136,6 @@ data SynchronizerNodeConfig = SynchronizerNodeConfig with
     sequencer : Optional SequencerConfig
       -- ^ The configuration of this sv's optional local sequencer.
 
-    sequencerIdentity : Optional SequencerIdentityConfig
-      -- ^ The configuration of this sv's optional local sequencer.
-
     mediator : Optional MediatorConfig
       -- ^ The configuration of this sv's optional local mediator.
 
@@ -147,6 +144,9 @@ data SynchronizerNodeConfig = SynchronizerNodeConfig with
 
     legacySequencerConfig: Optional LegacySequencerConfig
       -- ^ The legacy sequencer config for the prior migration id that is still up. We store this so it can be published on scan and validators can catchup.
+
+    sequencerIdentity : Optional SequencerIdentityConfig
+      -- ^ The configuration of this sv's optional local sequencer.
 
     physicalSynchronizers: Optional PhysicalSynchronizerNodeConfigMap
       -- ^ The synchronizer node configs for the currently running physical synchronizers.
