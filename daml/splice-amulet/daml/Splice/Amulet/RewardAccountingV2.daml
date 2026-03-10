@@ -27,6 +27,7 @@ template CalculateRewardsV2 with
     dso : Party
     round : Round
     rewardCouponTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
+    -- FIXME: doubl-check whether still required
     dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
   where
     signatory dso
