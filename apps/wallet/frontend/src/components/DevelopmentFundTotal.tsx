@@ -4,8 +4,10 @@ import React from 'react';
 import { Alert, Card, CardContent, Stack, Typography, CircularProgress } from '@mui/material';
 import { useDevelopmentFund } from '../hooks/useDevelopmentFund';
 import { extractApiErrorMessage } from '@lfdecentralizedtrust/splice-common-frontend';
+import { useWalletConfig } from '../utils/config';
 
 const DevelopmentFundTotal: React.FC = () => {
+  const config = useWalletConfig();
   const { unclaimedTotal, isLoadingUnclaimedTotal, isUnclaimedTotalError, unclaimedTotalError } =
     useDevelopmentFund();
 
@@ -26,7 +28,7 @@ const DevelopmentFundTotal: React.FC = () => {
             {isLoadingUnclaimedTotal ? (
               <CircularProgress size={24} />
             ) : (
-              `${unclaimedTotal.toFixed(4)} CC`
+              `${unclaimedTotal.toFixed(4)} ${config.spliceInstanceNames.amuletNameAcronym}`
             )}
           </Typography>
         </Stack>

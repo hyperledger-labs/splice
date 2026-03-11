@@ -86,7 +86,7 @@ const ActiveCouponsTable: React.FC = () => {
   if (isError) {
     return (
       <Alert severity="error">
-        Error loading active development fund allocations: {JSON.stringify(error)}
+        Error loading active development fund allocations: {extractApiErrorMessage(error)}
       </Alert>
     );
   }
