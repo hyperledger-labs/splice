@@ -232,24 +232,22 @@ final class DbMultiDomainAcsStore[TXE](
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("lookupContractByIdAsOf")
-    waitUntilAcsIngested {
-      waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
-        storage
-          .querySingle(
-            selectFromTcsTableWithStateAsOf(
-              acsTableName,
-              archiveConfig.archiveTableName,
-              acsStoreId,
-              domainMigrationId,
-              companion,
-              asOf,
-              additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
-            ).headOption,
-            "lookupContractByIdAsOf",
-          )
-          .map(result => contractWithStateFromRow(companion)(result))
-          .value
-      }
+    waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
+      storage
+        .querySingle(
+          selectFromTcsTableWithStateAsOf(
+            acsTableName,
+            archiveConfig.archiveTableName,
+            acsStoreId,
+            domainMigrationId,
+            companion,
+            asOf,
+            additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
+          ).headOption,
+          "lookupContractByIdAsOf",
+        )
+        .map(result => contractWithStateFromRow(companion)(result))
+        .value
     }
   }
 
@@ -263,27 +261,25 @@ final class DbMultiDomainAcsStore[TXE](
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("listContractsAsOf")
-    waitUntilAcsIngested {
-      waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
-        val templateId = companionClass.typeId(companion)
-        val opName = s"listContractsAsOf:${templateId.getEntityName}"
-        for {
-          result <- storage.query(
-            selectFromTcsTableWithStateAsOf(
-              acsTableName,
-              archiveConfig.archiveTableName,
-              acsStoreId,
-              domainMigrationId,
-              companion,
-              asOf,
-              orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
-            ),
-            opName,
-          )
-          limited = applyLimit(opName, limit, result)
-          withState = limited.map(contractWithStateFromRow(companion)(_))
-        } yield withState
-      }
+    waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
+      val templateId = companionClass.typeId(companion)
+      val opName = s"listContractsAsOf:${templateId.getEntityName}"
+      for {
+        result <- storage.query(
+          selectFromTcsTableWithStateAsOf(
+            acsTableName,
+            archiveConfig.archiveTableName,
+            acsStoreId,
+            domainMigrationId,
+            companion,
+            asOf,
+            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
+          ),
+          opName,
+        )
+        limited = applyLimit(opName, limit, result)
+        withState = limited.map(contractWithStateFromRow(companion)(_))
+      } yield withState
     }
   }
 
@@ -298,34 +294,32 @@ final class DbMultiDomainAcsStore[TXE](
       traceContext: TraceContext,
   ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] = {
     val archiveConfig = requireArchiveConfig("listContractsActiveWithin")
-    waitUntilAcsIngested {
-      waitUntilRecordTimeReached(synchronizerId, upperBoundIncl).flatMap { _ =>
-        val templateId = companionClass.typeId(companion)
-        val opName = s"listContractsActiveWithin:${templateId.getEntityName}"
-        for {
-          result <- storage.query(
-            selectFromTcsTableWithStateActiveWithin(
-              acsTableName,
-              archiveConfig.archiveTableName,
-              acsStoreId,
-              domainMigrationId,
-              companion,
-              lowerBoundIncl,
-              upperBoundIncl,
-              orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
-            ),
-            opName,
+    waitUntilRecordTimeReached(synchronizerId, upperBoundIncl).flatMap { _ =>
+      val templateId = companionClass.typeId(companion)
+      val opName = s"listContractsActiveWithin:${templateId.getEntityName}"
+      for {
+        result <- storage.query(
+          selectFromTcsTableWithStateActiveWithin(
+            acsTableName,
+            archiveConfig.archiveTableName,
+            acsStoreId,
+            domainMigrationId,
+            companion,
+            lowerBoundIncl,
+            upperBoundIncl,
+            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
+          ),
+          opName,
+        )
+        limited = applyLimit(opName, limit, result)
+        withState = limited.map { row =>
+          TcsStore.TemporalContractWithState(
+            contractWithState = contractWithStateFromRow(companion)(row.withStateRow),
+            createdAt = CantonTimestamp.assertFromLong(row.withStateRow.acsRow.createdAt.micros),
+            archivedAt = row.archivedAt,
           )
-          limited = applyLimit(opName, limit, result)
-          withState = limited.map { row =>
-            TcsStore.TemporalContractWithState(
-              contractWithState = contractWithStateFromRow(companion)(row.withStateRow),
-              createdAt = CantonTimestamp.assertFromLong(row.withStateRow.acsRow.createdAt.micros),
-              archivedAt = row.archivedAt,
-            )
-          }
-        } yield withState
-      }
+        }
+      } yield withState
     }
   }
 
