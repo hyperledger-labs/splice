@@ -52,6 +52,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
+  DbScanAppRewardsStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -233,6 +234,7 @@ class ScanApp(
         nodeMetrics.grpcClientMetrics,
         retryProvider,
       )
+      appRewardsStore = new DbScanAppRewardsStore(storage, loggerFactory)
       automation = new ScanAutomationService(
         config,
         clock,
@@ -241,6 +243,7 @@ class ScanApp(
         loggerFactory,
         store,
         updateHistory,
+        appRewardsStore,
         storage,
         acsSnapshotStore,
         serviceUserPrimaryParty,

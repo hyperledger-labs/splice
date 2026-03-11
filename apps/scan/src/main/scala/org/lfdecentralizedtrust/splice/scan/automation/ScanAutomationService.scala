@@ -19,16 +19,19 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
   UpdateHistory,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Manages background automation that runs on a CC Scan app. */
 class ScanAutomationService(
@@ -39,6 +42,7 @@ class ScanAutomationService(
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
     val updateHistory: UpdateHistory,
+    appRewardsStore: DbScanAppRewardsStore,
     storage: DbStorage,
     snapshotStore: AcsSnapshotStore,
     svParty: PartyId,
@@ -69,6 +73,26 @@ class ScanAutomationService(
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
   registerTrigger(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
+  )
+  // TODO(#4384): Replace with TCS-based FeaturedAppRightProvider using
+  //  DbScanRewardsReferenceStore.lookupFeaturedAppRightsAsOf (PR #4322).
+  private val featuredAppRightProvider: FeaturedAppRightProvider = new FeaturedAppRightProvider {
+    override def getFeaturedParties(roundNumber: Long)(implicit
+        tc: TraceContext
+    ): Future[Seq[String]] =
+      store.multiDomainAcsStore
+        .listContracts(FeaturedAppRight.COMPANION)
+        .map(_.map(_.payload.provider).toSeq)
+  }
+
+  registerTrigger(
+    new RewardComputationTrigger(
+      store,
+      appRewardsStore,
+      updateHistory,
+      featuredAppRightProvider,
+      triggerContext,
+    )
   )
 
   registerUpdateHistoryIngestion(updateHistory)
