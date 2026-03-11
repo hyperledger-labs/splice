@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
@@ -18,7 +19,7 @@ import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
   */
 trait ScanRewardsReferenceStore extends AppStore {
 
-  def key: ScanStore.Key
+  def key: ScanRewardsReferenceStore.Key
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
     ScanRewardsReferenceStoreRowData,
@@ -29,8 +30,16 @@ trait ScanRewardsReferenceStore extends AppStore {
 
 object ScanRewardsReferenceStore {
 
+  case class Key(
+      dsoParty: PartyId
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[Key] = prettyOfClass(
+      param("dsoParty", _.dsoParty)
+    )
+  }
+
   def contractFilter(
-      key: ScanStore.Key
+      key: ScanRewardsReferenceStore.Key
   ): MultiDomainAcsStore.ContractFilter[
     ScanRewardsReferenceStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,

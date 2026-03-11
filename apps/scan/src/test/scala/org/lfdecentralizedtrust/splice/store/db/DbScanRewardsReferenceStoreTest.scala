@@ -13,7 +13,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.ScanStore
+import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase, TcsStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -257,7 +257,7 @@ class DbScanRewardsReferenceStoreTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     new DbScanRewardsReferenceStore(
-      key = ScanStore.Key(dsoParty),
+      key = ScanRewardsReferenceStore.Key(dsoParty),
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

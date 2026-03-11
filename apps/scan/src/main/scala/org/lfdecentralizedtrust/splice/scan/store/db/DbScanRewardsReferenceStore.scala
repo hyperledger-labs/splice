@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.{ScanStore, ScanRewardsReferenceStore}
+import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.{DbAppStore, DbMultiDomainAcsStore, StoreDescriptor}
@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDeco
 import scala.concurrent.{ExecutionContext, Future}
 
 class DbScanRewardsReferenceStore(
-    override val key: ScanStore.Key,
+    override val key: ScanRewardsReferenceStore.Key,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
