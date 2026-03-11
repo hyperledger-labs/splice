@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
-import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -53,7 +52,6 @@ object ScanRewardsReferenceStore {
         mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanRewardsReferenceStoreRowData(
             contract = contract,
-            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
             round = Some(contract.payload.round.number),
           )
         },
