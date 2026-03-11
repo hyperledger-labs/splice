@@ -16,6 +16,7 @@ module Splice.Api.Token.UtilsV2 (
 
   allocation_v2_settleImplUsingV1,
   allocation_v2_withdrawImplUsingV1,
+  allocation_v2_cancelImplUsingV1,
 
   amulet_allocationFactoryV2_settleImpl,
 
@@ -318,6 +319,20 @@ allocation_v2_withdrawImplUsingV1 instrumentId self AllocationV2.Allocation_With
   pure AllocationV2.Allocation_WithdrawResult with
     senderHoldings = v1ToHoldingMap instrumentId result.senderHoldingCids
     meta = result.meta
+
+allocation_v2_cancelImplUsingV1
+  : HoldingV1.InstrumentId
+  -> ContractId AllocationV2.Allocation
+  -> AllocationV2.Allocation_Cancel
+  -> Update AllocationV2.Allocation_CancelResult
+allocation_v2_cancelImplUsingV1 instrumentId self AllocationV2.Allocation_Cancel{..} = do
+  let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
+  result <- exercise v1Cid AllocationV1.Allocation_Cancel with
+    extraArgs
+  pure AllocationV2.Allocation_CancelResult with
+    senderHoldings = v1ToHoldingMap instrumentId result.senderHoldingCids
+    meta = result.meta
+
 
 -- FIXME: better name
 v1ToHoldingMap : HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> AllocationV2.HoldingMap

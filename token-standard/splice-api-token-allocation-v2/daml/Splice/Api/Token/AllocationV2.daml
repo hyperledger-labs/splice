@@ -137,17 +137,20 @@ data AllocationView = AllocationView with
 -- | Convenience function to refer to the union of sender, receiver, and
 -- executor of the settlement, which jointly control the execution of the
 -- allocation.
-defaultAllocationControllers : AllocationSpecification -> [Party]
-defaultAllocationControllers AllocationSpecification{..} =
-  dedup $ settlement.executor :: concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) transferLegs
+defaultAllocationControllers : AllocationView -> [Party]
+defaultAllocationControllers allocView =
+  dedup $ allocView.allocation.settlement.executor ::
+    if allocView.settlementVersion == 1
+      then concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) allocView.allocation.transferLegs
+      else []
 
 -- | Convenience function read out the overridden allocation controllers.
-allocationControllers : AllocationSpecification -> [Party]
-allocationControllers alloc@AllocationSpecification{..} =
+allocationControllers : AllocationView -> [Party]
+allocationControllers allocView =
   optional
-    (defaultAllocationControllers alloc)
-    (\override -> dedup $ settlement.executor :: override)
-    settlement.controllerOverride
+    (defaultAllocationControllers allocView)
+    (\override -> dedup $ allocView.allocation.settlement.executor :: override)
+    allocView.allocation.settlement.controllerOverride
 
 allocationSettlementControllers : AllocationView -> [Party]
 allocationSettlementControllers allocView =
@@ -209,8 +212,8 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSettlementControllers (view this)
-      -- FIXME: switch to `actors`
+    controller defaultAllocationControllers (view this)
+      -- FIXME: switch to `actors`, and revisit controllers
     do allocation_cancelImpl this self arg
 
   nonconsuming choice Allocation_Withdraw : Allocation_WithdrawResult

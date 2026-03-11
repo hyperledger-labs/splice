@@ -19,9 +19,10 @@ import DA.Action (when)
 import DA.Assert
 import DA.Foldable (forA_, foldMap)
 import DA.Optional (fromSome, isSome)
-import DA.TextMap as TextMap hiding (filter)
 import DA.Map as Map hiding (filter)
+import DA.TextMap as TextMap hiding (filter)
 import DA.Time
+import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 as V2
@@ -300,8 +301,6 @@ testDvP = script do
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()
 
--- FIXME: reactivate
-{-
 testDvPCancel : Script ()
 testDvPCancel = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
@@ -334,7 +333,6 @@ testDvPCancel = script do
   [] <- queryInterface @Allocation bob
 
   pure ()
--}
 
 testDvPWithdraw : Script ()
 testDvPWithdraw = script do
