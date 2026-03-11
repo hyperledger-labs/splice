@@ -14,6 +14,8 @@ create table acs_store_archived_test(
 create index acs_store_archived_test_temporal
     on acs_store_archived_test (store_id, migration_id, template_id_qualified_name, archived_at) include (created_at);
 
+
+-- Store for reference data for the off-ledger reward computations.
 create table scan_rewards_reference_store_active
 (
     like acs_store_template including all,
