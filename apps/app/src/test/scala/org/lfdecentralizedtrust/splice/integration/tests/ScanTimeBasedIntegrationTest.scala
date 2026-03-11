@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
-import org.lfdecentralizedtrust.splice.store.{HasS3Mock, S3BucketConnection}
+import org.lfdecentralizedtrust.splice.store.{HasS3Mock, S3BucketConnectionForTests}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
@@ -556,7 +556,7 @@ class ScanTimeBasedIntegrationTest
     val nextMidnight = lastMidnight.plus(1, ChronoUnit.DAYS)
     val expectedAcsSnapshotKey = s"$lastMidnight-Migration-0-$nextMidnight/ACS_0.zstd"
 
-    val bucketConnection = S3BucketConnection(s3ConfigMock, loggerFactory)
+    val bucketConnection = new S3BucketConnectionForTests(s3ConfigMock, loggerFactory)
     eventually() {
 
       // wait for latest ACS snapshots to be created

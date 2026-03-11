@@ -35,7 +35,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
-import java.nio.ByteBuffer
 import scala.util.Using
 
 class UpdateHistoryBulkStorageTest
@@ -58,23 +57,8 @@ class UpdateHistoryBulkStorageTest
 
   "UpdateHistoryBulkStorage" should {
 
-    "multipart upload works" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-      val o = bucketConnection.newAppendWriteObject("test")
-      o.prepareUploadNext()
-      o.prepareUploadNext()
-      for {
-        _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
-        _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
-        _ <- o.finish()
-        content <- bucketConnection.readFullObject("test")
-      } yield {
-        new String(content.array(), "UTF-8") shouldBe "helloworld"
-      }
-    }
-
     "successfully dump a single segment of updates to an s3 bucket" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val initialStoreSize = 1500
       val segmentSize = 2200L
       val segmentFromTimestamp = 100L
@@ -171,7 +155,7 @@ class UpdateHistoryBulkStorageTest
     }
 
     "successfully handle an empty segment" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val mockStore =
         new MockUpdateHistoryStore(10, { i => Instant.ofEpochMilli(i + 1000) })
       val fromTimestamp =
@@ -214,7 +198,7 @@ class UpdateHistoryBulkStorageTest
     }
 
     "successfully dump all segments" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val initialStoreSize = 2000
       val genesisDate = LocalDate.of(2001, 1, 23)
       val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)

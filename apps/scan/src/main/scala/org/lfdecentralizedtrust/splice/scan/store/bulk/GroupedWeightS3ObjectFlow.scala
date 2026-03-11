@@ -68,7 +68,12 @@ case class GroupedWeightS3ObjectFlow(
   }
 
   private object State {
-    def initial() = State(1, s3Connection.newAppendWriteObject(getObjectKey(0)), 0, 0)
+    def initial() = State(
+      1,
+      s3Connection.newAppendWriteObject(getObjectKey(0)),
+      0,
+      0,
+    )
   }
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = {
@@ -142,7 +147,7 @@ case class GroupedWeightS3ObjectFlow(
           logger.debug("Received a final empty element")
           uploadCallback.invoke(())
         } else {
-          val partNumber = curState.currentObject.prepareUploadNext()
+          val partNumber = curState.currentObject.prepareUploadNext(elem.bytes.asByteBuffer)
           logger.debug(
             s"Received ${elem.bytes.length} bytes (isLast=${elem.isLast}), uploading as part $partNumber of object ${curState.currentObject.key}"
           )

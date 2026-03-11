@@ -15,7 +15,31 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.scalatest.Assertion
 
+import java.nio.ByteBuffer
+
 class S3UploadTest extends StoreTestBase with HasS3Mock {
+
+  "S3 multipart uploads" should {
+    "work" in {
+
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val o = bucketConnection.newAppendWriteObject("test")
+      val part1 = ByteBuffer.wrap("hello".getBytes("UTF-8"))
+      val part2 = ByteBuffer.wrap("world".getBytes("UTF-8"))
+
+      o.prepareUploadNext(part1)
+      o.prepareUploadNext(part2)
+      for {
+        _ <- o.upload(1, part1)
+        _ <- o.upload(2, part2)
+        _ <- o.finish()
+        content <- bucketConnection.readFullObject("test")
+      } yield {
+        new String(content.array(), "UTF-8") shouldBe "helloworld"
+      }
+    }
+  }
+
   "GroupedWeightS3Object" should {
 
     def testWithInput(
@@ -33,7 +57,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
         labelLast: Boolean = true,
     ): Future[Assertion] = {
       val data = ByteString(Random.nextBytes(100))
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
 
       val (pub, sub) = TestSource
         .probe[ByteStringWithTermination]
