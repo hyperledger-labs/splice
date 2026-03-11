@@ -34,6 +34,7 @@ trait SynchronizerNodeConfigClient {
       synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
       synchronizerNodeConfig.flatMap(_.scan.toScala).toJava,
       synchronizerNodeConfig.flatMap(_.legacySequencerConfig.toScala).toJava,
+      synchronizerNodeConfig.flatMap(_.sequencerIdentity.toScala).toJava,
       synchronizerNodeConfig.flatMap(_.physicalSynchronizers.toScala).toJava,
     )
 

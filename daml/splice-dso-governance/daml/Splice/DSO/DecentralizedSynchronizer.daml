@@ -65,14 +65,18 @@ data SynchronizerState
 -- ==========================
 
 -- | Config for a sequencer.
-data SequencerNodeConfig = SequencerNodeConfig with
+data SequencerIdentityConfig = SequencerIdentityConfig with
     sequencerId : Text
       -- ^ The id of the sequencer.
-    url : Text
-      -- ^ The public accessible url of the sequencer.
     availableAfter : Optional Time
       -- ^ Any participant should subscribe this sequencer after this time.
       -- ^ If not set the sequencer is not yet accessible
+  deriving (Eq, Show)
+
+-- | Connection config for a sequencer.
+data SequencerConnectionConfig = SequencerConnectionConfig with
+    url : Text
+      -- ^ The public accessible url of the sequencer.
   deriving (Eq, Show)
 
 -- | Config for a sequencer.
@@ -112,11 +116,8 @@ data ScanConfig = ScanConfig with
 
 data PhysicalSynchronizerNodeConfig = PhysicalSynchronizerNodeConfig with
 
-    sequencer : Optional SequencerNodeConfig
+    sequencer : Optional SequencerConnectionConfig
       -- ^ The configuration of this sv's optional local sequencer.
-
-    mediator : Optional MediatorConfig
-      -- ^ The configuration of this sv's optional local mediator.
 
   deriving (Eq, Show)
 
@@ -144,6 +145,9 @@ data SynchronizerNodeConfig = SynchronizerNodeConfig with
     legacySequencerConfig: Optional LegacySequencerConfig
       -- ^ The legacy sequencer config for the prior migration id that is still up. We store this so it can be published on scan and validators can catchup.
 
+    sequencerIdentity : Optional SequencerIdentityConfig
+      -- ^ The configuration of this sv's optional local sequencer.
+
     physicalSynchronizers: Optional PhysicalSynchronizerNodeConfigMap
       -- ^ The synchronizer node configs for the currently running physical synchronizers.
 
@@ -161,7 +165,7 @@ data SynchronizerNodeConfigLimits = SynchronizerNodeConfigLimits with
 -----------------
 
 emptySynchronizerNodeConfig : SynchronizerNodeConfig
-emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None None
+emptySynchronizerNodeConfig = SynchronizerNodeConfig emptyCometBftConfig None None None None None None
 
 
 -- helper functions
@@ -182,6 +186,7 @@ instance Patchable SynchronizerNodeConfig where
   patch new base current = SynchronizerNodeConfig with
     cometBft = patch new.cometBft base.cometBft current.cometBft
     sequencer = patch new.sequencer base.sequencer current.sequencer
+    sequencerIdentity = patch new.sequencerIdentity base.sequencerIdentity current.sequencerIdentity
     mediator = patch new.mediator base.mediator current.mediator
     scan = patch new.scan base.scan current.scan
     legacySequencerConfig = patch new.legacySequencerConfig base.legacySequencerConfig current.legacySequencerConfig
@@ -193,11 +198,14 @@ instance Patchable SynchronizerConfig where
     cometBftGenesisJson = patch new.cometBftGenesisJson base.cometBftGenesisJson current.cometBftGenesisJson
     acsCommitmentReconciliationInterval = patch new.acsCommitmentReconciliationInterval base.acsCommitmentReconciliationInterval current.acsCommitmentReconciliationInterval
 
-instance Patchable SequencerNodeConfig where
-  patch new base current = SequencerNodeConfig with
+instance Patchable SequencerIdentityConfig where
+  patch new base current = SequencerIdentityConfig with
     sequencerId = patch new.sequencerId base.sequencerId current.sequencerId
-    url = patch new.url base.url current.url
     availableAfter = patch new.availableAfter base.availableAfter current.availableAfter
+
+instance Patchable SequencerConnectionConfig where
+  patch new base current = SequencerConnectionConfig with
+    url = patch new.url base.url current.url
 
 instance Patchable SequencerConfig where
   patch new base current = SequencerConfig with
@@ -223,7 +231,6 @@ instance Patchable MediatorConfig where
 instance Patchable PhysicalSynchronizerNodeConfig where
   patch new base current = PhysicalSynchronizerNodeConfig with
     sequencer = patch new.sequencer base.sequencer current.sequencer
-    mediator = patch new.mediator base.mediator current.mediator
 
 instance Patchable DsoDecentralizedSynchronizerConfig where
   patch new base current = DsoDecentralizedSynchronizerConfig with

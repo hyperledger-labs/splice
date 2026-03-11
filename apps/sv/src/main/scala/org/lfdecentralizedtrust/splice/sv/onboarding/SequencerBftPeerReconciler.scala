@@ -31,17 +31,17 @@ abstract class SequencerBftPeerReconciler(
       sequencerId <- sequencerAdminConnection.getSequencerId
       sequencers = dsoRulesAndState
         .currentSynchronizerNodeConfigs()
-        .flatMap(_.sequencer.toScala)
         .flatMap(config =>
+          config.sequencerIdentity.toScala
+            .map(_.sequencerId)
+            .orElse(config.sequencer.toScala.map(_.sequencerId))
+        )
+        .flatMap(sequencerId =>
           SequencerId
-            .fromProtoPrimitive(
-              config.sequencerId,
-              "sequencerId",
-            )
+            .fromProtoPrimitive(sequencerId, "sequencerId")
             .fold(
               error => {
-                logger
-                  .warn(s"Failed to parse sequencer id $sequencerId for sequencer $config. $error")
+                logger.warn(s"Failed to parse sequencer id $sequencerId. $error")
                 None
               },
               Some(_),

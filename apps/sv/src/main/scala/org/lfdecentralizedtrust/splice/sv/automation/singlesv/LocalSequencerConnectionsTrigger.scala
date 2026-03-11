@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
   TriggerEnabledSynchronization,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SequencerConfig
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   SynchronizerNodeService,
@@ -30,9 +29,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.OptionConverters.*
 
 class LocalSequencerConnectionsTrigger(
     baseContext: TriggerContext,
@@ -68,7 +65,7 @@ class LocalSequencerConnectionsTrigger(
               maxDomainTimeLag = context.config.pollingInterval,
             )
             decentralizedSynchronizerId <- store.getAmuletRulesDomain()(traceContext)
-            dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
+            dsoRulesActiveSequencerConfig = rulesAndState.lookupActiveSequencerIdConfigFor(
               decentralizedSynchronizerId,
               domainTimeLb.timestamp.toInstant,
               migrationId,
@@ -78,14 +75,12 @@ class LocalSequencerConnectionsTrigger(
                 show"Sv info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
               )
               Future.unit
-            } { publishedSequencerInfo =>
+            } { _ =>
               participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
                 decentralizedSynchronizerAlias,
                 reconnectOnSynchronizerConfigurationChange,
                 setLocalSequencerConnection(
-                  publishedSequencerInfo,
-                  localSynchronizerNode.sequencerInternalConfig,
-                  domainTimeLb.timestamp.toInstant,
+                  localSynchronizerNode.sequencerInternalConfig
                 ),
               )
             }
@@ -95,17 +90,13 @@ class LocalSequencerConnectionsTrigger(
   }
 
   private def setLocalSequencerConnection(
-      publishedSequencerInfo: SequencerConfig,
-      internalSequencerClientConfig: ClientConfig,
-      domainTime: Instant,
+      internalSequencerClientConfig: ClientConfig
   )(implicit
       traceContext: TraceContext
   ): SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig] =
     conf =>
       conf.sequencerConnections.default match {
-        case _: GrpcSequencerConnection
-            if publishedSequencerInfo.availableAfter.toScala
-              .exists(availableAfter => domainTime.isAfter(availableAfter)) =>
+        case _: GrpcSequencerConnection =>
           // connect to the sequencer with internal client config here instead of the public url to avoid
           // - installing loopback in each SV namespace to work around traffic being blocked by cluster whitelisting
           // - network traffic going all the way through cluster load balancer / ingress routing while the sequencer is in the same namespace

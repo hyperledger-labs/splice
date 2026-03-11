@@ -113,7 +113,7 @@ tests:
           value: "private"
 
 ---
-suite: "SV values - cometBFT config (localSynchronizers)"
+suite: "SV values - cometBFT config (synchronizers)"
 templates:
   - sv.yaml
 release:
@@ -122,9 +122,9 @@ chart:
   version: 0.1.1
   appVersion: 0.1.0
 
-# Things we need just to pass the schema - using localSynchronizers (new format)
+# Things we need just to pass the schema - using synchronizers (new format)
 set:
-  localSynchronizers:
+  synchronizers:
     current:
       sequencerPublicUrl: "https://sequencer.mock.com"
       sequencerAddress: "sequencer-address"
@@ -149,9 +149,9 @@ set:
     audience: "mock_audience"
 
 tests:
-  - it: "sets inline cometBftConfig under localSynchronizers.current with enabled and connectionUri"
+  - it: "sets inline cometBftConfig under synchronizers.current with enabled and connectionUri"
     set:
-      localSynchronizers:
+      synchronizers:
         current:
           sequencerPublicUrl: "https://sequencer.test.com"
           sequencerAddress: "sequencer-test-address"
@@ -194,9 +194,9 @@ tests:
       - isNull:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_COMETBFT')]
 
-  - it: "sets inline cometBftConfig under localSynchronizers.current with enabled only (no connectionUri)"
+  - it: "sets inline cometBftConfig under synchronizers.current with enabled only (no connectionUri)"
     set:
-      localSynchronizers:
+      synchronizers:
         current:
           sequencerPublicUrl: "https://sequencer.test.com"
           sequencerAddress: "sequencer-test-address"
@@ -235,9 +235,9 @@ tests:
               }
             }
 
-  - it: "emits governance key secret env vars (but not ADDITIONAL_CONFIG) when localSynchronizers.current has externalGovernanceKey"
+  - it: "emits governance key secret env vars (but not ADDITIONAL_CONFIG) when synchronizers.current has externalGovernanceKey"
     set:
-      localSynchronizers:
+      synchronizers:
         current:
           sequencerPublicUrl: "https://sequencer.test.com"
           sequencerAddress: "sequencer-test-address"
@@ -267,9 +267,9 @@ tests:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY')].valueFrom.secretKeyRef.key
           value: "private"
 
-  - it: "sets inline cometBftConfig under both localSynchronizers.current and localSynchronizers.successor"
+  - it: "sets inline cometBftConfig under both synchronizers.current and synchronizers.successor"
     set:
-      localSynchronizers:
+      synchronizers:
         current:
           sequencerPublicUrl: "https://sequencer-current.test.com"
           sequencerAddress: "sequencer-current-address"

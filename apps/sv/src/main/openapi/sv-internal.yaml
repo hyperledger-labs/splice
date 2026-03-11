@@ -190,6 +190,23 @@ paths:
         "200":
           description: ok
 
+  /v0/admin/synchronizer/lsu/cancel:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "cancelLogicalSynchronizerUpgrade"
+      responses:
+        "200":
+          description: ok
+        "404":
+          description: "No active LSU announcement found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/admin/domain/migration-dump:
     get:
       tags: [ sv ]

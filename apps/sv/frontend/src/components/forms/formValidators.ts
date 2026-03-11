@@ -178,3 +178,41 @@ export const validateNextScheduledSynchronizerUpgrade = (
 
   return false;
 };
+
+export const validateNextScheduledLogicalSynchronizerUpgrade = (
+  topologyFreezeTime: string,
+  upgradeTime: string,
+  newPhyiscalSynchronizerSerial: string,
+  newPhyiscalSynchronizerProtocolVersion: string,
+  effectiveDate: string | undefined
+): string | false => {
+  const all = [
+    topologyFreezeTime,
+    upgradeTime,
+    newPhyiscalSynchronizerSerial,
+    newPhyiscalSynchronizerProtocolVersion,
+  ];
+
+  if (all.every(value => value === '')) {
+    return false;
+  }
+
+  if (!all.every(value => value !== '')) {
+    return 'Topology freeze time, upgrade time, new physical synchronizer serial, and new physical synchronizer protocol version are required for a Scheduled Logical Synchronizer Upgrade';
+  }
+
+  const freezeTimeDate = dayjs.utc(topologyFreezeTime);
+  const effectivity = dayjs(effectiveDate);
+
+  const freezeTimeIsAfterEffectiveDate = freezeTimeDate.isAfter(effectivity.add(1, 'hour'));
+  if (!freezeTimeIsAfterEffectiveDate) {
+    return 'Topology Freeze Time must be at least 1 hour after the Effective Date';
+  }
+
+  const upgradeTimeDate = dayjs.utc(upgradeTime);
+  if (!upgradeTimeDate.isAfter(freezeTimeDate)) {
+    return 'Upgrade Time must be after Topology Freeze Time';
+  }
+
+  return false;
+};

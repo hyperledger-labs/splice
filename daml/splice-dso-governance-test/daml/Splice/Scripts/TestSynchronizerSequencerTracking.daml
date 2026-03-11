@@ -32,6 +32,9 @@ testSynchronizerMigration = do
         sequencerId = "sequencer-id-" <> partyToText sv
         url = "sequencer-" <> partyToText sv <> ".address:1234"
         availableAfter = Some now
+      sequencerIdentity = Some SequencerIdentityConfig with
+        sequencerId = "sequencer-id-" <> partyToText sv
+        availableAfter = Some now
       mediator = Some MediatorConfig with
         mediatorId = "mediator-id-" <> partyToText sv
       scan = Some ScanConfig with
@@ -50,6 +53,9 @@ testSynchronizerMigration = do
       migrationId = 1
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"
+      availableAfter = Some now
+    synchronizerConfig.sequencerIdentity === Some SequencerIdentityConfig with
+      sequencerId = "sequencer-id-" <> partyToText sv
       availableAfter = Some now
     synchronizerConfig.legacySequencerConfig === Some LegacySequencerConfig with
       migrationId = 0
@@ -72,18 +78,17 @@ testPhysicalSynchronizersOnlyConfig = do
         sequencingKeys = []
         governanceKeys = []
       sequencer = None
+      sequencerIdentity = Some SequencerIdentityConfig with
+        sequencerId = "sequencer-id-" <> partyToText sv
+        availableAfter = Some now
       mediator = None
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
       legacySequencerConfig = None
       physicalSynchronizers = Some (Map.fromList
         [ (0, PhysicalSynchronizerNodeConfig with
-            sequencer = Some SequencerNodeConfig with
-              sequencerId = "sequencer-id-" <> partyToText sv
+            sequencer = Some SequencerConnectionConfig with
               url = "sequencer-" <> partyToText sv <> ".address:1234"
-              availableAfter = Some now
-            mediator = Some MediatorConfig with
-              mediatorId = "mediator-id-" <> partyToText sv
           )
         ])
 
@@ -97,12 +102,8 @@ testPhysicalSynchronizersOnlyConfig = do
     -- physicalSynchronizers should have the config
     let Some physicalSynchronizersMap = synchronizerConfig.physicalSynchronizers
     let Some physicalConfig = Map.lookup 0 physicalSynchronizersMap
-    physicalConfig.sequencer === Some SequencerNodeConfig with
-      sequencerId = "sequencer-id-" <> partyToText sv
+    physicalConfig.sequencer === Some SequencerConnectionConfig with
       url = "sequencer-" <> partyToText sv <> ".address:1234"
-      availableAfter = Some now
-    physicalConfig.mediator === Some MediatorConfig with
-      mediatorId = "mediator-id-" <> partyToText sv
 
 -- | Test that SVs can set physicalSynchronizers config for multiple physical synchronizers.
 testPhysicalSynchronizersMultipleEntries : Script ()
@@ -119,26 +120,21 @@ testPhysicalSynchronizersMultipleEntries = do
         sequencingKeys = []
         governanceKeys = []
       sequencer = None
+      sequencerIdentity = Some SequencerIdentityConfig with
+        sequencerId = "sequencer-id-" <> partyToText sv
+        availableAfter = Some now
       mediator = None
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
       legacySequencerConfig = None
       physicalSynchronizers = Some (Map.fromList
         [ (0, PhysicalSynchronizerNodeConfig with
-            sequencer = Some SequencerNodeConfig with
-              sequencerId = "sequencer-0-id-" <> partyToText sv
+            sequencer = Some SequencerConnectionConfig with
               url = "sequencer-0-" <> partyToText sv <> ".address:1234"
-              availableAfter = Some now
-            mediator = Some MediatorConfig with
-              mediatorId = "mediator-0-id-" <> partyToText sv
           )
         , (1, PhysicalSynchronizerNodeConfig with
-            sequencer = Some SequencerNodeConfig with
-              sequencerId = "sequencer-1-id-" <> partyToText sv
+            sequencer = Some SequencerConnectionConfig with
               url = "sequencer-1-" <> partyToText sv <> ".address:1234"
-              availableAfter = None
-            mediator = Some MediatorConfig with
-              mediatorId = "mediator-1-id-" <> partyToText sv
           )
         ])
 
@@ -152,16 +148,8 @@ testPhysicalSynchronizersMultipleEntries = do
     -- physicalSynchronizers should have both configs
     let Some physicalSynchronizersMap = synchronizerConfig.physicalSynchronizers
     let Some physicalConfig0 = Map.lookup 0 physicalSynchronizersMap
-    physicalConfig0.sequencer === Some SequencerNodeConfig with
-      sequencerId = "sequencer-0-id-" <> partyToText sv
+    physicalConfig0.sequencer === Some SequencerConnectionConfig with
       url = "sequencer-0-" <> partyToText sv <> ".address:1234"
-      availableAfter = Some now
-    physicalConfig0.mediator === Some MediatorConfig with
-      mediatorId = "mediator-0-id-" <> partyToText sv
     let Some physicalConfig1 = Map.lookup 1 physicalSynchronizersMap
-    physicalConfig1.sequencer === Some SequencerNodeConfig with
-      sequencerId = "sequencer-1-id-" <> partyToText sv
+    physicalConfig1.sequencer === Some SequencerConnectionConfig with
       url = "sequencer-1-" <> partyToText sv <> ".address:1234"
-      availableAfter = None
-    physicalConfig1.mediator === Some MediatorConfig with
-      mediatorId = "mediator-1-id-" <> partyToText sv

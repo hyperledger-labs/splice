@@ -142,6 +142,12 @@ abstract class SvAppReference(
       httpCommand(HttpSvAdminAppClient.UnpauseDecentralizedSynchronizer())
     }
 
+  @Help.Summary("Cancel a running logical synchronizer upgrade by removing its LSU announcement")
+  def cancelLogicalSynchronizerUpgrade(): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.CancelLogicalSynchronizerUpgrade())
+    }
+
   @Help.Summary("Dump all the required data for domain migration to the configured location")
   def triggerDecentralizedSynchronizerMigrationDump(
       migrationId: Long,
