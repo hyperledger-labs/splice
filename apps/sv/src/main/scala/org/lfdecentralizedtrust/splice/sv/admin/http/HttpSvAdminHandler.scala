@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 }
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
-
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, SynchronizerMigrationUtil}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
@@ -85,6 +84,44 @@ class HttpSvAdminHandler(
           decentralizedSynchronizer,
         )
       } yield r0.UnpauseDecentralizedSynchronizerResponseOK
+    }
+  }
+
+  override def cancelLogicalSynchronizerUpgrade(
+      respond: r0.CancelLogicalSynchronizerUpgradeResponse.type
+  )()(
+      extracted: AdminUserRequest
+  ): Future[r0.CancelLogicalSynchronizerUpgradeResponse] = {
+    implicit val AdminUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.cancelLogicalSynchronizerUpgrade") { _ => _ =>
+      for {
+        decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
+        sequencerId <- synchronizerNodeService.sequencerAdminConnection().flatMap(_.getSequencerId)
+        existingAnnouncement <- participantAdminConnection.lookupSynchronizerLsuAnnouncement(
+          decentralizedSynchronizer,
+          com.digitalasset.canton.topology.store.TimeQuery.HeadState,
+          org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
+        )
+        result <- existingAnnouncement match {
+          case Some(_) =>
+            participantAdminConnection
+              .removeSequencerSuccessor(
+                decentralizedSynchronizer,
+                sequencerId,
+              )
+              .flatMap(_ =>
+                participantAdminConnection
+                  .removeLsuAnnouncement(decentralizedSynchronizer)
+                  .map(_ => r0.CancelLogicalSynchronizerUpgradeResponseOK)
+              )
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(
+                "No active LSU announcement found."
+              )
+            )
+        }
+      } yield result
     }
   }
 

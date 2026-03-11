@@ -52,11 +52,17 @@ class LogicalSynchronizerUpgradeAnnouncementTrigger(
               TimeQuery.HeadState,
               TopologyTransactionType.AuthorizedState,
             )
-          } yield {
-            val scheduleSerial =
+            scheduleSerial =
               NonNegativeInt.tryCreate(schedule.newPhysicalSynchronizerSerial.toInt)
+            wasRemoved <- connection.wasLsuAnnouncementRemoved(psid.logical, scheduleSerial)
+          } yield {
             if (psid.serial >= scheduleSerial) { Seq.empty }
-            else {
+            else if (wasRemoved) {
+              logger.info(
+                s"Not creating LSU announcement for serial $scheduleSerial as it was previously cancelled"
+              )
+              Seq.empty
+            } else {
               existingAnnouncement match {
                 case Some(announcement)
                     if announcement.mapping.successorSynchronizerId.serial == scheduleSerial =>
