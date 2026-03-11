@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 /** This is a temporal contract store (TcsStore) to provide efficient asOf round
-  * lookups of FeaturedAppRight, OpenMiningRound, and AmuletRules contracts
+  * lookups of FeaturedAppRight and OpenMiningRound contracts
   * necessary for rewards calculations. It is a separate store with its own
   * tables to enable it to have its own indexing scheme and pruning schedule to
   * ensure consistent performance.
