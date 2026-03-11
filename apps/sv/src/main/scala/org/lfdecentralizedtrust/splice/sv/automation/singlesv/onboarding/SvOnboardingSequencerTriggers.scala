@@ -40,8 +40,11 @@ class SequencerOnboarding(
         val currentSynchronizerConfigs = dsoRulesAndState.currentSynchronizerNodeConfigs()
         val configuredSequencers =
           currentSynchronizerConfigs
-            .flatMap(_.sequencer.toScala)
-            .map(_.sequencerId)
+            .flatMap(config =>
+              config.sequencerIdentity.toScala
+                .map(_.sequencerId)
+                .orElse(config.sequencer.toScala.map(_.sequencerId))
+            )
             .flatMap(sequencerId =>
               SequencerId
                 .fromProtoPrimitive(sequencerId, "sequencerId")

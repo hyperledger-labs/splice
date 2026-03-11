@@ -642,13 +642,19 @@ class HttpScanHandler(
         nodeName: String,
         synchronizerConfig: SynchronizerNodeConfig,
     ) = {
+      val identityOpt = synchronizerConfig.sequencerIdentity.toScala
       val sequencers = for {
         sequencer <- synchronizerConfig.sequencer.toScala
-        availableAfter <- sequencer.availableAfter.toScala
+        // Prefer sequencerIdentity for sequencerId and availableAfter if set
+        effectiveSequencerId = identityOpt.map(_.sequencerId).getOrElse(sequencer.sequencerId)
+        effectiveAvailableAfter = identityOpt
+          .flatMap(_.availableAfter.toScala)
+          .orElse(sequencer.availableAfter.toScala)
+        availableAfter <- effectiveAvailableAfter
       } yield definitions.DsoSequencer(
         sequencer.migrationId,
         None,
-        sequencer.sequencerId,
+        effectiveSequencerId,
         sequencer.url,
         nodeName,
         OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
@@ -670,22 +676,30 @@ class HttpScanHandler(
         nodeName: String,
         synchronizerConfig: SynchronizerNodeConfig,
     ) = {
+      val identityOpt = synchronizerConfig.sequencerIdentity.toScala
       synchronizerConfig.physicalSynchronizers.toScala.toList.flatMap(_.asScala.flatMap {
         case (serial, nodeConfig) =>
-          nodeConfig.sequencer
-            .flatMap(sequencerConfig =>
-              sequencerConfig.availableAfter.map { availableAfter =>
-                definitions.DsoSequencer(
-                  NoMigrationIdSet,
-                  Some(serial),
-                  sequencerConfig.sequencerId,
-                  sequencerConfig.url,
-                  nodeName,
-                  OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
+          nodeConfig.sequencer.map { sequencerConfig =>
+            val (sequencerId, availableAfter) = identityOpt match {
+              case Some(identity) =>
+                (
+                  identity.sequencerId,
+                  identity.availableAfter.toScala
+                    .map(OffsetDateTime.ofInstant(_, ZoneOffset.UTC))
+                    .getOrElse(OffsetDateTime.MIN),
                 )
-              }
+              case None =>
+                ("", OffsetDateTime.MIN)
+            }
+            definitions.DsoSequencer(
+              NoMigrationIdSet,
+              Some(serial),
+              sequencerId,
+              sequencerConfig.url,
+              nodeName,
+              availableAfter,
             )
-            .toScala
+          }.toScala
       })
     }
 

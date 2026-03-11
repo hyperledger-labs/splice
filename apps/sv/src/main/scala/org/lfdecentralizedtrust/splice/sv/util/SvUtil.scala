@@ -230,6 +230,7 @@ object SvUtil {
           Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
           Optional.empty(),
+          Optional.empty(),
         )
       ).asJava
     }

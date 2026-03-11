@@ -60,14 +60,17 @@ class SvOnboardingMediatorProposalTrigger(
     } yield {
       val currentSynchronizerConfigs = rulesAndStates.currentSynchronizerNodeConfigs()
       val synchronizerNodeConfiguredNodes = currentSynchronizerConfigs
-        .flatMap(domainConfigs =>
-          (domainConfigs.mediator.toScala -> domainConfigs.sequencer.toScala).tupled
-        )
-        .map { case (mediatorConfig, sequencerConfig) =>
+        .flatMap { domainConfigs =>
+          val sequencerIdOpt = domainConfigs.sequencerIdentity.toScala
+            .map(_.sequencerId)
+            .orElse(domainConfigs.sequencer.toScala.map(_.sequencerId))
+          (domainConfigs.mediator.toScala -> sequencerIdOpt).tupled
+        }
+        .map { case (mediatorConfig, sequencerId) =>
           val mediatorId = mediatorConfig.mediatorId
           MemberIdUtil.MediatorId
             .tryFromProtoPrimitive(mediatorId, "mediatorId") -> MemberIdUtil.SequencerId
-            .tryFromProtoPrimitive(sequencerConfig.sequencerId, "sequencerId")
+            .tryFromProtoPrimitive(sequencerId, "sequencerId")
         }
       val mediatorsToAdd =
         synchronizerNodeConfiguredNodes
