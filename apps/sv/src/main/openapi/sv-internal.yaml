@@ -190,7 +190,7 @@ paths:
         "200":
           description: ok
 
-  /v0/admin/domain/lsu/cancel:
+  /v0/admin/synchronizer/lsu/cancel:
     post:
       tags: [sv]
       x-jvm-package: sv_admin

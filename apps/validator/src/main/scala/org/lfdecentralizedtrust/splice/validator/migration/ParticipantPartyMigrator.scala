@@ -274,14 +274,12 @@ class ParticipantPartyMigrator(
         s"Removing party mapping for $adminPartyId (was mapping to $oldParticipantId)"
       )
       _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
-        RetryFor.WaitingOnInitDependency,
         synchronizerId,
         adminPartyId,
         oldParticipantId,
       )
       _ = logger.info("Removing domain trust certificate.")
       _ <- participantAdminConnection.ensureSynchronizerTrustCertificateRemoved(
-        RetryFor.WaitingOnInitDependency,
         synchronizerId,
         oldParticipantId.member,
       )

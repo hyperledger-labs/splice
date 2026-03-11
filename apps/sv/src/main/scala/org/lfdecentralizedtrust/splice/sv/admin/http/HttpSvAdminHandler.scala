@@ -96,6 +96,7 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.cancelLogicalSynchronizerUpgrade") { _ => _ =>
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
+        sequencerId <- synchronizerNodeService.sequencerAdminConnection().flatMap(_.getSequencerId)
         existingAnnouncement <- participantAdminConnection.lookupSynchronizerLsuAnnouncement(
           decentralizedSynchronizer,
           com.digitalasset.canton.topology.store.TimeQuery.HeadState,
@@ -104,8 +105,15 @@ class HttpSvAdminHandler(
         result <- existingAnnouncement match {
           case Some(_) =>
             participantAdminConnection
-              .removeLsuAnnouncement(decentralizedSynchronizer)
-              .map(_ => r0.CancelLogicalSynchronizerUpgradeResponseOK)
+              .removeSequencerSuccessor(
+                decentralizedSynchronizer,
+                sequencerId,
+              )
+              .flatMap(_ =>
+                participantAdminConnection
+                  .removeLsuAnnouncement(decentralizedSynchronizer)
+                  .map(_ => r0.CancelLogicalSynchronizerUpgradeResponseOK)
+              )
           case None =>
             Future.failed(
               HttpErrorHandler.notFound(

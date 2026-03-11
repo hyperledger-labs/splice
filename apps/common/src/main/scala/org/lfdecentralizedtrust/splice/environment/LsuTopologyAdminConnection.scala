@@ -86,6 +86,22 @@ trait LsuTopologyAdminConnection {
       logger,
     )
   }
+
+  def removeSequencerSuccessor(
+      synchronizerId: SynchronizerId,
+      sequencerId: SequencerId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    ensureTopologyMappingRemoved(
+      s"Remove SequencerSuccessor for $synchronizerId and sequencer $sequencerId",
+      synchronizerId,
+      lookupSequencerSuccessors(
+        synchronizerId,
+        sequencerId,
+      ),
+      proposal = true,
+    )
+  }
+
   def lookupSynchronizerLsuAnnouncement(
       synchronizerId: SynchronizerId,
       timeQuery: TimeQuery,
@@ -138,28 +154,16 @@ trait LsuTopologyAdminConnection {
   def removeLsuAnnouncement(
       synchronizerId: SynchronizerId
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
-    retryProvider.ensureThat(
-      RetryFor.Automation,
-      "remove_lsu_announcement",
+    ensureTopologyMappingRemoved(
       s"Remove LsuAnnouncement for $synchronizerId",
+      synchronizerId,
       lookupSynchronizerLsuAnnouncement(
         synchronizerId,
         HeadState,
         TopologyTransactionType.AuthorizedState,
         Some(Replace),
-      ).map {
-        case None => Right(())
-        case Some(existing) => Left(existing)
-      },
-      (previous: TopologyResult[LsuAnnouncement]) =>
-        proposeMapping(
-          TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping,
-          previous.base.serial + PositiveInt.one,
-          isProposal = true,
-          change = TopologyChangeOp.Remove,
-        ).map(_ => ()),
-      logger,
+      ),
+      proposal = true,
     )
   }
 

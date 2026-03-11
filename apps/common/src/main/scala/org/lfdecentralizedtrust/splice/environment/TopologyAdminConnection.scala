@@ -709,6 +709,34 @@ abstract class TopologyAdminConnection(
     )
   }
 
+  def ensureTopologyMappingRemoved[M <: TopologyMapping: ClassTag](
+      description: String,
+      synchronizerId: SynchronizerId,
+      findTopologyMapping: => Future[Option[TopologyResult[M]]],
+      proposal: Boolean = false,
+      forceChanges: ForceFlags = ForceFlags.none,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    retryProvider.ensureThat(
+      RetryFor.WaitingOnInitDependency,
+      "ensure_topology_removed",
+      description,
+      findTopologyMapping.map {
+        case None => Right(())
+        case Some(existing) => Left(existing)
+      },
+      (previous: TopologyResult[M]) =>
+        proposeMapping(
+          TopologyStoreId.Synchronizer(synchronizerId),
+          previous.mapping,
+          previous.base.serial + PositiveInt.one,
+          isProposal = proposal,
+          change = TopologyChangeOp.Remove,
+          forceChanges,
+        ).map(_ => ()),
+      logger,
+    )
+  }
+
   /** Ensure that either the accepted state passes the check, or a topology mapping is created that passes the check
     *  - run the check to see if it holds
     *  - if not then create transaction with the updated mapping
@@ -1462,17 +1490,15 @@ abstract class TopologyAdminConnection(
     )
 
   def ensureSynchronizerTrustCertificateRemoved(
-      retryFor: RetryFor,
       synchronizerId: SynchronizerId,
       member: Member,
   )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.ensureThat(
-      retryFor,
-      "ensure_domain_trust_certificate_removed",
+    ensureTopologyMappingRemoved(
       s"Remove domain trust certificate for $member on $synchronizerId",
+      synchronizerId,
       listSynchronizerTrustCertificate(synchronizerId, member).map {
-        case Seq() => Right(())
-        case Seq(cert) => Left(cert)
+        case Seq() => None
+        case Seq(cert) => Some(cert)
         case certs =>
           throw Status.INTERNAL
             .withDescription(
@@ -1480,15 +1506,6 @@ abstract class TopologyAdminConnection(
             )
             .asRuntimeException()
       },
-      (previous: TopologyResult[SynchronizerTrustCertificate]) =>
-        proposeMapping(
-          TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping,
-          previous.base.serial + PositiveInt.one,
-          isProposal = false,
-          change = TopologyChangeOp.Remove,
-        ).map(_ => ()),
-      logger,
     )
 
   def listLsuAnnouncements(synchronizerId: SynchronizerId)(implicit
@@ -1546,23 +1563,21 @@ abstract class TopologyAdminConnection(
     )
 
   def ensurePartyToParticipantRemoved(
-      retryFor: RetryFor,
       synchronizerId: SynchronizerId,
       partyId: PartyId,
       participant: ParticipantId,
       forceChanges: ForceFlags = ForceFlags.none,
-  )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.ensureThat(
-      retryFor,
-      "ensure_party_to_participant_removed",
+  )(implicit tc: TraceContext): Future[Unit] = {
+    ensureTopologyMappingRemoved(
       s"Remove party to participant for $partyId on $synchronizerId",
+      synchronizerId,
       listPartyToParticipant(
         TopologyStoreId.Synchronizer(synchronizerId).some,
         filterParty = partyId.filterString,
         filterParticipant = participant.filterString,
       ).map {
-        case Seq() => Right(())
-        case Seq(mapping) => Left(mapping)
+        case Seq() => None
+        case Seq(mapping) => Some(mapping)
         case mappings =>
           throw Status.INTERNAL
             .withDescription(
@@ -1570,17 +1585,10 @@ abstract class TopologyAdminConnection(
             )
             .asRuntimeException()
       },
-      (previous: TopologyResult[PartyToParticipant]) =>
-        proposeMapping(
-          TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping,
-          previous.base.serial + PositiveInt.one,
-          isProposal = false,
-          change = TopologyChangeOp.Remove,
-          forceChanges = forceChanges,
-        ).map(_ => ()),
-      logger,
+      proposal = false,
+      forceChanges,
     )
+  }
 
   def runCommand[Req, Res, M <: TopologyMapping, Result <: topology.TopologyResult[M]](
       storeId: TopologyStoreId,
