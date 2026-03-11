@@ -414,7 +414,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
                     sequencer.migrationId shouldBe -1
                   }
                   forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe newSynchronizerSerial
+                    sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
                     sequencer.migrationId shouldBe -1
                   }
                   forExactly(1, sequencers) { sequencer =>
