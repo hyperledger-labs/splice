@@ -10,7 +10,8 @@ function get_digest() {
 
   img_name=$(get-docker-image-reference "$img")
   # The docker image is multi-arch, but the digests are per architecture. We support amd64 clusters only, so pick that digest.
-  docker manifest inspect "$img_name" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest'
+  # timeout because we've seen this command hang for 10m
+  timeout 10s docker manifest inspect "$img_name" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest'
 }
 
 echo "imageDigests:"
