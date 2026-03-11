@@ -87,14 +87,14 @@ multiValidator:
         memory: '2400Mi'
 operatorDeployment:
   reference:
-    deploymentDir: 'cluster/deployment'
-    gitReference: 'tom-da/basicScratch'
-    privateConfigsDir: 'cluster/configs/configs-private'
-    publicConfigsDir: 'cluster/configs/configs'
-    pulumiBaseDir: 'splice/cluster/pulumi'
-    pulumiStacksDir: 'cluster/stacks/scratchnets'
-    repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
-    spliceRoot: 'splice'
+    repoUrl: https://github.com/DACH-NY/canton-network-internal
+    gitReference: refs/heads/tom-da/basicScratch
+    pulumiBaseDir: "splice/cluster/pulumi"
+    pulumiStacksDir: "cluster/stacks/scratchnets"
+    deploymentDir: "splice/cluster/deployment"
+    spliceRoot: "splice"
+    privateConfigsDir: "cluster/configs/configs-private"
+    publicConfigsDir: "cluster/configs/configs"
 pulumiProjectConfig:
   default:
     allowDowngrade: true
@@ -497,17 +497,17 @@ synchronizerMigration:
   active:
     id: 0
     releaseReference:
-      deploymentDir: 'cluster/deployment'
+      deploymentDir: 'splice/cluster/deployment'
       gitReference: 'refs/heads/tom-da/basicScratch'
       privateConfigsDir: 'cluster/configs/configs-private'
       publicConfigsDir: 'cluster/configs/configs'
       pulumiBaseDir: 'splice/cluster/pulumi'
-      pulumiStacksDir: 'cluster/stacks/prod'
+      pulumiStacksDir: 'cluster/stacks/scratchnets'
       repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
       spliceRoot: 'splice'
     sequencer:
       enableBftSequencer: true
-    version: '0.6.0-snapshot.20260306.2097.0.vfcd9d2af'
+    version: '0.6.0-snapshot.20260311.2115.0.va6f865e7'
 validator1:
   deduplicationDuration: '30m'
   logging:
