@@ -39,10 +39,11 @@ class UpdateToLatestSchemaVersionTrigger(
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] = {
     for {
       amuletRulesO <- store.lookupAmuletRules()
-      supports24hSubmissionDelay <- svTaskContext.packageVersionSupport.supports24hSubmissionDelay(
-        Seq(store.key.dsoParty, store.key.svParty),
-        context.clock.now,
-      )
+      supports24hSubmissionDelay <- svTaskContext.packageVersionSupport
+        .supports24hSubmissionDelayDsoGovernance(
+          Seq(store.key.dsoParty, store.key.svParty),
+          context.clock.now,
+        )
     } yield {
       amuletRulesO.toList
         .filter(c =>
