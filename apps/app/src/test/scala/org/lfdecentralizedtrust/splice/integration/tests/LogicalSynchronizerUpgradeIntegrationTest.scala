@@ -107,7 +107,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .addConfigTransform((_, config) => {
         updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = true))(config)
       })
-      .withManualStart
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
