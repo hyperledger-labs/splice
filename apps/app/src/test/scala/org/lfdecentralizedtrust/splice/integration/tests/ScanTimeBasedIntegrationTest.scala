@@ -1,16 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
-import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
@@ -37,7 +34,8 @@ class ScanTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil
     with HasExecutionContext
-    with HasS3Mock {
+    with HasS3Mock
+    with HasActorSystem {
 
   val initialRound = 4815L
 
@@ -565,7 +563,7 @@ class ScanTimeBasedIntegrationTest
         .value
         .toInstant shouldBe >=(lastMidnight)
 
-      val s3Objs = bucketConnection.listObjects().futureValue.map(_.key)
+      val s3Objs = bucketConnection.listObjects().futureValue.map(_.key())
 
       // Wait for bulk storage objects to be created
       s3Objs should contain(expectedAcsSnapshotKey)

@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.store.S3BucketConnectionForTests
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
 
+import org.apache.pekko.actor.ActorSystem
 import java.io.DataInputStream
 import java.nio.ByteBuffer
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,7 +18,7 @@ class S3BucketConnectionForUnitTests(
     override val loggerFactory: NamedLoggerFactory,
 ) extends S3BucketConnectionForTests(s3Config, loggerFactory) {
 
-  override def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
+  override def readFullObject(key: String)(implicit ec: ExecutionContext, as: ActorSystem): Future[ByteBuffer] = {
     val request = GetObjectRequest.builder.bucket(bucketName).key(key).build
     s3Client.getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse]).asScala.map {
       s3Stream =>

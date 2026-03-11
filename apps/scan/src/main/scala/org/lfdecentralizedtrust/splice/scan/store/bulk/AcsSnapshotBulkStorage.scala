@@ -165,7 +165,7 @@ class AcsSnapshotBulkStorage(
           throw new NoSuchElementException("bulk storage not caught up to the requested date")
         case true =>
           for {
-            objects <- s3Connection.listObjects(Some(prefix))
+            objects <- s3Connection.listObjectsWithChecksums(Some(prefix))
             filteredObjects = objects.filter(_.key.matches(".*ACS_\\d+\\.zstd")).toSeq
           } yield {
             filteredObjects

@@ -4,9 +4,11 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.async.AsyncRequestBody
+import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
@@ -61,23 +63,73 @@ class S3BucketConnection(
       key: String
   )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
 
-  // FIXME: handle pagination
+  // If the result (aggregated over S3 pagination) exceeds `limit` entries, will throw an exception.
+  // It is the caller's responsibility to use narrow enough prefixes (or large enough limits) to avoid that.
+  // The reason we want to assert on it as that we do not want to rely on all S3 providers to return results
+  // with the same pagination (i.e. sorted in the same order), so we cannot rely on partial responses.
   def listObjects(
-      prefix: Option[String] = None
+      prefix: Option[String] = None,
+      limit: HardLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+  )(implicit ec: ExecutionContext): Future[Seq[S3Object]] = {
+
+    def recFetch(token: Option[String], acc: Seq[S3Object]): Future[Seq[S3Object]] =
+      for {
+        response <- s3Client
+          .listObjectsV2(
+            ListObjectsV2Request
+              .builder()
+              .bucket(bucketName)
+              .prefix(prefix.getOrElse(""))
+              .continuationToken(token.getOrElse(""))
+              .build()
+          )
+          .asScala
+        withResponse = acc ++ response.contents().asScala
+        _ = if (withResponse.size >= limit.limit) {
+          io.grpc.Status.INVALID_ARGUMENT.withDescription(s"S3 list had more than ${limit.limit} objects").asRuntimeException()
+        }
+        res <-
+          if (response.isTruncated) {
+            recFetch(Some(response.nextContinuationToken()), withResponse)
+          } else {
+            Future.successful(withResponse)
+          }
+      } yield {
+        res
+      }
+
+    recFetch(None, Seq.empty).map(_.sortBy(_.key))
+  }
+
+  def listObjectsWithChecksums(
+      prefix: Option[String] = None,
+      limit: HardLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
   )(implicit ec: ExecutionContext): Future[Seq[S3BucketConnection.ObjectKeyAndChecksum]] = {
     for {
-      objects <- s3Client
-        .listObjects(
-          ListObjectsRequest.builder().bucket(bucketName).prefix(prefix.getOrElse("")).build()
-        )
-        .asScala
-        .map(_.contents().asScala.toSeq)
+      objects <- listObjects(prefix, limit)
+      // TODO: limit parallelism of the checksum reading.
+      //  Something like: Future.traverse(objects.grouped(10)) { batch => Future.sequence(batch.map(object => readChecksum(object))) } ;
       keysWithChecksums <- Future.sequence(objects.map { obj =>
         readChecksum(obj.key).map(S3BucketConnection.ObjectKeyAndChecksum(obj.key, _))
       })
     } yield {
       keysWithChecksums
     }
+  }
+
+  def readObject(key: String)(implicit ec: ExecutionContext): Source[ByteBuffer, NotUsed] = {
+    // Use lazySource, so the API calls start only once the stream is actually materialized
+    Source.lazySource { () =>
+      val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+
+      Source.futureSource {
+        s3Client.getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
+          .asScala
+          .map { publisher =>
+            org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
+          }
+      }
+    }.mapMaterializedValue(_ => NotUsed)
   }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order

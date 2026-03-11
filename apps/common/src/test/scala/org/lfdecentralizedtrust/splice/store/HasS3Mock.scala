@@ -16,6 +16,7 @@ import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 import org.lfdecentralizedtrust.splice.config.S3Config
 import org.testcontainers.containers.wait.strategy.Wait
 
+import org.apache.pekko.actor.ActorSystem
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -101,7 +102,7 @@ trait HasS3Mock
   def readUncompressAndDecode[T](
       s3BucketConnection: S3BucketConnectionForTests,
       decoder: String => Either[io.circe.Error, T],
-  )(s3objKey: String)(implicit tag: reflect.ClassTag[T]): Array[T] = {
+  )(s3objKey: String)(implicit tag: reflect.ClassTag[T], as: ActorSystem): Array[T] = {
     val compressed = s3BucketConnection.readFullObject(s3objKey).futureValue
     val zis = new ZstdInputStream(new ByteBufInputStream(Unpooled.wrappedBuffer(compressed)))
     val buffer = new Array[Byte](16384)
