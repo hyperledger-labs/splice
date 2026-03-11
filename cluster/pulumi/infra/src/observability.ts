@@ -172,7 +172,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
               routes: [
                 {
                   receiver: 'null',
-                  matchers: ['alertname="Watchdog"'],
+                  matchers: ['alertname="Watchdog|InfoInhibitor"'],
                   continue: false,
                 },
               ],
