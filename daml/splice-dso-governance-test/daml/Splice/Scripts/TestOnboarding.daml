@@ -580,7 +580,6 @@ testGrantValidatorPermission = do
   let revokeTime = now `addRelTime` (hours 1)
 
   -- Level 1 Revocation: "Revoke until time X"
-  -- This is controlled by the dso party
   ValidatorPermission_SetRevocationStateResult updatedPermissionCid <- submit dso $
     exerciseCmd permissionCid ValidatorPermission_SetRevocationState with
       newLoginAfter = Some revokeTime
