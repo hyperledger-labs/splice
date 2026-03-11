@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -17,7 +16,6 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.{DbAppStore, DbMultiDomainAcsStore, StoreDescriptor}
 import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDecoder}
 
@@ -59,45 +57,7 @@ class DbScanRewardsReferenceStore(
         )
       ),
     )
-    with ScanRewardsReferenceStore
-    with TcsStore {
-
-  override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](
-      companion: C
-  )(id: ContractId[?], asOf: CantonTimestamp, synchronizerId: SynchronizerId)(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Option[ContractWithState[TCid, T]]] =
-    multiDomainAcsStore.lookupContractByIdAsOf(companion)(id, asOf, synchronizerId)
-
-  override def listContractsAsOf[C, TCid <: ContractId[?], T](
-      companion: C,
-      asOf: CantonTimestamp,
-      synchronizerId: SynchronizerId,
-      limit: Limit,
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Seq[ContractWithState[TCid, T]]] =
-    multiDomainAcsStore.listContractsAsOf(companion, asOf, synchronizerId, limit)
-
-  override def listContractsActiveWithin[C, TCid <: ContractId[?], T](
-      companion: C,
-      lowerBoundIncl: CantonTimestamp,
-      upperBoundIncl: CantonTimestamp,
-      synchronizerId: SynchronizerId,
-      limit: Limit,
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] =
-    multiDomainAcsStore.listContractsActiveWithin(
-      companion,
-      lowerBoundIncl,
-      upperBoundIncl,
-      synchronizerId,
-      limit,
-    )
+    with ScanRewardsReferenceStore {
 
   def lookupFeaturedAppRightsActiveWithin(
       lowerBoundIncl: CantonTimestamp,
@@ -108,7 +68,7 @@ class DbScanRewardsReferenceStore(
   ): Future[
     Seq[TcsStore.TemporalContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]
   ] =
-    listContractsActiveWithin(
+    multiDomainAcsStore.listContractsActiveWithin(
       FeaturedAppRight.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
@@ -125,7 +85,7 @@ class DbScanRewardsReferenceStore(
   ): Future[
     Seq[TcsStore.TemporalContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]
   ] =
-    listContractsActiveWithin(
+    multiDomainAcsStore.listContractsActiveWithin(
       OpenMiningRound.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
@@ -139,7 +99,7 @@ class DbScanRewardsReferenceStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    listContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId, limit)
+    multiDomainAcsStore.listContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId, limit)
 
   def lookupOpenMiningRoundsAsOf(
       asOf: CantonTimestamp,
@@ -147,5 +107,5 @@ class DbScanRewardsReferenceStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    listContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId, limit)
+    multiDomainAcsStore.listContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId, limit)
 }
