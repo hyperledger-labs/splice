@@ -109,33 +109,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
       })
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
-
-  private def scheduleLsu(
-      topologyFreezeTime: CantonTimestamp,
-      upgradeTime: CantonTimestamp,
-      serial: Long,
-  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    scheduleLogicalSynchronizerUpgrade(
-      sv1Backend,
-      Seq(sv2Backend, sv3Backend),
-      new LogicalSynchronizerUpgradeSchedule(
-        topologyFreezeTime.toInstant,
-        upgradeTime.toInstant,
-        serial,
-        ProtocolVersion.v34.toString,
-      ),
-    )
-  }
-
-  private def waitForLsuAnnouncement()(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    eventually(timeUntilSuccess = 5.minutes) {
-      sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
-        .list(
-          Some(Synchronizer(decentralizedSynchronizerId))
-        ) should not be empty
-    }
-  }
-
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(120)
@@ -393,7 +366,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           )
           nodeStates
             .flatMap { node =>
-              node.physicalSynchronizers.toScala.value.asScala.get(1)
+              node.physicalSynchronizers.toScala.value.asScala.get(newSynchronizerSerial.value)
             }
             .map(_.sequencer.toScala.value.url) should contain theSameElementsAs Seq(
             "http://localhost:27108",
@@ -422,7 +395,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       clue("Scan reports active physical synchronizer serial 1 after upgrade") {
         eventually() {
           Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
-            scan.getActivePhysicalSynchronizerSerial() shouldBe NonNegativeInt.one
+            scan.getActivePhysicalSynchronizerSerial() shouldBe newSynchronizerSerial
           }
         }
       }
@@ -441,7 +414,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
                     sequencer.migrationId shouldBe -1
                   }
                   forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe 1
+                    sequencer.serial shouldBe newSynchronizerSerial
                     sequencer.migrationId shouldBe -1
                   }
                   forExactly(1, sequencers) { sequencer =>
@@ -555,6 +528,32 @@ class LogicalSynchronizerUpgradeIntegrationTest
       aliceValidatorBackend.participantClientWithAdminToken.synchronizers.disconnect_all()
       stopAllAsync(allNodes*).futureValue
       allBackends.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
+    }
+  }
+
+  private def scheduleLsu(
+      topologyFreezeTime: CantonTimestamp,
+      upgradeTime: CantonTimestamp,
+      serial: Long,
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    scheduleLogicalSynchronizerUpgrade(
+      sv1Backend,
+      Seq(sv2Backend, sv3Backend),
+      new LogicalSynchronizerUpgradeSchedule(
+        topologyFreezeTime.toInstant,
+        upgradeTime.toInstant,
+        serial,
+        ProtocolVersion.v34.toString,
+      ),
+    )
+  }
+
+  private def waitForLsuAnnouncement()(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    eventually(timeUntilSuccess = 5.minutes) {
+      sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
+        .list(
+          Some(Synchronizer(decentralizedSynchronizerId))
+        ) should not be empty
     }
   }
 

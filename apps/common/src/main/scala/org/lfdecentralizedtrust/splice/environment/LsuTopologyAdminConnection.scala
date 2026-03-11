@@ -19,6 +19,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyMapping,
 }
+import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
@@ -89,21 +90,16 @@ trait LsuTopologyAdminConnection {
       synchronizerId: SynchronizerId,
       timeQuery: TimeQuery,
       topologyTransactionType: TopologyTransactionType,
-      operation: TopologyChangeOp = TopologyChangeOp.Replace,
+      operation: Option[TopologyChangeOp] = Some(Replace),
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): Future[Option[TopologyResult[LsuAnnouncement]]] = {
-    val announcements: Future[Seq[TopologyResult[LsuAnnouncement]]] = runCommand(
+    val announcements: Future[Seq[TopologyResult[LsuAnnouncement]]] = listLsuAnnouncements(
       synchronizerId,
       topologyTransactionType,
+      operation,
       timeQuery,
-      Some(operation),
-    )(baseQuery =>
-      TopologyAdminCommands.Read.ListLsuAnnouncement(
-        baseQuery,
-        filterSynchronizerId = synchronizerId.filterString,
-      )
     )
     announcements.map(_.headOption)
   }
@@ -119,7 +115,7 @@ trait LsuTopologyAdminConnection {
       s"LsuAnnouncement with upgrade time $upgradeTime",
       topologyType =>
         EitherT
-          .liftF(lookupSynchronizerLsuAnnouncement(synchronizerId, HeadState, topologyType))
+          .liftF(lookupSynchronizerLsuAnnouncement(synchronizerId, HeadState, topologyType, None))
           .subflatMap {
             case Some(announcement)
                 if announcement.mapping.successorSynchronizerId.serial == psid =>
@@ -150,6 +146,7 @@ trait LsuTopologyAdminConnection {
         synchronizerId,
         HeadState,
         TopologyTransactionType.AuthorizedState,
+        Some(Replace),
       ).map {
         case None => Right(())
         case Some(existing) => Left(existing)
@@ -170,18 +167,33 @@ trait LsuTopologyAdminConnection {
       synchronizerId: SynchronizerId,
       psid: NonNegativeInt,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] = {
+    val removals: Future[Seq[TopologyResult[LsuAnnouncement]]] =
+      listLsuAnnouncements(
+        synchronizerId,
+        TopologyTransactionType.AuthorizedState,
+        Some(TopologyChangeOp.Remove),
+        TimeQuery.Range(None, None),
+      )
+    removals.map(_.exists(_.mapping.successorSynchronizerId.serial == psid))
+  }
+
+  private def listLsuAnnouncements(
+      synchronizerId: SynchronizerId,
+      topologyTransactionType: TopologyTransactionType,
+      topologyChange: Option[TopologyChangeOp],
+      query: TimeQuery,
+  )(implicit tc: TraceContext, ec: ExecutionContext) = {
     val removals: Future[Seq[TopologyResult[LsuAnnouncement]]] = runCommand(
       synchronizerId,
-      TopologyTransactionType.AuthorizedState,
-      TimeQuery.Range(None, None),
-      Some(TopologyChangeOp.Remove),
+      topologyTransactionType,
+      query,
+      topologyChange,
     )(baseQuery =>
       TopologyAdminCommands.Read.ListLsuAnnouncement(
         baseQuery,
         filterSynchronizerId = synchronizerId.filterString,
       )
     )
-    removals.map(_.exists(_.mapping.successorSynchronizerId.serial == psid))
+    removals
   }
-
 }

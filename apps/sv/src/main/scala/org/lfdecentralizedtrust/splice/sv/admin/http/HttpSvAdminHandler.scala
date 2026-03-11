@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 }
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
-
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, SynchronizerMigrationUtil}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
