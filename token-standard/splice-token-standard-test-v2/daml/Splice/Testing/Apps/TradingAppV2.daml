@@ -38,7 +38,7 @@ template OTCTradeAllocationRequest with
     settleAt : Time
     settlementDeadline : Optional Time
     settlementV1Authorizers : [Party]
-      -- ^ Extra executors for testing multi-executors and mixed version settlement.
+      -- ^ Extra executor for testing multi-executor and mixed version settlement.
       -- FIXME: cleaup this code
   where
     signatory venue
@@ -47,12 +47,12 @@ template OTCTradeAllocationRequest with
     interface instance AllocationRequest for OTCTradeAllocationRequest where
       view = AllocationRequestView with
         settlement = SettlementInfo with
-          executors = venue :: settlementV1Authorizers
+          executor = venue
           requestedAt = createdAt
           settlementRef = makeTradeRef otcTradeCid
           settleAt = settleAt
           meta = emptyMetadata
-          controllerOverride = Some [] -- We will settle using only executors authority.
+          controllerOverride = Some [] -- We will settle using only executor authority.
           settlementDeadline = settlementDeadline
         transferLegs = transferLegs
         meta = emptyMetadata
@@ -167,7 +167,7 @@ template OTCTrade with
             alloc <- fetch allocCid
             -- validate the allocation request matches this trade
             (view alloc).allocation.settlement.settlementRef === makeTradeRef self
-            (view alloc).allocation.settlement.executors === [venue]
+            (view alloc).allocation.settlement.executor === venue
             exercise allocCid (Allocation_Cancel extraArgs)
           )
           allocationsWithContext

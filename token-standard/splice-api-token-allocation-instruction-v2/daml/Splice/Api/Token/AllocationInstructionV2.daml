@@ -174,7 +174,7 @@ interface AllocationFactory where
         -- FIXME: improve comment
       allocationCids : [ContractId Allocation]
         -- ^ Allocations to settle. Their instrument admin MUST match the expected admin.
-        -- Their legs MUST all have the same settlement executors.
+        -- Their legs MUST all have the same settlement executor.
         -- For every leg there must be both a sender and a receiver authorization.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
@@ -190,7 +190,7 @@ interface AllocationFactory where
         -- Registries MUST check their concrete values to avoid unauthorized
         -- settlement execution.
         --
-        -- The `actors` SHOULD at least include all the settlement executors of
+        -- The `actors` SHOULD at least include all the settlement executor of
         -- the settled allocations, and registries SHOULD allow successful
         -- settlement if they do.
 

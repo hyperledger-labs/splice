@@ -35,7 +35,6 @@ module Splice.Testing.Registries.AmuletRegistryV2
 import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
-import qualified DA.List
 import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
@@ -265,7 +264,7 @@ registryApi_getAllocationFactory_SettleBatch registry arg = do
         Some v1 <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
         queryDisclosure' @LockedAmulet registry.dso v1.lockedAmulet
       else do
-        -- need to disclose the amulet contract, as the executors has no visibility into it
+        -- need to disclose the amulet contract, as the executor has no visibility into it
         Some v2 <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
         case v2.lockedAmulet of
           None -> return mempty
@@ -282,8 +281,8 @@ registryApi_getAllocationTransferContext
 registryApi_getAllocationTransferContext registry allocCid = do
   transferC <- getExternalPartyConfigStateContext registry
   Some amuletAlloc <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
-  featuredAppRightC <- getFeaturedAppRightContext registry (DA.List.head amuletAlloc.allocation.settlement.executors)
-  -- need to disclose the amulet contract, as the executors has no visibility into it
+  featuredAppRightC <- getFeaturedAppRightContext registry amuletAlloc.allocation.settlement.executor
+  -- need to disclose the amulet contract, as the executor has no visibility into it
   lockedAmuletD <- case amuletAlloc.lockedAmulet of
     None -> return mempty
     Some la -> queryDisclosure' @LockedAmulet registry.dso la

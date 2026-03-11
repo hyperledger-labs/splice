@@ -12,10 +12,6 @@ module Splice.Api.Token.UtilsV2 (
   ForwardCompatible(..),
 
   -- * Allocation facctory
-  tryDowncast_v2_v1_AllocationSpecification,
-
-  allocationFactory_v2_tryAllocateUsingV1,
-
   amulet_allocationFactoryV2_settleImpl,
 
   -- * Transfer instructions
@@ -29,7 +25,7 @@ module Splice.Api.Token.UtilsV2 (
 ) where
 
 import DA.Date
-import DA.Optional (fromOptional, isNone)
+import DA.Optional (isNone)
 import DA.List (dedup, head)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
@@ -215,22 +211,22 @@ upcast_v1_v2_TransferLeg transferLegId (AllocationV1.TransferLeg with sender, re
     instrumentId = upcast instrumentId
     meta = dropAccountMeta "sender" $ dropAccountMeta "receiver" meta
 
-upcast_v1_v2_SettlementInfo : [Party] -> AllocationV1.SettlementInfo -> AllocationV2.SettlementInfo
-upcast_v1_v2_SettlementInfo extraExecutors(AllocationV1.SettlementInfo with executor, settlementRef, requestedAt, allocateBefore, settleBefore, meta) =
-  AllocationV2.SettlementInfo with
-    executors = executor :: extraExecutors
-    settlementRef = upcast settlementRef
-    requestedAt
-    settleAt = allocateBefore
-    settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
-    controllerOverride = None -- V1 does not support controller override.
-    meta
+instance BackwardCompatible AllocationV1.SettlementInfo AllocationV2.SettlementInfo where
+  upcast (AllocationV1.SettlementInfo with executor, settlementRef, requestedAt, allocateBefore, settleBefore, meta) =
+    AllocationV2.SettlementInfo with
+      executor
+      settlementRef = upcast settlementRef
+      requestedAt
+      settleAt = allocateBefore
+      settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
+      controllerOverride = None -- V1 does not support controller override.
+      meta
 
 instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
   upcast (AllocationV1.AllocationSpecification with settlement, transferLegId, transferLeg) =
     AllocationV2.AllocationSpecification with
       authorizer = accountFromMeta transferLeg.sender "sender" transferLeg.meta
-      settlement = upcast_v1_v2_SettlementInfo [transferLeg.sender, transferLeg.receiver] settlement
+      settlement = upcast settlement
       transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
 
 instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
@@ -266,65 +262,6 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
       output = upcast output
       senderChangeCids = map upcast senderChangeCids
       meta
-
--- | Convenience method for V2 factories to first attempt to create the allocation using the V1
--- API and create a V1 allocation with better compatibility if possible. On a failed downcast,
--- the caller is expected to fall back to creating a V2 allocation.
-allocationFactory_v2_tryAllocateUsingV1
-  : AllocationInstructionV1.AllocationFactory
-  -> ContractId AllocationInstructionV1.AllocationFactory
-  -> AllocationInstructionV2.AllocationFactory_Allocate
-  -> Update (Optional AllocationInstructionV2.AllocationInstructionResult)
-allocationFactory_v2_tryAllocateUsingV1 factory factoryCid AllocationInstructionV2.AllocationFactory_Allocate{..} = do
-  case tryDowncast_v2_v1_AllocationSpecification allocation of
-    None -> pure None
-    Some allocationV1 -> do
-      -- check choice params
-      requireExpectedAdminMatch ((view factory).admin) expectedAdmin
-      -- FIXME: handle non-basic accounts
-      require "Actor matches the sender" (actors == [allocationV1.transferLeg.sender])
-
-      -- FIXME: check that there is no extraneous account metadata on the v2 spec
-
-      -- execute the allocation using the V1 API
-      result <- exercise factoryCid $ AllocationInstructionV1.AllocationFactory_Allocate with
-        expectedAdmin
-        allocation = allocationV1
-        requestedAt = requestedAt
-        inputHoldingCids = map downcast inputHoldingCids
-        extraArgs
-      pure $ Some (upcast result)
-
-tryDowncast_v2_v1_AllocationSpecification : AllocationV2.AllocationSpecification -> Optional AllocationV1.AllocationSpecification
-tryDowncast_v2_v1_AllocationSpecification allocationV2@AllocationV2.AllocationSpecification{..} = do
-  guard (isNone $ settlement.controllerOverride)
-  [transferLeg] <- Some transferLegs
-  -- FIXME: consider allowing downcast of non-basic accounts by pushing them into metadata -- need to be careful wrt executor check
-  guard (isBasicAccount transferLeg.sender)
-  guard (isBasicAccount transferLeg.receiver)
-  guard (transferLeg.sender.owner `elem` settlement.executors)
-  guard (transferLeg.receiver.owner `elem` settlement.executors)
-  let settlementInfoV1 = AllocationV1.SettlementInfo with
-        executor = error "FIXME: unclear how to determine executor if there are multiple v1 settlements involved"
-        settlementRef = downcast settlement.settlementRef
-        requestedAt = settlement.requestedAt
-        allocateBefore = settlement.settleAt
-        settleBefore = fromOptional maxTime settlement.settlementDeadline
-        meta = settlement.meta
-  let allocationV1 = AllocationV1.AllocationSpecification with
-        settlement = settlementInfoV1
-        transferLegId = transferLeg.transferLegId
-        transferLeg = downcast transferLeg
-  -- prudent engineering: check upcast
-  let recomputedAllocationV2 = upcast allocationV1
-  if allocationV2 == recomputedAllocationV2
-    then Some allocationV1
-    else error $ T.unlines
-      [ "Invariant violation: upcasting the V1 spec does not result in the original V2 spec:"
-      , "Original V2 spec: " <> show allocationV2
-      , "Downcasted V1 spec: " <> show allocationV1
-      , "Recomputed V2 spec: " <> show recomputedAllocationV2
-      ]
 
 -- | Withdraw the allocation using the V1 API.
 allocation_v2_senderActor_withdrawUsingV1
@@ -379,7 +316,7 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
     require "Admin matches expected admin" (admin == AllocationV2.allocationAdmin allocation)
 
     -- FIXME: consider allowing the caller to pass these in
-    require "Actors match allocation executors" (actors == allocation.settlement.executors)
+    require "Actors include allocation executor" (allocation.settlement.executor `elem` actors)
     -- FIXME: consider what other validation is missing
 
     -- settlement version specific validation
@@ -507,7 +444,7 @@ settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
       None -> None
       Some co -> None -- TODO: Parse controller override.
     v2 = AllocationV2.SettlementInfo with
-      executors
+      executor
       settlementRef = reference_v1_to_v2 settlementRef
       requestedAt
       settleAt = allocateBefore
@@ -579,7 +516,7 @@ settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
         meta.values
 
     v1 = AllocationV1.SettlementInfo with
-      executors
+      executor
       settlementRef = reference_v2_to_v1 settlementRef
       requestedAt
       allocateBefore = settleAt

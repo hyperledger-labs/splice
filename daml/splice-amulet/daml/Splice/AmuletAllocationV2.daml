@@ -39,7 +39,7 @@ template AmuletAllocationV2
     expiresAt : Time
   where
     signatory dso, allocation.authorizer.owner
-    observer allocation.settlement.executors
+    observer allocation.settlement.executor
 
     ensure
       isBasicAccount allocation.authorizer &&
@@ -141,12 +141,7 @@ allocationToTwoStepTransfer sender transferLegs dso expiresAt settlement =
     -- FIXME: improve representation once the design for batch settlement is definite
     receiver = sender
     amount = negate (netAllocationAmount (basicAccount sender) transferLegs)
-    provider =
-      if null settlement.executors
-        then error "Unexpected: no executors in settlement"
-        else head settlement.executors
-        -- We only feature the first executor in case of multiple executors,
-        -- as that is easy to implement and should be sufficient for the time until CIP-104 is in effect.
+    provider = settlement.executor
     transferBefore = expiresAt
     transferBeforeDeadline = "allocation.expiresAt"
     allowFeaturing = True

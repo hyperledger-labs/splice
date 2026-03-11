@@ -31,10 +31,10 @@ data Reference = Reference with
 -- | The minimal set of information about a settlement that an app would like to execute.
 data SettlementInfo = SettlementInfo
   with
-    executors : [Party]
+    executor : Party
       -- ^ The parties that are responsible for executing the settlement, and
       -- guaranteeing its atomicity across asset admins.
-      -- FIXME: consider supporting multiple executors instead of controller overrides. The executors are the ones ensuring atomicity across different instrument admins.
+      -- FIXME: consider supporting multiple executor instead of controller overrides. The executor are the ones ensuring atomicity across different instrument admins.
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
     requestedAt : Time
@@ -46,7 +46,7 @@ data SettlementInfo = SettlementInfo
     meta : Metadata
       -- ^ Additional metadata about the settlement, used for extensibility.
     controllerOverride : Optional [Party]
-      -- ^ Additional party signatures in addition to executors that need to authorize
+      -- ^ Additional party signatures in addition to executor that need to authorize
       -- choices on the Allocation. Defaults to senders and receivers across all
       -- transferLegs.
     settlementDeadline : Optional Time
@@ -107,13 +107,13 @@ data AllocationView = AllocationView with
     settlementVersion : Int
       -- ^ Version of the workflow to use for settling this allocation.
       --
-      -- V2 settlement only requires the specified allocation.settlement.executors
+      -- V2 settlement only requires the specified allocation.settlement.executor
       -- to authorize the whole batch settlement.
 
       -- V1 settlement is only available if there is a single transfer leg. It
       -- guarantees that the owners of its sender and receiver account
       -- are also required to authorize the whole batch settlement in addition
-      -- to the executors.
+      -- to the executor.
       --
       -- Additional versions may defined in future extensions of the token standard.
     meta : Metadata
@@ -127,23 +127,23 @@ data AllocationView = AllocationView with
 ------------------------
 
 -- | Convenience function to refer to the union of sender, receiver, and
--- executors of the settlement, which jointly control the execution of the
+-- executor of the settlement, which jointly control the execution of the
 -- allocation.
 defaultAllocationControllers : AllocationSpecification -> [Party]
 defaultAllocationControllers AllocationSpecification{..} =
-  dedup $ settlement.executors <> concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) transferLegs
+  dedup $ settlement.executor :: concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) transferLegs
 
 -- | Convenience function read out the overridden allocation controllers.
 allocationControllers : AllocationSpecification -> [Party]
 allocationControllers alloc@AllocationSpecification{..} =
   optional
     (defaultAllocationControllers alloc)
-    (\override -> dedup $ settlement.executors <> override)
+    (\override -> dedup $ settlement.executor :: override)
     settlement.controllerOverride
 
 allocationSettlementControllers : AllocationSpecification -> [Party]
 allocationSettlementControllers alloc@AllocationSpecification{..} =
-  settlement.executors <> [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
+  settlement.executor :: [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
 
 -- | Convenience to get the allocation admin
 allocationAdmin : AllocationSpecification -> Party
@@ -156,7 +156,7 @@ allocationAdmin AllocationSpecification{..} = admin
 
 -- | A contract representing the approval of the authorizer to send or receive
 -- the net amount of assets of the transfer legs as part of a settlement where
--- the executors and instrument admin check that every transfer leg has a matching
+-- the executor and instrument admin check that every transfer leg has a matching
 -- authorization from the counterparty.
 interface Allocation where
   viewtype AllocationView
@@ -168,7 +168,7 @@ interface Allocation where
   choice Allocation_Settle : Allocation_SettleResult
     -- ^ Settle the allocation by moving the net amount of the transfer legs.
     --
-    -- Requires authorization from the settlement executors and the instrument
+    -- Requires authorization from the settlement executor and the instrument
     -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
     -- settlements of other legs of the same admins.
     --
@@ -181,13 +181,13 @@ interface Allocation where
 
   choice Allocation_Cancel : Allocation_CancelResult
     -- ^ Cancel the allocation. Requires authorization from sender, receiver, and
-    -- executors.
+    -- executor.
     --
     -- FIXME: comment
     --
     -- Typically this authorization is granted by sender and receiver to the
-    -- executors as part of the contract coordinating the settlement, so that
-    -- that the executors can release the allocated assets early in case the
+    -- executor as part of the contract coordinating the settlement, so that
+    -- that the executor can release the allocated assets early in case the
     -- settlement is aborted or it has definitely failed.
     with
       extraArgs : ExtraArgs

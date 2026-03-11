@@ -117,12 +117,12 @@ setupOtcTrade  = do
 
   let
     settlement = SettlementInfo with
-      executors = [provider, alice, bob]
+      executor = provider
       requestedAt = now
       settlementRef = makeTradeRef otcTradeCid
       settleAt = settleAt
       meta = emptyMetadata
-      controllerOverride = Some [] -- We will settle using only executors authority.
+      controllerOverride = Some [] -- We will settle using only executor authority.
         -- FIXME: decide whether we still need overrides
       settlementDeadline = Some deadline
 
@@ -202,7 +202,7 @@ setupOtcTrade  = do
     feeLeg
 
 
--- FIXME: test multiple executors
+-- FIXME: test multiple executor
 
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP_mixed : Script ()

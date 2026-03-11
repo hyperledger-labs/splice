@@ -33,14 +33,14 @@ interface AllocationRequest where
     do allocationRequest_RejectImpl this self arg
 
   choice AllocationRequest_Withdraw : ChoiceExecutionMetadata
-    -- ^ Withdraw an allocation request as the executors.
+    -- ^ Withdraw an allocation request as the executor.
     --
-    -- Used by executors to withdraw the allocation request if they are unable to execute it;
+    -- Used by executor to withdraw the allocation request if they are unable to execute it;
     -- e.g., because a trade has been cancelled.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).settlement.executors
+    controller (view this).settlement.executor
     do allocationRequest_WithdrawImpl this self arg
 
 
