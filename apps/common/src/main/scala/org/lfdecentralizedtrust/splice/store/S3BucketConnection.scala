@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncRequestBody
@@ -45,12 +44,10 @@ class S3BucketConnection(
 
   def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
     val checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
-    logger.debug(s"ISEGALL reading checksum for $key")(TraceContext.empty)
     for {
       checksumResponse <- s3Client
         .getObjectTagging(checksumRequest)
         .asScala
-      _ = logger.debug(s"ISEGALL done reading checksum for $key")(TraceContext.empty)
       checksum = checksumResponse
         .tagSet()
         .asScala
