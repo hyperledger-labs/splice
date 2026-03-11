@@ -86,6 +86,7 @@ data AllocationSpecification = AllocationSpecification with
 -- To be standards compliant, an allocation must have a non-zero number of
 -- transfer legs, all with an instrumentId with the same adminId.
 data AllocationView = AllocationView with
+    -- FIXME: try moving this to the `AllocationSpecification`
     authorizer : Account
       -- ^ The authorizer authorizing the transfer legs of the allocation to be executed.
     allocation : AllocationSpecification

@@ -106,11 +106,14 @@ interface AllocationFactory where
   allocationFactory_settleImpl : ContractId AllocationFactory -> AllocationFactory_SettleBatch -> Update AllocationFactory_SettleBatchResult
 
   nonconsuming choice AllocationFactory_Allocate : AllocationInstructionResult
-    -- ^ Generic choice for the sender's wallet to request the allocation of
-    -- assets to a specific leg of a settlement. It depends on the registry
-    -- whether this results in the allocation being created directly
-    -- or in an allocation instruction being created instead.
+    -- ^ Request the creation of an allocation for legs of a specific instrument.
+    --
+    -- It depends on the registry whether this results in the allocation being
+    -- created directly or in an allocation instruction being created instead.
     with
+      -- FIXME: specify account of allocation
+
+      -- FIXME: consider removing the `expectedAdmin`, as the caller already specifies it via their allocation specification.
       expectedAdmin : Party
         -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
@@ -119,12 +122,15 @@ interface AllocationFactory where
         -- on a factory contract acquired from an untrusted source *provided*
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
+
       allocation : AllocationSpecification
-        -- ^ The allocation which should be created.
+        -- ^ The allocation which should be created. All legs must be for the same instrument.
+        --
+        -- Implementations MUST validate that the instrument admin of the legs matches the admin of the factory.
       requestedAt : Time
         -- ^ The time at which the allocation was requested.
       inputHoldingCids : [ContractId Holding]
-        -- ^ The holdings that SHOULD be used to fund the allocation.
+        -- ^ The holdings matching the instrument of the legs that SHOULD be used to fund the allocation.
         --
         -- MAY be empty for registries that do not represent their holdings on-ledger; or
         -- for registries that support automatic selection of holdings for allocations.
