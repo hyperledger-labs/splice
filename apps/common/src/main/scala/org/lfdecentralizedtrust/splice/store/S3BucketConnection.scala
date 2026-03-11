@@ -6,12 +6,11 @@ package org.lfdecentralizedtrust.splice.store
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
+import software.amazon.awssdk.core.async.AsyncRequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 
-import java.io.{ByteArrayInputStream, IOException}
 import java.net.URI
 import java.nio.ByteBuffer
 import java.security.MessageDigest
@@ -21,46 +20,27 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
-import scala.sys.process.*
 
 class S3BucketConnection(
-    val s3Client: S3AsyncClient,
-    bucketName: String,
+    s3Config: S3Config,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
-  // Reads the full content of an s3 object into a ByteBuffer. Also verifies its checksum stored in the splice-checksum tag, and throws an assertion if it's missing or incorrect.
-  // Use only for testing, when the object size is known to be small
-  def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
-    val readRequest = GetObjectRequest.builder().bucket(bucketName).key(key).build()
-    for {
-      data <- s3Client
-        .getObject(readRequest, AsyncResponseTransformer.toBytes[GetObjectResponse])
-        .asScala
-        .map(_.asByteBuffer())
-      checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
-      checksumResponse <- s3Client
-        .getObjectTagging(checksumRequest)
-        .asScala
-      checksum = checksumResponse
-        .tagSet()
-        .asScala
-        .find(_.key() == "splice-checksum")
-        .map(_.value())
-        .getOrElse(throw new RuntimeException("Missing checksum tag"))
-    } yield {
-      val bytes = new Array[Byte](data.remaining)
-      data.duplicate.get(bytes)
-      val bis = new ByteArrayInputStream(bytes)
-      // We compare the computed & stored checksum to one we independtly compute via the system's `sha256sum` executable for sanity
-      val expectedChecksum =
-        ("sha256sum" #| "awk '{print $1}'" #| "xxd -r -p" #| "base64" #< bis).!!.trim
-      if (checksum != expectedChecksum) {
-        throw new IOException(s"Checksum mismatch. Expected $expectedChecksum, got $checksum")
-      }
-      data
-    }
-  }
+  val s3Client = S3AsyncClient
+    .builder()
+    .endpointOverride(URI.create(s3Config.endpoint))
+    .region(
+      Region.of(s3Config.region)
+    ) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
+    .credentialsProvider(
+      StaticCredentialsProvider.create(
+        AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
+      )
+    )
+    // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
+    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+    .build()
+  val bucketName = s3Config.bucketName
 
   def newAppendWriteObject(
       key: String
@@ -193,21 +173,7 @@ object S3BucketConnection {
       loggerFactory: NamedLoggerFactory,
   ): S3BucketConnection = {
     new S3BucketConnection(
-      S3AsyncClient
-        .builder()
-        .endpointOverride(URI.create(s3Config.endpoint))
-        .region(
-          Region.of(s3Config.region)
-        ) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
-        .credentialsProvider(
-          StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
-          )
-        )
-        // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .build(),
-      s3Config.bucketName,
+      s3Config,
       loggerFactory,
     )
   }

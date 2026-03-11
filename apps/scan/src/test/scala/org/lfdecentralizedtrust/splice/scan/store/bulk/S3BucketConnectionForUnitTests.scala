@@ -2,25 +2,20 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import org.lfdecentralizedtrust.splice.config.S3Config
-import org.lfdecentralizedtrust.splice.store.S3BucketConnection
-import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnectionForTests
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
-import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
-import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 
 import java.io.DataInputStream
 import java.nio.ByteBuffer
-import java.net.URI
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 import scala.util.{Try, Using}
 
 class S3BucketConnectionForUnitTests(
-    s3Client: S3AsyncClient,
-    bucketName: String,
+    s3Config: S3Config,
     override val loggerFactory: NamedLoggerFactory,
-) extends S3BucketConnection(s3Client, bucketName, loggerFactory) {
+) extends S3BucketConnectionForTests(s3Config, loggerFactory) {
 
   override def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
     val request = GetObjectRequest.builder.bucket(bucketName).key(key).build
@@ -68,29 +63,6 @@ class S3BucketConnectionForUnitTests(
 
     override def upload(partNumber: Int, content: ByteBuffer): Future[Unit] =
       super.upload(partNumber, PaddedData(paddingSize, content).toByteBuffer())
-  }
-}
-object S3BucketConnectionForUnitTests {
-  def apply(
-      s3Config: S3Config,
-      loggerFactory: NamedLoggerFactory,
-  ): S3BucketConnection = {
-    new S3BucketConnectionForUnitTests(
-      S3AsyncClient
-        .builder()
-        .endpointOverride(URI.create(s3Config.endpoint))
-        .region(Region.of(s3Config.region))
-        .credentialsProvider(
-          StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
-          )
-        )
-        // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .build(),
-      s3Config.bucketName,
-      loggerFactory,
-    )
   }
 }
 
