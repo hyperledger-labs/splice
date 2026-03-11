@@ -218,7 +218,8 @@ class AcsSnapshotBulkStorageTest
         )
         bulkStore
           .getAcsSnapshotAtOrBefore(ts3.minusSeconds(1))
-          .futureValue should contain theSameElementsAs(0 to 6).map(i =>
+          .futureValue
+          .map(_.key) should contain theSameElementsAs(0 to 6).map(i =>
           s"$ts1-Migration-0-$ts3/ACS_$i.zstd"
         )
         recoverToSucceededIf[NoSuchElementException](
