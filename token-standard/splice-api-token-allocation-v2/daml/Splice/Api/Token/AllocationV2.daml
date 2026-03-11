@@ -15,8 +15,16 @@ import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
 import DA.Optional (optionalToList)
 import DA.Map as Map
 
--- | A generic type to refer to data defined within an app.
+-- | A map of holding contract-ids by instrumentId.
+--
+-- Used in allocation workflows to pass around references to holdings in a way that
+-- allows splitting them by instrument without fetching them.
+data HoldingMap = HoldingMap with
+    byInstrument : Map.Map InstrumentId [ContractId Holding]
+  deriving (Show, Eq)
 
+
+-- | A generic type to refer to data defined within an app.
 -- The interpretation of such a reference is app specific, but SHOULD be unambiguous within the context of the app.
 data Reference = Reference with
     id : Text
@@ -230,7 +238,7 @@ data Allocation_SettleResult = Allocation_SettleResult with
 -- | The result of the `Allocation_Cancel` choice.
 data Allocation_CancelResult = Allocation_CancelResult
   with
-    senderHoldingCids : [ContractId Holding]
+    senderHoldings : HoldingMap
       -- ^ The holdings that were released back to the sender.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
@@ -239,7 +247,7 @@ data Allocation_CancelResult = Allocation_CancelResult
 -- | The result of the `Allocation_Withdraw` choice.
 data Allocation_WithdrawResult = Allocation_WithdrawResult
   with
-    senderHoldingCids : [ContractId Holding]
+    senderHoldings : HoldingMap
       -- ^ The holdings that were released back to the sender.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.

@@ -12,7 +12,10 @@ module Splice.Api.Token.UtilsV2 (
   ForwardCompatible(..),
 
   -- * Allocation facctory
+  v1ToHoldingMap,
+
   allocation_v2_settleImplUsingV1,
+  allocation_v2_withdrawImplUsingV1,
 
   amulet_allocationFactoryV2_settleImpl,
 
@@ -265,22 +268,6 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
       senderChangeCids = map upcast senderChangeCids
       meta
 
--- | Withdraw the allocation using the V1 API.
-allocation_v2_senderActor_withdrawUsingV1
-  : ContractId AllocationV2.Allocation
-  -> AllocationV2.Allocation_Withdraw
-  -> Update AllocationV2.Allocation_WithdrawResult
-allocation_v2_senderActor_withdrawUsingV1 _self AllocationV2.Allocation_Withdraw{..} =  error "Not implemented yet"
-   -- FIXME: implement once we have actors support
-
-
-allocation_v1_settleImplUsingV2
-  : AllocationV1.Allocation
-  -> ContractId AllocationV2.Allocation
-  -> AllocationV2.Allocation_Settle
-  -> Update AllocationV2.Allocation_SettleResult
-allocation_v1_settleImplUsingV2  = error "FIXME: implement"
-
 
 
 
@@ -317,6 +304,25 @@ allocation_v2_settleImplUsingV1 self AllocationV2.Allocation_Settle{..} = do
     newHoldingCids =
       Map.singleton (upcast (view v1Allocation).allocation.transferLeg.instrumentId) (map upcast result.senderHoldingCids)
     meta = result.meta
+
+
+allocation_v2_withdrawImplUsingV1
+  : HoldingV1.InstrumentId
+  -> ContractId AllocationV2.Allocation
+  -> AllocationV2.Allocation_Withdraw
+  -> Update AllocationV2.Allocation_WithdrawResult
+allocation_v2_withdrawImplUsingV1 instrumentId self AllocationV2.Allocation_Withdraw{..} = do
+  let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
+  result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
+    extraArgs
+  pure AllocationV2.Allocation_WithdrawResult with
+    senderHoldings = v1ToHoldingMap instrumentId result.senderHoldingCids
+    meta = result.meta
+
+-- FIXME: better name
+v1ToHoldingMap : HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> AllocationV2.HoldingMap
+v1ToHoldingMap instrumentId holdingCids =
+  AllocationV2.HoldingMap $ Map.singleton (upcast instrumentId) (map upcast holdingCids)
 
 
 -- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself

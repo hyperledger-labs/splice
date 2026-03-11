@@ -63,18 +63,20 @@ template AmuletAllocationV2
           -- allocations that support both interfaces are represented using AmuletAllocation.
         meta = emptyMetadata
 
-      allocation_withdrawImpl _self Allocation_Withdraw{..} = do
-        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+      allocation_withdrawImpl self Allocation_Withdraw{..} = do
+        archive self
+        senderHoldings <- unlockAmuletAllocation this extraArgs
         pure Allocation_WithdrawResult
           with
-            senderHoldingCids
+            senderHoldings
             meta = emptyMetadata
 
-      allocation_cancelImpl _self Allocation_Cancel{..} = do
-        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+      allocation_cancelImpl self Allocation_Cancel{..} = do
+        archive self
+        senderHoldings <- unlockAmuletAllocation this extraArgs
         pure Allocation_CancelResult
           with
-            senderHoldingCids
+            senderHoldings
             meta = emptyMetadata
 
       allocation_settleImpl self Allocation_Settle{..} = do
@@ -151,13 +153,14 @@ allocationToTwoStepTransfer sender transferLegs dso expiresAt settlement =
       -- We don't show more context to avoid bloating the response here.
       ["allocation for settlement ", settlement.settlementRef.id]
 
-unlockAmuletAllocation : AmuletAllocationV2 -> ExtraArgs -> Update [ContractId Holding]
+unlockAmuletAllocation : AmuletAllocationV2 -> ExtraArgs -> Update HoldingMap
 unlockAmuletAllocation amuletAllocation extraArgs = do
   case amuletAllocation.lockedAmulet of
-    None -> return []
+    None -> return (HoldingMap Map.empty)
     Some la -> do
       let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation.authorizer.owner amuletAllocation.allocation.transferLegs amuletAllocation.dso amuletAllocation.expiresAt amuletAllocation.allocation.settlement
-      map upcast <$> abortTwoStepTransfer twoStepTransfer la extraArgs
+      v1ToHoldingMap (amuletInstrumentId amuletAllocation.dso) <$>
+        abortTwoStepTransfer twoStepTransfer la extraArgs
 
 
 instance HasCheckedFetch AmuletAllocationV2 ForDso where

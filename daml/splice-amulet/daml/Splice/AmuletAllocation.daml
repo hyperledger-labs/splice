@@ -58,7 +58,7 @@ template AmuletAllocation
     interface instance V2.Allocation for AmuletAllocation where
       view = upcast (view (toInterface @V1.Allocation this))
 
-      allocation_withdrawImpl = error "FIXME: IMPLEMENT"
+      allocation_withdrawImpl = allocation_v2_withdrawImplUsingV1 allocation.transferLeg.instrumentId
       allocation_cancelImpl = error "FIXME: IMPLEMENT"
 
       allocation_settleImpl = allocation_v2_settleImplUsingV1

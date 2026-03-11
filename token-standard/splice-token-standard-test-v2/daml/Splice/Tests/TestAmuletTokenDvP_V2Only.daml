@@ -334,6 +334,7 @@ testDvPCancel = script do
   [] <- queryInterface @Allocation bob
 
   pure ()
+-}
 
 testDvPWithdraw : Script ()
 testDvPWithdraw = script do
@@ -359,7 +360,7 @@ testDvPWithdraw = script do
   AmuletRegistry.expireLockAsOwner registry bobLockedHoldingCid
 
   pure ()
--}
+
 
 -- utilities
 ------------
