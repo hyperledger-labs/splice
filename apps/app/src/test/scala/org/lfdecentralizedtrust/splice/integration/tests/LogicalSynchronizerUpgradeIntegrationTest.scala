@@ -107,6 +107,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .addConfigTransform((_, config) => {
         updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = true))(config)
       })
+      .withManualStart
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
@@ -204,13 +205,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
     }
 
-    def startValidatorAndTapAmulet(
+    def onboardUserAndTapAmulet(
         validatorBackend: ValidatorAppBackendReference,
         walletClient: WalletAppClientReference,
         tapAmount: BigDecimal = 50.0,
         expectedAmulets: Range = 50 to 50,
     ) = {
-      startAllSync(validatorBackend)
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
       walletClient.tap(tapAmount)
       clue(s"${validatorBackend.name} has tapped a amulet") {
@@ -220,9 +220,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
           Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
         )
       }
-      validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
-        true
-      )
       walletUserParty
     }
 
@@ -253,7 +250,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       onboarding
     }
 
-    startValidatorAndTapAmulet(aliceValidatorBackend, aliceValidatorWalletClient)
+    onboardUserAndTapAmulet(aliceValidatorBackend, aliceValidatorWalletClient)
 
     // account for the cancellation
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
@@ -524,10 +521,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      stopAllAsync(aliceValidatorBackend).futureValue
-      aliceValidatorBackend.participantClientWithAdminToken.synchronizers.disconnect_all()
-      stopAllAsync(allNodes*).futureValue
-      allBackends.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
+      clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
+        // manually stop stuff as we destroy the new synchronizer as it runs in process
+        val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
+        stopAllAsync(validators*).futureValue
+        validators.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
+        stopAllAsync(allNodes*).futureValue
+        allBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
+      }
     }
   }
 
