@@ -141,9 +141,14 @@ allocationControllers alloc@AllocationSpecification{..} =
     (\override -> dedup $ settlement.executor :: override)
     settlement.controllerOverride
 
-allocationSettlementControllers : AllocationSpecification -> [Party]
-allocationSettlementControllers alloc@AllocationSpecification{..} =
-  settlement.executor :: [ leg.instrumentId.admin | leg <- alloc.transferLegs ]
+allocationSettlementControllers : AllocationView -> [Party]
+allocationSettlementControllers allocView =
+    allocView.allocation.settlement.executor :: concatMap legControllers allocView.allocation.transferLegs
+  where
+    legControllers leg
+      | allocView.settlementVersion == 1 = leg.instrumentId.admin :: [leg.sender.owner, leg.receiver.owner]
+      | otherwise = [leg.instrumentId.admin]
+
 
 -- | Convenience to get the allocation admin
 allocationAdmin : AllocationSpecification -> Party
@@ -165,21 +170,23 @@ interface Allocation where
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
   allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
 
-  choice Allocation_Settle : Allocation_SettleResult
+  nonconsuming choice Allocation_Settle : Allocation_SettleResult
     -- ^ Settle the allocation by moving the net amount of the transfer legs.
     --
     -- Requires authorization from the settlement executor and the instrument
     -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
     -- settlements of other legs of the same admins.
     --
+    -- Implementations MUST ensure that the allocation is consumed by this choice.
+    --
     -- FIXME: adjust comments to call out that all legs must have the same instrument admin
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSettlementControllers (view this).allocation
+    controller allocationSettlementControllers (view this)
     do allocation_settleImpl this self arg
 
-  choice Allocation_Cancel : Allocation_CancelResult
+  nonconsuming choice Allocation_Cancel : Allocation_CancelResult
     -- ^ Cancel the allocation. Requires authorization from sender, receiver, and
     -- executor.
     --
@@ -189,17 +196,21 @@ interface Allocation where
     -- executor as part of the contract coordinating the settlement, so that
     -- that the executor can release the allocated assets early in case the
     -- settlement is aborted or it has definitely failed.
+    --
+    -- Implementations MUST ensure that the allocation is consumed by this choice.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSettlementControllers (view this).allocation
+    controller allocationSettlementControllers (view this)
       -- FIXME: switch to `actors`
     do allocation_cancelImpl this self arg
 
-  choice Allocation_Withdraw : Allocation_WithdrawResult
+  nonconsuming choice Allocation_Withdraw : Allocation_WithdrawResult
     -- ^ Withdraw the allocated assets. Used by the sender to withdraw the assets before settlement
     -- was completed. This SHOULD not fail settlement if the sender has still time to allocate the
     -- assets again; i.e., the `settlement.allocateBefore` deadline has not yet passed.
+    --
+    -- Implementations MUST ensure that the allocation is consumed by this choice.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.

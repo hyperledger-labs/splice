@@ -61,20 +61,7 @@ template AmuletAllocation
       allocation_withdrawImpl = error "FIXME: IMPLEMENT"
       allocation_cancelImpl = error "FIXME: IMPLEMENT"
 
-      allocation_settleImpl _self V2.Allocation_Settle{..} = do
-        -- note: this choice is only used if this allocation has a matching receiver-side allocation.
-        -- In that case both of these are settled using the V2 flow, which ensures that both
-        -- debit and credit are happening properly.
-        let leg = allocation.transferLeg
-        let admin = leg.instrumentId.admin
-        let sender = leg.sender
-        lockedAmulet <- fetchAndArchive (ForOwner with dso = admin; owner = sender) lockedAmulet
-        require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == leg.amount)
-
-        let reason = "sender-side settlement of allocation leg '" <> allocation.transferLegId <> "'"
-        pure V2.Allocation_SettleResult with
-          newHoldingCids = Map.empty
-          meta = holdingTxMeta TxKind_Transfer (Some reason) (Some sender) None
+      allocation_settleImpl = allocation_v2_settleImplUsingV1
 
 
 

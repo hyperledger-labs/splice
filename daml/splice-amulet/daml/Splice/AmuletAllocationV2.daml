@@ -77,7 +77,9 @@ template AmuletAllocationV2
             senderHoldingCids
             meta = emptyMetadata
 
-      allocation_settleImpl _self Allocation_Settle{..} = do
+      allocation_settleImpl self Allocation_Settle{..} = do
+        -- archive ourselves, as the choice is nonconsuming
+        archive self
         -- compute total funds to move
         let authorizer = allocation.authorizer.owner
         let netAmount = netAllocationAmount (basicAccount authorizer) allocation.transferLegs

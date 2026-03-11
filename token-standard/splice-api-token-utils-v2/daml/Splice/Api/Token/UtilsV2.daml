@@ -12,6 +12,8 @@ module Splice.Api.Token.UtilsV2 (
   ForwardCompatible(..),
 
   -- * Allocation facctory
+  allocation_v2_settleImplUsingV1,
+
   amulet_allocationFactoryV2_settleImpl,
 
   -- * Transfer instructions
@@ -25,6 +27,7 @@ module Splice.Api.Token.UtilsV2 (
 ) where
 
 import DA.Date
+import DA.Foldable (forA_)
 import DA.Optional (isNone)
 import DA.List (dedup, head)
 import qualified DA.Map as Map
@@ -238,7 +241,6 @@ instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationV
       settlementVersion = 1
       meta
 
-
 instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
   upcast = coerceInterfaceContractId
 
@@ -297,8 +299,27 @@ allocation_v2_settleImplUsingV1 allocationCid AllocationV2.Allocation_Settle{..}
     meta = result.meta
 -}
 
--- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself
+allocation_v2_settleImplUsingV1
+  : ContractId AllocationV2.Allocation
+  -> AllocationV2.Allocation_Settle
+  -> Update AllocationV2.Allocation_SettleResult
+allocation_v2_settleImplUsingV1 self AllocationV2.Allocation_Settle{..} = do
+  let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
+  v1Allocation <- fetch v1Cid
+  -- use the AllocationV1.Allocation_ExecuteTransfer choice to ensure the sender's tx parsing sees the expected choice
+  result <- exercise v1Cid AllocationV1.Allocation_ExecuteTransfer with extraArgs
+  -- Archive the receiver holdings, as the receiver will get their credit as part of settling their allocation.
+  -- The receiver parses this tranaction using the V2 choices and will thus understand it.
+  forA_ result.receiverHoldingCids $ \receiverHoldingCid -> do
+    exercise receiverHoldingCid Archive
 
+  pure AllocationV2.Allocation_SettleResult with
+    newHoldingCids =
+      Map.singleton (upcast (view v1Allocation).allocation.transferLeg.instrumentId) (map upcast result.senderHoldingCids)
+    meta = result.meta
+
+
+-- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself
 amulet_allocationFactoryV2_settleImpl
   : AllocationInstructionV2.AllocationFactory
   -> AllocationInstructionV2.AllocationFactory_SettleBatch
