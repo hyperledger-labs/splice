@@ -24,7 +24,7 @@ import DA.Map as Map hiding (filter)
 import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.HoldingV2 as V2
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationInstructionV2
 
@@ -123,7 +123,7 @@ setupOtcTrade  = do
   Some otcTrade <- queryContractId provider otcTradeCid
 
   -- Alice sees the allocation request in her wallet
-  [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin alice amuletId.admin
+  [aliceAlloc] <- WalletClient.listRequestedAllocationsForAdmin amuletId.admin (V2.basicAccount alice) alice
   aliceAlloc.transferLegs === [aliceLeg, aliceLeg2, bobLeg, bobLeg2]
 
   -- alice accepts allocation request directly via her wallet
@@ -168,7 +168,7 @@ setupOtcTrade  = do
     (fromSome (fromSome lockedHolding.lock).expiresAt > now)
 
   -- Bob sees the allocation request in his wallet as well
-  [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin bob amuletId.admin
+  [bobAlloc] <- WalletClient.listRequestedAllocationsForAdmin amuletId.admin (V2.basicAccount bob) bob
   bobAlloc.transferLegs === [aliceLeg, aliceLeg2, bobLeg, bobLeg2, feeLeg]
 
   -- bob accepts allocation request directly via his wallet
@@ -186,7 +186,10 @@ setupOtcTrade  = do
   -- Lastly, the venue creates an allocation for the fee leg.
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
-    allocation = AllocationSpecification with transferLegs = [feeLeg]; settlement
+    allocation = AllocationSpecification with
+      authorizer = basicAccount provider
+      transferLegs = [feeLeg]
+      settlement
     inputHoldingCids = []
     requestedAt = now
     extraArgs = emptyExtraArgs
@@ -361,7 +364,7 @@ testDvPWithdraw = script do
 -- utilities
 ------------
 
--- | List all allocations matching a particular settlement reference, sorted by their admin and trader.
+-- | List all allocations matching a particular settlement reference, sorted by their admin and trading account.
 -- This function would be run on the trading app provider's backend as part of an automation loop.
 appBackendListAllocations : Party -> Reference -> Script (Map (Party, Account) (ContractId Allocation, AllocationView))
 appBackendListAllocations p ref = do
@@ -371,7 +374,7 @@ appBackendListAllocations p ref = do
         guard (fundedAllocation.allocation.settlement.settlementRef == ref)
         let tl::_ = fundedAllocation.allocation.transferLegs
             admin = tl.instrumentId.admin
-            authorizer = fundedAllocation.authorizer
+            authorizer = fundedAllocation.allocation.authorizer
         return ((admin, authorizer), (cid, fundedAllocation))
   pure $ Map.fromList matchingAllocs
 

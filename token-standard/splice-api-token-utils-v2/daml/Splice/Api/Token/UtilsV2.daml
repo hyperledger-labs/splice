@@ -4,6 +4,10 @@
 -- | Conversion functions and standard implementations used to
 -- implement the V1 interfaces from the V2 interfaces.
 module Splice.Api.Token.UtilsV2 (
+  -- * Accounts
+  isBasicAccount,
+
+  -- * API conversion
   BackwardCompatible(..),
   ForwardCompatible(..),
 
@@ -225,13 +229,13 @@ upcast_v1_v2_SettlementInfo extraExecutors(AllocationV1.SettlementInfo with exec
 instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
   upcast (AllocationV1.AllocationSpecification with settlement, transferLegId, transferLeg) =
     AllocationV2.AllocationSpecification with
+      authorizer = accountFromMeta transferLeg.sender "sender" transferLeg.meta
       settlement = upcast_v1_v2_SettlementInfo [transferLeg.sender, transferLeg.receiver] settlement
       transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
 
 instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
   upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
     AllocationV2.AllocationView with
-      authorizer = accountFromMeta allocation.transferLeg.sender "sender" meta
       allocation = upcast allocation
       holdingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast holdingCids)]
       expiresAt = Some (allocation.settlement.settleBefore)
@@ -356,6 +360,8 @@ allocation_v2_settleImplUsingV1 allocationCid AllocationV2.Allocation_Settle{..}
     meta = result.meta
 -}
 
+-- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself
+
 amulet_allocationFactoryV2_settleImpl
   : AllocationInstructionV2.AllocationFactory
   -> AllocationInstructionV2.AllocationFactory_SettleBatch
@@ -381,7 +387,7 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
       1 -> do
         require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
         let tl = head allocation.transferLegs
-        require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.authorizer)
+        require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.allocation.authorizer)
         require "sender.owner authorizes v1 settlement" (tl.sender.owner `elem` settlementV1Authorizers)
         require "receiver.owner authorizes v1 settlement" (tl.receiver.owner `elem` settlementV1Authorizers)
       2 -> pure ()
@@ -394,7 +400,7 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
 
   let v2Legs = Set.fromList $ do
         (_, allocationView) <- v2Allocations
-        let authorizer = allocationView.authorizer
+        let authorizer = allocationView.allocation.authorizer
         leg <- allocationView.allocation.transferLegs
         pure (authorizer, leg)
 
@@ -416,7 +422,7 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
   -- check that all legs match up
   let allocatedV2Legs = Map.fromList $ do
         (_, allocationView) <- allocationsSettledUsingV2
-        let authorizer = allocationView.authorizer
+        let authorizer = allocationView.allocation.authorizer
         case allocationView.allocation.transferLegs of
           [] -> error "Unexpected empty transfer legs in allocation"
           (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)

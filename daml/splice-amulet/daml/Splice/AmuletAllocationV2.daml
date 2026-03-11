@@ -35,25 +35,25 @@ template AmuletAllocationV2
     -- ^ Locked amulet that holds the funds for the allocation.
     -- Empty if no outgoing legs.
     allocation : AllocationSpecification
-    authorizer : Party
     dso : Party
     expiresAt : Time
   where
-    signatory dso, authorizer
+    signatory dso, allocation.authorizer.owner
     observer allocation.settlement.executors
 
     ensure
+      isBasicAccount allocation.authorizer &&
+      -- FIXME: share validation logic via UtilsV2
       all
         (\tl -> (
             -- Authorizer needs to appear as sender or receiver of each leg.
-            authorizer `elem` [tl.sender.owner, tl.receiver.owner])
+            allocation.authorizer.owner `elem` [tl.sender.owner, tl.receiver.owner])
             -- Only one admin Id allowed.
-            && tl.instrumentId.admin == dso)
+            && tl.instrumentId.admin == dso) -- FIXME: check instrument against amulet instrument
         allocation.transferLegs
 
     interface instance Allocation for AmuletAllocationV2 where
       view = AllocationView with
-        authorizer = basicAccount authorizer
         expiresAt = Some expiresAt
         allocation
         holdingCids = case lockedAmulet of
@@ -79,7 +79,8 @@ template AmuletAllocationV2
 
       allocation_settleImpl _self Allocation_Settle{..} = do
         -- compute total funds to move
-        let netAmount = netAllocationAmount authorizer allocation.transferLegs
+        let authorizer = allocation.authorizer.owner
+        let netAmount = netAllocationAmount (basicAccount authorizer) allocation.transferLegs
         if netAmount >= 0.0 then do
           require "No locked amulet expected for non-negative net amount" (isNone lockedAmulet)
           if netAmount > 0.0
@@ -119,16 +120,16 @@ template AmuletAllocationV2
 -- Allocation usage
 -------------------
 
--- FIXME: consider lifting out to utils
-netAllocationAmount : Party -> [TransferLeg] -> Decimal
+-- FIXME: lift out to utils
+netAllocationAmount : Account -> [TransferLeg] -> Decimal
 netAllocationAmount authorizer transferLegs =
     sum $ map legAmount transferLegs
   where
-    legAmount tl = case (tl.sender.owner == authorizer, tl.receiver.owner == authorizer) of
-      (True, True) -> 0.0
-      (True, False) -> negate tl.amount
-      (False, True) -> tl.amount
-      (False, False) -> error $ "Unexpected: " <> show authorizer <> " is neither sender nor receiver in leg " <> show tl.transferLegId
+    legAmount leg =
+      (if leg.sender == authorizer then negate leg.amount else 0.0) +
+      (if leg.receiver == authorizer then leg.amount else 0.0)
+
+
 
 allocationToTwoStepTransfer : Party -> [TransferLeg] -> Party -> Time -> SettlementInfo -> TwoStepTransfer
 allocationToTwoStepTransfer sender transferLegs dso expiresAt settlement =
@@ -139,7 +140,7 @@ allocationToTwoStepTransfer sender transferLegs dso expiresAt settlement =
     -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
     -- FIXME: improve representation once the design for batch settlement is definite
     receiver = sender
-    amount = negate (netAllocationAmount sender transferLegs)
+    amount = negate (netAllocationAmount (basicAccount sender) transferLegs)
     provider =
       if null settlement.executors
         then error "Unexpected: no executors in settlement"
@@ -158,7 +159,7 @@ unlockAmuletAllocation amuletAllocation extraArgs = do
   case amuletAllocation.lockedAmulet of
     None -> return []
     Some la -> do
-      let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.authorizer amuletAllocation.allocation.transferLegs amuletAllocation.dso amuletAllocation.expiresAt amuletAllocation.allocation.settlement
+      let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation.authorizer.owner amuletAllocation.allocation.transferLegs amuletAllocation.dso amuletAllocation.expiresAt amuletAllocation.allocation.settlement
       map upcast <$> abortTwoStepTransfer twoStepTransfer la extraArgs
 
 

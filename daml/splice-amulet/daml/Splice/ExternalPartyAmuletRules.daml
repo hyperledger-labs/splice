@@ -475,11 +475,11 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   whenSome settlement.settlementDeadline \d -> do
       assertWithinDeadline "Allocation.settlement.settlementDeadline" d
 
-  authorizer <- case actors of
-    [authorizer] -> pure authorizer
-    _ -> abort $ "Creating an allocation requires the authorizer as the single actor, but got: " <> show actors
+  let authorizer = allocation.authorizer.owner
+  require "allocation.authorizer.owner is among the actors" (authorizer `elem` actors)
 
-  let amount = netAllocationAmount authorizer arg.allocation.transferLegs
+
+  let amount = netAllocationAmount (V2.basicAccount authorizer) arg.allocation.transferLegs
 
   let
     -- FIXME: revisit this logic -- 30 days might be too little, but we want protection for the DSO
@@ -526,7 +526,6 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
     allocation = arg.allocation
     lockedAmulet
     dso
-    authorizer
     expiresAt
 
   -- finaly done: return the result

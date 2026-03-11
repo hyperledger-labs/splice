@@ -176,7 +176,10 @@ setupOtcTrade  = do
   -- Lastly, the venue creates an allocation for the fee leg.
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
-    allocation = AllocationSpecification with transferLegs = [feeLeg]; settlement
+    allocation = AllocationSpecification with
+      authorizer = basicAccount provider
+      transferLegs = [feeLeg]
+      settlement
     inputHoldingCids = []
     requestedAt = now
     extraArgs = emptyExtraArgs
@@ -361,7 +364,7 @@ appBackendListAllocations p ref = do
         guard (fundedAllocation.allocation.settlement.settlementRef == ref)
         let tl::_ = fundedAllocation.allocation.transferLegs
             admin = tl.instrumentId.admin
-            authorizer = fundedAllocation.authorizer
+            authorizer = fundedAllocation.allocation.authorizer
         return ((admin, authorizer), (cid, fundedAllocation))
   pure $ Map.fromList matchingAllocs
 

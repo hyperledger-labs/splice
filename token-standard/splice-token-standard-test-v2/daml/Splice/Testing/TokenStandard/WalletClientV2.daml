@@ -129,18 +129,19 @@ listTransferOffers p instrumentId = do
         pure (cid, instr)
   pure pendingOffers
 
--- | List all allocations requested from the owner for a specific instrument.
-listRequestedAllocationsForAdmin : Party -> Party -> Script [V2.AllocationSpecification]
-listRequestedAllocationsForAdmin p admin = do
-  reqs <- queryInterface @V2.AllocationRequest p
+-- | List all allocations requested from the actor for instruments by the admin.
+listRequestedAllocationsForAdmin : Party -> V2.Account -> Party -> Script [V2.AllocationSpecification]
+listRequestedAllocationsForAdmin admin tradingAccount actor = do
+  reqs <- queryInterface @V2.AllocationRequest actor
   let amuletAllocs = do
         (_reqCid, Some req) <- reqs
         let transferLegs = do
               tf <- req.transferLegs
               guard (tf.instrumentId.admin ==  admin)
-              guard (p == tf.sender.owner || p == tf.receiver.owner)
+              guard (tradingAccount == tf.sender || tradingAccount == tf.receiver)
               return tf
         pure V2.AllocationSpecification with
+          authorizer = tradingAccount
           settlement = req.settlement
           transferLegs
   pure amuletAllocs
@@ -160,6 +161,7 @@ acceptAllocationRequestV2 registries tradingAccount actor req = do
   -- Allocate the legs grouped by instrument.
   choices <- forA (Map.toList legsByInstrument) $ \(instrumentId, legs) -> do
     let allocation = V2.AllocationSpecification with
+          authorizer = tradingAccount
           settlement = req.settlement
           transferLegs = legs
     registry <- V2.getRegistryFor' registries instrumentId
