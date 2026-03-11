@@ -3,7 +3,11 @@ package org.lfdecentralizedtrust.splice.store
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest}
+import software.amazon.awssdk.services.s3.model.{
+  GetObjectRequest,
+  GetObjectResponse,
+  GetObjectTaggingRequest,
+}
 
 import java.io.{ByteArrayInputStream, IOException}
 import java.nio.ByteBuffer
