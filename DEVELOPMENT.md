@@ -381,7 +381,7 @@ from the repo root to delete all `.daml` build directories.
 
 ## Daml Version Bump
 
-When you add a new daml template, you need to bump the version of the daml package,
+Whenever you update a .dar file, you need to bump the version of the corresponding daml package,
 and the version of daml packages that (recursively) depend on it. For that,
 
 1. Bump the version inside the `daml.yaml` file inside the updated module, and in all modules that (recursively) depend on it.
