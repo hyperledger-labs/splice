@@ -37,7 +37,7 @@ template OTCTradeAllocationRequest with
     createdAt : Time
     settleAt : Time
     settlementDeadline : Optional Time
-    extraExecutors : [Party]
+    settlementV1Authorizers : [Party]
       -- ^ Extra executors for testing multi-executors and mixed version settlement.
       -- FIXME: cleaup this code
   where
@@ -47,7 +47,7 @@ template OTCTradeAllocationRequest with
     interface instance AllocationRequest for OTCTradeAllocationRequest where
       view = AllocationRequestView with
         settlement = SettlementInfo with
-          executors = venue :: extraExecutors
+          executors = venue :: settlementV1Authorizers
           requestedAt = createdAt
           settlementRef = makeTradeRef otcTradeCid
           settleAt = settleAt
@@ -90,8 +90,8 @@ template OTCTrade with
     createdAt : Time
     settleAt : Time
     settlementDeadline : Optional Time
-    extraExecutors : [Party]
-      -- ^ Extra executors for testing multi-executors and mixed version settlement.
+    settlementV1Authorizers : [Party]
+      -- ^ Parties approving the settlement of v1 allocations affecting them.
   where
     signatory venue
     observer venue, tradingParties (concat $ Map.values transferLegsByAdmin)
@@ -111,7 +111,7 @@ template OTCTrade with
               createdAt = createdAt
               settleAt = settleAt
               settlementDeadline = settlementDeadline
-              extraExecutors
+              settlementV1Authorizers
         pure (concat requestss)
 
     -- Nonconsuming to avoid disclosures inside.
@@ -121,7 +121,7 @@ template OTCTrade with
         allocationBatchesByAdmin : Map.Map Party (ContractId Api.Token.AllocationInstructionV2.AllocationFactory, [ContractId Api.Token.AllocationV2.Allocation], ExtraArgs)
         -- ^ Allocations sorted by admin party
         allocationRequests : [ContractId OTCTradeAllocationRequest]
-      controller venue, extraExecutors
+      controller venue, settlementV1Authorizers
         -- FIXME: change choice or build infra to trigger this choice w/o resorting to a submitMulti step
       do
         archive self
@@ -137,7 +137,8 @@ template OTCTrade with
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
           exercise factoryCid Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatch with
             expectedAdmin = admin
-            actors = venue :: extraExecutors
+            actors = venue :: settlementV1Authorizers
+            settlementV1Authorizers = settlementV1Authorizers
             transferLegs
             allocationCids
             extraArgs

@@ -24,7 +24,6 @@ module Splice.Api.Token.UtilsV2 (
 
 ) where
 
-import DA.Action (when)
 import DA.Date
 import DA.Optional (fromOptional, isNone)
 import DA.List (dedup, head)
@@ -236,7 +235,7 @@ instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationV
       allocation = upcast allocation
       holdingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast holdingCids)]
       expiresAt = Some (allocation.settlement.settleBefore)
-      supportsV1 = True
+      settlementVersion = 1
       meta
 
 
@@ -377,16 +376,21 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
     require "Actors match allocation executors" (actors == allocation.settlement.executors)
     -- FIXME: consider what other validation is missing
 
-    -- extra v1 allocation validation
-    when (allocationView.supportsV1) $ do
-      require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
-      let tl = head allocation.transferLegs
-      require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.authorizer)
+    -- settlement version specific validation
+    case allocationView.settlementVersion of
+      1 -> do
+        require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
+        let tl = head allocation.transferLegs
+        require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.authorizer)
+        require "sender.owner authorizes v1 settlement" (tl.sender.owner `elem` settlementV1Authorizers)
+        require "receiver.owner authorizes v1 settlement" (tl.receiver.owner `elem` settlementV1Authorizers)
+      2 -> pure ()
+      v -> fail $ "Unsupported settlement version " <> show v <> " in " <> show allocationView
 
     pure (allocationCid, allocationView)
 
   -- determine which allocations to settle using v1 and which to settle using v2
-  let (v1Allocations, v2Allocations) = partition (._2.supportsV1) allocations
+  let (v1Allocations, v2Allocations) = partition (\a -> a._2.settlementVersion == 1) allocations
 
   let v2Legs = Set.fromList $ do
         (_, allocationView) <- v2Allocations

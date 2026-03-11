@@ -103,7 +103,7 @@ setupOtcTrade  = do
     settleAt
     createdAt = now
     settlementDeadline = Some deadline
-    extraExecutors = []
+    settlementV1Authorizers = []
 
   let
     settlement = SettlementInfo with
@@ -235,6 +235,7 @@ testDvP = script do
         transferLegs
         allocationCids
         extraArgs = emptyExtraArgs
+        settlementV1Authorizers = []
         actors = [provider]
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 

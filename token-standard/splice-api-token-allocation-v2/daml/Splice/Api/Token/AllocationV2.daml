@@ -101,9 +101,18 @@ data AllocationView = AllocationView with
     expiresAt : Optional Time
     -- ^ A time at which this allocation expires. SHOULD be as close as the
     -- registry can make it to the settlementInfo's settlementDeadline.
-    supportsV1 : Bool
-      -- ^ Whether this allocation also supports the V1 allocation interface.
-      -- Provided for debugging purposes.
+    settlementVersion : Int
+      -- ^ Version of the workflow to use for settling this allocation.
+      --
+      -- V2 settlement only requires the specified allocation.settlement.executors
+      -- to authorize the whole batch settlement.
+
+      -- V1 settlement is only available if there is a single transfer leg. It
+      -- guarantees that the owners of its sender and receiver account
+      -- are also required to authorize the whole batch settlement in addition
+      -- to the executors.
+      --
+      -- Additional versions may defined in future extensions of the token standard.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)

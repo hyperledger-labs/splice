@@ -178,6 +178,12 @@ interface AllocationFactory where
         -- For every leg there must be both a sender and a receiver authorization.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
+
+      settlementV1Authorizers : [Party]
+        -- ^ Parties authorizing the settlement of their V1 allocations.
+        --
+        -- They are a separate field from `actors` to provide explicit opt-in behavior.
+
       actors : [Party]
         -- ^ Actors executing the settlement.
         --

@@ -59,7 +59,7 @@ template AmuletAllocationV2
         holdingCids = case lockedAmulet of
           None -> Map.empty
           Some cid -> Map.fromList [(upcast (amuletInstrumentId dso), [toInterfaceContractId cid])]
-        supportsV1 = False
+        settlementVersion = 2
           -- allocations that support both interfaces are represented using AmuletAllocation.
         meta = emptyMetadata
 
