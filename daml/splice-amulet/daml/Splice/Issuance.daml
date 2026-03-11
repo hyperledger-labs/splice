@@ -32,7 +32,7 @@ data IssuanceConfig = IssuanceConfig with
 -- | Getter with the right default value for the validator faucet cap.
 -- Use this consistently instead of accessing the field directly.
 getValidatorFaucetCap : IssuanceConfig -> Decimal
-getValidatorFaucetCap = fromOptional 0.0 . (.optValidatorFaucetCap)
+getValidatorFaucetCap = fromOptional 2.85 . (.optValidatorFaucetCap)
 
 validIssuanceCurve : Schedule RelTime IssuanceConfig -> Bool
 validIssuanceCurve configSchedule = validSchedule configSchedule validIssuanceConfig
