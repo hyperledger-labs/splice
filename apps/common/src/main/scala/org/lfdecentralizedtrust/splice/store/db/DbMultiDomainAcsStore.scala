@@ -287,31 +287,31 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def listContractsInAsOfRange[C, TCid <: ContractId[?], T](
+  override def listContractsActiveWithin[C, TCid <: ContractId[?], T](
       companion: C,
-      minAsOf: CantonTimestamp,
-      maxAsOf: CantonTimestamp,
+      lowerBoundIncl: CantonTimestamp,
+      upperBoundIncl: CantonTimestamp,
       synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] = {
-    val archiveConfig = requireArchiveConfig("listContractsInAsOfRange")
+    val archiveConfig = requireArchiveConfig("listContractsActiveWithin")
     waitUntilAcsIngested {
-      waitUntilRecordTimeReached(synchronizerId, maxAsOf).flatMap { _ =>
+      waitUntilRecordTimeReached(synchronizerId, upperBoundIncl).flatMap { _ =>
         val templateId = companionClass.typeId(companion)
-        val opName = s"listContractsInAsOfRange:${templateId.getEntityName}"
+        val opName = s"listContractsActiveWithin:${templateId.getEntityName}"
         for {
           result <- storage.query(
-            selectFromTcsTableWithStateInAsOfRange(
+            selectFromTcsTableWithStateActiveWithin(
               acsTableName,
               archiveConfig.archiveTableName,
               acsStoreId,
               domainMigrationId,
               companion,
-              minAsOf,
-              maxAsOf,
+              lowerBoundIncl,
+              upperBoundIncl,
               orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
             ),
             opName,

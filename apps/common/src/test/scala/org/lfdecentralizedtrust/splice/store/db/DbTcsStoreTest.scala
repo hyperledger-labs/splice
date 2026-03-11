@@ -104,7 +104,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       } yield resultAtArchive shouldBe None
     }
 
-    "listContractsAsOf and listContractsInAsOfRange return correct contracts" in {
+    "listContractsAsOf and listContractsActiveWithin return correct contracts" in {
       implicit val store = mkStore()
       val coupon1 = c(1).copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val coupon2 = c(2).copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
@@ -158,8 +158,8 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         )
         _ = resultAt400.map(_.contract) shouldBe Seq(coupon2)
 
-        // listContractsInAsOfRange: [100, 400] should return all 3 contracts
-        resultRange_100_400 <- store.listContractsInAsOfRange(
+        // listContractsActiveWithin: [100, 400] should return all 3 contracts
+        resultRange_100_400 <- store.listContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(400),
@@ -171,30 +171,30 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           .toSet shouldBe Set(coupon1, coupon2, coupon3)
 
         // And we should be able to extract results for each asOf from its result
-        // contractsAsOf on the range result should match listContractsAsOf
+        // contractsActiveAsOf on the range result should match listContractsAsOf
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(100),
           ) shouldBe resultAt100
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(250),
           ) shouldBe resultAt250
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(300),
           ) shouldBe resultAt300
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(400),
           ) shouldBe resultAt400
 
-        // Also confirm listContractsInAsOfRange for various ranges
-        resultRange_100_200 <- store.listContractsInAsOfRange(
+        // Also confirm listContractsActiveWithin for various ranges
+        resultRange_100_200 <- store.listContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(200),
@@ -205,7 +205,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2)
 
-        resultRange_100_300 <- store.listContractsInAsOfRange(
+        resultRange_100_300 <- store.listContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(300),
@@ -216,7 +216,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2, coupon3)
 
-        resultRange_200_300 <- store.listContractsInAsOfRange(
+        resultRange_200_300 <- store.listContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(200),
           CantonTimestamp.ofEpochSecond(300),
@@ -227,7 +227,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2, coupon3)
 
-        resultRange_300_400 <- store.listContractsInAsOfRange(
+        resultRange_300_400 <- store.listContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(300),
           CantonTimestamp.ofEpochSecond(400),
@@ -333,7 +333,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         listError.getMessage should include("listContractsAsOf requires an AcsArchiveConfig")
 
         val rangeError = the[IllegalStateException] thrownBy {
-          store.listContractsInAsOfRange(
+          store.listContractsActiveWithin(
             AppRewardCoupon.COMPANION,
             CantonTimestamp.Epoch,
             CantonTimestamp.Epoch,
@@ -342,7 +342,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           )
         }
         rangeError.getMessage should include(
-          "listContractsInAsOfRange requires an AcsArchiveConfig"
+          "listContractsActiveWithin requires an AcsArchiveConfig"
         )
       }
     }

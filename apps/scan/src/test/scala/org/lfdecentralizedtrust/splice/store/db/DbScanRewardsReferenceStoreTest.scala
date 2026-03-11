@@ -26,7 +26,7 @@ class DbScanRewardsReferenceStoreTest
 
   "DbScanRewardsReferenceStore" should {
 
-    "lookupFeaturedAppRightsAsOf and lookupFeaturedAppRightsInAsOfRange return correct contracts" in {
+    "lookupFeaturedAppRightsAsOf and lookupFeaturedAppRightsActiveWithin return correct contracts" in {
       val store = mkStore()
       val far1 = featuredAppRight(userParty(1))
         .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
@@ -68,8 +68,8 @@ class DbScanRewardsReferenceStoreTest
         resultAt400 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(400))
         _ = resultAt400.map(_.contract) shouldBe Seq(far2)
 
-        // lookupFeaturedAppRightsInAsOfRange: [100, 400] should return all 3 contracts
-        resultRange_100_400 <- store.lookupFeaturedAppRightsInAsOfRange(
+        // lookupFeaturedAppRightsActiveWithin: [100, 400] should return all 3 contracts
+        resultRange_100_400 <- store.lookupFeaturedAppRightsActiveWithin(
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(400),
         )
@@ -77,30 +77,30 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(far1, far2, far3)
 
-        // contractsAsOf on the range result should match lookupFeaturedAppRightsAsOf
+        // contractsActiveAsOf on the range result should match lookupFeaturedAppRightsAsOf
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(100),
           ) shouldBe resultAt100
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(250),
           ) shouldBe resultAt250
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(300),
           ) shouldBe resultAt300
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(400),
           ) shouldBe resultAt400
 
-        // Also confirm lookupFeaturedAppRightsInAsOfRange for various ranges
-        resultRange_100_200 <- store.lookupFeaturedAppRightsInAsOfRange(
+        // Also confirm lookupFeaturedAppRightsActiveWithin for various ranges
+        resultRange_100_200 <- store.lookupFeaturedAppRightsActiveWithin(
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(200),
         )
@@ -108,7 +108,7 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(far1, far2)
 
-        resultRange_100_300 <- store.lookupFeaturedAppRightsInAsOfRange(
+        resultRange_100_300 <- store.lookupFeaturedAppRightsActiveWithin(
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(300),
         )
@@ -116,7 +116,7 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(far1, far2, far3)
 
-        resultRange_200_300 <- store.lookupFeaturedAppRightsInAsOfRange(
+        resultRange_200_300 <- store.lookupFeaturedAppRightsActiveWithin(
           CantonTimestamp.ofEpochSecond(200),
           CantonTimestamp.ofEpochSecond(300),
         )
@@ -124,7 +124,7 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(far1, far2, far3)
 
-        resultRange_300_400 <- store.lookupFeaturedAppRightsInAsOfRange(
+        resultRange_300_400 <- store.lookupFeaturedAppRightsActiveWithin(
           CantonTimestamp.ofEpochSecond(300),
           CantonTimestamp.ofEpochSecond(400),
         )
@@ -134,7 +134,7 @@ class DbScanRewardsReferenceStoreTest
       } yield succeed
     }
 
-    "lookupOpenMiningRoundsAsOf and lookupOpenMiningRoundsInAsOfRange return correct contracts" in {
+    "lookupOpenMiningRoundsAsOf and lookupOpenMiningRoundsActiveWithin return correct contracts" in {
       val store = mkStore()
       val omr1 = openMiningRound(dsoParty, round = 3, amuletPrice = 1.0)
         .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
@@ -176,8 +176,8 @@ class DbScanRewardsReferenceStoreTest
         resultAt400 <- store.lookupOpenMiningRoundsAsOf(CantonTimestamp.ofEpochSecond(400))
         _ = resultAt400.map(_.contract) shouldBe Seq(omr2)
 
-        // lookupOpenMiningRoundsInAsOfRange: [100, 400] should return all 3 contracts
-        resultRange_100_400 <- store.lookupOpenMiningRoundsInAsOfRange(
+        // lookupOpenMiningRoundsActiveWithin: [100, 400] should return all 3 contracts
+        resultRange_100_400 <- store.lookupOpenMiningRoundsActiveWithin(
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(400),
         )
@@ -185,30 +185,30 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(omr1, omr2, omr3)
 
-        // contractsAsOf on the range result should match lookupOpenMiningRoundsAsOf
+        // contractsActiveAsOf on the range result should match lookupOpenMiningRoundsAsOf
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(100),
           ) shouldBe resultAt100
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(250),
           ) shouldBe resultAt250
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(300),
           ) shouldBe resultAt300
         _ = TcsStore
-          .contractsAsOf(
+          .contractsActiveAsOf(
             resultRange_100_400,
             CantonTimestamp.ofEpochSecond(400),
           ) shouldBe resultAt400
 
-        // Also confirm lookupOpenMiningRoundsInAsOfRange for various ranges
-        resultRange_100_200 <- store.lookupOpenMiningRoundsInAsOfRange(
+        // Also confirm lookupOpenMiningRoundsActiveWithin for various ranges
+        resultRange_100_200 <- store.lookupOpenMiningRoundsActiveWithin(
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(200),
         )
@@ -216,7 +216,7 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(omr1, omr2)
 
-        resultRange_100_300 <- store.lookupOpenMiningRoundsInAsOfRange(
+        resultRange_100_300 <- store.lookupOpenMiningRoundsActiveWithin(
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(300),
         )
@@ -224,7 +224,7 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(omr1, omr2, omr3)
 
-        resultRange_200_300 <- store.lookupOpenMiningRoundsInAsOfRange(
+        resultRange_200_300 <- store.lookupOpenMiningRoundsActiveWithin(
           CantonTimestamp.ofEpochSecond(200),
           CantonTimestamp.ofEpochSecond(300),
         )
@@ -232,7 +232,7 @@ class DbScanRewardsReferenceStoreTest
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(omr1, omr2, omr3)
 
-        resultRange_300_400 <- store.lookupOpenMiningRoundsInAsOfRange(
+        resultRange_300_400 <- store.lookupOpenMiningRoundsActiveWithin(
           CantonTimestamp.ofEpochSecond(300),
           CantonTimestamp.ofEpochSecond(400),
         )

@@ -121,17 +121,17 @@ trait TcsQueries extends AcsQueries {
   }
 
   /** Builds a UNION ALL query across live and archive tables for range queries.
-    * Returns all contracts alive during some part of [minAsOf, maxAsOf],
+    * Returns all contracts whose activeness interval intersects with [lowerBoundIncl, upperBoundIncl],
     * together with their archived_at timestamp (None for still-active contracts).
     */
-  protected def selectFromTcsTableWithStateInAsOfRange[C, TCid <: ContractId[?], T](
+  protected def selectFromTcsTableWithStateActiveWithin[C, TCid <: ContractId[?], T](
       acsTableName: String,
       archiveTableName: String,
       storeId: AcsStoreId,
       migrationId: Long,
       companion: C,
-      minAsOf: CantonTimestamp,
-      maxAsOf: CantonTimestamp,
+      lowerBoundIncl: CantonTimestamp,
+      upperBoundIncl: CantonTimestamp,
       orderLimit: SQLActionBuilder = sql"",
   )(implicit companionClass: ContractCompanion[C, TCid, T]): SqlStreamingAction[Vector[
     TcsQueries.SelectFromTcsTableRangeResult
@@ -145,7 +145,7 @@ trait TcsQueries extends AcsQueries {
          and acs.migration_id = $migrationId
          and acs.package_name = ${packageQualifiedName.packageName}
          and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-         and acs.created_at <= $maxAsOf
+         and acs.created_at <= $upperBoundIncl
        )
        UNION ALL
        (
@@ -155,8 +155,8 @@ trait TcsQueries extends AcsQueries {
          and acs.migration_id = $migrationId
          and acs.package_name = ${packageQualifiedName.packageName}
          and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-         and acs.created_at <= $maxAsOf
-         and acs.archived_at > $minAsOf
+         and acs.created_at <= $upperBoundIncl
+         and acs.archived_at > $lowerBoundIncl
        )
        """ ++ orderLimit).toActionBuilder.as[TcsQueries.SelectFromTcsTableRangeResult]
   }

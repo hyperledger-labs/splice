@@ -31,10 +31,11 @@ trait TcsStore {
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]]
 
-  def listContractsInAsOfRange[C, TCid <: ContractId[?], T](
+  /** Returns all contracts whose activeness interval intersects with [lowerBoundIncl, upperBoundIncl]. */
+  def listContractsActiveWithin[C, TCid <: ContractId[?], T](
       companion: C,
-      minAsOf: CantonTimestamp,
-      maxAsOf: CantonTimestamp,
+      lowerBoundIncl: CantonTimestamp,
+      upperBoundIncl: CantonTimestamp,
       synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
@@ -53,7 +54,7 @@ object TcsStore {
   )
 
   /** Pure function: filter contracts alive at a specific timestamp. */
-  def contractsAsOf[TCid, T](
+  def contractsActiveAsOf[TCid, T](
       contracts: Seq[TemporalContractWithState[TCid, T]],
       asOf: CantonTimestamp,
   ): Seq[ContractWithState[TCid, T]] =
