@@ -62,6 +62,13 @@ svs:
         requests:
           cpu: "1"
           memory: 2Gi
+        additionalEnvVars:
+          - name: ADDITIONAL_CONFIG_DABFT_SCALE_SETTINGS
+            value: |
+            canton.sequencers.sequencer.sequencer.config {
+              epoch-length = 64
+              consensus-empty-block-creation-timeout = 500.milliseconds
+            }
     mediator:
       resources:
         limits:
@@ -98,7 +105,3 @@ operatorDeployment:
     spliceRoot: "splice"
     privateConfigsDir: "cluster/configs/configs-private"
     publicConfigsDir: "cluster/configs/configs"
-loadTester:
-  enable: true
-  iterationsPerMinute: 60
-  minRate: 0.95
