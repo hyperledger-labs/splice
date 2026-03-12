@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
 import org.lfdecentralizedtrust.splice.store.S3BucketConnectionForTests
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
@@ -17,7 +18,7 @@ class S3BucketConnectionForUnitTests(
     override val loggerFactory: NamedLoggerFactory,
 ) extends S3BucketConnectionForTests(s3Config, loggerFactory) {
 
-  override def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
+  override def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteString] = {
     val request = GetObjectRequest.builder.bucket(bucketName).key(key).build
     s3Client.getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse]).asScala.map {
       s3Stream =>
@@ -39,7 +40,7 @@ class S3BucketConnectionForUnitTests(
           }
 
           val allBytes = readAll()
-          concatenate(allBytes)
+          ByteString.fromByteBuffer(concatenate(allBytes))
         }
     }
   }
