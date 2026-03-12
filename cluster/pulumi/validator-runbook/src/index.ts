@@ -4,6 +4,7 @@ import {
   Auth0Fetch,
   config,
   getAuth0ClusterConfig,
+  getK8sApi,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { installNode } from './installNode';
@@ -27,7 +28,7 @@ async function main() {
       throw new Error('missing validator runbook auth0 output');
     }
     cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
-    return new Auth0Fetch(cfg);
+    return getK8sApi().apply(k8sApi => new Auth0Fetch(cfg, k8sApi));
   });
 
   auth0FetchOutput.apply(auth0Fetch => {

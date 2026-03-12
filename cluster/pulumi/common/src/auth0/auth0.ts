@@ -42,12 +42,12 @@ function addTimeSeconds(t: Date, seconds: number): Date {
   return t2;
 }
 
-const getK8sApi = (): Output<UnwrappedObject<CoreV1Api>> => {
+export const getK8sApi = (): Output<UnwrappedObject<CoreV1Api>> => {
   const kc = new KubeConfig();
   kc.loadFromDefault();
   const k8sApi = kc.makeApiClient(CoreV1Api);
   return pulumi.secret(k8sApi);
-}
+};
 
 export class Auth0Fetch implements Auth0Client {
   private secrets: Auth0SecretMap | undefined;
@@ -543,7 +543,6 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
         }
         cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
         return getK8sApi().apply(k8sApi => new Auth0Fetch(cfg, k8sApi));
-
       });
     case Auth0ClientType.MAINSTACK:
       if (isMainNet) {
