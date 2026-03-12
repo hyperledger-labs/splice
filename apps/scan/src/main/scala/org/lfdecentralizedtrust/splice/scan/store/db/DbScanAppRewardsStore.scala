@@ -13,7 +13,7 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.{GetResult, PostgresProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import slick.dbio.DBIO
+import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -189,13 +189,11 @@ class DbScanAppRewardsStore(
     import profile.api.jdbcActionExtensionMethods
     if (items.isEmpty) Future.unit
     else {
-      futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          batchInsertAppActivityPartyTotals(items)
-            .map(_ => logger.debug(s"Inserted ${items.size} app activity party totals."))
-            .transactionally,
-          "appRewards.insertAppActivityPartyTotals",
-        )
+      runUpdate(
+        batchInsertAppActivityPartyTotals(items)
+          .map(_ => logger.debug(s"Inserted ${items.size} app activity party totals."))
+          .transactionally,
+        "appRewards.insertAppActivityPartyTotals",
       )
     }
   }
@@ -203,16 +201,14 @@ class DbScanAppRewardsStore(
   def getAppActivityPartyTotalsByRound(historyId: Long, roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppActivityPartyTotalT]] = {
-    futureUnlessShutdownToFuture(
-      storage.query(
-        sql"""select history_id, round_number, total_app_activity_weight,
-                     app_provider_party_seq_num, app_provider_party
-              from #${Tables.appActivityPartyTotals}
-              where history_id = $historyId and round_number = $roundNumber
-              order by app_provider_party_seq_num
-        """.as[DbScanAppRewardsStore.AppActivityPartyTotalT],
-        "appRewards.getAppActivityPartyTotalsByRound",
-      )
+    runQuery(
+      sql"""select history_id, round_number, total_app_activity_weight,
+                   app_provider_party_seq_num, app_provider_party
+            from #${Tables.appActivityPartyTotals}
+            where history_id = $historyId and round_number = $roundNumber
+            order by app_provider_party_seq_num
+      """.as[DbScanAppRewardsStore.AppActivityPartyTotalT],
+      "appRewards.getAppActivityPartyTotalsByRound",
     )
   }
 
@@ -240,13 +236,11 @@ class DbScanAppRewardsStore(
     import profile.api.jdbcActionExtensionMethods
     if (items.isEmpty) Future.unit
     else {
-      futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          batchInsertAppActivityRoundTotals(items)
-            .map(_ => logger.debug(s"Inserted ${items.size} app activity round totals."))
-            .transactionally,
-          "appRewards.insertAppActivityRoundTotals",
-        )
+      runUpdate(
+        batchInsertAppActivityRoundTotals(items)
+          .map(_ => logger.debug(s"Inserted ${items.size} app activity round totals."))
+          .transactionally,
+        "appRewards.insertAppActivityRoundTotals",
       )
     }
   }
@@ -254,18 +248,14 @@ class DbScanAppRewardsStore(
   def getAppActivityRoundTotalByRound(historyId: Long, roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppActivityRoundTotalT]] = {
-    futureUnlessShutdownToFuture(
-      storage
-        .querySingle(
-          sql"""select history_id, round_number, total_round_app_activity_weight,
-                       active_app_provider_parties_count
-                from #${Tables.appActivityRoundTotals}
-                where history_id = $historyId and round_number = $roundNumber
-                limit 1
-          """.as[DbScanAppRewardsStore.AppActivityRoundTotalT].headOption,
-          "appRewards.getAppActivityRoundTotalByRound",
-        )
-        .value
+    runQuerySingle(
+      sql"""select history_id, round_number, total_round_app_activity_weight,
+                   active_app_provider_parties_count
+            from #${Tables.appActivityRoundTotals}
+            where history_id = $historyId and round_number = $roundNumber
+            limit 1
+      """.as[DbScanAppRewardsStore.AppActivityRoundTotalT].headOption,
+      "appRewards.getAppActivityRoundTotalByRound",
     )
   }
 
@@ -293,13 +283,11 @@ class DbScanAppRewardsStore(
     import profile.api.jdbcActionExtensionMethods
     if (items.isEmpty) Future.unit
     else {
-      futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          batchInsertAppRewardPartyTotals(items)
-            .map(_ => logger.debug(s"Inserted ${items.size} app reward party totals."))
-            .transactionally,
-          "appRewards.insertAppRewardPartyTotals",
-        )
+      runUpdate(
+        batchInsertAppRewardPartyTotals(items)
+          .map(_ => logger.debug(s"Inserted ${items.size} app reward party totals."))
+          .transactionally,
+        "appRewards.insertAppRewardPartyTotals",
       )
     }
   }
@@ -307,16 +295,14 @@ class DbScanAppRewardsStore(
   def getAppRewardPartyTotalsByRound(historyId: Long, roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppRewardPartyTotalT]] = {
-    futureUnlessShutdownToFuture(
-      storage.query(
-        sql"""select history_id, round_number, app_provider_party_seq_num,
-                     total_app_reward_amount
-              from #${Tables.appRewardPartyTotals}
-              where history_id = $historyId and round_number = $roundNumber
-              order by app_provider_party_seq_num
-        """.as[DbScanAppRewardsStore.AppRewardPartyTotalT],
-        "appRewards.getAppRewardPartyTotalsByRound",
-      )
+    runQuery(
+      sql"""select history_id, round_number, app_provider_party_seq_num,
+                   total_app_reward_amount
+            from #${Tables.appRewardPartyTotals}
+            where history_id = $historyId and round_number = $roundNumber
+            order by app_provider_party_seq_num
+      """.as[DbScanAppRewardsStore.AppRewardPartyTotalT],
+      "appRewards.getAppRewardPartyTotalsByRound",
     )
   }
 
@@ -346,13 +332,11 @@ class DbScanAppRewardsStore(
     import profile.api.jdbcActionExtensionMethods
     if (items.isEmpty) Future.unit
     else {
-      futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          batchInsertAppRewardRoundTotals(items)
-            .map(_ => logger.debug(s"Inserted ${items.size} app reward round totals."))
-            .transactionally,
-          "appRewards.insertAppRewardRoundTotals",
-        )
+      runUpdate(
+        batchInsertAppRewardRoundTotals(items)
+          .map(_ => logger.debug(s"Inserted ${items.size} app reward round totals."))
+          .transactionally,
+        "appRewards.insertAppRewardRoundTotals",
       )
     }
   }
@@ -360,19 +344,15 @@ class DbScanAppRewardsStore(
   def getAppRewardRoundTotalByRound(historyId: Long, roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppRewardRoundTotalT]] = {
-    futureUnlessShutdownToFuture(
-      storage
-        .querySingle(
-          sql"""select history_id, round_number,
-                       total_app_reward_minting_allowance, total_app_reward_thresholded,
-                       total_app_reward_unclaimed, rewarded_app_provider_parties_count
-                from #${Tables.appRewardRoundTotals}
-                where history_id = $historyId and round_number = $roundNumber
-                limit 1
-          """.as[DbScanAppRewardsStore.AppRewardRoundTotalT].headOption,
-          "appRewards.getAppRewardRoundTotalByRound",
-        )
-        .value
+    runQuerySingle(
+      sql"""select history_id, round_number,
+                   total_app_reward_minting_allowance, total_app_reward_thresholded,
+                   total_app_reward_unclaimed, rewarded_app_provider_parties_count
+            from #${Tables.appRewardRoundTotals}
+            where history_id = $historyId and round_number = $roundNumber
+            limit 1
+      """.as[DbScanAppRewardsStore.AppRewardRoundTotalT].headOption,
+      "appRewards.getAppRewardRoundTotalByRound",
     )
   }
 
@@ -401,13 +381,11 @@ class DbScanAppRewardsStore(
     import profile.api.jdbcActionExtensionMethods
     if (items.isEmpty) Future.unit
     else {
-      futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          batchInsertAppRewardBatchHashes(items)
-            .map(_ => logger.debug(s"Inserted ${items.size} app reward batch hashes."))
-            .transactionally,
-          "appRewards.insertAppRewardBatchHashes",
-        )
+      runUpdate(
+        batchInsertAppRewardBatchHashes(items)
+          .map(_ => logger.debug(s"Inserted ${items.size} app reward batch hashes."))
+          .transactionally,
+        "appRewards.insertAppRewardBatchHashes",
       )
     }
   }
@@ -415,16 +393,14 @@ class DbScanAppRewardsStore(
   def getAppRewardBatchHashesByRound(historyId: Long, roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppRewardBatchHashT]] = {
-    futureUnlessShutdownToFuture(
-      storage.query(
-        sql"""select history_id, round_number, batch_level,
-                     party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash
-              from #${Tables.appRewardBatchHashes}
-              where history_id = $historyId and round_number = $roundNumber
-              order by batch_level, party_seq_num_begin_incl
-        """.as[DbScanAppRewardsStore.AppRewardBatchHashT],
-        "appRewards.getAppRewardBatchHashesByRound",
-      )
+    runQuery(
+      sql"""select history_id, round_number, batch_level,
+                   party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId and round_number = $roundNumber
+            order by batch_level, party_seq_num_begin_incl
+      """.as[DbScanAppRewardsStore.AppRewardBatchHashT],
+      "appRewards.getAppRewardBatchHashesByRound",
     )
   }
 
@@ -451,13 +427,11 @@ class DbScanAppRewardsStore(
     import profile.api.jdbcActionExtensionMethods
     if (items.isEmpty) Future.unit
     else {
-      futureUnlessShutdownToFuture(
-        storage.queryAndUpdate(
-          batchInsertAppRewardRootHashes(items)
-            .map(_ => logger.debug(s"Inserted ${items.size} app reward root hashes."))
-            .transactionally,
-          "appRewards.insertAppRewardRootHashes",
-        )
+      runUpdate(
+        batchInsertAppRewardRootHashes(items)
+          .map(_ => logger.debug(s"Inserted ${items.size} app reward root hashes."))
+          .transactionally,
+        "appRewards.insertAppRewardRootHashes",
       )
     }
   }
@@ -465,17 +439,33 @@ class DbScanAppRewardsStore(
   def getAppRewardRootHashByRound(historyId: Long, roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppRewardRootHashT]] = {
-    futureUnlessShutdownToFuture(
-      storage
-        .querySingle(
-          sql"""select history_id, round_number, root_hash
-                from #${Tables.appRewardRootHashes}
-                where history_id = $historyId and round_number = $roundNumber
-                limit 1
-          """.as[DbScanAppRewardsStore.AppRewardRootHashT].headOption,
-          "appRewards.getAppRewardRootHashByRound",
-        )
-        .value
+    runQuerySingle(
+      sql"""select history_id, round_number, root_hash
+            from #${Tables.appRewardRootHashes}
+            where history_id = $historyId and round_number = $roundNumber
+            limit 1
+      """.as[DbScanAppRewardsStore.AppRewardRootHashT].headOption,
+      "appRewards.getAppRewardRootHashByRound",
     )
   }
+
+  // -- Private helpers -------------------------------------------------------
+
+  private def runQuery[T](
+      action: DBIOAction[T, NoStream, Effect.Read],
+      operationName: String,
+  )(implicit tc: TraceContext): Future[T] =
+    futureUnlessShutdownToFuture(storage.query(action, operationName))
+
+  private def runQuerySingle[T](
+      action: DBIOAction[Option[T], NoStream, Effect.Read],
+      operationName: String,
+  )(implicit tc: TraceContext): Future[Option[T]] =
+    futureUnlessShutdownToFuture(storage.querySingle(action, operationName).value)
+
+  private def runUpdate[T](
+      action: DBIOAction[T, NoStream, Effect.All],
+      operationName: String,
+  )(implicit tc: TraceContext): Future[T] =
+    futureUnlessShutdownToFuture(storage.queryAndUpdate(action, operationName))
 }
