@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.FeaturedAppActivityMarkerTrigger
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.slf4j.event.Level
@@ -36,9 +37,25 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .withNoVettedPackages(implicit env => env.validators.local.map(_.participantClient))
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
           _.withPausedTrigger[FeaturedAppActivityMarkerTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(
+            // Use a version that we can downgrade from so that bob can unvet it while still getting rewards.
+            initialPackageConfig = InitialPackageConfig(
+              amuletVersion = "0.1.16",
+              amuletNameServiceVersion = "0.1.17",
+              dsoGovernanceVersion = "0.1.22",
+              validatorLifecycleVersion = "0.1.6",
+              walletVersion = "0.1.17",
+              walletPaymentsVersion = "0.1.16",
+            )
+          )
         )(config)
       )
       .addConfigTransforms((_, config) =>
@@ -268,7 +285,7 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
         }
         forAtLeast(1, entries) { line =>
           line.message should (include(
-            s"vettedAmuletVersion = ${DarResources.amulet.latest.metadata.version}"
+            s"vettedAmuletVersion = 0.1.16"
           ) and include("Processing"))
         }
       },
