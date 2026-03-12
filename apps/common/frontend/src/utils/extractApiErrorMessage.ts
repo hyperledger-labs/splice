@@ -32,7 +32,9 @@ export function extractApiErrorMessage(err: unknown): string {
 
   // Fallback: match "error": "..." or \"error\": \"...\" (escaped)
   if (!errorValue) {
-    const errorMatch = msg.match(/(?:"|\\")error(?:"|\\")\s*:\s*(?:"|\\")((?:[^"\\]|\\.)*?)(?:"|\\")/);
+    const errorMatch = msg.match(
+      /(?:"|\\")error(?:"|\\")\s*:\s*(?:"|\\")((?:[^"\\]|\\.)*?)(?:"|\\")/
+    );
     if (errorMatch) {
       errorValue = errorMatch[1].replace(/\\"/g, '"');
     }
