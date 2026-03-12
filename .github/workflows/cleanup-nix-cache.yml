@@ -7,7 +7,7 @@ on:
 
 jobs:
   cleanup:
-    # TODO(fixme)
+    # TODO(martinflorian-da): to be fixes, I just need to get this on workflow on main first apparently
     uses: hyperledger-labs/splice-shared-gha/.github/workflows/cleanup-nix-cache.yml@martinflorian-da/fix-nix-pruning-differently
     with:
       runs_on: self-hosted-k8s-small
