@@ -7,18 +7,23 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SynchronizerNodeService,
+}
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.DsoRulesTopologyStateReconciler
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.control.NonFatal
 
 abstract class SequencerBftPeerReconciler(
-    sequencerAdminConnection: SequencerAdminConnection,
+    participantAdminConnection: ParticipantAdminConnection,
+    synchronizerNode: SynchronizerNodeService[LocalSynchronizerNode],
     scanConnection: AggregatingScanConnection,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
@@ -27,8 +32,13 @@ abstract class SequencerBftPeerReconciler(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
     for {
-      sequencerId <- sequencerAdminConnection.getSequencerId
-      psid <- sequencerAdminConnection.getPhysicalSynchronizerId()
+      activeSynchronizerNode <- synchronizerNode.activeSynchronizerNode()
+      sequencerId <- activeSynchronizerNode.sequencerAdminConnection.getSequencerId
+      sequencerInitialized <- activeSynchronizerNode.sequencerAdminConnection.isNodeInitialized()
+      psid <-
+        if (sequencerInitialized)
+          activeSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
+        else participantAdminConnection.getPhysicalSynchronizerId(dsoRulesAndState.dsoRules.domain)
       serialId = psid.serial.unwrap.toLong
       sequencers = dsoRulesAndState
         .currentSynchronizerNodeConfigs()
@@ -56,7 +66,8 @@ abstract class SequencerBftPeerReconciler(
         )
       }
       // TODO(#1929) Reconsider whether we can really ignore incoming connections.
-      currentPeers <- sequencerAdminConnection.listCurrentOutgoingPeerEndpoints()
+      currentPeers <- activeSynchronizerNode.sequencerAdminConnection
+        .listCurrentOutgoingPeerEndpoints()
 
       peersToAdd = dsoSequencersWithScanInfo
         .collect { case (id, Some(config)) =>
