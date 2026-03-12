@@ -1001,7 +1001,7 @@ template DsoRules with
           
         return DsoRules_GrantValidatorPermissionResult with ..
 
-    choice DsoRules_SetValidatorRevocationState : DsoRules_SetValidatorRevocationStateResult
+    nonconsuming choice DsoRules_SetValidatorRevocationState : DsoRules_SetValidatorRevocationStateResult
       with
         validatorPermissionCid : ContractId ValidatorPermission
         newLoginAfter : Optional Time
