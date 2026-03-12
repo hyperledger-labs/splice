@@ -29,3 +29,20 @@
 
        Traffic summaries will be enabled step-by-step on Dev/Test/MainNet,
        once the SVs have successfully concluded their performance testing.
+
+  - Wallet UI
+
+    - Introduced a new ``/development-fund`` panel providing a complete UI for managing Development Fund allocations (see `CIP-0082 <https://github.com/canton-foundation/cips/blob/main/cip-0082/cip-0082.md>`_ and `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_ for context).
+
+    - The panel includes:
+
+      - Display of total available Development Fund balance
+      - Allocation form for Development Fund coupons (Development Fund Manager only)
+      - Unclaimed allocations table with withdrawal support
+      - Coupon history with lifecycle event tracking (claimed, withdrawn, rejected, expired)
+
+    - Role-based behavior is enforced:
+
+      - Simple Users: read-only access to fund total
+      - Current Development Fund Manager: full allocation and withdrawal capabilities
+      - Former Development Fund Manager: can manage and view allocations created under their tenure, but cannot create new ones
