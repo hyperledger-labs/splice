@@ -436,6 +436,10 @@ function subcmd_logs() {
 function k8s_labels_for_app() {
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
     local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
+    local logical_synchronizer_deployment_mode=$(
+        "${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh"
+        | yq ".synchronizerMigration[] | select(.id == ${domain}).enableLogicalSynchronizerDeploymentMode"
+    )
 
     # shellcheck disable=SC2076
     # shellcheck disable=SC2053
@@ -443,7 +447,7 @@ function k8s_labels_for_app() {
        # If the app is in the list, append the domain to the app
        app_container=${app#"global-domain-"}
        app="global-domain-${domain}-${app#"global-domain-"}"
-    elif [[ "$app" == $domain_specific_apps && "$domain" != "-" ]]; then
+    elif [[ "$app" == $domain_specific_apps && "$logical_synchronizer_deployment_mode" != "true" ]]; then
        # If the app is in the list, append the domain to the app
        app="${app}-${domain}"
     fi
@@ -1590,10 +1594,7 @@ function subcmd_participant_console() {
                 cncluster participant_console sv-1 7
 
               Example: opening multi-participant-24 console
-                cncluster participant_console multi-validator 7 multi-participant-24 7
-
-              Example: opening sv-1 participant console in LSU mode
-                cncluster participant_console sv-1 -"
+                cncluster participant_console multi-validator 7 multi-participant-24 7"
     fi
 
     app_container="$app"
