@@ -436,9 +436,9 @@ function subcmd_logs() {
 function k8s_labels_for_app() {
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
     local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
-    local logical_synchronizer_deployment_mode=$(
-        "${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh"
-        | yq ".synchronizerMigration[] | select(.id == ${domain}).enableLogicalSynchronizerDeploymentMode"
+    local logical_synchronizer_deployment_mode
+    logical_synchronizer_deployment_mode=$( \
+        get_resolved_config | yq ".synchronizerMigration[] | select(.id == ${domain}).enableLogicalSynchronizerDeploymentMode" \
     )
 
     # shellcheck disable=SC2076
