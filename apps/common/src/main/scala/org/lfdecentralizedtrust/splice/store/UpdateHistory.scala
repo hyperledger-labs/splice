@@ -96,6 +96,7 @@ class UpdateHistory(
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
     metrics: HistoryMetrics,
+    externalTransactionHashThresholdTimestamp: Option[CantonTimestamp] = None,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -1566,7 +1567,8 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
+          // Import updates are not externally signed, so the transaction has no hash.
+          /*externalTransactionHash = */ ByteString.EMPTY,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1618,6 +1620,14 @@ class UpdateHistory(
       )
     }
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
+    // Only include the external transaction hash for transactions recorded on or after the threshold timestamp.
+    val externalTransactionHash: ByteString =
+      externalTransactionHashThresholdTimestamp match {
+        case Some(threshold) if updateRow.recordTime >= threshold =>
+          ByteString.copyFrom(updateRow.externalTransactionHash)
+        case _ =>
+          ByteString.EMPTY
+      }
 
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
@@ -1631,7 +1641,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
+          /*externalTransactionHash = */ externalTransactionHash,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),

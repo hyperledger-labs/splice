@@ -19,6 +19,9 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.util.{TokenStandardMetadata, UpdateHistoryTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+
 import java.io.FileOutputStream
 import scala.collection.mutable
 import scala.sys.process.{Process, ProcessLogger}
@@ -33,6 +36,17 @@ class TokenStandardCliIntegrationTest
     with ExternallySignedPartyTestUtil
     with HasTempDirectory
     with UpdateHistoryTestUtil {
+
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
+      .simpleTopology1Sv(this.getClass.getSimpleName)
+      // Set externalTransactionHashThresholdDate to a past date so that updates include external transaction hashes
+      .addConfigTransforms((_, config) =>
+        updateAllScanAppConfigs_(
+          _.copy(externalTransactionHashThresholdDate = Some("2026-02-20T00:00:00Z"))
+        )(config)
+      )
+  }
 
   "Token Standard CLI" should {
 

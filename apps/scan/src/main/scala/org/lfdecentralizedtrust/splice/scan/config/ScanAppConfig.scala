@@ -80,6 +80,8 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
+    externalTransactionHashThresholdDate: Option[String] = Some("2026-07-01T00:00:00Z"),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
