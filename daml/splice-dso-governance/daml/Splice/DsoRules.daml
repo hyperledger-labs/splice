@@ -115,6 +115,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_SetValidatorRevocationState DsoRules_SetValidatorRevocationState
+    -- ^ Voted action to revoke ValidatorPermission contract.   
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -305,6 +307,9 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data DsoRules_SetValidatorRevocationStateResult = DsoRules_SetValidatorRevocationStateResult with
+    permissionCid : ContractId ValidatorPermission
+  deriving (Eq, Show)
 
 -- Workflow templates
 ---------------------
@@ -992,6 +997,18 @@ template DsoRules with
           
         return DsoRules_GrantValidatorPermissionResult with ..
 
+    choice DsoRules_SetValidatorRevocationState : DsoRules_SetValidatorRevocationStateResult
+      with
+        validatorPermissionCid : ContractId ValidatorPermission
+        newLoginAfter : Optional Time
+        newIsRevoked : Bool
+      controller dso
+      do
+        result <- exercise validatorPermissionCid ValidatorPermission_SetRevocationState with
+          newLoginAfter
+          newIsRevoked
+        return DsoRules_SetValidatorRevocationStateResult with permissionCid = result.permissionCid    
+
 
     nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
@@ -1617,6 +1634,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_SetValidatorRevocationState choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
