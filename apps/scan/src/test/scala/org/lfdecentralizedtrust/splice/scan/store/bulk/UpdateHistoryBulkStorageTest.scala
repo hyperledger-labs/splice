@@ -10,6 +10,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.WallClock
@@ -27,13 +28,13 @@ import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKey
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import org.slf4j.event.Level
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
-import java.nio.ByteBuffer
 import scala.util.Using
 
 class UpdateHistoryBulkStorageTest
@@ -56,23 +57,8 @@ class UpdateHistoryBulkStorageTest
 
   "UpdateHistoryBulkStorage" should {
 
-    "multipart upload works" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-      val o = bucketConnection.newAppendWriteObject("test")
-      o.prepareUploadNext()
-      o.prepareUploadNext()
-      for {
-        _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
-        _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
-        _ <- o.finish()
-        content <- bucketConnection.readFullObject("test")
-      } yield {
-        new String(content.array(), "UTF-8") shouldBe "helloworld"
-      }
-    }
-
     "successfully dump a single segment of updates to an s3 bucket" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val initialStoreSize = 1500
       val segmentSize = 2200L
       val segmentFromTimestamp = 100L
@@ -168,8 +154,51 @@ class UpdateHistoryBulkStorageTest
       }
     }
 
+    "successfully handle an empty segment" in {
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val mockStore =
+        new MockUpdateHistoryStore(10, { i => Instant.ofEpochMilli(i + 1000) })
+      val fromTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(100L))
+      val toTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(200L))
+
+      val segment = UpdatesSegment(
+        TimestampWithMigrationId(fromTimestamp, 0),
+        TimestampWithMigrationId(toTimestamp, 0),
+      )
+      val metricsFactory = new InMemoryMetricsFactory
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+        {
+          val probe = UpdateHistorySegmentBulkStorage
+            .asSource(
+              bulkStorageTestConfig,
+              appConfig,
+              mockStore.store,
+              bucketConnection,
+              segment,
+              new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+              loggerFactory,
+            )
+            .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
+            .run()
+          probe.request(1)
+
+          probe.expectComplete()
+        },
+        logEntries =>
+          forExactly(1, logEntries)(logEntry =>
+            logEntry.message should (include("No updates found in segment"))
+          ),
+      )
+
+      succeed
+
+    }
+
     "successfully dump all segments" in {
-      val bucketConnection = S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
       val initialStoreSize = 2000
       val genesisDate = LocalDate.of(2001, 1, 23)
       val genesisInstant = genesisDate.atTime(2, 34).toInstant(ZoneOffset.UTC)

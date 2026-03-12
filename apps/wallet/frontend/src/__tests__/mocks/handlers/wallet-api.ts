@@ -225,6 +225,27 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/scan-proxy/amulet-rules`, (_, res, ctx) => {
     return res(ctx.json<GetAmuletRulesProxyResponse>(amuletRules));
   }),
+  rest.get(`${walletUrl}/v0/scan-proxy/unclaimed-development-fund-coupons`, (_, res, ctx) => {
+    return res(
+      ctx.json({
+        unclaimed_development_fund_coupons: [],
+      })
+    );
+  }),
+  rest.get(`${walletUrl}/v0/wallet/development-fund-coupons`, (_, res, ctx) => {
+    return res(
+      ctx.json({
+        active_development_fund_coupons: [],
+      })
+    );
+  }),
+  rest.get(`${walletUrl}/v0/wallet/development-fund-coupons/history`, (_, res, ctx) => {
+    return res(
+      ctx.json({
+        development_fund_coupon_history: [],
+      })
+    );
+  }),
 
   rest.get(`${walletUrl}/v0/scan-proxy/featured-apps/:party`, (_, res, ctx) => {
     return res(ctx.status(404), ctx.json({}));

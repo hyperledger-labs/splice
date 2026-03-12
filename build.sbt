@@ -2092,7 +2092,7 @@ updateTestConfigForParallelRuns := {
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isWithDockerWithoutCantonTest(name: String): Boolean =
-    name.contains("LocalNet") || name.contains("BulkStorageTest")
+    name.contains("LocalNet") || name.contains("BulkStorageTest") || name.contains("S3Upload")
   def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
     name contains "ScanTimeBasedIntegrationTest"
   def isCometBftTest(name: String): Boolean =

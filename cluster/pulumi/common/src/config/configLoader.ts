@@ -3,7 +3,8 @@
 import * as Yaml from 'js-yaml';
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import { merge, mergeWith } from 'lodash';
-import { dirname, join, resolve } from 'path';
+import { dirname, join, resolve, sep as pathSeparator } from 'path';
+import { env } from 'process';
 
 import { spliceEnvConfig } from './envConfig';
 
@@ -11,10 +12,7 @@ export function readAndParseYaml(
   path: string,
   context: ConfigLoaderContext = initializeContext()
 ): unknown {
-  const resolvedPath =
-    context.pathStack.length === 0
-      ? resolve(path) // resolve against CWD
-      : resolve(dirname(context.pathStack[context.pathStack.length - 1]), path);
+  const resolvedPath = resolveIncludedPath(path, context);
   if (resolvedPath in context.loadedFilesByPath) {
     return context.loadedFilesByPath[resolvedPath];
   } else if (context.pathStack.includes(resolvedPath)) {
@@ -58,6 +56,34 @@ type ConfigLoaderContext = {
   loadedFilesByPath: Partial<Record<string, unknown>>;
   schema: Yaml.Schema;
 };
+
+function resolveIncludedPath(path: string, context: ConfigLoaderContext): string {
+  const pathWithVariableSubstitutions = join(
+    ...path.split(pathSeparator).map(segment => {
+      if (segment === '') {
+        return '/';
+      } else if (segment.startsWith('$')) {
+        const variableName = segment.slice(1);
+        const variableValue = env[variableName];
+        return variableValue === undefined || variableValue === ''
+          ? reportError(
+              `Included path [${path}] references variable [${variableName}] that is not defined.`,
+              context
+            )
+          : variableValue;
+      } else {
+        return segment;
+      }
+    })
+  );
+
+  return context.pathStack.length === 0
+    ? resolve(pathWithVariableSubstitutions) // resolve against CWD
+    : resolve(
+        dirname(context.pathStack[context.pathStack.length - 1]),
+        pathWithVariableSubstitutions
+      );
+}
 
 function makeIncludeTagDefinition(context: ConfigLoaderContext): Yaml.Type {
   return new Yaml.Type('!include', {

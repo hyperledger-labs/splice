@@ -47,14 +47,9 @@ export class Auth0Fetch implements Auth0Client {
   private auth0Cache: Auth0CacheMap | undefined;
   private hasDiffsToSave = false;
 
-  private k8sApi: CoreV1Api;
   private cfg: Auth0Config;
 
   constructor(cfg: Auth0Config) {
-    const kc = new KubeConfig();
-    kc.loadFromDefault();
-
-    this.k8sApi = kc.makeApiClient(CoreV1Api);
     this.cfg = cfg;
   }
 
@@ -109,6 +104,12 @@ export class Auth0Fetch implements Auth0Client {
     }
   }
 
+  private getK8sClient(): CoreV1Api {
+    const kc = new KubeConfig();
+    kc.loadFromDefault();
+    return kc.makeApiClient(CoreV1Api);
+  }
+
   public async loadAuth0Cache(): Promise<void> {
     if (!fixedTokens()) {
       await pulumi.log.debug('Fixed tokens not enabled, skipping Auth0 cache load');
@@ -120,7 +121,8 @@ export class Auth0Fetch implements Auth0Client {
     const cacheMap = {} as Auth0CacheMap;
 
     try {
-      const cacheSecret = await this.k8sApi.readNamespacedSecret({
+      const k8sApi = this.getK8sClient();
+      const cacheSecret = await k8sApi.readNamespacedSecret({
         name: this.cfg.fixedTokenCacheName,
         namespace: 'default',
       });
@@ -161,7 +163,8 @@ export class Auth0Fetch implements Auth0Client {
 
     try {
       await pulumi.log.info('Attempting to create secret');
-      await this.k8sApi.createNamespacedSecret({
+      const k8sApi = this.getK8sClient();
+      await k8sApi.createNamespacedSecret({
         namespace: 'default',
         body: {
           apiVersion: 'v1',
@@ -175,13 +178,14 @@ export class Auth0Fetch implements Auth0Client {
     } catch (_) {
       try {
         await pulumi.log.info('Deleting existing secret');
-        await this.k8sApi.deleteNamespacedSecret({
+        const k8sApi = this.getK8sClient();
+        await k8sApi.deleteNamespacedSecret({
           name: this.cfg.fixedTokenCacheName,
           namespace: 'default',
         });
 
         await pulumi.log.info('Creating new secret');
-        await this.k8sApi.createNamespacedSecret({
+        await k8sApi.createNamespacedSecret({
           namespace: 'default',
           body: {
             apiVersion: 'v1',
