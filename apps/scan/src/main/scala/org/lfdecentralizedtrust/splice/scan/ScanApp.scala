@@ -337,7 +337,7 @@ class ScanApp(
         initialRound,
       )
       scanStreamHandler = config.bulkStorage.s3.fold(throw new RuntimeException(""))(s3Config =>
-        new HttpScanStreamHandler(S3BucketConnection(config.bulkStorage.s3.get, loggerFactory)))
+        new HttpScanStreamHandler(S3BucketConnection(s3Config, loggerFactory)))
       contractFetcher = ChoiceContextContractFetcher.createStoreWithLedgerFallback(
         config.parameters.contractFetchLedgerFallbackConfig,
         store,
