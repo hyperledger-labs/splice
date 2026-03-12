@@ -38,6 +38,9 @@ final case class BulkStorageConfig(
     updatesPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     // The maximum parallelization for uploading multiple parts of the same object
     maxParallelPartUploads: Int = 4,
+    // zstd compression level
+    // TODO(#3429): remove from here, and move to ScanStorageConfig, this must not be configured per-SV. We put it here for now to experiment with the impact of different compression levels.
+    zstdCompressionLevel: Int = 3,
     s3: Option[S3Config] = None,
 )
 
@@ -59,6 +62,7 @@ case class ScanAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     sequencerTrafficIngestion: SequencerTrafficIngestionConfig = SequencerTrafficIngestionConfig(),
+    serveTrafficSummaries: Boolean = false,
     isFirstSv: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     enableForcedAcsSnapshots: Boolean = false,

@@ -100,7 +100,7 @@ trait HasS3Mock
   }
 
   def readUncompressAndDecode[T](
-      s3BucketConnection: S3BucketConnection,
+      s3BucketConnection: S3BucketConnectionForTests,
       decoder: String => Either[io.circe.Error, T],
   )(s3obj: S3Object)(implicit tag: reflect.ClassTag[T]): Array[T] = {
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue

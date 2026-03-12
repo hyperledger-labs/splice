@@ -556,30 +556,32 @@ final class ScanAggregator(
         roundsOpenIssuingOrSummarizing <- storage
           .querySingle(
             sql"""
-              select   count(1)
-              from     scan_acs_store
-              where    store_id = $acsStoreId
-              and      migration_id = $domainMigrationId
-              and      round = $round
-              and
-              (
-                template_id_qualified_name = ${QualifiedName(
+              select exists(
+                select   1
+                from     scan_acs_store
+                where    store_id = $acsStoreId
+                and      migration_id = $domainMigrationId
+                and      round = $round
+                and
+                (
+                  template_id_qualified_name = ${QualifiedName(
                 OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
               )} or
-                template_id_qualified_name = ${QualifiedName(
+                  template_id_qualified_name = ${QualifiedName(
                 IssuingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
               )} or
-                template_id_qualified_name = ${QualifiedName(
+                  template_id_qualified_name = ${QualifiedName(
                 SummarizingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
+                )
               )
-            """.as[Long].headOption,
+            """.as[Boolean].headOption,
             "getOpenIssuingOrSummarizingForClosedRounds",
           )
           .value
       } yield {
         roundsOpenIssuingOrSummarizing
-          .flatMap(count => if (count > 0) Some(round) else None)
+          .flatMap(Option.when(_)(round))
       }
     }
     Future

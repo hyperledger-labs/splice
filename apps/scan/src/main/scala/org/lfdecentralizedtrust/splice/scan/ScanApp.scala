@@ -361,6 +361,7 @@ class ScanApp(
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
+        config.serveTrafficSummaries,
         clock,
         loggerFactory,
         packageVersionSupport,

@@ -37,9 +37,6 @@ monitoring:
       cometbft:
         expectedMaxBlocksPerSecond: 3.5
       confirmationRequests:
-        perMember:
-          overMinutes: 5
-          rate: 3
         total:
           overMinutes: 5
           rate: 25
@@ -59,6 +56,9 @@ monitoring:
         sequencerRetentionDays: 30
       sequencerClientDelay:
         seconds: 90
+      sequencerRateLimits:
+        circuitBreakerStateThreshold: 0.5
+        rejectionRateThreshold: 0
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
