@@ -46,3 +46,7 @@
       - Simple Users: read-only access to fund total
       - Current Development Fund Manager: full allocation and withdrawal capabilities
       - Former Development Fund Manager: can manage and view allocations created under their tenure, but cannot create new ones
+
+   - Docs
+
+     - Add a new :ref:`development_fund` page documenting the Development Fund.
