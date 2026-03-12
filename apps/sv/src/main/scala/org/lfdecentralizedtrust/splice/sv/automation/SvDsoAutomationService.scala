@@ -292,17 +292,14 @@ class SvDsoAutomationService(
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
     )
-    // TODO(#564) - account for PSID in the reconciliation
-    // TODO(#564) - add check for sequencer status in the triggers
-    def registerTriggersForSynchronizers(current: LocalSynchronizerNode): Unit = {
-      current.sequencerConfig match {
+    def registerTriggersForSynchronizers(node: LocalSynchronizerNode): Unit = {
+      node.sequencerConfig match {
         case BftSequencerConfig() =>
           registerTrigger(
             new SvBftSequencerPeerOffboardingTrigger(
               triggerContext,
               dsoStore,
-              participantAdminConnection,
-              synchronizerNodeService,
+              node.sequencerAdminConnection,
               aggregatingScanConnection,
             )
           )
@@ -310,8 +307,7 @@ class SvDsoAutomationService(
             new SvBftSequencerPeerOnboardingTrigger(
               triggerContext,
               dsoStore,
-              participantAdminConnection,
-              synchronizerNodeService,
+              node.sequencerAdminConnection,
               aggregatingScanConnection,
             )
           )

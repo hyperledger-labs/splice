@@ -22,22 +22,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SequencerConfig,
   SynchronizerNodeConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  SequencerAdminConnection,
-  SynchronizerNodeService,
-}
+import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.SingleScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.compat.java8.OptionConverters.RichOptionForJava8
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
 
 class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
@@ -53,14 +48,8 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
   private val svDsoStoreMock = mock[SvDsoStore]
   private val sequencerAdminConnection = mock[SequencerAdminConnection]
-  private val participantAdminConnection = mock[ParticipantAdminConnection]
-  private val synchronizerNode = mock[SynchronizerNodeService[LocalSynchronizerNode]]
-  private val localSynchronizerNode = mock[LocalSynchronizerNode]
   private val scanConnection = mock[AggregatingScanConnection]
 
-  when(localSynchronizerNode.sequencerAdminConnection).thenReturn(sequencerAdminConnection)
-  when(synchronizerNode.activeSynchronizerNode()(any[TraceContext]))
-    .thenReturn(Future.successful(localSynchronizerNode))
   when(sequencerAdminConnection.getSequencerId).thenReturn(Future.successful(selfSequencerId))
   when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
     .thenReturn(Future.successful(true))
@@ -75,8 +64,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
   )
 
   private val reconciler = new SequencerBftPeerReconciler(
-    participantAdminConnection,
-    synchronizerNode,
+    sequencerAdminConnection,
     scanConnection,
   ) {
     override protected def svDsoStore: SvDsoStore = svDsoStoreMock
@@ -337,6 +325,26 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
     val result = reconciler.diffDsoRulesWithTopology().futureValue.loneElement
     result.toAdd should be(empty)
     result.toRemove should contain only sequencer1Host
+  }
+
+  it should "do nothing if the sequencer is not initialized" in {
+    withConfiguredDsoSequencers(
+      Seq(
+        createSequencerConfig(sequencer1Id),
+        createSequencerConfig(sequencer2Id),
+      )
+    )
+
+    when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
+      .thenReturn(Future.successful(false))
+
+    try {
+      val result = reconciler.diffDsoRulesWithTopology().futureValue
+      result should be(empty)
+    } finally {
+      when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
+        .thenReturn(Future.successful(true))
+    }
   }
 
   private def createSequencerConfig(id: SequencerId) = {

@@ -8,24 +8,19 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome, TaskSuccess}
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  SynchronizerNodeService,
-}
+import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class SequencerBftPeerRemoveReconciler(
     override protected val svDsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
-    synchronizerNode: SynchronizerNodeService[LocalSynchronizerNode],
+    sequencerAdminConnection: SequencerAdminConnection,
     val loggerFactory: NamedLoggerFactory,
     scanConnection: AggregatingScanConnection,
-) extends SequencerBftPeerReconciler(participantAdminConnection, synchronizerNode, scanConnection) {
+) extends SequencerBftPeerReconciler(sequencerAdminConnection, scanConnection) {
 
   override def reconcileTask(
       task: BftPeerDifference
@@ -38,7 +33,7 @@ class SequencerBftPeerRemoveReconciler(
       )
       for {
         _ <- MonadUtil.sequentialTraverse(task.toRemove.toList)(
-          task.adminConnection.removePeerEndpoint
+          sequencerAdminConnection.removePeerEndpoint
         )
       } yield TaskSuccess(s"Finished bft peer removal: $task")
     }
