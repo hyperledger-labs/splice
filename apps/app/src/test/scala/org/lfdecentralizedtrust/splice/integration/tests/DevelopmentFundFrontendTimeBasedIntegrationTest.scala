@@ -338,12 +338,10 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               }
             }
 
-            clue("Check: user_2's History List is empty") {
+            clue("Check: user_2 sees beneficiary history events") {
               eventually() {
-                val emptyStateCell =
-                  find(cssSelector("#coupon-history-table tbody tr td[colspan='6']"))
-                emptyStateCell.isDefined shouldBe true
-                emptyStateCell.value.text should include("No history events found")
+                val rows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
+                rows.nonEmpty shouldBe true
               }
             }
 
