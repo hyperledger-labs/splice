@@ -20,6 +20,8 @@ class DbScanAppRewardsStoreTest
     with HasExecutionContext
     with SplicePostgresTest {
 
+  import DbScanAppRewardsStoreTest.DecimalSamples
+
   private val migrationId = 0L
   private val roundNumber = 42L
 
@@ -85,6 +87,49 @@ class DbScanAppRewardsStoreTest
         loaded.head shouldBe rewardRow
         // Verify decimal precision round-trips correctly
         loaded.head.totalAppRewardAmount shouldBe BigDecimal("12345678901234567890.1234567891")
+      }
+    }
+
+    "decimal(38,10) boundary values round-trip correctly" in {
+      import DecimalSamples.*
+      val testValues = Seq(
+        Zero,
+        One,
+        NegOne,
+        MinPositiveFractional,
+        MinNegativeFractional,
+        FractionalOnly,
+        TypicalPositive,
+        TypicalNegative,
+        LargePositive,
+        MaxDecimal,
+        MinDecimal,
+      )
+      for {
+        (store, historyId) <- newStore()
+        activityRows = testValues.zipWithIndex.map { case (_, i) =>
+          AppActivityPartyTotalT(
+            historyId = historyId,
+            roundNumber = roundNumber,
+            totalAppActivityWeight = 1L,
+            appProviderPartySeqNum = i,
+            appProviderParty = s"party-$i::provider",
+          )
+        }
+        _ <- store.insertAppActivityPartyTotals(activityRows)
+        rewardRows = testValues.zipWithIndex.map { case (amount, i) =>
+          AppRewardPartyTotalT(
+            historyId = historyId,
+            roundNumber = roundNumber,
+            appProviderPartySeqNum = i,
+            totalAppRewardAmount = amount,
+          )
+        }
+        _ <- store.insertAppRewardPartyTotals(rewardRows)
+        loaded <- store.getAppRewardPartyTotalsByRound(historyId, roundNumber)
+      } yield {
+        loaded should have size testValues.size.toLong
+        loaded.map(_.totalAppRewardAmount) shouldBe testValues
       }
     }
 
@@ -276,4 +321,20 @@ class DbScanAppRewardsStoreTest
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
     resetAllAppTables(storage)
+}
+
+object DbScanAppRewardsStoreTest {
+  object DecimalSamples {
+    val Zero: BigDecimal = BigDecimal("0")
+    val One: BigDecimal = BigDecimal("1")
+    val NegOne: BigDecimal = BigDecimal("-1")
+    val MinPositiveFractional: BigDecimal = BigDecimal("0.0000000001")
+    val MinNegativeFractional: BigDecimal = BigDecimal("-0.0000000001")
+    val FractionalOnly: BigDecimal = BigDecimal("0.1234567890")
+    val TypicalPositive: BigDecimal = BigDecimal("1.2345678901")
+    val TypicalNegative: BigDecimal = BigDecimal("-1.2345678901")
+    val LargePositive: BigDecimal = BigDecimal("12345678901234567890.1234567891")
+    val MaxDecimal: BigDecimal = BigDecimal("9999999999999999999999999999.9999999999")
+    val MinDecimal: BigDecimal = BigDecimal("-9999999999999999999999999999.9999999999")
+  }
 }
