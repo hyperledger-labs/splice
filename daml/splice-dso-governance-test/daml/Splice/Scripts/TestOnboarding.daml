@@ -563,7 +563,7 @@ testGrantValidatorPermission = do
     DsoRules_GrantValidatorPermission with
       sponsor = sv1
       validator = v1
-      validatorParticipantId = "v1-participant-id"
+      validatorParticipantId = "PAR:v1-participant-id::namespace"
 
   -- Verify the ValidatorPermission contract was created with default revocation states
   [(permissionCid, permission)] <- queryFilter @ValidatorPermission dso (\p -> p.validator == v1)
@@ -571,7 +571,7 @@ testGrantValidatorPermission = do
     dso
     sponsor = sv1
     validator = v1
-    validatorParticipantId = "v1-participant-id"
+    validatorParticipantId = "PAR:v1-participant-id::namespace"
     loginAfter = None
     isRevoked = False
 
