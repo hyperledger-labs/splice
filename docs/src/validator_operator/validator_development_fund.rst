@@ -79,6 +79,9 @@ allows the Development Fund Manager to allocate and manage coupons.
    this page to manage your active Development Fund allocations and
    review the history of your past allocations.
 
+   If your party is the beneficiary of an allocation, you will be able
+   to view the history of those allocations.
+
    Otherwise, this page can be safely ignored.
 
 Development Fund Total
@@ -135,7 +138,8 @@ Coupon History
 ^^^^^^^^^^^^^^
 
 The **Coupon History** section allows the current or former
-Development Fund Manager to view historical allocations.
+Development Fund Manager to view historical allocations, and
+beneficiaries to view those where their party was the beneficiary.
 
 This includes ``Splice.Amulet.DevelopmentFundCoupon`` contracts that have been
 archived due to:
