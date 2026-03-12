@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase, Upd
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.google.protobuf.ByteString
 
 import scala.concurrent.Future
 
@@ -108,7 +109,7 @@ class DbScanAppRewardsStoreTest
     "insert and read back app_reward_batch_hashes" in {
       for {
         (store, historyId) <- newStore()
-        hash = Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+        hash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16))
         row = AppRewardBatchHashT(
           historyId = historyId,
           roundNumber = roundNumber,
@@ -128,7 +129,7 @@ class DbScanAppRewardsStoreTest
     "insert and read back app_reward_root_hashes" in {
       for {
         (store, historyId) <- newStore()
-        hash = Array[Byte](0xca.toByte, 0xfe.toByte, 0xba.toByte, 0xbe.toByte)
+        hash = ByteString.copyFrom(Array[Byte](0xca.toByte, 0xfe.toByte, 0xba.toByte, 0xbe.toByte))
         row = AppRewardRootHashT(
           historyId = historyId,
           roundNumber = roundNumber,
@@ -175,7 +176,7 @@ class DbScanAppRewardsStoreTest
             batchLevel = 0,
             partySeqNumBeginIncl = i * 10,
             partySeqNumEndExcl = (i + 1) * 10,
-            batchHash = Array.fill(32)((i + 1).toByte),
+            batchHash = ByteString.copyFrom(Array.fill(32)((i + 1).toByte)),
           )
         }
         _ <- store.insertAppRewardBatchHashes(rows)
@@ -231,13 +232,13 @@ class DbScanAppRewardsStoreTest
         row = AppRewardRootHashT(
           historyId = historyId,
           roundNumber = roundNumber,
-          rootHash = Array[Byte](1, 2, 3, 4),
+          rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
         )
         _ <- store.insertAppRewardRootHashes(Seq(row))
         duplicate = AppRewardRootHashT(
           historyId = historyId,
           roundNumber = roundNumber,
-          rootHash = Array[Byte](5, 6, 7, 8),
+          rootHash = ByteString.copyFrom(Array[Byte](5, 6, 7, 8)),
         )
         result <- store.insertAppRewardRootHashes(Seq(duplicate)).failed
       } yield {

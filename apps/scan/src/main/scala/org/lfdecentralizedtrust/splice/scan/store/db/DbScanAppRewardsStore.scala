@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -65,55 +66,14 @@ object DbScanAppRewardsStore {
       batchLevel: Int,
       partySeqNumBeginIncl: Int,
       partySeqNumEndExcl: Int,
-      batchHash: Array[Byte],
-  ) {
-
-    /** Equals ignoring reference equality on Array[Byte]. */
-    override def equals(obj: Any): Boolean = obj match {
-      case that: AppRewardBatchHashT =>
-        this.historyId == that.historyId &&
-        this.roundNumber == that.roundNumber &&
-        this.batchLevel == that.batchLevel &&
-        this.partySeqNumBeginIncl == that.partySeqNumBeginIncl &&
-        this.partySeqNumEndExcl == that.partySeqNumEndExcl &&
-        java.util.Arrays.equals(this.batchHash, that.batchHash)
-      case _ => false
-    }
-
-    override def hashCode(): Int = {
-      var h = 17
-      h = 31 * h + historyId.hashCode()
-      h = 31 * h + roundNumber.hashCode()
-      h = 31 * h + batchLevel.hashCode()
-      h = 31 * h + partySeqNumBeginIncl.hashCode()
-      h = 31 * h + partySeqNumEndExcl.hashCode()
-      h = 31 * h + java.util.Arrays.hashCode(batchHash)
-      h
-    }
-  }
+      batchHash: ByteString,
+  )
 
   final case class AppRewardRootHashT(
       historyId: Long,
       roundNumber: Long,
-      rootHash: Array[Byte],
-  ) {
-
-    override def equals(obj: Any): Boolean = obj match {
-      case that: AppRewardRootHashT =>
-        this.historyId == that.historyId &&
-        this.roundNumber == that.roundNumber &&
-        java.util.Arrays.equals(this.rootHash, that.rootHash)
-      case _ => false
-    }
-
-    override def hashCode(): Int = {
-      var h = 17
-      h = 31 * h + historyId.hashCode()
-      h = 31 * h + roundNumber.hashCode()
-      h = 31 * h + java.util.Arrays.hashCode(rootHash)
-      h
-    }
-  }
+      rootHash: ByteString,
+  )
 }
 
 class DbScanAppRewardsStore(
@@ -192,7 +152,7 @@ class DbScanAppRewardsStore(
       batchLevel = prs.<<[Int],
       partySeqNumBeginIncl = prs.<<[Int],
       partySeqNumEndExcl = prs.<<[Int],
-      batchHash = prs.<<[Array[Byte]],
+      batchHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
     )
   }
 
@@ -201,7 +161,7 @@ class DbScanAppRewardsStore(
     DbScanAppRewardsStore.AppRewardRootHashT(
       historyId = prs.<<[Long],
       roundNumber = prs.<<[Long],
-      rootHash = prs.<<[Array[Byte]],
+      rootHash = ByteString.copyFrom(prs.<<[Array[Byte]]),
     )
   }
 
@@ -426,7 +386,7 @@ class DbScanAppRewardsStore(
     else {
       val values = sqlCommaSeparated(items.map { row =>
         sql"""(${row.historyId}, ${row.roundNumber}, ${row.batchLevel},
-              ${row.partySeqNumBeginIncl}, ${row.partySeqNumEndExcl}, ${row.batchHash})"""
+              ${row.partySeqNumBeginIncl}, ${row.partySeqNumEndExcl}, ${row.batchHash.toByteArray})"""
       })
       (sql"""insert into #${Tables.appRewardBatchHashes}(
               history_id, round_number, batch_level,
@@ -477,7 +437,7 @@ class DbScanAppRewardsStore(
     if (items.isEmpty) DBIO.successful(0)
     else {
       val values = sqlCommaSeparated(items.map { row =>
-        sql"""(${row.historyId}, ${row.roundNumber}, ${row.rootHash})"""
+        sql"""(${row.historyId}, ${row.roundNumber}, ${row.rootHash.toByteArray})"""
       })
       (sql"""insert into #${Tables.appRewardRootHashes}(
               history_id, round_number, root_hash
