@@ -39,7 +39,6 @@ class UpdateHistoryIngestionPerformanceTest(
     "update_history_transactions",
     "update_history_creates",
     "update_history_exercises",
-    "update_history_last_ingested_offsets",
   )
 
   override protected def mkStore(storage: DbStorage): UpdateHistory = {

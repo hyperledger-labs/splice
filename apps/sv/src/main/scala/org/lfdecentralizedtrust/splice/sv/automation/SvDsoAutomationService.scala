@@ -7,6 +7,7 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
+import com.digitalasset.canton.topology.SynchronizerId
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
@@ -69,6 +70,7 @@ class SvDsoAutomationService(
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
+    synchronizerId: SynchronizerId,
     enabledFeatures: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -91,6 +93,18 @@ class SvDsoAutomationService(
       : org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.type =
     SvDsoAutomationService
 
+  private val packageVettingService = new PackageVettingLookupService(
+    config.packageVettingCache,
+    connection(
+      SpliceLedgerConnectionPriority.Medium
+    ), // priority doesn't matter, we don't do command submissions
+    synchronizerId,
+    clock,
+    loggerFactory,
+    retryProvider,
+    triggerContext.metricsFactory,
+  )
+
   // notice the absence of UpdateHistory: the history for the dso party is duplicate with Scan
 
   private[splice] val restartDsoDelegateBasedAutomationTrigger =
@@ -104,6 +118,7 @@ class SvDsoAutomationService(
       config,
       retryProvider,
       packageVersionSupport,
+      packageVettingService,
     )
 
   // required for triggers that must run in sim time as well
@@ -426,7 +441,8 @@ class SvDsoAutomationService(
           internalClientConfig.sequencerInternalConfig,
           config.participantClient.sequencerRequestAmplification,
           config.domainMigrationId,
-          newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
+          reconnectOnSynchronizerConfigurationChange =
+            enabledFeatures.reconnectOnSynchronizerConfigurationChange,
         )
       )
     }

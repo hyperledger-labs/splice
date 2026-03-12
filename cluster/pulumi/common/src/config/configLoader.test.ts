@@ -3,6 +3,7 @@
 import { expect, jest, test } from '@jest/globals';
 import dedent from 'dedent';
 import { readFileSync } from 'fs';
+import { env } from 'process';
 
 import { readAndParseYaml } from './configLoader';
 
@@ -323,6 +324,32 @@ test('detect cyclic dependency between multiple files', () => {
   });
   expect(() => readAndParseYaml('a.yaml')).toThrow(
     'Cyclic dependency detected: [/test/a.yaml -> /test/b.yaml -> /test/c.yaml -> /test/a.yaml].'
+  );
+});
+
+test('reference defined environment variable', () => {
+  env['COMMONS'] = '/test/common';
+  mockFiles({
+    '/test/common/base.yaml': dedent`
+      prop: test
+    `,
+    '/test/config.yaml': dedent`
+      !include($COMMONS/base.yaml)
+    `,
+  });
+  expect(readAndParseYaml('config.yaml')).toEqual({
+    prop: 'test',
+  });
+});
+
+test('reference undefined environment variable', () => {
+  mockFiles({
+    '/test/config.yaml': dedent`
+      !include($UNDEFINED/base.yaml)
+    `,
+  });
+  expect(() => readAndParseYaml('config.yaml')).toThrow(
+    `Included path [$UNDEFINED/base.yaml] references variable [UNDEFINED] that is not defined.`
   );
 });
 

@@ -123,6 +123,9 @@ loadTester:
   maxVUs: 30
   adaptiveScenario:
     enabled: true
+    scaleUpStep: 3
+    windowStartUTC: "02:30"
+    windowDurationMinutes: 150
 svs:
   default:
     pruning:
@@ -297,6 +300,104 @@ cluster:
       nodeType: c4-standard-16
       minNodes: 0
       maxNodes: 1
+gha:
+  githubRepo: "https://github.com/hyperledger-labs/splice"
+  runnerVersion: "0.5.10"
+  runnerHookVersion: "0.5.10"
+  runnerScaleSetVersion: "0.13.1"
+  runnerSpecs:
+    [
+      {
+        name: 'tiny',
+        k8s: false,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '0.5',
+            memory: '512Mi',
+          },
+          limits: {
+            cpu: '0.5',
+            memory: '512Mi',
+          },
+        },
+      },
+      {
+        name: 'x-small',
+        k8s: true,
+        docker: false,
+        resources: {
+          requests: {
+            cpu: '4',
+            memory: '6Gi',
+          },
+          limits: {
+            cpu: '4',
+            memory: '6Gi',
+          },
+        },
+      },
+      {
+        name: 'small',
+        k8s: true,
+        docker: false,
+        resources: {
+          requests: {
+            cpu: '6',
+            memory: '18Gi',
+          },
+          limits: {
+            cpu: '6',
+            memory: '18Gi',
+          },
+        },
+      },
+      {
+        name: 'medium',
+        k8s: true,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '8',
+            memory: '26Gi',
+          },
+          limits: {
+            cpu: '8',
+            memory: '26Gi',
+          },
+        },
+      },
+      {
+        name: 'large',
+        k8s: true,
+        docker: true,
+        resources: {
+          requests: {
+            cpu: '8',
+            memory: '36Gi',
+          },
+          limits: {
+            cpu: '8',
+            memory: '36Gi',
+          },
+        },
+      },
+      {
+        name: 'x-large',
+        k8s: true,
+        docker: false,
+        resources: {
+          requests: {
+            cpu: '10',
+            memory: '48Gi',
+          },
+          limits: {
+            cpu: '10',
+            memory: '48Gi',
+          },
+        },
+      },
+    ]
 networkWide:
   maxVettingDelay: 1m
 validators:

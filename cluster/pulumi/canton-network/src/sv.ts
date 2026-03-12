@@ -44,6 +44,7 @@ import {
   configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installScanBulkStorage,
   installSvLoopback,
   SvParticipant,
   valuesForSvApp,
@@ -162,7 +163,16 @@ export async function installSvNode(
     prefix: baseConfig.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
   };
 
-  const config = { ...baseConfig, periodicBackupConfig, identitiesBackupLocation };
+  const bulkStorageBucket = svConfig.scanApp?.bulkStorage
+    ? installScanBulkStorage(xns, svConfig.scanApp.bulkStorage)
+    : undefined;
+
+  const config = {
+    ...baseConfig,
+    periodicBackupConfig,
+    identitiesBackupLocation,
+    bulkStorageBucket,
+  };
 
   const identitiesBackupConfigSecret = installBootstrapDataBucketSecret(
     xns,
@@ -575,6 +585,18 @@ function installScan(
     logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
+    ...(config.bulkStorageBucket
+      ? {
+          bulkStorage: {
+            s3: {
+              region: config.bulkStorageBucket.region,
+              bucketName: config.bulkStorageBucket.bucketName,
+              endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
+              secretName: config.bulkStorageBucket.secretName,
+            },
+          },
+        }
+      : {}),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

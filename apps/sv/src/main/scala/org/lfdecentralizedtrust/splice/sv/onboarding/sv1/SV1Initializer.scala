@@ -211,7 +211,8 @@ class SV1Initializer(
             observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
-        newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
+        reconnectOnSynchronizerConfigurationChange =
+          config.parameters.enabledFeatures.reconnectOnSynchronizerConfigurationChange,
         overwriteExistingConnection =
           false, // The validator will manage sequencer connections after initial setup
         retryFor = RetryFor.WaitingOnInitDependency,
@@ -355,6 +356,7 @@ class SV1Initializer(
         Some(localSynchronizerNode),
         upgradesConfig,
         packageVersionSupport,
+        decentralizedSynchronizer,
         enabledFeatures,
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)

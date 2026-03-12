@@ -410,6 +410,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       updateId = "update-xyz",
       submittingParties = Seq(partyA, partyB),
       transactionRootViews = Seq(0, 2),
+      trafficSummaryO = None,
     )
 
     val view0 = DbScanVerdictStore.TransactionViewT(
@@ -603,5 +604,40 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         viewsIn,
       )
     encodedRejected.verdictResult shouldBe httpApi.VerdictResult.VerdictResultRejected
+  }
+
+  "encode traffic summary" in {
+    val summary = DbScanVerdictStore.TrafficSummaryT(
+      totalTrafficCost = 500L,
+      envelopeTrafficSummarys = Seq(
+        DbScanVerdictStore.EnvelopeT(trafficCost = 300L, viewIds = Seq(0, 2)),
+        DbScanVerdictStore.EnvelopeT(trafficCost = 200L, viewIds = Seq(1)),
+      ),
+      sequencingTime = CantonTimestamp.now(),
+    )
+
+    val encoded = ScanHttpEncodings.encodeTrafficSummary(summary)
+
+    encoded.totalTrafficCost shouldBe 500L
+    encoded.envelopeTrafficSummaries.size shouldBe 2
+
+    encoded.envelopeTrafficSummaries(0).trafficCost shouldBe 300L
+    encoded.envelopeTrafficSummaries(0).viewIds shouldBe Vector(0, 2)
+
+    encoded.envelopeTrafficSummaries(1).trafficCost shouldBe 200L
+    encoded.envelopeTrafficSummaries(1).viewIds shouldBe Vector(1)
+  }
+
+  "encode traffic summary with empty envelopes" in {
+    val summary = DbScanVerdictStore.TrafficSummaryT(
+      totalTrafficCost = 0L,
+      envelopeTrafficSummarys = Seq.empty,
+      sequencingTime = CantonTimestamp.now(),
+    )
+
+    val encoded = ScanHttpEncodings.encodeTrafficSummary(summary)
+
+    encoded.totalTrafficCost shouldBe 0L
+    encoded.envelopeTrafficSummaries shouldBe empty
   }
 }

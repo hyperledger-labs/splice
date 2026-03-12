@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
@@ -20,6 +21,7 @@ import {
   installCloudSQLMaintenanceUpdateAlerts,
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
+  installLoggedSecretsAlerts,
 } from './gcpAlerts';
 import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
@@ -34,7 +36,10 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig);
+const cloudArmorSecurityPolicy = configureCloudArmorPolicy(
+  cloudArmorConfig,
+  svsConfig?.scan?.externalRateLimits || {}
+);
 const useGKEL7Gateway = infraConfig.gkeGateway.proxyForIstioHttp;
 
 if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
@@ -73,6 +78,9 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     installClusterMaintenanceUpdateAlerts(notificationChannel);
     if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
       installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+    }
+    if (monitoringConfig.alerting.loggedSecretsFilter) {
+      installLoggedSecretsAlerts(notificationChannel);
     }
   }
 }

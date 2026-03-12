@@ -94,6 +94,7 @@ lazy val root: Project = (project in file("."))
     `apps-sv`,
     `apps-app`,
     `apps-metrics-docs`,
+    `apps-dar-resources-generator`,
     `apps-wallet`,
     `apps-frontends`,
     `splice-util-daml`,
@@ -1974,6 +1975,40 @@ lazy val `apps-metrics-docs` =
       Headers.ApacheDAHeaderSettings
     )
 
+lazy val `apps-dar-resources-generator` =
+  project
+    .in(file("apps/dar-resources-generator"))
+    .dependsOn(
+      `canton-util-external`,
+      // We include all DARs here to make sure they are available as resources.
+      `splice-amulet-daml`,
+      `splice-amulet-name-service-daml`,
+      `splitwell-daml`,
+      `splice-dso-governance-daml`,
+      `splice-validator-lifecycle-daml`,
+      `splice-wallet-daml`,
+      `splice-wallet-payments-daml`,
+      `splice-api-token-metadata-v1-daml`,
+      `splice-api-token-holding-v1-daml`,
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `splice-api-token-allocation-v1-daml`,
+      `splice-api-token-allocation-request-v1-daml`,
+      `splice-api-token-allocation-instruction-v1-daml`,
+      `splice-token-test-dummy-holding-daml`,
+      `splice-token-test-trading-app-daml`,
+      `splice-featured-app-api-v1-daml`,
+      `splice-featured-app-api-v2-daml`,
+      `splice-util-batched-markers-daml`,
+    )
+    .settings(
+      Headers.ApacheDAHeaderSettings,
+      libraryDependencies ++= Seq(
+        Dependencies.better_files,
+        Dependencies.daml_lf_archive_reader,
+        CantonDependencies.cats,
+      ),
+    )
+
 lazy val `apps-app`: Project =
   project
     .in(file("apps/app"))
@@ -2093,7 +2128,7 @@ updateTestConfigForParallelRuns := {
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isWithDockerWithoutCantonTest(name: String): Boolean =
-    name.contains("LocalNet") || name.contains("BulkStorageTest")
+    name.contains("LocalNet") || name.contains("BulkStorageTest") || name.contains("S3Upload")
   def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
     name contains "ScanTimeBasedIntegrationTest"
   def isCometBftTest(name: String): Boolean =

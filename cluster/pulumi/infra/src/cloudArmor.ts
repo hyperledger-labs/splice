@@ -3,7 +3,8 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME, extractPathPrefixes } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { PerEndpointLimits } from '@lfdecentralizedtrust/splice-pulumi-common/src/ratelimit/envoyRateLimiter';
 
 import * as config from './config';
 
@@ -43,11 +44,13 @@ const PolicyRule = gcp.compute.RegionSecurityPolicyRule;
 /**
  * Creates a Cloud Armor security policy
  * @param cac loaded configuration
+ * @param scanExternalRateLimits Envoy rate limit config
  * @param opts Pulumi resource options
  * @returns The created security policy resource, if enabled
  */
 export function configureCloudArmorPolicy(
   cac: CloudArmorConfig,
+  scanExternalRateLimits: PerEndpointLimits,
   opts?: pulumi.ComponentResourceOptions
 ): CloudArmorPolicy | undefined {
   if (!cac.enabled) {
@@ -81,7 +84,13 @@ export function configureCloudArmorPolicy(
 
   // Step 4: Add throttling/banning rules for specific API endpoints
   if (cac.publicEndpoints && !_.isEmpty(cac.publicEndpoints)) {
-    addThrottleAndBanRules(securityPolicy, cac.publicEndpoints, cac.allRulesPreviewOnly, ruleOpts);
+    addThrottleAndBanRules(
+      securityPolicy,
+      cac.publicEndpoints,
+      scanExternalRateLimits,
+      cac.allRulesPreviewOnly,
+      ruleOpts
+    );
   }
 
   // Step 5: Add default deny rule
@@ -121,6 +130,7 @@ function addIpWhitelistRules(): void {
 function addThrottleAndBanRules(
   securityPolicy: CloudArmorPolicy,
   throttles: ThrottleConfig,
+  scanExternalRateLimits: PerEndpointLimits,
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
@@ -138,8 +148,7 @@ function addThrottleAndBanRules(
       if (throttleAcrossAllEndpointsAllIps.maxRequestsBeforeHttp429 > 0) {
         const ruleName = `throttle-all-endpoints-all-ips-${confEntryHead}`;
 
-        // Build the expression for path and hostname matching
-        const pathExpr = `request.path.startsWith(R"${pathPrefix}")`;
+        const pathExpr = allowedPathsCondition(scanExternalRateLimits, pathPrefix);
         const hostExpr = `request.headers['host'].matches(R"^${_.escapeRegExp(hostname)}(?::[0-9]+)?$")`;
         const matchExpr = `${pathExpr} && ${hostExpr}`;
 
@@ -209,4 +218,42 @@ function addDefaultDenyRule(
     },
     opts
   );
+}
+
+// Extract un-banned path prefixes and build optimized regex
+function allowedPathsCondition(scanExternalRateLimits: PerEndpointLimits, pathPrefix: string) {
+  if (scanExternalRateLimits.rateLimits && scanExternalRateLimits.rateLimits.length > 0) {
+    const pathPrefixes = extractPathPrefixes(scanExternalRateLimits.rateLimits)
+      .filter(p => !p.isBanned)
+      .map(p => p.pathPrefix);
+
+    // Factor out /api/scan/ prefix (with trailing slash)
+    const scanPrefix = '/api/scan/';
+    const scanPathRxs = pathPrefixes
+      .filter(p => p.startsWith(scanPrefix))
+      .map(p => _.escapeRegExp(p.substring(scanPrefix.length))); // Remove prefix for factoring
+
+    // Build regex pattern
+    if (scanPathRxs.length > 0) {
+      const regexPattern = `${scanPrefix}(${scanPathRxs.join('|')})`;
+      const pathExpr = `request.path.matches(R"^${regexPattern}")`;
+
+      // limit from https://docs.cloud.google.com/armor/quotas#limits
+      // in which a "subexpression" is an arg to && or ||
+      if (pathExpr.length > 1024) {
+        throw new Error(
+          `Cloud Armor path expression exceeds 1024 character limit (current: ${pathExpr.length}). ` +
+            `Consider grouping path prefixes more aggressively.`
+        );
+      }
+
+      return pathExpr;
+    } else {
+      // Fallback to simple prefix if no scan paths
+      return `request.path.startsWith(R"${pathPrefix}")`;
+    }
+  } else {
+    // No rate limits specified, use simple prefix matching
+    return `request.path.startsWith(R"${pathPrefix}")`;
+  }
 }
