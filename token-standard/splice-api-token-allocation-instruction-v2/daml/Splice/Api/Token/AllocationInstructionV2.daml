@@ -19,6 +19,17 @@ import DA.Optional (optionalToList)
 -- AllocationInstruction
 ------------------------
 
+-- | Actions to advance the state of an allocation instruction.
+data AllocationInstructionAction
+    = AIA_Withdraw
+    | AIA_Custom with  -- FIXME: explain that this is only used for extensibility
+        id : Text
+          -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
+          -- Namespaced analogously to metadata keys.
+        meta : Metadata
+          -- ^ Additional metadata specific to the action, used for extensibility.
+    deriving (Show, Eq)
+
 -- | View for `AllocationInstruction`.
 data AllocationInstructionView = AllocationInstructionView with
     originalInstructionCid : Optional (ContractId AllocationInstruction)
@@ -28,22 +39,19 @@ data AllocationInstructionView = AllocationInstructionView with
       -- Only set if the registry evolved the allocation instruction in multiple steps.
     allocation : AllocationSpecification
       -- ^ The allocation that this instruction should create.
-    pendingActions : Map.Map Party Text
-      -- ^ The pending actions to be taken by different actors to create the allocation.
-      --
-      -- FIXME: switch to action graph
-      --
-      -- ^ This field can by used to report on the progress of registry specific
-      -- workflows that are required to prepare the allocation.
     requestedAt : Time
-      -- ^ The time at which the allocation was requested.
+      -- ^ The time at which the allocation was originally requested.
     inputHoldingCids : [ContractId Holding]
       -- ^ The holdings to be used to fund the allocation.
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
-    sender : Account
-      -- ^ The sender of the allocation - who typically instructed the allocation instruction
-      -- and later appear on the Allocation as sender.
+    availableActions : Map.Map [Party] AllocationInstructionAction
+      -- ^ The actions that the wallet can present to the user to advance the allocation instruction.
+      --
+      -- This field can by used to inform wallet users whether they can take an action or not.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, registry-specific delegation contracts to be in place.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for
       -- extensibility; e.g., more detailed status information.
@@ -60,32 +68,20 @@ interface AllocationInstruction where
   viewtype AllocationInstructionView
 
   allocationInstruction_withdrawImpl : ContractId AllocationInstruction -> AllocationInstruction_Withdraw -> Update AllocationInstructionResult
-  allocationInstruction_updateImpl : ContractId AllocationInstruction -> AllocationInstruction_Update -> Update AllocationInstructionResult
 
-  choice AllocationInstruction_Withdraw : AllocationInstructionResult
+  nonconsuming choice AllocationInstruction_Withdraw : AllocationInstructionResult
     -- ^ Withdraw the allocation instruction as the sender.
     with
+      actors : [Party]
+        -- ^ Parties executing the withdrawal.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized settlement execution.
+        --
+        -- Registries are free to decide on the required authorization for withdrawal. They MUST however report the parties that can withdraw unilaterally via the `AllocationView.canWithdraw` field, so that wallets can show the withdrawal option to the user.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).sender.owner::optionalToList (view this).sender.provider
+    controller actors
     do allocationInstruction_withdrawImpl this self arg
-
-  choice AllocationInstruction_Update : AllocationInstructionResult
-    -- ^ Update the state of the allocation instruction. Used by the registry to
-    -- execute registry internal workflow steps that advance the state of the
-    -- allocation instruction. A reason may be communicated via the metadata.
-    with
-      extraActors : [Party]
-        -- ^ Extra actors authorizing the update. Implementations MUST check that
-        -- this field contains the expected actors for the specific update.
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller allocationAdmin (view this).allocation, extraActors
-    do allocationInstruction_updateImpl this self arg
-
--- FIXME: remove the need for this by switching to actors
-allocationAdmin : AllocationSpecification -> [Party]
-allocationAdmin allocation = map (.instrumentId.admin) allocation.transferLegs
 
 
 -- AllocationFactory
@@ -115,12 +111,11 @@ interface AllocationFactory where
     -- It depends on the registry whether this results in the allocation being
     -- created directly or in an allocation instruction being created instead.
     with
-      -- FIXME: specify account of allocation
 
-      -- FIXME: consider removing the `expectedAdmin`, as the caller already specifies it via their allocation specification.
       expectedAdmin : Party
         -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
+        --
         -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
         -- their own participant. That way they can ensure that it is safe to exercise a choice
         -- on a factory contract acquired from an untrusted source *provided*
@@ -148,10 +143,9 @@ interface AllocationFactory where
       actors : [Party]
         -- ^ Actors executing the allocation.
         --
-        -- Registries MUST check their concrete values to avoid unauthorized
-        -- allocation creation.
+        -- Implementations MUST check their concrete values to avoid unauthorized allocation creation.
         --
-        -- Registries SHOULD allow the initation of the allocation if the `actors`
+        -- Implementations SHOULD allow the initation of the allocation if the `actors`
         -- is equal to the `authorizer` of the allocation. Likewise, for accounts
         -- where the account provider has the right to allocate funds, the registry
         -- SHOULD allow the initiation of the allocation if the `actors` are
@@ -159,13 +153,11 @@ interface AllocationFactory where
     controller actors
     do allocationFactory_allocateImpl this self arg
 
+-- FIXME: move into separate `SettlementFactory` interface in `AllocationV2`
   nonconsuming choice AllocationFactory_SettleBatch : AllocationFactory_SettleBatchResult
     -- ^ Settle a batch of allocations for asset from the same instrument admin.
     with
       expectedAdmin : Party
-
-      -- FIXME: pass in the overall allocation to settle as an extra safe-guard
-
         -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
         -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
@@ -173,9 +165,14 @@ interface AllocationFactory where
         -- on a factory contract acquired from an untrusted source *provided*
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
-      transferLegs : [TransferLeg]
-        -- ^ The transfer legs to settle in this batch.
-        -- FIXME: improve comment
+
+      settlement : SettlementInfo
+
+      transferLegsToSettle : [TransferLeg]
+        -- ^ The specification of the batch of allocations to settle.
+        --
+        -- FIXME: comments: All legs for the same admin; settlement must match
+
       allocationCids : [ContractId Allocation]
         -- ^ Allocations to settle. Their instrument admin MUST match the expected admin.
         -- Their legs MUST all have the same settlement executor.

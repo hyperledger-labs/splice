@@ -272,7 +272,7 @@ interface Allocation where
         --
         -- Implementations MUST check these parties to avoid unauthorized withdrawal.
         --
-        -- Registries are free to decide on the required authorization for withdrawal.
+        -- Implementations are free to decide on the required authorization for withdrawal.
         -- They MUST however report the parties that can withdraw unilaterally via
         -- the `AllocationView.canWithdraw` field, so that wallets can show the
         -- withdrawal option to the user.

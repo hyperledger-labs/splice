@@ -87,8 +87,8 @@ data TransferInstructionAction
         id : Text
           -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
           -- Namespaced analogously to metadata keys.
-        description : Text
-          -- ^ Human-readable description of the action for display in the wallet.
+        meta : Metadata
+          -- ^ Additional metadata specific to the action, used for extensibility.
     deriving (Show, Eq)
 
 -- | View for `TransferInstruction`.
@@ -106,7 +106,7 @@ data TransferInstructionView = TransferInstructionView with
       -- This field can by used to inform wallet users whether they can take an action or not.
       --
       -- Supports multiple parties for actions that require joint authorization. Executing them
-      -- will require appropriate delegation contracts to be in place.
+      -- will require appropriate, registry-specific delegation contracts to be in place.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
