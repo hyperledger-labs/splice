@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   AmuletConfigUtil,
+  DisclosedContracts,
   SpliceUtil,
   TimeTestUtil,
   TriggerTestUtil,
@@ -111,6 +112,81 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
     clue("Mining rounds still transition to issuing") {
       val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
       issuingRounds should not be empty
+    }
+  }
+
+  "SV handles stale ValidatorLivenessActivityRecord with faucet cap=0" in { implicit env =>
+    clue("Set optValidatorFaucetCap to 0 via voting flow") {
+      val amuletRules = sv1Backend.getDsoInfo().amuletRules
+      val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(env.environment.clock.now)
+      val newConfig = withZeroFaucetCapConfig(currentConfig)
+      setAmuletConfig(Seq((None, newConfig, currentConfig)))
+    }
+
+    clue("Advance rounds so new rounds with cap=0 issuanceConfig are created") {
+      (1 to 3).foreach { _ =>
+        advanceRoundsToNextRoundOpening
+      }
+    }
+
+    clue("Manually create a ValidatorLivenessActivityRecord on a cap=0 round") {
+      // Simulates a validator that hasn't picked up the workaround and still
+      // exercises ValidatorLicense_RecordValidatorLivenessActivity.
+      val validatorParty = aliceValidatorBackend.getValidatorPartyId()
+      val license =
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .awaitJava(ValidatorLicense.COMPANION)(validatorParty)
+
+      // Find an open round that has cap=0 in its issuanceConfig
+      val openRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
+        .filter(r =>
+          r.payload.opensAt.isBefore(getLedgerTime.toInstant) &&
+            r.payload.issuanceConfig.optValidatorFaucetCap.toScala
+              .exists(_.compareTo(java.math.BigDecimal.ZERO) <= 0)
+        )
+      openRounds should not be empty withClue "expected open rounds with faucet cap=0"
+
+      val targetRound = openRounds.minBy(_.payload.round.number)
+
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitJava(
+          actAs = Seq(validatorParty),
+          commands = license.id
+            .exerciseValidatorLicense_RecordValidatorLivenessActivity(
+              targetRound.contractId
+            )
+            .commands
+            .asScala
+            .toSeq,
+          readAs = Seq(validatorParty),
+          disclosedContracts =
+            DisclosedContracts.forTesting(targetRound).toLedgerApiDisclosedContracts,
+        )
+
+      eventually() {
+        val records = sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(ValidatorLivenessActivityRecord.COMPANION)(dsoParty)
+        records should have size 1
+      }
+    }
+
+    clue("Advance rounds — SV should summarize without failing despite stale record on cap=0 round") {
+      (1 to 5).foreach { _ =>
+        advanceRoundsToNextRoundOpening
+      }
+    }
+
+    clue("Mining rounds still transition to issuing") {
+      val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
+      issuingRounds should not be empty
+    }
+
+    clue("Stale ValidatorLivenessActivityRecord should be expired") {
+      eventually() {
+        val records = sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(ValidatorLivenessActivityRecord.COMPANION)(dsoParty)
+        records shouldBe empty
+      }
     }
   }
 }
