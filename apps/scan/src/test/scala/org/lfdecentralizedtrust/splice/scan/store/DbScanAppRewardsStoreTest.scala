@@ -76,7 +76,7 @@ class DbScanAppRewardsStoreTest
           historyId = historyId,
           roundNumber = roundNumber,
           appProviderPartySeqNum = 0,
-          totalAppRewardAmount = BigDecimal("12345678901234567890.1234567890"),
+          totalAppRewardAmount = BigDecimal("12345678901234567890.1234567891"),
         )
         _ <- store.insertAppRewardPartyTotals(Seq(rewardRow))
         loaded <- store.getAppRewardPartyTotalsByRound(historyId, roundNumber)
@@ -84,7 +84,7 @@ class DbScanAppRewardsStoreTest
         loaded should have size 1
         loaded.head shouldBe rewardRow
         // Verify decimal precision round-trips correctly
-        loaded.head.totalAppRewardAmount shouldBe BigDecimal("12345678901234567890.1234567890")
+        loaded.head.totalAppRewardAmount shouldBe BigDecimal("12345678901234567890.1234567891")
       }
     }
 
@@ -109,7 +109,9 @@ class DbScanAppRewardsStoreTest
     "insert and read back app_reward_batch_hashes" in {
       for {
         (store, historyId) <- newStore()
-        hash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16))
+        hash = ByteString.copyFrom(
+          Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+        )
         row = AppRewardBatchHashT(
           historyId = historyId,
           roundNumber = roundNumber,
