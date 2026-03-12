@@ -1,9 +1,15 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithIsolatedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   AmuletConfigUtil,
@@ -17,6 +23,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletC
 import org.lfdecentralizedtrust.splice.codegen.java.splice.schedule.Schedule
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
+import org.lfdecentralizedtrust.splice.automation.Trigger
+import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -40,8 +48,22 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+            .withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
+
+  private def allFaucetTriggers(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Seq[Trigger] =
+    Seq(
+      sv1ValidatorBackend,
+      aliceValidatorBackend,
+      bobValidatorBackend,
+      splitwellValidatorBackend,
+    ).map(
+      _.validatorAutomation
+        .trigger[ReceiveFaucetCouponTrigger]
+    )
 
   /** Copy an IssuanceConfig with optValidatorFaucetCap set to 0. */
   private def withZeroFaucetCap(ic: IssuanceConfig): IssuanceConfig =
@@ -82,35 +104,57 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
   "system works with optValidatorFaucetCap=0" in { implicit env =>
     clue("Set optValidatorFaucetCap to 0 via voting flow") {
       val amuletRules = sv1Backend.getDsoInfo().amuletRules
-      val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(env.environment.clock.now)
+      val currentConfig =
+        AmuletConfigSchedule(amuletRules)
+          .getConfigAsOf(env.environment.clock.now)
       val newConfig = withZeroFaucetCapConfig(currentConfig)
       setAmuletConfig(Seq((None, newConfig, currentConfig)))
     }
 
-    clue("Advance several rounds") {
+    clue("Advance rounds so new rounds carry cap=0 issuanceConfig") {
       (1 to 3).foreach { _ =>
         advanceRoundsToNextRoundOpening
       }
     }
 
-    clue("No ValidatorLivenessActivityRecord contracts should exist") {
-      // This implicitly verifies that alice's ReceiveFaucetCouponTrigger did not fire —
-      // that trigger is the only thing that creates ValidatorLivenessActivityRecord contracts
-      // (via ValidatorLicense_RecordValidatorLivenessActivity).
-      val records = sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(ValidatorLivenessActivityRecord.COMPANION)(dsoParty)
-      records shouldBe empty
+    // Resume faucet triggers now that all open rounds have cap=0.
+    // If our workaround is correct, the triggers will skip these
+    // rounds and no ValidatorLivenessActivityRecord gets created.
+    setTriggersWithin(
+      triggersToResumeAtStart = allFaucetTriggers,
+      triggersToPauseAtStart = Seq.empty,
+    ) {
+      clue("Advance several more rounds with triggers resumed") {
+        (1 to 3).foreach { _ =>
+          advanceRoundsToNextRoundOpening
+        }
+      }
+
+      clue("No ValidatorLivenessActivityRecord contracts should exist") {
+        // ReceiveFaucetCouponTrigger is the only creator of these
+        // records. Because the trigger skips rounds with cap=0,
+        // no records should have been created.
+        val records =
+          sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(
+              ValidatorLivenessActivityRecord.COMPANION
+            )(dsoParty)
+        records shouldBe empty
+      }
     }
 
     clue("ValidatorLicenseMetadataTrigger still updates metadata") {
       val license =
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorBackend.getValidatorPartyId())
+          .awaitJava(ValidatorLicense.COMPANION)(
+            aliceValidatorBackend.getValidatorPartyId()
+          )
       license.data.metadata.toScala should not be empty
     }
 
     clue("Mining rounds still transition to issuing") {
-      val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
+      val issuingRounds =
+        sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
       issuingRounds should not be empty
     }
   }
@@ -138,7 +182,9 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
           .awaitJava(ValidatorLicense.COMPANION)(validatorParty)
 
       // Find an open round that has cap=0 in its issuanceConfig
-      val openRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
+      val openRounds = sv1ScanBackend
+        .getOpenAndIssuingMiningRounds()
+        ._1
         .filter(r =>
           r.payload.opensAt.isBefore(getLedgerTime.toInstant) &&
             r.payload.issuanceConfig.optValidatorFaucetCap.toScala
@@ -170,7 +216,9 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
       }
     }
 
-    clue("Advance rounds — SV should summarize without failing despite stale record on cap=0 round") {
+    clue(
+      "Advance rounds — SV should summarize without failing despite stale record on cap=0 round"
+    ) {
       (1 to 5).foreach { _ =>
         advanceRoundsToNextRoundOpening
       }
