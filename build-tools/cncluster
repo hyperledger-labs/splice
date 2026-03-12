@@ -443,7 +443,7 @@ function k8s_labels_for_app() {
        # If the app is in the list, append the domain to the app
        app_container=${app#"global-domain-"}
        app="global-domain-${domain}-${app#"global-domain-"}"
-    elif [[ "$app" == $domain_specific_apps ]]; then
+    elif [[ "$app" == $domain_specific_apps && "$domain" != "-" ]]; then
        # If the app is in the list, append the domain to the app
        app="${app}-${domain}"
     fi
@@ -1590,7 +1590,10 @@ function subcmd_participant_console() {
                 cncluster participant_console sv-1 7
 
               Example: opening multi-participant-24 console
-                cncluster participant_console multi-validator 7 multi-participant-24 7"
+                cncluster participant_console multi-validator 7 multi-participant-24 7
+
+              Example: opening sv-1 participant console in LSU mode
+                cncluster participant_console sv-1 -"
     fi
 
     app_container="$app"
