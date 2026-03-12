@@ -74,6 +74,16 @@ class ReceiveFaucetCouponTrigger(
           )
           .minByOption(_.contract.payload.opensAt)
       )
+      // Skip if validator faucet cap is zero — no rewards to distribute
+      _ <- OptionT.fromOption[Future] {
+        val cap = firstOpenNotClaimed.payload.issuanceConfig.optValidatorFaucetCap.toScala
+        if (cap.exists(_.compareTo(java.math.BigDecimal.ZERO) <= 0)) {
+          logger.info(
+            s"Skipping faucet coupon collection for round ${firstOpenNotClaimed.payload.round.number}: validator faucet cap is zero."
+          )
+          None
+        } else Some(())
+      }
     } yield ReceiveFaucetCouponTrigger.Task(license, firstOpenNotClaimed)
   }
 
