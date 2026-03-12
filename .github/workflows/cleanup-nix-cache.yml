@@ -1,0 +1,13 @@
+name: Cleanup Nix Cache
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # daily at 04:00 UTC
+  workflow_dispatch: {}   # allow manual trigger
+
+jobs:
+  cleanup:
+    # This is to be fixed, I just need to get this on workflow on main first apparently
+    uses: hyperledger-labs/splice-shared-gha/.github/workflows/cleanup-nix-cache.yml@martinflorian-da/fix-nix-pruning-differently
+    with:
+      runs_on: self-hosted-k8s-small
