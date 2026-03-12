@@ -65,10 +65,10 @@ svs:
         additionalEnvVars:
           - name: ADDITIONAL_CONFIG_DABFT_SCALE_SETTINGS
             value: |
-            canton.sequencers.sequencer.sequencer.config {
-              epoch-length = 64
-              consensus-empty-block-creation-timeout = 500.milliseconds
-            }
+              canton.sequencers.sequencer.sequencer.config {
+                epoch-length = 64
+                consensus-empty-block-creation-timeout = 500.milliseconds
+              }
     mediator:
       resources:
         limits:
