@@ -6,11 +6,15 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
-import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SynchronizerNodeService,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerRemoveReconciler
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.ExecutionContext
 
@@ -20,7 +24,8 @@ import scala.concurrent.ExecutionContext
 class SvBftSequencerPeerOffboardingTrigger(
     baseContext: TriggerContext,
     store: SvDsoStore,
-    sequencerAdminConnection: SequencerAdminConnection,
+    participantAdminConnection: ParticipantAdminConnection,
+    synchronizerNode: SynchronizerNodeService[LocalSynchronizerNode],
     scanConnection: AggregatingScanConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -35,7 +40,8 @@ class SvBftSequencerPeerOffboardingTrigger(
   override val reconciler: SequencerBftPeerRemoveReconciler =
     new SequencerBftPeerRemoveReconciler(
       store,
-      sequencerAdminConnection,
+      participantAdminConnection,
+      synchronizerNode,
       loggerFactory,
       scanConnection,
     )

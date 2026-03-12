@@ -8,19 +8,24 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome, TaskSuccess}
-import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SynchronizerNodeService,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class SequencerBftPeerAddReconciler(
     override protected val svDsoStore: SvDsoStore,
-    sequencerAdminConnection: SequencerAdminConnection,
+    participantAdminConnection: ParticipantAdminConnection,
+    synchronizerNode: SynchronizerNodeService[LocalSynchronizerNode],
     val loggerFactory: NamedLoggerFactory,
     scanConnection: AggregatingScanConnection,
-) extends SequencerBftPeerReconciler(sequencerAdminConnection, scanConnection) {
+) extends SequencerBftPeerReconciler(participantAdminConnection, synchronizerNode, scanConnection) {
 
   override def reconcileTask(
       task: BftPeerDifference
@@ -33,7 +38,7 @@ class SequencerBftPeerAddReconciler(
       )
       for {
         _ <- MonadUtil.sequentialTraverse(task.toAdd.toList)(
-          sequencerAdminConnection.addPeerEndpoint
+          task.adminConnection.addPeerEndpoint
         )
       } yield TaskSuccess(s"Finished bft peer addition: $task")
     }

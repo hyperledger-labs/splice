@@ -22,10 +22,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SequencerConfig,
   SynchronizerNodeConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SequencerAdminConnection,
+  SynchronizerNodeService,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.SingleScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.scalatest.flatspec.AnyFlatSpec
@@ -48,9 +53,17 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
   private val svDsoStoreMock = mock[SvDsoStore]
   private val sequencerAdminConnection = mock[SequencerAdminConnection]
+  private val participantAdminConnection = mock[ParticipantAdminConnection]
+  private val synchronizerNode = mock[SynchronizerNodeService[LocalSynchronizerNode]]
+  private val localSynchronizerNode = mock[LocalSynchronizerNode]
   private val scanConnection = mock[AggregatingScanConnection]
 
+  when(localSynchronizerNode.sequencerAdminConnection).thenReturn(sequencerAdminConnection)
+  when(synchronizerNode.activeSynchronizerNode()(any[TraceContext]))
+    .thenReturn(Future.successful(localSynchronizerNode))
   when(sequencerAdminConnection.getSequencerId).thenReturn(Future.successful(selfSequencerId))
+  when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
+    .thenReturn(Future.successful(true))
   when(sequencerAdminConnection.getPhysicalSynchronizerId()(any[TraceContext])).thenReturn(
     Future.successful(
       PhysicalSynchronizerId(
@@ -62,7 +75,8 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
   )
 
   private val reconciler = new SequencerBftPeerReconciler(
-    sequencerAdminConnection,
+    participantAdminConnection,
+    synchronizerNode,
     scanConnection,
   ) {
     override protected def svDsoStore: SvDsoStore = svDsoStoreMock

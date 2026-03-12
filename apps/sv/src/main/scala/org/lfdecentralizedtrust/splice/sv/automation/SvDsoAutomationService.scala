@@ -301,7 +301,8 @@ class SvDsoAutomationService(
             new SvBftSequencerPeerOffboardingTrigger(
               triggerContext,
               dsoStore,
-              current.sequencerAdminConnection,
+              participantAdminConnection,
+              synchronizerNodeService,
               aggregatingScanConnection,
             )
           )
@@ -309,7 +310,8 @@ class SvDsoAutomationService(
             new SvBftSequencerPeerOnboardingTrigger(
               triggerContext,
               dsoStore,
-              current.sequencerAdminConnection,
+              participantAdminConnection,
+              synchronizerNodeService,
               aggregatingScanConnection,
             )
           )

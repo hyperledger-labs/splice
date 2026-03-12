@@ -9,6 +9,7 @@ import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
+  SequencerAdminConnection,
   SynchronizerNodeService,
 }
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
@@ -91,7 +92,14 @@ abstract class SequencerBftPeerReconciler(
         }
     } yield {
       if (peersToAdd.nonEmpty || peersToRemove.nonEmpty)
-        Seq(BftPeerDifference(peersToAdd.map(_._2.peerId), peersToRemove.map(_._2), currentPeers))
+        Seq(
+          BftPeerDifference(
+            peersToAdd.map(_._2.peerId),
+            peersToRemove.map(_._2),
+            currentPeers,
+            activeSynchronizerNode.sequencerAdminConnection,
+          )
+        )
       else Seq()
     }
   }
@@ -115,5 +123,6 @@ object SequencerBftPeerReconciler {
       toAdd: Seq[P2PEndpoint],
       toRemove: Seq[P2PEndpoint.Id],
       currentPeers: Seq[(Option[SequencerId], P2PEndpoint.Id)],
+      adminConnection: SequencerAdminConnection,
   )
 }
