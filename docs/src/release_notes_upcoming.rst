@@ -25,6 +25,19 @@
 
     - Daml:
 
+      .. important::
+
+          **Action recommended from app devs:**
+
+          **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.17`` should recompile their Daml code
+          to link against ``splice-amulet >= 0.1.17`` in order to be ready to consume new field ``contractStateSchemaVersion`` added to ``AmuletRules``.
+
+          This is required because once the new fields are set, downgrades of `AmuletRules` will fail. This field will be set by SV automation directly after the
+          upgrade.
+
+          No change is required for apps that build against the :ref:`token_standard`
+          or :ref:`featured_app_activity_markers_api`.
+
        - Restrict ``AmuletConfig`` to not allow fees as part of `CIP 107 <https://github.com/canton-foundation/cips/blob/main/cip-0107/cip-0107.md>`_.
          This has no functional effect as `CIP 78 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`_ set the fees to zero already.
 
