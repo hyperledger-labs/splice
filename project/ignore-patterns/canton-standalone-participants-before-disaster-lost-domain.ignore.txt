@@ -9,3 +9,4 @@ Failed to acknowledge clean timestamp.*CANCELLED
 Now retrying operation 'request current time'
 
 'sequencer-client' is now in state Failed
+Connection has failed validation

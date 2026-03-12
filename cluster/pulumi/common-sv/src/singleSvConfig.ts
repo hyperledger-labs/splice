@@ -14,7 +14,7 @@ import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
 
-import { GCPBucketSchema } from './config';
+import { TopologySnapshotSchema } from './config';
 
 const SvCometbftConfigSchema = z
   .object({
@@ -93,6 +93,10 @@ const SvAppConfigSchema = z
     resources: K8sResourceSchema,
   })
   .strict();
+const BulkStorageConfigSchema = z.object({
+  enabled: z.boolean(),
+});
+export type BulkStorageConfig = z.infer<typeof BulkStorageConfigSchema>;
 const ScanAppConfigSchema = z
   .object({
     bigQuery: z
@@ -101,6 +105,7 @@ const ScanAppConfigSchema = z
         prefix: z.string(),
       })
       .optional(),
+    bulkStorage: BulkStorageConfigSchema.optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     resources: K8sResourceSchema,
@@ -163,7 +168,7 @@ const SingleSvConfigSchema = z
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
-    periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
+    periodicSnapshots: z.object({ topology: TopologySnapshotSchema.optional() }).optional(),
     versionOverride: CnChartVersionSchema.optional(),
   })
   .strict();

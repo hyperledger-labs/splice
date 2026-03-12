@@ -10,11 +10,11 @@
         "@typescript-eslint/parser": "^7.7.1",
         "eslint": "8.57.0",
         "eslint-config-prettier": "8.10.0",
-        "eslint-plugin-import": "^2.29.1",
+        "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-promise": "^6.1.1",
         "jest": "^30.2.0",
-        "minimatch": "10.2.2",
-        "prettier": "^3.4.2",
+        "minimatch": "10.2.4",
+        "prettier": "^3.8.1",
         "ts-jest": "^29.4.6",
         "typescript": "^5.9.3"
     },
@@ -55,7 +55,7 @@
         "sv"
     ],
     "dependencies": {
-        "@google-cloud/sql": "^0.20.1",
+        "@google-cloud/sql": "^0.24.0",
         "commander": "^14.0.3"
     }
 }

@@ -5,15 +5,19 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.pattern.after
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
-import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
-import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
+import org.apache.pekko.stream.scaladsl.{Source, Sink}
+import org.lfdecentralizedtrust.splice.PekkoRetryingService
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
+  PageLimit,
   HistoryMetrics,
   S3BucketConnection,
   TimestampWithMigrationId,
@@ -75,7 +79,7 @@ class UpdateHistoryBulkStorage(
     */
   private def getFirstSegmentFromGenesis: Future[Option[UpdatesSegment]] =
     for {
-      firstUpdate <- updateHistory.getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
+      firstUpdate <- updateHistory.getUpdatesWithoutImportUpdates(None, PageLimit.tryCreate(1))
       segmentEnd <- firstUpdate.headOption match {
         case None => Future.successful(None)
         case Some(first) =>
@@ -157,16 +161,20 @@ class UpdateHistoryBulkStorage(
     }
   }
 
-  def getSource(): Source[UpdatesSegment, UniqueKillSwitch] = {
-    val restartSettings = RestartSettings(
-      minBackoff = 3.seconds,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.1,
+  def asRetryableService(
+      automationConfig: AutomationConfig,
+      backoffClock: Clock,
+      retryProvider: RetryProvider,
+  )(implicit tracer: Tracer): PekkoRetryingService[UpdatesSegment] = {
+    val src = mksrc()
+    new PekkoRetryingService(
+      src,
+      Sink.ignore,
+      automationConfig,
+      backoffClock,
+      "Update History Bulk Storage",
+      retryProvider,
+      loggerFactory,
     )
-
-    RestartSource
-      .withBackoff(restartSettings)(() => mksrc())
-      .viaMat(KillSwitches.single)(Keep.right)
   }
-
 }

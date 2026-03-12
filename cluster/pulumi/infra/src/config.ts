@@ -44,10 +44,6 @@ const MonitoringConfigSchema = z
             rate: z.number(),
             overMinutes: z.number(),
           }),
-          perMember: z.object({
-            rate: z.number(),
-            overMinutes: z.number(),
-          }),
         }),
         cloudSql: z.object({
           maintenance: z.boolean(),
@@ -68,8 +64,13 @@ const MonitoringConfigSchema = z
         sequencerClientDelay: z.object({
           seconds: z.number(),
         }),
+        sequencerRateLimits: z.object({
+          rejectionRateThreshold: z.number(),
+          circuitBreakerStateThreshold: z.number(),
+        }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
+      loggedSecretsFilter: z.string().optional(),
     }),
   })
   .strict();

@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
+import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -46,7 +47,9 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanKeyValueStore,
   ScanStore,
 }
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -61,10 +64,11 @@ import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
@@ -212,6 +216,8 @@ class ScanApp(
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore.history,
+        externalTransactionHashThresholdTimestamp = config.externalTransactionHashThresholdDate
+          .map(s => CantonTimestamp.assertFromInstant(java.time.Instant.parse(s))),
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
@@ -252,9 +258,38 @@ class ScanApp(
         currentMigrationId = migrationInfo.currentMigrationId,
         kvProvider,
         retryProvider.metricsFactory,
+        config.automation,
+        backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),
+        retryProvider,
         loggerFactory,
       )
-      scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
+      // Conditionally create traffic summary ingestion dependencies
+      sequencerTrafficClientO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new SequencerTrafficClient(
+              config.sequencerAdminClient,
+              ScanApp.this,
+              nodeMetrics.grpcClientMetrics,
+              loggerFactory,
+            )
+          )
+        } else None
+      appActivityRecordStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new DbAppActivityRecordStore(
+              storage,
+              loggerFactory,
+            )
+          )
+        } else None
+      scanVerdictStore = DbScanVerdictStore(
+        storage,
+        updateHistory,
+        appActivityRecordStoreO,
+        loggerFactory,
+      )(ec)
       scanEventStore = new ScanEventStore(
         scanVerdictStore,
         updateHistory,
@@ -302,6 +337,7 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
+      appActivityComputation = NoOpAppActivityComputation
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
@@ -312,6 +348,8 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         synchronizerId,
         nodeMetrics.verdictIngestion,
+        sequencerTrafficClientO,
+        appActivityComputation,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
@@ -326,6 +364,7 @@ class ScanApp(
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
+        config.serveTrafficSummaries,
         clock,
         loggerFactory,
         packageVersionSupport,

@@ -116,8 +116,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     }
   );
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '77.12.1';
-  const prometheusStackCrdVersion = '0.85.0';
+  const stackVersion = '82.9.0';
+  const prometheusStackCrdVersion = '0.89.0';
   const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const migrationSnapshots = getVolumeSnapshotsForHyperdiskMigration();
@@ -172,7 +172,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
               routes: [
                 {
                   receiver: 'null',
-                  matchers: ['alertname="Watchdog"'],
+                  matchers: ['alertname="Watchdog|InfoInhibitor"'],
                   continue: false,
                 },
               ],
@@ -254,11 +254,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             serviceMonitorSelector: {
               matchLabels: null,
             },
-            enableFeatures: [
-              'native-histograms',
-              'memory-snapshot-on-shutdown',
-              'promql-experimental-functions',
-            ],
+            enableFeatures: ['memory-snapshot-on-shutdown', 'promql-experimental-functions'],
             enableRemoteWriteReceiver: true,
             retention: infraConfig.prometheus.retentionDuration,
             retentionSize: infraConfig.prometheus.retentionSize,
@@ -272,6 +268,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             remoteWriteDashboards: true,
             // fix for https://github.com/prometheus/prometheus/issues/6857
             additionalArgs: [{ name: 'storage.tsdb.max-block-duration', value: '1d' }],
+            scrapeNativeHistograms: true,
             storageSpec: {
               volumeClaimTemplate: {
                 ...(hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
@@ -900,6 +897,17 @@ function createGrafanaAlerting(namespace: Input<string>) {
               'sequencer_connection_pool_alerts.yaml'
             ),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
+            'sequencer_rate_limit_alerts.yaml': readGrafanaAlertingFile(
+              'sequencer_rate_limit_alerts.yaml'
+            )
+              .replace(
+                '$SEQUENCER_RATE_LIMIT_REJECTION_RATE_THRESHOLD',
+                monitoringConfig.alerting.alerts.sequencerRateLimits.rejectionRateThreshold.toString()
+              )
+              .replace(
+                '$SEQUENCER_RATE_LIMIT_CIRCUIT_BREAKER_STATE_THRESHOLD',
+                monitoringConfig.alerting.alerts.sequencerRateLimits.circuitBreakerStateThreshold.toString()
+              ),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
@@ -908,14 +916,6 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD',
                 monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.perMember.overMinutes.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.perMember.rate.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
@@ -950,7 +950,7 @@ function grafanaAlertNotificationPolicies() {
   const notificationPolicies = [];
   const defaultPolicy = yaml.load(
     readGrafanaAlertingFile('notification_policies/default_slack.yaml')
-  );
+  ) as Record<string, unknown>;
   if (enableAlertEmailToSupportTeam) {
     notificationPolicies.push(
       yaml.load(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
@@ -975,6 +975,8 @@ function grafanaAlertNotificationPolicies() {
       ],
     });
   } else {
+    // we can't have a single policy with matchers, the root policy must be the default if nothing else matches
+    delete defaultPolicy.object_matchers;
     return yaml.dump({
       apiVersion: 1,
       policies: [defaultPolicy],

@@ -120,7 +120,8 @@ class DomainConnector(
     participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
       overwriteExistingConnection = true,
-      newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
+      reconnectOnSynchronizerConfigurationChange =
+        config.parameters.enabledFeatures.reconnectOnSynchronizerConfigurationChange,
       retryFor = RetryFor.WaitingOnInitDependency,
     )
   }
@@ -133,7 +134,7 @@ class DomainConnector(
       // The only case where this can happen is during a domain migration and even then
       // it is fairly unlikely outside of tests for validators to come up fast enough that
       // scan has not yet updated.
-      RetryFor.ClientCalls,
+      RetryFor.WaitingOnInitDependency, // because the scan connections might still be in bootstrap phase
       "scan_sequencer_connections",
       "non-empty sequencer connections from scan",
       getSequencerConnectionsFromScan(Right(clock))

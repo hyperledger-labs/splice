@@ -371,12 +371,25 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
    If you change any of them, then you can propagate these changes across the .dars as follows:
    1. redo Step 2
     3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
+7. When updating a DAR, make sure to run `sbt updateDarResources` before running integration tests. CI enforces that this is always done.
 
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
 Alternatively, use the "big hammer" and run `find -name ".daml" -type d -exec rm -rf {} \;`
 from the repo root to delete all `.daml` build directories.
 
+
+## Daml Version Bump
+
+Whenever you update a .dar file, you need to bump the version of the corresponding daml package,
+and the version of daml packages that (recursively) depend on it. For that,
+
+1. Bump the version inside the `daml.yaml` file inside the updated module, and in all modules that (recursively) depend on it.
+2. Run `sbt damlBuild; sbt damlDarsLockFileUpdate` to compile the `.dar` files.
+3. Manually update the relevant daml package versions inside `apps/dar-resources-generator/src/main/scala/org/lfdecentralizedtrust/splice/darutils/DarResources.scala`.
+4. Run `sbt updateDarResources` to update DarResources.
+5. Manually update `apps/package.json` to update the versions of the daml packages that were updated in step 1.
+6. Run `sbt npmInstall ; sbt compile`
 
 ## Daml Version Guards in Integration Tests
 

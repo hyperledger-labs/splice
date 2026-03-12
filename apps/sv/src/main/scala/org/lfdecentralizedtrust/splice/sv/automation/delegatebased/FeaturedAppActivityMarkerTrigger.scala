@@ -11,19 +11,21 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet, amuletrules, dsorules}
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import FeaturedAppActivityMarkerTrigger.Task
+import FeaturedAppActivityMarkerTrigger.{CrossVersionBatch, Task}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 
@@ -71,10 +73,45 @@ class FeaturedAppActivityMarkerTrigger(
           // one or more SVs seem to be lagging wrt their activity markers ==> start working on all of them
           retrieveBatchesByRandomSampling(numSamplingRuns = 1)
       }
+      .flatMap { batches =>
+        MonadUtil.sequentialTraverse(batches)(splitBatchByVettingState(_)).map(_.flatten)
+      }
+
+  def splitBatchByVettingState(
+      batch: CrossVersionBatch
+  )(implicit tc: TraceContext): Future[Seq[Task]] =
+    svTaskContext.vettingLookupService
+      .splitBatch[Contract[
+        amulet.FeaturedAppActivityMarker.ContractId,
+        amulet.FeaturedAppActivityMarker,
+      ]](
+        PackageIdResolver.Package.SpliceAmulet,
+        c =>
+          Seq(c.payload.provider, c.payload.beneficiary, c.payload.dso)
+            .map(PartyId.tryFromProtoPrimitive(_)),
+        batch.markers,
+        batchSize,
+      )
+      .map {
+        _.toSeq.flatMap {
+          case (Some(version), markerBatches) =>
+            markerBatches.map(
+              Task(
+                batch.retrievalKind,
+                _,
+                version,
+              )
+            )
+          case (None, markers) =>
+            logger.warn(show"No vetted amulet version for $markers")
+            Seq.empty
+        }
+
+      }
 
   private def retrieveBatchesBySvIndex(
       dsoRules: dsorules.DsoRules
-  )(implicit tc: TraceContext): Future[Seq[Task]] = {
+  )(implicit tc: TraceContext): Future[Seq[CrossVersionBatch]] = {
     // guaranteedly no contention between different SVs
     val minInt: Long = Int.MinValue.toLong
     val maxInt: Long = Int.MaxValue.toLong
@@ -103,7 +140,7 @@ class FeaturedAppActivityMarkerTrigger(
 
   private def retrieveBatchesByRandomSampling(
       numSamplingRuns: Int
-  )(implicit tc: TraceContext): Future[Seq[Task]] = {
+  )(implicit tc: TraceContext): Future[Seq[CrossVersionBatch]] = {
     // probabilistic guarantee of no overlap between different SVs
     val hashMinBoundIncl: Int = rng.nextInt()
     val hashMaxBoundIncl: Int = Int.MaxValue
@@ -137,7 +174,7 @@ class FeaturedAppActivityMarkerTrigger(
 
   private def getBatchesByBounds(kind: String, hashMinBoundIncl: Int, hashMaxBoundIncl: Int)(
       implicit tc: TraceContext
-  ): Future[Seq[Task]] = {
+  ): Future[Seq[CrossVersionBatch]] = {
     val numMarkers = context.config.parallelism * batchSize
     store
       .listFeaturedAppActivityMarkersByContractIdHash(
@@ -148,7 +185,7 @@ class FeaturedAppActivityMarkerTrigger(
       .map(markers =>
         markers
           .grouped(batchSize)
-          .map(Task(kind, _))
+          .map(CrossVersionBatch(kind, _))
           .toSeq
       )
   }
@@ -218,7 +255,7 @@ class FeaturedAppActivityMarkerTrigger(
 }
 
 object FeaturedAppActivityMarkerTrigger {
-  final case class Task(
+  final case class CrossVersionBatch(
       retrievalKind: String,
       markers: Seq[
         Contract[amulet.FeaturedAppActivityMarker.ContractId, amulet.FeaturedAppActivityMarker]
@@ -228,6 +265,22 @@ object FeaturedAppActivityMarkerTrigger {
       prettyOfClass(
         param("retrievalKind", _.retrievalKind.unquoted),
         param("numMarkers", _.markers.size),
+        param("markerCids", _.markers.map(_.contractId.contractId.unquoted)),
+      )
+  }
+
+  final case class Task(
+      retrievalKind: String,
+      markers: Seq[
+        Contract[amulet.FeaturedAppActivityMarker.ContractId, amulet.FeaturedAppActivityMarker]
+      ],
+      vettedAmuletVersion: PackageVersion,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("retrievalKind", _.retrievalKind.unquoted),
+        param("numMarkers", _.markers.size),
+        param("vettedAmuletVersion", _.vettedAmuletVersion),
         param("markerCids", _.markers.map(_.contractId.contractId.unquoted)),
       )
   }
