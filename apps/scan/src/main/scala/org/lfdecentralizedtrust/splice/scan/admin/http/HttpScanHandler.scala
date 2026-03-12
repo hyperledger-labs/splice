@@ -42,8 +42,10 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   MaybeCachedContractWithState,
   UpdateHistoryItem,
   UpdateHistoryItemV2,
+  UpdateHistoryItemV3,
   UpdateHistoryRequestV2,
   UpdateHistoryTransactionV2,
+  UpdateHistoryTransactionV3,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -961,6 +963,28 @@ class HttpScanHandler(
             rootEventIds = t.rootEventIds,
             eventsById = SortedMap.from(t.eventsById),
             externalTransactionHash = t.externalTransactionHash,
+          )
+        )
+    }
+
+  private def toUpdateV3(update: UpdateHistoryItem): UpdateHistoryItemV3 =
+    update match {
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV3(
+          UpdateHistoryItemV3.members.UpdateHistoryReassignment(r)
+        )
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV3(
+          UpdateHistoryTransactionV3(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash.getOrElse(""),
           )
         )
     }
@@ -1893,7 +1917,7 @@ class HttpScanHandler(
           case Left(error) =>
             ScanResource.GetUpdateByHashV2Response.NotFound(error)
           case Right(update) =>
-            ScanResource.GetUpdateByHashV2Response.OK(toUpdateV2(update))
+            ScanResource.GetUpdateByHashV2Response.OK(toUpdateV3(update))
         }
     }
   }

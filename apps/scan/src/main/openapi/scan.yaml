@@ -429,9 +429,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UpdateHistoryItemV2"
-                # TODO(#3408): external_transaction_hash is an optional field in UpdateHistoryItemV2.
-                # We need introduce a new schema with external_transaction_hash as required field for this endpoint.
+                $ref: "#/components/schemas/UpdateHistoryItemV3"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -2226,6 +2224,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItemV3:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a contract reassignment.
+      oneOf:
+        - $ref: "#/components/schemas/UpdateHistoryTransactionV3"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
     UpdateHistoryItemV2:
       type: object
       description: |
@@ -2431,6 +2436,70 @@ components:
         - effective_at
         - root_event_ids
         - events_by_id
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer.
+          type: integer
+          format: int64
+        workflow_id:
+          description: |
+            This transaction's Daml workflow ID; a workflow ID can be associated
+            with multiple transactions. If empty, no workflow ID was set.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced, with microsecond
+            resolution, using ISO-8601 representation.
+          type: string
+        synchronizer_id:
+          description: |
+            The id of the synchronizer through which this transaction was sequenced.
+          type: string
+        effective_at:
+          description: |
+            Ledger effective time, using ISO-8601 representation. This is the time
+            returned by `getTime` for all Daml executed as part of this transaction,
+            both by the submitting participant and all confirming participants.
+          type: string
+        root_event_ids:
+          description: |
+            Roots of the transaction tree. These are guaranteed to occur as keys
+            of the `events_by_id` object.
+          type: array
+          items:
+            type: string
+        events_by_id:
+          x-scala-map-type: "scala.collection.immutable.SortedMap"
+          description: |
+            Changes to the ledger that were caused by this transaction, keyed by ID and sorted lexicographically by ID for display consistency.
+            Values are nodes of the transaction tree.
+            Within a transaction, IDs may be referenced by `root_event_ids` or
+            `child_event_ids` in `ExercisedEvent` herein, which are sorted in the order as they occurred in the transaction.
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/TreeEvent"
+        external_transaction_hash:
+          description: |
+            For transaction externally signed, contains the external transaction hash
+            signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          type: string
+    UpdateHistoryTransactionV3:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - workflow_id
+        - record_time
+        - synchronizer_id
+        - effective_at
+        - root_event_ids
+        - events_by_id
+        - external_transaction_hash
       properties:
         update_id:
           description: |
