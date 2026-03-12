@@ -33,10 +33,6 @@ create table scan_rewards_reference_store_active
     featured_app_right_provider text
 );
 
--- temporal query support: created_at filtering for point-in-time lookups on the live table
-create index scan_rewards_reference_store_active_temporal
-    on scan_rewards_reference_store_active (store_id, migration_id, template_id_qualified_name, created_at);
-
 create table scan_rewards_reference_store_archived
 (
     like scan_rewards_reference_store_active including all,
@@ -47,6 +43,10 @@ create table scan_rewards_reference_store_archived
     -- record_time of the transaction that archived the contract, in micros since epoch.
     archived_at bigint not null
 );
+
+-- temporal query support: created_at filtering for point-in-time lookups on the live table
+create index scan_rewards_reference_store_active_temporal
+    on scan_rewards_reference_store_active (store_id, migration_id, template_id_qualified_name, created_at);
 
 -- temporal query support: created_at + archived_at filtering for point-in-time lookups on the archive table
 -- Since we would be typically doing lookups for recently archived contracts, index on archived_at will help skip past events more efficiently
