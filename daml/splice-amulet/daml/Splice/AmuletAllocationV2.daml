@@ -9,7 +9,6 @@ module Splice.AmuletAllocationV2 (
 
 import DA.Foldable (forA_)
 import DA.Optional (isNone, isSome)
-import DA.List (head)
 import DA.Text as Text
 
 import Splice.Api.Token.MetadataV1
@@ -57,11 +56,17 @@ template AmuletAllocationV2
         expiresAt = Some expiresAt
         allocation
         holdingCids = case lockedAmulet of
-          None -> Map.empty
-          Some cid -> Map.fromList [(upcast (amuletInstrumentId dso), [toInterfaceContractId cid])]
+          None -> mempty
+          Some cid -> singletonHoldingMap (upcast (amuletInstrumentId dso)) [toInterfaceContractId cid]
         settlementVersion = 2
           -- allocations that support both interfaces are represented using AmuletAllocation.
+        canWithdraw = [allocation.authorizer.owner]
         meta = emptyMetadata
+
+      -- no extra observers required, as the choice bodies do not introduce further informees
+      allocation_settleExtraObservers _arg = []
+      allocation_cancelExtraObservers _arg = []
+      allocation_withdrawExtraObservers _arg = []
 
       allocation_withdrawImpl self Allocation_Withdraw{..} = do
         archive self
@@ -103,11 +108,11 @@ template AmuletAllocationV2
                 amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
 
               pure Allocation_SettleResult with
-                newHoldingCids = Map.singleton (upcast (amuletInstrumentId dso)) [toInterfaceContractId newHoldingCid]
+                newHoldingCids = singletonHoldingMap (upcast (amuletInstrumentId dso)) [toInterfaceContractId newHoldingCid]
                 meta = emptyMetadata
           else
             pure Allocation_SettleResult with
-              newHoldingCids = Map.empty
+              newHoldingCids = mempty
               meta = emptyMetadata
         else do
           -- Net debit of Amulet ==> archive the locked amulet
@@ -117,7 +122,7 @@ template AmuletAllocationV2
              require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
 
           pure Allocation_SettleResult with
-            newHoldingCids = Map.empty
+            newHoldingCids = mempty
             meta = emptyMetadata
 
 

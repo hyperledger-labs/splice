@@ -1,28 +1,48 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | This module defines the `Allocation` interface and supporting types.
+-- | This module defines V2 of the `Allocation` interface and supporting types.
 --
--- Contracts implementing the `Allocation` interface represent a reservation of
--- assets to transfer them as part of an atomic on-ledger settlement requested
--- by an app.
+-- In contrast to V1, this interface supports:
+--
+--  - authorizing multiple transfers in a single allocation
+--  - only allocating the net amount of funds transferred to the allocation
+--  - specifying accounts directly in the transfer legs instead of using metadata
+--  - flexible actors for for extensibility
+--  - implementation-defined choice observers for more efficient views where privacy allows for it
+--
 module Splice.Api.Token.AllocationV2 where
 
-import DA.List (dedup, dedupSort)
+import DA.Map as Map
+import DA.Set qualified as Set
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
-import DA.Optional (optionalToList)
-import DA.Map as Map
+
+
+-- Utility types
+----------------
 
 -- | A map of holding contract-ids by instrumentId.
 --
 -- Used in allocation workflows to pass around references to holdings in a way that
 -- allows splitting them by instrument without fetching them.
+--
+-- Defined as a data type instead of a type synomym, as type synonyms are not
+-- supported across data dependencies.
 data HoldingMap = HoldingMap with
     byInstrument : Map.Map InstrumentId [ContractId Holding]
   deriving (Show, Eq)
 
+instance Semigroup HoldingMap where
+  HoldingMap m1 <> HoldingMap m2 = HoldingMap (Map.unionWith (++) m1 m2)
+
+instance Monoid HoldingMap where
+  mempty = HoldingMap Map.empty
+
+
+-- Allocation View
+------------------
 
 -- | A generic type to refer to data defined within an app.
 -- The interpretation of such a reference is app specific, but SHOULD be unambiguous within the context of the app.
@@ -42,7 +62,6 @@ data SettlementInfo = SettlementInfo
     executor : Party
       -- ^ The parties that are responsible for executing the settlement, and
       -- guaranteeing its atomicity across asset admins.
-      -- FIXME: consider supporting multiple executor instead of controller overrides. The executor are the ones ensuring atomicity across different instrument admins.
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
     requestedAt : Time
@@ -53,10 +72,6 @@ data SettlementInfo = SettlementInfo
       -- happens at any point after this time.
     meta : Metadata
       -- ^ Additional metadata about the settlement, used for extensibility.
-    controllerOverride : Optional [Party]
-      -- ^ Additional party signatures in addition to executor that need to authorize
-      -- choices on the Allocation. Defaults to senders and receivers across all
-      -- transferLegs.
     settlementDeadline : Optional Time
       -- ^ The latest point at which settlement will occur. This allows registries
       -- to set appropriate locks and expiries.
@@ -79,30 +94,28 @@ data TransferLeg = TransferLeg with
       -- ^ Additional metadata about the transfer leg, used for extensibility.
   deriving (Eq, Ord, Show)
 
--- | The specification of an allocation of assets to a specific leg of a settlement.
+-- | An approval by the authorizer to execute the given transfers
+-- as part of the settlement.
 --
--- In contrast to an `AllocationView` this just specifies what should be allocated,
--- but not the holdings that are backing the allocation.
+-- In contrast to an `AllocationView` this just specifies the authorized
+-- transfers, but not the holdings that fund the transfers.
 data AllocationSpecification = AllocationSpecification with
     settlement : SettlementInfo
       -- ^ The settlement for which this allocation is made.
     transferLegs: [TransferLeg]
-     -- ^ The transfers whose sender or receiver side is authorized by this allocation.
-     --
-     -- There MUST be at least one transfer leg. All transfer legs MUST have the
-     -- same instrument admin and involve the authorizer as sender or receiver.
+      -- ^ The transfers whose send or receipt is authorized by this allocation.
+      --
+      -- There MUST be at least one transfer leg. All transfer legs MUST have the
+      -- same instrument admin and involve the authorizer as sender or receiver.
     authorizer : Account
-      -- FIXME: rename to authorizingAccount
-      -- ^ The account authorizing the transfer legs to happen as part of the settlement.
+      -- ^ The account authorizing the transfers to happen as part of the settlement.
   deriving (Show, Eq)
 
 -- | View of an contract representing a ready-to settle allocation.
 data AllocationView = AllocationView with
     allocation : AllocationSpecification
       -- ^ The specification of the allocation.
-    holdingCids : Map InstrumentId [ContractId Holding]
-      -- FIXME: investigate whether we can get away without classifying the holdings by instrumentId.
-      --
+    holdingCids : HoldingMap
       -- ^ The holdings that are backing this allocation.
       --
       -- Provided so that that wallets can correlate the allocation with the
@@ -110,8 +123,8 @@ data AllocationView = AllocationView with
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     expiresAt : Optional Time
-    -- ^ The time at which this allocation expires. SHOULD be as close as the
-    -- registry can make it to the `allocation.settlement.settlementDeadline`.
+      -- ^ The time at which this allocation expires. SHOULD be as close as the
+      -- registry can make it to the `allocation.settlement.settlementDeadline`.
     settlementVersion : Int
       -- ^ Version of the workflow to use for settling this allocation.
       --
@@ -124,51 +137,43 @@ data AllocationView = AllocationView with
       -- to the executor.
       --
       -- Additional versions may defined in future extensions of the token standard.
+      --
+    -- FIXME: consider whether we can replace this ^^ in favor of `extraSettlementAuthorizers`
+
+    canWithdraw : [Party]
+      -- ^ The parties that can unilaterally withdraw this allocation.
+      --
+      -- Provided for wallets to determine whether their user can call the `Allocation_Withdraw` choice.
+      --
+      -- Registries that require joint authorization for a withdrawal to complete SHOULD
+      -- set this to the empty list, and provide a registry specific UI to
+      -- initiate and complete the withdrawal.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
 
--- FIXME: expose action graph
-
 
 -- Allocation
-------------------------
+-------------
 
--- | Convenience function to refer to the union of sender, receiver, and
--- executor of the settlement, which jointly control the execution of the
--- allocation.
-defaultAllocationControllers : AllocationView -> [Party]
-defaultAllocationControllers allocView =
-  dedup $ allocView.allocation.settlement.executor ::
-    if allocView.settlementVersion == 1
-      then concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) allocView.allocation.transferLegs
-      else []
-
--- | Convenience function read out the overridden allocation controllers.
-allocationControllers : AllocationView -> [Party]
-allocationControllers allocView =
-  optional
-    (defaultAllocationControllers allocView)
-    (\override -> dedup $ allocView.allocation.settlement.executor :: override)
-    allocView.allocation.settlement.controllerOverride
-
-allocationSettlementControllers : AllocationView -> [Party]
-allocationSettlementControllers allocView =
-    allocView.allocation.settlement.executor :: concatMap legControllers allocView.allocation.transferLegs
+-- | Default controllers for allocation settlement.
+defaultAllocationSettlementControllers : AllocationView -> Set.Set Party
+defaultAllocationSettlementControllers allocView =
+    Set.fromList $ allocView.allocation.settlement.executor :: concatMap legControllers allocView.allocation.transferLegs
   where
     legControllers leg
       | allocView.settlementVersion == 1 = leg.instrumentId.admin :: [leg.sender.owner, leg.receiver.owner]
       | otherwise = [leg.instrumentId.admin]
 
-
--- | Convenience to get the allocation admin
-allocationAdmin : AllocationSpecification -> Party
-allocationAdmin AllocationSpecification{..} = admin
+-- | Default controllers for allocation cancellation.
+defaultAllocationCancellationControllers : AllocationView -> Set.Set Party
+defaultAllocationCancellationControllers allocView =
+    Set.fromList $ allocView.allocation.settlement.executor ::
+      if allocView.settlementVersion == 1
+        then concatMap legControllers allocView.allocation.transferLegs
+        else []
   where
-    admins = dedupSort $ map (.instrumentId.admin) (transferLegs)
-    admin = case admins of
-      [a] -> a
-      _ -> error "Allocations must involve instruments from exactly one admin"
+    legControllers leg = [leg.sender.owner, leg.receiver.owner]
 
 -- | A contract representing the approval of the authorizer to send or receive
 -- the net amount of assets of the transfer legs as part of a settlement where
@@ -177,62 +182,113 @@ allocationAdmin AllocationSpecification{..} = admin
 interface Allocation where
   viewtype AllocationView
 
+  allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
   allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update Allocation_CancelResult
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
-  allocation_settleImpl : ContractId Allocation -> Allocation_Settle -> Update Allocation_SettleResult
+
+  allocation_settleExtraObservers : Allocation_Settle -> [Party]
+  allocation_cancelExtraObservers : Allocation_Cancel -> [Party]
+  allocation_withdrawExtraObservers : Allocation_Withdraw -> [Party]
 
   nonconsuming choice Allocation_Settle : Allocation_SettleResult
     -- ^ Settle the allocation by moving the net amount of the transfer legs.
     --
-    -- Requires authorization from the settlement executor and the instrument
-    -- admins of the transfer legs. They jointly ensure that the settlement happens atomically with matching
-    -- settlements of other legs of the same admins.
+    -- The choice is nonconsuming to support alternative consumption patterns,
+    -- e.g., by calling the consuming V1.Allocation_ExecuteTransfer choice for
+    -- transaction parsing compatibility.
     --
-    -- Implementations MUST ensure that the allocation is consumed by this choice.
-    --
-    -- FIXME: adjust comments to call out that all legs must have the same instrument admin
+    -- IMPORTANT: implementations MUST ensure that the allocation is consumed by
+    -- the body of this choice.
     with
+      actors : [Party]
+        -- ^ Parties executing the settlement.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized settlement execution.
+        --
+        -- They SHOULD do so by checking that the actors are equal to the
+        -- `defaultAllocationSettlementControllers`, which ensures maximal
+        -- compatibility and proper implemention of the following constraints:
+        --
+        -- - The actors MUST always include the settlement executor and the
+        --   instrument admin of the transfer legs.
+        -- - For V1 allocations, the actors MUST additionally include the owners
+        --   of the sender and receiver accounts of the transfer legs.
+        --
+        -- This authorization is required as all of these parties are expected to guarantee
+        -- atomic settlement.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller allocationSettlementControllers (view this)
+    observer allocation_settleExtraObservers this arg
+    controller actors
     do allocation_settleImpl this self arg
 
   nonconsuming choice Allocation_Cancel : Allocation_CancelResult
-    -- ^ Cancel the allocation. Requires authorization from sender, receiver, and
-    -- executor.
+    -- ^ Cancel the allocation to release the funds and invalidate the approval
+    -- to execute the settlement.
     --
-    -- FIXME: comment
+    -- Typically called by the executor once it is clear that the settlement
+    -- will not be executed.
     --
-    -- Typically this authorization is granted by sender and receiver to the
-    -- executor as part of the contract coordinating the settlement, so that
-    -- that the executor can release the allocated assets early in case the
-    -- settlement is aborted or it has definitely failed.
+    -- The choice is nonconsuming to support alternative consumption patterns,
+    -- e.g., by calling the consuming V1.Allocation_Cancel` choice for
+    -- transaction parsing compatibility.
     --
-    -- Implementations MUST ensure that the allocation is consumed by this choice.
+    -- IMPORTANT: implementations MUST ensure that the allocation is consumed by
+    -- the body of this choice.
     with
+      actors : [Party]
+        -- ^ Parties authorizing the cancellation.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized cancellation.
+        --
+        -- They SHOULD do so by checking that the actors are equal to the
+        -- `defaultAllocationCancellationControllers`, which ensures maximal
+        -- compatibility and proper implemention of the following constraints:
+        --
+        -- - The actors MUST always include the settlement executor.
+        -- - For V1 allocations, the actors MUST additionally include the owners
+        --   of the sender and receiver accounts of the transfer legs.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller defaultAllocationControllers (view this)
-      -- FIXME: switch to `actors`, and revisit controllers
+    observer allocation_cancelExtraObservers this arg
+    controller actors
     do allocation_cancelImpl this self arg
 
   nonconsuming choice Allocation_Withdraw : Allocation_WithdrawResult
-    -- ^ Withdraw the allocated assets. Used by the sender to withdraw the assets before settlement
-    -- was completed. This SHOULD not fail settlement if the sender has still time to allocate the
-    -- assets again; i.e., the `settlement.allocateBefore` deadline has not yet passed.
+    -- ^ Allow the authorizer to withdraw the allocation to release the funds
+    -- and invalidate the approval to execute the settlement, which can for
+    -- example be used by the authorizer to undo a mistakenly created
+    -- allocation.
     --
-    -- Implementations MUST ensure that the allocation is consumed by this choice.
+    -- The choice is nonconsuming to support alternative consumption patterns,
+    -- e.g., by calling the consuming V1.Allocation_Withdraw` choice for
+    -- transaction parsing compatibility.
+    --
+    -- IMPORTANT: implementations MUST ensure that the allocation is consumed by
+    -- the body of this choice.
     with
+      actors : [Party]
+        -- ^ Parties authorizing the withdrawal.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized withdrawal.
+        --
+        -- Registries are free to decide on the required authorization for withdrawal.
+        -- They MUST however report the parties that can withdraw unilaterally via
+        -- the `AllocationView.canWithdraw` field, so that wallets can show the
+        -- withdrawal option to the user.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).allocation.authorizer.owner::(optionalToList (view this).allocation.authorizer.provider)
-      -- FIXME: make configurable
+    observer allocation_withdrawExtraObservers this arg
+    controller actors
     do allocation_withdrawImpl this self arg
 
 
--- FIXME: comment
+-- result types
+---------------
+
+-- | The result of settling an allocation by exercising the `Allocation_Settle` choice.
 data Allocation_SettleResult = Allocation_SettleResult with
-    newHoldingCids : Map.Map InstrumentId [ContractId Holding]
+    newHoldingCids : HoldingMap
       -- ^ New holdings created as part of the settlement.
     meta : Metadata
       -- ^ Additional metadata specific to the settlement, used for extensibility.

@@ -122,8 +122,6 @@ setupOtcTrade  = do
       settlementRef = makeTradeRef otcTradeCid
       settleAt = settleAt
       meta = emptyMetadata
-      controllerOverride = Some [] -- We will settle using only executor authority.
-        -- FIXME: decide whether we still need overrides
       settlementDeadline = Some deadline
 
   -- venue requests settlement

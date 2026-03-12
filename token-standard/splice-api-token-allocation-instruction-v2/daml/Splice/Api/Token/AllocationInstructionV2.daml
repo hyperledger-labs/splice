@@ -83,6 +83,10 @@ interface AllocationInstruction where
     controller allocationAdmin (view this).allocation, extraActors
     do allocationInstruction_updateImpl this self arg
 
+-- FIXME: remove the need for this by switching to actors
+allocationAdmin : AllocationSpecification -> [Party]
+allocationAdmin allocation = map (.instrumentId.admin) allocation.transferLegs
+
 
 -- AllocationFactory
 --------------------
@@ -249,7 +253,7 @@ data AllocationInstructionResult_Output
 -- | Result of settling a batch of allocations.
 data AllocationFactory_SettleBatchResult = AllocationFactory_SettleBatchResult with
     -- FIXME: add owning accounts
-    newHoldingCids : Map.Map InstrumentId [ContractId Holding]
+    newHoldingCids : HoldingMap
       -- ^ New holdings created as part of the batch settlement.
     meta : Metadata
       -- ^ Additional metadata specific to the batch settlement, used for extensibility.

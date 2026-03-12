@@ -52,7 +52,6 @@ template OTCTradeAllocationRequest with
           settlementRef = makeTradeRef otcTradeCid
           settleAt = settleAt
           meta = emptyMetadata
-          controllerOverride = Some [] -- We will settle using only executor authority.
           settlementDeadline = settlementDeadline
         transferLegs = transferLegs
         meta = emptyMetadata
@@ -168,7 +167,7 @@ template OTCTrade with
             -- validate the allocation request matches this trade
             (view alloc).allocation.settlement.settlementRef === makeTradeRef self
             (view alloc).allocation.settlement.executor === venue
-            exercise allocCid (Allocation_Cancel extraArgs)
+            exercise allocCid (Allocation_Cancel with actors = [venue]; extraArgs)
           )
           allocationsWithContext
 

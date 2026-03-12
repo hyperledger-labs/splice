@@ -13,6 +13,7 @@ module Splice.Api.Token.UtilsV2 (
 
   -- * Allocation facctory
   v1ToHoldingMap,
+  singletonHoldingMap,
 
   allocation_v2_settleImplUsingV1,
   allocation_v2_withdrawImplUsingV1,
@@ -75,6 +76,14 @@ insertOptional k ov m = case ov of
 v2Namespace : Text
 v2Namespace = "cip-TOKEN-STANDARD-V2/"
   -- FIXME: update with actual CIP number once it's available.
+
+-- Holding Map
+--------------
+
+singletonHoldingMap : HoldingV2.InstrumentId -> [ContractId HoldingV2.Holding] -> AllocationV2.HoldingMap
+singletonHoldingMap instrumentId holdingCids =
+  AllocationV2.HoldingMap $ Map.singleton instrumentId (map toInterfaceContractId holdingCids)
+
 
 -- Account metadata utils
 -------------------------
@@ -226,7 +235,6 @@ instance BackwardCompatible AllocationV1.SettlementInfo AllocationV2.SettlementI
       requestedAt
       settleAt = allocateBefore
       settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
-      controllerOverride = None -- V1 does not support controller override.
       meta
 
 instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
@@ -240,9 +248,11 @@ instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationV
   upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
     AllocationV2.AllocationView with
       allocation = upcast allocation
-      holdingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast holdingCids)]
+      holdingCids = singletonHoldingMap (upcast allocation.transferLeg.instrumentId) (map upcast holdingCids)
       expiresAt = Some (allocation.settlement.settleBefore)
       settlementVersion = 1
+      -- FIXME: read from metadata of V1 allocations, as accountable assets might use a different rule
+      canWithdraw = [allocation.transferLeg.sender]
       meta
 
 instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
@@ -303,7 +313,7 @@ allocation_v2_settleImplUsingV1 self AllocationV2.Allocation_Settle{..} = do
 
   pure AllocationV2.Allocation_SettleResult with
     newHoldingCids =
-      Map.singleton (upcast (view v1Allocation).allocation.transferLeg.instrumentId) (map upcast result.senderHoldingCids)
+      singletonHoldingMap (upcast (view v1Allocation).allocation.transferLeg.instrumentId) (map upcast result.senderHoldingCids)
     meta = result.meta
 
 
@@ -355,10 +365,13 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
     allocation0 <- fetch allocationCid
     let allocationView = view allocation0
     let allocation = allocationView.allocation
-    require "Admin matches expected admin" (admin == AllocationV2.allocationAdmin allocation)
+
+    forA_ allocation.transferLegs $ \leg -> do
+      require "Admin of allocation transfer leg matches" (leg.instrumentId.admin == admin)
 
     -- FIXME: consider allowing the caller to pass these in
     require "Actors include allocation executor" (allocation.settlement.executor `elem` actors)
+    -- FIXME: check settlement
     -- FIXME: consider what other validation is missing
 
     -- settlement version specific validation
@@ -426,17 +439,21 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
     let instrumentId = (head allocationView.allocation.transferLegs).instrumentId
     let senderHoldingCids = (instrumentId, map upcast result.senderHoldingCids)
     let receiverHoldingCids = (instrumentId, map upcast result.receiverHoldingCids)
-    pure (Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
+    pure (AllocationV2.HoldingMap $ Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
+      -- FIXME: build utility for this
 
 
   -- settle all v2 allocations
-  newHoldingCidssV2 <- forA allocationsSettledUsingV2 $ \(allocationCid, _) -> do
-    result <- exercise allocationCid AllocationV2.Allocation_Settle with extraArgs
+  newHoldingCidssV2 <- forA allocationsSettledUsingV2 $ \(allocationCid, allocView) -> do
+    result <- exercise allocationCid AllocationV2.Allocation_Settle with
+      -- FIXME: call out the consequences of this defaulting in the API docs, or compute them in an interface method or the view
+      actors = Set.toList $ AllocationV2.defaultAllocationSettlementControllers allocView
+      extraArgs
     pure result.newHoldingCids
 
   -- return result
   pure AllocationInstructionV2.AllocationFactory_SettleBatchResult with
-    newHoldingCids = foldl (Map.unionWith (++)) Map.empty (newHoldingCidssV1 ++ newHoldingCidssV2)
+    newHoldingCids = mconcat newHoldingCidssV1 <> mconcat newHoldingCidssV2
     meta = emptyMetadata
 
 
@@ -468,6 +485,8 @@ ppLeg : (HoldingV2.Account, AllocationV2.TransferLeg) -> Text
 ppLeg (authorizer, leg) =
   -- show (authorizer.owner, leg.sender.owner, leg.receiver.owner, leg.amount)
   show (authorizer, leg)
+
+
 
 
 
