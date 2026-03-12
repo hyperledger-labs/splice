@@ -554,7 +554,7 @@ testBootstrapMainNetWithNonZeroRound = do
 
 testGrantValidatorPermission : Script ()
 testGrantValidatorPermission = do
-  (app, dso, (sv1, sv2, sv3, _)) <- initDevNet
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNet
 
   v1 <- allocateParty "v1"
 
@@ -580,7 +580,7 @@ testGrantValidatorPermission = do
   let revokeTime = now `addRelTime` (hours 1)
 
   -- Level 1 Revocation: "Revoke until time X"
-  initiateAndAcceptVote app [sv1, sv2, sv3] $
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
     ARC_DsoRules with
       dsoAction = SRARC_SetValidatorRevocationState DsoRules_SetValidatorRevocationState with
         validatorPermissionCid = permissionCid
@@ -592,7 +592,7 @@ testGrantValidatorPermission = do
   updatedPermission.isRevoked === False
 
   -- Level 2 Revocation: "Fully revoke"
-  initiateAndAcceptVote app [sv1, sv2, sv3] $
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
     ARC_DsoRules with
       dsoAction = SRARC_SetValidatorRevocationState DsoRules_SetValidatorRevocationState with
         validatorPermissionCid = updatedPermissionCid
