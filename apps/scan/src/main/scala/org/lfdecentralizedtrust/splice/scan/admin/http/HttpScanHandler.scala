@@ -72,7 +72,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
-import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -111,6 +111,7 @@ import AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.time.Clock
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
@@ -121,8 +122,11 @@ import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyT
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
 
+import scala.collection.concurrent
 import scala.collection.immutable.SortedMap
+import scala.concurrent.duration.*
 
 class HttpScanHandler(
     svParty: PartyId,
@@ -157,6 +161,13 @@ class HttpScanHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
+
+  private val initializedBftSequencersCache
+      : concurrent.Map[Int, definitions.SynchronizerBftSequencer] =
+    new java.util.concurrent.ConcurrentHashMap[Int, definitions.SynchronizerBftSequencer]().asScala
+
+  private val uninitializedBftSequencersCooldown: Cache[Int, Unit] =
+    Scaffeine().expireAfterWrite(30.seconds).build[Int, Unit]()
 
   private implicit val offsetDateTimeCodecInstance: Codec[CantonTimestamp, OffsetDateTime] =
     Codec.OffsetDateTime.instance
@@ -2402,22 +2413,49 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listSvBftSequencers") { _ => _ =>
       MonadUtil
-        .sequentialTraverse(bftSequencers) { case (sequencerAdminConnection, bftSequencer) =>
-          for {
-            sequencerId <- sequencerAdminConnection.getSequencerId
-          } yield {
-            definitions.SynchronizerBftSequencer(
-              bftSequencer.migrationId,
-              sequencerId.toProtoPrimitive,
-              bftSequencer.p2pUrl,
-            )
-          }
+        .sequentialTraverse(bftSequencers.zipWithIndex) {
+          case ((sequencerAdminConnection, bftSequencer), idx) =>
+            initializedBftSequencersCache.get(idx) match {
+              case Some(cached) =>
+                Future.successful(Some(cached))
+              case None if uninitializedBftSequencersCooldown.getIfPresent(idx).isDefined =>
+                Future.successful(None)
+              case None =>
+                sequencerAdminConnection.getStatus
+                  .map { status =>
+                    if (status.isInitialized) {
+                      val psid = status.trySuccess.synchronizerId
+                      val sequencerId = SequencerId(status.trySuccess.uid)
+                      val entry = definitions.SynchronizerBftSequencer(
+                        psid.serial.unwrap.toLong,
+                        sequencerId.toProtoPrimitive,
+                        bftSequencer.p2pUrl,
+                      )
+                      initializedBftSequencersCache.put(idx, entry).discard
+                      Some(entry)
+                    } else {
+                      logger.info(
+                        s"Skipping BFT sequencer with p2p url ${bftSequencer.p2pUrl} as it is not initialized"
+                      )
+                      uninitializedBftSequencersCooldown.put(idx, ()).discard
+                      None
+                    }
+                  }
+                  .recover { case ex =>
+                    logger.warn(
+                      s"Failed to get status of BFT sequencer with p2p url ${bftSequencer.p2pUrl}",
+                      ex,
+                    )
+                    uninitializedBftSequencersCooldown.put(idx, ()).discard
+                    None
+                  }
+            }
         }
-        .map(sequencers =>
+        .map { results =>
           ScanResource.ListSvBftSequencersResponse.OK(
-            definitions.ListSvBftSequencersResponse(sequencers.toVector)
+            definitions.ListSvBftSequencersResponse(results.flatten.toVector)
           )
-        )
+        }
     }
   }
 

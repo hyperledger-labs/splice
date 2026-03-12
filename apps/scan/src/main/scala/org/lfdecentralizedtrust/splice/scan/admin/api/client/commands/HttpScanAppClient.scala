@@ -865,7 +865,7 @@ object HttpScanAppClient {
       availableAfter: Instant,
   )
   final case class BftSequencer(
-      migrationId: Long,
+      serialId: Long,
       id: SequencerId,
       url: String,
   ) {
@@ -2413,7 +2413,7 @@ object HttpScanAppClient {
         response.bftSequencers.traverse { sequencer =>
           Codec.decode(Codec.Sequencer)(sequencer.id).map { sequencerId =>
             BftSequencer(
-              sequencer.migrationId,
+              sequencer.serialId,
               sequencerId,
               sequencer.p2pUrl,
             )

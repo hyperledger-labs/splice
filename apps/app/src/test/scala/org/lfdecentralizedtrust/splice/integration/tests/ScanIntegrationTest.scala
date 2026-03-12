@@ -65,12 +65,15 @@ class ScanIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(config =>
           config.copy(
-            bftSequencers = Seq(
-              BftSequencerConfig(
-                config.domainMigrationId,
-                config.synchronizerNodes.current.sequencer,
-                "http://testUrl:8081",
-              )
+            synchronizerNodes = config.synchronizerNodes.copy(
+              current = config.synchronizerNodes.current.copy(
+                bftSequencerConfig = Some(BftSequencerConfig("http://testUrl:8081"))
+              ),
+              legacy = Some(
+                config.synchronizerNodes.current.copy(
+                  bftSequencerConfig = Some(BftSequencerConfig("http://legacyUrl:8082"))
+                )
+              ),
             ),
             parameters = config.parameters.copy(
               customTimeouts = config.parameters.customTimeouts.map {
@@ -692,10 +695,13 @@ class ScanIntegrationTest
 
   "return bft sequencers" in { implicit env =>
     val bftSequencers = sv1ScanBackend.listBftSequencers()
-    val sequencer = bftSequencers.loneElement
-    sequencer.url should be("http://testUrl:8081")
-    sequencer.migrationId should be(0)
-    sequencer.id shouldBe sv1Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
+    bftSequencers should have size 2
+    val expectedSequencerId =
+      sv1Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
+    val currentSequencer = bftSequencers.find(_.url == "http://testUrl:8081").value
+    currentSequencer.id shouldBe expectedSequencerId
+    val legacySequencer = bftSequencers.find(_.url == "http://legacyUrl:8082").value
+    legacySequencer.id shouldBe expectedSequencerId
   }
 
   "respect rate limit" in { implicit env =>

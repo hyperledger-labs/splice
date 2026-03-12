@@ -303,7 +303,6 @@ class SvDsoAutomationService(
               dsoStore,
               current.sequencerAdminConnection,
               aggregatingScanConnection,
-              config.domainMigrationId,
             )
           )
           registerTrigger(
@@ -312,7 +311,6 @@ class SvDsoAutomationService(
               dsoStore,
               current.sequencerAdminConnection,
               aggregatingScanConnection,
-              config.domainMigrationId,
             )
           )
         case _ =>

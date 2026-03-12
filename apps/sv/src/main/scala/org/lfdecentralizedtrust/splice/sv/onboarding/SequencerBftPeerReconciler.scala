@@ -20,7 +20,6 @@ import scala.util.control.NonFatal
 abstract class SequencerBftPeerReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
-    migrationId: Long,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
 
@@ -29,6 +28,8 @@ abstract class SequencerBftPeerReconciler(
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
+      psid <- sequencerAdminConnection.getPhysicalSynchronizerId()
+      serialId = psid.serial.unwrap.toLong
       sequencers = dsoRulesAndState
         .currentSynchronizerNodeConfigs()
         .flatMap(config =>
@@ -51,7 +52,7 @@ abstract class SequencerBftPeerReconciler(
       sequencersFromScan <- getAllBftSequencers()
       dsoSequencersWithScanInfo = dsoSequencersWithoutSelf.map { sequencerId =>
         sequencerId -> sequencersFromScan.find(scanSequencer =>
-          scanSequencer.id == sequencerId && scanSequencer.migrationId == migrationId
+          scanSequencer.id == sequencerId && scanSequencer.serialId == serialId
         )
       }
       // TODO(#1929) Reconsider whether we can really ignore incoming connections.
