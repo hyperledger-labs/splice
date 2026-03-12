@@ -115,6 +115,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_CreateBootstrapExternalPartyConfigStateInstruction DsoRules_CreateBootstrapExternalPartyConfigStateInstruction
+    -- ^ Create BootstrapExternalPartyConfigStateInstruction
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -299,10 +301,6 @@ data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_Amu
   with
     result : AmuletRules_ConvertFeaturedAppActivityMarkersResult
 
-data DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult = DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult
-  with
-    result : AmuletRules_UpdateToLatestSchemaVersionResult
-
 data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with
     unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
 
@@ -315,6 +313,10 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult = DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult
+  with
+    instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
+  deriving (Show, Eq)
 
 -- Workflow templates
 ---------------------
@@ -398,6 +400,8 @@ data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
     abstainingSvs : [Text] -- ^ SVs that did not vote.
     outcome : VoteRequestOutcome  -- ^ The final result of the vote.
   deriving (Eq, Show)
+
+data DsoRules_BootstrapExternalPartyConfigStateResult = DsoRules_BootstrapExternalPartyConfigStateResult
 
 data VoteRequestOutcome
   = VRO_AcceptedButActionFailed with
@@ -1504,18 +1508,6 @@ template DsoRules with
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
 
-    nonconsuming choice DsoRules_AmuletRules_UpdateToLatestSchemaVersion : DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult
-      with
-        amuletRulesCid : ContractId AmuletRules
-        argument : AmuletRules_UpdateToLatestSchemaVersion
-        sv : Party
-      controller sv
-      do
-        _ <- getAndValidateSvParty this (Some sv)
-        result <- exercise amuletRulesCid argument
-        pure DsoRules_AmuletRules_UpdateToLatestSchemaVersionResult with result
-
-
     -- Unallocated unclaimed activity record
     ----------------------------------------
 
@@ -1593,6 +1585,28 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
+    nonconsuming choice DsoRules_CreateBootstrapExternalPartyConfigStateInstruction : DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult
+      controller dso
+      do
+        instructionCid <- create BootstrapExternalPartyConfigStateInstruction with dso
+        pure (DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult instructionCid)
+
+    nonconsuming choice DsoRules_BootstrapExternalPartyConfigState : DsoRules_BootstrapExternalPartyConfigStateResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
+        openMiningRoundTriple : OpenMiningRoundTriple
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        _ <- fetchAndArchive (ForDso dso) instructionCid
+        _ <- exercise amuletRulesCid AmuletRules_BootstrapExternalPartyConfigState with
+          openMiningRoundTriple
+          expectedDso = dso
+        pure DsoRules_BootstrapExternalPartyConfigStateResult
+
+
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
    case reverse past of
@@ -1651,6 +1665,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateBootstrapExternalPartyConfigStateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -1842,6 +1857,15 @@ template UnallocatedUnclaimedActivityRecord
     signatory dso
     ensure amount > 0.0
 
+-- | Instruction to bootstrap the external party config state.
+-- This exists so that the `ActionRequiringConfirmation` for this is independent of the
+-- current rounds which we need so that we can do deduplication by action hash
+-- in our automation.
+template BootstrapExternalPartyConfigStateInstruction
+  with
+   dso : Party
+  where
+    signatory dso
 
 -- instances
 ------------
@@ -1883,3 +1907,6 @@ instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with
         time = patch new.time base.time current.time
         migrationId = patch new.migrationId base.migrationId current.migrationId
+
+instance HasCheckedFetch BootstrapExternalPartyConfigStateInstruction ForDso where
+  contractGroupId BootstrapExternalPartyConfigStateInstruction{..} = ForDso with dso

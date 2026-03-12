@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.util.JavaDecodeUtil
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
+import scala.jdk.CollectionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 // This test simulates reward expiry after a Daml upgrade where the node hosting the parties that are informees
@@ -134,14 +135,26 @@ class RewardExpiryIntegrationTest
         closedRound.getTemplateId.packageId shouldBe DarResources.amulet.latest.packageId
       },
     )
-    // Check that AmuletRules is in new package id. This gets triggered by
-    // the UpdateToLatestSchemaVersionTrigger trigger.
-    eventually() {
-      val amuletRules = sv1ScanBackend
-        .getAmuletRules()
-      amuletRules.contract.identifier.getPackageId shouldBe DarResources.amulet.latest.packageId
-      DarResources.amulet.latest.packageId should not be initialAmuletPackage.packageId
-    }
+    // Recreate AmuletRules in new package id.
+    actAndCheck(
+      "Recreate amulet rules in new package id", {
+        val amuletRules = sv1ScanBackend.getAmuletRules()
+        amuletRules.contract.identifier.getPackageId shouldBe initialAmuletPackage.packageId
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+          Seq(dsoParty),
+          amuletRules.contract.contractId.exerciseArchive().commands.asScala.toSeq ++
+            amuletRules.contract.payload.create().commands.asScala.toSeq,
+        )
+      },
+    )(
+      "Amulet rules is created in new package id",
+      _ => {
+        val amuletRules = sv1ScanBackend
+          .getAmuletRules()
+        amuletRules.contract.identifier.getPackageId shouldBe DarResources.amulet.latest.packageId
+        DarResources.amulet.latest.packageId should not be initialAmuletPackage.packageId
+      },
+    )
     actAndCheck(
       "Resume reward expiry trigger",
       sv1Backend.dsoDelegateBasedAutomation

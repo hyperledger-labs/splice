@@ -40,10 +40,7 @@ import Splice.ValidatorLicense
 
 import Splice.Util
 
-data AmuletRules_UpdateToLatestSchemaVersionResult = AmuletRules_UpdateToLatestSchemaVersionResult
-  with
-    amuletRulesCid : ContractId AmuletRules
-    newContractStateSchemaVersion : Int
+data AmuletRules_BootstrapExternalPartyConfigStateResult = AmuletRules_BootstrapExternalPartyConfigStateResult
   deriving (Show, Eq)
 
 data AmuletRules_ComputeFeesResult = AmuletRules_ComputeFeesResult with
@@ -119,32 +116,13 @@ template AmuletRules
     dso : Party
     configSchedule : Schedule Time (AmuletConfig Unit.USD) -- Note: The schedule is no longer used, only the initial value
     isDevNet : Bool
-    contractStateSchemaVersion : Optional Int -- Schema version for amulet rules and associated contracts. This is used through `AmuletRules_UpdateToLatestSchemaVersion` to bootstrap required contracts on an already existing network, e.g., create `ExternalPartyConfigState`.
+    contractStateSchemaVersion : Optional Int
+      -- Schema version for amulet rules and associated contracts. Intended for bootstrapping new required contracts.
+      -- Currently still unused but added so apps can start recompiling against the new version and don't break once it will be set.
   where
     ensure validAmuletConfig configSchedule.initialValue && null configSchedule.futureValues && fromOptional 0 contractStateSchemaVersion >= 0
 
     signatory dso
-
-    choice AmuletRules_UpdateToLatestSchemaVersion : AmuletRules_UpdateToLatestSchemaVersionResult
-      -- ^ Bootstrap new network state
-      with
-        -- mining rounds are passed in, as new state can depend on it.
-        openMiningRoundTriple : OpenMiningRoundTriple
-      controller dso
-      do
-         let currentVersion = fromOptional 0 contractStateSchemaVersion
-         -- When changing this, also update UpdateToLatestSchemaVersionTrigger
-         let maxVersion = 1
-         require "currentVersion < maxVersion" (currentVersion < maxVersion)
-
-         forA_ [currentVersion+1 .. maxVersion] $ bootstrapContractStateSchemaVersion this arg
-         amuletRulesCid <- create this with
-            contractStateSchemaVersion = Some maxVersion
-
-         pure AmuletRules_UpdateToLatestSchemaVersionResult with
-           amuletRulesCid
-           newContractStateSchemaVersion = maxVersion
-
 
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
@@ -416,15 +394,26 @@ template AmuletRules
         last <- create OpenMiningRound with
           dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
 
-        exercise self AmuletRules_UpdateToLatestSchemaVersion with
+        exercise self AmuletRules_BootstrapExternalPartyConfigState with
           openMiningRoundTriple = OpenMiningRoundTriple with
             round0Cid = oldest
             round1Cid = newestOpen
             round2Cid = last
+          expectedDso = dso
 
         return AmuletRules_Bootstrap_RoundsResult with
           openMiningRoundCid = last
           initialRound = Some (Round nr0)
+
+    nonconsuming choice AmuletRules_BootstrapExternalPartyConfigState : AmuletRules_BootstrapExternalPartyConfigStateResult
+      with
+        openMiningRoundTriple : OpenMiningRoundTriple
+        expectedDso : Party
+      controller dso
+      do
+         checkExpectedDso dso (Some expectedDso)
+         bootstrapExternalPartyConfigState this openMiningRoundTriple
+         pure AmuletRules_BootstrapExternalPartyConfigStateResult
 
     nonconsuming choice AmuletRules_AdvanceOpenMiningRounds : AmuletRules_AdvanceOpenMiningRoundsResult
       with
@@ -1901,12 +1890,6 @@ unfeaturedPaymentContextFromChoiceContext : Party -> Api.Token.MetadataV1.Choice
 unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
   context <- externalPartyTransferFromChoiceContext dso choiceContext
   pure context with featuredAppRight = None
-
-bootstrapContractStateSchemaVersion : AmuletRules -> AmuletRules_UpdateToLatestSchemaVersion -> Int -> Update ()
-bootstrapContractStateSchemaVersion amuletRules arg version
-  | version <= 0 = abort ("Schema version must be > 0 but got: " <> show version)
-  | version == 1 = bootstrapExternalPartyConfigState amuletRules arg.openMiningRoundTriple
-  | otherwise = abort ("Unknown schema version: " <> show version)
 
 bootstrapExternalPartyConfigState : AmuletRules -> OpenMiningRoundTriple -> Update ()
 bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do

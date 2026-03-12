@@ -32,8 +32,9 @@
           **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.17`` should recompile their Daml code
           to link against ``splice-amulet >= 0.1.17`` in order to be ready to consume new field ``contractStateSchemaVersion`` added to ``AmuletRules``.
 
-          This is required because once the new fields are set, downgrades of `AmuletRules` will fail. This field will be set by SV automation directly after the
-          upgrade.
+          This is required because once the new fields are set, downgrades of `AmuletRules` will fail.
+          At the moment, this recompilation is not strictly required, as setting these fields is not planned immediately.
+          It is strongly recommended to avoid direct dependencies on amulet and replace them by dependencies through token standard interfaces.
 
           No change is required for apps that build against the :ref:`token_standard`
           or :ref:`featured_app_activity_markers_api`.

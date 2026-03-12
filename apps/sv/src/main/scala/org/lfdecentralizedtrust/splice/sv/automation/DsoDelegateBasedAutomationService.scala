@@ -128,7 +128,7 @@ class DsoDelegateBasedAutomationService(
     )
 
     registerTrigger(
-      new UpdateToLatestSchemaVersionTrigger(
+      new BootstrapExternalPartyConfigStateInstructionTrigger(
         triggerContext,
         svTaskContext,
       )
@@ -169,6 +169,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredUnclaimedActivityRecordTrigger],
     aTrigger[MergeUnclaimedDevelopmentFundCouponsTrigger],
     aTrigger[ExpiredDevelopmentFundCouponTrigger],
-    aTrigger[UpdateToLatestSchemaVersionTrigger],
+    aTrigger[BootstrapExternalPartyConfigStateInstructionTrigger],
   )
 }

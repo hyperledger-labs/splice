@@ -133,6 +133,18 @@ trait SvDsoStore
   ] =
     lookupAmuletRulesWithOffset().map(_.value)
 
+  def lookupBootstrapExternalPartyConfigStateInstruction()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[
+    splice.dsorules.BootstrapExternalPartyConfigStateInstruction.ContractId,
+    splice.dsorules.BootstrapExternalPartyConfigStateInstruction,
+  ]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(
+        splice.dsorules.BootstrapExternalPartyConfigStateInstruction.COMPANION
+      )
+      .map(_.value.map(_.contract))
+
   def getAmuletRules()(implicit
       tc: TraceContext
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
@@ -984,6 +996,12 @@ trait SvDsoStore
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
 
+  def listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ]
+
   def listFeaturedAppActivityMarkers(limit: Int)(implicit tc: TraceContext): Future[Seq[Contract[
     splice.amulet.FeaturedAppActivityMarker.ContractId,
     splice.amulet.FeaturedAppActivityMarker,
@@ -1414,6 +1432,11 @@ object SvDsoStore {
           contract,
           miningRound = Some(contract.payload.holdingFeesOpenRoundNumber.number),
         )
+      },
+      mkFilter(splice.dsorules.BootstrapExternalPartyConfigStateInstruction.COMPANION)(co =>
+        co.payload.dso == dso
+      ) {
+        DsoAcsStoreRowData(_)
       },
     )
 

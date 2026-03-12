@@ -17,6 +17,7 @@ import Splice.Types
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
+import Splice.ExternalPartyConfigState
 import Splice.Fees
 
 import Splice.DsoRules
@@ -28,6 +29,7 @@ import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
 import Splice.Scripts.TestTransferPreapproval
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry qualified as Registry
 import Splice.Wallet.Subscriptions
 
 
@@ -505,4 +507,45 @@ testTransferPreapprovalExpiry = do
     transferPreapprovalCid
     sv = Some sv1
 
+  pure ()
+
+
+testBootstrapExternalPartyConfigState : Script ()
+testBootstrapExternalPartyConfigState = do
+  (_, dso, (sv1, sv2, sv3, _)) <- initDevNet
+  -- archive to simulate bootstrapping with an older version
+  configStates <- query @ExternalPartyConfigState dso
+  submit dso $ forA configStates $ \(cid, _) -> archiveCmd cid
+  [] <- query @ExternalPartyConfigState dso
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  [(amuletRulesCid, _)] <- query @AmuletRules dso
+
+  let action = ARC_DsoRules (SRARC_CreateBootstrapExternalPartyConfigStateInstruction DsoRules_CreateBootstrapExternalPartyConfigStateInstruction)
+
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action
+    return result.confirmation
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
+    action
+    amuletRulesCid = None
+    confirmationCids
+    sv = Some sv1
+
+  [(instructionCid, _)] <- query @BootstrapExternalPartyConfigStateInstruction dso
+  [(round0Cid, _), (round1Cid, _), (round2Cid, _)] <- Registry.getActiveOpenRoundsSorted dso
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_BootstrapExternalPartyConfigState with
+    amuletRulesCid
+    instructionCid
+    openMiningRoundTriple = OpenMiningRoundTriple with
+      round0Cid
+      round1Cid
+      round2Cid
+    sv = sv1
+
+  configStates <- query @ExternalPartyConfigState dso
+  length configStates === 2
   pure ()

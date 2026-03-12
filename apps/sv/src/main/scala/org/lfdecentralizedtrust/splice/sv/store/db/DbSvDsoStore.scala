@@ -1537,6 +1537,20 @@ class DbSvDsoStore(
     listConfirmationsByActionConfirmer(expectedAction, confirmer)
   }
 
+  override def listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] = {
+    val expectedAction = new splice.dsorules.actionrequiringconfirmation.ARC_DsoRules(
+      new splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateBootstrapExternalPartyConfigStateInstruction(
+        new splice.dsorules.DsoRules_CreateBootstrapExternalPartyConfigStateInstruction()
+      )
+    )
+    listConfirmationsByActionConfirmer(expectedAction, confirmer)
+  }
+
   override def lookupAmuletConversionRateFeed(
       publisher: PartyId
   )(implicit tc: TraceContext): Future[Option[Contract[
