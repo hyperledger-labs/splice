@@ -4,7 +4,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
-import { Output } from '@pulumi/pulumi';
+import { Output, UnwrappedObject } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
 import { config, isMainNet } from '../config';
@@ -42,19 +42,26 @@ function addTimeSeconds(t: Date, seconds: number): Date {
   return t2;
 }
 
+const getK8sApi = (): Output<UnwrappedObject<CoreV1Api>> => {
+  const kc = new KubeConfig();
+  kc.loadFromDefault();
+  const k8sApi = kc.makeApiClient(CoreV1Api);
+  return pulumi.secret(k8sApi);
+}
+
 export class Auth0Fetch implements Auth0Client {
   private secrets: Auth0SecretMap | undefined;
   private auth0Cache: Auth0CacheMap | undefined;
   private hasDiffsToSave = false;
 
-  private k8sApi: CoreV1Api;
+  private k8sApi: UnwrappedObject<CoreV1Api>;
   private cfg: Auth0Config;
 
-  constructor(cfg: Auth0Config) {
+  constructor(cfg: Auth0Config, k8sApi: UnwrappedObject<CoreV1Api>) {
     const kc = new KubeConfig();
     kc.loadFromDefault();
 
-    this.k8sApi = kc.makeApiClient(CoreV1Api);
+    this.k8sApi = k8sApi;
     this.cfg = cfg;
   }
 
@@ -535,7 +542,8 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
           throw new Error('missing sv runbook auth0 output');
         }
         cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
-        return new Auth0Fetch(cfg);
+        return getK8sApi().apply(k8sApi => new Auth0Fetch(cfg, k8sApi));
+
       });
     case Auth0ClientType.MAINSTACK:
       if (isMainNet) {
@@ -547,7 +555,7 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
             throw new Error('missing mainNet auth0 output');
           }
           cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET');
-          return new Auth0Fetch(cfg);
+          return getK8sApi().apply(k8sApi => new Auth0Fetch(cfg, k8sApi));
         });
       } else {
         if (!auth0ClusterCfg.cantonNetwork) {
@@ -558,7 +566,7 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
             throw new Error('missing cantonNetwork auth0 output');
           }
           cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
-          return new Auth0Fetch(cfg);
+          return getK8sApi().apply(k8sApi => new Auth0Fetch(cfg, k8sApi));
         });
       }
   }
