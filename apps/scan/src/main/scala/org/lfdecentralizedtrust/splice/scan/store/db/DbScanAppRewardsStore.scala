@@ -232,7 +232,7 @@ class DbScanAppRewardsStore(
       futureUnlessShutdownToFuture(
         storage.queryAndUpdate(
           batchInsertAppActivityPartyTotals(items)
-            .map(_ => logger.info(s"Inserted ${items.size} app activity party totals."))
+            .map(_ => logger.debug(s"Inserted ${items.size} app activity party totals."))
             .transactionally,
           "appRewards.insertAppActivityPartyTotals",
         )
@@ -283,7 +283,7 @@ class DbScanAppRewardsStore(
       futureUnlessShutdownToFuture(
         storage.queryAndUpdate(
           batchInsertAppActivityRoundTotals(items)
-            .map(_ => logger.info(s"Inserted ${items.size} app activity round totals."))
+            .map(_ => logger.debug(s"Inserted ${items.size} app activity round totals."))
             .transactionally,
           "appRewards.insertAppActivityRoundTotals",
         )
@@ -336,7 +336,7 @@ class DbScanAppRewardsStore(
       futureUnlessShutdownToFuture(
         storage.queryAndUpdate(
           batchInsertAppRewardPartyTotals(items)
-            .map(_ => logger.info(s"Inserted ${items.size} app reward party totals."))
+            .map(_ => logger.debug(s"Inserted ${items.size} app reward party totals."))
             .transactionally,
           "appRewards.insertAppRewardPartyTotals",
         )
@@ -389,7 +389,7 @@ class DbScanAppRewardsStore(
       futureUnlessShutdownToFuture(
         storage.queryAndUpdate(
           batchInsertAppRewardRoundTotals(items)
-            .map(_ => logger.info(s"Inserted ${items.size} app reward round totals."))
+            .map(_ => logger.debug(s"Inserted ${items.size} app reward round totals."))
             .transactionally,
           "appRewards.insertAppRewardRoundTotals",
         )
@@ -444,7 +444,7 @@ class DbScanAppRewardsStore(
       futureUnlessShutdownToFuture(
         storage.queryAndUpdate(
           batchInsertAppRewardBatchHashes(items)
-            .map(_ => logger.info(s"Inserted ${items.size} app reward batch hashes."))
+            .map(_ => logger.debug(s"Inserted ${items.size} app reward batch hashes."))
             .transactionally,
           "appRewards.insertAppRewardBatchHashes",
         )
@@ -494,7 +494,7 @@ class DbScanAppRewardsStore(
       futureUnlessShutdownToFuture(
         storage.queryAndUpdate(
           batchInsertAppRewardRootHashes(items)
-            .map(_ => logger.info(s"Inserted ${items.size} app reward root hashes."))
+            .map(_ => logger.debug(s"Inserted ${items.size} app reward root hashes."))
             .transactionally,
           "appRewards.insertAppRewardRootHashes",
         )
