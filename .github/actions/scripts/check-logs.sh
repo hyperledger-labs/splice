@@ -98,7 +98,7 @@ find_secrets() {
   rg -i -o -e "(secret|token|(private|secret)(-)?key|password)=[^,[:space:]]*" "$LOGFILE" |
     # we mask secrets as "****" in our logs and testcontainers obfuscates secrets as "hidden non-blank value"
     # (https://github.com/testcontainers/testcontainers-java/blob/bf5605a2031d7f29f86a85430e3509a198c6e125/core/src/main/java/org/testcontainers/utility/AuthConfigUtil.java#L33)
-    rg -v -e "=\\\\\"\*\*\*\*\\\\\"" -e "=hidden" || true
+    rg -v -e "=\\\\\"\*\*\*\*\\\\\"" -e "=hidden" -e "continuation-token" -e "continuationToken" || true
   # JWTs; `eyJhbGc` is a base64-endcoded JSON object that starts with `{"alg`
   rg -o -e "(Bearer\s*$|(Bearer\s*e|eyJhbGc)[A-Za-z0-9\-\_]{2,}\.[A-Za-z0-9\-\_]{2,}\.[A-Za-z0-9\-\_]{2,})" "$LOGFILE" || true
 }
