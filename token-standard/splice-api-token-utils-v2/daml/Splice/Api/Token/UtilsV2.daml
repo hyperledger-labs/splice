@@ -4,8 +4,10 @@
 -- | Conversion functions and standard implementations used to
 -- implement the V1 interfaces from the V2 interfaces.
 module Splice.Api.Token.UtilsV2 (
-  -- * Accounts
+  -- * Choices
   isBasicAccount,
+  publicFetchWithExpectedAdmin,
+
 
   -- * API conversion
   BackwardCompatible(..),

@@ -75,9 +75,7 @@ template ExternalPartyAmuletRules
         meta = emptyMetadata
 
       transferFactory_transferImpl self arg = amulet_transferFactory_transferImpl this self arg
-      transferFactory_publicFetchImpl _self arg = do
-        requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @Api.Token.TransferInstructionV1.TransferFactory this)
+      transferFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
     interface instance V2.TransferFactory for ExternalPartyAmuletRules where
       view = V2.TransferFactoryView with
@@ -85,7 +83,7 @@ template ExternalPartyAmuletRules
         meta = emptyMetadata
 
       transferFactory_transferImpl = transferFactory_v2_senderActor_transferImpl
-      transferFactory_publicFetchImpl = transferFactory_v2_publicFetchImpl (toInterface this)
+      transferFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
     interface instance V1.AllocationFactory for ExternalPartyAmuletRules where
       view = V1.AllocationFactoryView with
@@ -93,9 +91,7 @@ template ExternalPartyAmuletRules
         meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV1_allocateImpl this self arg
-      allocationFactory_publicFetchImpl _self arg = do
-        requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @V1.AllocationFactory this)
+      allocationFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
     interface instance V2.AllocationFactory for ExternalPartyAmuletRules where
       view = V2.AllocationFactoryView with
@@ -104,9 +100,7 @@ template ExternalPartyAmuletRules
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
 
-      allocationFactory_publicFetchImpl _self arg = do
-        requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @V2.AllocationFactory this)
+      allocationFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
     interface instance V2.SettlementFactory for ExternalPartyAmuletRules where
       view = V2.SettlementFactoryView with
@@ -120,9 +114,7 @@ template ExternalPartyAmuletRules
       settlementFactory_settleBatchExtraObservers arg =
         concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) arg.transferLegs
 
-      settlementFactory_publicFetchImpl _self arg = do
-        requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @V2.SettlementFactory this)
+      settlementFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
 
 

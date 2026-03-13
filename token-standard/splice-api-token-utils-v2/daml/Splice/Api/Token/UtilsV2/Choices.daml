@@ -8,6 +8,9 @@ module Splice.Api.Token.UtilsV2.Choices (
   ensureActorIsDefault,
   ensureBasicAccount,
   isBasicAccount,
+
+  -- * Choice implementations
+  publicFetchWithExpectedAdmin,
 ) where
 
 import DA.Optional (isNone)
@@ -33,8 +36,7 @@ ensureActorIsDefault p actors
 
 
 isBasicAccount : HoldingV2.Account -> Bool
-isBasicAccount (HoldingV2.Account with provider, id) =
-  isNone provider && isNone id
+isBasicAccount account = isNone account.provider && isNone account.id
 
 
 
@@ -46,3 +48,11 @@ ensureBasicAccount fieldName account = do
   case account.id of
     None -> pure ()
     Some x -> fail ("self-custodied accounts do not support:" <> fieldName <> ".id set to '" <> show x <> "'")
+
+
+publicFetchWithExpectedAdmin
+  : forall i v t arg. (HasInterfaceView i v, HasToInterface t i, GetField "expectedAdmin" arg Party)
+  => t -> Party -> ContractId i -> arg -> Update v
+publicFetchWithExpectedAdmin this admin _self arg = do
+  requireExpectedAdminMatch arg.expectedAdmin admin
+  pure (view (toInterface this : i))
