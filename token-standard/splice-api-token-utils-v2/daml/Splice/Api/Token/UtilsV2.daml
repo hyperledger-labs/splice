@@ -18,7 +18,7 @@ module Splice.Api.Token.UtilsV2 (
   allocation_v2_withdrawImplUsingV1,
   allocation_v2_cancelImplUsingV1,
 
-  amulet_allocationFactoryV2_settleImpl,
+  settlementFactoryV2_defaultSettleBatchImpl,
 
   -- * Transfer instructions
   transferInstruction_v2_receiverActor_acceptImpl,

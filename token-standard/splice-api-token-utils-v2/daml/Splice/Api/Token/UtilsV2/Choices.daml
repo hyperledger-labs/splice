@@ -4,6 +4,7 @@
 -- | Utility functions for implementing token standard v2 choices.
 module Splice.Api.Token.UtilsV2.Choices (
   require,
+  requireMatchExpected,
   requireExpectedAdminMatch,
   ensureActorIsDefault,
   ensureBasicAccount,
@@ -14,6 +15,7 @@ module Splice.Api.Token.UtilsV2.Choices (
 ) where
 
 import DA.Optional (isNone)
+import DA.Text qualified as T
 
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 
@@ -26,7 +28,17 @@ require msg invariant =
 
 requireExpectedAdminMatch : Party -> Party -> Update ()
 requireExpectedAdminMatch expected actual =
+  -- FIXME: upgrade to requireMatchExpected, and report self
   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
+
+requireMatchExpected : (Eq a, Show a, Show obj) => (obj, Text) -> a -> a -> Update ()
+requireMatchExpected (obj, fieldName) expected actual
+  | expected == actual = pure ()
+  | otherwise = fail $ T.unlines
+      [ "Actual value of '" <> fieldName <> "' of " <> show obj <> " did not match expected value."
+      , "Expected: " <> show expected
+      , "Actual: " <> show actual
+      ]
 
 ensureActorIsDefault : Party -> [Party] -> Update ()
 ensureActorIsDefault _ [] = pure ()

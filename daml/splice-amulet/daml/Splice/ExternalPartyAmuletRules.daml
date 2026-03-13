@@ -85,6 +85,7 @@ template ExternalPartyAmuletRules
       transferFactory_transferImpl = transferFactory_v2_senderActor_transferImpl
       transferFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
+
     interface instance V1.AllocationFactory for ExternalPartyAmuletRules where
       view = V1.AllocationFactoryView with
         admin = dso
@@ -99,7 +100,6 @@ template ExternalPartyAmuletRules
         meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
-
       allocationFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso
 
     interface instance V2.SettlementFactory for ExternalPartyAmuletRules where
@@ -107,11 +107,11 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl _self arg =
-        amulet_allocationFactoryV2_settleImpl (toInterface @V2.SettlementFactory this) arg
+      settlementFactory_settleBatchImpl = settlementFactoryV2_defaultSettleBatchImpl this
 
-      -- Make all senders and receiver observers, so we get by with a single view for batch settlement of Amulet allocations
       settlementFactory_settleBatchExtraObservers arg =
+        -- Make all senders and receiver observers, so we get by with a single
+        -- view for batch settlement of Amulet allocations
         concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) arg.transferLegs
 
       settlementFactory_publicFetchImpl = publicFetchWithExpectedAdmin this dso

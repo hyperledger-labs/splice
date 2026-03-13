@@ -9,10 +9,11 @@ module Splice.Api.Token.UtilsV2.Allocations (
   allocation_v2_withdrawImplUsingV1,
   allocation_v2_cancelImplUsingV1,
 
-  amulet_allocationFactoryV2_settleImpl,
+  settlementFactoryV2_defaultSettleBatchImpl,
 
 ) where
 
+import DA.Either (partitionEithers)
 import DA.Foldable (forA_)
 import DA.List (dedup, head)
 import qualified DA.Map as Map
@@ -30,89 +31,9 @@ import Splice.Api.Token.UtilsV2.Conversions
 import Splice.Api.Token.UtilsV2.Choices
 
 
--- Allocation
--------------
 
-instance ForwardCompatible AllocationV1.Reference AllocationV2.Reference where
-  downcast AllocationV2.Reference{..} = AllocationV1.Reference with ..
-
-instance BackwardCompatible AllocationV1.Reference AllocationV2.Reference where
-  upcast AllocationV1.Reference{..} = AllocationV2.Reference with ..
-
-instance ForwardCompatible AllocationV1.TransferLeg AllocationV2.TransferLeg where
-  downcast (AllocationV2.TransferLeg with sender, receiver, amount, instrumentId, meta) =
-    AllocationV1.TransferLeg with
-      sender = sender.owner
-      receiver = receiver.owner
-      amount
-      instrumentId = downcast instrumentId
-      meta =
-        accountToMeta "sender" sender $
-        accountToMeta "receiver" receiver $
-        meta
-
-upcast_v1_v2_TransferLeg : Text -> AllocationV1.TransferLeg -> AllocationV2.TransferLeg
-upcast_v1_v2_TransferLeg transferLegId (AllocationV1.TransferLeg with sender, receiver, amount, instrumentId, meta) =
-  AllocationV2.TransferLeg with
-    transferLegId
-    sender = accountFromMeta sender "sender" meta
-    receiver = accountFromMeta receiver "receiver" meta
-    amount
-    instrumentId = upcast instrumentId
-    meta = dropAccountMeta "sender" $ dropAccountMeta "receiver" meta
-
-instance BackwardCompatible AllocationV1.SettlementInfo AllocationV2.SettlementInfo where
-  upcast (AllocationV1.SettlementInfo with executor, settlementRef, requestedAt, allocateBefore, settleBefore, meta) =
-    AllocationV2.SettlementInfo with
-      executor
-      settlementRef = upcast settlementRef
-      requestedAt
-      settleAt = allocateBefore
-      settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
-      meta
-
-instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
-  upcast (AllocationV1.AllocationSpecification with settlement, transferLegId, transferLeg) =
-    AllocationV2.AllocationSpecification with
-      authorizer = accountFromMeta transferLeg.sender "sender" transferLeg.meta
-      settlement = upcast settlement
-      transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
-
-instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
-  upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
-    AllocationV2.AllocationView with
-      allocation = upcast allocation
-      holdingCids = map upcast holdingCids
-      expiresAt = Some (allocation.settlement.settleBefore)
-      settlementVersion = 1
-      -- FIXME: read from metadata of V1 allocations, as accountable assets might use a different rule
-      canWithdraw = [allocation.transferLeg.sender]
-      meta
-
-instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
-  upcast = coerceInterfaceContractId
-
-instance BackwardCompatible (ContractId AllocationInstructionV1.AllocationInstruction) (ContractId AllocationInstructionV2.AllocationInstruction) where
-  upcast = coerceInterfaceContractId
-
-instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult_Output AllocationInstructionV2.AllocationInstructionResult_Output where
-  upcast (AllocationInstructionV1.AllocationInstructionResult_Pending with allocationInstructionCid) =
-    AllocationInstructionV2.AllocationInstructionResult_Pending with
-      allocationInstructionCid = upcast allocationInstructionCid
-  upcast (AllocationInstructionV1.AllocationInstructionResult_Completed with allocationCid) =
-    AllocationInstructionV2.AllocationInstructionResult_Completed with
-      allocationCid = upcast allocationCid
-  upcast AllocationInstructionV1.AllocationInstructionResult_Failed =
-    AllocationInstructionV2.AllocationInstructionResult_Failed
-
-
-instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult AllocationInstructionV2.AllocationInstructionResult where
-  upcast (AllocationInstructionV1.AllocationInstructionResult with output, senderChangeCids, meta) =
-    AllocationInstructionV2.AllocationInstructionResult with
-      output = upcast output
-      senderChangeCids = map upcast senderChangeCids
-      meta
-
+-- Allocation choices
+---------------------
 
 allocation_v2_settleImplUsingV1
   : ContractId AllocationV2.Allocation
@@ -160,104 +81,53 @@ allocation_v2_cancelImplUsingV1 instrumentId self AllocationV2.Allocation_Cancel
     meta = result.meta
 
 
+-- Batch settlement
+-------------------
 
--- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself
-amulet_allocationFactoryV2_settleImpl
-  : AllocationV2.SettlementFactory
+data PreparedAllocations = PreparedAllocations with
+    allocationsSettledUsingV1 : [((ContractId AllocationV2.Allocation, AllocationV2.AllocationView), AllocationV2.TransferLeg)]
+      -- ^ Allocations that should be settled using -- V1.Allocation_ExecuteTransfer because they have no matching V2
+      -- allocation for the receipt of their transfer leg.
+    allocationsSettledUsingV2 : [(ContractId AllocationV2.Allocation, AllocationV2.AllocationView)]
+      -- ^ Allocations that can and should be settled using V2.Allocation_Settle
+      -- because they have a matching V2 allocation.
+  deriving (Eq, Show)
+
+-- | Default implementation for settling a batch of allocations.
+--
+-- It validates that the allocations match the expected transfer legs and settlement,
+-- and settles them using V1 or V2 settlement depending on the settlement
+-- version of the individual allocations.
+--
+-- The logic for doing this correctly is nontrivial, which is why registries
+-- SHOULD use this default implementation where possible.
+settlementFactoryV2_defaultSettleBatchImpl
+  : HasToInterface t AllocationV2.SettlementFactory
+  => t
+  -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-amulet_allocationFactoryV2_settleImpl factory (AllocationV2.SettlementFactory_SettleBatch {..}) = do
+settlementFactoryV2_defaultSettleBatchImpl factory0 self (AllocationV2.SettlementFactory_SettleBatch {..}) = do
   -- validate call to factory and retrieve context
+  let factory = toInterface @AllocationV2.SettlementFactory factory0
   let admin = (view factory).admin
   requireExpectedAdminMatch admin expectedAdmin
 
-  -- fetch and validate all allocations
-  allocations <- forA allocationCids $ \allocationCid -> do
-    allocation0 <- fetch allocationCid
-    let allocationView = view allocation0
-    let allocation = allocationView.allocation
+  requireMatchExpected (self, "arg.actors") [settlement.executor] actors
 
-    forA_ allocation.transferLegs $ \leg -> do
-      require "Admin of allocation transfer leg matches" (leg.instrumentId.admin == admin)
-
-    -- FIXME: consider allowing the caller to pass these in
-    require "Actors include allocation executor" (allocation.settlement.executor `elem` actors)
-    -- FIXME: check settlement
-    -- FIXME: consider what other validation is missing
-
-    -- settlement version specific validation
-    case allocationView.settlementVersion of
-      1 -> do
-        require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
-        let tl = head allocation.transferLegs
-        require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.allocation.authorizer)
-        require "sender.owner authorizes v1 settlement" (tl.sender.owner `elem` settlementV1Authorizers)
-        require "receiver.owner authorizes v1 settlement" (tl.receiver.owner `elem` settlementV1Authorizers)
-      2 -> pure ()
-      v -> fail $ "Unsupported settlement version " <> show v <> " in " <> show allocationView
-
-    pure (allocationCid, allocationView)
-
-  -- determine which allocations to settle using v1 and which to settle using v2
-  let (v1Allocations, v2Allocations) = partition (\a -> a._2.settlementVersion == 1) allocations
-
-  let v2Legs = Set.fromList $ do
-        (_, allocationView) <- v2Allocations
-        let authorizer = allocationView.allocation.authorizer
-        leg <- allocationView.allocation.transferLegs
-        pure (authorizer, leg)
-
-  let hasMatchingV2Allocation allocationView =
-        let leg = head allocationView._2.allocation.transferLegs
-        in (leg.receiver, leg) `Set.member` v2Legs
-
-  let (matchedV1Allocations, unmatchedV1Allocations) = partition hasMatchingV2Allocation v1Allocations
-
-  let allocationsSettledUsingV1 = unmatchedV1Allocations
-
-  -- We settle V1 allocations that are matched with a V2 allocation using the V2 API to
-  -- avoid having to archive the holding for the receiver that would be created as part of its
-  -- V1 settlement. This seems too finnicky. Wallets will have to use their fallback tx history
-  -- parsing to understand the transfer.
-  let allocationsSettledUsingV2 = matchedV1Allocations ++ v2Allocations
-
-
-  -- check that all legs match up
-  let allocatedV2Legs = Map.fromList $ do
-        (_, allocationView) <- allocationsSettledUsingV2
-        let authorizer = allocationView.allocation.authorizer
-        case allocationView.allocation.transferLegs of
-          [] -> error "Unexpected empty transfer legs in allocation"
-          (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
-
-  let allocatedV1Legs = Map.fromList $ concat $ do
-        allocationView <- allocationsSettledUsingV1
-        leg <- allocationView._2.allocation.transferLegs
-        pure $ dedup [((leg.sender, leg), []), ((leg.receiver, leg), [])]
-
-
-  -- We allow self-transfers as future extensions might customize them via additional metadata.
-  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
-  validateExpectedTransfers ppLeg expectedLegs (allocatedV1Legs `Map.union` allocatedV2Legs)
-
-  -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
-  -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
+  -- prepare
+  prep <- validateAndPrepareAllocations admin (AllocationV2.SettlementFactory_SettleBatch {..})
 
   -- settle all v1 allocations
-  newHoldingCidssV1 <- forA allocationsSettledUsingV1 $ \(allocationCid, allocationView) -> do
+  newHoldingCidssV1 <- forA prep.allocationsSettledUsingV1 $ \((allocationCid, allocationView), leg) -> do
     let (allocationCidV1 : ContractId AllocationV1.Allocation) = coerceContractId allocationCid
     result <- exercise allocationCidV1 AllocationV1.Allocation_ExecuteTransfer with extraArgs
-    leg <- case allocationView.allocation.transferLegs of
-      [leg] -> pure leg
-      legs -> fail $ "Expected exactly one leg in v1 allocation, but got: " <> show legs
-    let instrumentId = (head allocationView.allocation.transferLegs).instrumentId
     let senderHoldingCids = (leg.sender, map upcast result.senderHoldingCids)
     let receiverHoldingCids = (leg.receiver, map upcast result.receiverHoldingCids)
     pure (Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
 
-
   -- settle all v2 allocations
-  newHoldingCidssV2 <- forA allocationsSettledUsingV2 $ \(allocationCid, allocView) -> do
+  newHoldingCidssV2 <- forA prep.allocationsSettledUsingV2 $ \(allocationCid, allocView) -> do
     result <- exercise allocationCid AllocationV2.Allocation_Settle with
       -- FIXME: call out the consequences of this defaulting in the API docs, or compute them in an interface method or the view
       actors = Set.toList $ AllocationV2.defaultAllocationSettlementControllers allocView
@@ -268,6 +138,78 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationV2.SettlementFactory_Se
   pure AllocationV2.SettlementFactory_SettleBatchResult with
     newHoldingCids = mconcat newHoldingCidssV1 <> mconcat newHoldingCidssV2
     meta = emptyMetadata
+
+
+validateAndPrepareAllocations : Party ->  AllocationV2.SettlementFactory_SettleBatch -> Update PreparedAllocations
+validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{..} = do
+  -- fetch and validate all allocations
+  allocations <- forA allocationCids $ \allocationCid -> do
+    allocation0 <- fetch allocationCid
+    let allocationView = view allocation0
+    let allocation = allocationView.allocation
+
+    -- shared validation
+    requireMatchExpected (allocationCid, "allocation.settlement") settlement allocation.settlement
+    forA_ allocation.transferLegs $ \leg -> do
+      requireMatchExpected (leg.transferLegId, "transferLeg.admin") admin leg.instrumentId.admin
+
+    -- settlement version specific validation
+    case allocationView.settlementVersion of
+      1 -> do
+        require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
+        let tl = head allocation.transferLegs
+        require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.allocation.authorizer)
+        require "sender.owner authorizes v1 settlement" (tl.sender.owner `elem` settlementV1Authorizers)
+        require "receiver.owner authorizes v1 settlement" (tl.receiver.owner `elem` settlementV1Authorizers)
+
+        pure (Left ((allocationCid, allocationView), tl))
+
+      2 -> pure (Right (allocationCid, allocationView))
+      v -> fail $ "Unsupported settlement version " <> show v <> " in " <> show allocationView
+
+  -- determine which allocations to settle using v1 and which to settle using v2
+  let (v1Allocations, v2Allocations) = partitionEithers allocations
+
+  let v2Legs = Set.fromList $ do
+        (_, allocationView) <- v2Allocations
+        let authorizer = allocationView.allocation.authorizer
+        leg <- allocationView.allocation.transferLegs
+        pure (authorizer, leg)
+
+  let hasMatchingV2Allocation (_, v1Leg) = (v1Leg.receiver, v1Leg) `Set.member` v2Legs
+
+  let (matchedV1Allocations, unmatchedV1Allocations) = partition hasMatchingV2Allocation v1Allocations
+
+  let allocationsSettledUsingV1 = unmatchedV1Allocations
+
+  -- We settle V1 allocations that are matched with a V2 allocation using the V2 API to
+  -- avoid having to archive the holding for the receiver that would be created as part of its
+  -- V1 settlement. This seems too finnicky. Wallets will have to use their fallback tx history
+  -- parsing to understand the transfer.
+  let allocationsSettledUsingV2 = map fst matchedV1Allocations ++ v2Allocations
+
+  -- check that all legs match up
+  let allocatedV1Legs = Map.fromList $ concat $ do
+        (_, leg) <- allocationsSettledUsingV1
+        pure $ dedup [((leg.sender, leg), []), ((leg.receiver, leg), [])]
+
+  let allocatedV2Legs = Map.fromList $ do
+        (_, allocationView) <- allocationsSettledUsingV2
+        let authorizer = allocationView.allocation.authorizer
+        case allocationView.allocation.transferLegs of
+          [] -> error "Unexpected empty transfer legs in allocation"
+          (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
+
+  -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
+  -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
+
+  -- We allow self-transfers as future extensions might customize them via additional metadata.
+  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
+  validateExpectedTransfers ppLeg expectedLegs (allocatedV1Legs `Map.union` allocatedV2Legs)
+
+  pure PreparedAllocations with
+    allocationsSettledUsingV1 = unmatchedV1Allocations
+    allocationsSettledUsingV2 = allocationsSettledUsingV2
 
 
 validateExpectedTransfers
@@ -306,202 +248,6 @@ ppLeg (authorizer, leg) =
 
 {-
 -- FIXME: move to class based conversion
-
--- Upcast
-reference_v1_to_v2 : AllocationV1.Reference -> AllocationV2.Reference
-reference_v1_to_v2 AllocationV1.Reference{..} = AllocationV2.Reference with ..
-
-settlement_info_v1_to_v2 : AllocationV1.SettlementInfo -> AllocationV2.SettlementInfo
-settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
-  where
-    controllerOverride = case TextMap.lookup "canton.network/controllerOverride" meta.values of
-      None -> None
-      Some co -> None -- TODO: Parse controller override.
-    v2 = AllocationV2.SettlementInfo with
-      executor
-      settlementRef = reference_v1_to_v2 settlementRef
-      requestedAt
-      settleAt = allocateBefore
-      meta
-      controllerOverride
-      settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
-
-transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> Text -> AllocationV2.TransferLeg
-transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} transferLegId =
-  AllocationV2.TransferLeg with
-    instrumentId = upcast instrumentId
-    sender = senderAccount
-    receiver = receiverAccount
-    ..
-  where
-    senderAccount = HoldingV2.Account
-      with
-        provider = (TextMap.lookup "canton.network/sender.provider" meta.values) >>= partyFromText
-        id = TextMap.lookup "canton.network/sender.id" meta.values
-        owner = sender
-    receiverAccount = HoldingV2.Account
-      with
-        provider = (TextMap.lookup "canton.network/receiver.provider" meta.values) >>= partyFromText
-        id = TextMap.lookup "canton.network/receiver.id" meta.values
-        owner = receiver
-
-
-allocation_specification_v1_to_v2 : AllocationV1.AllocationSpecification -> AllocationV2.AllocationSpecification
-allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} =
-  AllocationV2.AllocationSpecification with
-    settlement = settlement_info_v1_to_v2 settlement
-    transferLegs = (transfer_leg_v1_to_v2 transferLeg transferLegId)::otherLegs
-  where
-    otherLegs = case TextMap.lookup "canton.network/otherLegs" transferLeg.meta.values of
-      None -> []
-      Some ol -> [] -- TODO: Parse other legs.
-
-allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.AllocationView
-allocation_view_v1_to_v2 AllocationV1.AllocationView{..} =
-  AllocationV2.AllocationView with
-    allocation = allocation_specification_v1_to_v2 allocation
-    holdingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast holdingCids)]
-    meta
-    authorizer
-    expiresAt
-  where
-    authorizer = HoldingV2.Account with
-      owner = allocation.transferLeg.sender
-      provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
-      id = TextMap.lookup "canton.network/sender.id" meta.values
-    expiresAt = Some $ optional
-      (allocation.settlement.settleBefore)
-      decodeTime
-      -- FIXME: share namespace and use cip-nr for token standard v2 as the namespace
-      (TextMap.lookup "canton.network/expiresAt" meta.values)
-
-
--- Downcast
-reference_v2_to_v1 : AllocationV2.Reference -> AllocationV1.Reference
-reference_v2_to_v1 AllocationV2.Reference{..} = AllocationV1.Reference with ..
-
-settlement_info_v2_to_v1 : AllocationV2.SettlementInfo -> AllocationV1.SettlementInfo
-settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
-  where
-    meta' = Metadata with
-      values =
-        TextMap.insert "canton.network/version" "v2" $
-        TextMap.insert "canton.network/controllerOverride" (show controllerOverride) $
-        meta.values
-
-    v1 = AllocationV1.SettlementInfo with
-      executor
-      settlementRef = reference_v2_to_v1 settlementRef
-      requestedAt
-      allocateBefore = settleAt
-      settleBefore = fromOptional maxTime settlementDeadline
-      meta = meta'
-
-transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
-transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} =
-  AllocationV1.TransferLeg with
-    instrumentId = downcast instrumentId
-    sender = sender.owner
-    receiver = receiver.owner
-    meta = meta'
-    ..
-  where
-   meta' = Metadata with
-      values =
-        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
-        insertOptional "canton.network/sender.id" (sender.id) $
-        insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
-        insertOptional "canton.network/receiver.id" (receiver.id) $
-        meta.values
-
-allocation_specification_v2_to_v1 : AllocationV2.AllocationSpecification -> AllocationV1.AllocationSpecification
-allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} =
-  AllocationV1.AllocationSpecification with
-    settlement = settlement_info_v2_to_v1 settlement
-    transferLegId = transferLeg'.transferLegId
-    transferLeg = transfer_leg_v2_to_v1 transferLeg
-  where
-    (transferLeg', other) = case transferLegs of
-      x::xs -> (x, xs)
-      [] -> error "Cannot downcast an allocation specification without any legs."
-    meta = Metadata with
-      values =
-        TextMap.insert "canton.network/version" "v2" $
-        TextMap.insert "canton.network/otherLegs" (show other) $ -- TODO
-        transferLeg'.meta.values
-    transferLeg = transferLeg' with meta
-
-allocation_view_v2_to_v1 : AllocationV2.AllocationView -> AllocationV1.AllocationView
-allocation_view_v2_to_v1 AllocationV2.AllocationView{..} =
-  AllocationV1.AllocationView with
-    allocation = allocation_specification_v2_to_v1 allocation
-    holdingCids = concatMap (\(_, holdingCids) -> map coerceInterfaceContractId holdingCids) (Map.toList holdingCids)
-    meta = meta'
-  where
-    meta' = Metadata with
-      values =
-        TextMap.insert "canton.network/version" "v2" $
-        -- FIXME: double check that sender.provider and .id are the right ones to use here
-        insertOptional "canton.network/sender.provider" (partyToText <$> authorizer.provider) $
-        insertOptional "canton.network/sender.id" (authorizer.id) $
-        insertOptional "canton.network/expiresAt" (fmap encodeTime expiresAt) $
-        meta.values
-
-
--- Choices
-
-{-
-FIXME: adjust if there's a straightforward adjustment
-
-allocation_execute_transfer_v1_to_v2 : AllocationV1.Allocation_ExecuteTransfer -> AllocationV2.Allocation_ExecuteTransfer
-allocation_execute_transfer_v1_to_v2 AllocationV1.Allocation_ExecuteTransfer{..} =
-  AllocationV2.Allocation_ExecuteTransfer with
-    ..
-
-allocation_transfer_result_v2_to_v1 : AllocationV2.Allocation_ExecuteTransferResult -> AllocationV1.Allocation_ExecuteTransferResult
-allocation_transfer_result_v2_to_v1 AllocationV2.Allocation_ExecuteTransferResult {..} =
-  AllocationV1.Allocation_ExecuteTransferResult with
-    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
-    receiverHoldingCids = map coerceInterfaceContractId receiverHoldingCids
-    meta
-
-allocation_v1_executeTransferImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_ExecuteTransfer -> Update AllocationV1.Allocation_ExecuteTransferResult
-allocation_v1_executeTransferImpl this self execv1 = do
-  resv2 <- AllocationV2.allocation_executeTransferImpl
-    this
-    (coerceInterfaceContractId @AllocationV2.Allocation self)
-    (allocation_execute_transfer_v1_to_v2 execv1)
-  return (allocation_transfer_result_v2_to_v1 resv2)
--}
-
-allocation_withdraw_result_v2_to_v1 : AllocationV2.Allocation_WithdrawResult -> AllocationV1.Allocation_WithdrawResult
-allocation_withdraw_result_v2_to_v1 AllocationV2.Allocation_WithdrawResult {..} =
-  AllocationV1.Allocation_WithdrawResult with
-    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
-    meta
-
-allocation_v1_withdrawImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Withdraw -> Update AllocationV1.Allocation_WithdrawResult
-allocation_v1_withdrawImpl this self AllocationV1.Allocation_Withdraw{..} = do
-  resv2 <- AllocationV2.allocation_withdrawImpl
-    this
-    (coerceInterfaceContractId @AllocationV2.Allocation self)
-    AllocationV2.Allocation_Withdraw {..}
-  return (allocation_withdraw_result_v2_to_v1 resv2)
-
-
-allocation_cancel_result_v2_to_v1 : AllocationV2.Allocation_CancelResult -> AllocationV1.Allocation_CancelResult
-allocation_cancel_result_v2_to_v1 AllocationV2.Allocation_CancelResult {..} =
-  AllocationV1.Allocation_CancelResult with
-    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
-    meta
-
-allocation_v1_cancelImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Cancel -> Update AllocationV1.Allocation_CancelResult
-allocation_v1_cancelImpl this self AllocationV1.Allocation_Cancel{..} = do
-  resv2 <- AllocationV2.allocation_cancelImpl
-   this
-    (coerceInterfaceContractId @AllocationV2.Allocation self)
-    AllocationV2.Allocation_Cancel {..}
-  return (allocation_cancel_result_v2_to_v1 resv2)
 
 
 -- AllocationInstruction
@@ -627,3 +373,86 @@ allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.Allocatio
   return (allocation_factory_view_v2_to_v1 resv2)
 
 -}
+
+-- Allocation casts
+-------------------
+
+instance ForwardCompatible AllocationV1.Reference AllocationV2.Reference where
+  downcast AllocationV2.Reference{..} = AllocationV1.Reference with ..
+
+instance BackwardCompatible AllocationV1.Reference AllocationV2.Reference where
+  upcast AllocationV1.Reference{..} = AllocationV2.Reference with ..
+
+instance ForwardCompatible AllocationV1.TransferLeg AllocationV2.TransferLeg where
+  downcast (AllocationV2.TransferLeg with sender, receiver, amount, instrumentId, meta) =
+    AllocationV1.TransferLeg with
+      sender = sender.owner
+      receiver = receiver.owner
+      amount
+      instrumentId = downcast instrumentId
+      meta =
+        accountToMeta "sender" sender $
+        accountToMeta "receiver" receiver $
+        meta
+
+upcast_v1_v2_TransferLeg : Text -> AllocationV1.TransferLeg -> AllocationV2.TransferLeg
+upcast_v1_v2_TransferLeg transferLegId (AllocationV1.TransferLeg with sender, receiver, amount, instrumentId, meta) =
+  AllocationV2.TransferLeg with
+    transferLegId
+    sender = accountFromMeta sender "sender" meta
+    receiver = accountFromMeta receiver "receiver" meta
+    amount
+    instrumentId = upcast instrumentId
+    meta = dropAccountMeta "sender" $ dropAccountMeta "receiver" meta
+
+instance BackwardCompatible AllocationV1.SettlementInfo AllocationV2.SettlementInfo where
+  upcast (AllocationV1.SettlementInfo with executor, settlementRef, requestedAt, allocateBefore, settleBefore, meta) =
+    AllocationV2.SettlementInfo with
+      executor
+      settlementRef = upcast settlementRef
+      requestedAt
+      settleAt = allocateBefore
+      settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
+      meta
+
+instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
+  upcast (AllocationV1.AllocationSpecification with settlement, transferLegId, transferLeg) =
+    AllocationV2.AllocationSpecification with
+      authorizer = accountFromMeta transferLeg.sender "sender" transferLeg.meta
+      settlement = upcast settlement
+      transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
+
+instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
+  upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
+    AllocationV2.AllocationView with
+      allocation = upcast allocation
+      holdingCids = map upcast holdingCids
+      expiresAt = Some (allocation.settlement.settleBefore)
+      settlementVersion = 1
+      -- FIXME: read from metadata of V1 allocations, as accountable assets might use a different rule
+      canWithdraw = [allocation.transferLeg.sender]
+      meta
+
+instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
+  upcast = coerceInterfaceContractId
+
+instance BackwardCompatible (ContractId AllocationInstructionV1.AllocationInstruction) (ContractId AllocationInstructionV2.AllocationInstruction) where
+  upcast = coerceInterfaceContractId
+
+instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult_Output AllocationInstructionV2.AllocationInstructionResult_Output where
+  upcast (AllocationInstructionV1.AllocationInstructionResult_Pending with allocationInstructionCid) =
+    AllocationInstructionV2.AllocationInstructionResult_Pending with
+      allocationInstructionCid = upcast allocationInstructionCid
+  upcast (AllocationInstructionV1.AllocationInstructionResult_Completed with allocationCid) =
+    AllocationInstructionV2.AllocationInstructionResult_Completed with
+      allocationCid = upcast allocationCid
+  upcast AllocationInstructionV1.AllocationInstructionResult_Failed =
+    AllocationInstructionV2.AllocationInstructionResult_Failed
+
+
+instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult AllocationInstructionV2.AllocationInstructionResult where
+  upcast (AllocationInstructionV1.AllocationInstructionResult with output, senderChangeCids, meta) =
+    AllocationInstructionV2.AllocationInstructionResult with
+      output = upcast output
+      senderChangeCids = map upcast senderChangeCids
+      meta
