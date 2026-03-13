@@ -106,5 +106,5 @@ operatorDeployment:
     publicConfigsDir: "cluster/configs/configs"
 loadTester:
   enable: true
-  iterationsPerMinute: 60
+  iterationsPerMinute: 240
   minRate: 0.95
