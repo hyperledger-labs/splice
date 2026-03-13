@@ -22,8 +22,6 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      // Found the network with optValidatorFaucetCap=0 so all rounds
-      // carry cap=0 from the start — no voting flow needed.
       .addConfigTransform((_, config) => ConfigTransforms.withValidatorFaucetCap(0)(config))
 
   "system works with optValidatorFaucetCap=0 and handles stale liveness records" in {
@@ -35,16 +33,13 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
       }
 
       clue("No ValidatorLivenessActivityRecord contracts should exist") {
-        // ReceiveFaucetCouponTrigger is the only creator of these
-        // records. Because the trigger skips rounds with cap=0,
-        // no records should have been created.
         val records = sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(ValidatorLivenessActivityRecord.COMPANION)(dsoParty)
         records shouldBe empty
       }
 
       clue("Manually create a ValidatorLivenessActivityRecord on a cap=0 round") {
-        // Simulates a validator that hasn't picked up the workaround and still
+        // Simulates a validator on an old version that is still
         // exercises ValidatorLicense_RecordValidatorLivenessActivity.
         val validatorParty = aliceValidatorBackend.getValidatorPartyId()
         val license =
