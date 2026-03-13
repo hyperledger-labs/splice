@@ -233,7 +233,9 @@ trait SvDsoStore
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.AppRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[
+    Contract[splice.amulet.AppRewardCoupon.ContractId, splice.amulet.AppRewardCoupon]
+  ]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
@@ -257,7 +259,9 @@ trait SvDsoStore
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[
+    Contract[splice.amulet.ValidatorRewardCoupon.ContractId, splice.amulet.ValidatorRewardCoupon]
+  ]]]
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
@@ -299,7 +303,10 @@ trait SvDsoStore
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
+    Seq[SvDsoStore.RoundBatch[Contract[
+      splice.validatorlicense.ValidatorFaucetCoupon.ContractId,
+      splice.validatorlicense.ValidatorFaucetCoupon,
+    ]]]
   ]
 
   def listValidatorLivenessActivityRecordsGroupedByRound(
@@ -310,9 +317,10 @@ trait SvDsoStore
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundBatch[
-      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
-    ]]
+    Seq[SvDsoStore.RoundBatch[Contract[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId,
+      splice.validatorlicense.ValidatorLivenessActivityRecord,
+    ]]]
   ]
 
   def listSvRewardCouponsOnDomain(
@@ -349,7 +357,9 @@ trait SvDsoStore
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.SvRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[
+    Contract[splice.amulet.SvRewardCoupon.ContractId, splice.amulet.SvRewardCoupon]
+  ]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
@@ -1428,13 +1438,23 @@ object SvDsoStore {
 case class ExpiredRewardCouponsBatch(
     closedRoundCid: splice.round.ClosedMiningRound.ContractId,
     closedRoundNumber: Long,
-    validatorCoupons: Seq[splice.amulet.ValidatorRewardCoupon.ContractId],
-    appCoupons: Seq[splice.amulet.AppRewardCoupon.ContractId],
-    svRewardCoupons: Seq[splice.amulet.SvRewardCoupon.ContractId],
-    validatorFaucets: Seq[splice.validatorlicense.ValidatorFaucetCoupon.ContractId],
-    validatorLivenessActivityRecords: Seq[
-      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
+    validatorCoupons: Seq[
+      Contract[splice.amulet.ValidatorRewardCoupon.ContractId, splice.amulet.ValidatorRewardCoupon]
     ],
+    appCoupons: Seq[
+      Contract[splice.amulet.AppRewardCoupon.ContractId, splice.amulet.AppRewardCoupon]
+    ],
+    svRewardCoupons: Seq[
+      Contract[splice.amulet.SvRewardCoupon.ContractId, splice.amulet.SvRewardCoupon]
+    ],
+    validatorFaucets: Seq[Contract[
+      splice.validatorlicense.ValidatorFaucetCoupon.ContractId,
+      splice.validatorlicense.ValidatorFaucetCoupon,
+    ]],
+    validatorLivenessActivityRecords: Seq[Contract[
+      splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId,
+      splice.validatorlicense.ValidatorLivenessActivityRecord,
+    ]],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
