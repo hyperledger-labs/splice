@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.admin.api.client
 
-import org.apache.pekko.http.scaladsl.model.HttpHeader
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
@@ -45,7 +45,10 @@ class HttpCtlRunner(
         .leftMap(resp =>
           resp match {
             case Left(httpErr: HttpCommandException) => throw httpErr
-            case err => err.toString()
+            case Left(err: Throwable) => throw err
+            case Right(unknownResponse: HttpResponse) =>
+              unknownResponse.discardEntityBytes()
+              unknownResponse.toString()
           }
         )
       result <- EitherT.fromEither[Future](command.handleResponse(response))
