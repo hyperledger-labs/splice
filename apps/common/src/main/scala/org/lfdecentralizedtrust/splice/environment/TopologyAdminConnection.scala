@@ -1410,25 +1410,9 @@ abstract class TopologyAdminConnection(
     )
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
-    retryProvider.ensureThatB(
-      RetryFor.WaitingOnInitDependency,
-      "init_id",
-      show"Node is initialized with ID $id",
-      getIdOption().map {
-        case GetIdResult(true, Some(uid)) if uid == id.uid => true
-        case GetIdResult(true, Some(uid)) =>
-          throw Status.FAILED_PRECONDITION
-            .withDescription(
-              s"Node is already initialized with a different ID: $uid (expected ${id.uid})"
-            )
-            .asRuntimeException()
-        case _ => false
-      },
-      runCmd(
-        TopologyAdminCommands.Init
-          .InitId(id.uid.identifier.toProtoPrimitive, id.uid.namespace.toProtoPrimitive, Seq.empty)
-      ).map(_ => ()),
-      logger,
+    runCmd(
+      TopologyAdminCommands.Init
+        .InitId(id.uid.identifier.toProtoPrimitive, id.uid.namespace.toProtoPrimitive, Seq.empty)
     )
   }
 
