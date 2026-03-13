@@ -267,7 +267,7 @@ class RecoverExternalPartyIntegrationTest
       tx,
       NonEmpty(Seq, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,
-      ProtocolVersion.v34,
+      sv1Backend.config.localSynchronizerNodes.current.protocolVersion,
     )
   }
 }
