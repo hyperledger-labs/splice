@@ -1,0 +1,48 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utility functions for implementing token standard v2 choices.
+module Splice.Api.Token.UtilsV2.Choices (
+  require,
+  requireExpectedAdminMatch,
+  ensureActorIsDefault,
+  ensureBasicAccount,
+  isBasicAccount,
+) where
+
+import DA.Optional (isNone)
+
+import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
+
+requireExpectedAdminMatch : Party -> Party -> Update ()
+requireExpectedAdminMatch expected actual =
+  require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
+
+ensureActorIsDefault : Party -> [Party] -> Update ()
+ensureActorIsDefault _ [] = pure ()
+ensureActorIsDefault p actors
+  | [p] == actors = pure ()
+  | otherwise = fail $ "Expected default actor " <> show p <> ", but got " <> show actors
+
+
+isBasicAccount : HoldingV2.Account -> Bool
+isBasicAccount (HoldingV2.Account with provider, id) =
+  isNone provider && isNone id
+
+
+
+ensureBasicAccount : Text -> HoldingV2.Account -> Update ()
+ensureBasicAccount fieldName account = do
+  case account.provider of
+    None -> pure ()
+    Some x -> fail ("self-custodied accounts do not support:" <> fieldName <> ".provider set to '" <> show x <> "'")
+  case account.id of
+    None -> pure ()
+    Some x -> fail ("self-custodied accounts do not support:" <> fieldName <> ".id set to '" <> show x <> "'")

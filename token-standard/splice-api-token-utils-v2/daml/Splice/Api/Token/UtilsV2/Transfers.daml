@@ -1,0 +1,183 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | FIXME: comment
+module Splice.Api.Token.UtilsV2.Transfers (
+
+  transferInstruction_v2_receiverActor_acceptImpl,
+  transferInstruction_v2_receiverActor_rejectImpl,
+  transferInstruction_v2_senderActor_withdrawImpl,
+
+  transferFactory_v2_senderActor_transferImpl,
+  transferFactory_v2_publicFetchImpl,
+
+) where
+
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+import Splice.Api.Token.UtilsV2.Conversions
+import Splice.Api.Token.UtilsV2.Choices
+
+
+
+-- TransferInstruction
+----------------------
+
+instance ForwardCompatible (ContractId TransferInstructionV1.TransferInstruction) (ContractId TransferInstructionV2.TransferInstruction) where
+  downcast = coerceInterfaceContractId
+
+instance BackwardCompatible (ContractId TransferInstructionV1.TransferInstruction) (ContractId TransferInstructionV2.TransferInstruction) where
+  upcast = coerceInterfaceContractId
+
+instance ForwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
+  downcast v2 = TransferInstructionV1.Transfer with
+    sender = v2.sender.owner
+    receiver = v2.receiver.owner
+    amount = v2.amount
+    instrumentId = downcast v2.instrumentId
+    requestedAt = v2.requestedAt
+    executeBefore = v2.executeBefore
+    inputHoldingCids = map coerceInterfaceContractId v2.inputHoldingCids
+    meta =
+      accountToMeta "sender" v2.sender $
+      accountToMeta "receiver" v2.receiver $
+      v2.meta
+
+instance BackwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
+  upcast v1 = TransferInstructionV2.Transfer with
+    sender = accountFromMeta v1.sender "sender" v1.meta
+    receiver = accountFromMeta v1.receiver "receiver" v1.meta
+    amount = v1.amount
+    instrumentId = upcast v1.instrumentId
+    requestedAt = v1.requestedAt
+    executeBefore = v1.executeBefore
+    inputHoldingCids = map coerceInterfaceContractId v1.inputHoldingCids
+    meta =
+      dropAccountMeta "sender" $
+      dropAccountMeta "receiver" $
+      v1.meta
+
+instance ForwardCompatible TransferInstructionV1.TransferInstructionResult_Output TransferInstructionV2.TransferInstructionResult_Output where
+  downcast tio = case tio of
+    TransferInstructionV2.TransferInstructionResult_Pending cid ->
+      TransferInstructionV1.TransferInstructionResult_Pending (downcast cid)
+    TransferInstructionV2.TransferInstructionResult_Completed receiverHoldingCids ->
+      TransferInstructionV1.TransferInstructionResult_Completed (map downcast receiverHoldingCids)
+    TransferInstructionV2.TransferInstructionResult_Failed ->
+      TransferInstructionV1.TransferInstructionResult_Failed
+
+instance BackwardCompatible TransferInstructionV1.TransferInstructionResult_Output TransferInstructionV2.TransferInstructionResult_Output where
+  upcast tio = case tio of
+    TransferInstructionV1.TransferInstructionResult_Pending cid ->
+      TransferInstructionV2.TransferInstructionResult_Pending (upcast cid)
+    TransferInstructionV1.TransferInstructionResult_Completed receiverHoldingCids ->
+      TransferInstructionV2.TransferInstructionResult_Completed (map upcast receiverHoldingCids)
+    TransferInstructionV1.TransferInstructionResult_Failed ->
+      TransferInstructionV2.TransferInstructionResult_Failed
+
+instance ForwardCompatible TransferInstructionV1.TransferInstructionResult TransferInstructionV2.TransferInstructionResult where
+  downcast tir = TransferInstructionV1.TransferInstructionResult with
+    output = downcast tir.output
+    senderChangeCids = map downcast tir.senderChangeCids
+    meta = tir.meta
+
+instance BackwardCompatible TransferInstructionV1.TransferInstructionResult TransferInstructionV2.TransferInstructionResult where
+  upcast TransferInstructionV1.TransferInstructionResult{..} =
+    TransferInstructionV2.TransferInstructionResult with
+      output = upcast output
+      senderChangeCids = map upcast senderChangeCids
+      meta
+
+-- Choices
+
+-- | Accept implementation based on V1, which can and should be used whenever the receiver is the actor.
+transferInstruction_v2_receiverActor_acceptImpl
+  : Party
+  -> ContractId TransferInstructionV2.TransferInstruction
+  -> TransferInstructionV2.TransferInstruction_Accept
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_receiverActor_acceptImpl receiver self arg = do
+  ensureActorIsDefault receiver arg.actors
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
+    TransferInstructionV1.TransferInstruction_Accept with
+      extraArgs = arg.extraArgs
+
+-- | Reject implementation based on V1, which can and should be used whenever the receiver is the actor.
+transferInstruction_v2_receiverActor_rejectImpl
+  : Party
+  -> ContractId TransferInstructionV2.TransferInstruction
+  -> TransferInstructionV2.TransferInstruction_Reject
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_receiverActor_rejectImpl receiver self arg = do
+  ensureActorIsDefault receiver arg.actors
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
+    TransferInstructionV1.TransferInstruction_Reject with
+      extraArgs = arg.extraArgs
+
+-- | Withdraw implementation based on V1, which can and should be used whenever the sender is the actor.
+transferInstruction_v2_senderActor_withdrawImpl
+  : Party
+  -> ContractId TransferInstructionV2.TransferInstruction
+  -> TransferInstructionV2.TransferInstruction_Withdraw
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferInstruction_v2_senderActor_withdrawImpl sender self arg = do
+  ensureActorIsDefault sender arg.actors
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferInstruction) self)
+    TransferInstructionV1.TransferInstruction_Withdraw with
+      extraArgs = arg.extraArgs
+
+
+-- intentionally no automatic conversion for `TransferInstruction_Update`, as
+-- its semantics is highly dependent on the registry itself.
+
+
+-- TransferFactory
+------------------
+
+instance ForwardCompatible TransferInstructionV1.TransferFactoryView TransferInstructionV2.TransferFactoryView where
+  downcast v1 = TransferInstructionV1.TransferFactoryView with
+    admin = v1.admin
+    meta = v1.meta
+
+instance BackwardCompatible TransferInstructionV1.TransferFactoryView TransferInstructionV2.TransferFactoryView where
+  upcast v1 = TransferInstructionV2.TransferFactoryView with
+    admin = v1.admin
+    meta = v1.meta
+
+instance ForwardCompatible TransferInstructionV1.TransferFactory_PublicFetch TransferInstructionV2.TransferFactory_PublicFetch where
+  downcast v2 = TransferInstructionV1.TransferFactory_PublicFetch with
+    actor = v2.actor
+    expectedAdmin = v2.expectedAdmin
+
+instance BackwardCompatible TransferInstructionV1.TransferFactory_PublicFetch TransferInstructionV2.TransferFactory_PublicFetch where
+  upcast v1 = TransferInstructionV2.TransferFactory_PublicFetch with
+    actor = v1.actor
+    expectedAdmin = v1.expectedAdmin
+
+instance ForwardCompatible (ContractId TransferInstructionV1.TransferFactory) (ContractId TransferInstructionV2.TransferFactory) where
+  downcast = coerceInterfaceContractId
+
+-- Choices
+
+transferFactory_v2_senderActor_transferImpl
+  :  ContractId TransferInstructionV2.TransferFactory
+  -> TransferInstructionV2.TransferFactory_Transfer
+  -> Update TransferInstructionV2.TransferInstructionResult
+transferFactory_v2_senderActor_transferImpl self args = do
+  ensureNoAccountMeta "transfer." "sender" args.transfer.meta
+  ensureNoAccountMeta "transfer." "receiver" args.transfer.meta
+  ensureActorIsDefault args.transfer.sender.owner args.actors
+  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferFactory) self) TransferInstructionV1.TransferFactory_Transfer with
+    expectedAdmin = args.expectedAdmin
+    transfer = downcast args.transfer
+    extraArgs = args.extraArgs
+
+-- FIXME: add support for adding the right metadata when the actor is not the sender
+
+transferFactory_v2_publicFetchImpl
+  : TransferInstructionV1.TransferFactory
+  -> ContractId TransferInstructionV2.TransferFactory
+  -> TransferInstructionV2.TransferFactory_PublicFetch
+  -> Update TransferInstructionV2.TransferFactoryView
+transferFactory_v2_publicFetchImpl this self arg =
+  upcast <$> TransferInstructionV1.transferFactory_publicFetchImpl this (downcast self) (downcast arg)
