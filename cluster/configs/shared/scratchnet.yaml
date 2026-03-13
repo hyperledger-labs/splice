@@ -1,4 +1,4 @@
-!include(base.yaml)
+!include(base.yaml;scratch-default-operator.yaml;scratch-default-synchronizer-migration.yaml)
 infra:
   prometheus:
     retentionDuration: "30d"
