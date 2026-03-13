@@ -164,14 +164,8 @@ testUSDSubscription = script do
   (_, round) <- getLatestOpenRound app
 
   let transferConfigAmulet = transferConfigAmuletFromOpenRound round
-      expectedValidatorRewardInLockLeg =
-          2.0 * transferConfigAmulet.lockHolderFee.fee +
-          transferConfigAmulet.createFee.fee
-      expectedAppRewardInLockLeg = expectedValidatorRewardInLockLeg + transferConfigAmulet.extraFeaturedAppRewardAmount
-      expectedValidatorRewardInUnlockLeg =
-          transferConfigAmulet.createFee.fee +
-          transferConfigAmulet.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round.amuletPrice)
-      expectedAppRewardInUnlockLeg = expectedValidatorRewardInUnlockLeg + transferConfigAmulet.extraFeaturedAppRewardAmount
+      expectedAppRewardInLockLeg = transferConfigAmulet.extraFeaturedAppRewardAmount
+      expectedAppRewardInUnlockLeg = transferConfigAmulet.extraFeaturedAppRewardAmount
   [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon validator
   reward.amount === expectedAppRewardInLockLeg
   reward.featured === True
@@ -184,9 +178,7 @@ testUSDSubscription = script do
 
   reward.featured === True
 
-  rewards <- query @Splice.Amulet.ValidatorRewardCoupon alice.primaryParty
-  let amounts = map (._2.amount) rewards
-  sort amounts === sort ([expectedValidatorRewardInLockLeg, expectedValidatorRewardInUnlockLeg])
+  [] <- query @Splice.Amulet.ValidatorRewardCoupon alice.primaryParty
 
   amulets1 <- query @Amulet pizzeria.primaryParty
 
@@ -199,13 +191,7 @@ testUSDSubscription = script do
   (_, round2) <- getLatestOpenRound app
 
   let transferConfigAmulet2 = transferConfigAmuletFromOpenRound round2
-      expectedAppRewardInLockLeg2 =
-          2.0 * transferConfigAmulet2.lockHolderFee.fee +
-          transferConfigAmulet2.createFee.fee
-          -- no extra app reward when locking as the transfer below does not pass in the featured app right
       expectedAppRewardInUnlockLeg2 =
-          transferConfigAmulet2.createFee.fee +
-          transferConfigAmulet2.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round2.amuletPrice) +
           transferConfigAmulet2.extraFeaturedAppRewardAmount
 
   payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
@@ -213,7 +199,7 @@ testUSDSubscription = script do
 
   rewards <- query @Splice.Amulet.AppRewardCoupon validator
   let amounts = map (._2.amount) rewards
-  sort amounts === sort ([expectedAppRewardInLockLeg, expectedAppRewardInLockLeg2])
+  sort amounts === sort ([expectedAppRewardInLockLeg])
 
   rewards <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
   let amounts = map (._2.amount) rewards
@@ -240,7 +226,7 @@ testUSDSubscription = script do
   amounts === [1.0]
 
   -- alice has only change left, as all her amulet has been used up
-  aliceAmulets <- queryFilter @Amulet alice.primaryParty (\a -> a.amount.initialAmount > 0.05)
+  aliceAmulets <- queryFilter @Amulet alice.primaryParty (\a -> a.amount.initialAmount > 0.5)
   aliceAmulets === []
 
   pure ()

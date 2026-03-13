@@ -2,7 +2,7 @@
   {
     "contractId": "1",
     "payload": {
-      "amount": "1064.0304414400",
+      "amount": "1000.0000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"
@@ -45,7 +45,7 @@
   {
     "contractId": "3",
     "payload": {
-      "amount": "4100.8695585600",
+      "amount": "4289.0000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"
@@ -63,7 +63,7 @@
   {
     "contractId": "4",
     "payload": {
-      "amount": "489.0000000000",
+      "amount": "500.0000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"

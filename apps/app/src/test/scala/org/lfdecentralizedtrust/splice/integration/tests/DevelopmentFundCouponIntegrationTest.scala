@@ -376,7 +376,7 @@ class DevelopmentFundCouponIntegrationTest
       eventually() {
         aliceValidatorWalletClient
           .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
-        val newBalance = 34 // 40 - fees
+        val newBalance = 40
         checkWallet(
           bobParty,
           bobWalletClient,

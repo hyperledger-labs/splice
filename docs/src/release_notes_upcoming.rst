@@ -9,44 +9,24 @@
 
 .. release-notes:: Upcoming
 
-   - Validator App
+    - Daml:
 
-     - Remove the ``new-sequencer-connection-pool`` flag as it didn't
-       do what it was supposed to do. If you did set it, you can
-       safely remove it regardless of whether you disabled the new sequencer connection
-       pools in the participant or not.
+       - Restrict ``AmuletConfig`` to not allow fees as part of `CIP 107 <https://github.com/canton-foundation/cips/blob/main/cip-0107/cip-0107.md>`_.
+         This has no functional effect as `CIP 78 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`_ set the fees to zero already.
 
-       Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
-       in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
-       persisted scan connections from previous runs, removing the dependency on seedUrls
-       scan availability for successful reboots.
+         This also disables the choice ``AmuletRules_ComputeFees`` as it always returned 0. Application providers that statically
+         link against ``splice-amulet`` will need to remove usages of this choice when recompiling against the new ``splice-amulet`` version.
 
-   - Scan
+         These Daml changes require an upgrade to the following Daml versions **before**
+         voting to set the transfer fees to zero:
 
-     - **Experimental**: Added an optional ``traffic_summary`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
-       When enabled by SV configuration, traffic summaries are included alongside verdicts in event history items.
-       This is part of the CIP-104 preview and is subject to change.
-
-       Traffic summaries will be enabled step-by-step on Dev/Test/MainNet,
-       once the SVs have successfully concluded their performance testing.
-
-  - Wallet UI
-
-    - Introduced a new ``/development-fund`` panel providing a complete UI for managing Development Fund allocations (see `CIP-0082 <https://github.com/canton-foundation/cips/blob/main/cip-0082/cip-0082.md>`_ and `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_ for context).
-
-    - The panel includes:
-
-      - Display of total available Development Fund balance
-      - Allocation form for Development Fund coupons (Development Fund Manager only)
-      - Unclaimed allocations table with withdrawal support
-      - Coupon history with lifecycle event tracking (claimed, withdrawn, rejected, expired)
-
-    - Role-based behavior is enforced:
-
-      - Simple Users: read-only access to fund total
-      - Current Development Fund Manager: full allocation and withdrawal capabilities
-      - Former Development Fund Manager: can manage and view allocations created under their tenure, but cannot create new ones
-
-   - Docs
-
-     - Add a new :ref:`development_fund` page documenting the Development Fund.
+         ================== =======
+         name               version
+         ================== =======
+         amulet             0.1.17
+         amuletNameService  0.1.18
+         dsoGovernance      0.1.23
+         validatorLifecycle 0.1.6
+         wallet             0.1.18
+         walletPayments     0.1.17
+         ================== =======
