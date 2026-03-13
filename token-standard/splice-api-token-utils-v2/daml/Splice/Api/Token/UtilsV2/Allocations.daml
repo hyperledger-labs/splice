@@ -5,9 +5,9 @@
 module Splice.Api.Token.UtilsV2.Allocations (
 
   -- * Allocation facctory
-  allocation_v2_settleImplUsingV1,
-  allocation_v2_withdrawImplUsingV1,
-  allocation_v2_cancelImplUsingV1,
+  allocationV2_defaultSettleImplUsingV1,
+  allocationV2_defaultWithdrawImplUsingV1,
+  allocationV2_defaultCancelImplUsingV1,
 
   settlementFactoryV2_defaultSettleBatchImpl,
 
@@ -23,7 +23,6 @@ import qualified DA.Set as Set
 import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
@@ -38,12 +37,12 @@ import Splice.Api.Token.UtilsV2.Choices
 ---------------------
 
 
-allocation_v2_settleImplUsingV1
+allocationV2_defaultSettleImplUsingV1
   : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Settle
   -> Update AllocationV2.Allocation_SettleResult
-allocation_v2_settleImplUsingV1 this self arg@(AllocationV2.Allocation_Settle{..}) = do
+allocationV2_defaultSettleImplUsingV1 this self arg@(AllocationV2.Allocation_Settle{..}) = do
   -- no archive of self, as the V1 choice is consuming
   onlyAllowDefaultControllers' "V2.Allocation_Settle" this arg
   -- use the AllocationV1.Allocation_ExecuteTransfer choice to ensure the sender's tx parsing sees the expected choice
@@ -60,12 +59,12 @@ allocation_v2_settleImplUsingV1 this self arg@(AllocationV2.Allocation_Settle{..
     meta = result.meta
 
 
-allocation_v2_withdrawImplUsingV1
+allocationV2_defaultWithdrawImplUsingV1
   : Party
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
-allocation_v2_withdrawImplUsingV1 sender self (AllocationV2.Allocation_Withdraw{..}) = do
+allocationV2_defaultWithdrawImplUsingV1 sender self (AllocationV2.Allocation_Withdraw{..}) = do
   -- no archive of self, as the V1 choice is consuming
   requireMatchExpected ("V2.Allocation_Withdraw", "actors") [sender] actors
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
@@ -75,12 +74,12 @@ allocation_v2_withdrawImplUsingV1 sender self (AllocationV2.Allocation_Withdraw{
     authorizerHoldingCids = map upcast result.senderHoldingCids
     meta = result.meta
 
-allocation_v2_cancelImplUsingV1
+allocationV2_defaultCancelImplUsingV1
   : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
-allocation_v2_cancelImplUsingV1 this self arg@(AllocationV2.Allocation_Cancel{..}) = do
+allocationV2_defaultCancelImplUsingV1 this self arg@(AllocationV2.Allocation_Cancel{..}) = do
   -- no archive of self, as the V1 choice is consuming
   onlyAllowDefaultControllers' "V2.Allocation_Cancel" this arg
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation

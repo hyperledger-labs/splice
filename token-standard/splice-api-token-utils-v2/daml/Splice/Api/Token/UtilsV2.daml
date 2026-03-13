@@ -19,9 +19,9 @@ module Splice.Api.Token.UtilsV2 (
   ForwardCompatible(..),
 
   -- * Allocation facctory
-  allocation_v2_settleImplUsingV1,
-  allocation_v2_withdrawImplUsingV1,
-  allocation_v2_cancelImplUsingV1,
+  allocationV2_defaultSettleImplUsingV1,
+  allocationV2_defaultWithdrawImplUsingV1,
+  allocationV2_defaultCancelImplUsingV1,
 
   settlementFactoryV2_defaultSettleBatchImpl,
 
