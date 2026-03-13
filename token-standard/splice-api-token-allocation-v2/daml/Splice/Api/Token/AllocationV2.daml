@@ -20,28 +20,6 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
 
 
--- Utility types
-----------------
-
--- | A map of holding contract-ids by instrumentId.
---
--- Used in allocation workflows to pass around references to holdings in a way that
--- allows splitting them by instrument without fetching them.
---
--- Defined as a data type instead of a type synomym, as type synonyms are not
--- supported across data dependencies.
--- FIXME: remove, as it can be replaced by fetch
-data HoldingMap = HoldingMap with
-    byInstrument : Map.Map InstrumentId [ContractId Holding]
-  deriving (Show, Eq)
-
-instance Semigroup HoldingMap where
-  HoldingMap m1 <> HoldingMap m2 = HoldingMap (Map.unionWith (++) m1 m2)
-
-instance Monoid HoldingMap where
-  mempty = HoldingMap Map.empty
-
-
 -- Allocation View
 ------------------
 
@@ -116,7 +94,7 @@ data AllocationSpecification = AllocationSpecification with
 data AllocationView = AllocationView with
     allocation : AllocationSpecification
       -- ^ The specification of the allocation.
-    holdingCids : HoldingMap
+    holdingCids : [ContractId Holding]
       -- ^ The holdings that are backing this allocation.
       --
       -- Provided so that that wallets can correlate the allocation with the
@@ -289,7 +267,7 @@ interface Allocation where
 
 -- | The result of settling an allocation by exercising the `Allocation_Settle` choice.
 data Allocation_SettleResult = Allocation_SettleResult with
-    newHoldingCids : HoldingMap
+    newHoldingCids : [ContractId Holding]
       -- ^ New holdings created as part of the settlement.
     meta : Metadata
       -- ^ Additional metadata specific to the settlement, used for extensibility.
@@ -298,8 +276,8 @@ data Allocation_SettleResult = Allocation_SettleResult with
 -- | The result of the `Allocation_Cancel` choice.
 data Allocation_CancelResult = Allocation_CancelResult
   with
-    senderHoldings : HoldingMap
-      -- ^ The holdings that were released back to the sender.
+    authorizerHoldingCids : [ContractId Holding]
+      -- ^ The holdings that were released back to the authorizer.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
@@ -307,8 +285,8 @@ data Allocation_CancelResult = Allocation_CancelResult
 -- | The result of the `Allocation_Withdraw` choice.
 data Allocation_WithdrawResult = Allocation_WithdrawResult
   with
-    senderHoldings : HoldingMap
-      -- ^ The holdings that were released back to the sender.
+    authorizerHoldingCids : [ContractId Holding]
+      -- ^ The holdings that were released back to the authorizer.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
@@ -419,9 +397,7 @@ interface SettlementFactory where
 
 -- | Result of settling a batch of allocations.
 data SettlementFactory_SettleBatchResult = SettlementFactory_SettleBatchResult with
-    newHoldingCids : HoldingMap
-    -- FIXME: switch to account map
-    -- newHoldingCids : Map.Map Account [ContractId Holding]
+    newHoldingCids : Map.Map Account [ContractId Holding]
       -- ^ New holdings created as part of the batch settlement, grouped by account
       -- to enable chaining of actions on an account's holdings.
     meta : Metadata

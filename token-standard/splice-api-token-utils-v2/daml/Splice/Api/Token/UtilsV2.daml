@@ -12,9 +12,6 @@ module Splice.Api.Token.UtilsV2 (
   ForwardCompatible(..),
 
   -- * Allocation facctory
-  v1ToHoldingMap,
-  singletonHoldingMap,
-
   allocation_v2_settleImplUsingV1,
   allocation_v2_withdrawImplUsingV1,
   allocation_v2_cancelImplUsingV1,
@@ -76,13 +73,6 @@ insertOptional k ov m = case ov of
 v2Namespace : Text
 v2Namespace = "cip-TOKEN-STANDARD-V2/"
   -- FIXME: update with actual CIP number once it's available.
-
--- Holding Map
---------------
-
-singletonHoldingMap : HoldingV2.InstrumentId -> [ContractId HoldingV2.Holding] -> AllocationV2.HoldingMap
-singletonHoldingMap instrumentId holdingCids =
-  AllocationV2.HoldingMap $ Map.singleton instrumentId (map toInterfaceContractId holdingCids)
 
 
 -- Account metadata utils
@@ -248,7 +238,7 @@ instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationV
   upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
     AllocationV2.AllocationView with
       allocation = upcast allocation
-      holdingCids = singletonHoldingMap (upcast allocation.transferLeg.instrumentId) (map upcast holdingCids)
+      holdingCids = map upcast holdingCids
       expiresAt = Some (allocation.settlement.settleBefore)
       settlementVersion = 1
       -- FIXME: read from metadata of V1 allocations, as accountable assets might use a different rule
@@ -280,23 +270,6 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
       meta
 
 
-
-
-{-
-allocation_v2_settleImplUsingV1
-  : AllocationV1.Allocation
-  -> ContractId AllocationV1.Allocation
-  -> AllocationV2.Allocation_Settle
-  -> Update AllocationV2.Allocation_SettleResult
-allocation_v2_settleImplUsingV1 allocationCid AllocationV2.Allocation_Settle{..} = do
-  result <- exercise allocationCid $ AllocationV1.Allocation_ExecuteTransfer with
-    extraArgs
-  pure $ AllocationV2.Allocation_SettleResult with
-    newHoldingCids = Map.fromList [(upcast allocation.transferLeg.instrumentId, map upcast result.senderHol)]
-    receiverHoldingCids = map upcast result.receiverHoldingCids
-    meta = result.meta
--}
-
 allocation_v2_settleImplUsingV1
   : ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Settle
@@ -312,8 +285,7 @@ allocation_v2_settleImplUsingV1 self AllocationV2.Allocation_Settle{..} = do
     exercise receiverHoldingCid Archive
 
   pure AllocationV2.Allocation_SettleResult with
-    newHoldingCids =
-      singletonHoldingMap (upcast (view v1Allocation).allocation.transferLeg.instrumentId) (map upcast result.senderHoldingCids)
+    newHoldingCids = map upcast result.senderHoldingCids
     meta = result.meta
 
 
@@ -327,7 +299,7 @@ allocation_v2_withdrawImplUsingV1 instrumentId self AllocationV2.Allocation_With
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
   pure AllocationV2.Allocation_WithdrawResult with
-    senderHoldings = v1ToHoldingMap instrumentId result.senderHoldingCids
+    authorizerHoldingCids = map upcast result.senderHoldingCids
     meta = result.meta
 
 allocation_v2_cancelImplUsingV1
@@ -340,14 +312,9 @@ allocation_v2_cancelImplUsingV1 instrumentId self AllocationV2.Allocation_Cancel
   result <- exercise v1Cid AllocationV1.Allocation_Cancel with
     extraArgs
   pure AllocationV2.Allocation_CancelResult with
-    senderHoldings = v1ToHoldingMap instrumentId result.senderHoldingCids
+    authorizerHoldingCids = map upcast result.senderHoldingCids
     meta = result.meta
 
-
--- FIXME: better name
-v1ToHoldingMap : HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> AllocationV2.HoldingMap
-v1ToHoldingMap instrumentId holdingCids =
-  AllocationV2.HoldingMap $ Map.singleton (upcast instrumentId) (map upcast holdingCids)
 
 
 -- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself
@@ -436,11 +403,13 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationV2.SettlementFactory_Se
   newHoldingCidssV1 <- forA allocationsSettledUsingV1 $ \(allocationCid, allocationView) -> do
     let (allocationCidV1 : ContractId AllocationV1.Allocation) = coerceContractId allocationCid
     result <- exercise allocationCidV1 AllocationV1.Allocation_ExecuteTransfer with extraArgs
+    leg <- case allocationView.allocation.transferLegs of
+      [leg] -> pure leg
+      legs -> fail $ "Expected exactly one leg in v1 allocation, but got: " <> show legs
     let instrumentId = (head allocationView.allocation.transferLegs).instrumentId
-    let senderHoldingCids = (instrumentId, map upcast result.senderHoldingCids)
-    let receiverHoldingCids = (instrumentId, map upcast result.receiverHoldingCids)
-    pure (AllocationV2.HoldingMap $ Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
-      -- FIXME: build utility for this
+    let senderHoldingCids = (leg.sender, map upcast result.senderHoldingCids)
+    let receiverHoldingCids = (leg.receiver, map upcast result.receiverHoldingCids)
+    pure (Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
 
 
   -- settle all v2 allocations
@@ -449,7 +418,7 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationV2.SettlementFactory_Se
       -- FIXME: call out the consequences of this defaulting in the API docs, or compute them in an interface method or the view
       actors = Set.toList $ AllocationV2.defaultAllocationSettlementControllers allocView
       extraArgs
-    pure result.newHoldingCids
+    pure (Map.singleton allocView.allocation.authorizer result.newHoldingCids)
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with
