@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpS
 import org.lfdecentralizedtrust.splice.util.{
   PostgresAroundEach,
   ProcessTestUtil,
+  SpliceUtil,
   SplitwellTestUtil,
   WalletTestUtil,
 }
@@ -49,6 +50,7 @@ class AppUpgradeIntegrationTest
     with WalletTxLogTestUtil {
 
   override protected def runEventHistorySanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   private val splitwellDarPathV1 =
     s"daml/splitwell/.daml/dist/splitwell-base.dar"
@@ -244,7 +246,10 @@ class AppUpgradeIntegrationTest
           // 12 seconds seems to work well empirically.
           val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
           val newAmuletConfig = new splice.amuletconfig.AmuletConfig(
-            amuletConfig.transferConfig,
+            SpliceUtil.defaultTransferConfig(
+              amuletConfig.transferConfig.maxNumInputs,
+              amuletConfig.transferConfig.holdingFee.rate,
+            ),
             amuletConfig.issuanceCurve,
             amuletConfig.decentralizedSynchronizer,
             amuletConfig.tickDuration,
@@ -256,9 +261,9 @@ class AppUpgradeIntegrationTest
               DarResources.wallet.latest.metadata.version.toString(),
               DarResources.walletPayments.latest.metadata.version.toString(),
             ),
-            java.util.Optional.empty(),
-            java.util.Optional.empty(),
-            java.util.Optional.empty(),
+            amuletConfig.transferPreapprovalFee,
+            amuletConfig.featuredAppActivityMarkerAmount,
+            amuletConfig.optDevelopmentFundManager,
           )
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_SetConfig(

@@ -16,7 +16,7 @@ class AmuletConfigScheduleTest extends AnyWordSpec with BaseTest {
     "global::122084763882fa4111e288caf832fd9e83b666acf8f167a09fc63344d2df9bcf72a7"
   )
   private def mkConfig(
-      maxNumInputs: Int
+      maxNumInputs: Long
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     SpliceUtil.defaultAmuletConfig(
       dummyTickDuration,
@@ -33,7 +33,7 @@ class AmuletConfigScheduleTest extends AnyWordSpec with BaseTest {
     ),
   )
 
-  private def testCase(schedule: AmuletConfigSchedule, asOf: Int, expectedMaxNumInputs: Int) = {
+  private def testCase(schedule: AmuletConfigSchedule, asOf: Int, expectedMaxNumInputs: Long) = {
     val config = schedule.getConfigAsOf(CantonTimestamp.ofEpochMilli(asOf.toLong))
     config.transferConfig.maxNumInputs shouldBe expectedMaxNumInputs
   }
