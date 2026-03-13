@@ -29,6 +29,8 @@ interface AllocationRequest where
       actor : Party -- ^ The party rejecting the allocation request.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
+
+      -- FIXME: consider switching to actors pattern
     controller actor
     do allocationRequest_RejectImpl this self arg
 
@@ -40,6 +42,8 @@ interface AllocationRequest where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
+
+      -- FIXME: consider switching to actors pattern
     controller (view this).settlement.executor
     do allocationRequest_WithdrawImpl this self arg
 

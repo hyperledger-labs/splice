@@ -25,8 +25,10 @@ import DA.Either (partitionEithers)
 import DA.Foldable (forA_)
 import DA.List (head)
 import qualified DA.Map as Map
+import DA.Optional (fromOptional)
 import qualified DA.Set as Set
 import DA.Text qualified as T
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
@@ -34,6 +36,8 @@ import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
 import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
 import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructionV2
+import Splice.Api.Token.AllocationRequestV1 qualified as AllocationRequestV1
+import Splice.Api.Token.AllocationRequestV2 qualified as AllocationRequestV2
 import Splice.Api.Token.UtilsV2.Conversions
 import Splice.Api.Token.UtilsV2.Choices
 
@@ -472,6 +476,16 @@ instance BackwardCompatible AllocationV1.SettlementInfo AllocationV2.SettlementI
       settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
       meta
 
+instance ForwardCompatible AllocationV1.SettlementInfo AllocationV2.SettlementInfo where
+  downcast (AllocationV2.SettlementInfo with executor, settlementRef, requestedAt, settleAt, settlementDeadline, meta) =
+    AllocationV1.SettlementInfo with
+      executor
+      settlementRef = downcast settlementRef
+      requestedAt
+      allocateBefore = settleAt
+      settleBefore = fromOptional maxTime settlementDeadline
+      meta
+
 instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.AllocationSpecification where
   upcast (AllocationV1.AllocationSpecification with settlement, transferLegId, transferLeg) =
     AllocationV2.AllocationSpecification with
@@ -511,6 +525,23 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
     AllocationInstructionV2.AllocationInstructionResult with
       output = upcast output
       senderChangeCids = map upcast senderChangeCids
+      meta
+
+instance BackwardCompatible AllocationRequestV1.AllocationRequestView AllocationRequestV2.AllocationRequestView where
+  upcast (AllocationRequestV1.AllocationRequestView with settlement, transferLegs, meta) =
+    AllocationRequestV2.AllocationRequestView with
+      settlement = upcast settlement
+      transferLegs =
+        [ upcast_v1_v2_TransferLeg id leg | (id, leg) <- TextMap.toList transferLegs ]
+      meta
+
+-- | Note that converting down to v1 and back to v2 is lossy, as the transfer legs will get sorted by their id.
+-- Use with caution.
+instance ForwardCompatible AllocationRequestV1.AllocationRequestView AllocationRequestV2.AllocationRequestView where
+  downcast (AllocationRequestV2.AllocationRequestView with settlement, transferLegs, meta) =
+    AllocationRequestV1.AllocationRequestView with
+      settlement = downcast settlement
+      transferLegs = TextMap.fromList [ (leg.transferLegId, downcast leg) | leg <- transferLegs ]
       meta
 
 
