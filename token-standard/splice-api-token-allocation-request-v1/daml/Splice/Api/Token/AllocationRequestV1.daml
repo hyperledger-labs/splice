@@ -37,7 +37,7 @@ interface AllocationRequest where
   choice AllocationRequest_Withdraw : ChoiceExecutionMetadata
     -- ^ Withdraw an allocation request as the executor.
     --
-    -- Used by executor to withdraw the allocation request if they are unable to execute it;
+    -- Used by executors to withdraw the allocation request if they are unable to execute it;
     -- e.g., because a trade has been cancelled.
     with
       extraArgs : ExtraArgs

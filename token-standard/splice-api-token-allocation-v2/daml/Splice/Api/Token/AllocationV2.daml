@@ -120,14 +120,14 @@ data AllocationView = AllocationView with
       --
     -- FIXME: consider whether we can replace this ^^ in favor of `extraSettlementAuthorizers`
 
-    canWithdraw : [Party]
-      -- ^ The parties that can unilaterally withdraw this allocation.
+    canWithdraw : [[Party]]
+      -- ^ The groups of parties that can initiate the withdrawal of this allocation.
       --
       -- Provided for wallets to determine whether their user can call the `Allocation_Withdraw` choice.
       --
-      -- Registries that require joint authorization for a withdrawal to complete SHOULD
-      -- set this to the empty list, and provide a registry specific UI to
-      -- initiate and complete the withdrawal.
+      -- Implementations MAY elide some of the possible groups of parties to avoid
+      -- very large views. They SHOULD however list all parties that can unilaterally withdraw
+      -- the allocation, so that token standard wallets can enable their users to do so.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
@@ -217,7 +217,7 @@ interface Allocation where
 
   nonconsuming choice Allocation_Withdraw : Allocation_WithdrawResult
     -- ^ Allow the authorizer to withdraw the allocation to release the funds
-    -- and invalidate the approval to execute the settlement, which can for
+    -- and invalidate the approval to execute the settlement. This can for
     -- example be used by the authorizer to undo a mistakenly created
     -- allocation.
     --
@@ -234,9 +234,8 @@ interface Allocation where
         -- Implementations MUST check these parties to avoid unauthorized withdrawal.
         --
         -- Implementations are free to decide on the required authorization for withdrawal.
-        -- They MUST however report the parties that can withdraw unilaterally via
-        -- the `AllocationView.canWithdraw` field, so that wallets can show the
-        -- withdrawal option to the user.
+        -- They MUST however allow the parties listed in the
+        -- `AllocationView.canWithdraw` to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocation_withdrawExtraObservers this arg

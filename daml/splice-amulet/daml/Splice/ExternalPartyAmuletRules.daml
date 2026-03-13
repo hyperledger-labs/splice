@@ -484,7 +484,7 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   require "allocation.authorizer.owner is among the actors" (authorizer `elem` actors)
 
 
-  let amount = netAllocationAmount (V2.basicAccount authorizer) arg.allocation.transferLegs
+  let amount = netAllocationCreditAmount (V2.basicAccount authorizer) arg.allocation.transferLegs
 
   let
     -- FIXME: revisit this logic -- 30 days might be too little, but we want protection for the DSO
@@ -517,13 +517,13 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
   -- inputHoldingCids:
   require "At least one input holding must be provided when net amount is negative" (amount >= 0.0 || not (null inputHoldingCids))
 
-  -- lock the funds
-  let twoStepTransfer = AmuletAllocationV2.allocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
 
   (lockedAmulet, senderChangeCids, meta) <-
     if amount >= 0.0
     then return (None, [], emptyMetadata)
     else do
+      -- lock the funds
+      let twoStepTransfer = AmuletAllocationV2.debitAllocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
       (la, cids, m) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map downcast inputHoldingCids) paymentContext
       return (Some la, cids, m)
   -- create the amulet allocation

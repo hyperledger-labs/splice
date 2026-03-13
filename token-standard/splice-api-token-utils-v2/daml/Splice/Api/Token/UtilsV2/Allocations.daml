@@ -13,6 +13,12 @@ module Splice.Api.Token.UtilsV2.Allocations (
 
   validateAndPrepareAllocations,
 
+  -- * Non-standard conversions
+  upcast_v1_v2_AllocationView,
+
+  -- * Allocation utilities
+  netAllocationCreditAmount,
+
 ) where
 
 import DA.Either (partitionEithers)
@@ -31,6 +37,19 @@ import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructi
 import Splice.Api.Token.UtilsV2.Conversions
 import Splice.Api.Token.UtilsV2.Choices
 
+
+-- Allocation utilities
+------------------------
+
+
+-- | Net credit of an allocation. Positive for a credit and negative for a debit.
+netAllocationCreditAmount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> Decimal
+netAllocationCreditAmount authorizer transferLegs =
+    sum $ map legAmount transferLegs
+  where
+    legAmount leg =
+      (if leg.sender == authorizer then negate leg.amount else 0.0) +
+      (if leg.receiver == authorizer then leg.amount else 0.0)
 
 
 -- Allocation choices
@@ -60,13 +79,13 @@ allocationV2_defaultSettleImplUsingV1 this self arg@(AllocationV2.Allocation_Set
 
 
 allocationV2_defaultWithdrawImplUsingV1
-  : Party
+  : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
-allocationV2_defaultWithdrawImplUsingV1 sender self (AllocationV2.Allocation_Withdraw{..}) = do
+allocationV2_defaultWithdrawImplUsingV1 this self (AllocationV2.Allocation_Withdraw{..}) = do
   -- no archive of self, as the V1 choice is consuming
-  requireMatchExpected ("V2.Allocation_Withdraw", "actors") [sender] actors
+  requireMemberOfDedup "V2.AllocationView.canWithdraw" "actors" (view this).canWithdraw actors
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
@@ -436,16 +455,15 @@ instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.Al
       settlement = upcast settlement
       transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
 
-instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
-  upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
-    AllocationV2.AllocationView with
-      allocation = upcast allocation
-      holdingCids = map upcast holdingCids
-      expiresAt = Some (allocation.settlement.settleBefore)
-      settlementVersion = 1
-      -- FIXME: read from metadata of V1 allocations, as accountable assets might use a different rule
-      canWithdraw = [allocation.transferLeg.sender]
-      meta
+upcast_v1_v2_AllocationView : [[Party]] -> AllocationV1.AllocationView -> AllocationV2.AllocationView
+upcast_v1_v2_AllocationView canWithdraw (AllocationV1.AllocationView with allocation, holdingCids, meta) =
+  AllocationV2.AllocationView with
+    allocation = upcast allocation
+    holdingCids = map upcast holdingCids
+    expiresAt = Some (allocation.settlement.settleBefore)
+    settlementVersion = 1
+    canWithdraw
+    meta
 
 instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
   upcast = coerceInterfaceContractId

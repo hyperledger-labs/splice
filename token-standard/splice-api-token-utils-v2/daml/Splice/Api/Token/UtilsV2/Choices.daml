@@ -5,7 +5,13 @@
 module Splice.Api.Token.UtilsV2.Choices (
   require,
   requireMatchExpected,
+  requireMatchExpectedDedup,
+  requireMemberOf,
+  requireMemberOfDedup,
+
   requireExpectedAdminMatch,
+
+
   ensureActorIsDefault,
   ensureBasicAccount,
   isBasicAccount,
@@ -46,6 +52,25 @@ requireMatchExpected (obj, fieldName) expected actual
       , "Expected: " <> show expected
       , "Actual: " <> show actual
       ]
+
+requireMatchExpectedDedup : (Ord a, Show a, Show obj) => (obj, Text) -> [a] -> [a] -> Update ()
+requireMatchExpectedDedup (obj, fieldName) expected actual =
+  requireMatchExpected (obj, fieldName) (dedupSort expected) (dedupSort actual)
+
+
+requireMemberOf : (Eq a, Show a) => Text -> Text -> [a] -> a -> Update ()
+requireMemberOf description fieldName expected actual
+  | actual `elem` expected = pure ()
+  | otherwise = fail $ T.unlines
+      [ "Actual value of '" <> fieldName <> "' was not a member of " <> description <> "."
+      , "Expected one of: " <> show expected
+      , "Actual: " <> show actual
+      ]
+
+requireMemberOfDedup : (Ord a, Show a) => Text -> Text -> [[a]] -> [a] -> Update ()
+requireMemberOfDedup description fieldName expected actual =
+  requireMemberOf description fieldName (map dedupSort expected) (dedupSort actual)
+
 
 ensureActorIsDefault : Party -> [Party] -> Update ()
 ensureActorIsDefault _ [] = pure ()
@@ -94,8 +119,7 @@ onlyAllowDefaultControllers choiceName this arg =
   case arg.controllersOverride of
     None -> pure ()
     Some actual -> do
-      let expected = dedupSort $ defaultControllers this arg
-      requireMatchExpected (choiceName, "controllersOverride") expected (dedupSort actual)
+      requireMatchExpectedDedup (choiceName, "controllersOverride") (defaultControllers this arg) (dedupSort actual)
 
 
 -- Actors pattern
@@ -107,9 +131,7 @@ onlyAllowDefaultControllers choiceName this arg =
 onlyAllowDefaultControllers'
   : forall i ch. (HasDefaultControllers i ch, GetField "actors" ch [Party]) => Text -> i -> ch -> Update ()
 onlyAllowDefaultControllers' choiceName this arg =
-    requireMatchExpected (choiceName, "actors") expected (dedupSort arg.actors)
-  where
-    expected = dedupSort $ defaultControllers this arg
+    requireMatchExpectedDedup (choiceName, "actors") (defaultControllers this arg) (dedupSort arg.actors)
 
 
 -- | Preamble for V2 choices that follow the actors pattern.

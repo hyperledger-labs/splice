@@ -12,11 +12,18 @@ module Splice.Api.Token.UtilsV2 (
   archiveAndCheckActors,
 
   requireMatchExpected,
+  requireMatchExpectedDedup,
+  requireMemberOf,
+  requireMemberOfDedup,
 
 
   -- * API conversion
   BackwardCompatible(..),
   ForwardCompatible(..),
+
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_AllocationView,
 
   -- * Allocation facctory
   allocationV2_defaultSettleImplUsingV1,
@@ -24,6 +31,9 @@ module Splice.Api.Token.UtilsV2 (
   allocationV2_defaultCancelImplUsingV1,
 
   settlementFactoryV2_defaultSettleBatchImpl,
+
+  -- ** Allocation utilities
+  netAllocationCreditAmount,
 
   -- * Transfer instructions
   transferInstruction_v2_receiverActor_acceptImpl,
