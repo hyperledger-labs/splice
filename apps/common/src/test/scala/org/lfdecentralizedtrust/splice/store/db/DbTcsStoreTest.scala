@@ -297,6 +297,38 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       } yield succeed
     }
 
+    "waitUntilRecordTimeReached blocks on a synchronizer with no ingested contracts" in {
+      implicit val store = mkStore()
+      for {
+        _ <- initWithAcs()(store)
+        // No contracts ingested for d1 yet, so waiting should block
+        waitFuture = store.waitUntilRecordTimeReached(d1, CantonTimestamp.ofEpochSecond(100))
+        _ = waitFuture.isCompleted shouldBe false
+        // An offset checkpoint advancing d1 to t=100 should unblock the wait
+        _ <- store.testIngestionSink.ingestUpdateBatch(
+          NonEmptyList.of(
+            TreeUpdateOrOffsetCheckpoint.Checkpoint(
+              new OffsetCheckpoint(
+                nextOffset(),
+                java.util.List.of(
+                  new SynchronizerTime(
+                    d1.toProtoPrimitive,
+                    CantonTimestamp.ofEpochSecond(100).toInstant,
+                  )
+                ),
+              )
+            )
+          )
+        )
+        _ <- waitFuture
+        // Also verify d2 with no ingested contracts, unblocked via transaction ingestion
+        waitD2Future = store.waitUntilRecordTimeReached(d2, CantonTimestamp.ofEpochSecond(100))
+        _ = waitD2Future.isCompleted shouldBe false
+        _ <- d2.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
+        _ <- waitD2Future
+      } yield succeed
+    }
+
     "temporal store query methods throw when archive config is None" in {
       implicit val store = mkStore(acsArchiveConfigOpt = None)
       for {
