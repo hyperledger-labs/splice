@@ -62,50 +62,44 @@ class DbScanRewardsReferenceStore(
   def lookupFeaturedAppRightsActiveWithin(
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
-      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
     Seq[TcsStore.TemporalContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]
   ] =
-    multiDomainAcsStore.listContractsActiveWithin(
+    multiDomainAcsStore.listAllContractsActiveWithin(
       FeaturedAppRight.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
       synchronizerId,
-      limit,
     )
 
   def lookupOpenMiningRoundsActiveWithin(
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
-      limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
     Seq[TcsStore.TemporalContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]
   ] =
-    multiDomainAcsStore.listContractsActiveWithin(
+    multiDomainAcsStore.listAllContractsActiveWithin(
       OpenMiningRound.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
       synchronizerId,
-      limit,
     )
 
   def lookupFeaturedAppRightsAsOf(
-      asOf: CantonTimestamp,
-      limit: Limit = defaultLimit,
+      asOf: CantonTimestamp
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    multiDomainAcsStore.listContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId, limit)
+    multiDomainAcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId)
 
   def lookupOpenMiningRoundsAsOf(
-      asOf: CantonTimestamp,
-      limit: Limit = defaultLimit,
+      asOf: CantonTimestamp
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    multiDomainAcsStore.listContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId, limit)
+    multiDomainAcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId)
 }

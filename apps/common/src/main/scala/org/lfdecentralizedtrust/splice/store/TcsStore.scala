@@ -21,23 +21,27 @@ trait TcsStore {
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
 
-  def listContractsAsOf[C, TCid <: ContractId[?], T](
+  /** List ALL contracts of the given template that are active as of the given
+    * record time. Use this with great caution as the result set is unbounded in size.
+    */
+  def listAllContractsAsOf[C, TCid <: ContractId[?], T](
       companion: C,
       asOf: CantonTimestamp,
       synchronizerId: SynchronizerId,
-      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]]
 
-  /** Returns all contracts whose activeness interval intersects with [lowerBoundIncl, upperBoundIncl]. */
-  def listContractsActiveWithin[C, TCid <: ContractId[?], T](
+  /** Returns all contracts whose activeness interval intersects with
+    * [lowerBoundIncl, upperBoundIncl]. Use this with great caution as the
+    * result set is unbounded in size.
+    */
+  def listAllContractsActiveWithin[C, TCid <: ContractId[?], T](
       companion: C,
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
       synchronizerId: SynchronizerId,
-      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,

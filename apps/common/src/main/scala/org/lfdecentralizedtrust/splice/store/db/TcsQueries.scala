@@ -44,7 +44,6 @@ trait TcsQueries extends AcsQueries {
       companion: C,
       asOf: CantonTimestamp,
       additionalWhere: SQLActionBuilder,
-      orderLimit: SQLActionBuilder,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): SQLActionBuilder = {
     val packageQualifiedName = companionClass.packageQualifiedName(companion)
     (sql"""(
@@ -69,7 +68,7 @@ trait TcsQueries extends AcsQueries {
          and acs.archived_at > $asOf
          """ ++ additionalWhere ++ sql"""
        )
-       """ ++ orderLimit).toActionBuilder
+       """).toActionBuilder
   }
 
   protected def selectFromTcsTableAsOf[C, TCid <: ContractId[?], T](
@@ -80,7 +79,6 @@ trait TcsQueries extends AcsQueries {
       companion: C,
       asOf: CantonTimestamp,
       additionalWhere: SQLActionBuilder = sql"",
-      orderLimit: SQLActionBuilder = sql"",
   )(implicit companionClass: ContractCompanion[C, TCid, T]) = {
     tcsUnionAll(
       SelectFromAcsTableResult.sqlColumnsCommaSeparated(),
@@ -91,7 +89,6 @@ trait TcsQueries extends AcsQueries {
       companion,
       asOf,
       additionalWhere,
-      orderLimit,
     ).as[SelectFromAcsTableResult]
   }
 
@@ -103,7 +100,6 @@ trait TcsQueries extends AcsQueries {
       companion: C,
       asOf: CantonTimestamp,
       additionalWhere: SQLActionBuilder = sql"",
-      orderLimit: SQLActionBuilder = sql"",
   )(implicit companionClass: ContractCompanion[C, TCid, T]): SqlStreamingAction[Vector[
     SelectFromAcsTableWithStateResult
   ], SelectFromAcsTableWithStateResult, Effect.Read] = {
@@ -116,7 +112,6 @@ trait TcsQueries extends AcsQueries {
       companion,
       asOf,
       additionalWhere,
-      orderLimit,
     ).as[SelectFromAcsTableWithStateResult]
   }
 
@@ -132,13 +127,12 @@ trait TcsQueries extends AcsQueries {
       companion: C,
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
-      orderLimit: SQLActionBuilder = sql"",
   )(implicit companionClass: ContractCompanion[C, TCid, T]): SqlStreamingAction[Vector[
     TcsQueries.SelectFromTcsTableRangeResult
   ], TcsQueries.SelectFromTcsTableRangeResult, Effect.Read] = {
     val packageQualifiedName = companionClass.packageQualifiedName(companion)
     val columns = SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()
-    (sql"""(
+    sql"""(
        select #$columns, null::bigint as archived_at
        from #$acsTableName acs
        where acs.store_id = $storeId
@@ -158,7 +152,7 @@ trait TcsQueries extends AcsQueries {
          and acs.created_at <= $upperBoundIncl
          and acs.archived_at > $lowerBoundIncl
        )
-       """ ++ orderLimit).toActionBuilder.as[TcsQueries.SelectFromTcsTableRangeResult]
+       """.toActionBuilder.as[TcsQueries.SelectFromTcsTableRangeResult]
   }
 }
 

@@ -251,19 +251,18 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def listContractsAsOf[C, TCid <: ContractId[?], T](
+  override def listAllContractsAsOf[C, TCid <: ContractId[?], T](
       companion: C,
       asOf: CantonTimestamp,
       synchronizerId: SynchronizerId,
-      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] = {
-    val archiveConfig = requireArchiveConfig("listContractsAsOf")
+    val archiveConfig = requireArchiveConfig("listAllContractsAsOf")
     waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
       val templateId = companionClass.typeId(companion)
-      val opName = s"listContractsAsOf:${templateId.getEntityName}"
+      val opName = s"listAllContractsAsOf:${templateId.getEntityName}"
       for {
         result <- storage.query(
           selectFromTcsTableWithStateAsOf(
@@ -273,30 +272,27 @@ final class DbMultiDomainAcsStore[TXE](
             domainMigrationId,
             companion,
             asOf,
-            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
           ),
           opName,
         )
-        limited = applyLimit(opName, limit, result)
-        withState = limited.map(contractWithStateFromRow(companion)(_))
+        withState = result.map(contractWithStateFromRow(companion)(_))
       } yield withState
     }
   }
 
-  override def listContractsActiveWithin[C, TCid <: ContractId[?], T](
+  override def listAllContractsActiveWithin[C, TCid <: ContractId[?], T](
       companion: C,
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
       synchronizerId: SynchronizerId,
-      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] = {
-    val archiveConfig = requireArchiveConfig("listContractsActiveWithin")
+    val archiveConfig = requireArchiveConfig("listAllContractsActiveWithin")
     waitUntilRecordTimeReached(synchronizerId, upperBoundIncl).flatMap { _ =>
       val templateId = companionClass.typeId(companion)
-      val opName = s"listContractsActiveWithin:${templateId.getEntityName}"
+      val opName = s"listAllContractsActiveWithin:${templateId.getEntityName}"
       for {
         result <- storage.query(
           selectFromTcsTableWithStateActiveWithin(
@@ -307,12 +303,10 @@ final class DbMultiDomainAcsStore[TXE](
             companion,
             lowerBoundIncl,
             upperBoundIncl,
-            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
           ),
           opName,
         )
-        limited = applyLimit(opName, limit, result)
-        withState = limited.map { row =>
+        withState = result.map { row =>
           TcsStore.TemporalContractWithState(
             contractWithState = contractWithStateFromRow(companion)(row.withStateRow),
             createdAt = CantonTimestamp.assertFromLong(row.withStateRow.acsRow.createdAt.micros),

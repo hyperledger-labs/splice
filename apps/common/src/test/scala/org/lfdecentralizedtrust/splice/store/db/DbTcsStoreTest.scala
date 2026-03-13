@@ -104,7 +104,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       } yield resultAtArchive shouldBe None
     }
 
-    "listContractsAsOf and listContractsActiveWithin return correct contracts" in {
+    "listAllContractsAsOf and listAllContractsActiveWithin return correct contracts" in {
       implicit val store = mkStore()
       val coupon1 = c(1).copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val coupon2 = c(2).copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
@@ -117,61 +117,55 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         _ <- d1.archive(coupon1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(store)
         _ <- d1.archive(coupon3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(store)
 
-        // listContractsAsOf point-in-time checks
-        resultAt50 <- store.listContractsAsOf(
+        // listAllContractsAsOf point-in-time checks
+        resultAt50 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(50),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultAt50 shouldBe empty
 
-        resultAt100 <- store.listContractsAsOf(
+        resultAt100 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultAt100.map(_.contract) shouldBe Seq(coupon1)
 
-        resultAt250 <- store.listContractsAsOf(
+        resultAt250 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(250),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultAt250.map(_.contract).toSet shouldBe Set(coupon1, coupon2)
 
-        resultAt300 <- store.listContractsAsOf(
+        resultAt300 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(300),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultAt300.map(_.contract).toSet shouldBe Set(coupon2, coupon3)
 
-        resultAt400 <- store.listContractsAsOf(
+        resultAt400 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(400),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultAt400.map(_.contract) shouldBe Seq(coupon2)
 
-        // listContractsActiveWithin: [100, 400] should return all 3 contracts
-        resultRange_100_400 <- store.listContractsActiveWithin(
+        // listAllContractsActiveWithin: [100, 400] should return all 3 contracts
+        resultRange_100_400 <- store.listAllContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(400),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultRange_100_400
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2, coupon3)
 
         // And we should be able to extract results for each asOf from its result
-        // contractsActiveAsOf on the range result should match listContractsAsOf
+        // contractsActiveAsOf on the range result should match listAllContractsAsOf
         _ = TcsStore
           .contractsActiveAsOf(
             resultRange_100_400,
@@ -193,46 +187,42 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
             CantonTimestamp.ofEpochSecond(400),
           ) shouldBe resultAt400
 
-        // Also confirm listContractsActiveWithin for various ranges
-        resultRange_100_200 <- store.listContractsActiveWithin(
+        // Also confirm listAllContractsActiveWithin for various ranges
+        resultRange_100_200 <- store.listAllContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(200),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultRange_100_200
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2)
 
-        resultRange_100_300 <- store.listContractsActiveWithin(
+        resultRange_100_300 <- store.listAllContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(300),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultRange_100_300
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2, coupon3)
 
-        resultRange_200_300 <- store.listContractsActiveWithin(
+        resultRange_200_300 <- store.listAllContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(200),
           CantonTimestamp.ofEpochSecond(300),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultRange_200_300
           .map(_.contractWithState.contract)
           .toSet shouldBe Set(coupon1, coupon2, coupon3)
 
-        resultRange_300_400 <- store.listContractsActiveWithin(
+        resultRange_300_400 <- store.listAllContractsActiveWithin(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(300),
           CantonTimestamp.ofEpochSecond(400),
           d1,
-          HardLimit.tryCreate(10),
         )
         _ = resultRange_300_400
           .map(_.contractWithState.contract)
@@ -323,26 +313,24 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         lookupError.getMessage should include("lookupContractByIdAsOf requires an AcsArchiveConfig")
 
         val listError = the[IllegalStateException] thrownBy {
-          store.listContractsAsOf(
+          store.listAllContractsAsOf(
             AppRewardCoupon.COMPANION,
             CantonTimestamp.Epoch,
             d1,
-            HardLimit.tryCreate(10),
           )
         }
-        listError.getMessage should include("listContractsAsOf requires an AcsArchiveConfig")
+        listError.getMessage should include("listAllContractsAsOf requires an AcsArchiveConfig")
 
         val rangeError = the[IllegalStateException] thrownBy {
-          store.listContractsActiveWithin(
+          store.listAllContractsActiveWithin(
             AppRewardCoupon.COMPANION,
             CantonTimestamp.Epoch,
             CantonTimestamp.Epoch,
             d1,
-            HardLimit.tryCreate(10),
           )
         }
         rangeError.getMessage should include(
-          "listContractsActiveWithin requires an AcsArchiveConfig"
+          "listAllContractsActiveWithin requires an AcsArchiveConfig"
         )
       }
     }
