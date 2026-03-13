@@ -109,7 +109,7 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
           val license =
             aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
               .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorBackend.getValidatorPartyId())
-          license.data.lastActiveAt should not be initialLastActiveAt
+          license.data.lastActiveAt.toScala.value should be > initialLastActiveAt.toScala.value
         }
       }
 
