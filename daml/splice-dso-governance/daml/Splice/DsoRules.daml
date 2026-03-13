@@ -1037,10 +1037,10 @@ template DsoRules with
     nonconsuming choice DsoRules_MergeValidatorPermission : DsoRules_MergeValidatorPermissionResult
       with
         validatorPermissionCids : [ContractId ValidatorPermission]
-        sv : Optional Party
+        sv : Party
       controller sv
       do 
-         _ <- getAndValidateSvParty this sv
+         _ <- getAndValidateSvParty this (Some sv)
          require "Number of ValidatorPermission contracts to merge is >= 2" (length validatorPermissionCids >= 2)
          
          permissions <- forA validatorPermissionCids $ fetchAndArchive (ForDso this.dso)
