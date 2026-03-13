@@ -107,11 +107,11 @@ template AmuletAllocationV2
                 amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
 
               pure V2.Allocation_SettleResult with
-                newHoldingCids = [toInterfaceContractId newHoldingCid]
+                authorizerHoldingCids = [toInterfaceContractId newHoldingCid]
                 meta = emptyMetadata
           else
             pure V2.Allocation_SettleResult with
-              newHoldingCids = mempty
+              authorizerHoldingCids = mempty
               meta = emptyMetadata
         else do
           -- Net debit of Amulet ==> archive the locked amulet
@@ -121,7 +121,7 @@ template AmuletAllocationV2
              require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
 
           pure V2.Allocation_SettleResult with
-            newHoldingCids = mempty
+            authorizerHoldingCids = mempty
             meta = emptyMetadata
 
 

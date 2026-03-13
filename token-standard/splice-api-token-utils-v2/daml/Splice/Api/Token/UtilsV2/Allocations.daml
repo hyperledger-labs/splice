@@ -1,29 +1,29 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | FIXME: comment
+-- | Internal module of utilities to implement V2 allocations and settlement factories.
+--
+-- Import 'Splice.Api.Token.UtilsV2' to get access to them.
 module Splice.Api.Token.UtilsV2.Allocations (
 
-  -- * Allocation facctory
+  -- * Allocation implementation
   allocationV2_defaultSettleImplUsingV1,
   allocationV2_defaultWithdrawImplUsingV1,
   allocationV2_defaultCancelImplUsingV1,
 
+  -- * SettlementFactory implementation
   settlementFactoryV2_defaultSettleBatchImpl,
 
   validateAndPrepareAllocations,
-
-  -- * Non-standard conversions
-  upcast_v1_v2_AllocationView,
-
-  -- * Allocation utilities
   netAllocationCreditAmount,
 
+  -- * Non-standard conversions of allocation types
+  upcast_v1_v2_AllocationView,
 ) where
 
 import DA.Either (partitionEithers)
 import DA.Foldable (forA_)
-import DA.List (dedup, head)
+import DA.List (head)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import DA.Text qualified as T
@@ -41,7 +41,6 @@ import Splice.Api.Token.UtilsV2.Choices
 -- Allocation utilities
 ------------------------
 
-
 -- | Net credit of an allocation. Positive for a credit and negative for a debit.
 netAllocationCreditAmount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> Decimal
 netAllocationCreditAmount authorizer transferLegs =
@@ -55,7 +54,11 @@ netAllocationCreditAmount authorizer transferLegs =
 -- Allocation choices
 ---------------------
 
-
+-- | Default implementation for the `V2.Allocation_Settle` for a template that
+-- implements the `V1.Allocation` interface.
+--
+-- It uses the `V1.Allocation_ExecuteTransfer` choice to ensure the sender's tx
+-- parsing sees the expected choice.
 allocationV2_defaultSettleImplUsingV1
   : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
@@ -64,20 +67,23 @@ allocationV2_defaultSettleImplUsingV1
 allocationV2_defaultSettleImplUsingV1 this self arg@(AllocationV2.Allocation_Settle{..}) = do
   -- no archive of self, as the V1 choice is consuming
   onlyAllowDefaultControllers' "V2.Allocation_Settle" this arg
-  -- use the AllocationV1.Allocation_ExecuteTransfer choice to ensure the sender's tx parsing sees the expected choice
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_ExecuteTransfer with extraArgs
-  -- Archive the receiver holdings
-  forA_ result.receiverHoldingCids $ \receiverHoldingCid -> do
-    exercise receiverHoldingCid Archive
-    -- This is required, as the receiver will get their credit as part of settling their allocation.
-    -- The receiver parses this tranaction using the V2 choices and will thus understand it.
-
+  -- Archive the receiver holdings,
+  -- which is required, as the receiver will get their credit as part of
+  -- settling their allocation. The receiver parses this transaction using the
+  -- V2 choices and will thus understand it.
+  forA_ result.receiverHoldingCids $ \receiverHoldingCid ->
+    archive receiverHoldingCid
   pure AllocationV2.Allocation_SettleResult with
-    newHoldingCids = map upcast result.senderHoldingCids
-    meta = result.meta
+    authorizerHoldingCids = map upcast result.senderHoldingCids
+    meta = emptyMetadata -- empty to avoid duplicating the metadata
 
-
+-- | Default implementation for the `V2.Allocation_Withdraw` for a template that
+-- implements the `V1.Allocation` interface.
+--
+-- It uses the `V1.Allocation_Withdraw` choice to ensure the sender's tx parsing
+-- sees the expected choice.
 allocationV2_defaultWithdrawImplUsingV1
   : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
@@ -91,8 +97,13 @@ allocationV2_defaultWithdrawImplUsingV1 this self (AllocationV2.Allocation_Withd
     extraArgs
   pure AllocationV2.Allocation_WithdrawResult with
     authorizerHoldingCids = map upcast result.senderHoldingCids
-    meta = result.meta
+    meta = emptyMetadata -- empty to avoid duplicating the metadata
 
+-- | Default implementation for the `V2.Allocation_Cancel` for a template that
+-- implements the `V1.Allocation` interface.
+--
+-- It uses the `V1.Allocation_Cancel` choice to ensure the sender's tx parsing
+-- sees the expected choice.
 allocationV2_defaultCancelImplUsingV1
   : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
@@ -106,12 +117,13 @@ allocationV2_defaultCancelImplUsingV1 this self arg@(AllocationV2.Allocation_Can
     extraArgs
   pure AllocationV2.Allocation_CancelResult with
     authorizerHoldingCids = map upcast result.senderHoldingCids
-    meta = result.meta
+    meta = emptyMetadata -- empty to avoid duplicating the metadata
 
 
 -- Batch settlement
 -------------------
 
+-- | Internal type to hold the results of validating and preparing the allocations for batch settlement.
 data PreparedAllocations = PreparedAllocations with
     allocationsSettledUsingV1 : [((ContractId AllocationV2.Allocation, AllocationV2.AllocationView), AllocationV2.TransferLeg)]
       -- ^ Allocations that should be settled using -- V1.Allocation_ExecuteTransfer because they have no matching V2
@@ -165,7 +177,7 @@ settlementFactoryV2_defaultSettleBatchImpl factory0 self arg@(AllocationV2.Settl
       -- Use default controllers as the actors
       actors = AllocationV2.defaultAllocation_SettleControllers allocView
       extraArgs
-    pure (Map.singleton allocView.allocation.authorizer result.newHoldingCids)
+    pure (Map.singleton allocView.allocation.authorizer result.authorizerHoldingCids)
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with
@@ -210,9 +222,7 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
         pure (authorizer, leg)
 
   let hasMatchingV2Allocation (_, v1Leg) = (v1Leg.receiver, v1Leg) `Set.member` v2Legs
-
   let (matchedV1Allocations, unmatchedV1Allocations) = partition hasMatchingV2Allocation v1Allocations
-
   let allocationsSettledUsingV1 = unmatchedV1Allocations
 
   -- We settle V1 allocations that are matched with a V2 allocation using the V2 API to
@@ -222,58 +232,72 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
   let allocationsSettledUsingV2 = map fst matchedV1Allocations ++ v2Allocations
 
   -- check that all legs match up
-  let allocatedV1Legs = Map.fromList $ concat $ do
+  let allocatedV1Legs = do
         (_, leg) <- allocationsSettledUsingV1
-        pure $ dedup [((leg.sender, leg), []), ((leg.receiver, leg), [])]
+        -- Note that the receiver implicitly gives their authorization as part of the settlement
+        -- execution. We can thus consider their leg as authorized as well.
+        authLeg <- toAuthorizedLegs leg
+        pure (authLeg, (authLeg, [])) -- no remaining authorizations, as V1 allocations can be executed in any order
 
-  let allocatedV2Legs = Map.fromList $ do
+  let allocatedV2Legs : [(AuthorizedLeg, (AuthorizedLeg, [AuthorizedLeg]))] = do
         (_, allocationView) <- allocationsSettledUsingV2
         let authorizer = allocationView.allocation.authorizer
         case allocationView.allocation.transferLegs of
           [] -> error "Unexpected empty transfer legs in allocation"
-          (leg::legs) -> pure ((authorizer, leg), map ((,) authorizer) legs)
+          (leg::legs) -> do
+             let authLeg = (authorizer, leg)
+             pure (authLeg, (authLeg, map ((,) authorizer) legs))
+
+  let allocatedLegs = snd <$> Map.fromListWithR errorOnDuplicate (allocatedV1Legs ++ allocatedV2Legs)
+
+  let expectedLegs = concatMap toAuthorizedLegs transferLegs
+  validateAuthorizedTransfers expectedLegs allocatedLegs
 
   -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
-  -- of validateExpectedTransfers and netAllocationAmount but rather be safe than sorry
-
-  -- We allow self-transfers as future extensions might customize them via additional metadata.
-  let expectedLegs = concatMap (\leg -> dedup [(leg.sender, leg), (leg.receiver, leg)]) transferLegs
-  validateExpectedTransfers ppLeg expectedLegs (allocatedV1Legs `Map.union` allocatedV2Legs)
+  -- of validateAuthorizedTransfers and netAllocationAmount but rather be safe than sorry
 
   pure PreparedAllocations with
     allocationsSettledUsingV1 = unmatchedV1Allocations
     allocationsSettledUsingV2 = allocationsSettledUsingV2
 
+errorOnDuplicate : (Show k, Show v) => (k, v) -> (k, v) -> (k, v)
+errorOnDuplicate (k, v1) (_, v2) = error $ T.unlines
+  [ "Duplicate transfer leg authorization: "
+  , "authorizer and leg: " <> show k
+  , "other legs 1: " <> show v1
+  , "other legs 2: " <> show v2
+  ]
 
-validateExpectedTransfers
-  : (Show leg, Ord leg) => (leg -> Text) -> [leg] -> Map.Map leg [leg] -> Update ()
-validateExpectedTransfers pp [] allocated
+-- | Helper type of a transfer leg together with its authorizer.
+type AuthorizedLeg = (HoldingV2.Account, AllocationV2.TransferLeg)
+
+toAuthorizedLegs : AllocationV2.TransferLeg -> [AuthorizedLeg]
+toAuthorizedLegs leg
+  | leg.sender == leg.receiver = [(leg.sender, leg)] -- self-transfers are authorized only once
+  | otherwise = [(leg.sender, leg), (leg.receiver, leg)]
+
+-- | Check the expected transfers are authorized in the expected order.
+validateAuthorizedTransfers : [AuthorizedLeg] -> Map.Map AuthorizedLeg [AuthorizedLeg] -> Update ()
+validateAuthorizedTransfers [] allocated
   | Map.null allocated  =  pure ()
-  | otherwise = abort $ "Unexpected remaining allocated transfer legs:\n" <> ppMap pp allocated
-validateExpectedTransfers pp (expected :: expectedRest) allocated =
+  | otherwise = abort $ "Unexpected remaining allocated transfer legs:\n" <> prettyMap allocated
+validateAuthorizedTransfers (expected :: expectedRest) allocated =
   case Map.lookup expected allocated of
     None -> abort $ T.unlines
       [ "No matching allocations for expected transfer leg: "
-      , pp expected
+      , show expected
       , "with open allocations: "
-      , ppMap pp allocated
+      , prettyMap allocated
       , "remaining expected legs: "
-      , T.unlines (map pp expectedRest)
+      , T.unlines (map show expectedRest)
       ]
-    Some [] -> validateExpectedTransfers pp expectedRest (Map.delete expected allocated)
+    Some [] -> validateAuthorizedTransfers expectedRest (Map.delete expected allocated)
     Some (newExpected::newRemaining) ->
-      validateExpectedTransfers pp expectedRest $
+      validateAuthorizedTransfers expectedRest $
         Map.insert newExpected newRemaining $ Map.delete expected allocated
 
--- FIXME: cleanup this debug pretty-printing code
-ppMap : (leg -> Text) -> Map.Map leg [leg] -> Text
-ppMap pp m = T.unlines $ concat [ pp k :: map (\v -> "  " <> pp v) vs  | (k, vs) <- Map.toList m ]
-
-ppLeg : (HoldingV2.Account, AllocationV2.TransferLeg) -> Text
-ppLeg (authorizer, leg) =
-  -- show (authorizer.owner, leg.sender.owner, leg.receiver.owner, leg.amount)
-  show (authorizer, leg)
-
+prettyMap : Show leg => Map.Map leg [leg] -> Text
+prettyMap m = T.unlines $ concat [ show k :: map (\v -> "  " <> show v) vs  | (k, vs) <- Map.toList m ]
 
 
 

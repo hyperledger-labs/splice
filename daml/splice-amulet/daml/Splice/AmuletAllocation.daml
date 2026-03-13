@@ -67,13 +67,11 @@ template AmuletAllocation
       allocation_settleImpl = allocationV2_defaultSettleImplUsingV1 (toInterface this)
 
 
+-- Allocation usage
+-------------------
 
 allocationInstrumentAdmin : V1.AllocationSpecification -> Party
 allocationInstrumentAdmin V1.AllocationSpecification{..} = transferLeg.instrumentId.admin
-
-
--- Allocation usage
--------------------
 
 allocationToTwoStepTransfer : V1.AllocationSpecification -> TwoStepTransfer
 allocationToTwoStepTransfer allocation =

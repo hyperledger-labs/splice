@@ -271,8 +271,8 @@ defaultAllocation_CancelControllers allocView =
 
 -- | The result of settling an allocation by exercising the `Allocation_Settle` choice.
 data Allocation_SettleResult = Allocation_SettleResult with
-    newHoldingCids : [ContractId Holding]
-      -- ^ New holdings created as part of the settlement.
+    authorizerHoldingCids : [ContractId Holding]
+      -- ^ New holdings created for the authorizer as part of the settlement.
     meta : Metadata
       -- ^ Additional metadata specific to the settlement, used for extensibility.
   deriving (Eq, Show)
@@ -307,10 +307,6 @@ data SettlementFactoryView = SettlementFactoryView with
     meta : Metadata
       -- ^ Additional metadata specific to the settlement factory, used for extensibility.
   deriving (Show, Eq)
-
-defaultSettlementFactory_SettleBatchControllers : SettlementFactory_SettleBatch -> [Party]
-defaultSettlementFactory_SettleBatchControllers arg =
-    arg.settlement.executor :: arg.settlementV1Authorizers
 
 -- | A settlement factory enables the net settlement of a batch of allocations
 -- for the same instrument admin.
@@ -397,6 +393,14 @@ interface SettlementFactory where
         -- FIXME: switch to multiple actors for extensibility
     controller actor
     do settlementFactory_publicFetchImpl this self arg
+
+
+-- Default controllers
+----------------------
+
+defaultSettlementFactory_SettleBatchControllers : SettlementFactory_SettleBatch -> [Party]
+defaultSettlementFactory_SettleBatchControllers arg =
+    arg.settlement.executor :: arg.settlementV1Authorizers
 
 
 -- Result type
