@@ -603,3 +603,88 @@ testGrantValidatorPermission = do
   fullyRevokedPermission.isRevoked === True
 
   pure ()
+
+
+testMergeValidatorPermission : Script ()
+testMergeValidatorPermission = do
+  (app, dso, (sv1, sv2, _, _)) <- initDevNet
+
+  v1 <- allocateParty "v1"
+  v2 <- allocateParty "v2"
+  now <- getTime
+
+  let participant1 = "PAR:participant-1::namespace"
+  let participant2 = "PAR:participant-2::namespace"
+
+  -- Create 3 duplicate permissions for v1 on participant1 with different revocation states.
+  perm1Cid <- submit dso $ createCmd ValidatorPermission with
+    dso
+    sponsor = sv1
+    validator = v1
+    validatorParticipantId = participant1
+    loginAfter = None
+    isRevoked = False
+
+  perm2Cid <- submit dso $ createCmd ValidatorPermission with
+    dso
+    sponsor = sv1
+    validator = v1
+    validatorParticipantId = participant1
+    loginAfter = Some (now `addRelTime` hours 1)
+    isRevoked = True
+
+  perm3Cid <- submit dso $ createCmd ValidatorPermission with
+    dso
+    sponsor = sv2
+    validator = v1
+    validatorParticipantId = participant1
+    loginAfter = Some (now `addRelTime` hours 2)
+    isRevoked = False
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- Test 1: Successful merge
+  DsoRules_MergeValidatorPermissionResult mergedCid <-
+    submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+      validatorPermissionCids = [perm1Cid, perm2Cid, perm3Cid]
+      sv = sv1
+
+  Some mergedPerm <- queryContractId dso mergedCid
+  mergedPerm.validator === v1
+  mergedPerm.validatorParticipantId === participant1
+  mergedPerm.isRevoked === True 
+  mergedPerm.loginAfter === Some (now `addRelTime` hours 2) 
+
+  -- Test 2: Failure on less than 2 contracts
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+    validatorPermissionCids = [mergedCid]
+    sv = sv1
+
+  -- Test 3: Failure on different validators
+  permV2Cid <- submit dso $ createCmd ValidatorPermission with
+    dso
+    sponsor = sv1
+    validator = v2
+    validatorParticipantId = participant1
+    loginAfter = None
+    isRevoked = False
+
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+    validatorPermissionCids = [mergedCid, permV2Cid]
+    sv = sv1
+
+  -- Test 4: Failure on different participant IDs
+  permParticipant2Cid <- submit dso $ createCmd ValidatorPermission with
+    dso
+    sponsor = sv1
+    validator = v1
+    validatorParticipantId = participant2
+    loginAfter = None
+    isRevoked = False
+
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_MergeValidatorPermission with
+    validatorPermissionCids = [mergedCid, permParticipant2Cid]
+    sv = sv1
+
+  pure ()
+
