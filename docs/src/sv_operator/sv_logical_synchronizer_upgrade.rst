@@ -72,7 +72,9 @@ Concretely, the procedure is as follows:
 
    .. todo:: add more details once this is implemented
 
-4. All validators and super validators use an endpoint on the validator app to initiate the participant to migrate to the new synchronizer node.
+4. Super Validators configure their scan to indicate to validators that they should roll forward to a new synchronizer.
+
+5. Validator app automation picks up that configuration and initiates a manual roll-forward LSU to the new synchronizer.
 
 Note that depending on how exactly the old synchronizer failed, validators may desynchronize if some validators have observed a transaction before the failure while others have not.
 In that case, the participant will produce ACS mismatches that should be resolved using the `standard ACS mismatch resolution process <https://docs.digitalasset.com/operate/3.4/howtos/troubleshoot/commitments.html>`_ after migrating to the new physical synchronizer.
