@@ -245,7 +245,7 @@ class ExecuteConfirmedActionTrigger(
           case _: SRARC_CreateBootstrapExternalPartyConfigStateInstruction =>
             for {
               instructionO <- store.lookupBootstrapExternalPartyConfigStateInstruction()
-              configStateExists <- store.externalPartyConfigStateExistsWithOffset()
+              configStateExists <- store.existsExternalPartyConfigStateWithOffset()
             } yield instructionO.isDefined || configStateExists.value
           case action =>
             throw new UnsupportedOperationException(

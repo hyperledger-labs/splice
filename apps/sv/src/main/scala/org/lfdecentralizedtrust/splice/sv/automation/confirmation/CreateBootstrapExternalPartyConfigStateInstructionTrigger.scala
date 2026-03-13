@@ -37,7 +37,7 @@ class CreateBootstrapExternalPartyConfigStateInstructionTrigger(
 
   override def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Unit]] = {
     for {
-      configStateExists <- dsoStore.externalPartyConfigStateExistsWithOffset()
+      configStateExists <- dsoStore.existsExternalPartyConfigStateWithOffset()
       supports24hSubmissionDelay <- packageVersionSupport
         .supports24hSubmissionDelayDsoGovernance(
           Seq(dsoStore.key.dsoParty, dsoStore.key.svParty),
@@ -54,7 +54,7 @@ class CreateBootstrapExternalPartyConfigStateInstructionTrigger(
   override def completeTask(
       task: Unit
   )(implicit tc: TraceContext): Future[TaskOutcome] =
-    dsoStore.externalPartyConfigStateExistsWithOffset().flatMap {
+    dsoStore.existsExternalPartyConfigStateWithOffset().flatMap {
       case QueryResult(_, true) =>
         Future.successful(
           TaskSuccess(

@@ -53,7 +53,7 @@ trait ExternalPartyConfigStateStore extends AppStore {
 
   // Only intended for deduplication for initial bootstrapping, not returning the
   // contract as we arbitrarily pick one of the two which is misleading.
-  def externalPartyConfigStateExistsWithOffset()(implicit tc: TraceContext): Future[
+  def existsExternalPartyConfigStateWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Boolean]
   ] = multiDomainAcsStore
     .findAnyContractWithOffset(ExternalPartyConfigState.COMPANION)
