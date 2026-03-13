@@ -54,26 +54,30 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
 
         val targetRound = openRounds.minBy(_.payload.round.number)
 
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitJava(
-            actAs = Seq(validatorParty),
-            commands = license.id
-              .exerciseValidatorLicense_RecordValidatorLivenessActivity(
-                targetRound.contractId
-              )
-              .commands
-              .asScala
-              .toSeq,
-            readAs = Seq(validatorParty),
-            disclosedContracts =
-              DisclosedContracts.forTesting(targetRound).toLedgerApiDisclosedContracts,
-          )
-
-        eventually() {
-          val records = sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(ValidatorLivenessActivityRecord.COMPANION)(dsoParty)
-          records should have size 1
-        }
+        actAndCheck(
+          "Submit RecordValidatorLivenessActivity",
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              actAs = Seq(validatorParty),
+              commands = license.id
+                .exerciseValidatorLicense_RecordValidatorLivenessActivity(
+                  targetRound.contractId
+                )
+                .commands
+                .asScala
+                .toSeq,
+              readAs = Seq(validatorParty),
+              disclosedContracts =
+                DisclosedContracts.forTesting(targetRound).toLedgerApiDisclosedContracts,
+            ),
+        )(
+          "ValidatorLivenessActivityRecord is created",
+          _ => {
+            val records = sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(ValidatorLivenessActivityRecord.COMPANION)(dsoParty)
+            records should have size 1
+          },
+        )
       }
 
       clue(
