@@ -421,11 +421,26 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       ),
     )
 
+  private val archiveTableName = "acs_store_archived_test"
+
   override protected def cleanDb(
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = {
+    import storage.api.jdbcProfile.api.*
     for {
       _ <- resetAllAppTables(storage)
+      _ <- storage.queryAndUpdate(
+        sqlu"""create table if not exists #$archiveTableName(
+            like acs_store_template including all,
+            foreign key (store_id) references store_descriptors(id),
+            archived_at bigint not null
+          )""",
+        "createArchiveTestTable",
+      )
+      _ <- storage.queryAndUpdate(
+        sqlu"truncate #$archiveTableName",
+        "truncateArchiveTestTable",
+      )
     } yield ()
   }
 }
