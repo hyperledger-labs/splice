@@ -13,7 +13,6 @@ import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
-import Splice.Api.Token.AllocationInstructionV2 as Api.Token.AllocationInstructionV2
 import Splice.Api.Token.AllocationRequestV2
 import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationRequestV1 qualified as AllocationRequestV1
@@ -82,6 +81,14 @@ template OTCTradeAllocationRequest with
       allocationRequest_RejectImpl = error "Not implemented for V1"
       allocationRequest_WithdrawImpl = error "Not implemented for V1"
 
+mkOtcTradeSettlementInfo : ContractId OTCTrade -> OTCTrade -> Api.Token.AllocationV2.SettlementInfo
+mkOtcTradeSettlementInfo otcTradeCid otcTrade = Api.Token.AllocationV2.SettlementInfo with
+  executor = otcTrade.venue
+  requestedAt = otcTrade.createdAt
+  settlementRef = makeTradeRef otcTradeCid
+  settleAt = otcTrade.settleAt
+  meta = emptyMetadata
+  settlementDeadline = otcTrade.settlementDeadline
 
 template OTCTrade with
     venue : Party
@@ -115,9 +122,9 @@ template OTCTrade with
 
     -- Nonconsuming to avoid disclosures inside.
     -- FIXME: check whether this really does what we want it to do
-    nonconsuming choice OTCTrade_Settle : [Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatchResult] -- FIXME: better type
+    nonconsuming choice OTCTrade_Settle : [Api.Token.AllocationV2.SettlementFactory_SettleBatchResult] -- FIXME: better type
       with
-        allocationBatchesByAdmin : Map.Map Party (ContractId Api.Token.AllocationInstructionV2.AllocationFactory, [ContractId Api.Token.AllocationV2.Allocation], ExtraArgs)
+        allocationBatchesByAdmin : Map.Map Party (ContractId Api.Token.AllocationV2.SettlementFactory, [ContractId Api.Token.AllocationV2.Allocation], ExtraArgs)
         -- ^ Allocations sorted by admin party
         allocationRequests : [ContractId OTCTradeAllocationRequest]
       controller venue, settlementV1Authorizers
@@ -134,10 +141,11 @@ template OTCTrade with
         require "Admins of batches match expected legs" (Map.keys allocationBatchesByAdmin == Map.keys transferLegsByAdmin)
         forA (Map.toList allocationBatchesByAdmin) $ \(admin, (factoryCid, allocationCids, extraArgs)) -> do
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
-          exercise factoryCid Api.Token.AllocationInstructionV2.AllocationFactory_SettleBatch with
+          exercise factoryCid Api.Token.AllocationV2.SettlementFactory_SettleBatch with
             expectedAdmin = admin
             actors = venue :: settlementV1Authorizers
             settlementV1Authorizers = settlementV1Authorizers
+            settlement = mkOtcTradeSettlementInfo self this
             transferLegs
             allocationCids
             extraArgs

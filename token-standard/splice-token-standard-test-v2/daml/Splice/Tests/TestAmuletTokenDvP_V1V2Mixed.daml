@@ -221,8 +221,9 @@ testDvP_mixed = script do
             ((allocAdmin, _authorizer), (allocCid, _allocView)) <- Map.toList allocationsMap
             guard (allocAdmin == admin)
             pure allocCid
-      context <- RegistryApi.getAllocationFactory_SettleBatch registry AllocationFactory_SettleBatch with
+      context <- RegistryApi.getSettlementFactory_SettleBatch registry SettlementFactory_SettleBatch with
         expectedAdmin = registry.dso
+        settlement = mkOtcTradeSettlementInfo otcTradeCid otcTrade
         transferLegs
         allocationCids
         extraArgs = emptyExtraArgs

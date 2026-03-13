@@ -84,7 +84,7 @@ data AmuletRegistry = AmuletRegistry with
 instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
-  getAllocationFactory_SettleBatch = registryApi_getAllocationFactory_SettleBatch
+  getSettlementFactory_SettleBatch = registryApi_getSettlementFactory_SettleBatch
   getAllocation_TransferContext app cid _meta = registryApi_getAllocationTransferContext app cid
   getAllocation_WithdrawContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
@@ -247,11 +247,11 @@ registryApi_getAllocationFactory registry arg = do
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
     disclosures = fullContext.disclosures
 
-registryApi_getAllocationFactory_SettleBatch
+registryApi_getSettlementFactory_SettleBatch
   : AmuletRegistry
-  -> AllocationFactory_SettleBatch
-  -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_SettleBatch)
-registryApi_getAllocationFactory_SettleBatch registry arg = do
+  -> SettlementFactory_SettleBatch
+  -> Script (EnrichedFactoryChoice SettlementFactory SettlementFactory_SettleBatch)
+registryApi_getSettlementFactory_SettleBatch registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   -- FIXME: trim context
   transferC <- getExternalPartyConfigStateContext registry
@@ -272,7 +272,7 @@ registryApi_getAllocationFactory_SettleBatch registry arg = do
   let fullContext = withExtraDisclosures (extAmuletRulesD <> mconcat lockedDs) transferC
 
   pure EnrichedFactoryChoice with
-    factoryCid = toInterfaceContractId @AllocationFactory extAmuletRulesCid
+    factoryCid = toInterfaceContractId @SettlementFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
     disclosures = fullContext.disclosures
 

@@ -44,17 +44,17 @@ interface AllocationRequest where
     do allocationRequest_WithdrawImpl this self arg
 
 
--- | View of `AllocationRequest`.
+-- | View of an `AllocationRequest`.
 --
--- Implementations SHOULD make sure that at least all senders of the transfer legs
--- are observers of the implementing contract, so that their wallet can show
--- the request to them.
+-- Implementations SHOULD make sure that the account owners and providers of all
+-- sender and receiver accounts of the transfer legs are observers of the implementing
+-- contract, so that their wallet can show the request to them.
 data AllocationRequestView = AllocationRequestView with
     settlement : SettlementInfo
-      -- ^ Settlement for which the assets are requested to be allocated.
+      -- ^ Settlement for which allocations are requested to be created.
     transferLegs : [TransferLeg]
-      -- ^ Transfer legs that are requested to be allocated for the execution of the settlement
-      -- keyed by their identifier.
+      -- ^ Transfer legs that are requested to be authorized for execution as
+      -- part of the settlement.
       --
       -- This may or may not be a complete list of transfer legs that are part of the settlement,
       -- depending on the confidentiality requirements of the app.

@@ -352,10 +352,10 @@ v1ToHoldingMap instrumentId holdingCids =
 
 -- FIXME: adjust name; and ensure we use the legs from the batch settlement call itself
 amulet_allocationFactoryV2_settleImpl
-  : AllocationInstructionV2.AllocationFactory
-  -> AllocationInstructionV2.AllocationFactory_SettleBatch
-  -> Update AllocationInstructionV2.AllocationFactory_SettleBatchResult
-amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.AllocationFactory_SettleBatch {..}) = do
+  : AllocationV2.SettlementFactory
+  -> AllocationV2.SettlementFactory_SettleBatch
+  -> Update AllocationV2.SettlementFactory_SettleBatchResult
+amulet_allocationFactoryV2_settleImpl factory (AllocationV2.SettlementFactory_SettleBatch {..}) = do
   -- validate call to factory and retrieve context
   let admin = (view factory).admin
   requireExpectedAdminMatch admin expectedAdmin
@@ -452,7 +452,7 @@ amulet_allocationFactoryV2_settleImpl factory (AllocationInstructionV2.Allocatio
     pure result.newHoldingCids
 
   -- return result
-  pure AllocationInstructionV2.AllocationFactory_SettleBatchResult with
+  pure AllocationV2.SettlementFactory_SettleBatchResult with
     newHoldingCids = mconcat newHoldingCidssV1 <> mconcat newHoldingCidssV2
     meta = emptyMetadata
 

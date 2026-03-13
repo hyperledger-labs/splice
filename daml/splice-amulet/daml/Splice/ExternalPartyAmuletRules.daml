@@ -15,6 +15,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationInstructionV1 qualified as V1
 import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.UtilsV2
@@ -102,12 +103,28 @@ template ExternalPartyAmuletRules
         meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactoryV2_allocateImpl this self arg
-      allocationFactory_settleImpl _self arg =
-        amulet_allocationFactoryV2_settleImpl (toInterface @V2.AllocationFactory this) arg
 
       allocationFactory_publicFetchImpl _self arg = do
         requireExpectedAdminMatch arg.expectedAdmin dso
         pure (view $ toInterface @V2.AllocationFactory this)
+
+    interface instance V2.SettlementFactory for ExternalPartyAmuletRules where
+      view = V2.SettlementFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      settlementFactory_settleBatchImpl _self arg =
+        amulet_allocationFactoryV2_settleImpl (toInterface @V2.SettlementFactory this) arg
+
+      -- Make all senders and receiver observers, so we get by with a single view for batch settlement of Amulet allocations
+      settlementFactory_settleBatchExtraObservers arg =
+        concatMap (\leg -> [leg.sender.owner, leg.receiver.owner]) arg.transferLegs
+
+      settlementFactory_publicFetchImpl _self arg = do
+        requireExpectedAdminMatch arg.expectedAdmin dso
+        pure (view $ toInterface @V2.SettlementFactory this)
+
+
 
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult

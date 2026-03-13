@@ -30,6 +30,7 @@ import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
 --
 -- Defined as a data type instead of a type synomym, as type synonyms are not
 -- supported across data dependencies.
+-- FIXME: remove, as it can be replaced by fetch
 data HoldingMap = HoldingMap with
     byInstrument : Map.Map InstrumentId [ContractId Holding]
   deriving (Show, Eq)
@@ -311,3 +312,118 @@ data Allocation_WithdrawResult = Allocation_WithdrawResult
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
+
+
+-- Settlement factory
+---------------------
+
+-- | View for `SettlementFactory`.
+data SettlementFactoryView = SettlementFactoryView with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instruments
+      -- for which this settlement factory can be used.
+    meta : Metadata
+      -- ^ Additional metadata specific to the settlement factory, used for extensibility.
+  deriving (Show, Eq)
+
+-- | A settlement factory enables the net settlement of a batch of allocations
+-- for the same instrument admin.
+interface SettlementFactory where
+  viewtype SettlementFactoryView
+
+  settlementFactory_publicFetchImpl : ContractId SettlementFactory -> SettlementFactory_PublicFetch -> Update SettlementFactoryView
+  settlementFactory_settleBatchImpl : ContractId SettlementFactory -> SettlementFactory_SettleBatch -> Update SettlementFactory_SettleBatchResult
+
+  settlementFactory_settleBatchExtraObservers : SettlementFactory_SettleBatch -> [Party]
+
+  nonconsuming choice SettlementFactory_SettleBatch : SettlementFactory_SettleBatchResult
+    -- ^ Settle a batch of allocations for instruments with the same instrument admin.
+    --
+    -- The choice is structured in this form for efficiency and privacy. It
+    -- enables the instrument admin to only perform net debits and credits for
+    -- each account across all transfers being settled; and restrict visibility of
+    -- each credit or debit to executor, admin, and affected account only.
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST
+        -- validate that this matches the admin of the factory.
+        --
+        -- Provided as an extra safeguard for callers to avoid calling the wrong
+        -- settlement factory.
+      settlement : SettlementInfo
+        -- ^ The settlement for which the allocations are settled.
+      transferLegs : [TransferLeg]
+        -- ^ The sequence of transfers to execute as part of the settlement.
+      allocationCids : [ContractId Allocation]
+        -- ^ Allocations to settle.
+        --
+        -- They serve as proof that all transfers executed as part of settlement
+        -- were authorized by both sender and receiver to happen in the order
+        -- specified by `transferLegs`.
+        --
+        -- The implementation of this choice determines the validation performed
+        -- by the instrument admin when settling an allocation created by an
+        -- instrument holder.
+
+        -- To minimize the risk of allocations being settled in the wrong
+        -- context, implementations SHOULD ensure that:
+        --
+        --  - the allocations were created for the `settlement` being settled
+        --  - the transfer legs of the allocations authorize both send and
+        --    receipt for the transfers in the order specified in `transferLegs`
+        --  - the `transferLegs` cover exactly the transfers authorized by the
+        --    allocations
+        --
+      settlementV1Authorizers : [Party]
+        -- ^ Parties authorizing the settlement of their V1 settlements.
+        --
+        -- They are a separate field from `actors` to provide explicit opt-in behavior.
+      actors : [Party]
+        -- ^ Actors executing the settlement.
+        --
+        -- Registries MUST check their concrete values to avoid unauthorized
+        -- settlement execution.
+        --
+        -- The `actors` SHOULD at least include all the settlement executor of
+        -- the settled settlements, and registries SHOULD allow successful
+        -- settlement if they do.
+
+        -- FIXME: consider switching to an `actorsOverride` optional field that is only used for extensibility. Thereby simplifying the default flows.
+
+      extraArgs : ExtraArgs
+        -- ^ Additional choice arguments.
+    observer settlementFactory_settleBatchExtraObservers this arg
+    controller actors
+    do settlementFactory_settleBatchImpl this self arg
+
+  nonconsuming choice SettlementFactory_PublicFetch : SettlementFactoryView
+    with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
+      actor : Party
+        -- ^ Party executing the fetch.
+        --
+        -- FIXME: switch to multiple actors
+    controller actor
+    do settlementFactory_publicFetchImpl this self arg
+
+
+-- Result type
+--------------
+
+-- | Result of settling a batch of allocations.
+data SettlementFactory_SettleBatchResult = SettlementFactory_SettleBatchResult with
+    newHoldingCids : HoldingMap
+    -- FIXME: switch to account map
+    -- newHoldingCids : Map.Map Account [ContractId Holding]
+      -- ^ New holdings created as part of the batch settlement, grouped by account
+      -- to enable chaining of actions on an account's holdings.
+    meta : Metadata
+      -- ^ Additional metadata specific to the batch settlement, used for extensibility.
+  deriving (Eq, Show)

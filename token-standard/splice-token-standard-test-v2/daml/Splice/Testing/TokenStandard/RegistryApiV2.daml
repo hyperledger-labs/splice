@@ -42,9 +42,9 @@ class RegistryApi app where
     -> Script (EnrichedFactoryChoice V2.AllocationFactory V2.AllocationFactory_Allocate)
 
   -- FIXME: better name
-  getAllocationFactory_SettleBatch
-    : app -> V2.AllocationFactory_SettleBatch
-    -> Script (EnrichedFactoryChoice V2.AllocationFactory V2.AllocationFactory_SettleBatch)
+  getSettlementFactory_SettleBatch
+    : app -> V2.SettlementFactory_SettleBatch
+    -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
 
   getAllocation_TransferContext
     : app -> ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
@@ -76,7 +76,7 @@ mkGenericRegistry app =
   GenericRegistry with
     ggetTransferFactory = getTransferFactory app
     ggetAllocationFactory = getAllocationFactory app
-    ggetAllocationFactory_SettleBatch = getAllocationFactory_SettleBatch app
+    ggetSettlementFactory_SettleBatch = getSettlementFactory_SettleBatch app
     ggetAllocation_TransferContext = getAllocation_TransferContext app
     ggetAllocation_WithdrawContext = getAllocation_WithdrawContext app
     ggetAllocation_CancelContext = getAllocation_CancelContext app
@@ -111,10 +111,9 @@ data GenericRegistry = GenericRegistry with
     : V2.AllocationFactory_Allocate
     -> Script (EnrichedFactoryChoice V2.AllocationFactory V2.AllocationFactory_Allocate)
 
-  -- FIXME: better name
-  ggetAllocationFactory_SettleBatch
-    : V2.AllocationFactory_SettleBatch
-    -> Script (EnrichedFactoryChoice V2.AllocationFactory V2.AllocationFactory_SettleBatch)
+  ggetSettlementFactory_SettleBatch
+    : V2.SettlementFactory_SettleBatch
+    -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
 
   ggetAllocation_TransferContext
     : ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
@@ -138,7 +137,7 @@ data GenericRegistry = GenericRegistry with
 instance RegistryApi GenericRegistry where
   getTransferFactory registry = registry.ggetTransferFactory
   getAllocationFactory registry = registry.ggetAllocationFactory
-  getAllocationFactory_SettleBatch registry = registry.ggetAllocationFactory_SettleBatch
+  getSettlementFactory_SettleBatch registry = registry.ggetSettlementFactory_SettleBatch
   getAllocation_TransferContext registry = registry.ggetAllocation_TransferContext
   getAllocation_WithdrawContext registry = registry.ggetAllocation_WithdrawContext
   getAllocation_CancelContext registry = registry.ggetAllocation_CancelContext
