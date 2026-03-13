@@ -12,7 +12,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
@@ -617,7 +620,7 @@ class ScanTimeBasedIntegrationTest
 
       val updateObjs = s3Objs.filter(_.key().contains("/updates"))
       val updatesFromS3 = updateObjs
-        .flatMap {obj =>
+        .flatMap { obj =>
           val out = new ByteArrayOutputStream()
           sv1ScanBackend.bulkStorageDownload(obj.key(), out).futureValue
           uncompressAndDecode(

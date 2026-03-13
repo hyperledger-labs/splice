@@ -4,16 +4,16 @@ import _root_.org.lfdecentralizedtrust.splice.http.v0.Implicits.*
 import _root_.org.lfdecentralizedtrust.splice.http.v0.PekkoHttpImplicits.*
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
-import org.apache.pekko.http.scaladsl.marshalling.{
-  Marshal,
-  ToEntityMarshaller,
-}
+import org.apache.pekko.http.scaladsl.marshalling.{Marshal, ToEntityMarshaller}
 import org.apache.pekko.http.scaladsl.util.FastFuture
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.*
 import scala.concurrent.{ExecutionContext, Future}
 
+/** We failed to convince Guardrail to not try and decode a binary stream as a json, so we ended up disabling client
+  * code generation for the streaming endpoints, and just manually create it (heavily based on the guardrail generated clients)
+  */
 object ScanStreamClient {
   def apply(host: String = "https://example.com")(implicit
       httpClient: HttpRequest => Future[HttpResponse],
@@ -106,7 +106,8 @@ class ScanStreamClient(host: String = "https://example.com")(implicit
               case StatusCodes.NotFound => notFound(resp)
               case _ => FastFuture.successful(Left(Right(resp)))
             }
-          ).recover({ case e: Throwable => Left(Left(e)) })
+          )
+          .recover({ case e: Throwable => Left(Left(e)) })
       )
     )
   }

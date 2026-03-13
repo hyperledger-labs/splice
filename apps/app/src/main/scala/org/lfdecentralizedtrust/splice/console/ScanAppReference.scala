@@ -5,29 +5,62 @@ package org.lfdecentralizedtrust.splice.console
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, UnclaimedDevelopmentFundCoupon}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext, TransferPreapproval}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{ExternalPartyAmuletRules, TransferCommandCounter}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AppTransferContext,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  ClosedMiningRound,
+  IssuingMiningRound,
+  OpenMiningRound,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{GetDsoInfoResponse, UpdateHistoryItem, UpdateHistoryItemV2}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  GetDsoInfoResponse,
+  UpdateHistoryItem,
+  UpdateHistoryItemV2,
+}
 import org.lfdecentralizedtrust.splice.scan.{ScanApp, ScanAppBootstrap}
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, ChoiceContextWithDisclosures, Contract, ContractWithState, FactoryChoiceWithDisclosures, PackageQualifiedName, SpliceUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  AmuletConfigSchedule,
+  ChoiceContextWithDisclosures,
+  Contract,
+  ContractWithState,
+  FactoryChoiceWithDisclosures,
+  PackageQualifiedName,
+  SpliceUtil,
+}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{allocationinstructionv1, allocationv1, transferinstructionv1}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationv1,
+  transferinstructionv1,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvOperatorAppClient
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.StreamConverters
@@ -721,7 +754,10 @@ abstract class ScanAppReference(
   }
 
   @Help.Summary("Download a bulk storage object")
-  def bulkStorageDownload(objectKey: String, output: OutputStream)(implicit ec: ExecutionContext, as: ActorSystem): Future[Long] =
+  def bulkStorageDownload(objectKey: String, output: OutputStream)(implicit
+      ec: ExecutionContext,
+      as: ActorSystem,
+  ): Future[Long] =
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.BulkStorageDownload(objectKey)

@@ -11,8 +11,10 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import io.opentelemetry.api.trace.Tracer
 
 class HttpScanStreamHandler(
-    s3Connection: S3BucketConnection
-)(implicit ec: ExecutionContextExecutor, protected val tracer: Tracer) extends v0.ScanStreamHandler[TraceContext] with Spanning {
+    s3Connection: Option[S3BucketConnection]
+)(implicit ec: ExecutionContextExecutor, protected val tracer: Tracer)
+    extends v0.ScanStreamHandler[TraceContext]
+    with Spanning {
 
   protected val workflowId: String = this.getClass.getSimpleName
 
@@ -21,12 +23,18 @@ class HttpScanStreamHandler(
   )(extracted: TraceContext): Future[ScanStreamResource.BulkStorageDownloadResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.bulkStorageDownload") { _ => _ =>
-      s3Connection
-        .readObject(objectKey)
-        .map(source =>
-          ScanStreamResource.BulkStorageDownloadResponse.OK(HttpEntity(ContentTypes.`application/octet-stream`, source))
+      s3Connection.fold(
+        throw new UnsupportedOperationException(
+          "s3 bucket connection not configured on this instance of Scan"
         )
-        .transform(HttpErrorHandler.onGrpcNotFound(s"Object $objectKey not found"))
+      )(
+        _.readObject(objectKey)
+          .map(source =>
+            ScanStreamResource.BulkStorageDownloadResponse
+              .OK(HttpEntity(ContentTypes.`application/octet-stream`, source))
+          )
+          .transform(HttpErrorHandler.onGrpcNotFound(s"Object $objectKey not found"))
+      )
     }
   }
 

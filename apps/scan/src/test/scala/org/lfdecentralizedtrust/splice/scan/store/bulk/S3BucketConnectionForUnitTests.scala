@@ -19,7 +19,9 @@ class S3BucketConnectionForUnitTests(
     override val loggerFactory: NamedLoggerFactory,
 ) extends S3BucketConnectionForTests(s3Config, loggerFactory) {
 
-  override def readFullObject(key: String)(implicit ec: ExecutionContext, as: ActorSystem): Future[ByteString] = {
+  override def readFullObject(
+      key: String
+  )(implicit ec: ExecutionContext, as: ActorSystem): Future[ByteString] = {
     val request = GetObjectRequest.builder.bucket(bucketName).key(key).build
     s3Client.getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse]).asScala.map {
       s3Stream =>

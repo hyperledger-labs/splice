@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Scan API
+  title: Scan Streaming API
   version: 0.0.1
 tags:
   - name: external
@@ -18,12 +18,16 @@ tags:
 servers:
   - url: https://example.com/api/scan
 paths:
+
+  # Note for developers working on this openAPI spec: we generate only server-side code from this file,
+  # not client-side. Client-side code in `ScanStreamClient` must be modified manually to reflect any changes in this spec.
+
   /v0/history/bulk/download/{object_key}:
     get:
       tags: [external, scan]
       x-jvm-package: scanStream
       operationId: "bulkStorageDownload"
-      description: TBD
+      description: Download a bulk storage object
       parameters:
         - name: "object_key"
           in: "path"
@@ -32,7 +36,7 @@ paths:
             type: string
       responses:
         "200":
-          description: TBD
+          description: ok
           content:
               application/octet-stream:
                 schema:

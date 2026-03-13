@@ -10,34 +10,86 @@ import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, UnclaimedDevelopmentFundCoupon}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext, TransferPreapproval}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{ExternalPartyAmuletRules, TransferCommandCounter}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AppTransferContext,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  ClosedMiningRound,
+  IssuingMiningRound,
+  OpenMiningRound,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
-import org.lfdecentralizedtrust.tokenstandard.{allocation, allocationinstruction, metadata, transferinstruction}
-import org.lfdecentralizedtrust.splice.http.v0.scan.{ForceAcsSnapshotNowResponse, GetDateOfFirstSnapshotAfterResponse, GetDateOfMostRecentSnapshotBeforeResponse}
-import org.lfdecentralizedtrust.splice.scan.admin.http.{CompactJsonScanHttpEncodings, ProtobufJsonScanHttpEncodings}
+import org.lfdecentralizedtrust.tokenstandard.{
+  allocation,
+  allocationinstruction,
+  metadata,
+  transferinstruction,
+}
+import org.lfdecentralizedtrust.splice.http.v0.scan.{
+  ForceAcsSnapshotNowResponse,
+  GetDateOfFirstSnapshotAfterResponse,
+  GetDateOfMostRecentSnapshotBeforeResponse,
+}
+import org.lfdecentralizedtrust.splice.scan.admin.http.{
+  CompactJsonScanHttpEncodings,
+  ProtobufJsonScanHttpEncodings,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{ChoiceContextWithDisclosures, Codec, Contract, ContractWithState, DomainRecordTimeRange, FactoryChoiceWithDisclosures, PackageQualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  ChoiceContextWithDisclosures,
+  Codec,
+  Contract,
+  ContractWithState,
+  DomainRecordTimeRange,
+  FactoryChoiceWithDisclosures,
+  PackageQualifiedName,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
-import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  Member,
+  ParticipantId,
+  PartyId,
+  SequencerId,
+  SynchronizerId,
+}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.scaladsl.Source
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{allocationinstructionv1, allocationv1, metadatav1, transferinstructionv1}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationv1,
+  metadatav1,
+  transferinstructionv1,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetFactoryRequest as GetTransferFactoryRequest
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.definitions.GetFactoryRequest as GetAllocationFactoryRequest
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.{BulkStorageDownloadResponse, ScanStreamClient}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
+  BulkStorageDownloadResponse,
+  ScanStreamClient,
+}
 
 import java.util.Base64
 import java.time.Instant
@@ -84,7 +136,8 @@ object HttpScanAppClient {
 
   abstract class ScanStreamBaseCommand[Res, Result]
       extends HttpCommand[Res, Result, ScanStreamClient] {
-    override val createGenClientFn = (fn, host, ec, mat) => ScanStreamClient.httpClient(fn, host)(ec, mat)
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      ScanStreamClient.httpClient(fn, host)(ec, mat)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -2434,8 +2487,7 @@ object HttpScanAppClient {
 
   case class BulkStorageDownload(
       objectKey: String
-                                )
-      extends ScanStreamBaseCommand[
+  ) extends ScanStreamBaseCommand[
         BulkStorageDownloadResponse,
         Source[org.apache.pekko.util.ByteString, Any],
       ] {
@@ -2448,9 +2500,11 @@ object HttpScanAppClient {
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): PartialFunction[BulkStorageDownloadResponse, Either[String, Source[org.apache.pekko.util.ByteString, Any]]] = {
-      case BulkStorageDownloadResponse.OK(response) =>
-        Right(response.dataBytes)
+    ): PartialFunction[BulkStorageDownloadResponse, Either[
+      String,
+      Source[org.apache.pekko.util.ByteString, Any],
+    ]] = { case BulkStorageDownloadResponse.OK(response) =>
+      Right(response.dataBytes)
     }
   }
 }

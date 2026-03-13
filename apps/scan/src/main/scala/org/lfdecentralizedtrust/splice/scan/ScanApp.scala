@@ -10,7 +10,16 @@ import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTrac
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
-import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResources, Node, PackageVersionSupport, ParticipantAdminConnection, RetryFor, SequencerAdminConnection, SpliceLedgerClient}
+import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
+  DarResources,
+  Node,
+  PackageVersionSupport,
+  ParticipantAdminConnection,
+  RetryFor,
+  SequencerAdminConnection,
+  SpliceLedgerClient,
+}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
@@ -18,16 +27,42 @@ import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.admin.http.{HttpScanHandler, HttpScanStreamHandler, HttpTokenStandardAllocationHandler, HttpTokenStandardAllocationInstructionHandler, HttpTokenStandardMetadataHandler, HttpTokenStandardTransferInstructionHandler}
-import org.lfdecentralizedtrust.splice.scan.automation.{ScanAutomationService, ScanVerdictAutomationService}
+import org.lfdecentralizedtrust.splice.scan.admin.http.{
+  HttpScanHandler,
+  HttpScanStreamHandler,
+  HttpTokenStandardAllocationHandler,
+  HttpTokenStandardAllocationInstructionHandler,
+  HttpTokenStandardMetadataHandler,
+  HttpTokenStandardTransferInstructionHandler,
+}
+import org.lfdecentralizedtrust.splice.scan.automation.{
+  ScanAutomationService,
+  ScanVerdictAutomationService,
+}
 import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanKeyValueProvider, ScanKeyValueStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanEventStore,
+  ScanKeyValueProvider,
+  ScanKeyValueStore,
+  ScanStore,
+}
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
-import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore, ScanAggregatesReader, ScanAggregatesReaderContext}
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
+  DbScanVerdictStore,
+  ScanAggregatesReader,
+  ScanAggregatesReaderContext,
+}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{ChoiceContextContractFetcher, PageLimit, S3BucketConnection, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  ChoiceContextContractFetcher,
+  PageLimit,
+  S3BucketConnection,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -336,8 +371,9 @@ class ScanApp(
         bftSequencersWithAdminConnections,
         initialRound,
       )
-      scanStreamHandler = config.bulkStorage.s3.fold(throw new RuntimeException(""))(s3Config =>
-        new HttpScanStreamHandler(S3BucketConnection(s3Config, loggerFactory)))
+      scanStreamHandler = new HttpScanStreamHandler(
+        config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))
+      )
       contractFetcher = ChoiceContextContractFetcher.createStoreWithLedgerFallback(
         config.parameters.contractFetchLedgerFallbackConfig,
         store,
@@ -415,7 +451,7 @@ class ScanApp(
                 ),
                 ScanStreamResource.routes(
                   scanStreamHandler,
-                  buildRouteForOperation(_, "scan_stream")
+                  buildRouteForOperation(_, "scan_stream"),
                 ),
                 TokenStandardTransferInstructionResource.routes(
                   tokenStandardTransferInstructionHandler,

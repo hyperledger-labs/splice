@@ -19,7 +19,9 @@ class S3BucketConnectionForTests(
 ) extends S3BucketConnection(s3Config, loggerFactory) {
   // Reads the full content of an s3 object into a ByteBuffer. Also verifies its checksum stored in the splice-checksum tag, and throws an assertion if it's missing or incorrect.
   // Use only for testing, when the object size is known to be small
-  def readFullObject(key: String)(implicit ec: ExecutionContext, as: ActorSystem): Future[ByteString] = {
+  def readFullObject(
+      key: String
+  )(implicit ec: ExecutionContext, as: ActorSystem): Future[ByteString] = {
     for {
       dataSrc <- readObject(key)
       data <- dataSrc.runWith(Sink.fold(ByteString.empty)(_ ++ _))

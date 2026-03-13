@@ -52,14 +52,18 @@ class S3BucketConnection(
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
 
-  def readObject(key: String)(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
-      val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+  def readObject(
+      key: String
+  )(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
 
-      s3Client.getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
-        .asScala
-        .map { publisher =>
-          org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
-        }.map{ _.map(ByteString.fromByteBuffer)}
+    s3Client
+      .getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
+      .asScala
+      .map { publisher =>
+        org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
+      }
+      .map { _.map(ByteString.fromByteBuffer) }
   }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
