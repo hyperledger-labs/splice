@@ -57,11 +57,10 @@ svs:
       # formerly the effect of `SEQUENCER_LOW_RESOURCES=true`
       resources:
         limits:
-          cpu: "3"
-          memory: 4Gi
+          memory: 8Gi
         requests:
-          cpu: "1"
-          memory: 2Gi
+          cpu: "4"
+          memory: 4Gi
       additionalEnvVars:
         - name: ADDITIONAL_CONFIG_DABFT_SCALE_SETTINGS
           value: |
