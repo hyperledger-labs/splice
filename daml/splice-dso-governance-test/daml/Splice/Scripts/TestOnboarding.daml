@@ -607,7 +607,7 @@ testGrantValidatorPermission = do
 
 testMergeValidatorPermission : Script ()
 testMergeValidatorPermission = do
-  (app, dso, (sv1, sv2, _, _)) <- initDevNet
+  (_, dso, (sv1, sv2, _, _)) <- initDevNet
 
   v1 <- allocateParty "v1"
   v2 <- allocateParty "v2"
