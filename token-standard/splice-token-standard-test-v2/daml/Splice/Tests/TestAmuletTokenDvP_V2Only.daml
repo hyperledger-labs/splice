@@ -1,16 +1,8 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Daml script tests showing that the token standard can be used to execute
--- DvP settlements of Amulet tokens; and how to do so.
---
--- See this test and the 'Splice.Testing.TradingApp' module for an example of
--- how to integrate with the allocation APIs of the token standard to execute
--- DvP settlements.
---
--- Note also that the delivery part of a DvP settelement can be both another
--- token implementing the standard, as well as the creation of on-ledger state
--- specific to your registry; e.g., a license contract.
+-- | Daml script tests showing that the token standard v2 can be used to
+-- to implement batch settlements with net amounts.
 module Splice.Tests.TestAmuletTokenDvP_V2Only where
 
 import Daml.Script
@@ -211,8 +203,6 @@ setupOtcTrade  = do
     feeLeg
 
 
--- FIXME: test multiple executor
-
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP : Script ()
 testDvP = script do
@@ -362,6 +352,8 @@ testDvPWithdraw = script do
 
 -- utilities
 ------------
+
+-- FIXME: share with the mixed-version settlement tests
 
 -- | List all allocations matching a particular settlement reference, sorted by their admin and trading account.
 -- This function would be run on the trading app provider's backend as part of an automation loop.

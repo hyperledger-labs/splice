@@ -57,10 +57,10 @@ template AmuletAllocation
     interface instance V2.Allocation for AmuletAllocation where
       view = upcast_v1_v2_AllocationView [[allocation.transferLeg.sender]] (view (toInterface @V1.Allocation this))
 
-      -- no extra observers required, as the choice bodies do not introduce further informees
       allocation_settleExtraObservers _arg = []
-      allocation_cancelExtraObservers _arg = []
-      allocation_withdrawExtraObservers _arg = []
+      -- add the executor as an extra observer, as they otherwise only see the V1 choice by default
+      allocation_cancelExtraObservers _arg = [allocation.settlement.executor]
+      allocation_withdrawExtraObservers _arg = [allocation.settlement.executor]
 
       allocation_withdrawImpl = allocationV2_defaultWithdrawImplUsingV1 (toInterface this)
       allocation_cancelImpl = allocationV2_defaultCancelImplUsingV1 (toInterface this)

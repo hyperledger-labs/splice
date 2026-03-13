@@ -28,8 +28,8 @@ maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
 template OTCTradeAllocationRequest with
-    request : V2.AllocationRequestView
     authorizer : Account
+    request : V2.AllocationRequestView
   where
     signatory request.settlement.executor
     observer accountParties authorizer
@@ -37,6 +37,7 @@ template OTCTradeAllocationRequest with
     interface instance V2.AllocationRequest for OTCTradeAllocationRequest where
       view = request
 
+      -- FIXME: introduce default implementations in UtilsV2
       allocationRequest_RejectImpl _self V2.AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that assets won't be allocated / that the trade is being rejected.
         require "Actor is is the needed authorizer"
@@ -50,7 +51,7 @@ template OTCTradeAllocationRequest with
     interface instance V1.AllocationRequest for OTCTradeAllocationRequest where
       view = downcast request
 
-      -- FIXME: implement
+      -- FIXME: introduce default implementations in UtilsV2; and use them here
       allocationRequest_RejectImpl = error "Not implemented for V1"
       allocationRequest_WithdrawImpl = error "Not implemented for V1"
 
@@ -136,7 +137,7 @@ template OTCTrade with
       with
         allocationsWithContext : [(ContractId V2.Allocation, ExtraArgs)]
         allocationRequests : [ContractId OTCTradeAllocationRequest]
-      controller venue
+      controller venue, settlementV1Authorizers
       do
         let settlement = mkOtcTradeSettlementInfo self this
         forA_ allocationRequests $ \reqCid -> do
@@ -146,9 +147,13 @@ template OTCTrade with
         forA allocationsWithContext $ \(allocCid, extraArgs) -> do
             alloc <- fetch allocCid
             -- validate the allocation request matches this trade
-            (view alloc).allocation.settlement.settlementRef === makeTradeRef self
-            (view alloc).allocation.settlement.executor === venue
-            exercise allocCid (V2.Allocation_Cancel with actors = [venue]; extraArgs)
+            let allocView = view alloc
+            allocView.allocation.settlement.settlementRef === makeTradeRef self
+            allocView.allocation.settlement.executor === venue
+            exercise allocCid $ V2.Allocation_Cancel with
+              -- FIXME: consider using the controllers override pattern to avoid that every venue has to copy the exaclty right computation
+              actors = V2.defaultAllocation_CancelControllers allocView
+              extraArgs
 
 accountParties : Account -> [Party]
 accountParties account = account.owner :: optionalToList account.provider

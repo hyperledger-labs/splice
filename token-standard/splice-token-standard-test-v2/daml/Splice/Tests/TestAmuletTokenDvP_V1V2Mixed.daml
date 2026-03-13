@@ -1,16 +1,12 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Daml script tests showing that the token standard can be used to execute
--- DvP settlements of Amulet tokens; and how to do so.
+-- | Daml script tests showing how to batch settle allocations created using
+-- both the V1 and V2 allocation factories in a single settlement using the V2
+-- settlement factory.
 --
--- See this test and the 'Splice.Testing.TradingApp' module for an example of
--- how to integrate with the allocation APIs of the token standard to execute
--- DvP settlements.
---
--- Note also that the delivery part of a DvP settelement can be both another
--- token implementing the standard, as well as the creation of on-ledger state
--- specific to your registry; e.g., a license contract.
+-- Uses Amulet as the test token, but can be extened to use multiple tokens from
+-- different registries as well.
 module Splice.Tests.TestAmuletTokenDvP_V1V2Mixed where
 
 import Daml.Script
@@ -22,6 +18,7 @@ import DA.Optional (isSome)
 import DA.TextMap as TextMap hiding (filter)
 import DA.Map as Map hiding (filter)
 import DA.Time
+import qualified DA.Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
@@ -37,13 +34,14 @@ import Splice.Amulet.TokenApiUtils (burnedMetaKey)
 
 import Splice.Testing.Apps.TradingAppV2 hiding (require)
 import Splice.Testing.UtilsV2
-import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
-import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
-import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistryV1
 import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApiV1
 import Splice.Testing.TokenStandard.WalletClient qualified as WalletClientV1
+
 
 data AllocatedOTCTrade = AllocatedOTCTrade
   with
@@ -53,7 +51,7 @@ data AllocatedOTCTrade = AllocatedOTCTrade
     providerBeneficiary1 : Party
     providerBeneficiary2 : Party
     providerBeneficiaries : [(Party, Decimal)]
-    registry : AmuletRegistry.AmuletRegistry
+    registry : AmuletRegistryV2.AmuletRegistry
     otcTradeCid : ContractId OTCTrade
     otcTrade : OTCTrade
     requestCids : [ContractId OTCTradeAllocationRequest]
@@ -63,7 +61,7 @@ data AllocatedOTCTrade = AllocatedOTCTrade
 
 setupOtcTrade : Script AllocatedOTCTrade
 setupOtcTrade  = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  registry <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
 
   let amuletId = registry.instrumentId
   let registryV1 = AmuletRegistryV1.AmuletRegistry with
@@ -82,11 +80,11 @@ setupOtcTrade  = do
         , (providerBeneficiary1, 0.1)
         , (providerBeneficiary2, 0.1)
         ]
-  AmuletRegistry.featureApp registry provider
+  AmuletRegistryV2.featureApp registry provider
 
   -- get some funds for alice and bob
-  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
-  AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
+  AmuletRegistryV2.tapLockedAndUnlockedFunds registry alice 1000.0
+  AmuletRegistryV2.tapLockedAndUnlockedFunds registry bob 1000.0
 
   let
     mkTransfer id sender receiver amount =
@@ -97,13 +95,21 @@ setupOtcTrade  = do
         amount
         instrumentId = amuletId
         meta = emptyMetadata
+
   -- Note: here we use Amulet as the single asset, as that is all we have available in this repository.
   -- Given that we are using only the DvP interface, that should though be a fine stand-in for
   -- a DvP across two assets from different registries.
   let aliceLeg = mkTransfer "leg0_a" alice bob 100.0
   let feeLeg = mkTransfer "fee" bob provider 1.0
 
-  -- venue creates a trade
+  -- venue creates a trade where
+  -- - alice -> bob for 100.0 Amulet
+  -- - bob -> provider for 1.0 Amulet
+  --
+  -- and alice allocates using V1, while Bob and Venue allocate using V2.
+  --
+  -- FIXME: increase test coverage for the other combinations of V1 and V2 allocations, allocation requests, and settlement factories
+  --
   now <- getTime
   let settleAt = now `addRelTime` hours 1
       deadline = now `addRelTime` hours 2
@@ -135,11 +141,10 @@ setupOtcTrade  = do
   aliceAlloc.transferLeg === (downcast aliceLeg)
 
   -- alice accepts allocation request directly via her wallet
-  inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
+  inputHoldingCids <- WalletClientV2.listHoldingCids alice amuletId
   now <- getTime
 
   -- alice accepts allocation request directly via her wallet
-  -- TODO(DACH-NY/canton-network-node#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
   enrichedChoice <- RegistryApiV1.getAllocationFactory registryV1 V1.AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
@@ -153,26 +158,13 @@ setupOtcTrade  = do
   -- check metadata
   expectNoBurn result.meta
 
-  -- check lock context
-  {-
-  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  let expectedLock = Lock with
-        expiresAt = None
-        expiresAfter = None
-        holders = [registry.dso]
-        context = Some "allocation for transfer leg 'leg0_a' to Bob"]
-  ((fromSome lockedHolding.lock) with expiresAt = None) === expectedLock
-  assertMsg "locks expire should be in the future"
-    (fromSome (fromSome lockedHolding.lock).expiresAt > now)
-  -}
-
   -- Bob sees the allocation request in his wallet as well
-  [bobAlloc] <- WalletClient.listAllocationRequestsV2 bob
+  [bobAlloc] <- WalletClientV2.listAllocationRequestsV2 bob
   bobAlloc.transferLegs === [aliceLeg, feeLeg]
-  WalletClient.acceptAllocationRequestV2 (AmuletRegistry.amuletToMultiRegistry registry) (basicAccount bob) bob bobAlloc
+  WalletClientV2.acceptAllocationRequestV2 (AmuletRegistryV2.amuletToMultiRegistry registry) (basicAccount bob) bob bobAlloc
 
   -- Lastly, the venue creates an allocation for the fee leg.
-  enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
+  enrichedChoice <- RegistryApiV2.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = AllocationSpecification with
       authorizer = basicAccount provider
@@ -200,8 +192,6 @@ setupOtcTrade  = do
     feeLeg
 
 
--- FIXME: test multiple executor
-
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP_mixed : Script ()
 testDvP_mixed = script do
@@ -221,7 +211,7 @@ testDvP_mixed = script do
             ((allocAdmin, _authorizer), (allocCid, _allocView)) <- Map.toList allocationsMap
             guard (allocAdmin == admin)
             pure allocCid
-      context <- RegistryApi.getSettlementFactory_SettleBatch registry SettlementFactory_SettleBatch with
+      context <- RegistryApiV2.getSettlementFactory_SettleBatch registry SettlementFactory_SettleBatch with
         expectedAdmin = registry.dso
         settlement = mkOtcTradeSettlementInfo otcTradeCid otcTrade
         transferLegs
@@ -243,18 +233,24 @@ testDvP_mixed = script do
   forA_ results $ \result -> expectNoBurn result.meta
 
   -- check that the netted transfers happended
-  -- FIXME: fix -- Alice should have one holding of 20.0 as her two 50.0s get merged and netted with the bob legs.
-  WalletClient.checkHoldingWithAmountExists alice amuletId 900.0
-  -- FIXME: fix -- Bob should have a single holding of 100 as his two 50.0s get merged in the fee leg.
-  WalletClient.checkHoldingWithAmountExists bob amuletId 99.0
+  -- Alice has one holding of 900 Amulet left
+  WalletClientV2.checkHoldingWithAmountExists alice amuletId 900.0
+  -- Bob has a holding of 99 Amulet that he got as part of settling the trade
+  WalletClientV2.checkHoldingWithAmountExists bob amuletId 99.0
 
   -- trading app received their fee in a single holding of 1.0
-  WalletClient.checkHoldingWithAmountExists provider amuletId 1.0
+  WalletClientV2.checkHoldingWithAmountExists provider amuletId 1.0
+
+  WalletClientV2.checkBalance alice amuletId 900.0
+  WalletClientV2.checkBalance bob amuletId 1099.00
+  WalletClientV2.checkBalance provider amuletId 1.0
+
 
   -- check that the provider got their featured app reward coupons
-  AmuletRegistry.convertAllFeaturedAppActivityMarkers registry.dso
+  AmuletRegistryV2.convertAllFeaturedAppActivityMarkers registry.dso
 
-{- FIXME: review check
+{- QUESTION: should we go through the trouble of creating featured app coupons for the provider when using the V2 interface?
+
   coupons <- map snd <$> query @AppRewardCoupon provider
   let couponWithAmount : Decimal -> AppRewardCoupon -> Bool
       couponWithAmount amount coupon =
@@ -280,17 +276,10 @@ testDvP_mixed = script do
   checkNumCouponsFor providerBeneficiary2 1
 -}
 
-  WalletClient.checkBalance alice amuletId 900.0
-  WalletClient.checkBalance bob amuletId 1099.00
-  WalletClient.checkBalance provider amuletId 1.0
-
-
-
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()
 
--- FIXME: reactivate
-{-
+
 testDvPCancel : Script ()
 testDvPCancel = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
@@ -298,26 +287,27 @@ testDvPCancel = script do
   allocationsMap <- appBackendListAllocations provider otcTradeRef
   Map.size allocationsMap === 3
 
-  [(_, aliceLockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  [(bobLockedHoldingCid, _)] <- WalletClient.listLockedHoldings bob registry.instrumentId
+  [(_, aliceLockedHolding)] <- WalletClientV2.listLockedHoldings alice registry.instrumentId
+  [(bobLockedHoldingCid, _)] <- WalletClientV2.listLockedHoldings bob registry.instrumentId
 
   passTime (days 1)
 
   -- expire the amulet for bob to test both cases where the amulet still exists for alice and where it doesn't for bob
-  AmuletRegistry.expireLockAsOwner registry bobLockedHoldingCid
+  AmuletRegistryV2.expireLockAsOwner registry bobLockedHoldingCid
 
-  richAllocationsWithContext <- Traversable.forA allocationsMap $ \(allocCid, _) -> do
-    context <- RegistryApi.getAllocation_CancelContext registry allocCid emptyMetadata
+  richAllocationsWithContext <- DA.Traversable.forA allocationsMap $ \(allocCid, _) -> do
+    context <- RegistryApiV2.getAllocation_CancelContext registry allocCid emptyMetadata
     let extraArgs = ExtraArgs with
           context = context.choiceContext
           meta = emptyMetadata
     pure (context.disclosures, (allocCid, extraArgs))
   let disclosures = foldMap fst richAllocationsWithContext
-  _ <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Cancel with
-    allocationsWithContext = Map.values $ fmap snd richAllocationsWithContext
-    allocationRequests = requestCids
-  [] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  WalletClient.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
+  _ <- submit (actAs alice <> actAs bob <> actAs provider <> discloseMany (Map.values disclosures.disclosures)) $
+    exerciseCmd otcTradeCid OTCTrade_Cancel with
+      allocationsWithContext = Map.values $ fmap snd richAllocationsWithContext
+      allocationRequests = requestCids
+  [] <- WalletClientV2.listLockedHoldings alice registry.instrumentId
+  WalletClientV2.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
 
   [] <- queryInterface @Allocation alice
   [] <- queryInterface @Allocation bob
@@ -328,27 +318,29 @@ testDvPWithdraw : Script ()
 testDvPWithdraw = script do
   AllocatedOTCTrade{..} <- setupOtcTrade
   [(aliceAllocationCid, _)] <- queryInterface @Allocation alice
-  context <- RegistryApi.getAllocation_WithdrawContext registry aliceAllocationCid emptyMetadata
+  context <- RegistryApiV2.getAllocation_WithdrawContext registry aliceAllocationCid emptyMetadata
 
-  [(_, aliceLockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
+  [(_, aliceLockedHolding)] <- WalletClientV2.listLockedHoldings alice registry.instrumentId
 
   _ <- submitWithDisclosures' alice context.disclosures $ exerciseCmd aliceAllocationCid Allocation_Withdraw with
+    actors = [alice]
     extraArgs = ExtraArgs with
       context = context.choiceContext
       meta = emptyMetadata
 
-  [] <- WalletClient.listLockedHoldings alice registry.instrumentId
-  WalletClient.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
+
+  [] <- WalletClientV2.listLockedHoldings alice registry.instrumentId
+  WalletClientV2.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
 
   [] <- queryInterface @Allocation alice
 
   passTime (days 1)
 
-  [(bobLockedHoldingCid, _)] <- WalletClient.listLockedHoldings bob registry.instrumentId
-  AmuletRegistry.expireLockAsOwner registry bobLockedHoldingCid
+  [(bobLockedHoldingCid, _)] <- WalletClientV2.listLockedHoldings bob registry.instrumentId
+  AmuletRegistryV2.expireLockAsOwner registry bobLockedHoldingCid
 
   pure ()
--}
+
 
 -- utilities
 ------------

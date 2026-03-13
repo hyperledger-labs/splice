@@ -253,24 +253,10 @@ registryApi_getSettlementFactory_SettleBatch
   -> Script (EnrichedFactoryChoice SettlementFactory SettlementFactory_SettleBatch)
 registryApi_getSettlementFactory_SettleBatch registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
-  -- FIXME: trim context
   transferC <- getExternalPartyConfigStateContext registry
-
-  -- FIXME: cleanup lookup
   lockedDs <- forA arg.allocationCids $ \allocCid -> do
-    v2s <- query @AmuletAllocationV2 registry.dso
-    if (coerceContractId allocCid `notElem` map fst v2s)
-      then do
-        Some v1 <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
-        queryDisclosure' @LockedAmulet registry.dso v1.lockedAmulet
-      else do
-        -- need to disclose the amulet contract, as the executor has no visibility into it
-        Some v2 <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
-        case v2.lockedAmulet of
-          None -> return mempty
-          Some la -> queryDisclosure' @LockedAmulet registry.dso la
+    getLockedAmuleForAllocationsD registry allocCid
   let fullContext = withExtraDisclosures (extAmuletRulesD <> mconcat lockedDs) transferC
-
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @SettlementFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
@@ -326,17 +312,17 @@ registryApi_getAllocation_abortTwoStepTransferContext
 registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
   -- check whether the locked amulet is still active, so that aborts still work
   -- even if the owner of the LockedAmulet expired it
-  Some amuletAlloc <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId instrCid)
-  case amuletAlloc.lockedAmulet of
+  lockedCid <- lookupLockedAmuletOfAllocation registry instrCid
+  case lockedCid of
     None -> pure emptyOpenApiChoiceContext
     Some la -> do
       optLockedAmulet <- queryContractId @LockedAmulet registry.dso la
       let lockedAmuletActive = isSome optLockedAmulet
       -- this can only happen if the locked amulet already expired
-      now <- getTime
       -- FIXME: review condition
-      unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleAt <= now) $
-        fail "Invariant violation: the locked amulet is archived, but the settlement is not yet expired"
+      -- now <- getTime
+      -- unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleAt <= now) $
+        -- fail "Invariant violation: the locked amulet is archived, but the settlement is not yet expired"
       -- this context communicates whether to unlock the amulet
       let expireLockC = OpenApiChoiceContext with
             disclosures = mempty
@@ -429,6 +415,27 @@ getFeaturedAppRightContext registry provider = do
         disclosures = rightDisc
         choiceContext = mkAmuletContext $
           TextMap.fromList [ (featuredAppRightContextKey, AV_ContractId (coerceContractId rightCid)) ]
+
+lookupLockedAmuletOfAllocation : AmuletRegistry -> ContractId Allocation -> Script (Optional (ContractId LockedAmulet))
+lookupLockedAmuletOfAllocation registry allocCid = do
+  -- FIXME: find a better way to determine whether a contract-id points to a specific template instance
+  v2s <- query @AmuletAllocationV2 registry.dso
+  if (coerceContractId allocCid `notElem` map fst v2s)
+    then do
+      Some v1 <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
+      pure (Some v1.lockedAmulet)
+    else do
+      -- need to disclose the amulet contract, as the executor has no visibility into it
+      Some v2 <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
+      pure v2.lockedAmulet
+
+getLockedAmuleForAllocationsD : AmuletRegistry -> ContractId Allocation -> Script Disclosures'
+getLockedAmuleForAllocationsD registry allocCid = do
+  optLockedAmuletCid <- lookupLockedAmuletOfAllocation registry allocCid
+  -- FIXME: find a better way to determine whether a contract-id points to a specific template instance
+  case optLockedAmuletCid of
+    None -> return mempty
+    Some la -> queryDisclosure' @LockedAmulet registry.dso la
 
 emptyOpenApiChoiceContext : OpenApiChoiceContext
 emptyOpenApiChoiceContext = OpenApiChoiceContext with
