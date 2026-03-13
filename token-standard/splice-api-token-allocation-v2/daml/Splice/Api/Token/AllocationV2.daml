@@ -8,14 +8,14 @@
 --  - authorizing multiple transfers in a single allocation
 --  - only allocating the net amount of funds transferred to the allocation
 --  - specifying accounts directly in the transfer legs instead of using metadata
---  - flexible actors for for extensibility
---  - implementation-defined choice observers for more efficient views where privacy allows for it
+--  - flexible actors for extensibility
+--  - implementation-defined choice observers for view compression where
+--    confidentiality requirements allow for it
 --
 module Splice.Api.Token.AllocationV2 where
 
 import DA.Optional (fromOptional)
 import DA.Map as Map
-import DA.Set qualified as Set
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 (Holding, InstrumentId, Account)
@@ -40,8 +40,8 @@ data Reference = Reference with
 data SettlementInfo = SettlementInfo
   with
     executor : Party
-      -- ^ The parties that are responsible for executing the settlement, and
-      -- guaranteeing its atomicity across asset admins.
+      -- ^ The party that is responsible for executing the settlement, and
+      -- guaranteeing atomic settlement across asset admins.
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
     requestedAt : Time
