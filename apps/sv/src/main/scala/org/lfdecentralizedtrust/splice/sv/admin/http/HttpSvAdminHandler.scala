@@ -97,31 +97,14 @@ class HttpSvAdminHandler(
       for {
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
         sequencerId <- synchronizerNodeService.sequencerAdminConnection().flatMap(_.getSequencerId)
-        existingAnnouncement <- participantAdminConnection.lookupSynchronizerLsuAnnouncement(
-          decentralizedSynchronizer,
-          com.digitalasset.canton.topology.store.TimeQuery.HeadState,
-          org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState,
-        )
-        result <- existingAnnouncement match {
-          case Some(_) =>
-            participantAdminConnection
-              .removeSequencerSuccessor(
-                decentralizedSynchronizer,
-                sequencerId,
-              )
-              .flatMap(_ =>
-                participantAdminConnection
-                  .removeLsuAnnouncement(decentralizedSynchronizer)
-                  .map(_ => r0.CancelLogicalSynchronizerUpgradeResponseOK)
-              )
-          case None =>
-            Future.failed(
-              HttpErrorHandler.notFound(
-                "No active LSU announcement found."
-              )
-            )
-        }
-      } yield result
+        _ <- participantAdminConnection
+          .removeSequencerSuccessor(
+            decentralizedSynchronizer,
+            sequencerId,
+          )
+        _ <- participantAdminConnection
+          .removeLsuAnnouncement(decentralizedSynchronizer)
+      } yield r0.CancelLogicalSynchronizerUpgradeResponseOK
     }
   }
 
