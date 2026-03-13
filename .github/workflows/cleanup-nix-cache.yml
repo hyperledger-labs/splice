@@ -3,11 +3,23 @@ name: Cleanup Nix Cache
 on:
   schedule:
     - cron: '0 4 * * *'  # daily at 04:00 UTC
-  workflow_dispatch: {}   # allow manual trigger
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: "Delete cache entries older than this many days"
+        type: string
+        required: false
+        default: "30"
 
 jobs:
   cleanup:
-    # This is to be fixed, I just need to get this on workflow on main first apparently
-    uses: hyperledger-labs/splice-shared-gha/.github/workflows/cleanup-nix-cache.yml@martinflorian-da/fix-nix-pruning-differently
-    with:
-      runs_on: self-hosted-k8s-small
+    runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: recursive
+      - uses: ./splice-shared-gha/.github/actions/nix/cleanup_nix_cache
+        with:
+          max_age_days: ${{ inputs.max_age_days || '30' }}
