@@ -1122,5 +1122,46 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         storedTransaction.getExternalTransactionHash shouldBe ByteString.EMPTY
       }
     }
+
+    "getUpdate() returns stored external transaction hash when not empty irrespective of the threshold date" in {
+      val externalTxnHashThresholdDate = Instant.parse("2026-06-30T23:59:59Z")
+      // even if the recordDate is before the externalTxnHashThresholdDate, it should be included
+      val recordDate = Instant.parse("2026-01-01T00:00:00Z")
+
+      val store = mkStore(
+        storeName = "store",
+        externalTransactionHashThresholdTimestamp =
+          Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate)),
+      )
+
+      val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+      val externalTxnHashByteString =
+        HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
+      for {
+        _ <- initStore(store)
+        expectedUpdate <- domain1.ingest(offset => {
+          mkTx(
+            offset = offset,
+            events = Seq(),
+            synchronizerId = domain1,
+            effectiveAt = recordDate,
+            recordTime = recordDate,
+            externalTransactionHash = externalTxnHashByteString,
+          )
+        })(store)
+        fetchedUpdate <- store.getUpdate(expectedUpdate.getUpdateId)
+      } yield {
+        fetchedUpdate should be(defined)
+        val fetchedTransaction = fetchedUpdate
+          .fold(fail("expected update not found")) { fetched =>
+            fetched.update.update match {
+              case TransactionTreeUpdate(tree) => tree
+              case u => fail(s"unexpected update $u")
+            }
+          }
+        fetchedTransaction.getExternalTransactionHash should be(externalTxnHashByteString)
+      }
+    }
   }
 }

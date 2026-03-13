@@ -1396,6 +1396,7 @@ class UpdateHistory(
             row,
             creates.getOrElse(row.rowId, Seq.empty),
             exercises.getOrElse(row.rowId, Seq.empty),
+            externalHashInclusion = UpdateHistory.ExternalHashInclusion.AlwaysInclude,
           ),
           row.migrationId,
         )
@@ -1579,6 +1580,8 @@ class UpdateHistory(
       updateRow: SelectFromTransactions,
       createRows: Seq[SelectFromCreateEvents],
       exerciseRows: Seq[SelectFromExerciseEvents],
+      externalHashInclusion: UpdateHistory.ExternalHashInclusion =
+        UpdateHistory.ExternalHashInclusion.ApplyThreshold,
   ): UpdateHistoryResponse = {
 
     val createEvents = createRows.map(_.toCreatedEvent.event)
@@ -1622,11 +1625,16 @@ class UpdateHistory(
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
     // Only include the external transaction hash for transactions recorded on or after the threshold timestamp.
     val externalTransactionHash: ByteString =
-      externalTransactionHashThresholdTimestamp match {
-        case Some(threshold) if updateRow.recordTime >= threshold =>
+      externalHashInclusion match {
+        case UpdateHistory.ExternalHashInclusion.AlwaysInclude =>
           ByteString.copyFrom(updateRow.externalTransactionHash)
-        case _ =>
-          ByteString.EMPTY
+        case UpdateHistory.ExternalHashInclusion.ApplyThreshold =>
+          externalTransactionHashThresholdTimestamp match {
+            case Some(threshold) if updateRow.recordTime >= threshold =>
+              ByteString.copyFrom(updateRow.externalTransactionHash)
+            case _ =>
+              ByteString.EMPTY
+          }
       }
 
     UpdateHistoryResponse(
@@ -2397,6 +2405,17 @@ object UpdateHistory {
   }
 
   sealed trait BackfillingRequirement
+
+  /** Controls whether the external transaction hash threshold is applied when decoding transactions.
+    * - ApplyThreshold: only include the hash if the record time is on or after the configured threshold.
+    * - AlwaysInclude: always include the hash regardless of the threshold (e.g., for direct lookups by updateId).
+    */
+  sealed trait ExternalHashInclusion
+  object ExternalHashInclusion {
+    case object ApplyThreshold extends ExternalHashInclusion
+    case object AlwaysInclude extends ExternalHashInclusion
+  }
+
   object BackfillingRequirement {
 
     /** This history is guaranteed to have started ingestion early enough
