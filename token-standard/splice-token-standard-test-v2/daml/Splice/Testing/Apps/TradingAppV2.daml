@@ -6,8 +6,14 @@
 -- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
 module Splice.Testing.Apps.TradingAppV2 where
 
-import DA.Set qualified as Set
+import DA.Assert ((===))
+import DA.Date
+import DA.Foldable (forA_)
+import DA.List (dedupSort)
 import DA.Map qualified as Map
+import DA.Optional (optionalToList)
+import DA.Set qualified as Set
+import DA.Time
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.AllocationRequestV1 qualified as V1
@@ -17,38 +23,19 @@ import Splice.Api.Token.AllocationRequestV2 qualified as V2
 import Splice.Api.Token.HoldingV2 (Account)
 import Splice.Api.Token.UtilsV2
 
-import DA.List (dedupSort)
-import DA.Foldable (mapA_)
-import DA.Assert ((===))
-import DA.Time
-import DA.Date
 
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
 template OTCTradeAllocationRequest with
-    venue : Party
-    otcTradeCid : ContractId OTCTrade
+    request : V2.AllocationRequestView
     authorizer : Account
-    transferLegs : [V2.TransferLeg]
-    createdAt : Time
-    settleAt : Time
-    settlementDeadline : Optional Time
   where
-    signatory venue
+    signatory request.settlement.executor
     observer accountParties authorizer
 
     interface instance V2.AllocationRequest for OTCTradeAllocationRequest where
-      view = V2.AllocationRequestView with
-        settlement = V2.SettlementInfo with
-          executor = venue
-          requestedAt = createdAt
-          settlementRef = makeTradeRef otcTradeCid
-          settleAt = settleAt
-          meta = emptyMetadata
-          settlementDeadline = settlementDeadline
-        transferLegs = transferLegs
-        meta = emptyMetadata
+      view = request
 
       allocationRequest_RejectImpl _self V2.AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that assets won't be allocated / that the trade is being rejected.
@@ -61,7 +48,7 @@ template OTCTradeAllocationRequest with
         pure ChoiceExecutionMetadata with meta = emptyMetadata
 
     interface instance V1.AllocationRequest for OTCTradeAllocationRequest where
-      view = downcast (view (toInterface @V2.AllocationRequest this))
+      view = downcast request
 
       -- FIXME: implement
       allocationRequest_RejectImpl = error "Not implemented for V1"
@@ -92,44 +79,48 @@ template OTCTrade with
       with
       controller venue
       do
+        let settlement = mkOtcTradeSettlementInfo self this
         requestss <- forA (Map.values transferLegsByAdmin) $ \transferLegs -> do
           let traders = dedupSort $ concatMap (\tl -> [tl.sender, tl.receiver]) transferLegs
           forA traders $ \trader -> do
             create OTCTradeAllocationRequest with
-              venue
-              otcTradeCid = self
               authorizer = trader
-              transferLegs = filter (\leg -> trader == leg.sender || trader == leg.receiver) transferLegs
-              createdAt = createdAt
-              settleAt = settleAt
-              settlementDeadline = settlementDeadline
+              request = V2.AllocationRequestView with
+                settlement
+                transferLegs = filter (\leg -> trader == leg.sender || trader == leg.receiver) transferLegs
+                meta = emptyMetadata
         pure (concat requestss)
 
     -- Nonconsuming to avoid disclosures inside.
-    -- FIXME: check whether this really does what we want it to do
+    -- FIXME: check with Bernhard what problem that the 'nonconsuming' is intended to solve.
     nonconsuming choice OTCTrade_Settle : [V2.SettlementFactory_SettleBatchResult] -- FIXME: better type
       with
         allocationBatchesByAdmin : Map.Map Party (ContractId V2.SettlementFactory, [ContractId V2.Allocation], ExtraArgs)
-        -- ^ Allocations sorted by admin party
+        -- ^ Allocations and their batch settlement factories sorted by admin party
+        -- FIXME: introduce suitable utility types in UtilsV2
         allocationRequests : [ContractId OTCTradeAllocationRequest]
       controller venue, settlementV1Authorizers
         -- FIXME: change choice or build infra to trigger this choice w/o resorting to a submitMulti step
       do
         archive self
-        -- Could be safer by validating the requests match the trade, but venue is the only authorizer
-        -- so we can assume the checks happened off-ledger.
-        -- FIXME: don't make this assumption
 
-        mapA_ archive allocationRequests
+        -- Archive requests
+        let settlement = mkOtcTradeSettlementInfo self this
+        forA_ allocationRequests $ \reqCid -> do
+          req <- fetch reqCid
+          archive reqCid
+          requireMatchExpected (reqCid, "AllocationRequest.settlement") settlement req.request.settlement
 
         -- FIXME: consider what other validation is missing here
-        require "Admins of batches match expected legs" (Map.keys allocationBatchesByAdmin == Map.keys transferLegsByAdmin)
+        requireMatchExpected ("OTCTrade_Settle", "Admins of batches match expected legs")
+          (Map.keys allocationBatchesByAdmin) (Map.keys transferLegsByAdmin)
+
         forA (Map.toList allocationBatchesByAdmin) $ \(admin, (factoryCid, allocationCids, extraArgs)) -> do
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
           exercise factoryCid V2.SettlementFactory_SettleBatch with
             expectedAdmin = admin
-            settlementV1Authorizers = settlementV1Authorizers
-            settlement = mkOtcTradeSettlementInfo self this
+            settlementV1Authorizers
+            settlement
             transferLegs
             allocationCids
             controllersOverride = None
@@ -147,25 +138,20 @@ template OTCTrade with
         allocationRequests : [ContractId OTCTradeAllocationRequest]
       controller venue
       do
-        mapA_ (\arCid -> do
-            ar <- fetch arCid
-            -- validate the allocation request matches this trade
-            ar.otcTradeCid ===  self
-            signatory ar === [venue]
-            archive arCid
-          )
-          allocationRequests
-        mapA (\(allocCid, extraArgs) -> do
+        let settlement = mkOtcTradeSettlementInfo self this
+        forA_ allocationRequests $ \reqCid -> do
+            req <- fetch reqCid
+            archive reqCid
+            requireMatchExpected (reqCid, "AllocationRequest.settlement") settlement req.request.settlement
+        forA allocationsWithContext $ \(allocCid, extraArgs) -> do
             alloc <- fetch allocCid
             -- validate the allocation request matches this trade
             (view alloc).allocation.settlement.settlementRef === makeTradeRef self
             (view alloc).allocation.settlement.executor === venue
             exercise allocCid (V2.Allocation_Cancel with actors = [venue]; extraArgs)
-          )
-          allocationsWithContext
 
 accountParties : Account -> [Party]
-accountParties account = account.owner::optionalToList account.provider
+accountParties account = account.owner :: optionalToList account.provider
 
 transferLegParties : V2.TransferLeg -> [Party]
 transferLegParties tl = accountParties tl.sender ++ accountParties tl.receiver
