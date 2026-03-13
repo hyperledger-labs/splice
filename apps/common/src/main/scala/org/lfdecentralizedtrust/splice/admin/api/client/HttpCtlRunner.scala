@@ -39,18 +39,19 @@ class HttpCtlRunner(
 
     val client: Client = command.createClient(host)
 
+    def handleFailure(f: Either[Throwable, HttpResponse]): EitherT[Future, String, Res] = f match {
+      case Left(httpErr: HttpCommandException) => throw httpErr
+      case Left(err: Throwable) => throw err
+      case Right(unknownResponse: HttpResponse) =>
+        EitherT.left(
+          unknownResponse.discardEntityBytes().future.map(_ => unknownResponse.toString())
+        )
+    }
+
     for {
       response <- command
         .submitRequest(client, tc.propagate(headers))
-        .leftMap(resp =>
-          resp match {
-            case Left(httpErr: HttpCommandException) => throw httpErr
-            case Left(err: Throwable) => throw err
-            case Right(unknownResponse: HttpResponse) =>
-              unknownResponse.discardEntityBytes()
-              unknownResponse.toString()
-          }
-        )
+        .leftFlatMap(handleFailure)
       result <- EitherT.fromEither[Future](command.handleResponse(response))
     } yield result
   }
