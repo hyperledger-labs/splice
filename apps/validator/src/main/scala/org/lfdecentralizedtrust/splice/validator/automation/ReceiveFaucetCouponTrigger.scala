@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupCon
 
 import java.time.temporal.ChronoUnit
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -47,6 +48,7 @@ class ReceiveFaucetCouponTrigger(
 ) extends RoundBasedRewardTrigger[ReceiveFaucetCouponTrigger.Task] {
 
   private val validatorParty = validatorStore.key.validatorParty
+  private val loggedCapZeroSkip = new AtomicBoolean(false)
 
   override protected def retrieveAvailableTasksForRound()(implicit
       tc: TraceContext
@@ -78,11 +80,16 @@ class ReceiveFaucetCouponTrigger(
       _ <- OptionT.fromOption[Future] {
         val cap = firstOpenNotClaimed.payload.issuanceConfig.optValidatorFaucetCap.toScala
         if (cap.exists(_.compareTo(java.math.BigDecimal.ZERO) <= 0)) {
-          logger.info(
-            s"Skipping faucet coupon collection for round ${firstOpenNotClaimed.payload.round.number}: validator faucet cap is zero."
-          )
+          if (loggedCapZeroSkip.compareAndSet(false, true)) {
+            logger.info(
+              s"Skipping faucet coupon collection: validator faucet cap is zero. This message is logged once; will keep checking silently in case the cap changes."
+            )
+          }
           None
-        } else Some(())
+        } else {
+          loggedCapZeroSkip.set(false)
+          Some(())
+        }
       }
     } yield ReceiveFaucetCouponTrigger.Task(license, firstOpenNotClaimed)
   }
