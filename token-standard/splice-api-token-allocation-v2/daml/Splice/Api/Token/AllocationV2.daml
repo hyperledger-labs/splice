@@ -136,25 +136,6 @@ data AllocationView = AllocationView with
 -- Allocation
 -------------
 
--- | Default controllers for allocation settlement.
-defaultAllocationSettlementControllers : AllocationView -> Set.Set Party
-defaultAllocationSettlementControllers allocView =
-    Set.fromList $ allocView.allocation.settlement.executor :: concatMap legControllers allocView.allocation.transferLegs
-  where
-    legControllers leg
-      | allocView.settlementVersion == 1 = leg.instrumentId.admin :: [leg.sender.owner, leg.receiver.owner]
-      | otherwise = [leg.instrumentId.admin]
-
--- | Default controllers for allocation cancellation.
-defaultAllocationCancellationControllers : AllocationView -> Set.Set Party
-defaultAllocationCancellationControllers allocView =
-    Set.fromList $ allocView.allocation.settlement.executor ::
-      if allocView.settlementVersion == 1
-        then concatMap legControllers allocView.allocation.transferLegs
-        else []
-  where
-    legControllers leg = [leg.sender.owner, leg.receiver.owner]
-
 -- | A contract representing the approval of the authorizer to send or receive
 -- the net amount of assets of the transfer legs as part of a settlement where
 -- the executor and instrument admin check that every transfer leg has a matching
@@ -186,7 +167,7 @@ interface Allocation where
         -- Implementations MUST check these parties to avoid unauthorized settlement execution.
         --
         -- They SHOULD do so by checking that the actors are equal to the
-        -- `defaultAllocationSettlementControllers`, which ensures maximal
+        -- `defaultAllocation_SettleControllers`, which ensures maximal
         -- compatibility and proper implemention of the following constraints:
         --
         -- - The actors MUST always include the settlement executor and the
@@ -222,7 +203,7 @@ interface Allocation where
         -- Implementations MUST check these parties to avoid unauthorized cancellation.
         --
         -- They SHOULD do so by checking that the actors are equal to the
-        -- `defaultAllocationCancellationControllers`, which ensures maximal
+        -- `defaultAllocation_CancelControllers`, which ensures maximal
         -- compatibility and proper implemention of the following constraints:
         --
         -- - The actors MUST always include the settlement executor.
@@ -261,6 +242,29 @@ interface Allocation where
     observer allocation_withdrawExtraObservers this arg
     controller actors
     do allocation_withdrawImpl this self arg
+
+
+-- default controllers
+----------------------
+
+-- | Default controllers for allocation settlement.
+defaultAllocation_SettleControllers : AllocationView -> [Party]
+defaultAllocation_SettleControllers allocView =
+    allocView.allocation.settlement.executor :: concatMap legControllers allocView.allocation.transferLegs
+  where
+    legControllers leg
+      | allocView.settlementVersion == 1 = leg.instrumentId.admin :: [leg.sender.owner, leg.receiver.owner]
+      | otherwise = [leg.instrumentId.admin]
+
+-- | Default controllers for allocation cancellation.
+defaultAllocation_CancelControllers : AllocationView -> [Party]
+defaultAllocation_CancelControllers allocView =
+    allocView.allocation.settlement.executor ::
+      if allocView.settlementVersion == 1
+        then concatMap legControllers allocView.allocation.transferLegs
+        else []
+  where
+    legControllers leg = [leg.sender.owner, leg.receiver.owner]
 
 
 -- result types

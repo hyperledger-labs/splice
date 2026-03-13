@@ -11,6 +11,8 @@ module Splice.Api.Token.UtilsV2.Allocations (
 
   settlementFactoryV2_defaultSettleBatchImpl,
 
+  validateAndPrepareAllocations,
+
 ) where
 
 import DA.Either (partitionEithers)
@@ -35,19 +37,23 @@ import Splice.Api.Token.UtilsV2.Choices
 -- Allocation choices
 ---------------------
 
+
 allocation_v2_settleImplUsingV1
-  : ContractId AllocationV2.Allocation
+  : AllocationV2.Allocation
+  -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Settle
   -> Update AllocationV2.Allocation_SettleResult
-allocation_v2_settleImplUsingV1 self AllocationV2.Allocation_Settle{..} = do
-  let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
-  v1Allocation <- fetch v1Cid
+allocation_v2_settleImplUsingV1 this self arg@(AllocationV2.Allocation_Settle{..}) = do
+  -- no archive of self, as the V1 choice is consuming
+  onlyAllowDefaultControllers' "V2.Allocation_Settle" this arg
   -- use the AllocationV1.Allocation_ExecuteTransfer choice to ensure the sender's tx parsing sees the expected choice
+  let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_ExecuteTransfer with extraArgs
-  -- Archive the receiver holdings, as the receiver will get their credit as part of settling their allocation.
-  -- The receiver parses this tranaction using the V2 choices and will thus understand it.
+  -- Archive the receiver holdings
   forA_ result.receiverHoldingCids $ \receiverHoldingCid -> do
     exercise receiverHoldingCid Archive
+    -- This is required, as the receiver will get their credit as part of settling their allocation.
+    -- The receiver parses this tranaction using the V2 choices and will thus understand it.
 
   pure AllocationV2.Allocation_SettleResult with
     newHoldingCids = map upcast result.senderHoldingCids
@@ -55,11 +61,13 @@ allocation_v2_settleImplUsingV1 self AllocationV2.Allocation_Settle{..} = do
 
 
 allocation_v2_withdrawImplUsingV1
-  : HoldingV1.InstrumentId
+  : Party
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
-allocation_v2_withdrawImplUsingV1 instrumentId self AllocationV2.Allocation_Withdraw{..} = do
+allocation_v2_withdrawImplUsingV1 sender self (AllocationV2.Allocation_Withdraw{..}) = do
+  -- no archive of self, as the V1 choice is consuming
+  requireMatchExpected ("V2.Allocation_Withdraw", "actors") [sender] actors
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
@@ -68,11 +76,13 @@ allocation_v2_withdrawImplUsingV1 instrumentId self AllocationV2.Allocation_With
     meta = result.meta
 
 allocation_v2_cancelImplUsingV1
-  : HoldingV1.InstrumentId
+  : AllocationV2.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
-allocation_v2_cancelImplUsingV1 instrumentId self AllocationV2.Allocation_Cancel{..} = do
+allocation_v2_cancelImplUsingV1 this self arg@(AllocationV2.Allocation_Cancel{..}) = do
+  -- no archive of self, as the V1 choice is consuming
+  onlyAllowDefaultControllers' "V2.Allocation_Cancel" this arg
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Cancel with
     extraArgs
@@ -101,6 +111,11 @@ data PreparedAllocations = PreparedAllocations with
 --
 -- The logic for doing this correctly is nontrivial, which is why registries
 -- SHOULD use this default implementation where possible.
+--
+-- The implementation uses the default controllers for calling the V2.Allocation_Settle
+-- choices. Registries that need to use custom controllers can reuse the
+-- validation and preparation logic in `validateAndPrepareAllocations`, but will
+-- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_defaultSettleBatchImpl
   : HasToInterface t AllocationV2.SettlementFactory
   => t
@@ -115,7 +130,7 @@ settlementFactoryV2_defaultSettleBatchImpl factory0 self arg@(AllocationV2.Settl
   requireExpectedAdminMatch admin expectedAdmin
   onlyAllowDefaultControllers "SettlementFactory_SettleBatch" factory arg
 
-  -- prepare
+  -- validate and prepare the allocations
   prep <- validateAndPrepareAllocations admin arg
 
   -- settle all v1 allocations
@@ -129,8 +144,8 @@ settlementFactoryV2_defaultSettleBatchImpl factory0 self arg@(AllocationV2.Settl
   -- settle all v2 allocations
   newHoldingCidssV2 <- forA prep.allocationsSettledUsingV2 $ \(allocationCid, allocView) -> do
     result <- exercise allocationCid AllocationV2.Allocation_Settle with
-      -- FIXME: call out the consequences of this defaulting in the API docs, or compute them in an interface method or the view
-      actors = Set.toList $ AllocationV2.defaultAllocationSettlementControllers allocView
+      -- Use default controllers as the actors
+      actors = AllocationV2.defaultAllocation_SettleControllers allocView
       extraArgs
     pure (Map.singleton allocView.allocation.authorizer result.newHoldingCids)
 
@@ -463,3 +478,9 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
 
 instance HasDefaultControllers AllocationV2.SettlementFactory AllocationV2.SettlementFactory_SettleBatch where
   defaultControllers _ arg = AllocationV2.defaultSettlementFactory_SettleBatchControllers arg
+
+instance HasDefaultControllers AllocationV2.Allocation AllocationV2.Allocation_Settle where
+  defaultControllers this _arg = AllocationV2.defaultAllocation_SettleControllers (view this)
+
+instance HasDefaultControllers AllocationV2.Allocation AllocationV2.Allocation_Cancel where
+  defaultControllers this _arg = AllocationV2.defaultAllocation_CancelControllers (view this)

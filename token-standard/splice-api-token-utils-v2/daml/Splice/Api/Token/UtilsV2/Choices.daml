@@ -16,6 +16,8 @@ module Splice.Api.Token.UtilsV2.Choices (
   -- * Controller override pattern
   HasDefaultControllers(..),
   onlyAllowDefaultControllers,
+  onlyAllowDefaultControllers',
+  archiveAndCheckActors,
 ) where
 
 import DA.List (dedupSort)
@@ -95,3 +97,26 @@ onlyAllowDefaultControllers choiceName this arg =
       let expected = dedupSort $ defaultControllers this arg
       requireMatchExpected (choiceName, "controllersOverride") expected (dedupSort actual)
 
+
+-- Actors pattern
+-----------------
+
+-- | Check for the actors to be equal to the default controllers
+--
+-- FIXME: decide on which variant to use 'actors' vs. 'controllersOverride'.
+onlyAllowDefaultControllers'
+  : forall i ch. (HasDefaultControllers i ch, GetField "actors" ch [Party]) => Text -> i -> ch -> Update ()
+onlyAllowDefaultControllers' choiceName this arg =
+    requireMatchExpected (choiceName, "actors") expected (dedupSort arg.actors)
+  where
+    expected = dedupSort $ defaultControllers this arg
+
+
+-- | Preamble for V2 choices that follow the actors pattern.
+--
+-- SHOULD be used consistently as the first action in all non-factory V2 choices.
+archiveAndCheckActors
+  : forall i ch. (HasArchive i, HasDefaultControllers i ch, GetField "actors" ch [Party]) => Text -> ContractId i -> i -> ch -> Update ()
+archiveAndCheckActors choiceName cid this arg = do
+  archive cid
+  onlyAllowDefaultControllers' choiceName this arg

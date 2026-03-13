@@ -58,9 +58,9 @@ template AmuletAllocation
       allocation_cancelExtraObservers _arg = []
       allocation_withdrawExtraObservers _arg = []
 
-      allocation_withdrawImpl = allocation_v2_withdrawImplUsingV1 allocation.transferLeg.instrumentId
-      allocation_cancelImpl = allocation_v2_cancelImplUsingV1 allocation.transferLeg.instrumentId
-      allocation_settleImpl = allocation_v2_settleImplUsingV1
+      allocation_withdrawImpl = allocation_v2_withdrawImplUsingV1 allocation.transferLeg.sender
+      allocation_cancelImpl = allocation_v2_cancelImplUsingV1 (toInterface this)
+      allocation_settleImpl = allocation_v2_settleImplUsingV1 (toInterface this)
 
 
 
