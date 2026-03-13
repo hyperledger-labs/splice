@@ -8,11 +8,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.{
   ValidatorLicense,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.environment.BuildInfo
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TimeTestUtil, WalletTestUtil}
 
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class ValidatorFaucetCapZeroTimeBasedIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
@@ -31,6 +33,20 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
           advanceRoundsToNextRoundOpening
         }
       }
+
+      val initialLastActiveAt =
+        clue("ValidatorLicense lastActiveAt and metadata should be updated despite cap=0") {
+          eventually() {
+            val license =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .awaitJava(ValidatorLicense.COMPANION)(
+                  aliceValidatorBackend.getValidatorPartyId()
+                )
+            license.data.lastActiveAt.toScala should not be empty
+            license.data.metadata.toScala.value.version shouldBe BuildInfo.compiledVersion
+            license.data.lastActiveAt
+          }
+        }
 
       clue("No ValidatorLivenessActivityRecord contracts should exist") {
         val records = sv1Backend.participantClient.ledger_api_extensions.acs
@@ -85,6 +101,15 @@ class ValidatorFaucetCapZeroTimeBasedIntegrationTest
       ) {
         (1 to 5).foreach { _ =>
           advanceRoundsToNextRoundOpening
+        }
+      }
+
+      clue("ValidatorLicense lastActiveAt should have increased") {
+        eventually() {
+          val license =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorBackend.getValidatorPartyId())
+          license.data.lastActiveAt should not be initialLastActiveAt
         }
       }
 
