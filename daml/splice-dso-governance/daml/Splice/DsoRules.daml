@@ -1044,8 +1044,10 @@ template DsoRules with
          require "Number of ValidatorPermission contracts to merge is >= 2" (length validatorPermissionCids >= 2)
          
          permissions <- forA validatorPermissionCids $ fetchAndArchive (ForDso this.dso)
-         require "All permissions map to the same validator" (length (dedup (map (.validator) permissions)) == 1)
          
+         require "All permissions map to the same validator" (length (dedup (map (.validator) permissions)) == 1)
+         require "All permissions map to the same participant ID" (length (dedup (map (.validatorParticipantId) permissions)) == 1)
+        
          let mergedIsRevoked = any (.isRevoked) permissions
          let allLoginAfters = mapOptional (.loginAfter) permissions
          let mergedLoginAfter = if null allLoginAfters then None else Some (maximum allLoginAfters)
