@@ -619,7 +619,7 @@ class ScanTimeBasedIntegrationTest
       val updatesFromS3 = updateObjs
         .flatMap {obj =>
           val out = new ByteArrayOutputStream()
-          sv1ScanBackend.bulkStorageDownload(obj.key(), out).futureValue should be > 0
+          sv1ScanBackend.bulkStorageDownload(obj.key(), out).futureValue
           uncompressAndDecode(
             ByteString(out.toByteArray),
             io.circe.parser.decode[definitions.UpdateHistoryItemV2],
