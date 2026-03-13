@@ -2396,6 +2396,8 @@ object DbMultiDomainAcsStore {
     * @param offsetIngestionsToSignal A map from offsets to promises. The keys are offsets that are not ingested yet.
     *                                 The values are promises that are not completed, and will be completed when
     *                                 the corresponding offset is ingested.
+    * @param lastIngestedRecordTimes The highest record time ingested per synchronizer.
+    * @param recordTimeWaiters Pending promises keyed by (synchronizerId, recordTime) that are completed when the corresponding record time is ingested.
     */
   private case class State(
       acsStoreId: Option[AcsStoreId],
