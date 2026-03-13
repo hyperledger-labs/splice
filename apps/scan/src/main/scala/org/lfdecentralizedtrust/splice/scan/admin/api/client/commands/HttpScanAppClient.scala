@@ -10,83 +10,34 @@ import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
-  FeaturedAppRight,
-  UnclaimedDevelopmentFundCoupon,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules,
-  AppTransferContext,
-  TransferPreapproval,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
-  ExternalPartyAmuletRules,
-  TransferCommandCounter,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
-  ClosedMiningRound,
-  IssuingMiningRound,
-  OpenMiningRound,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, UnclaimedDevelopmentFundCoupon}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext, TransferPreapproval}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{ExternalPartyAmuletRules, TransferCommandCounter}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, IssuingMiningRound, OpenMiningRound}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http, scanStream as streamHttp}
-import org.lfdecentralizedtrust.tokenstandard.{
-  allocation,
-  allocationinstruction,
-  metadata,
-  transferinstruction,
-}
-import org.lfdecentralizedtrust.splice.http.v0.scan.{
-  ForceAcsSnapshotNowResponse,
-  GetDateOfFirstSnapshotAfterResponse,
-  GetDateOfMostRecentSnapshotBeforeResponse,
-}
-import org.lfdecentralizedtrust.splice.scan.admin.http.{
-  CompactJsonScanHttpEncodings,
-  ProtobufJsonScanHttpEncodings,
-}
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
+import org.lfdecentralizedtrust.tokenstandard.{allocation, allocationinstruction, metadata, transferinstruction}
+import org.lfdecentralizedtrust.splice.http.v0.scan.{ForceAcsSnapshotNowResponse, GetDateOfFirstSnapshotAfterResponse, GetDateOfMostRecentSnapshotBeforeResponse}
+import org.lfdecentralizedtrust.splice.scan.admin.http.{CompactJsonScanHttpEncodings, ProtobufJsonScanHttpEncodings}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{
-  ChoiceContextWithDisclosures,
-  Codec,
-  Contract,
-  ContractWithState,
-  DomainRecordTimeRange,
-  FactoryChoiceWithDisclosures,
-  PackageQualifiedName,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{ChoiceContextWithDisclosures, Codec, Contract, ContractWithState, DomainRecordTimeRange, FactoryChoiceWithDisclosures, PackageQualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
-import com.digitalasset.canton.topology.{
-  Member,
-  ParticipantId,
-  PartyId,
-  SequencerId,
-  SynchronizerId,
-}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.scaladsl.Source
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
-  allocationinstructionv1,
-  allocationv1,
-  metadatav1,
-  transferinstructionv1,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{allocationinstructionv1, allocationv1, metadatav1, transferinstructionv1}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetFactoryRequest as GetTransferFactoryRequest
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.definitions.GetFactoryRequest as GetAllocationFactoryRequest
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
-  DsoRules_CloseVoteRequestResult,
-  VoteRequest,
-}
-import org.lfdecentralizedtrust.splice.http.v0.scanStream.BulkStorageDownloadResponse
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{BulkStorageDownloadResponse, ScanStreamClient}
 
 import java.util.Base64
 import java.time.Instant
@@ -96,7 +47,6 @@ import scala.util.Try
 
 object HttpScanAppClient {
   import http.ScanClient as ScanClient
-  import streamHttp.ScanStreamClient as StreamClient
   import transferinstruction.v1.Client as TClient
   import allocationinstruction.v1.Client as IClient
   import allocation.v1.Client as AClient
@@ -133,8 +83,8 @@ object HttpScanAppClient {
   }
 
   abstract class ScanStreamBaseCommand[Res, Result]
-      extends HttpCommand[Res, Result, StreamClient] {
-    override val createGenClientFn = (fn, host, ec, mat) => StreamClient.httpClient(fn, host)(ec, mat)
+      extends HttpCommand[Res, Result, ScanStreamClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => ScanStreamClient.httpClient(fn, host)(ec, mat)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -2486,12 +2436,12 @@ object HttpScanAppClient {
       objectKey: String
                                 )
       extends ScanStreamBaseCommand[
-        streamHttp.BulkStorageDownloadResponse,
+        BulkStorageDownloadResponse,
         Source[org.apache.pekko.util.ByteString, Any],
       ] {
 
     override def submitRequest(
-        client: StreamClient,
+        client: ScanStreamClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], BulkStorageDownloadResponse] =
       client.bulkStorageDownload(objectKey)
@@ -2499,7 +2449,7 @@ object HttpScanAppClient {
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ): PartialFunction[BulkStorageDownloadResponse, Either[String, Source[org.apache.pekko.util.ByteString, Any]]] = {
-      case streamHttp.BulkStorageDownloadResponse.OK(response) =>
+      case BulkStorageDownloadResponse.OK(response) =>
         Right(response.dataBytes)
     }
   }

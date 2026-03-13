@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import org.apache.pekko.http.scaladsl.marshalling.Marshaller
 import org.apache.pekko.http.scaladsl.model.ResponseEntity
-import io.circe.Decoder
+//import io.circe.Decoder
 
 object StreamingSupport {
 //  // Guardrail maps 'type: string, format: binary' to Source[ByteString, Any]
@@ -20,8 +20,8 @@ object StreamingSupport {
 //      HttpEntity(ContentTypes.`application/octet-stream`, source)
 //    }
 //
-implicit val responseEntityDecoder: Decoder[ResponseEntity] =
-  Decoder.failedWithMessage("ResponseEntity cannot be decoded via Circe; use Pekko Unmarshallers.")
+//implicit val responseEntityDecoder: Decoder[ResponseEntity] =
+//  Decoder.failedWithMessage("ResponseEntity cannot be decoded via Circe; use Pekko Unmarshallers.")
 
   implicit val httpEntityMarshaller: Marshaller[ResponseEntity, ResponseEntity] =
     Marshaller.opaque(identity)
