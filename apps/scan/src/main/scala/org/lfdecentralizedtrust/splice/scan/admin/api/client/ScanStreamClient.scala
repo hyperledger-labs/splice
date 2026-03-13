@@ -1,11 +1,13 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
-import _root_.org.lfdecentralizedtrust.splice.http.v0.Implicits.*
-import _root_.org.lfdecentralizedtrust.splice.http.v0.PekkoHttpImplicits.*
+import org.lfdecentralizedtrust.splice.http.v0.Implicits.*
+import org.lfdecentralizedtrust.splice.http.v0.PekkoHttpImplicits.*
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.http.scaladsl.marshalling.{Marshal, ToEntityMarshaller}
 import org.apache.pekko.http.scaladsl.util.FastFuture
+import org.apache.pekko.http.scaladsl.model.ResponseEntity
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.*
@@ -64,14 +66,14 @@ class ScanStreamClient(host: String = "https://example.com")(implicit
       _ =>
         json =>
           io.circe
-            .Decoder[_root_.org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse]
+            .Decoder[ErrorResponse]
             .decodeJson(json)
             .fold(FastFuture.failed, FastFuture.successful)
     )
   }
 
   def ok(
-      entity: org.apache.pekko.http.scaladsl.model.ResponseEntity
+      entity: ResponseEntity
   ): Future[Either[Either[Throwable, HttpResponse], BulkStorageDownloadResponse]] =
     Future.successful(Right(BulkStorageDownloadResponse.OK(entity)))
 
@@ -79,7 +81,7 @@ class ScanStreamClient(host: String = "https://example.com")(implicit
       resp: HttpResponse
   ): Future[Either[Either[Throwable, HttpResponse], BulkStorageDownloadResponse]] =
     Unmarshal(resp.entity)
-      .to[_root_.org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse](
+      .to[ErrorResponse](
         bulkStorageDownloadNotFoundDecoder,
         implicitly,
         implicitly,
@@ -114,8 +116,8 @@ class ScanStreamClient(host: String = "https://example.com")(implicit
 }
 sealed abstract class BulkStorageDownloadResponse {
   def fold[A](
-      handleOK: org.apache.pekko.http.scaladsl.model.ResponseEntity => A,
-      handleNotFound: _root_.org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse => A,
+      handleOK: ResponseEntity => A,
+      handleNotFound: ErrorResponse => A,
   ): A = this match {
     case x: BulkStorageDownloadResponse.OK =>
       handleOK(x.value)
@@ -124,9 +126,8 @@ sealed abstract class BulkStorageDownloadResponse {
   }
 }
 object BulkStorageDownloadResponse {
-  case class OK(value: org.apache.pekko.http.scaladsl.model.ResponseEntity)
-      extends BulkStorageDownloadResponse
+  case class OK(value: ResponseEntity) extends BulkStorageDownloadResponse
   case class NotFound(
-      value: _root_.org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
+      value: ErrorResponse
   ) extends BulkStorageDownloadResponse
 }
