@@ -12,8 +12,13 @@ module Splice.Api.Token.UtilsV2.Choices (
 
   -- * Choice implementations
   publicFetchWithExpectedAdmin,
+
+  -- * Controller override pattern
+  HasDefaultControllers(..),
+  onlyAllowDefaultControllers,
 ) where
 
+import DA.List (dedupSort)
 import DA.Optional (isNone)
 import DA.Text qualified as T
 
@@ -68,3 +73,25 @@ publicFetchWithExpectedAdmin
 publicFetchWithExpectedAdmin this admin _self arg = do
   requireExpectedAdminMatch arg.expectedAdmin admin
   pure (view (toInterface this : i))
+
+
+
+-- Controller override pattern
+------------------------------
+
+
+-- | Templates or interfaces whose arguments have default controllers.
+class HasDefaultControllers t ch where
+  -- | Default controllers for a choice on a template or interface.
+  defaultControllers : t -> ch -> [Party]
+
+
+onlyAllowDefaultControllers
+  : forall t ch. (HasDefaultControllers t ch, GetField "controllersOverride" ch (Optional [Party])) => Text -> t -> ch -> Update ()
+onlyAllowDefaultControllers choiceName this arg =
+  case arg.controllersOverride of
+    None -> pure ()
+    Some actual -> do
+      let expected = dedupSort $ defaultControllers this arg
+      requireMatchExpected (choiceName, "controllersOverride") expected (dedupSort actual)
+

@@ -143,11 +143,11 @@ template OTCTrade with
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
           exercise factoryCid Api.Token.AllocationV2.SettlementFactory_SettleBatch with
             expectedAdmin = admin
-            actors = venue :: settlementV1Authorizers
             settlementV1Authorizers = settlementV1Authorizers
             settlement = mkOtcTradeSettlementInfo self this
             transferLegs
             allocationCids
+            controllersOverride = None
             extraArgs
 
 

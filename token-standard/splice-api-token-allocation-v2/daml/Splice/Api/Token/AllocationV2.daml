@@ -13,6 +13,7 @@
 --
 module Splice.Api.Token.AllocationV2 where
 
+import DA.Optional (fromOptional)
 import DA.Map as Map
 import DA.Set qualified as Set
 
@@ -304,6 +305,10 @@ data SettlementFactoryView = SettlementFactoryView with
       -- ^ Additional metadata specific to the settlement factory, used for extensibility.
   deriving (Show, Eq)
 
+defaultSettlementFactory_SettleBatchControllers : SettlementFactory_SettleBatch -> [Party]
+defaultSettlementFactory_SettleBatchControllers arg =
+    arg.settlement.executor :: arg.settlementV1Authorizers
+
 -- | A settlement factory enables the net settlement of a batch of allocations
 -- for the same instrument admin.
 interface SettlementFactory where
@@ -356,22 +361,21 @@ interface SettlementFactory where
         -- ^ Parties authorizing the settlement of their V1 settlements.
         --
         -- They are a separate field from `actors` to provide explicit opt-in behavior.
-      actors : [Party]
-        -- ^ Actors executing the settlement.
+      controllersOverride : Optional [Party]
+        -- ^ Allows setting non-default controllers for settling the batch, which
+        -- can be used for implementation specific authorization patterns.
         --
-        -- Registries MUST check their concrete values to avoid unauthorized
-        -- settlement execution.
+        -- Implementations MUST check this value to avoid unauthorized settlement execution.
         --
-        -- The `actors` SHOULD at least include all the settlement executor of
-        -- the settled settlements, and registries SHOULD allow successful
-        -- settlement if they do.
-
-        -- FIXME: consider switching to an `actorsOverride` optional field that is only used for extensibility. Thereby simplifying the default flows.
-
+        -- This choice's default controllers are the `settlement.executor` and the
+        -- `settlementV1Authorizers`. Implementations SHOULD allow executing the
+        -- choice with these default controllers to maximize compatibility with apps.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     observer settlementFactory_settleBatchExtraObservers this arg
-    controller actors
+    controller fromOptional (defaultSettlementFactory_SettleBatchControllers arg) controllersOverride
+      -- FIXME: decide on whether to use plain 'actors' (see the allocation choices above) or this 'controllerOverride' pattern.
+      -- I (SM) lean towards override, as it simplifes calls and improves documentation)
     do settlementFactory_settleBatchImpl this self arg
 
   nonconsuming choice SettlementFactory_PublicFetch : SettlementFactoryView
@@ -387,7 +391,7 @@ interface SettlementFactory where
       actor : Party
         -- ^ Party executing the fetch.
         --
-        -- FIXME: switch to multiple actors
+        -- FIXME: switch to multiple actors for extensibility
     controller actor
     do settlementFactory_publicFetchImpl this self arg
 

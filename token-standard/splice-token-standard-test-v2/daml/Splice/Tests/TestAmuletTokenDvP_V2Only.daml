@@ -237,9 +237,9 @@ testDvP = script do
         settlement = mkOtcTradeSettlementInfo otcTradeCid otcTrade
         transferLegs
         allocationCids
-        extraArgs = emptyExtraArgs
         settlementV1Authorizers = []
-        actors = [provider]
+        controllersOverride = None
+        extraArgs = emptyExtraArgs
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
   let disclosures = foldMap snd settleBatchContexts

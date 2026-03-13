@@ -228,7 +228,7 @@ testDvP_mixed = script do
         allocationCids
         extraArgs = emptyExtraArgs
         settlementV1Authorizers = [alice, bob]
-        actors = [provider, alice, bob]
+        controllersOverride = None
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
   let disclosures = foldMap snd settleBatchContexts

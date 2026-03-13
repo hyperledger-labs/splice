@@ -107,16 +107,16 @@ settlementFactoryV2_defaultSettleBatchImpl
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_defaultSettleBatchImpl factory0 self (AllocationV2.SettlementFactory_SettleBatch {..}) = do
+settlementFactoryV2_defaultSettleBatchImpl factory0 self arg@(AllocationV2.SettlementFactory_SettleBatch {..}) = do
   -- validate call to factory and retrieve context
   let factory = toInterface @AllocationV2.SettlementFactory factory0
   let admin = (view factory).admin
-  requireExpectedAdminMatch admin expectedAdmin
 
-  requireMatchExpected (self, "arg.actors") [settlement.executor] actors
+  requireExpectedAdminMatch admin expectedAdmin
+  onlyAllowDefaultControllers "SettlementFactory_SettleBatch" factory arg
 
   -- prepare
-  prep <- validateAndPrepareAllocations admin (AllocationV2.SettlementFactory_SettleBatch {..})
+  prep <- validateAndPrepareAllocations admin arg
 
   -- settle all v1 allocations
   newHoldingCidssV1 <- forA prep.allocationsSettledUsingV1 $ \((allocationCid, allocationView), leg) -> do
@@ -456,3 +456,10 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
       output = upcast output
       senderChangeCids = map upcast senderChangeCids
       meta
+
+
+-- Default controller instances
+-------------------------------
+
+instance HasDefaultControllers AllocationV2.SettlementFactory AllocationV2.SettlementFactory_SettleBatch where
+  defaultControllers _ arg = AllocationV2.defaultSettlementFactory_SettleBatchControllers arg
