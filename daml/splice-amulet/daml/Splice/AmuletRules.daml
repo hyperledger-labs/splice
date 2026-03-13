@@ -37,6 +37,7 @@ import Splice.Round
 import Splice.Types
 import Splice.DecentralizedSynchronizer
 import Splice.ValidatorLicense
+import Splice.Api.Token.AllocationV1
 
 import Splice.Util
 
@@ -55,6 +56,17 @@ data AmuletRules_MintResult = AmuletRules_MintResult with
 data AmuletRules_DevNet_TapResult = AmuletRules_DevNet_TapResult with
     amuletSum : AmuletCreateSummary (ContractId Amulet)
     meta : Optional Metadata
+
+data AmuletRules_Amulet_ExpireAllocationsResult = AmuletRules_Amulet_ExpireAllocationsResult
+  with
+    results : [Allocation_UpdateResult]
+  deriving (Eq, Show)
+
+data AmuletRules_ExpireAllocationInput = AmuletRules_ExpireAllocationInput
+  with
+    allocationCid : ContractId Allocation
+    extraArgs : ExtraArgs
+  deriving (Eq, Show)    
 
 data AmuletRules_DevNet_FeatureAppResult = AmuletRules_DevNet_FeatureAppResult with
     featuredAppRightCid : ContractId FeaturedAppRight
@@ -123,6 +135,32 @@ template AmuletRules
     ensure validAmuletConfig configSchedule.initialValue && null configSchedule.futureValues && fromOptional 0 contractStateSchemaVersion >= 0
 
     signatory dso
+
+    nonconsuming choice AmuletRules_Amulet_ExpireAllocations : AmuletRules_Amulet_ExpireAllocationsResult
+      with
+        expectedDso: Party
+        inputs : [AmuletRules_ExpireAllocationInput]
+        observers : [Party] 
+      observer observers
+      controller dso
+      do
+        require "The expectedDso must match the AmuletDso" (dso == expectedDso)
+        individualResults <- forA inputs $ \input -> do
+          -- Fetch the allocation interface and verify admin authority
+          alloc <- fetchCheckedInterface @Allocation (ForDso dso) input.allocationCid
+          let allocView = view alloc
+          
+          require "The DSO must be the admin of the allocation's instrument" 
+            (allocView.allocation.transferLeg.instrumentId.admin == dso)
+
+          -- Exercise the Update choice
+          exercise input.allocationCid Allocation_Update with
+            updateArg = Allocation_Update_Arg with
+              extraActors = []
+              extraArgs = input.extraArgs
+        
+        pure AmuletRules_Amulet_ExpireAllocationsResult with
+          results = individualResults
 
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context

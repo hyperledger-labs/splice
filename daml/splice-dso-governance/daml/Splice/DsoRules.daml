@@ -229,6 +229,11 @@ data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingCon
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
 
+data DsoRules_Amulet_ExpireAllocationsResult = DsoRules_Amulet_ExpireAllocationsResult
+  with
+    result : AmuletRules_Amulet_ExpireAllocationsResult
+  deriving (Eq, Show)
+
 data DsoRules_Amulet_ExpireV2Result = DsoRules_Amulet_ExpireV2Result with
   expireSum : AmuletExpireV2Summary
 
@@ -1117,6 +1122,18 @@ template DsoRules with
 
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
+
+    nonconsuming choice DsoRules_Amulet_ExpireAllocations : DsoRules_Amulet_ExpireAllocationsResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        allocations : AmuletRules_Amulet_ExpireAllocations 
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        
+        res <- exercise amuletRulesCid (allocations with expectedDso = dso) 
+        pure DsoRules_Amulet_ExpireAllocationsResult with result = res
 
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with

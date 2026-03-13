@@ -14,6 +14,7 @@ import Splice.Api.Token.AllocationV1
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
+import DA.Assert (assertDeadlineExceeded)
 
 
 -- | Amulet allocated in locked form to a trade.
@@ -46,6 +47,9 @@ template AmuletAllocation
           with
             senderHoldingCids
             meta = emptyMetadata
+
+      allocation_updateImpl _self arg = 
+        updateAmuletAllocation this arg.extraActors arg.extraArgs      
 
 allocationInstrumentAdmin : AllocationSpecification -> Party
 allocationInstrumentAdmin AllocationSpecification{..} = transferLeg.instrumentId.admin
@@ -84,3 +88,15 @@ unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId Hol
 unlockAmuletAllocation amuletAllocation extraArgs = do
   let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
   abortTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+
+updateAmuletAllocation : AmuletAllocation -> [Party] -> ExtraArgs -> Update Allocation_UpdateResult
+updateAmuletAllocation amuletAllocation extraActors extraArgs = do
+  assertMsg "Amulet allocation expiry does not support extra actors" (null extraActors)
+  -- Ensure the settleBefore deadline has actually passed
+  assertDeadlineExceeded "allocation.settlement.settleBefore" amuletAllocation.allocation.settlement.settleBefore
+  
+  -- Return funds to sender
+  senderHoldingCids <- unlockAmuletAllocation amuletAllocation extraArgs
+  pure Allocation_UpdateResult with
+    senderHoldingCids = senderHoldingCids
+    meta = emptyMetadata

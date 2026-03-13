@@ -62,6 +62,13 @@ data TransferLeg = TransferLeg with
       -- ^ Additional metadata about the transfer leg, used for extensibility.
   deriving (Eq, Ord, Show)
 
+-- The argument for the Allocation_Update choice.
+data Allocation_Update_Arg = Allocation_Update_Arg
+  with
+    extraActors : [Party]
+    extraArgs : ExtraArgs
+  deriving (Show, Eq)
+
 -- | The specification of an allocation of assets to a specific leg of a settlement.
 --
 -- In contrast to an `AllocationView` this just specifies what should be allocated,
@@ -109,6 +116,7 @@ interface Allocation where
   allocation_executeTransferImpl : ContractId Allocation -> Allocation_ExecuteTransfer -> Update Allocation_ExecuteTransferResult
   allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update Allocation_CancelResult
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update Allocation_WithdrawResult
+  allocation_updateImpl : ContractId Allocation -> Allocation_Update_Arg -> Update Allocation_UpdateResult
 
   choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
     -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
@@ -144,8 +152,24 @@ interface Allocation where
     do allocation_withdrawImpl this self arg
 
 
+  choice Allocation_Update : Allocation_UpdateResult
+    with
+      updateArg : Allocation_Update_Arg
+    controller (view this).allocation.transferLeg.instrumentId.admin :: updateArg.extraActors
+    do 
+      allocation_updateImpl this self updateArg
+
 -- Result types
 ---------------
+
+-- | the result type for the update choice
+data Allocation_UpdateResult = Allocation_UpdateResult
+  with
+    senderHoldingCids : [ContractId Holding]
+      -- ^ The holdings that were released back to the sender.
+    meta : Metadata
+      -- ^ Additional metadata.
+  deriving (Show, Eq)
 
 -- | The result of the `Allocation_ExecuteTransfer` choice.
 data Allocation_ExecuteTransferResult = Allocation_ExecuteTransferResult
