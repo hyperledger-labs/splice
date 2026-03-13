@@ -1159,7 +1159,9 @@ lazy val `apps-scan` =
             new File(s"apps/scan/src/main/openapi/scan-stream-server.yaml"),
             pkg = "org.lfdecentralizedtrust.splice.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
-            imports = List("org.lfdecentralizedtrust.splice.scan.admin.http.ResponseEntityGuardrailSupport._"),
+            imports = List(
+              "org.lfdecentralizedtrust.splice.scan.admin.http.ResponseEntityGuardrailSupport._"
+            ),
             customExtraction = true,
           ),
           ScalaServer(
