@@ -27,11 +27,6 @@
       safely remove it regardless of whether you disabled the new sequencer connection
       pools in the participant or not.
 
-    - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
-      in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
-      persisted scan connections from previous runs, removing the dependency on seedUrls
-      scan availability for successful reboots.
-
   - Scan
 
     - **Experimental**: Add an optional ``traffic_summary`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.

@@ -81,16 +81,13 @@ class FeaturedAppActivityMarkerTrigger(
       batch: CrossVersionBatch
   )(implicit tc: TraceContext): Future[Seq[Task]] =
     svTaskContext.vettingLookupService
-      .splitBatch[Contract[
-        amulet.FeaturedAppActivityMarker.ContractId,
-        amulet.FeaturedAppActivityMarker,
-      ]](
+      .splitBatch(
         PackageIdResolver.Package.SpliceAmulet,
-        c =>
-          Seq(c.payload.provider, c.payload.beneficiary, c.payload.dso)
-            .map(PartyId.tryFromProtoPrimitive(_)),
         batch.markers,
         batchSize,
+      )(c =>
+        Seq(c.payload.provider, c.payload.beneficiary, c.payload.dso)
+          .map(PartyId.tryFromProtoPrimitive(_))
       )
       .map {
         _.toSeq.flatMap {
