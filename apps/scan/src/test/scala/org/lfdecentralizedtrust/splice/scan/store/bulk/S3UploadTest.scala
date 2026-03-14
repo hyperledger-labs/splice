@@ -35,7 +35,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
         _ <- o.finish()
         content <- bucketConnection.readFullObject("test")
       } yield {
-        new String(content.array(), "UTF-8") shouldBe "helloworld"
+        new String(content.toArray, "UTF-8") shouldBe "helloworld"
       }
     }
   }
@@ -96,7 +96,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       val s3ObjData = s3ObjKeys.map { obj =>
         bucketConnection.readFullObject(obj.key()).futureValue
       }.toSeq
-      s3ObjData.map(_.remaining()) shouldBe expectedObjectSizes
+      s3ObjData.map(_.length) shouldBe expectedObjectSizes
       val dataFromS3 = s3ObjData.foldLeft(ByteString.empty) { (acc, buf) => acc ++ ByteString(buf) }
       dataFromS3 shouldBe data.take(expectedObjectSizes.sum)
     }
