@@ -17,6 +17,7 @@ data-dependencies:
 - ../splice-dso-governance/.daml/dist/splice-dso-governance-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
+- ../../token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
