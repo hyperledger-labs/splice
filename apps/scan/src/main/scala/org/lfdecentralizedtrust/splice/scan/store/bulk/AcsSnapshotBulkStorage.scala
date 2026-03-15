@@ -156,4 +156,55 @@ class AcsSnapshotBulkStorage(
       loggerFactory,
     )
   }
+
+//  def getAcsSnapshotAtOrBefore(atOrBeforeTimestamp: CantonTimestamp): Future[Seq[ObjectKeyAndChecksum]] = {
+//    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
+//    val prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTimestamp)
+//    kvProvider
+//      .getLatestAcsSnapshotInBulkStorage()
+//      .value
+//      .map(_.fold(false)(_.timestamp >= snapshotTimestamp))
+//      .flatMap {
+//        case false =>
+//          throw new NoSuchElementException("bulk storage not caught up to the requested date")
+//        case true =>
+//          for {
+//            objects <- s3Connection.listObjectsWithChecksums(Some(prefix))
+//            filteredObjects = objects.filter(_.key.matches(".*ACS_\\d+\\.zstd")).toSeq
+//          } yield {
+//            filteredObjects
+//          }
+//      }
+//  }
+
+  // TODO: probably wanna move this and the pipeline below to S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the size of the return)
+  case class ObjectKeyAndChecksum(
+      key: String,
+      checksum: String,
+  )
+
+  def getAcsSnapshotAtOrBefore(
+      atOrBeforeTimestamp: CantonTimestamp
+  ): Future[Seq[(String, String)]] = {
+    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
+    val prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTimestamp)
+    kvProvider
+      .getLatestAcsSnapshotInBulkStorage()
+      .value
+      .map(_.fold(false)(_.timestamp >= snapshotTimestamp))
+      .flatMap {
+        case false =>
+          throw new NoSuchElementException("bulk storage not caught up to the requested date")
+        case true =>
+          s3Connection
+            .listObjectsSource(prefix)
+            .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
+            .mapAsync(4) { obj => // TODO: configurable parallelism
+              s3Connection.readChecksum(obj.key).map(checksum => obj.key -> checksum)
+            }
+            .runWith(Sink.seq[(String, String)])
+
+      }
+  }
+
 }

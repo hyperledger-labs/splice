@@ -10,6 +10,8 @@ import software.amazon.awssdk.core.async.AsyncRequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 
 import java.net.URI
 import java.nio.ByteBuffer
@@ -48,6 +50,34 @@ class S3BucketConnection(
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+
+  def listObjectsSource(prefix: String): Source[S3Object, NotUsed] = {
+    val listRequest = ListObjectsV2Request
+      .builder()
+      .bucket(bucketName)
+      .prefix(prefix)
+      .build();
+    Source
+      .fromPublisher(
+        s3Client.listObjectsV2Paginator(listRequest)
+      )
+      .mapConcat(_.contents().asScala)
+  }
+
+  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+    val checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
+    for {
+      checksumResponse <- s3Client
+        .getObjectTagging(checksumRequest)
+        .asScala
+      checksum = checksumResponse
+        .tagSet()
+        .asScala
+        .find(_.key() == "splice-checksum")
+        .map(_.value())
+        .getOrElse(throw new RuntimeException("Missing checksum tag"))
+    } yield checksum
+  }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */

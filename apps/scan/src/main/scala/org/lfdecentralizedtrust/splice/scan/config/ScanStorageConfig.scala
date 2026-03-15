@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.AcsSnapshot
 import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import java.time.{Duration, ZoneOffset}
-import java.time.temporal.ChronoField
+import java.time.temporal.{ChronoField, ChronoUnit}
 
 /** Note that these configurations must be kept consistent between SVs,
   *  so they are not configured via a local config file in Scan. Instead, they must be voted on.
@@ -43,25 +43,50 @@ case class ScanStorageConfig(
     lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(dbAcsSnapshotPeriodHours.toLong))
   }
 
+  def atHour(time: CantonTimestamp, plusDays: Int, atHour: Int): CantonTimestamp =
+    CantonTimestamp.assertFromInstant(
+      time.toInstant
+        .plus(plusDays.toLong, ChronoUnit.DAYS)
+        .atOffset(ZoneOffset.UTC)
+        .withHour(atHour)
+        .withMinute(0)
+        .withSecond(0)
+        .withNano(0)
+        .toInstant
+    )
+
   def computeSnapshotTimeAfter(
       afterRecordTime: CantonTimestamp,
       periodHours: Int,
   ): CantonTimestamp = {
-    val afterTimeUTC = afterRecordTime.toInstant.atOffset(ZoneOffset.UTC)
     val (hourForSnapshot, plusDays) = timesToDoSnapshot(periodHours)
-      .find(_ > afterTimeUTC.get(ChronoField.HOUR_OF_DAY)) match {
+      .find(_ > afterRecordTime.toInstant.get(ChronoField.HOUR_OF_DAY)) match {
       case Some(hour) => hour -> 0 // current day at hour
       case None => 0 -> 1 // next day at 00:00
     }
-    val until = afterTimeUTC.toLocalDate
-      .plusDays(plusDays.toLong)
-      .atTime(hourForSnapshot, 0)
-      .toInstant(ZoneOffset.UTC)
-    CantonTimestamp.assertFromInstant(until)
+    atHour(afterRecordTime, plusDays, hourForSnapshot)
+  }
+
+  def computeSnapshotTimeAtOrBefore(
+      upToRecordTime: CantonTimestamp,
+      periodHours: Int,
+  ): CantonTimestamp = {
+    val rtHours = upToRecordTime.toInstant.get(ChronoField.HOUR_OF_DAY)
+    val hourForSnapshot = timesToDoSnapshot(periodHours)
+      .find(_ <= rtHours)
+      .getOrElse(
+        throw new RuntimeException(
+          s"Unexpectedly could not find a time for a snapshot before ${rtHours}"
+        )
+      )
+    atHour(upToRecordTime, 0, hourForSnapshot)
   }
 
   def computeBulkSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, bulkAcsSnapshotPeriodHours)
+
+  def computeBulkSnapshotTimeAtOrBefore(upToRecordTime: CantonTimestamp): CantonTimestamp =
+    computeSnapshotTimeAtOrBefore(upToRecordTime, bulkAcsSnapshotPeriodHours)
 
   def computeDbSnapshotTimeAfter(afterRecordTime: CantonTimestamp): CantonTimestamp =
     computeSnapshotTimeAfter(afterRecordTime, dbAcsSnapshotPeriodHours)
@@ -79,7 +104,7 @@ case class ScanStorageConfig(
    * If end timestamp is not given, it will be computed from the start timestamp
    * based on the bulkAcsSnapshotPeriodHours period
    */
-  def getSegmentKeyPrefix(
+  def getSegmentFolder(
       segmentStartTimestamp: TimestampWithMigrationId,
       segmentEndTimestamp: Option[TimestampWithMigrationId],
   ): String = {
@@ -88,6 +113,10 @@ case class ScanStorageConfig(
     )(_.timestamp)
     s"${segmentStartTimestamp.timestamp}-Migration-${segmentStartTimestamp.migrationId}-${endTimestamp}"
   }
+
+  def findSegmentFolderPrefixByStartTimestamp(
+      segmentStartTimestamp: CantonTimestamp
+  ): String = segmentStartTimestamp.toString
 
 }
 
