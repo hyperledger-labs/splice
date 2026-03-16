@@ -131,11 +131,12 @@ class ZstdTest extends StoreTestBase {
     sub.request(1)
     sub.expectNext()
     pub.sendNext(ByteString.fromArray(randInput))
-    // Send completion before we request the second element, should be handled correctly
-    pub.sendComplete()
-    sub.request(1)
-    sub.expectNext()
-
+    clue("Upstream completes before the next element is requested, should be handled correctly") {
+      pub.sendComplete()
+      sub.request(1)
+      sub.expectNext()
+      sub.expectComplete()
+    }
     succeed
   }
 }
