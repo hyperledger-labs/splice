@@ -784,7 +784,7 @@ template AmuletRules
           instr <- fetchCheckedInterface (ForDso dso) input.transferInstructionCid
           let instrView = view instr
           
-          require "The DSO must be the admin of the transfer instruction's instrument" (instrView.transfer.instrumentId.admin == dso)
+          require "The controllerDSO must be the admin of the transfer instruction's instrument" (instrView.transfer.instrumentId.admin == dso)
           
 
           exercise input.transferInstructionCid TransferInstruction_Update with
