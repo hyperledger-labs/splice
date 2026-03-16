@@ -1910,7 +1910,7 @@ checkErrors := {
     val ignorePatternsFilenames = ignorePatterns.map(ignorePatternsFilename)
     val cmd =
       Seq(
-        ".github/actions/scripts/check-logs.sh",
+        "splice-shared-gha/.github/actions/scripts/check-logs.sh",
         logFileName,
       ) ++ ignorePatternsFilenames
     if (cmd.! != 0) {
