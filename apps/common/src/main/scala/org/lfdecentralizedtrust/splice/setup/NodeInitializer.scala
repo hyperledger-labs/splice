@@ -130,7 +130,7 @@ class NodeInitializer(
             Future.successful(result)
           } else {
             // No ID set yet according to GetId. Check the status endpoint to determine whether
-            // the node is genuinely waiting for an ID or still bootstrapping.
+            // the node is genuinely waiting for an ID. If not we assume that it is still bootstrapping.
             connection.getStatus.flatMap {
               case NodeStatus.NotInitialized(_, Some(WaitingForId)) =>
                 Future.successful(result)
