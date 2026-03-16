@@ -24,10 +24,10 @@
     "esbuild": "^0.25.0",
     "eslint": "^8.53.0",
     "prettier": "^3.1.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "bignumber.js": "^9.1.1",
-    "zod": "^3.22.4"
+    "zod": "^4.3.6"
   }
 }
