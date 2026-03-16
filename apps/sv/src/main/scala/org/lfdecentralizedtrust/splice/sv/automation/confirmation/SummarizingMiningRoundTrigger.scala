@@ -30,6 +30,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 
 /** This is a polling trigger to avoid issues where SVs run out of retries (e.g. due to the synchronizer being down)
   * and then the round gets stuck forever in the summarizing state.
@@ -67,7 +68,11 @@ class SummarizingMiningRoundTrigger(
     tasks <- MonadUtil
       .sequentialTraverse(summarizingRounds) { round =>
         for {
-          rewards <- queryRewards(round.payload.round.number, round.domain)
+          rewards <- queryRewards(
+            round.payload.round.number,
+            round.domain,
+            round.payload.issuanceConfig,
+          )
           action = amuletRulesStartIssuingAction(
             round.contractId,
             rewards.summary,
@@ -147,10 +152,16 @@ class SummarizingMiningRoundTrigger(
   /** Query the open reward contracts for a given round. This should only be used
     * for a SummarizingMiningRound.
     */
-  private def queryRewards(round: Long, domain: SynchronizerId)(implicit
+  private def queryRewards(
+      round: Long,
+      domain: SynchronizerId,
+      issuanceConfig: splice.issuance.IssuanceConfig,
+  )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[RoundRewards] = {
+    val faucetCapIsZero = issuanceConfig.optValidatorFaucetCap.toScala
+      .exists(_.compareTo(java.math.BigDecimal.ZERO) <= 0)
     for {
       appRewardCoupons <- store.sumAppRewardCouponsOnDomain(
         round,
@@ -160,14 +171,12 @@ class SummarizingMiningRoundTrigger(
         round,
         domain,
       )
-      validatorFaucetCoupons <- store.countValidatorFaucetCouponsOnDomain(
-        round,
-        domain,
-      )
-      validatorLivenessActivityRecords <- store.countValidatorLivenessActivityRecordsOnDomain(
-        round,
-        domain,
-      )
+      validatorFaucetCoupons <-
+        if (faucetCapIsZero) Future.successful(0L)
+        else store.countValidatorFaucetCouponsOnDomain(round, domain)
+      validatorLivenessActivityRecords <-
+        if (faucetCapIsZero) Future.successful(0L)
+        else store.countValidatorLivenessActivityRecordsOnDomain(round, domain)
       svRewardCouponsWeightSum <- store.sumSvRewardCouponWeightsOnDomain(
         round,
         domain,
