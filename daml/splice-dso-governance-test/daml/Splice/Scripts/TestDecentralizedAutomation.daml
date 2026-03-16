@@ -31,6 +31,14 @@ import Splice.Scripts.TestTransferPreapproval
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.Registries.AmuletRegistry qualified as Registry
 import Splice.Wallet.Subscriptions
+import qualified Splice.Testing.Registries.AmuletRegistry as AmuletRegistry
+import qualified Splice.Testing.TokenStandard.RegistryApi as RegistryApi
+import Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.TransferInstructionV1 as TransferInstructionV1
+import Splice.Api.Token.MetadataV1 (ChoiceContext, ChoiceContext, ExtraArgs(ExtraArgs))
+import Splice.Api.Token.AllocationV1 (Allocation)
+import Splice.AmuletAllocation (AmuletAllocation)
+import qualified DA.TextMap as TextMap
 
 
 testUnclaimedRewardsMerging : Script ()
@@ -548,4 +556,84 @@ testBootstrapExternalPartyConfigState = do
 
   configStates <- query @ExternalPartyConfigState dso
   length configStates === 2
+  pure ()
+
+
+testExpireAmuletAllocation : Script ()
+testExpireAmuletAllocation = do
+  (app, _, (sv1, _, _, _)) <- initDevNet
+  sender <- setupUser app "sender" app.dso
+  receiver <- allocateParty "receiver"
+  executor <- allocateParty "executor"
+  
+  _ <- tap app sender 100.0
+  let registry = AmuletRegistry.AmuletRegistry with
+        dso = app.dso
+        instrumentId = InstrumentId with
+          admin = app.dso
+          id = "Amulet"
+
+  liquidAmulets <- query @Amulet sender.primaryParty
+  let totalBalance = sum (map (\(_, a) -> a.amount.initialAmount) liquidAmulets)
+  let senderAmuletCids = map fst liquidAmulets
+  
+  now <- getTime
+  let settleBefore = now `addRelTime` hours 1
+  
+  transfer <- RegistryApi.getTransferFactory registry TransferInstructionV1.TransferFactory_Transfer
+    with
+      expectedAdmin = app.dso
+      transfer = TransferInstructionV1.Transfer with
+        sender = sender.primaryParty
+        receiver
+        amount = totalBalance
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = settleBefore
+        inputHoldingCids = map toInterfaceContractId senderAmuletCids
+        meta = emptyMetadata
+      extraArgs = ExtraArgs with
+        ExtraArgs.context = emptyChoiceContext
+        ExtraArgs.meta = emptyMetadata
+
+  submitWithDisclosures' sender.primaryParty transfer.disclosures $ exerciseCmd transfer.factoryCid transfer.arg
+
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  [(allocInterfaceCid, maybeView)] <- queryInterface @Allocation app.dso
+  
+  let allocView = fromSomeNote "Need view" maybeView
+  let stakeholders = [allocView.allocation.transferLeg.sender, allocView.allocation.transferLeg.receiver, executor]
+
+  let expireBatchChoice = AmuletRules_Amulet_ExpireAllocations with
+        expectedDso = app.dso
+        inputs = [AmuletRules_ExpireAllocationInput with 
+                    allocationCid = allocInterfaceCid
+                    extraArgs = ExtraArgs with
+                      meta = emptyMetadata
+                      context = ChoiceContext with
+                        values = TextMap.fromList [(expireLockKey, toAnyValue True)]]
+        observers = stakeholders
+
+  submitMultiMustFail [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireAllocations with
+      amuletRulesCid = amuletRulesCid
+      allocations = expireBatchChoice
+      sv = sv1
+
+  passTime (hours 2)
+
+  submitMulti [sv1] [app.dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireAllocations with
+      amuletRulesCid = amuletRulesCid
+      allocations = expireBatchChoice
+      sv = sv1
+
+  allocationsAfter <- query @AmuletAllocation app.dso
+  allocationsAfter === []
+
+  senderAmulets <- query @Amulet sender.primaryParty
+  let totalBalanceAfter = sum (map (\(_, a) -> a.amount.initialAmount) senderAmulets)
+  totalBalanceAfter === totalBalance
+
   pure ()
