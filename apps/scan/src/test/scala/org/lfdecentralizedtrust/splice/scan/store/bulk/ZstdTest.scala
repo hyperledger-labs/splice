@@ -117,4 +117,25 @@ class ZstdTest extends StoreTestBase {
     }
 
   }
+
+  "handle upstream close correctly" in {
+    val zstdChunkSize = 10L
+    val (pub, sub) = TestSource
+      .probe[ByteString]
+      .via(ZstdGroupedWeight(3, zstdChunkSize))
+      .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
+      .run()
+    val randInput = new Array[Byte](100)
+    scala.util.Random.nextBytes(randInput)
+    pub.sendNext(ByteString.fromArray(randInput))
+    sub.request(1)
+    sub.expectNext()
+    pub.sendNext(ByteString.fromArray(randInput))
+    // Send completion before we request the second element, should be handled correctly
+    pub.sendComplete()
+    sub.request(1)
+    sub.expectNext()
+
+    succeed
+  }
 }
