@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.prettyString
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 
 class NodeInitializer(
     connection: TopologyAdminConnection & StatusAdminConnection,
@@ -109,6 +110,7 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Making sure canton node has an identity")
+    val bootDeadline = 20.seconds.fromNow
     for {
       // If the node was started concurrently with the app, it might not immediately be responding, so we're
       // retrying the getId() call.
@@ -118,8 +120,20 @@ class NodeInitializer(
       nodeId <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "node_id",
-        s"${connection.serviceName} answers the getId request",
-        connection.getIdOption(),
+        s"${connection.serviceName} answers the getId request with an ID or confirms uninitialized state",
+        connection.getIdOption().flatMap { result =>
+          if (result.uniqueIdentifier.isDefined || result.initialized) {
+            Future.successful(result)
+          } else if (bootDeadline.hasTimeLeft()) {
+            Future.failed(
+              new IllegalStateException(
+                s"Node might be bootstrapping. Retrying getId... (${bootDeadline.timeLeft.toSeconds}s remaining)"
+              )
+            )
+          } else {
+            Future.successful(result)
+          }
+        },
         logger,
       )
       _ <- nodeId.uniqueIdentifier match {
