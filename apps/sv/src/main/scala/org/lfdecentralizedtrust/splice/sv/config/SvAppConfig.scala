@@ -93,10 +93,9 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = SpliceUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
-      initialMaxNumInputs: Int = 100,
+      initialMaxNumInputs: Long = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -108,6 +107,7 @@ object SvOnboardingConfig {
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

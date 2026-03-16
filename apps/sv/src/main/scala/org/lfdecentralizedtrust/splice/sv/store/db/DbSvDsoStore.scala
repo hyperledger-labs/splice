@@ -72,7 +72,6 @@ import slick.jdbc.canton.SQLActionBuilder
 
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
-import scala.reflect.ClassTag
 
 class DbSvDsoStore(
     override val key: SvStore.Key,
@@ -449,7 +448,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[AppRewardCoupon.ContractId]]] =
+  ): Future[Seq[RoundBatch[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]]] =
     listCouponsGroupedByRound(
       AppRewardCoupon.COMPANION,
       domain,
@@ -465,7 +464,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[ValidatorRewardCoupon.ContractId]]] =
+  ): Future[Seq[RoundBatch[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]]] =
     listCouponsGroupedByRound(
       ValidatorRewardCoupon.COMPANION,
       domain,
@@ -481,7 +480,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[ValidatorFaucetCoupon.ContractId]]] =
+  ): Future[Seq[RoundBatch[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]]] =
     listCouponsGroupedByRound(
       ValidatorFaucetCoupon.COMPANION,
       domain,
@@ -497,7 +496,9 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundBatch[ValidatorLivenessActivityRecord.ContractId]]] =
+  ): Future[Seq[RoundBatch[
+    Contract[ValidatorLivenessActivityRecord.ContractId, ValidatorLivenessActivityRecord]
+  ]]] =
     listCouponsGroupedByRound(
       ValidatorLivenessActivityRecord.COMPANION,
       domain,
@@ -511,7 +512,9 @@ class DbSvDsoStore(
       batchSize: Limit,
       numBatches: Limit,
       ignoredParties: Set[PartyId],
-  )(implicit tc: TraceContext): Future[Seq[RoundBatch[SvRewardCoupon.ContractId]]] =
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[RoundBatch[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]]] =
     listCouponsGroupedByRound(
       SvRewardCoupon.COMPANION,
       domain,
@@ -520,7 +523,7 @@ class DbSvDsoStore(
       ignoredParties,
     )
 
-  private def listCouponsGroupedByRound[C, TCId <: ContractId[?]: ClassTag, T](
+  private def listCouponsGroupedByRound[C, TCId <: ContractId[?], T](
       companion: C,
       domain: SynchronizerId,
       batchSize: Limit,
@@ -529,7 +532,7 @@ class DbSvDsoStore(
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
-  ): Future[Seq[SvDsoStore.RoundBatch[TCId]]] = {
+  ): Future[Seq[SvDsoStore.RoundBatch[Contract[TCId, T]]]] = {
     val packageQualifiedName = companionClass.packageQualifiedName(companion)
     val templateId = companionClass.typeId(companion)
     val opName = s"list${templateId.getEntityName}GroupedByRound"
@@ -552,9 +555,9 @@ class DbSvDsoStore(
         result <- storage
           .query(
             (sql"""
-                select sub.reward_round, array_agg(sub.contract_id)
+                select sub.reward_round, #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}
                 from (
-                  select reward_round, contract_id,
+                  select reward_round, #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()},
                          row_number() over (partition by reward_round) as rn
                   from dso_acs_store
                   where store_id = $acsStoreId
@@ -567,21 +570,21 @@ class DbSvDsoStore(
                     """ ++ partyFilter ++ sql"""
                 ) sub
                 where sub.rn <= ${sqlLimit(batchSize)}
-                group by sub.reward_round
                 order by sub.reward_round asc
-                limit ${sqlLimit(numBatches)}
-               """).toActionBuilder.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
+                limit ${sqlLimit(numBatches) * sqlLimit(batchSize)}
+               """).toActionBuilder.as[(Long, SelectFromAcsTableResult)],
+            // the limit at the end is not exact but good enough to avoid fetching an unbounded result, the applyLimit below forces us into the actual batch limit.
             opName,
           )
-      } yield applyLimit(opName, numBatches, result)
-        .map { case (round, batch) =>
+      } yield {
+        val groupedResults = applyLimit(opName, numBatches, result.groupBy(_._1))
+        groupedResults.map { case (round, batch) =>
           RoundBatch(
             round,
-            batch
-              .map(cid => companionClass.toContractId(companion, cid.contractId))
-              .toSeq,
+            batch.map { case (_, c) => contractFromRow(companion)(c) }.toSeq,
           )
-        }
+        }.toSeq
+      }
     }
   }
 
@@ -904,8 +907,19 @@ class DbSvDsoStore(
                     and template_id_qualified_name = ${QualifiedName(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
+                  and mining_round is not null
+                order by mining_round desc limit 1)
+                and coalesce(acs.amulet_round_of_expiry <= (
+                  select mining_round
+                  from dso_acs_store
+                  where store_id = $acsStoreId
+                    and migration_id = $domainMigrationId
+                    and package_name = ${splice.externalpartyconfigstate.ExternalPartyConfigState.PACKAGE_NAME}
+                    and template_id_qualified_name = ${QualifiedName(
+                  splice.externalpartyconfigstate.ExternalPartyConfigState.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
                     and mining_round is not null
-                  order by mining_round desc limit 1)""" ++ extraFilter).toActionBuilder,
+                  order by mining_round asc limit 1), true)""" ++ extraFilter).toActionBuilder,
               orderLimit = sql"""order by mining_round desc limit ${sqlLimit(limit)}""",
             ),
             "listExpiredRoundBased",
@@ -1518,6 +1532,20 @@ class DbSvDsoStore(
     val expectedAction = new splice.dsorules.actionrequiringconfirmation.ARC_DsoRules(
       new splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateExternalPartyAmuletRules(
         new splice.dsorules.DsoRules_CreateExternalPartyAmuletRules()
+      )
+    )
+    listConfirmationsByActionConfirmer(expectedAction, confirmer)
+  }
+
+  override def listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] = {
+    val expectedAction = new splice.dsorules.actionrequiringconfirmation.ARC_DsoRules(
+      new splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateBootstrapExternalPartyConfigStateInstruction(
+        new splice.dsorules.DsoRules_CreateBootstrapExternalPartyConfigStateInstruction()
       )
     )
     listConfirmationsByActionConfirmer(expectedAction, confirmer)

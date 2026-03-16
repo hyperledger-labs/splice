@@ -135,6 +135,7 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       val packagesToUnvet = DarResources.amulet.others.filter(
         _.metadata.version > DarResources.amulet_0_1_15.metadata.version
       )
+      logger.info(s"Unvetting ${packagesToUnvet.map(d => (d.metadata.version, d.packageId))}")
       bobValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
         bobValidatorBackend.participantClient.id,
         store = decentralizedSynchronizerId,
@@ -266,7 +267,9 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
           line.message should (include("vettedAmuletVersion = 0.1.15") and include("Processing"))
         }
         forAtLeast(1, entries) { line =>
-          line.message should (include("vettedAmuletVersion = 0.1.16") and include("Processing"))
+          line.message should (include(
+            s"vettedAmuletVersion = ${DarResources.amulet.latest.metadata.version}"
+          ) and include("Processing"))
         }
       },
     )
