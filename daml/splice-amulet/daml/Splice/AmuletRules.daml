@@ -50,7 +50,7 @@ data AmuletRules_ExpireTransferInstructionInput = AmuletRules_ExpireTransferInst
   with
     transferInstructionCid : ContractId TransferInstruction
     expireLock : Bool
-  deriving (Eq, Show)  
+  deriving (Eq, Show)
 
 data AmuletRules_BootstrapExternalPartyConfigStateResult = AmuletRules_BootstrapExternalPartyConfigStateResult
   deriving (Show, Eq)
@@ -783,9 +783,9 @@ template AmuletRules
         individualResults <- forA inputs $ \input -> do
           instr <- fetchCheckedInterface (ForDso dso) input.transferInstructionCid
           let instrView = view instr
-          
-          require "The controllerDSO must be the admin of the transfer instruction's instrument" (instrView.transfer.instrumentId.admin == dso)
-          
+
+          require "The controller must be the admin of the transfer instruction's instrument" (instrView.transfer.instrumentId.admin == dso)
+
 
           exercise input.transferInstructionCid TransferInstruction_Update with
             extraActors = []
@@ -793,10 +793,10 @@ template AmuletRules
               meta = emptyMetadata
               context = ChoiceContext with
                 values = TextMap.fromList [(expireLockKey, toAnyValue input.expireLock)]
-        
+
         pure AmuletRules_Amulet_ExpireTransferInstructionsResult with
           results = individualResults
-    
+
     nonconsuming choice AmuletRules_UpdateExternalPartyConfigStates : AmuletRules_UpdateExternalPartyConfigStatesResult
       with
         externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState
