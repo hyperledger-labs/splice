@@ -728,3 +728,4 @@ testExpireTransferInstructionAlreadyUnlocked = do
 
   instructions <- query @AmuletTransferInstruction app.dso
   instructions === []
+  pure ()
