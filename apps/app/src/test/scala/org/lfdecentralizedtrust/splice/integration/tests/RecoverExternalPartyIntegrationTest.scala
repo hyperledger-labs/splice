@@ -17,7 +17,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.HexString
-import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 
 import java.nio.file.Files
