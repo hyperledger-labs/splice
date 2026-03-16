@@ -93,6 +93,30 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.amulet_0_1_16,
     )
 
+  def supports24hSubmissionDelay(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      DarResources.amulet,
+      DarResources.amulet_0_1_17,
+    )
+  }
+
+  def supports24hSubmissionDelayDsoGovernance(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance,
+      DarResources.dsoGovernance_0_1_23,
+    )
+  }
+
   private def isDarSupported(
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,
