@@ -86,10 +86,11 @@ allocationV2_defaultSettleImplUsingV1 this self (AllocationV2.Allocation_Settle{
 -- It uses the `V1.Allocation_Withdraw` choice to ensure the sender's tx parsing
 -- sees the expected choice.
 allocationV2_defaultWithdrawImplUsingV1
-  :  ContractId AllocationV2.Allocation
+  : AllocationV2.Allocation
+  -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
-allocationV2_defaultWithdrawImplUsingV1 self (AllocationV2.Allocation_Withdraw{..}) = do
+allocationV2_defaultWithdrawImplUsingV1 _this self (AllocationV2.Allocation_Withdraw{..}) = do
   -- no archive of self, as the V1 choice is consuming
   -- no check of actors, as they will be checked implicitly by the V1 choice
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
@@ -105,10 +106,11 @@ allocationV2_defaultWithdrawImplUsingV1 self (AllocationV2.Allocation_Withdraw{.
 -- It uses the `V1.Allocation_Cancel` choice to ensure the sender's tx parsing
 -- sees the expected choice.
 allocationV2_defaultCancelImplUsingV1
-  :  ContractId AllocationV2.Allocation
+  : AllocationV2.Allocation
+  -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
-allocationV2_defaultCancelImplUsingV1 self (AllocationV2.Allocation_Cancel{..}) = do
+allocationV2_defaultCancelImplUsingV1 _this self (AllocationV2.Allocation_Cancel{..}) = do
   -- no archive of self, as the V1 choice is consuming
   -- no check of actors, as they will be checked implicitly by the V1 choice
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
@@ -180,12 +182,14 @@ settlementFactoryV2_defaultSettleBatchImpl createReceiptAllocation settlementFac
     meta = emptyMetadata
 
 
--- FIXME: comment
+-- | Default implementation for creating receipt allocations using the allocation factory interface.
 settlementFactoryV2_defaultCreateReceiptAllocation
   : ContractId AllocationInstructionV2.AllocationFactory
   -> (HoldingV2.Account -> [Party])
+     -- ^ Which actors must authorize the creation of the receipt allocation for a given account.
   -> AllocationV2.SettlementFactory_SettleBatch
   -> AllocationV2.AllocationSpecification
+     -- ^ Allocation to create.
   -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView)
 settlementFactoryV2_defaultCreateReceiptAllocation allocationFactoryCid directAllocateActors settleBatchArg allocSpec = do
   result <- exercise allocationFactoryCid AllocationInstructionV2.AllocationFactory_Allocate with

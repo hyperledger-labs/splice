@@ -62,8 +62,8 @@ template AmuletAllocation
       allocation_cancelExtraObservers _arg = [allocation.settlement.executor]
       allocation_withdrawExtraObservers _arg = [allocation.settlement.executor]
 
-      allocation_withdrawImpl = allocationV2_defaultWithdrawImplUsingV1
-      allocation_cancelImpl = allocationV2_defaultCancelImplUsingV1
+      allocation_withdrawImpl = allocationV2_defaultWithdrawImplUsingV1 (toInterface this)
+      allocation_cancelImpl = allocationV2_defaultCancelImplUsingV1 (toInterface this)
       allocation_settleImpl = allocationV2_defaultSettleImplUsingV1 (toInterface this)
 
 
