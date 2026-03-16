@@ -181,11 +181,7 @@ case class GroupedWeightS3ObjectFlow(
         }
 
       override def onUpstreamFinish(): Unit = {
-        if (!upstreamFinished) {
-          throw new RuntimeException(
-            "upstream finished unexpectedly, without omitting a final object first"
-          )
-        }
+        logger.debug("upstream finished")
         // Note that we're not finishing the stage here, we're doing that above when the last object finishes uploading
       }
 
