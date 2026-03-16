@@ -11,19 +11,22 @@
 
     - SV and Validator app
 
-    - Going forward unsupported splice DARs will no longer be uploaded or vetted.
+    - Going forward unusable splice DARs will be automatically unvetted by the super validators.
+      This will be used for DARs that can already not be used,
+      e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
+
       The minimum supported versions are:
 
-        ================== =======
-        name               version
-        ================== =======
-        amulet             0.1.10
-        amuletNameService  0.1.10
-        dsoGovernance      0.1.14
-        validatorLifecycle 0.1.3
-        wallet             0.1.10
-        walletPayments     0.1.10
-        ================== =======
+         ================== =======
+         name               version
+         ================== =======
+         amulet             0.1.17
+         amuletNameService  0.1.18
+         dsoGovernance      0.1.23
+         validatorLifecycle 0.1.6
+         wallet             0.1.18
+         walletPayments     0.1.17
+         ================== =======
 
     .. important::
 

@@ -17,7 +17,7 @@ abstract class PackageVettingTrigger(
     packages: Set[PackageIdResolver.Package],
     maxVettingDelay: NonNegativeFiniteDuration,
     latestPackagesOnly: Boolean,
-    svValidator: Boolean,
+    enableUnvetting: Boolean,
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
@@ -68,7 +68,7 @@ abstract class PackageVettingTrigger(
         vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
       )
       // See https://github.com/DACH-NY/canton/issues/29834: make it work for non-sv validators as well
-      _ = if (unsupportedPackages.nonEmpty && svValidator) {
+      _ = if (unsupportedPackages.nonEmpty && enableUnvetting) {
         vetting.unvetPackages(
           domainId,
           unsupportedPackages,
@@ -81,10 +81,12 @@ abstract class PackageVettingTrigger(
   private def runIfInputChanged(
       input: Seq[String]
   )(run: => Future[Unit])(implicit tc: TraceContext) = {
-    val previoslyRunInput = previouslyRunInputRef.get()
-    if (previoslyRunInput != input.toSet) {
+    val previouslyRunInput = previouslyRunInputRef.get()
+    if (previouslyRunInput.isEmpty) {
+      Future.unit.map(_ => previouslyRunInputRef.set(input.toSet))
+    } else if (previouslyRunInput != input.toSet) {
       logger.info(
-        s"Running package vetting as the input has changed from $previoslyRunInput to $input"
+        s"Running package vetting as the input has changed from $previouslyRunInput to $input"
       )
       run.map(_ => previouslyRunInputRef.set(input.toSet))
     } else {

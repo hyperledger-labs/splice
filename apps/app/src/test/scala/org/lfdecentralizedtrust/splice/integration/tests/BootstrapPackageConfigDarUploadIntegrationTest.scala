@@ -85,6 +85,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
             DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
           ),
           sv1Backend.appState.participantAdminConnection,
+          3,
         )
         checkDarVersions(
           decentralizedSynchronizerId,
@@ -96,6 +97,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
             DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
           ),
           aliceValidatorBackend.appState.participantAdminConnection,
+          2,
         )
       }
   }
@@ -104,6 +106,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       domainId: SynchronizerId,
       darsToCheck: Seq[(PackageResource, String)],
       participantAdminConnection: ParticipantAdminConnection,
+      serial: Int,
   ): Unit = {
     eventually() {
       val vettedPackages: Seq[VettedPackage] =
@@ -141,6 +144,16 @@ class BootstrapPackageConfigDarUploadIntegrationTest
         }
       }
     }
+    clue(s"Vetted package transactions have the expected serial $serial") {
+      participantAdminConnection
+        .listVettedPackages(
+          participantAdminConnection.getParticipantId().futureValue,
+          domainId,
+          AuthorizedState,
+        )
+        .futureValue
+        .map(_.base.serial.value) should contain only serial
+    }
   }
 
   private def checkDarLatestVersion(
@@ -167,6 +180,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           PackageVersion.assertFromString(requiredVersion),
         )
         .map(_.metadata.version)
+        .distinct
     }
     clue(
       s"versions older than minimumInitialization for package ${packageResource.latest.metadata.name} should not be vetted"

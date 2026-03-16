@@ -23,7 +23,7 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
 
   "Unsupported vetted packages are automatically removed by the package vetting trigger for SV and validator" in {
     implicit env =>
-      val unsupportedDars = Seq(
+      val unsupportedDarsToVet = Seq(
         DarResources.dsoGovernance_0_1_0,
         DarResources.walletPayments_0_1_0,
         DarResources.amuletNameService_0_1_0,
@@ -36,20 +36,20 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
       test(
         sv1Backend.appState.participantAdminConnection,
         synchronizerId,
-        unsupportedDars,
-        unsupportedDars,
+        unsupportedDarsToVet,
+        unsupportedDarsToVet,
       )
       test(
         sv1ValidatorBackend.appState.participantAdminConnection,
         synchronizerId,
-        unsupportedDars,
-        unsupportedDars,
+        unsupportedDarsToVet,
+        unsupportedDarsToVet,
       )
-      // See https://github.com/DACH-NY/canton/issues/29834: set removedDars when unvetting works on non-sv validators
+      // See https://github.com/DACH-NY/canton/issues/29834: set darsUnvettedByAutomation when unvetting works on non-sv validators
       test(
         aliceValidatorBackend.appState.participantAdminConnection,
         synchronizerId,
-        unsupportedDars,
+        unsupportedDarsToVet,
         Seq.empty,
       )
   }
@@ -57,8 +57,8 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
   private def test(
       participantAdminConnection: ParticipantAdminConnection,
       synchronizerId: SynchronizerId,
-      unsupportedDars: Seq[DarResource],
-      removedDars: Seq[DarResource],
+      unsupportedDarsToVet: Seq[DarResource],
+      darsUnvettedByAutomation: Seq[DarResource],
   ) = {
     val participantId = participantAdminConnection.getParticipantId().futureValue
     val name = participantId.uid.identifier
@@ -66,12 +66,12 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
       s"$name uploads and vets unsupported packages", {
         participantAdminConnection
           .uploadDarFiles(
-            unsupportedDars.map(UploadablePackage.fromResource),
+            unsupportedDarsToVet.map(UploadablePackage.fromResource),
             RetryFor.Automation,
           )
           .futureValue
         participantAdminConnection
-          .vetDars(synchronizerId, unsupportedDars, None, None)
+          .vetDars(synchronizerId, unsupportedDarsToVet, None, None)
           .futureValue
       },
     )(
@@ -81,7 +81,7 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
           .listVettedPackages(participantId, synchronizerId, AuthorizedState)
           .futureValue
           .flatMap(_.mapping.packages)
-          .map(_.packageId) should contain allElementsOf unsupportedDars.map(_.packageId),
+          .map(_.packageId) should contain allElementsOf unsupportedDarsToVet.map(_.packageId),
     )
     clue(s"the unsupported packages are then removed by the package vetting trigger from $name") {
       eventually() {
@@ -89,7 +89,7 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
           .listVettedPackages(participantId, synchronizerId, AuthorizedState)
           .futureValue
           .flatMap(_.mapping.packages)
-          .map(_.packageId) should contain noElementsOf removedDars.map(_.packageId)
+          .map(_.packageId) should contain noElementsOf darsUnvettedByAutomation.map(_.packageId)
       }
     }
   }

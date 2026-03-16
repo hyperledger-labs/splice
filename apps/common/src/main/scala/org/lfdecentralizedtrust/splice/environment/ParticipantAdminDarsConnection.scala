@@ -28,7 +28,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
 }
-import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, UploadablePackage}
+import org.lfdecentralizedtrust.splice.util.UploadablePackage
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
@@ -199,17 +199,9 @@ trait ParticipantAdminDarsConnection {
       currentVetting: VettedPackages,
   ): VettedPackages = {
     val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
-    // filter out all dependencies that may exist with the resulting packages before removing a package
-    // See https://github.com/DACH-NY/canton/issues/29834: make it work for validators
-    val packageIdsToKeep = DarResourcesUtil
-      .getDarResources(currentVetting.packages.map(_.packageId))
-      .diff(dars)
-      .flatMap(e => DarResourcesUtil.getDarResources(e.dependencyPackageIds.toSeq))
-      .map(_.packageId)
-    val safePackageIdsToRemove = packageIdsToRemove.diff(packageIdsToKeep)
     currentVetting
       .focus(_.packages)
-      .modify(packages => packages.filterNot(pkg => safePackageIdsToRemove.contains(pkg.packageId)))
+      .modify(packages => packages.filterNot(pkg => packageIdsToRemove.contains(pkg.packageId)))
   }
 
   private def addDarsToVettingState(
