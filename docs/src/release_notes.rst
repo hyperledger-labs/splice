@@ -3,6 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+
+
 .. NOTE:
    We keep notes for upcoming releases in `release_notes_upcoming.rst`
    to avoid merges accidentally merging new changes into an existing release.
@@ -423,8 +425,8 @@
       to link against ``splice-amulet >= 0.1.15`` in order to be ready to consume the two new fields introduced in `AmuletConfig`
       (`optDevelopmentFundManager`) and `IssuanceConfig` (`optDevelopmentFundPercentage`) once either of them is set.
 
-      This is required because once the new fields are set, downgrades of `AmuletRules` will fail. Note that the field
-      will not be set automatically after this upgrade.
+      This is required because once the new fields are set, downgrades of `AmuletRules` will fail.
+      At the moment, this recompilation is not strictly required, as setting these fields is not planned immediately.
 
       No change is required for apps that build against the :ref:`token_standard`
       or :ref:`featured_app_activity_markers_api`.
