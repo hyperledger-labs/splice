@@ -37,8 +37,20 @@ import Splice.Round
 import Splice.Types
 import Splice.DecentralizedSynchronizer
 import Splice.ValidatorLicense
-
 import Splice.Util
+import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
+
+
+data AmuletRules_Amulet_ExpireTransferInstructionsResult = AmuletRules_Amulet_ExpireTransferInstructionsResult
+  with
+    results : [TransferInstructionResult]
+  deriving (Eq, Show)
+
+data AmuletRules_ExpireTransferInstructionInput = AmuletRules_ExpireTransferInstructionInput
+  with
+    transferInstructionCid : ContractId TransferInstruction
+    expireLock : Bool
+  deriving (Eq, Show)  
 
 data AmuletRules_BootstrapExternalPartyConfigStateResult = AmuletRules_BootstrapExternalPartyConfigStateResult
   deriving (Show, Eq)
@@ -759,6 +771,32 @@ template AmuletRules
              else pure []
          pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
 
+    nonconsuming choice AmuletRules_Amulet_ExpireTransferInstructions : AmuletRules_Amulet_ExpireTransferInstructionsResult
+      with
+        expectedDso: Party
+        inputs : [AmuletRules_ExpireTransferInstructionInput]
+        observers : [Party]
+      observer observers
+      controller dso
+      do
+        require "The expectedDso must match the AmuletDso" (dso== expectedDso)
+        individualResults <- forA inputs $ \input -> do
+          instr <- fetchCheckedInterface (ForDso dso) input.transferInstructionCid
+          let instrView = view instr
+          
+          require "The DSO must be the admin of the transfer instruction's instrument" (instrView.transfer.instrumentId.admin == dso)
+          
+
+          exercise input.transferInstructionCid TransferInstruction_Update with
+            extraActors = []
+            extraArgs = ExtraArgs with
+              meta = emptyMetadata
+              context = ChoiceContext with
+                values = TextMap.fromList [(expireLockKey, toAnyValue input.expireLock)]
+        
+        pure AmuletRules_Amulet_ExpireTransferInstructionsResult with
+          results = individualResults
+    
     nonconsuming choice AmuletRules_UpdateExternalPartyConfigStates : AmuletRules_UpdateExternalPartyConfigStatesResult
       with
         externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState
