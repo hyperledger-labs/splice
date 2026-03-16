@@ -85,7 +85,7 @@ object DarResources {
   lazy val amulet_current = DarResource("splice-amulet-current.dar")
   lazy val amulet = PackageResource(
     amulet_current,
-    amulet_0_1_10,
+    amulet_0_1_14,
     Seq(
       amulet_0_1_0,
       amulet_0_1_1,
@@ -135,7 +135,7 @@ object DarResources {
   lazy val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   lazy val dsoGovernance = PackageResource(
     dsoGovernance_current,
-    dsoGovernance_0_1_14,
+    dsoGovernance_0_1_19,
     Seq(
       dsoGovernance_0_1_0,
       dsoGovernance_0_1_1,
@@ -186,7 +186,7 @@ object DarResources {
   lazy val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   lazy val amuletNameService = PackageResource(
     amuletNameService_current,
-    amuletNameService_0_1_10,
+    amuletNameService_0_1_14,
     Seq(
       amuletNameService_0_1_0,
       amuletNameService_0_1_1,
@@ -232,7 +232,7 @@ object DarResources {
   lazy val splitwell_current = DarResource("splitwell-current.dar")
   lazy val splitwell = PackageResource(
     splitwell_current,
-    splitwell_0_1_10,
+    splitwell_0_1_14,
     Seq(
       splitwell_0_1_0,
       splitwell_0_1_1,
@@ -278,7 +278,7 @@ object DarResources {
   lazy val wallet_current = DarResource("splice-wallet-current.dar")
   lazy val wallet = PackageResource(
     wallet_current,
-    wallet_0_1_10,
+    wallet_0_1_14,
     Seq(
       wallet_0_1_0,
       wallet_0_1_1,
@@ -323,7 +323,7 @@ object DarResources {
   lazy val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   lazy val walletPayments = PackageResource(
     walletPayments_current,
-    walletPayments_0_1_10,
+    walletPayments_0_1_14,
     Seq(
       walletPayments_0_1_0,
       walletPayments_0_1_1,
@@ -356,7 +356,7 @@ object DarResources {
   lazy val validatorLifecycle_current = DarResource("splice-validator-lifecycle-current.dar")
   lazy val validatorLifecycle = PackageResource(
     validatorLifecycle_current,
-    validatorLifecycle_0_1_3,
+    validatorLifecycle_0_1_5,
     Seq(
       validatorLifecycle_0_1_0,
       validatorLifecycle_0_1_1,

@@ -100,7 +100,6 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
-import scala.jdk.OptionConverters.*
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -324,8 +323,6 @@ class SV1Initializer(
       initialRound <- establishInitialRound(
         connection,
         upgradesConfig,
-        packageVersionSupport,
-        svParty,
       )
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
@@ -719,12 +716,13 @@ class SV1Initializer(
                     sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
                     sv1Config.initialPackageConfig.toPackageConfig,
                     sv1Config.initialHoldingFee,
-                    sv1Config.zeroTransferFees,
                     sv1Config.initialTransferPreapprovalFee,
                     sv1Config.initialFeaturedAppActivityMarkerAmount,
                     developmentFundPercentage =
                       if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
                     developmentFundManager = sv1Config.developmentFundManager,
+                    initialExternalPartyConfigStateTickDuration =
+                      sv1Config.initialExternalPartyConfigStateTickDuration,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,
@@ -737,11 +735,6 @@ class SV1Initializer(
                   _ = logger
                     .info(
                       s"Bootstrapping DSO as $dsoParty and BFT nodes $sv1SynchronizerNodes at round $initialRound"
-                    )
-                  bootstrapWithNonZeroRound <- packageVersionSupport
-                    .supportBootstrapWithNonZeroRound(
-                      Seq(svParty),
-                      clock.now,
                     )
                   _ <- dsoStoreWithIngestion
                     .connection(SpliceLedgerConnectionPriority.Low)
@@ -780,9 +773,7 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
-                        Option
-                          .when(bootstrapWithNonZeroRound.supported)(initialRound: java.lang.Long)
-                          .toJava,
+                        java.util.Optional.of(initialRound),
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(

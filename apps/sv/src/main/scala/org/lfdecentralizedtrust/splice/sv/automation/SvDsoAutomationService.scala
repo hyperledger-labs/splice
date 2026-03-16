@@ -471,6 +471,15 @@ class SvDsoAutomationService(
       )
     }
   }
+
+  registerTrigger(
+    new CreateBootstrapExternalPartyConfigStateInstructionTrigger(
+      triggerContext,
+      packageVersionSupport,
+      dsoStore,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
 }
 
 object SvDsoAutomationService extends AutomationServiceCompanion {
@@ -522,5 +531,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
+      aTrigger[CreateBootstrapExternalPartyConfigStateInstructionTrigger],
     )
 }

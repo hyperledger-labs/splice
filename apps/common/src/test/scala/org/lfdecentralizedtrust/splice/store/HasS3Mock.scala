@@ -16,6 +16,8 @@ import software.amazon.awssdk.services.s3.model.{
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 import org.lfdecentralizedtrust.splice.config.S3Config
 import org.testcontainers.containers.wait.strategy.Wait
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.util.ByteString
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -102,9 +104,18 @@ trait HasS3Mock
   def readUncompressAndDecode[T](
       s3BucketConnection: S3BucketConnectionForTests,
       decoder: String => Either[io.circe.Error, T],
-  )(s3obj: S3Object)(implicit tag: reflect.ClassTag[T]): Array[T] = {
+  )(s3obj: S3Object)(implicit tag: reflect.ClassTag[T], as: ActorSystem): Array[T] = {
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
-    val zis = new ZstdInputStream(new ByteBufInputStream(Unpooled.wrappedBuffer(compressed)))
+    uncompressAndDecode(compressed, decoder)
+  }
+
+  def uncompressAndDecode[T](
+      compressed: ByteString,
+      decoder: String => Either[io.circe.Error, T],
+  )(implicit tag: reflect.ClassTag[T]): Array[T] = {
+    val zis = new ZstdInputStream(
+      new ByteBufInputStream(Unpooled.wrappedBuffer(compressed.asByteBuffer))
+    )
     val buffer = new Array[Byte](16384)
     val out = new ByteArrayOutputStream()
 

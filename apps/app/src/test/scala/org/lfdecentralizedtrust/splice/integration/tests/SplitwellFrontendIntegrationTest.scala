@@ -174,9 +174,9 @@ class SplitwellFrontendIntegrationTest
 
       eventually() {
         // Check final amounts in the wallets
-        checkWallet(aliceUserParty, aliceWalletClient, Seq((399.75, 400)))
-        checkWallet(bobUserParty, bobWalletClient, Seq((6.7, 7.1)))
-        checkWallet(charlieUserParty, charlieWalletClient, Seq((110.75, 111)))
+        checkWallet(aliceUserParty, aliceWalletClient, Seq((400.0, 400)))
+        checkWallet(bobUserParty, bobWalletClient, Seq((39.0, 39.0)))
+        checkWallet(charlieUserParty, charlieWalletClient, Seq((111.0, 111.0)))
       }
     }
 
@@ -256,7 +256,7 @@ class SplitwellFrontendIntegrationTest
 
       val expectedAliceAmount = walletUsdToAmulet(5 /*ans tap*/ - 1 /*ans fee*/ ) + 500 /*from bob*/
       val expectedBobAmount =
-        walletUsdToAmulet(5 /*ans tap*/ - 1.105 /*ans fee*/ ) + 510 /*tap*/ - 500 /*to alice*/
+        walletUsdToAmulet(5 /*ans tap*/ - 1.0 /*ans fee*/ ) + 510 /*tap*/ - 500 /*to alice*/
       eventually() {
         // Check final amounts in the wallets
         checkWallet(

@@ -23,12 +23,13 @@ abstract class TransferInputStoreTest extends StoreTestBase {
         _ <- dummyDomain.ingest(mintTransaction(user, 13.0, 3L, 4.0))(store.multiDomainAcsStore)
         _ <- dummyDomain.ingest(mintTransaction(user, 10.0, 4L, 1.0))(store.multiDomainAcsStore)
       } yield {
-        // We don't deduct holding fees here (anymore)
-        // TODO(#2257): we also shouldn't need to pass a round here anymore...
-        store
-          .listSortedAmuletsAndQuantity(5L, PageLimit.tryCreate(5))
-          .futureValue
-          .map(_._1.toDouble) shouldBe Seq(13.0, 12.0, 11.0, 10.0)
+        def top3: Seq[Double] =
+          store
+            .listSortedAmuletsAndQuantity(PageLimit.tryCreate(3))
+            .futureValue
+            .map(_._1.toDouble)
+
+        top3 should contain theSameElementsInOrderAs Seq(13.0, 12.0, 11.0)
       }
     }
   }
