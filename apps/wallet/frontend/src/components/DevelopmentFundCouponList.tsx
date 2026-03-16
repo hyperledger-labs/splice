@@ -42,6 +42,7 @@ const ActiveCouponsTable: React.FC = () => {
     spliceInstanceNames: { amuletNameAcronym },
   } = useWalletConfig();
   const {
+    primaryParty,
     coupons: {
       coupons,
       isLoading,
@@ -154,13 +155,19 @@ const ActiveCouponsTable: React.FC = () => {
                       </TableCell>
                       <TableCell>{coupon.reason}</TableCell>
                       <TableCell>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleWithdrawClick(coupon.id)}
-                        >
-                          Withdraw
-                        </Button>
+                        {coupon.fundManager === primaryParty ? (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleWithdrawClick(coupon.id)}
+                          >
+                            Withdraw
+                          </Button>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

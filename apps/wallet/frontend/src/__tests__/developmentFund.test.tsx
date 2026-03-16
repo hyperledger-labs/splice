@@ -428,6 +428,60 @@ describe('Development Fund page', () => {
     useDevelopmentFundSpy.mockRestore();
   });
 
+  test('shows beneficiary active coupons without withdraw action', async () => {
+    const useDevelopmentFundSpy = vi
+      .spyOn(developmentFundHook, 'useDevelopmentFund')
+      .mockReturnValue({
+        primaryParty: bobPartyId,
+        isFundManager: false,
+        isLoading: false,
+        coupons: {
+          coupons: [
+            {
+              id: 'dev-fund-coupon-beneficiary-1',
+              createdAt: new Date('2026-01-01T10:00:00.000Z'),
+              fundManager: alicePartyId,
+              beneficiary: bobPartyId,
+              amount: new BigNumber(7.5),
+              expiresAt: new Date('2026-01-10T11:00:00.000Z'),
+              reason: 'Beneficiary visible coupon',
+            },
+          ],
+          isLoading: false,
+          isError: false,
+          error: null,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          currentPage: 1,
+          goToNextPage: vi.fn(),
+          goToPreviousPage: vi.fn(),
+        },
+        history: {
+          historyEvents: [],
+          isLoadingHistory: false,
+          isHistoryError: false,
+          historyError: null,
+          hasNextHistoryPage: false,
+          hasPreviousHistoryPage: false,
+          currentHistoryPage: 1,
+          goToNextHistoryPage: vi.fn(),
+          goToPreviousHistoryPage: vi.fn(),
+        },
+        unclaimedTotal: new BigNumber(10),
+        isLoadingUnclaimedTotal: false,
+        isUnclaimedTotalError: false,
+        unclaimedTotalError: null,
+        invalidateAll: vi.fn(),
+      });
+
+    await loginAndOpenDevelopmentFund();
+
+    expect(await screen.findByText('Beneficiary visible coupon')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+
+    useDevelopmentFundSpy.mockRestore();
+  });
+
   test.each([
     {
       missingInput: 'beneficiary',

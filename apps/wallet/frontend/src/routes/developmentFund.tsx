@@ -27,8 +27,10 @@ const DevelopmentFund: React.FC = () => {
           <Alert severity="warning">
             Your party is not the development fund manager designated by the CF foundation. If your
             party was formerly the development fund manager you can use this page to manage your
-            active development fund allocations and review the history of your past allocations.
-            Otherwise, you likely want to ignore the content on this page.
+            active development fund allocations and review the history of your past allocations. If
+            your party is a beneficiary of allocations, you can view relevant entries in the
+            unclaimed allocations table and coupon history. Otherwise, you likely want to ignore the
+            content on this page.
           </Alert>
         )}
         <DevelopmentFundTotal />

@@ -268,6 +268,47 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
         }
 
         // ===================================================================
+        // Section: As beneficiary while not DFM
+        // ===================================================================
+
+        clue("As user_2 (beneficiary, not DFM)") {
+          withFrontEnd("bob") { implicit webDriver =>
+            browseToBobWallet(bobDamlUser)
+            eventuallyClickOn(id("navlink-development-fund"))
+
+            clue("Check: user_2 sees non-DFM warning alert") {
+              eventually() {
+                find(className("MuiAlert-standardWarning")).isDefined shouldBe true
+              }
+            }
+
+            clue("Check: user_2 sees active coupons where user_2 is beneficiary") {
+              eventually() {
+                val rows = findAll(cssSelector("#active-coupons-table tbody tr")).toSeq
+                rows.exists(row => row.text.contains("Coupon 3 - stays active")) shouldBe true
+                rows.exists(row => row.text.contains("10.0000")) shouldBe true
+              }
+            }
+
+            clue("Check: user_2 cannot withdraw beneficiary coupons") {
+              eventually() {
+                val withdrawButtons =
+                  findAll(cssSelector("#active-coupons-table tbody tr td:last-child button")).toSeq
+                withdrawButtons shouldBe empty
+              }
+            }
+
+            clue("Check: user_2 sees beneficiary history events") {
+              eventually() {
+                val rows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
+                rows.nonEmpty shouldBe true
+                rows.exists(row => row.text.contains("Claimed") || row.text.contains("Withdrawn")) shouldBe true
+              }
+            }
+          }
+        }
+
+        // ===================================================================
         // Section: Change DFM from user_1 to user_2
         // ===================================================================
 

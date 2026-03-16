@@ -28,6 +28,10 @@
          persisted scan connections from previous runs, removing the dependency on seedUrls
          scan availability for successful reboots.
 
+    - Wallet UI
+      - Extended the `/development-fund` page to make active coupons visible to beneficiaries. But beneficiaries cannot withdraw coupons.
+      - Updated `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
+
     - Daml:
 
       .. important::
