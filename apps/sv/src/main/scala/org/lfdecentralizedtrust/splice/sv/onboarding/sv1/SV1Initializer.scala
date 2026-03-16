@@ -721,6 +721,8 @@ class SV1Initializer(
                     developmentFundPercentage =
                       if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
                     developmentFundManager = sv1Config.developmentFundManager,
+                    initialExternalPartyConfigStateTickDuration =
+                      sv1Config.initialExternalPartyConfigStateTickDuration,
                     optValidatorFaucetCap = sv1Config.optValidatorFaucetCap,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(

@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyconfigstate.ExternalPartyConfigState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -231,7 +232,8 @@ class BootstrapPackageConfigIntegrationTest
         ),
         amuletConfig.transferPreapprovalFee,
         amuletConfig.featuredAppActivityMarkerAmount,
-        java.util.Optional.empty(),
+        amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -353,6 +355,13 @@ class BootstrapPackageConfigIntegrationTest
       }
     }
 
+    clue("ExternalPartyConfigState contracts are created") {
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ExternalPartyConfigState.COMPANION)(dsoParty) should have size 2
+      }
+    }
+
     // We check this as splice-amulet < 0.1.14 did not support setting the fees to zero;
     // and we want to ensure that the upgrade works as expected.
     clue("Change AmuletConfig to zero fees") {
@@ -373,6 +382,7 @@ class BootstrapPackageConfigIntegrationTest
         amuletConfig.transferPreapprovalFee,
         amuletConfig.featuredAppActivityMarkerAmount,
         amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(

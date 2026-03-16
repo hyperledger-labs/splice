@@ -92,7 +92,7 @@
     - Fix issue where sequencer startup could take more than 10 minutes.
 
     - APIs:
-    
+
       - *BREAKING* The
 
           - ``/v2/updates`` HTTP POST and websocket GET endpoints
