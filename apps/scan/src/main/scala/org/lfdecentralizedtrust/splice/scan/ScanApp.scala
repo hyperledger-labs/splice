@@ -39,7 +39,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
+import org.lfdecentralizedtrust.splice.scan.rewards.FakeAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -340,7 +340,11 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
-      appActivityComputation = NoOpAppActivityComputation
+      // TODO(#4384): Remove once the PR adding the real AppActivityComputation is merged into this feature branch.
+      appActivityComputation =
+        FakeAppActivityComputation.withRoundFromStore(implicit tc =>
+          store.lookupRoundOfLatestData()
+        )
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
