@@ -157,25 +157,21 @@ class S3BucketConnection(
 
         _ <- s3Client.completeMultipartUpload(completeRequest).asScala
 
-        taggingRequest = PutObjectTaggingRequest
+        // Copy-in-place of the object to add the final checksum to its metadata
+        metadata = Map("splice-checksum" -> Base64.getEncoder.encodeToString(md.digest()))
+
+        copyReq = CopyObjectRequest
           .builder()
-          .bucket(bucketName)
-          .key(key)
-          .tagging(
-            Tagging
-              .builder()
-              .tagSet(
-                Tag
-                  .builder()
-                  .key("splice-checksum")
-                  .value(Base64.getEncoder.encodeToString(md.digest()))
-                  .build()
-              )
-              .build()
-          )
+          .destinationBucket(bucketName)
+          .destinationKey(key)
+          .sourceBucket(bucketName)
+          .sourceKey(key)
+          // CRITICAL: Tells S3/GCS to ignore old metadata and use the new map
+          .metadataDirective(MetadataDirective.REPLACE)
+          .metadata(metadata.asJava)
           .build()
 
-        _ <- s3Client.putObjectTagging(taggingRequest).asScala
+        _ <- s3Client.copyObject(copyReq).asScala
 
       } yield {
         ()
