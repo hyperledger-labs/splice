@@ -5,6 +5,8 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -34,6 +36,11 @@ class ExpiredLockedAmuletTrigger(
       svConfig.delegatelessAutomationExpiredAmuletBatchSize,
       svTaskContext.dsoStore.listLockedExpiredAmulets(context.config.ignoredExpiredAmuletPartyIds),
       splice.amulet.LockedAmulet.COMPANION,
+      svTaskContext.vettingLookupService,
+      PackageIdResolver.Package.SpliceAmulet,
+      c =>
+        (Seq(c.amulet.dso, c.amulet.owner) ++ c.lock.holders.asScala)
+          .map(PartyId.tryFromProtoPrimitive(_)),
     )
     with SvTaskBasedTrigger[Task] {
   private val store = svTaskContext.dsoStore

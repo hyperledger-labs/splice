@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
+  PageLimit,
   HistoryMetrics,
   S3BucketConnection,
   TimestampWithMigrationId,
@@ -79,7 +79,7 @@ class UpdateHistoryBulkStorage(
     */
   private def getFirstSegmentFromGenesis: Future[Option[UpdatesSegment]] =
     for {
-      firstUpdate <- updateHistory.getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
+      firstUpdate <- updateHistory.getUpdatesWithoutImportUpdates(None, PageLimit.tryCreate(1))
       segmentEnd <- firstUpdate.headOption match {
         case None => Future.successful(None)
         case Some(first) =>

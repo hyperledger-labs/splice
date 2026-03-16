@@ -107,6 +107,7 @@ import org.lfdecentralizedtrust.splice.store.{
   VotesStore,
 }
 import AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
@@ -135,6 +136,7 @@ class HttpScanHandler(
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
+    serveTrafficSummaries: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
@@ -771,34 +773,34 @@ class HttpScanHandler(
       for {
         synchronizerId <- store
           .lookupAmuletRules()
-          .map(
-            _.getOrElse(
-              throw io.grpc.Status.NOT_FOUND
-                .withDescription("No amulet rules found.")
-                .asRuntimeException()
-            ).state.fold(
-              identity,
-              throw io.grpc.Status.FAILED_PRECONDITION
-                .withDescription("Amulet rules are in flight.")
-                .asRuntimeException(),
+          .map(_.flatMap(_.state.fold(_.some, None)))
+        connectedDomains <- participantAdminConnection.listConnectedDomains()
+      } yield {
+        synchronizerId.fold(
+          ScanResource.GetActivePhysicalSynchronizerSerialResponse.NotFound(
+            definitions.ErrorResponse(
+              "No amulet rules"
             )
           )
-        connectedDomains <- participantAdminConnection.listConnectedDomains()
-        psid = connectedDomains
-          .find(_.synchronizerId == synchronizerId)
-          .getOrElse(
-            throw io.grpc.Status.NOT_FOUND
-              .withDescription(
-                s"Active synchronizer $synchronizerId is not connected to the participant."
+        )(syncId =>
+          connectedDomains
+            .find(_.synchronizerId == syncId)
+            .map(_.physicalSynchronizerId) match {
+            case Some(psid) =>
+              ScanResource.GetActivePhysicalSynchronizerSerialResponse.OK(
+                definitions.GetActivePhysicalSynchronizerSerialResponse(
+                  serial = psid.serial.unwrap.toLong
+                )
               )
-              .asRuntimeException()
-          )
-          .physicalSynchronizerId
-      } yield ScanResource.GetActivePhysicalSynchronizerSerialResponse.OK(
-        definitions.GetActivePhysicalSynchronizerSerialResponse(
-          serial = psid.serial.unwrap.toLong
+            case None =>
+              ScanResource.GetActivePhysicalSynchronizerSerialResponse.NotFound(
+                definitions.ErrorResponse(
+                  "No active synchronizer connected"
+                )
+              )
+          }
         )
-      )
+      }
     }
   }
 
@@ -965,7 +967,15 @@ class HttpScanHandler(
           val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
             ScanHttpEncodings.encodeVerdict(v, views)
           }
-          Right(definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded))
+          val trafficSummaryEncoded =
+            if (serveTrafficSummaries)
+              verdictWithViewsO.flatMap { case (v, _) =>
+                v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+              }
+            else None
+          Right(
+            definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
+          )
       }
     }
   }
@@ -1014,7 +1024,13 @@ class HttpScanHandler(
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
         }
-        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded)
+        val trafficSummaryEncoded =
+          if (serveTrafficSummaries)
+            verdictWithViewsO.flatMap { case (v, _) =>
+              v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+            }
+          else None
+        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
       }.toVector
     }
   }

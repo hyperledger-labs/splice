@@ -107,7 +107,7 @@ class ParticipantAdminConnection(
 
   private val synchronizerIdAliasCache =
     Scaffeine()
-      .expireAfterWrite(10.minutes)
+      .expireAfterWrite(1.minutes)
       .maximumSize(100)
       .buildAsync[SynchronizerAlias, SynchronizerId]()
 

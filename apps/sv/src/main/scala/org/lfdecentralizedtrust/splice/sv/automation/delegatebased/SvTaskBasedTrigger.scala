@@ -135,6 +135,6 @@ object SvTaskBasedTrigger {
       delegatelessAutomationExpiredRewardCouponBatchSize: Int,
       delegatelessAutomationExpiredRewardCouponNumBatches: Int,
       packageVersionSupport: PackageVersionSupport,
-      vettingService: PackageVettingLookupService,
+      vettingLookupService: PackageVettingLookupService,
   )
 }
