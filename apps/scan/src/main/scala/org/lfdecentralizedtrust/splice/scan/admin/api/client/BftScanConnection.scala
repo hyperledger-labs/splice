@@ -750,6 +750,10 @@ object BftScanConnection {
       case Success(value) => Future.successful(BftScanConnection.SuccessfulResponse(value))
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpNonJsonResponse) =>
         Future.successful(BftScanConnection.NonJsonHttpFailureResponse(unexpected.statusCode))
+      case Failure(unexpected: BaseAppConnection.UnexpectedHttpTextResponse) =>
+        Future.successful(
+          BftScanConnection.TextFailureResponse(unexpected.statusCode, unexpected.content)
+        )
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpJsonResponse) =>
         Unmarshal(unexpected.entity)
           .to[ByteString]
@@ -1605,6 +1609,8 @@ object BftScanConnection {
   private case class SuccessfulResponse[+T](response: T) extends ScanResponse[T]
   private case class HttpFailureResponse[+T](status: StatusCode, body: Json) extends ScanResponse[T]
   private case class NonJsonHttpFailureResponse[+T](status: StatusCode) extends ScanResponse[T]
+  private case class TextFailureResponse[+T](status: StatusCode, content: String)
+      extends ScanResponse[T]
   private case class ExceptionFailureResponse[+T](error: Throwable) extends ScanResponse[T]
 
   class ConsensusNotReached(
@@ -1627,6 +1633,8 @@ object BftScanConnection {
             uris -> HttpFailureResponse(status, body)
           case (NonJsonHttpFailureResponse(status), uris) =>
             uris -> NonJsonHttpFailureResponse(status)
+          case (TextFailureResponse(status, body), uris) =>
+            uris -> TextFailureResponse(status, body)
           case (ExceptionFailureResponse(error), uris) => uris -> ExceptionFailureResponse(error)
         }
 
