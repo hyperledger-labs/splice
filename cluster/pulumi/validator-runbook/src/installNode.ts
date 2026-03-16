@@ -153,12 +153,15 @@ async function installValidator(
   const participantPruningConfig = validatorConfig?.participantPruningSchedule;
 
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
-  const postgresValues: ChartValues = loadYamlFromFile(
+  const postgresValuesFromFile: ChartValues = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
   );
-  if (validatorConfig.postgresPvcSize) {
-    postgresValues.db = { ...postgresValues.db, volumeSize: validatorConfig.postgresPvcSize };
-  }
+  const postgresValues: ChartValues = validatorConfig.postgresPvcSize
+    ? {
+        ...postgresValuesFromFile,
+        db: { ...postgresValuesFromFile.db, volumeSize: validatorConfig.postgresPvcSize },
+      }
+    : postgresValuesFromFile;
   const postgres = new SplicePostgres(
     xns,
     'postgres',
