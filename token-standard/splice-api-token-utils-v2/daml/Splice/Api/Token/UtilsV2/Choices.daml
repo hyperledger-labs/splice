@@ -8,6 +8,7 @@ module Splice.Api.Token.UtilsV2.Choices (
   requireMatchExpectedDedup,
   requireMemberOf,
   requireMemberOfDedup,
+  requireUnique,
 
   requireExpectedAdminMatch,
 
@@ -27,6 +28,7 @@ module Splice.Api.Token.UtilsV2.Choices (
 ) where
 
 import DA.List (dedupSort)
+import DA.Map qualified as Map
 import DA.Optional (isNone)
 import DA.Text qualified as T
 
@@ -67,9 +69,28 @@ requireMemberOf description fieldName expected actual
       , "Actual: " <> show actual
       ]
 
+requireSubsetOf : (Eq a, Show a) => Text -> [a] -> [a] -> Update ()
+requireSubsetOf fieldName required actual
+  | all (`elem` actual) required = pure ()
+  | otherwise = fail $ T.unlines
+      [ "Actual value of '" <> fieldName <> "' did not contain all required elements."
+      , "Required subset: " <> show required
+      , "Actual: " <> show actual
+      ]
+
 requireMemberOfDedup : (Ord a, Show a) => Text -> Text -> [[a]] -> [a] -> Update ()
 requireMemberOfDedup description fieldName expected actual =
   requireMemberOf description fieldName (map dedupSort expected) (dedupSort actual)
+
+requireUnique : (Ord a, Show a) => Text -> [a] -> Update ()
+requireUnique description xs
+  | null duplicates = pure ()
+  | otherwise = fail $ T.unlines $
+      "Expected unique " <> description <> ", but found duplicates:" :: map show duplicates
+  where
+   groups = Map.fromListWithR (++) [(x, [x]) | x <- xs]
+   duplicates = [x | (x, occurrences) <- Map.toList groups, length occurrences > 1]
+
 
 
 ensureActorIsDefault : Party -> [Party] -> Update ()
@@ -138,7 +159,7 @@ onlyAllowDefaultControllers' choiceName this arg =
 --
 -- SHOULD be used consistently as the first action in all non-factory V2 choices.
 archiveAndCheckActors
-  : forall i ch. (HasArchive i, HasDefaultControllers i ch, GetField "actors" ch [Party]) => Text -> ContractId i -> i -> ch -> Update ()
-archiveAndCheckActors choiceName cid this arg = do
+  : forall i ch. (HasArchive i, GetField "actors" ch [Party]) => Text -> ContractId i -> ch -> [Party] -> Update ()
+archiveAndCheckActors choiceName cid arg requiredActors = do
   archive cid
-  onlyAllowDefaultControllers' choiceName this arg
+  requireSubsetOf (choiceName <> ".actors") requiredActors arg.actors

@@ -13,6 +13,7 @@ module Splice.Api.Token.UtilsV2.Allocations (
 
   -- * SettlementFactory implementation
   settlementFactoryV2_defaultSettleBatchImpl,
+  settlementFactoryV2_defaultCreateReceiptAllocation,
 
   validateAndPrepareAllocations,
   netAllocationCreditAmount,
@@ -21,13 +22,10 @@ module Splice.Api.Token.UtilsV2.Allocations (
   upcast_v1_v2_AllocationView,
 ) where
 
-import DA.Either (partitionEithers)
 import DA.Foldable (forA_)
-import DA.List (head)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional)
 import qualified DA.Set as Set
-import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -113,9 +111,9 @@ allocationV2_defaultCancelImplUsingV1
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
-allocationV2_defaultCancelImplUsingV1 this self arg@(AllocationV2.Allocation_Cancel{..}) = do
+allocationV2_defaultCancelImplUsingV1 _this self (AllocationV2.Allocation_Cancel{..}) = do
   -- no archive of self, as the V1 choice is consuming
-  onlyAllowDefaultControllers' "V2.Allocation_Cancel" this arg
+  -- no check of actors, as they will be checked implicitly by the V1 choice
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Cancel with
     extraArgs
@@ -129,12 +127,10 @@ allocationV2_defaultCancelImplUsingV1 this self arg@(AllocationV2.Allocation_Can
 
 -- | Internal type to hold the results of validating and preparing the allocations for batch settlement.
 data PreparedAllocations = PreparedAllocations with
-    allocationsSettledUsingV1 : [((ContractId AllocationV2.Allocation, AllocationV2.AllocationView), AllocationV2.TransferLeg)]
-      -- ^ Allocations that should be settled using -- V1.Allocation_ExecuteTransfer because they have no matching V2
-      -- allocation for the receipt of their transfer leg.
-    allocationsSettledUsingV2 : [(ContractId AllocationV2.Allocation, AllocationV2.AllocationView)]
-      -- ^ Allocations that can and should be settled using V2.Allocation_Settle
-      -- because they have a matching V2 allocation.
+    receiptAllocationsToCreate : [AllocationV2.AllocationSpecification]
+      -- ^ Missing receipt allocations that were authorized to be created as part of the settlement.
+    existingAllocationsToSettle : [(ContractId AllocationV2.Allocation, AllocationV2.AllocationView)]
+      -- ^ Existing allocations to settle jointly with the missing receipt allocations.
   deriving (Eq, Show)
 
 -- | Default implementation for settling a batch of allocations.
@@ -152,42 +148,64 @@ data PreparedAllocations = PreparedAllocations with
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_defaultSettleBatchImpl
   : HasToInterface t AllocationV2.SettlementFactory
-  => t
+  => (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
+     -- ^ How to create the allocation of a missing receipt leg
+  -> t
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_defaultSettleBatchImpl factory0 self arg@(AllocationV2.SettlementFactory_SettleBatch {..}) = do
+settlementFactoryV2_defaultSettleBatchImpl createReceiptAllocation settlementFactory0 self arg= do
   -- validate call to factory and retrieve context
-  let factory = toInterface @AllocationV2.SettlementFactory factory0
-  let admin = (view factory).admin
+  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
+  let settlementFactory = toInterface @AllocationV2.SettlementFactory settlementFactory0
+  let admin = (view settlementFactory).admin
 
   requireExpectedAdminMatch admin expectedAdmin
-  onlyAllowDefaultControllers "SettlementFactory_SettleBatch" factory arg
+  require "Executor is an actor" (settlement.executor `elem` actors)
 
   -- validate and prepare the allocations
   prep <- validateAndPrepareAllocations admin arg
 
-  -- settle all v1 allocations
-  newHoldingCidssV1 <- forA prep.allocationsSettledUsingV1 $ \((allocationCid, allocationView), leg) -> do
-    let (allocationCidV1 : ContractId AllocationV1.Allocation) = coerceContractId allocationCid
-    result <- exercise allocationCidV1 AllocationV1.Allocation_ExecuteTransfer with extraArgs
-    let senderHoldingCids = (leg.sender, map upcast result.senderHoldingCids)
-    let receiverHoldingCids = (leg.receiver, map upcast result.receiverHoldingCids)
-    pure (Map.fromList $ filter (not . null . snd) [senderHoldingCids, receiverHoldingCids])
+  -- create missing receipt allocations
+  receiptAllocations <- forA prep.receiptAllocationsToCreate createReceiptAllocation
 
-  -- settle all v2 allocations
-  newHoldingCidssV2 <- forA prep.allocationsSettledUsingV2 $ \(allocationCid, allocView) -> do
+  -- settle all allocations
+  newHoldingCidss <- forA (prep.existingAllocationsToSettle ++ receiptAllocations) $ \(allocationCid, allocView) -> do
     result <- exercise allocationCid AllocationV2.Allocation_Settle with
       -- Use default controllers as the actors
       actors = AllocationV2.defaultAllocation_SettleControllers allocView
       extraArgs
-    pure (Map.singleton allocView.allocation.authorizer result.authorizerHoldingCids)
+    pure (allocView.allocation.authorizer, result.authorizerHoldingCids)
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with
-    newHoldingCids = mconcat newHoldingCidssV1 <> mconcat newHoldingCidssV2
+    newHoldingCids = Map.fromListWithR (++) newHoldingCidss
     meta = emptyMetadata
 
+
+-- FIXME: comment
+settlementFactoryV2_defaultCreateReceiptAllocation
+  : ContractId AllocationInstructionV2.AllocationFactory
+  -> (HoldingV2.Account -> [Party])
+  -> AllocationV2.SettlementFactory_SettleBatch
+  -> AllocationV2.AllocationSpecification
+  -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView)
+settlementFactoryV2_defaultCreateReceiptAllocation allocationFactoryCid directAllocateActors settleBatchArg allocSpec = do
+  result <- exercise allocationFactoryCid AllocationInstructionV2.AllocationFactory_Allocate with
+    expectedAdmin = settleBatchArg.expectedAdmin
+    allocation = allocSpec
+    requestedAt = settleBatchArg.settlement.requestedAt
+    inputHoldingCids = []
+    extraArgs = settleBatchArg.extraArgs
+    actors = directAllocateActors allocSpec.authorizer
+  case result.output of
+    AllocationInstructionV2.AllocationInstructionResult_Completed with allocationCid -> do
+      allocation <- fetch allocationCid
+      pure (allocationCid, view allocation)
+    AllocationInstructionV2.AllocationInstructionResult_Pending _instrCid -> do
+      abort $ "unexpected: receipt allocation did create a pending allocation instruction for " <> show allocSpec
+    AllocationInstructionV2.AllocationInstructionResult_Failed ->
+      abort $ "failed to create receipt allocation for " <> show allocSpec
 
 validateAndPrepareAllocations : Party ->  AllocationV2.SettlementFactory_SettleBatch -> Update PreparedAllocations
 validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{..} = do
@@ -199,78 +217,40 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
 
     -- shared validation
     requireMatchExpected (allocationCid, "allocation.settlement") settlement allocation.settlement
+    requireUnique "transfer legs" allocation.transferLegs
+    require "Extra settlement authorizers are actors" (all (`elem` actors) allocationView.extraSettlementAuthorizers)
     forA_ allocation.transferLegs $ \leg -> do
       requireMatchExpected (leg.transferLegId, "transferLeg.admin") admin leg.instrumentId.admin
+    pure (allocationCid, allocationView)
 
-    -- settlement version specific validation
-    case allocationView.settlementVersion of
-      1 -> do
-        require "Exactly one transfer leg expected for v1 allocation" (length allocation.transferLegs == 1)
-        let tl = head allocation.transferLegs
-        require "Sender of the transfer leg must be the authorizer for v1 allocations" (tl.sender == allocationView.allocation.authorizer)
-        require "sender.owner authorizes v1 settlement" (tl.sender.owner `elem` settlementV1Authorizers)
-        require "receiver.owner authorizes v1 settlement" (tl.receiver.owner `elem` settlementV1Authorizers)
 
-        pure (Left ((allocationCid, allocationView), tl))
-
-      2 -> pure (Right (allocationCid, allocationView))
-      v -> fail $ "Unsupported settlement version " <> show v <> " in " <> show allocationView
-
-  -- determine which allocations to settle using v1 and which to settle using v2
-  let (v1Allocations, v2Allocations) = partitionEithers allocations
-
-  let v2Legs = Set.fromList $ do
-        (_, allocationView) <- v2Allocations
-        let authorizer = allocationView.allocation.authorizer
+  let allocatedAuthorizations0 = do
+        (_, allocationView) <- allocations
         leg <- allocationView.allocation.transferLegs
-        pure (authorizer, leg)
+        pure (allocationView.allocation.authorizer, leg)
+  requireUnique "authorizations of allocated legs" allocatedAuthorizations0
 
-  let hasMatchingV2Allocation (_, v1Leg) = (v1Leg.receiver, v1Leg) `Set.member` v2Legs
-  let (matchedV1Allocations, unmatchedV1Allocations) = partition hasMatchingV2Allocation v1Allocations
-  let allocationsSettledUsingV1 = unmatchedV1Allocations
+  -- determine missing allocations for receipt legs
+  let requiredAuthorizations = Set.fromList $ concatMap toAuthorizedLegs transferLegs
+  let allocatedAuthorizations = Set.fromList allocatedAuthorizations0
+  let missingAllocations = Set.difference requiredAuthorizations allocatedAuthorizations
+  let missingAllocationsByAuthorizer = Map.fromListWithR (++) $ do
+        (authorizer, leg) <- Set.toList missingAllocations
+        pure (authorizer, [leg])
 
-  -- We settle V1 allocations that are matched with a V2 allocation using the V2 API to
-  -- avoid having to archive the holding for the receiver that would be created as part of its
-  -- V1 settlement. This seems too finnicky. Wallets will have to use their fallback tx history
-  -- parsing to understand the transfer.
-  let allocationsSettledUsingV2 = map fst matchedV1Allocations ++ v2Allocations
-
-  -- check that all legs match up
-  let allocatedV1Legs = do
-        (_, leg) <- allocationsSettledUsingV1
-        -- Note that the receiver implicitly gives their authorization as part of the settlement
-        -- execution. We can thus consider their leg as authorized as well.
-        authLeg <- toAuthorizedLegs leg
-        pure (authLeg, (authLeg, [])) -- no remaining authorizations, as V1 allocations can be executed in any order
-
-  let allocatedV2Legs : [(AuthorizedLeg, (AuthorizedLeg, [AuthorizedLeg]))] = do
-        (_, allocationView) <- allocationsSettledUsingV2
-        let authorizer = allocationView.allocation.authorizer
-        case allocationView.allocation.transferLegs of
-          [] -> error "Unexpected empty transfer legs in allocation"
-          (leg::legs) -> do
-             let authLeg = (authorizer, leg)
-             pure (authLeg, (authLeg, map ((,) authorizer) legs))
-
-  let allocatedLegs = snd <$> Map.fromListWithR errorOnDuplicate (allocatedV1Legs ++ allocatedV2Legs)
-
-  let expectedLegs = concatMap toAuthorizedLegs transferLegs
-  validateAuthorizedTransfers expectedLegs allocatedLegs
-
-  -- FIXME: also validate netAllocationAmounts summing up to 0.0; it is implied by the definition
-  -- of validateAuthorizedTransfers and netAllocationAmount but rather be safe than sorry
+  -- check that all missing authorizations are covered by the extra receipt authorizers
+  forA_ (Set.toList missingAllocations) $ \(authorizer, leg) -> do
+    requireMemberOf "extraReceiptAuthorizers" ("leg " <> leg.transferLegId <> ".authorizer") extraReceiptAuthorizers authorizer
 
   pure PreparedAllocations with
-    allocationsSettledUsingV1 = unmatchedV1Allocations
-    allocationsSettledUsingV2 = allocationsSettledUsingV2
+    receiptAllocationsToCreate = do
+      (authorizer, legs) <- Map.toList missingAllocationsByAuthorizer
+      pure $ AllocationV2.AllocationSpecification with
+        authorizer = authorizer
+        settlement = settlement
+        transferLegs = legs
+    existingAllocationsToSettle = allocations
 
-errorOnDuplicate : (Show k, Show v) => (k, v) -> (k, v) -> (k, v)
-errorOnDuplicate (k, v1) (_, v2) = error $ T.unlines
-  [ "Duplicate transfer leg authorization: "
-  , "authorizer and leg: " <> show k
-  , "other legs 1: " <> show v1
-  , "other legs 2: " <> show v2
-  ]
 
 -- | Helper type of a transfer leg together with its authorizer.
 type AuthorizedLeg = (HoldingV2.Account, AllocationV2.TransferLeg)
@@ -279,31 +259,6 @@ toAuthorizedLegs : AllocationV2.TransferLeg -> [AuthorizedLeg]
 toAuthorizedLegs leg
   | leg.sender == leg.receiver = [(leg.sender, leg)] -- self-transfers are authorized only once
   | otherwise = [(leg.sender, leg), (leg.receiver, leg)]
-
--- | Check the expected transfers are authorized in the expected order.
-validateAuthorizedTransfers : [AuthorizedLeg] -> Map.Map AuthorizedLeg [AuthorizedLeg] -> Update ()
-validateAuthorizedTransfers [] allocated
-  | Map.null allocated  =  pure ()
-  | otherwise = abort $ "Unexpected remaining allocated transfer legs:\n" <> prettyMap allocated
-validateAuthorizedTransfers (expected :: expectedRest) allocated =
-  case Map.lookup expected allocated of
-    None -> abort $ T.unlines
-      [ "No matching allocations for expected transfer leg: "
-      , show expected
-      , "with open allocations: "
-      , prettyMap allocated
-      , "remaining expected legs: "
-      , T.unlines (map show expectedRest)
-      ]
-    Some [] -> validateAuthorizedTransfers expectedRest (Map.delete expected allocated)
-    Some (newExpected::newRemaining) ->
-      validateAuthorizedTransfers expectedRest $
-        Map.insert newExpected newRemaining $ Map.delete expected allocated
-
-prettyMap : Show leg => Map.Map leg [leg] -> Text
-prettyMap m = T.unlines $ concat [ show k :: map (\v -> "  " <> show v) vs  | (k, vs) <- Map.toList m ]
-
-
 
 
 
@@ -499,7 +454,7 @@ upcast_v1_v2_AllocationView canWithdraw (AllocationV1.AllocationView with alloca
     allocation = upcast allocation
     holdingCids = map upcast holdingCids
     expiresAt = Some (allocation.settlement.settleBefore)
-    settlementVersion = 1
+    extraSettlementAuthorizers = [allocation.transferLeg.sender, allocation.transferLeg.receiver]
     canWithdraw
     meta
 

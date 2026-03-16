@@ -217,8 +217,8 @@ testDvP_mixed = script do
         transferLegs
         allocationCids
         extraArgs = emptyExtraArgs
-        settlementV1Authorizers = [alice, bob]
-        controllersOverride = None
+        extraReceiptAuthorizers = [basicAccount alice, basicAccount bob] -- we assume that both alice and bob are receipt authorizers for simplicity, but in a real scenario the app would determine the receipt authorizers based on the transfer legs and app specific config
+        actors = [provider, alice, bob]
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 
   let disclosures = foldMap snd settleBatchContexts

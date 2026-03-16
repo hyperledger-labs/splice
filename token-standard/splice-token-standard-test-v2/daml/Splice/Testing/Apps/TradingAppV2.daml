@@ -20,7 +20,7 @@ import Splice.Api.Token.AllocationRequestV1 qualified as V1
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationRequestV2 qualified as V2
 
-import Splice.Api.Token.HoldingV2 (Account)
+import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.UtilsV2
 
 
@@ -28,7 +28,7 @@ maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
 template OTCTradeAllocationRequest with
-    authorizer : Account
+    authorizer : V2.Account
     request : V2.AllocationRequestView
   where
     signatory request.settlement.executor
@@ -120,11 +120,15 @@ template OTCTrade with
           Some transferLegs <- pure (Map.lookup admin transferLegsByAdmin)
           exercise factoryCid V2.SettlementFactory_SettleBatch with
             expectedAdmin = admin
-            settlementV1Authorizers
+            extraReceiptAuthorizers =
+              -- Here we assume that the trading app only allows transfers to the basic account
+              -- of v1 authorizers. More complex strategies to determine the extra receipt authorizers
+              -- are possible by determining the accounts form the transfer legs and app specific config.
+              map V2.basicAccount settlementV1Authorizers
             settlement
             transferLegs
             allocationCids
-            controllersOverride = None
+            actors = venue :: settlementV1Authorizers
             extraArgs
 
 
@@ -151,11 +155,10 @@ template OTCTrade with
             allocView.allocation.settlement.settlementRef === makeTradeRef self
             allocView.allocation.settlement.executor === venue
             exercise allocCid $ V2.Allocation_Cancel with
-              -- FIXME: consider using the controllers override pattern to avoid that every venue has to copy the exaclty right computation
-              actors = V2.defaultAllocation_CancelControllers allocView
+              actors = venue :: settlementV1Authorizers
               extraArgs
 
-accountParties : Account -> [Party]
+accountParties : V2.Account -> [Party]
 accountParties account = account.owner :: optionalToList account.provider
 
 transferLegParties : V2.TransferLeg -> [Party]

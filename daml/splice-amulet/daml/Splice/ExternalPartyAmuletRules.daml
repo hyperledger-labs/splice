@@ -107,7 +107,14 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl = settlementFactoryV2_defaultSettleBatchImpl this
+      settlementFactory_settleBatchImpl self arg =
+        let createReceiptAllocation =
+              settlementFactoryV2_defaultCreateReceiptAllocation
+                (coerceContractId self)
+                (\account -> [account.owner])
+                arg
+        in
+          settlementFactoryV2_defaultSettleBatchImpl createReceiptAllocation this self arg
 
       settlementFactory_settleBatchExtraObservers arg =
         -- Make all senders and receiver observers, so we get by with a single

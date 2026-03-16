@@ -58,7 +58,7 @@ template AmuletAllocationV2
         holdingCids = case lockedAmulet of
           None -> mempty
           Some cid -> [toInterfaceContractId cid]
-        settlementVersion = 2  -- allocations for v1 are represented using AmuletAllocation.
+        extraSettlementAuthorizers = []
         canWithdraw = [[allocation.authorizer.owner]]
         meta = emptyMetadata
 
@@ -68,8 +68,7 @@ template AmuletAllocationV2
       allocation_withdrawExtraObservers _arg = []
 
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
-        archive self
-        requireMatchExpected ("V2.Allocation_Withdraw", "actors") [allocation.authorizer.owner] arg.actors
+        archiveAndCheckActors "V2.Allocation_Withdraw" self arg [allocation.authorizer.owner]
         authorizerHoldingCids <- unlockAmuletAllocationV2 this extraArgs
         pure V2.Allocation_WithdrawResult
           with
@@ -77,7 +76,7 @@ template AmuletAllocationV2
             meta = emptyMetadata
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
-        archiveAndCheckActors "V2.Allocation_Cancel" self (toInterface @V2.Allocation this) arg
+        archiveAndCheckActors "V2.Allocation_Cancel" self arg [allocation.settlement.executor]
         authorizerHoldingCids <- unlockAmuletAllocationV2 this extraArgs
         pure V2.Allocation_CancelResult
           with
@@ -85,7 +84,7 @@ template AmuletAllocationV2
             meta = emptyMetadata
 
       allocation_settleImpl self arg@(V2.Allocation_Settle{..}) = do
-        archiveAndCheckActors "V2.Allocation_Settle" self (toInterface @V2.Allocation this) arg
+        archiveAndCheckActors "V2.Allocation_Settle" self arg [allocation.settlement.executor, dso]
         -- compute total funds to move
         let authorizer = allocation.authorizer.owner
         let netAmount = netAllocationCreditAmount (V2.basicAccount authorizer) allocation.transferLegs

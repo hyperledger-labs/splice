@@ -14,7 +14,6 @@
 --
 module Splice.Api.Token.AllocationV2 where
 
-import DA.Optional (fromOptional)
 import DA.Map as Map
 
 import Splice.Api.Token.MetadataV1
@@ -105,21 +104,15 @@ data AllocationView = AllocationView with
     expiresAt : Optional Time
       -- ^ The time at which this allocation expires. SHOULD be as close as the
       -- registry can make it to the `allocation.settlement.settlementDeadline`.
-    settlementVersion : Int
-      -- ^ Version of the workflow to use for settling this allocation.
+    extraSettlementAuthorizers : [Party]
+      -- ^ Additional parties that are required to authorize the settlement of
+      -- this allocation in addition to the settlement executor and the
+      -- instrument admin.
       --
-      -- V2 settlement only requires the specified allocation.settlement.executor
-      -- to authorize the whole batch settlement.
-
-      -- V1 settlement is only available if there is a single transfer leg. It
-      -- guarantees that the owners of its sender and receiver account
-      -- are also required to authorize the whole batch settlement in addition
-      -- to the executor.
-      --
-      -- Additional versions may defined in future extensions of the token standard.
-      --
-    -- FIXME: consider whether we can replace this ^^ in favor of `extraSettlementAuthorizers`
-
+      -- This field is mainly provided for compatibility with V1 allocations,
+      -- where the sender and receiver are expected to authorize the settlement
+      -- as well. V2 allocations SHOULD set it to the empty list to simplify
+      -- the authorization flow for applications.
     canWithdraw : [[Party]]
       -- ^ The groups of parties that can initiate the withdrawal of this allocation.
       --
@@ -249,21 +242,16 @@ interface Allocation where
 -- | Default controllers for allocation settlement.
 defaultAllocation_SettleControllers : AllocationView -> [Party]
 defaultAllocation_SettleControllers allocView =
-    allocView.allocation.settlement.executor :: concatMap legControllers allocView.allocation.transferLegs
-  where
-    legControllers leg
-      | allocView.settlementVersion == 1 = leg.instrumentId.admin :: [leg.sender.owner, leg.receiver.owner]
-      | otherwise = [leg.instrumentId.admin]
+    allocView.allocation.settlement.executor ::
+      allocView.extraSettlementAuthorizers ++ map (.instrumentId.admin) allocView.allocation.transferLegs
 
 -- | Default controllers for allocation cancellation.
 defaultAllocation_CancelControllers : AllocationView -> [Party]
-defaultAllocation_CancelControllers allocView =
-    allocView.allocation.settlement.executor ::
-      if allocView.settlementVersion == 1
-        then concatMap legControllers allocView.allocation.transferLegs
-        else []
-  where
-    legControllers leg = [leg.sender.owner, leg.receiver.owner]
+defaultAllocation_CancelControllers allocView = [allocView.allocation.settlement.executor]
+   -- NOTE: this is different from V1, where the cancellation also required the
+   -- sender and receiver to authorize. This is because in V2 we expect the
+   -- settlement executor to have more control over the settlement process, and
+   -- therefore to be the only required authorizer for cancellation.
 
 
 -- result types
@@ -356,11 +344,17 @@ interface SettlementFactory where
         --  - the `transferLegs` cover exactly the transfers authorized by the
         --    allocations
         --
-      settlementV1Authorizers : [Party]
-        -- ^ Parties authorizing the settlement of their V1 settlements.
+      extraReceiptAuthorizers : [Account]
+        -- ^ The accounts for which missing receipt allocations should be
+        -- automatically created as part of the settlement.
         --
-        -- They are a separate field from `actors` to provide explicit opt-in behavior.
-      controllersOverride : Optional [Party]
+        -- Use for V1 compatibility, where only senders create allocations.
+        -- Can also be used in V2 as a performance optimization.
+        --
+        -- Implementations MUST check that the parties required to authorize
+        -- the receipt are part of the `actors` exercising the choice to avoid
+        -- unauthorized settlement execution.
+      actors : [Party]
         -- ^ Allows setting non-default controllers for settling the batch, which
         -- can be used for implementation specific authorization patterns.
         --
@@ -372,9 +366,7 @@ interface SettlementFactory where
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     observer settlementFactory_settleBatchExtraObservers this arg
-    controller fromOptional (defaultSettlementFactory_SettleBatchControllers arg) controllersOverride
-      -- FIXME: decide on whether to use plain 'actors' (see the allocation choices above) or this 'controllerOverride' pattern.
-      -- I (SM) lean towards override, as it simplifes calls and improves documentation)
+    controller actors
     do settlementFactory_settleBatchImpl this self arg
 
   nonconsuming choice SettlementFactory_PublicFetch : SettlementFactoryView
@@ -398,9 +390,9 @@ interface SettlementFactory where
 -- Default controllers
 ----------------------
 
+-- FIXME: consider switching to multiple executors for extensibility
 defaultSettlementFactory_SettleBatchControllers : SettlementFactory_SettleBatch -> [Party]
-defaultSettlementFactory_SettleBatchControllers arg =
-    arg.settlement.executor :: arg.settlementV1Authorizers
+defaultSettlementFactory_SettleBatchControllers arg = [arg.settlement.executor]
 
 
 -- Result type

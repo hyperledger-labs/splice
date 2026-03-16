@@ -227,8 +227,8 @@ testDvP = script do
         settlement = mkOtcTradeSettlementInfo otcTradeCid otcTrade
         transferLegs
         allocationCids
-        settlementV1Authorizers = []
-        controllersOverride = None
+        extraReceiptAuthorizers = []
+        actors = [provider]
         extraArgs = emptyExtraArgs
       pure ((admin, (context.factoryCid, allocationCids, context.arg.extraArgs)), context.disclosures)
 

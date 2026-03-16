@@ -31,6 +31,7 @@ module Splice.Api.Token.UtilsV2 (
   allocationV2_defaultCancelImplUsingV1,
 
   settlementFactoryV2_defaultSettleBatchImpl,
+  settlementFactoryV2_defaultCreateReceiptAllocation,
 
   -- ** Allocation utilities
   netAllocationCreditAmount,

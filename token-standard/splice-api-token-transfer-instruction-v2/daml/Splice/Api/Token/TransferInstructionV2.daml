@@ -218,6 +218,8 @@ interface TransferFactory where
         -- that check the expected admin party.
       transfer : Transfer
         -- ^ The transfer to execute.
+        --
+        -- Implementations MUST validate that the admin of the instrument matches the admin of the factory.
       actors : [Party]
         -- ^ The parties instructing the transfer, if different from the owner or the source account
       extraArgs : ExtraArgs
