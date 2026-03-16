@@ -179,6 +179,7 @@ services:
       - *sv-auth-env
     volumes:
       - ${LOCALNET_DIR}/conf/console/app.conf:/app/app.conf
+      - ${LOCALNET_DIR}/conf/console/app-synchronizer.sc:/app/app-synchronizer.sc
       - ${LOCALNET_DIR}/conf/console/app-provider:/app/app-provider/${APP_PROVIDER_PROFILE}
       - ${LOCALNET_DIR}/conf/console/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/console/sv:/app/sv/${SV_PROFILE}

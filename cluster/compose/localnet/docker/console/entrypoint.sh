@@ -22,4 +22,4 @@ for script in /app/pre-startup/on/*.sh; do
 # shellcheck disable=SC1090
   [ -f "$script" ] && source "$script"
 done
-/app/bin/canton --no-tty -c /app/app.conf
+/app/bin/canton --no-tty -c /app/app.conf --bootstrap /app/app-synchronizer.sc
