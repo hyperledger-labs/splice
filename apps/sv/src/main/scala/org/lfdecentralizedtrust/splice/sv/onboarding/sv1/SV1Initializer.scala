@@ -91,7 +91,6 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -481,7 +480,8 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicSynchronizerParameters.initialValues(ProtocolVersion.v34)
+        val initialValues =
+          DynamicSynchronizerParameters.initialValues(synchronizerNode.config.protocolVersion)
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
