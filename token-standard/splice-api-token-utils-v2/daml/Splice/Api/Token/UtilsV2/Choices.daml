@@ -23,6 +23,11 @@ module Splice.Api.Token.UtilsV2.Choices (
 
   -- * Actors pattern
   archiveAndCheckActors,
+
+  -- * Holding metadata
+  -- FIXME: decide how much to export from here, and whether to also export from UtilsV2 main module
+  reasonMetaKey,
+  txKindMetaKey,
 ) where
 
 import DA.List (dedupSort)
@@ -82,7 +87,7 @@ requireMemberOfDedup description fieldName expected actual =
 
 requireUnique : (Ord a, Show a) => Text -> [a] -> Update ()
 requireUnique description xs
-  | null duplicates = pure ()
+  | Prelude.null duplicates = pure ()
   | otherwise = fail $ T.unlines $
       "Expected unique " <> description <> ", but found duplicates:" :: map show duplicates
   where
@@ -132,3 +137,18 @@ archiveAndCheckActors
 archiveAndCheckActors choiceName cid arg requiredActors = do
   archive cid
   requireSubsetOf ("required actors", requiredActors) (choiceName <> ".actors", arg.actors)
+
+
+-- Holding change metadata
+--------------------------
+
+cip56Prefix : Text
+cip56Prefix = "splice.lfdecentralizedtrust.org/"
+
+-- | Short, human-readable reason for the transaction.
+reasonMetaKey : Text
+reasonMetaKey = cip56Prefix <> "reason"
+
+-- | Kind of the transaction.
+txKindMetaKey : Text
+txKindMetaKey = cip56Prefix <> "tx-kind"

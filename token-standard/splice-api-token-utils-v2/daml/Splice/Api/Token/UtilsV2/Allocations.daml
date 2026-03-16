@@ -67,18 +67,40 @@ allocationV2_defaultSettleImplUsingV1
 allocationV2_defaultSettleImplUsingV1 this self (AllocationV2.Allocation_Settle{..}) = do
   -- no archive of self, as the V1 choice is consuming
   -- check actors explicitly to avoid leaking authority from too many controllers
-  requireMatchExpectedDedup ("V2.Allocation_Settle", "actors") (AllocationV2.defaultAllocation_SettleControllers (view this)) actors
+  let thisView = view this
+  requireMatchExpectedDedup ("V2.Allocation_Settle", "actors") (AllocationV2.defaultAllocation_SettleControllers thisView) actors
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_ExecuteTransfer with extraArgs
   -- Archive the receiver holdings,
   -- which is required, as the receiver will get their credit as part of
-  -- settling their allocation. The receiver parses this transaction using the
-  -- V2 choices and will thus understand it.
+  -- settling their allocation.
+  --
+  -- We refrain from attempting to pass the receiver holding to its matching
+  -- allocation's settle choice, as that would make the V2.Allocation_Settle choice
+  -- unnecessarily difficult for the sake of a small optimization that is only relevant
+  -- for the limited period of mixed version settlements.
   forA_ result.receiverHoldingCids $ \receiverHoldingCid ->
     archive receiverHoldingCid
+
+  -- construct metadata to aid V1 tx history parsers
+  leg <- case thisView.allocation.transferLegs of
+    [leg] -> pure leg
+    legs -> abort $ "expected exactly one transfer leg for allocation settlement, but got: " <> show legs
+  let reason = "V2 allocation settlement for leg '" <> leg.transferLegId <> "' using V1.Allocation_ExecuteTransfer"
   pure AllocationV2.Allocation_SettleResult with
     authorizerHoldingCids = map upcast result.senderHoldingCids
-    meta = emptyMetadata -- empty to avoid duplicating the metadata
+    meta = Metadata with
+      values = TextMap.fromList
+        [ (reasonMetaKey, reason)
+        , (txKindMetaKey, "mint")
+        ]
+      -- Note: this fallback metadata will be used by V1 tx history parsers for the receiver
+      -- when parsing the joint creation and archival of the receiver holding.
+      -- We tag it as a mint of 0.0 holding amount, as that is as good as any of
+      -- the other options.
+      --
+      -- Recievers using V2 wallets will parse the choice as a whole and ignore this metadata.
+
 
 -- | Default implementation for the `V2.Allocation_Withdraw` for a template that
 -- implements the `V1.Allocation` interface.
@@ -134,12 +156,8 @@ data PreparedAllocations = PreparedAllocations with
 
 -- | Default implementation for settling a batch of allocations.
 --
--- It validates that the allocations match the expected transfer legs and settlement,
--- and settles them using V1 or V2 settlement depending on the settlement
--- version of the individual allocations.
---
--- The logic for doing this correctly is nontrivial, which is why registries
--- SHOULD use this default implementation where possible.
+-- It validates that the transfer legs and allocations are unique, creates missing
+-- receipt allocations and then settles all allocations using their `V2.Allocation_Settle` choice.
 --
 -- The implementation uses the default controllers for calling the V2.Allocation_Settle
 -- choices. Registries that need to use custom controllers can reuse the
@@ -210,6 +228,8 @@ settlementFactoryV2_defaultCreateReceiptAllocation allocationFactoryCid directAl
 
 validateAndPrepareAllocations : Party ->  AllocationV2.SettlementFactory_SettleBatch -> Update PreparedAllocations
 validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{..} = do
+  requireUnique "transfer legs" transferLegs
+
   -- fetch and validate all allocations
   allocations <- forA allocationCids $ \allocationCid -> do
     allocation0 <- fetch allocationCid
@@ -218,22 +238,20 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
 
     -- shared validation
     requireMatchExpected (allocationCid, "allocation.settlement") settlement allocation.settlement
-    requireUnique "transfer legs" allocation.transferLegs
-    require "Extra settlement authorizers are actors" (all (`elem` actors) allocationView.extraSettlementAuthorizers)
+    requireUnique "allocation.transferLegs" allocation.transferLegs
+    requireSubsetOf
+      ("allocation.extraSettlementAuthorizers", allocationView.extraSettlementAuthorizers)
+      ("SettlementFactory_SettleBatch.actors", actors)
     forA_ allocation.transferLegs $ \leg -> do
       requireMatchExpected (leg.transferLegId, "transferLeg.admin") admin leg.instrumentId.admin
     pure (allocationCid, allocationView)
 
-
-  let allocatedAuthorizations0 = do
+  -- determine missing allocations for receipt legs
+  let requiredAuthorizations = Set.fromList $ concatMap toAuthorizedLegs transferLegs
+  let allocatedAuthorizations = Set.fromList $ do
         (_, allocationView) <- allocations
         leg <- allocationView.allocation.transferLegs
         pure (allocationView.allocation.authorizer, leg)
-  requireUnique "authorizations of allocated legs" allocatedAuthorizations0
-
-  -- determine missing allocations for receipt legs
-  let requiredAuthorizations = Set.fromList $ concatMap toAuthorizedLegs transferLegs
-  let allocatedAuthorizations = Set.fromList allocatedAuthorizations0
   let missingAllocations = Set.difference requiredAuthorizations allocatedAuthorizations
   let missingAllocationsByAuthorizer = Map.fromListWithR (++) $ do
         (authorizer, leg) <- Set.toList missingAllocations

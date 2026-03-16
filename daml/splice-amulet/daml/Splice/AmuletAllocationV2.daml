@@ -104,10 +104,11 @@ template AmuletAllocationV2
                 owner = authorizer
                 amount = expiringAmount holdingFeeAmulet netAmount externalPartyConfigState.holdingFeesOpenRoundNumber
 
+              let reason = "Settle net positive allocation for settlement " <> show allocation.settlement.settlementRef
               pure V2.Allocation_SettleResult with
                 authorizerHoldingCids = [toInterfaceContractId newHoldingCid]
-                meta = emptyMetadata
-          else
+                meta = simpleHoldingTxMeta TxKind_Mint (Some reason) None
+          else do
             pure V2.Allocation_SettleResult with
               authorizerHoldingCids = mempty
               meta = emptyMetadata
@@ -118,9 +119,10 @@ template AmuletAllocationV2
              lockedAmulet <- fetchAndArchive (ForOwner with dso = dso; owner = authorizer) cid
              require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
 
+          let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef
           pure V2.Allocation_SettleResult with
             authorizerHoldingCids = mempty
-            meta = emptyMetadata
+            meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
 
 
 -- Allocation usage
