@@ -123,6 +123,18 @@ data AllocationView = AllocationView with
 -- Allocation
 -------------
 
+-- | Default controllers for allocation settlement.
+defaultAllocation_SettleControllers : AllocationView -> [Party]
+defaultAllocation_SettleControllers allocView =
+    allocView.allocation.settlement.executor ::
+      allocView.extraSettlementAuthorizers ++ map (.instrumentId.admin) allocView.allocation.transferLegs
+
+-- | Default controllers for allocation cancellation.
+defaultAllocation_CancelControllers : AllocationView -> [Party]
+defaultAllocation_CancelControllers allocView =
+    allocView.allocation.settlement.executor :: allocView.extraSettlementAuthorizers
+
+
 -- | A contract representing the approval of the authorizer to send or receive
 -- the net amount of assets of the transfer legs as part of a settlement where
 -- the executor and instrument admin check that every transfer leg has a matching
@@ -220,29 +232,14 @@ interface Allocation where
         --
         -- Implementations MUST check these parties to avoid unauthorized withdrawal.
         --
-        -- Implementations are free to decide on the required authorization for withdrawal.
-        -- They MUST however allow the parties listed in the
-        -- `AllocationView.canWithdraw` to call this choice.
+        -- Implementations SHOULD allow the owner and provider of the authorizer
+        -- account to call this choice to withdraw mistakenly created allocations.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocation_withdrawExtraObservers this arg
     controller actors
     do allocation_withdrawImpl this self arg
 
-
--- default controllers
-----------------------
-
--- | Default controllers for allocation settlement.
-defaultAllocation_SettleControllers : AllocationView -> [Party]
-defaultAllocation_SettleControllers allocView =
-    allocView.allocation.settlement.executor ::
-      allocView.extraSettlementAuthorizers ++ map (.instrumentId.admin) allocView.allocation.transferLegs
-
--- | Default controllers for allocation cancellation.
-defaultAllocation_CancelControllers : AllocationView -> [Party]
-defaultAllocation_CancelControllers allocView =
-    allocView.allocation.settlement.executor :: allocView.extraSettlementAuthorizers
 
 
 -- result types
@@ -351,9 +348,13 @@ interface SettlementFactory where
         --
         -- Implementations MUST check this value to avoid unauthorized settlement execution.
         --
-        -- This choice's default controllers are the `settlement.executor` and the
-        -- `settlementV1Authorizers`. Implementations SHOULD allow executing the
-        -- choice with these default controllers to maximize compatibility with apps.
+        -- They SHOULD check that they include:
+        --
+        --  - the `settlement.executor`
+        --  - the `extraSettlementAuthorizers` required by the allocations being settled
+        --  - the parties required to authorize the receipt into the `extraReceiptAuthorizers` accounts
+        --
+        -- They SHOULD not require additional actors to maximize compatibility with apps.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     observer settlementFactory_settleBatchExtraObservers this arg
