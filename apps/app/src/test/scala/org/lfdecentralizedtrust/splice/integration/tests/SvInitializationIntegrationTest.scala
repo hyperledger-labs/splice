@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.RetryFor
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -215,7 +216,11 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getPartyToParticipant(decentralizedSynchronizerId, dsoParty)
+          .getPartyToParticipant(
+            decentralizedSynchronizerId,
+            dsoParty,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .threshold
@@ -226,7 +231,11 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       eventually() {
         val participantAdminConnection = sv1Backend.appState.participantAdminConnection
         val dsoHostingParticipants = participantAdminConnection
-          .getPartyToParticipant(decentralizedSynchronizerId, dsoParty)
+          .getPartyToParticipant(
+            decentralizedSynchronizerId,
+            dsoParty,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .participants
