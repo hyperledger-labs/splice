@@ -1927,7 +1927,7 @@ checkErrors := {
     val logFileAfter = s"log/${logName}_after_shutdown.clog"
 
     // Note that this will split the given file and then delete it, so it is idempotent.
-    Seq(".github/actions/scripts/split-canton-logs.sh", logFile, logFileBefore, logFileAfter).!
+    Seq(".github/splice-shared-gha/actions/scripts/split-canton-logs.sh", logFile, logFileBefore, logFileAfter).!
 
     import better.files.File
     val logSpecificIgnores =
