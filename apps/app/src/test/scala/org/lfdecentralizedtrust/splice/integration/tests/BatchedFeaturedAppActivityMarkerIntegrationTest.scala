@@ -266,8 +266,6 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
         forExactly(1, entries) { line =>
           line.message should (include("vettedAmuletVersion = 0.1.15") and include("Processing"))
         }
-        val currentAmuletVersion = DarResources.amulet.latest.metadata.version
-
         forAtLeast(1, entries) { line =>
           line.message should (include(
             s"vettedAmuletVersion = ${DarResources.amulet.latest.metadata.version}"
