@@ -9,9 +9,9 @@ import DA.Action (void, unless)
 import DA.Assert
 import DA.Either (partitionEithers)
 import DA.Exception
-import DA.Foldable (forA_, all)
+import DA.Foldable (maximum, forA_, all)
 import DA.List as List hiding (all)
-import DA.Optional (isNone, fromSome, fromOptional, isSome)
+import DA.Optional (mapOptional, isNone, fromSome, fromOptional, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -36,6 +36,7 @@ import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
+import Splice.ValidatorPermission
 
 
 -- Types
@@ -114,6 +115,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_SetValidatorRevocationState DsoRules_SetValidatorRevocationState
+    -- ^ Voted action to revoke ValidatorPermission contract.   
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -207,8 +210,16 @@ data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResu
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
     validatorLicense : ContractId ValidatorLicense
 
+data DsoRules_GrantValidatorPermissionResult = DsoRules_GrantValidatorPermissionResult with
+    permissionCid : ContractId ValidatorPermission
+  deriving (Eq, Show)    
+
 data DsoRules_MergeValidatorLicenseResult = DsoRules_MergeValidatorLicenseResult with
     validatorLicense : ContractId ValidatorLicense
+
+data DsoRules_MergeValidatorPermissionResult = DsoRules_MergeValidatorPermissionResult with
+    permissionCid : ContractId ValidatorPermission
+  deriving (Eq, Show)
 
 data DsoRules_StartSvOnboardingResult = DsoRules_StartSvOnboardingResult with
     onboardingRequest : ContractId SvOnboardingRequest
@@ -300,6 +311,9 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data DsoRules_SetValidatorRevocationStateResult = DsoRules_SetValidatorRevocationStateResult with
+    permissionCid : ContractId ValidatorPermission
+  deriving (Eq, Show)
 
 -- Workflow templates
 ---------------------
@@ -967,6 +981,39 @@ template DsoRules with
     -- Validator onboarding
     -----------------------
 
+    nonconsuming choice DsoRules_GrantValidatorPermission : DsoRules_GrantValidatorPermissionResult
+      with
+        sponsor : Party
+        validator : Party
+        validatorParticipantId : Text
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        
+        -- Create the ValidatorPermission with default revocation states
+        permissionCid <- create ValidatorPermission with
+          dso
+          sponsor
+          validator
+          validatorParticipantId
+          loginAfter = None
+          isRevoked = False
+          
+        return DsoRules_GrantValidatorPermissionResult with ..
+
+    nonconsuming choice DsoRules_SetValidatorRevocationState : DsoRules_SetValidatorRevocationStateResult
+      with
+        validatorPermissionCid : ContractId ValidatorPermission
+        newLoginAfter : Optional Time
+        newIsRevoked : Bool
+      controller dso
+      do
+        result <- exercise validatorPermissionCid ValidatorPermission_SetRevocationState with
+          newLoginAfter
+          newIsRevoked
+        return DsoRules_SetValidatorRevocationStateResult with permissionCid = result.permissionCid    
+
+
     nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
         sponsor : Party
@@ -986,6 +1033,32 @@ template DsoRules with
           metadata = fmap (\version -> ValidatorLicenseMetadata with version; contactPoint = fromOptional "" contactPoint; lastUpdatedAt = now) version
           lastActiveAt = Some now
         return DsoRules_OnboardValidatorResult with ..
+
+    nonconsuming choice DsoRules_MergeValidatorPermission : DsoRules_MergeValidatorPermissionResult
+      with
+        validatorPermissionCids : [ContractId ValidatorPermission]
+        sv : Party
+      controller sv
+      do 
+         _ <- getAndValidateSvParty this (Some sv)
+         require "Number of ValidatorPermission contracts to merge is >= 2" (length validatorPermissionCids >= 2)
+         
+         permissions <- forA validatorPermissionCids $ fetchAndArchive (ForDso this.dso)
+         
+         require "All permissions map to the same validator" (length (dedup (map (.validator) permissions)) == 1)
+         require "All permissions map to the same participant ID" (length (dedup (map (.validatorParticipantId) permissions)) == 1)
+        
+         let mergedIsRevoked = any (.isRevoked) permissions
+         let allLoginAfters = mapOptional (.loginAfter) permissions
+         let mergedLoginAfter = if null allLoginAfters then None else Some (maximum allLoginAfters)
+         
+         let basePermission = head permissions
+         
+         permissionCid <- create basePermission with
+           loginAfter = mergedLoginAfter
+           isRevoked = mergedIsRevoked
+           
+         pure $ DsoRules_MergeValidatorPermissionResult permissionCid
 
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
       -- ^ Note: removes the old duplicated licenses and creates a new one with the highest lastReceivedFor round
@@ -1591,6 +1664,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_SetValidatorRevocationState choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
