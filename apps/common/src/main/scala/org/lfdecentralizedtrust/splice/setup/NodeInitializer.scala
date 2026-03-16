@@ -29,7 +29,6 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.prettyString
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
 
 class NodeInitializer(
     connection: TopologyAdminConnection & StatusAdminConnection,
@@ -110,13 +109,18 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Making sure canton node has an identity")
-    val bootDeadline = 10.seconds.fromNow
     for {
       // If the node was started concurrently with the app, it might not immediately be responding, so we're
       // retrying the getId() call.
       // Note that Canton nodes enable their endpoints one at a time, and return NOT_IMPLEMENTED while an endpoint
       // is not yet enabled. E.g., even if a node returned something to a getStatus() request, it might still fail
       // a subsequent getId() request with NOT_IMPLEMENTED.
+      //
+      // Because initialized == uniqueIdentifier.isDefined, we cannot distinguish between:
+      //   (a) no ID has been set yet (node has fully booted and is waiting for an ID), and
+      //   (b) the node is still booting and hasn't yet loaded its previously-set ID.
+      // To disambiguate, we cross-check with the status endpoint:
+
       nodeId <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "node_id",
@@ -124,16 +128,21 @@ class NodeInitializer(
         connection.getIdOption().flatMap { result =>
           if (result.uniqueIdentifier.isDefined || result.initialized) {
             Future.successful(result)
-          } else if (bootDeadline.hasTimeLeft()) {
-            Future.failed(
-              Status.UNAVAILABLE
-                .withDescription(
-                  s"Node might be bootstrapping. Retrying getId... (${bootDeadline.timeLeft.toSeconds}s remaining)"
-                )
-                .asRuntimeException()
-            )
           } else {
-            Future.successful(result)
+            // No ID set yet according to GetId. Check the status endpoint to determine whether
+            // the node is genuinely waiting for an ID or still bootstrapping.
+            connection.getStatus.flatMap {
+              case NodeStatus.NotInitialized(_, Some(WaitingForId)) =>
+                Future.successful(result)
+              case status =>
+                Future.failed(
+                  Status.UNAVAILABLE
+                    .withDescription(
+                      s"Node is still bootstrapping (status: $status). Retrying getId..."
+                    )
+                    .asRuntimeException()
+                )
+            }
           }
         },
         logger,
