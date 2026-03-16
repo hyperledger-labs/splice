@@ -7,6 +7,7 @@ module Splice.Api.Token.UtilsV2.Choices (
   requireMatchExpected,
   requireMatchExpectedDedup,
   requireMemberOf,
+  requireSubsetOf,
   requireMemberOfDedup,
   requireUnique,
 
@@ -20,10 +21,7 @@ module Splice.Api.Token.UtilsV2.Choices (
   -- * Choice implementations
   publicFetchWithExpectedAdmin,
 
-  -- * Controller override pattern
-  HasDefaultControllers(..),
-  onlyAllowDefaultControllers,
-  onlyAllowDefaultControllers',
+  -- * Actors pattern
   archiveAndCheckActors,
 ) where
 
@@ -59,7 +57,7 @@ requireMatchExpectedDedup : (Ord a, Show a, Show obj) => (obj, Text) -> [a] -> [
 requireMatchExpectedDedup (obj, fieldName) expected actual =
   requireMatchExpected (obj, fieldName) (dedupSort expected) (dedupSort actual)
 
-
+-- FIXME: move to (desc, value) structure here and everywhere relse
 requireMemberOf : (Eq a, Show a) => Text -> Text -> [a] -> a -> Update ()
 requireMemberOf description fieldName expected actual
   | actual `elem` expected = pure ()
@@ -69,13 +67,13 @@ requireMemberOf description fieldName expected actual
       , "Actual: " <> show actual
       ]
 
-requireSubsetOf : (Eq a, Show a) => Text -> [a] -> [a] -> Update ()
-requireSubsetOf fieldName required actual
+requireSubsetOf : (Eq a, Show a) => (Text, [a]) -> (Text, [a]) -> Update ()
+requireSubsetOf (requiredDesc, required) (actualDesc, actual)
   | all (`elem` actual) required = pure ()
   | otherwise = fail $ T.unlines
-      [ "Actual value of '" <> fieldName <> "' did not contain all required elements."
-      , "Required subset: " <> show required
-      , "Actual: " <> show actual
+      [ "Requirement failed: " <>requiredDesc <> " is not a subset of " <> actualDesc <> "."
+      , requiredDesc <> ": " <> show required
+      , actualDesc <> ": " <> show actual
       ]
 
 requireMemberOfDedup : (Ord a, Show a) => Text -> Text -> [[a]] -> [a] -> Update ()
@@ -123,37 +121,8 @@ publicFetchWithExpectedAdmin this admin _self arg = do
   pure (view (toInterface this : i))
 
 
-
--- Controller override pattern
-------------------------------
-
-
--- | Templates or interfaces whose arguments have default controllers.
-class HasDefaultControllers t ch where
-  -- | Default controllers for a choice on a template or interface.
-  defaultControllers : t -> ch -> [Party]
-
-
-onlyAllowDefaultControllers
-  : forall t ch. (HasDefaultControllers t ch, GetField "controllersOverride" ch (Optional [Party])) => Text -> t -> ch -> Update ()
-onlyAllowDefaultControllers choiceName this arg =
-  case arg.controllersOverride of
-    None -> pure ()
-    Some actual -> do
-      requireMatchExpectedDedup (choiceName, "controllersOverride") (defaultControllers this arg) (dedupSort actual)
-
-
 -- Actors pattern
 -----------------
-
--- | Check for the actors to be equal to the default controllers
---
--- FIXME: decide on which variant to use 'actors' vs. 'controllersOverride'.
-onlyAllowDefaultControllers'
-  : forall i ch. (HasDefaultControllers i ch, GetField "actors" ch [Party]) => Text -> i -> ch -> Update ()
-onlyAllowDefaultControllers' choiceName this arg =
-    requireMatchExpectedDedup (choiceName, "actors") (defaultControllers this arg) (dedupSort arg.actors)
-
 
 -- | Preamble for V2 choices that follow the actors pattern.
 --
@@ -162,4 +131,4 @@ archiveAndCheckActors
   : forall i ch. (HasArchive i, GetField "actors" ch [Party]) => Text -> ContractId i -> ch -> [Party] -> Update ()
 archiveAndCheckActors choiceName cid arg requiredActors = do
   archive cid
-  requireSubsetOf (choiceName <> ".actors") requiredActors arg.actors
+  requireSubsetOf ("required actors", requiredActors) (choiceName <> ".actors", arg.actors)

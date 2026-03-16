@@ -8,7 +8,6 @@ module Splice.Api.Token.UtilsV2 (
   isBasicAccount,
   publicFetchWithExpectedAdmin,
 
-  onlyAllowDefaultControllers',
   archiveAndCheckActors,
 
   requireMatchExpected,
@@ -20,10 +19,6 @@ module Splice.Api.Token.UtilsV2 (
   -- * API conversion
   BackwardCompatible(..),
   ForwardCompatible(..),
-
-
-  -- ** Non-standard conversions
-  upcast_v1_v2_AllocationView,
 
   -- * Allocation facctory
   allocationV2_defaultSettleImplUsingV1,

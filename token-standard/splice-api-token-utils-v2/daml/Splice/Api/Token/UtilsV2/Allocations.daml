@@ -18,8 +18,6 @@ module Splice.Api.Token.UtilsV2.Allocations (
   validateAndPrepareAllocations,
   netAllocationCreditAmount,
 
-  -- * Non-standard conversions of allocation types
-  upcast_v1_v2_AllocationView,
 ) where
 
 import DA.Foldable (forA_)
@@ -66,9 +64,10 @@ allocationV2_defaultSettleImplUsingV1
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Settle
   -> Update AllocationV2.Allocation_SettleResult
-allocationV2_defaultSettleImplUsingV1 this self arg@(AllocationV2.Allocation_Settle{..}) = do
+allocationV2_defaultSettleImplUsingV1 this self (AllocationV2.Allocation_Settle{..}) = do
   -- no archive of self, as the V1 choice is consuming
-  onlyAllowDefaultControllers' "V2.Allocation_Settle" this arg
+  -- check actors explicitly to avoid leaking authority from too many controllers
+  requireMatchExpectedDedup ("V2.Allocation_Settle", "actors") (AllocationV2.defaultAllocation_SettleControllers (view this)) actors
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_ExecuteTransfer with extraArgs
   -- Archive the receiver holdings,
@@ -87,13 +86,12 @@ allocationV2_defaultSettleImplUsingV1 this self arg@(AllocationV2.Allocation_Set
 -- It uses the `V1.Allocation_Withdraw` choice to ensure the sender's tx parsing
 -- sees the expected choice.
 allocationV2_defaultWithdrawImplUsingV1
-  : AllocationV2.Allocation
-  -> ContractId AllocationV2.Allocation
+  :  ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
-allocationV2_defaultWithdrawImplUsingV1 this self (AllocationV2.Allocation_Withdraw{..}) = do
+allocationV2_defaultWithdrawImplUsingV1 self (AllocationV2.Allocation_Withdraw{..}) = do
   -- no archive of self, as the V1 choice is consuming
-  requireMemberOfDedup "V2.AllocationView.canWithdraw" "actors" (view this).canWithdraw actors
+  -- no check of actors, as they will be checked implicitly by the V1 choice
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
@@ -107,11 +105,10 @@ allocationV2_defaultWithdrawImplUsingV1 this self (AllocationV2.Allocation_Withd
 -- It uses the `V1.Allocation_Cancel` choice to ensure the sender's tx parsing
 -- sees the expected choice.
 allocationV2_defaultCancelImplUsingV1
-  : AllocationV2.Allocation
-  -> ContractId AllocationV2.Allocation
+  :  ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
-allocationV2_defaultCancelImplUsingV1 _this self (AllocationV2.Allocation_Cancel{..}) = do
+allocationV2_defaultCancelImplUsingV1 self (AllocationV2.Allocation_Cancel{..}) = do
   -- no archive of self, as the V1 choice is consuming
   -- no check of actors, as they will be checked implicitly by the V1 choice
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
@@ -448,15 +445,14 @@ instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.Al
       settlement = upcast settlement
       transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
 
-upcast_v1_v2_AllocationView : [[Party]] -> AllocationV1.AllocationView -> AllocationV2.AllocationView
-upcast_v1_v2_AllocationView canWithdraw (AllocationV1.AllocationView with allocation, holdingCids, meta) =
-  AllocationV2.AllocationView with
-    allocation = upcast allocation
-    holdingCids = map upcast holdingCids
-    expiresAt = Some (allocation.settlement.settleBefore)
-    extraSettlementAuthorizers = [allocation.transferLeg.sender, allocation.transferLeg.receiver]
-    canWithdraw
-    meta
+instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
+  upcast (AllocationV1.AllocationView with allocation, holdingCids, meta) =
+    AllocationV2.AllocationView with
+      allocation = upcast allocation
+      holdingCids = map upcast holdingCids
+      expiresAt = Some (allocation.settlement.settleBefore)
+      extraSettlementAuthorizers = [allocation.transferLeg.sender, allocation.transferLeg.receiver]
+      meta
 
 instance BackwardCompatible (ContractId AllocationV1.Allocation) (ContractId AllocationV2.Allocation) where
   upcast = coerceInterfaceContractId
@@ -499,15 +495,3 @@ instance ForwardCompatible AllocationRequestV1.AllocationRequestView AllocationR
       transferLegs = TextMap.fromList [ (leg.transferLegId, downcast leg) | leg <- transferLegs ]
       meta
 
-
--- Default controller instances
--------------------------------
-
-instance HasDefaultControllers AllocationV2.SettlementFactory AllocationV2.SettlementFactory_SettleBatch where
-  defaultControllers _ arg = AllocationV2.defaultSettlementFactory_SettleBatchControllers arg
-
-instance HasDefaultControllers AllocationV2.Allocation AllocationV2.Allocation_Settle where
-  defaultControllers this _arg = AllocationV2.defaultAllocation_SettleControllers (view this)
-
-instance HasDefaultControllers AllocationV2.Allocation AllocationV2.Allocation_Cancel where
-  defaultControllers this _arg = AllocationV2.defaultAllocation_CancelControllers (view this)

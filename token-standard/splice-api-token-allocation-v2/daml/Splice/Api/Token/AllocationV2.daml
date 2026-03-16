@@ -41,6 +41,8 @@ data SettlementInfo = SettlementInfo
     executor : Party
       -- ^ The party that is responsible for executing the settlement, and
       -- guaranteeing atomic settlement across asset admins.
+      --
+      -- FIXME: consider switching to multiple executors to support apps that want to have their users be part of validating atomic settlement
     settlementRef : Reference
       -- ^ Reference to the settlement that app would like to execute.
     requestedAt : Time
@@ -113,14 +115,6 @@ data AllocationView = AllocationView with
       -- where the sender and receiver are expected to authorize the settlement
       -- as well. V2 allocations SHOULD set it to the empty list to simplify
       -- the authorization flow for applications.
-    canWithdraw : [[Party]]
-      -- ^ The groups of parties that can initiate the withdrawal of this allocation.
-      --
-      -- Provided for wallets to determine whether their user can call the `Allocation_Withdraw` choice.
-      --
-      -- Implementations MAY elide some of the possible groups of parties to avoid
-      -- very large views. They SHOULD however list all parties that can unilaterally withdraw
-      -- the allocation, so that token standard wallets can enable their users to do so.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
@@ -247,11 +241,8 @@ defaultAllocation_SettleControllers allocView =
 
 -- | Default controllers for allocation cancellation.
 defaultAllocation_CancelControllers : AllocationView -> [Party]
-defaultAllocation_CancelControllers allocView = [allocView.allocation.settlement.executor]
-   -- NOTE: this is different from V1, where the cancellation also required the
-   -- sender and receiver to authorize. This is because in V2 we expect the
-   -- settlement executor to have more control over the settlement process, and
-   -- therefore to be the only required authorizer for cancellation.
+defaultAllocation_CancelControllers allocView =
+    allocView.allocation.settlement.executor :: allocView.extraSettlementAuthorizers
 
 
 -- result types
@@ -385,14 +376,6 @@ interface SettlementFactory where
         -- FIXME: switch to multiple actors for extensibility
     controller actor
     do settlementFactory_publicFetchImpl this self arg
-
-
--- Default controllers
-----------------------
-
--- FIXME: consider switching to multiple executors for extensibility
-defaultSettlementFactory_SettleBatchControllers : SettlementFactory_SettleBatch -> [Party]
-defaultSettlementFactory_SettleBatchControllers arg = [arg.settlement.executor]
 
 
 -- Result type
