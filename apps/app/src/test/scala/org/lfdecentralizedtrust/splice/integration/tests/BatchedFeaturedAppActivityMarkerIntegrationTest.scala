@@ -127,6 +127,10 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       )
 
   "Batched activity marker creation produces only one view" in { implicit env =>
+    val amuletVersion =
+      sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue.packageConfig.amulet
+    // check that the test actually uses a different version
+    amuletVersion should not be "0.1.15"
     clue("Bob unvets amulet > 0.1.15") {
       bobValidatorBackend.validatorAutomation
         .trigger[ValidatorPackageVettingTrigger]
@@ -268,7 +272,7 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
         }
         forAtLeast(1, entries) { line =>
           line.message should (include(
-            s"vettedAmuletVersion = ${DarResources.amulet.latest.metadata.version}"
+            s"vettedAmuletVersion = ${amuletVersion}"
           ) and include("Processing"))
         }
       },
