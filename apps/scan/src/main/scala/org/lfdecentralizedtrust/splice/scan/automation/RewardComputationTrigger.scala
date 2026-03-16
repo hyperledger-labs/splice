@@ -45,28 +45,32 @@ class RewardComputationTrigger(
     extends PollingTrigger {
 
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    val historyId = updateHistory.historyId
-    for {
-      lastClosedO <- store.lookupRoundOfLatestData()
-      result <- lastClosedO match {
-        case Some((lastClosed, _)) =>
-          for {
-            nextRoundO <- appRewardsStore.getNextRoundWithoutRootHash(historyId, lastClosed)
-            completedAggregation <- nextRoundO match {
-              case Some(nextRound) =>
-                for {
-                  featuredParties <- featuredAppRightProvider.getFeaturedParties(nextRound)
-                  _ <- appRewardsStore.aggregateActivityTotals(
-                    historyId,
-                    nextRound,
-                    featuredParties,
-                  )
-                } yield true
-              case None => Future.successful(false)
-            }
-          } yield completedAggregation
-        case None => Future.successful(false)
-      }
-    } yield result
+    if (!updateHistory.isReady) {
+      Future.successful(false)
+    } else {
+      val historyId = updateHistory.historyId
+      for {
+        lastClosedO <- store.lookupRoundOfLatestData()
+        result <- lastClosedO match {
+          case Some((lastClosed, _)) =>
+            for {
+              nextRoundO <- appRewardsStore.getNextRoundWithoutRootHash(historyId, lastClosed)
+              completedAggregation <- nextRoundO match {
+                case Some(nextRound) =>
+                  for {
+                    featuredParties <- featuredAppRightProvider.getFeaturedParties(nextRound)
+                    _ <- appRewardsStore.aggregateActivityTotals(
+                      historyId,
+                      nextRound,
+                      featuredParties,
+                    )
+                  } yield true
+                case None => Future.successful(false)
+              }
+            } yield completedAggregation
+          case None => Future.successful(false)
+        }
+      } yield result
+    }
   }
 }
