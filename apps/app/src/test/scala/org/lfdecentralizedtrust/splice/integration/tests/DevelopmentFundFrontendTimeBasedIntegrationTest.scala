@@ -400,6 +400,7 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
       existingConfig.transferPreapprovalFee,
       existingConfig.featuredAppActivityMarkerAmount,
       Optional.of(newDfm.toProtoPrimitive),
+      existingConfig.externalPartyConfigStateTickDuration,
     )
 
     val action = new ARC_AmuletRules(
