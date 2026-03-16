@@ -32,7 +32,7 @@ trait FeaturedAppRightProvider {
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
   *
-  * FIXME(#4384): Add CalculateRewardsV2 / ProcessRewardsV2 contract that gates
+  * TODO(#4384): Add CalculateRewardsV2 / ProcessRewardsV2 contract that gates
   * triggering
   */
 class RewardComputationTrigger(
