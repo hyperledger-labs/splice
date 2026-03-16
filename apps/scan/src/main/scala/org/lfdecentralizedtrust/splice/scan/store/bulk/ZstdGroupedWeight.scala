@@ -115,14 +115,27 @@ case class ZstdGroupedWeight(
         }
       }
 
-      override def onPull(): Unit = pull(in)
+      override def onPull(): Unit = {
+        if (isClosed(in)) {
+          if (state.get().bytes.nonEmpty) {
+            push(out, ByteStringWithTermination(state.get().bytes, true))
+          }
+          completeStage()
+        } else {
+          pull(in)
+        }
+      }
 
       override def onUpstreamFinish(): Unit = {
         if (state.get().bytes.nonEmpty) {
           state.set(state.get().append(zstd.get().zstdFinish()))
+          if (isAvailable(out)) {
+            push(out, ByteStringWithTermination(state.get().bytes, true))
+            completeStage()
+          }
+        } else {
+          completeStage()
         }
-        push(out, ByteStringWithTermination(state.get().bytes, true))
-        completeStage()
       }
 
       setHandlers(in, out, this)
