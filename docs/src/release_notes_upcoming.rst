@@ -28,12 +28,6 @@
          persisted scan connections from previous runs, removing the dependency on seedUrls
          scan availability for successful reboots.
 
-       - Fix a bug that caused the Validator App to fail with a ``FAILED_PRECONDITION`` error
-         during concurrent restarts with its participant node.
-         This fix ensures the Validator App implements a short probing period for the ``getId`` request,
-         allowing the participant sufficient time to finish bootstrapping its persisted identity before
-         the Validator attempts to initialize a new one.
-
     - Daml:
 
       .. important::

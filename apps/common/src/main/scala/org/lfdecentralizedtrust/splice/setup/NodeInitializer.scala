@@ -110,7 +110,7 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Making sure canton node has an identity")
-    val bootDeadline = 20.seconds.fromNow
+    val bootDeadline = 10.seconds.fromNow
     for {
       // If the node was started concurrently with the app, it might not immediately be responding, so we're
       // retrying the getId() call.
@@ -126,9 +126,11 @@ class NodeInitializer(
             Future.successful(result)
           } else if (bootDeadline.hasTimeLeft()) {
             Future.failed(
-              new IllegalStateException(
-                s"Node might be bootstrapping. Retrying getId... (${bootDeadline.timeLeft.toSeconds}s remaining)"
-              )
+              Status.UNAVAILABLE
+                .withDescription(
+                  s"Node might be bootstrapping. Retrying getId... (${bootDeadline.timeLeft.toSeconds}s remaining)"
+                )
+                .asRuntimeException()
             )
           } else {
             Future.successful(result)
