@@ -311,7 +311,6 @@ val todoStyleExcludePrefixes =
     "project/CantonDependencies.scala",
     "experiments/",
     "CONTRIBUTING.md",
-    ".github/actions/tests/split_tests/dist/",
     "token-standard/dependencies",
   )
 val todoStyleExcludeSuffixes =
