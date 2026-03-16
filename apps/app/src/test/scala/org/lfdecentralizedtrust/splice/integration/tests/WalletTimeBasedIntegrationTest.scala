@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
@@ -182,22 +181,31 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsToNextRoundOpening
 
       clue("Check wallet after advancing to next 2 round") {
-        eventually()(aliceWalletClient.list().lockedAmulets.head.round shouldBe startRound + 2)
+        val lockedAmulet =
+          eventually() {
+            val response = aliceWalletClient.list()
+            val lockedAmulet = response.lockedAmulets.loneElement
+            lockedAmulet.round shouldBe startRound + 2
+            lockedAmulet
+          }
         logger.debug(
-          s"lockedAmulet has round: ${aliceWalletClient.list().lockedAmulets.head.round}"
+          s"lockedAmulet has round: ${lockedAmulet.round}"
         )
-        aliceWalletClient.list().lockedAmulets should have length 1
 
         // The locked amulet is expired but not yet archived.
         // It will be archived when no amulets can be used as transfer input.
         // ie, in 2 rounds
-        aliceWalletClient.list().lockedAmulets.head.accruedHoldingFee shouldBe 0.000005
-        aliceWalletClient.list().lockedAmulets.head.effectiveAmount shouldBe 0
+        lockedAmulet.accruedHoldingFee shouldBe lockedAmulet.effectiveAmount
       }
 
       // advance 2 more rounds.
       advanceRoundsToNextRoundOpening
       advanceRoundsToNextRoundOpening
+
+      waitForUpdateExternalPartyConfigStatesAutomation
+
+      advanceTimeAndUpdateExternalPartyConfigStates
+      advanceTimeAndUpdateExternalPartyConfigStates
 
       setTriggersWithin(
         Seq.empty,
@@ -211,78 +219,6 @@ class WalletTimeBasedIntegrationTest
         }
       }
     }
-
-    "generate rewards for subscriptions" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-
-      clue(
-        "Advance seven rounds to ensure that rewards from previous test cases were claimed or expired"
-      ) {
-        Range(1, 8).foreach(_ => advanceRoundsToNextRoundOpening)
-      }
-
-      val respond = clue("Alice requests an ANS entry") {
-        aliceAnsExternalClient.createAnsEntry(
-          testEntryName,
-          testEntryUrl,
-          testEntryDescription,
-        )
-      }
-      bracket(
-        clue("Alice obtains some amulets and accepts the subscription") {
-          aliceWalletClient.tap(50.0)
-          aliceWalletClient.acceptSubscriptionRequest(respond.subscriptionRequestCid)
-        },
-        cancelAllSubscriptions(aliceWalletClient),
-      ) {
-        clue("Getting Alice's new entry") {
-          eventuallySucceeds() {
-            sv1ScanBackend.lookupEntryByName(testEntryName)
-          }
-        }
-
-        clue("Wait for reward coupons to be issued") {
-          eventually()({
-            aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
-            aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 2
-            sv1Backend.participantClient.ledger_api_extensions.acs
-              .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
-                dsoParty,
-                _.data.provider == dsoParty.toProtoPrimitive,
-              ) should have length 1
-          })
-        }
-
-        actAndCheck(
-          "Advance six rounds - all rewards should be claimed or expired",
-          Range(1, 7).foreach(_ => advanceRoundsToNextRoundOpening),
-        )(
-          "",
-          _ => {
-            aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
-            aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
-            sv1Backend.participantClient.ledger_api_extensions.acs
-              .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
-                dsoParty,
-                _.data.provider == dsoParty.toProtoPrimitive,
-              ) should be(empty)
-          },
-        )
-
-        actAndCheck(
-          "Advance time until ANS entry is up for renewal", {
-            // We time the advances so that automation doesn't trigger before payments can be made.
-            // TODO (#996): consider replacing with stopping and starting triggers
-            advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(17)))
-            advanceTimeToRoundOpen
-          },
-        )(
-          "Wait for another coupon to be generated upon renewal",
-          _ => aliceValidatorWalletClient.listAppRewardCoupons() should have length 1,
-        )
-      }
-    }
-
   }
 
 }

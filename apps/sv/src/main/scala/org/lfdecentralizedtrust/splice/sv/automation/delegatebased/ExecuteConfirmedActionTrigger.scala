@@ -242,6 +242,11 @@ class ExecuteConfirmedActionTrigger(
             for {
               rulesO <- store.lookupExternalPartyAmuletRules()
             } yield rulesO.value.isDefined
+          case _: SRARC_CreateBootstrapExternalPartyConfigStateInstruction =>
+            for {
+              instructionO <- store.lookupBootstrapExternalPartyConfigStateInstruction()
+              configStateExists <- store.existsExternalPartyConfigStateWithOffset()
+            } yield instructionO.isDefined || configStateExists.value
           case action =>
             throw new UnsupportedOperationException(
               show"DsoRules $action is not yet supported"

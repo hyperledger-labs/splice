@@ -98,9 +98,6 @@ monitoring:
         total:
           rate: 25
           overMinutes: 5
-        perMember:
-          rate: 3
-          overMinutes: 5
       cloudSql:
         maintenance: false
       cometbft:

@@ -254,11 +254,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             serviceMonitorSelector: {
               matchLabels: null,
             },
-            enableFeatures: [
-              'native-histograms',
-              'memory-snapshot-on-shutdown',
-              'promql-experimental-functions',
-            ],
+            enableFeatures: ['memory-snapshot-on-shutdown', 'promql-experimental-functions'],
             enableRemoteWriteReceiver: true,
             retention: infraConfig.prometheus.retentionDuration,
             retentionSize: infraConfig.prometheus.retentionSize,
@@ -272,6 +268,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             remoteWriteDashboards: true,
             // fix for https://github.com/prometheus/prometheus/issues/6857
             additionalArgs: [{ name: 'storage.tsdb.max-block-duration', value: '1d' }],
+            scrapeNativeHistograms: true,
             storageSpec: {
               volumeClaimTemplate: {
                 ...(hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
@@ -919,14 +916,6 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD',
                 monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.perMember.overMinutes.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.perMember.rate.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

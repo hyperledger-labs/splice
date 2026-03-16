@@ -1156,6 +1156,15 @@ lazy val `apps-scan` =
             pkg = "org.lfdecentralizedtrust.splice.http.v0",
           ),
           ScalaServer(
+            new File(s"apps/scan/src/main/openapi/scan-stream-server.yaml"),
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
+            modules = List("pekko-http-v1.0.0", "circe"),
+            imports = List(
+              "org.lfdecentralizedtrust.splice.scan.admin.http.ResponseEntityGuardrailSupport._"
+            ),
+            customExtraction = true,
+          ),
+          ScalaServer(
             new File(
               "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction-v1.yaml"
             ),
@@ -2128,7 +2137,7 @@ updateTestConfigForParallelRuns := {
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isWithDockerWithoutCantonTest(name: String): Boolean =
-    name.contains("LocalNet") || name.contains("BulkStorageTest")
+    name.contains("LocalNet") || name.contains("BulkStorageTest") || name.contains("S3Upload")
   def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
     name contains "ScanTimeBasedIntegrationTest"
   def isCometBftTest(name: String): Boolean =

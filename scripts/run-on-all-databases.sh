@@ -77,4 +77,5 @@ do
 done
 
 
-echo "Done"
+echo "Done. Run the commands above in a debug shell in the cluster you need."
+echo "You'll need to kubectl cp or create the sql file with the same name in the debug shell."
