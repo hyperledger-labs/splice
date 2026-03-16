@@ -93,7 +93,7 @@ class DomainConnector(
             case Some(serial) =>
               waitForSequencerConnectionsFromScan(clock, serial.serial)
             case None =>
-              logger.info("No registered physicial synchronizer id, using active id from scan")
+              logger.info("No registered physical synchronizer id, using active id from scan")
               retryProvider
                 .getValueWithRetries(
                   RetryFor.Automation,

@@ -37,9 +37,6 @@ monitoring:
       cometbft:
         expectedMaxBlocksPerSecond: 3.5
       confirmationRequests:
-        perMember:
-          overMinutes: 5
-          rate: 3
         total:
           overMinutes: 5
           rate: 25
@@ -59,6 +56,9 @@ monitoring:
         sequencerRetentionDays: 30
       sequencerClientDelay:
         seconds: 90
+      sequencerRateLimits:
+        circuitBreakerStateThreshold: 0.5
+        rejectionRateThreshold: 0
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
@@ -87,6 +87,7 @@ multiValidator:
         memory: '2400Mi'
 operatorDeployment:
   reference:
+<<<<<<< HEAD
     repoUrl: https://github.com/DACH-NY/canton-network-internal
     gitReference: refs/heads/tom-da/basicScratch
     pulumiBaseDir: "splice/cluster/pulumi"
@@ -95,6 +96,16 @@ operatorDeployment:
     spliceRoot: "splice"
     privateConfigsDir: "cluster/configs/configs-private"
     publicConfigsDir: "cluster/configs/configs"
+=======
+    deploymentDir: 'cluster/deployment'
+    gitReference: 'refs/heads/main'
+    privateConfigsDir: 'cluster/configs/configs-private'
+    publicConfigsDir: 'cluster/configs/configs'
+    pulumiBaseDir: 'splice/cluster/pulumi'
+    pulumiStacksDir: 'cluster/stacks/prod'
+    repoUrl: 'https://github.com/DACH-NY/canton-network-internal'
+    spliceRoot: 'splice'
+>>>>>>> 50ffbd79aa15f7b3e49e1dad61bb2a9ace0c69a1
 pulumiProjectConfig:
   default:
     allowDowngrade: true

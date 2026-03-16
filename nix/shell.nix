@@ -108,6 +108,7 @@ let
     deno
     unzip
     which
+    xxd
     zip
 
     # Package required to install daml studio

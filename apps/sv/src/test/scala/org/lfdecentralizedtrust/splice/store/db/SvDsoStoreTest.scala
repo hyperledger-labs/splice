@@ -636,15 +636,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet ++ provider1OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider2OutOfRound.map(_.contractId).toSet ++ provider1OutOfRound
               .map(_.contractId)
               .toSet
           }
@@ -682,15 +684,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet ++ provider2OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider1OutOfRound.map(_.contractId).toSet ++ provider2OutOfRound
               .map(_.contractId)
               .toSet
           }
@@ -730,15 +734,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
               .map(_.contractId)
               .toSet
           }
@@ -781,15 +787,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
               .map(_.contractId)
               .toSet
           }
@@ -979,9 +987,8 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           ignoredExpiredRewardsPartyIds = Set.empty,
         )
       } yield {
-        result should have size 1
-        result.head.closedRoundNumber shouldBe 2
-        result.head.validatorCoupons should have size 3
+        result.loneElement.closedRoundNumber shouldBe 2
+        result.loneElement.validatorCoupons should have size 3
       }
     }
 

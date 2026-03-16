@@ -12,7 +12,6 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
-import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppFoundDsoConfigs_
 import org.lfdecentralizedtrust.splice.console.*
@@ -543,7 +542,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         topologyFreezeTime.toInstant,
         upgradeTime.toInstant,
         serial,
-        ProtocolVersion.v34.toString,
+        sv1Backend.config.localSynchronizerNodes.current.protocolVersion.toString,
       ),
     )
   }

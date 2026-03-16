@@ -9,6 +9,9 @@ deleteRules:
   - orgId: 1
     # wasted traffic
     uid: adw5rd048zf9ca
+  - orgId: 1
+    # Confirmation Requests By Member (replaced by sequencer caps, #2917)
+    uid: 88b8827c8d09
 deleteContactPoints:
   - uid: grafana-default-email
     orgId: 1
