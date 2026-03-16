@@ -11,6 +11,7 @@ import Splice.Api.Token.TransferInstructionV1
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
+import DA.Assert (assertDeadlineExceeded)
 
 -- | A transfer instruction for transferring Amulet tokens pending on receiver
 -- acceptance.
@@ -35,8 +36,8 @@ template AmuletTransferInstruction
       transferInstruction_rejectImpl _self arg =
         abortAmuletTransferInstruction this arg.extraArgs
 
-      transferInstruction_updateImpl _self _arg =
-        fail "AmuletTransferInstruction.updateImpl: not used, and thus not implemented"
+      transferInstruction_updateImpl _self arg =
+        updateAmuletTransferInstruction this arg.extraActors arg.extraArgs
 
       transferInstruction_withdrawImpl _self arg = do
         abortAmuletTransferInstruction this arg.extraArgs
@@ -71,6 +72,17 @@ executeTransferInstr instr extraArgs = do
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 abortAmuletTransferInstruction instr extraArgs = do
+  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
+  senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+  pure TransferInstructionResult with
+    senderChangeCids = senderHoldingCids
+    output = TransferInstructionResult_Failed
+    meta = emptyMetadata
+
+updateAmuletTransferInstruction : AmuletTransferInstruction -> [Party] ->ExtraArgs -> Update TransferInstructionResult
+updateAmuletTransferInstruction instr extraActors extraArgs = do
+  assertMsg "Amulet transfer expiry does not support extra actors" (null extraActors)
+  assertDeadlineExceeded "Transfer.executeBefore" instr.transfer.executeBefore
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
