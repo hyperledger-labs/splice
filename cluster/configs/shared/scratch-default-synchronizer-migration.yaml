@@ -1,7 +1,7 @@
 synchronizerMigration:
   active:
     id: 0
-    version: 0.6.0-snapshot.20260316.2188.0.v8a136bdf
+    version: 0.6.0-snapshot.20260316.2192.0.v46d017d1
     sequencer:
       enableBftSequencer: true
     releaseReference:
