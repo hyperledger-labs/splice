@@ -7,10 +7,10 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
+import org.lfdecentralizedtrust.splice.scan.util
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.definitions
@@ -29,6 +29,8 @@ class HttpTokenStandardAllocationInstructionHandler(
 ) extends v1.Handler[TraceContext]
     with Spanning
     with NamedLogging {
+
+  import HttpTokenStandardAllocationInstructionHandler.*
 
   private val workflowId = this.getClass.getSimpleName
 
@@ -50,6 +52,8 @@ class HttpTokenStandardAllocationInstructionHandler(
                 .asRuntimeException()
             )
           )
+        // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+        externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
       } yield {
         val activeSynchronizerId =
           AmuletConfigSchedule(amuletRules.payload.configSchedule)
@@ -57,71 +61,71 @@ class HttpTokenStandardAllocationInstructionHandler(
             .decentralizedSynchronizer
             .activeSynchronizer
         val excludeDebugFields = body.excludeDebugFields.getOrElse(false)
+        val choiceContextBuilder = new ChoiceContextBuilder(
+          activeSynchronizerId,
+          excludeDebugFields,
+        )
         v1.Resource.GetAllocationFactoryResponseOK(
           definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
-            definitions.ChoiceContext(
-              choiceContextData = io.circe.parser
-                .parse(
-                  new metadatav1.ChoiceContext(
-                    Map(
-                      "amulet-rules" -> amuletRules.contractId.contractId,
-                      "open-round" -> newestOpenRound.contractId.contractId,
-                    ).map[String, metadatav1.AnyValue] { case (k, v) =>
-                      k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                    }.asJava
-                  ).toJson
-                )
-                .getOrElse(
-                  throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
-                ),
-              disclosedContracts = Vector(
-                toTokenStandardDisclosedContract(
-                  externalPartyAmuletRules.contract,
-                  activeSynchronizerId,
-                  excludeDebugFields,
-                ),
-                toTokenStandardDisclosedContract(
-                  amuletRules,
-                  activeSynchronizerId,
-                  excludeDebugFields,
-                ),
-                toTokenStandardDisclosedContract(
-                  newestOpenRound.contract,
-                  activeSynchronizerId,
-                  excludeDebugFields,
-                ),
-              ),
-            ),
+            choiceContextBuilder
+              .addContracts(
+                "amulet-rules" -> amuletRules,
+                "open-round" -> newestOpenRound.contract,
+              )
+              .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO)
+              .disclose(externalPartyAmuletRules.contract)
+              .build(),
           )
         )
       }
     }
   }
+}
 
-  // The HTTP definition of the standard differs from any other
-  private def toTokenStandardDisclosedContract[TCId, T](
-      contract: Contract[TCId, T],
-      synchronizerId: String,
-      excludeDebugFields: Boolean,
-  )(implicit elc: ErrorLoggingContext): definitions.DisclosedContract = {
-    val asHttp = contract.toHttp
-    definitions.DisclosedContract(
-      templateId = asHttp.templateId,
-      contractId = asHttp.contractId,
-      createdEventBlob = asHttp.createdEventBlob,
-      synchronizerId = synchronizerId,
-      debugPackageName =
-        if (excludeDebugFields) None
-        else
-          DarResources
-            .lookupPackageId(contract.identifier.getPackageId)
-            .map(_.metadata.name),
-      debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),
-      debugCreatedAt =
-        if (excludeDebugFields) None
-        else Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+object HttpTokenStandardAllocationInstructionHandler {
+  final class ChoiceContextBuilder(activeSynchronizerId: String, excludeDebugFields: Boolean)(
+      implicit elc: ErrorLoggingContext
+  ) extends util.ChoiceContextBuilder[
+        definitions.DisclosedContract,
+        definitions.ChoiceContext,
+        ChoiceContextBuilder,
+      ](activeSynchronizerId, excludeDebugFields) {
+
+    def build(): definitions.ChoiceContext = definitions.ChoiceContext(
+      choiceContextData = io.circe.parser
+        .parse(
+          new metadatav1.ChoiceContext(contextEntries.asJava).toJson
+        )
+        .getOrElse(
+          throw new RuntimeException("Just-serialized JSON cannot be parsed.")
+        ),
+      disclosedContracts = disclosedContracts.toVector,
     )
-  }
 
+    // The HTTP definition of the standard differs from any other
+    override protected def toTokenStandardDisclosedContract[TCId, T](
+        contract: Contract[TCId, T],
+        synchronizerId: String,
+        excludeDebugFields: Boolean,
+    ): definitions.DisclosedContract = {
+      val asHttp = contract.toHttp
+      definitions.DisclosedContract(
+        templateId = asHttp.templateId,
+        contractId = asHttp.contractId,
+        createdEventBlob = asHttp.createdEventBlob,
+        synchronizerId = synchronizerId,
+        debugPackageName =
+          if (excludeDebugFields) None
+          else
+            DarResources
+              .lookupPackageId(contract.identifier.getPackageId)
+              .map(_.metadata.name),
+        debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),
+        debugCreatedAt =
+          if (excludeDebugFields) None
+          else Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+      )
+    }
+  }
 }

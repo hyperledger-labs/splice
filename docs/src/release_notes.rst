@@ -92,7 +92,7 @@
     - Fix issue where sequencer startup could take more than 10 minutes.
 
     - APIs:
-    
+
       - *BREAKING* The
 
           - ``/v2/updates`` HTTP POST and websocket GET endpoints
@@ -414,6 +414,8 @@
       You can either directly reinstall the new version or first do the reinstall on the old version and then upgrade.
 
 .. release-notes:: 0.5.7
+
+   Daml:
 
   .. important::
 

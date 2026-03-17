@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_operator as v0}
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource as r0
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
+import TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.{
   HttpClient,
   HttpFeatureSupportHandler,
@@ -431,6 +432,8 @@ class HttpSvOperatorHandler(
             .getPartyToParticipant(
               dsoRules.domain,
               party,
+              topologySnapshot =
+                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
             )
           _ <- {
             if (partyToParticipant.mapping.partyId == party) {

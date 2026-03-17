@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
   ConfigurableApp,
 }
@@ -54,11 +53,6 @@ class ScanIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(
-          _.copy(zeroTransferFees = true)
-        )(config)
-      )
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
@@ -617,7 +611,7 @@ class ScanIntegrationTest
     // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
     // replace _ with validatorRewardAmount
     val (appRewardAmount, _) =
-      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, featured = false)
+      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons)
 
     clue("Checking app and validator reward and faucet amounts") {
       eventually() {

@@ -643,7 +643,7 @@
           "name": "cn-mocknet"
         },
         "db": {
-          "volumeSize": "50Gi"
+          "volumeSize": "200Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {

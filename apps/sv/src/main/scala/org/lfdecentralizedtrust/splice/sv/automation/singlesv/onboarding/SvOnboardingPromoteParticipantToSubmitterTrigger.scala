@@ -7,6 +7,7 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import cats.syntax.option.*
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
@@ -62,7 +63,11 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     for {
       dsoRules <- dsoStore.getDsoRules()
       dsoHostingParticipants <- participantAdminConnection
-        .getPartyToParticipant(dsoRules.domain, dsoParty)
+        .getPartyToParticipant(
+          dsoRules.domain,
+          dsoParty,
+          topologySnapshot = TopologySnapshot.Sequenced,
+        )
         .map(_.mapping.participants)
       res <-
         if (dsoHostingParticipants.forall(_.permission == ParticipantPermission.Submission)) {
@@ -167,7 +172,11 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     svs
       .parTraverse { svParty =>
         participantAdminConnection
-          .getPartyToParticipant(dsoRules.domain, svParty)
+          .getPartyToParticipant(
+            dsoRules.domain,
+            svParty,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
       }
       .map(_.flatMap(_.mapping.participants))
   }
@@ -198,7 +207,11 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     for {
       dsoRules <- dsoStore.getDsoRules()
       dsoHostingParticipants <- participantAdminConnection
-        .getPartyToParticipant(dsoRules.domain, dsoParty)
+        .getPartyToParticipant(
+          dsoRules.domain,
+          dsoParty,
+          topologySnapshot = TopologySnapshot.Sequenced,
+        )
         .map(_.mapping.participants)
       notConnected <- isNotConnectedToSync()
     } yield {
