@@ -1132,7 +1132,7 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-
+        require ("expectedDso " <> show transferInsts.expectedDso <> " matches the actualDso " <> show dso) (transferInsts.expectedDso == dso)
         res <- exercise amuletRulesCid (transferInsts with expectedDso = dso)
         pure DsoRules_Amulet_ExpireTransferInstructionsResult with result = res
 
