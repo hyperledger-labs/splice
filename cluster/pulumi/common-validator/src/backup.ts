@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
-  BackupConfig,
   bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
+  BucketConfig,
   config,
   GcpBucket,
   isDevNet,
@@ -19,11 +19,11 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
   : undefined;
 
 export async function readBackupConfig(): Promise<{
-  periodicBackupConfig?: BackupConfig;
+  periodicBackupConfig?: BucketConfig;
   identitiesBackupLocation: { bucket: GcpBucket };
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
 }> {
-  let periodicBackupConfig: BackupConfig | undefined;
+  let periodicBackupConfig: BucketConfig | undefined;
   let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
   // TODO(#3224): Put it in config.yaml like we do for topology snapshots

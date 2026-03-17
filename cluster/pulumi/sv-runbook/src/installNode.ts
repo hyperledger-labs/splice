@@ -4,7 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   ChartValues,
   config,
   exactNamespace,
@@ -190,7 +190,7 @@ type SvConfig = {
   xns: ExactNamespace;
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig;
   onboarding?: ExpectedValidatorOnboarding;
-  backupConfig?: BackupConfig;
+  backupConfig?: BucketConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];

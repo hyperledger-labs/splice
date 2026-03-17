@@ -51,17 +51,17 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+          "json-credentials": "eyJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJ0b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
         }
       },
       "kind": "Secret",
       "metadata": {
-        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "name": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-shared-cn-topology-snapshots",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -3171,13 +3171,13 @@
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
         "periodicTopologySnapshotConfig": {
-          "backupInterval": "24h",
+          "backupInterval": "12h",
           "location": {
             "bucket": {
-              "bucketName": "da-cn-topology-snapshots",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-test",
-              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+              "bucketName": "cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-shared",
+              "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
             },
             "prefix": "mock/sv-1"
           }

@@ -312,6 +312,17 @@ export async function initDumpConfig(): Promise<void> {
                 ...args.inputs,
                 secretData,
               };
+            } else if (args.inputs.secret == 'gcp-topology-snapshot-bucket-sa-key-secret') {
+              const secretData = JSON.stringify({
+                projectId: args.inputs.project,
+                bucketName: 'topology-snapshot-bucket-name',
+                secretName: 'topology-snapshot-bucket-sa-key-secret',
+                jsonCredentials: 'topology-snapshot-bucket-sa-key-secret-creds',
+              });
+              return {
+                ...args.inputs,
+                secretData,
+              };
             } else if (args.inputs.secret == 'artifactory-keys') {
               const secretData = JSON.stringify({
                 username: 'art_user',

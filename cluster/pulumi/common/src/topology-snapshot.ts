@@ -1,19 +1,21 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { BackupConfig, bootstrapDataBucketSpec } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { TopologySnapshotSchema } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { z } from 'zod';
+
+import { bootstrapBucket, BucketConfig } from './buckets';
+import { config } from './config';
 
 export async function topologySnapshotConfig(
   configuration: z.infer<typeof TopologySnapshotSchema>,
   prefix: string
-): Promise<BackupConfig> {
-  const bucketSpec = await bootstrapDataBucketSpec(
+): Promise<BucketConfig> {
+  const gcpSecretName = config.requireEnv('TOPOLOGY_SNAPSHOT_BUCKET_SA_KEY_SECRET');
+  const bucketSpec = await bootstrapBucket(
     configuration.projectId,
-    configuration.bucketName
+    configuration.bucketName,
+    gcpSecretName
   );
-
-  // Note that it backups at most once day (also when backupInterval is less than 24h)
   return {
     backupInterval: configuration.backupInterval,
     location: { bucket: bucketSpec, prefix: prefix },

@@ -633,6 +633,14 @@ function subcmd_install_data_export_bucket_key() {
 
     _install_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
 }
+
+subcommand_whitelist[install_topology_snapshot_bucket_key]='Allocate a topology snapshot SA key for the project and store it in a secret.'
+
+function subcmd_install_topology_snapshot_bucket_key() {
+    _prompt_to_confirm --no-lock
+
+    _install_service_account_key "${TOPOLOGY_SNAPSHOT_BUCKET_SA_KEY_SECRET}" "${TOPOLOGY_SNAPSHOT_BUCKET_SA_IAM_ACCOUNT}"
+}
 ###
 
 function _uninstall_service_account_key() {
