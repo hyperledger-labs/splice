@@ -54,6 +54,26 @@ svs:
               consensus-empty-block-creation-timeout = 500.milliseconds
               min-requests-in-batch = 16
             }
+        - name: ADDITIONAL_CONFIG_HIGH_THROUGHPUT_SETTINGS
+          value: |
+            canton.sequencers.sequencer.sequencer.block.throughput-cap {
+              enabled = true
+              messages = {
+                confirmation-request = {
+                  global-tps-cap = 50
+                  per-client-tps-cap = 25
+                  global-kbps-cap = 20000
+                  per-client-kbps-cap = 10000
+                }
+                topology = {
+                  global-tps-cap = 200
+                  per-client-tps-cap = 10
+                  global-kbps-cap = 2000
+                  per-client-kbps-cap = 500
+                }
+              }
+              strict = false
+            }
     mediator:
       resources:
         limits:
