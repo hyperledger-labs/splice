@@ -14,7 +14,8 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   TopologyAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
+import TopologyAdminConnection.TopologySnapshot
+import TopologyAdminConnection.TopologyTransactionType.AllProposals
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -63,6 +64,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
             currentlyHostingParticipants <- participantAdminConnection.getPartyToParticipant(
               dsoRules.domain,
               dsoParty,
+              topologySnapshot = TopologySnapshot.Sequenced,
             )
             dsoPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
               store = TopologyStoreId.Synchronizer(dsoRules.domain).some,
@@ -140,6 +142,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
     partyToParticipant <- participantAdminConnection.getPartyToParticipant(
       dsoRules.domain,
       dsoParty,
+      topologySnapshot = TopologySnapshot.Sequenced,
     )
   } yield {
     partyToParticipant.base.serial != task.serial

@@ -5,6 +5,7 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{ApiLoggingConfig, FullClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -46,6 +47,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
           synchronizerId,
           dsoParty,
           None,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
     } {
       _.mapping.participantIds.size shouldBe 4

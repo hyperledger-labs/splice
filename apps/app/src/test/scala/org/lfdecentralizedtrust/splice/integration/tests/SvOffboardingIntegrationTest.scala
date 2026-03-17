@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   IsTheCantonSequencerBFTEnabled,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
@@ -222,6 +223,7 @@ class SvOffboardingIntegrationTest
                 .getPartyToParticipant(
                   decentralizedSynchronizerId,
                   sv3Backend.getDsoInfo().dsoParty,
+                  topologySnapshot = TopologySnapshot.Sequenced,
                 )
                 .futureValue
                 .mapping

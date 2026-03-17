@@ -240,7 +240,7 @@ abstract class TopologyAdminConnection(
       // get only active (non-removed) mappings by default; this matches the Canton console defaults
       operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
-      topologySnapshot: TopologySnapshot = TopologySnapshot.Effective,
+      topologySnapshot: TopologySnapshot,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
     findPartyToParticipant(
       synchronizerId,
