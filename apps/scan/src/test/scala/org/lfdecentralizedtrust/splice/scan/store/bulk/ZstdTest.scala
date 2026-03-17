@@ -139,4 +139,31 @@ class ZstdTest extends StoreTestBase {
     }
     succeed
   }
+
+  "handle upstream close when buffer was just flushed" in {
+    // Regression test: when onPush crosses minSize, it pushes (isLast=false) and resets state to empty.
+    // If upstream then completes immediately after, onUpstreamFinish should recognize that there is
+    // no pending user data (hasPendingData=false) and just completeStage() without trying to emit
+    // another element. The downstream stage (e.g., GroupedWeightS3ObjectFlow) handles the upstream
+    // completion via its own onUpstreamFinish handler.
+    val zstdChunkSize = 10L // very small so a single 100-byte input crosses the threshold
+    val (pub, sub) = TestSource
+      .probe[ByteString]
+      .via(ZstdGroupedWeight(3, zstdChunkSize, loggerFactory))
+      .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
+      .run()
+    val randInput = new Array[Byte](100)
+    scala.util.Random.nextBytes(randInput)
+    // This single input is large enough to cross minSize, so onPush will push and reset.
+    pub.sendNext(ByteString.fromArray(randInput))
+    // Complete upstream immediately — after reset, hasPendingData is false so
+    // onUpstreamFinish will just completeStage() without emitting.
+    pub.sendComplete()
+    sub.request(1)
+    val first = sub.expectNext(5.seconds)
+    first.isLast shouldBe false
+    // Stage should now complete without emitting another element
+    sub.expectComplete()
+    succeed
+  }
 }

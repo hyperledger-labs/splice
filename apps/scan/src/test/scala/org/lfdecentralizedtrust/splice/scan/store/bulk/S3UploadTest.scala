@@ -166,5 +166,42 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
         labelLast = false,
       )
     }
+
+    "handle upstream completion without isLast flag" in {
+      // Regression test: GroupedWeightS3ObjectFlow previously relied entirely on the
+      // in-band isLast flag to know when the stream was done. If upstream completed
+      // without sending isLast=true, the uploadCallback would try to pull(in) on a
+      // closed port, crashing with IllegalArgumentException.
+      // The fix: onUpstreamFinish now sets upstreamFinished=true and triggers
+      // finishCurrentObject() when all pending uploads are done.
+      val data = ByteString(Random.nextBytes(100))
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+
+      val (pub, sub) = TestSource
+        .probe[ByteStringWithTermination]
+        .via(
+          GroupedWeightS3ObjectFlow(
+            bucketConnection,
+            getObjectKey = i => s"test_$i",
+            maxObjectSize = 100L, // large enough that one input doesn't fill the object
+            maxParallelPartUploads = 2,
+            loggerFactory,
+          )
+        )
+        .toMat(TestSink.probe[GroupedWeightS3ObjectFlow.Output])(Keep.both)
+        .run()
+
+      // Send data without isLast=true, then complete upstream
+      pub.sendNext(ByteStringWithTermination(data.take(10), isLast = false))
+      pub.sendComplete()
+
+      // The stage should finish the current object and emit it with isLastObject=true
+      sub.request(1)
+      val output = sub.expectNext(10.seconds)
+      output.objectKey shouldBe "test_0"
+      output.isLastObject shouldBe true
+      sub.expectComplete()
+      succeed
+    }
   }
 }

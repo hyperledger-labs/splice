@@ -81,14 +81,16 @@ case class GroupedWeightS3ObjectFlow(
     new GraphStageLogic(shape) with InHandler with OutHandler {
       // The usage of callbacks makes this thread safe, so we use vars here and not Atomic's
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
-      @volatile
       private var state = State.initial()
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
-      @volatile
       private var upstreamFinished = false
 
       private def objectDone =
         upstreamFinished || state.currentObjectSize >= maxObjectSize
+
+      private val failCallback = getAsyncCallback[Throwable] { ex =>
+        failStage(ex)
+      }
 
       private val uploadCallback = getAsyncCallback[Unit] { _ =>
         state = state.completePart()
@@ -96,7 +98,7 @@ case class GroupedWeightS3ObjectFlow(
           s"Part upload completed, waiting for ${state.numPendingPartUploads} more"
         )
         if (state.numPendingPartUploads == maxParallelPartUploads - 1) {
-          if (!objectDone) {
+          if (!objectDone && !isClosed(in)) {
             logger.debug(
               "More parallel upload capacity freed up, and we're not done yet, pull more input"
             )
@@ -156,7 +158,7 @@ case class GroupedWeightS3ObjectFlow(
           )
           curState.currentObject.upload(partNumber, elem.bytes.asByteBuffer).onComplete {
             case Success(_) => uploadCallback.invoke(())
-            case Failure(ex) => failStage(ex)
+            case Failure(ex) => failCallback.invoke(ex)
           }
           if (!objectDone) {
             logger.debug(
@@ -182,12 +184,32 @@ case class GroupedWeightS3ObjectFlow(
       private def finishCurrentObject(): Unit =
         state.currentObject.finish().onComplete {
           case Success(_) => finishCallback.invoke(())
-          case Failure(ex) => failStage(ex)
+          case Failure(ex) => failCallback.invoke(ex)
         }
 
       override def onUpstreamFinish(): Unit = {
         logger.debug("upstream finished")
-        // Note that we're not finishing the stage here, we're doing that above when the last object finishes uploading
+        upstreamFinished = true
+        if (state.numPendingPartUploads == 0) {
+          if (state.currentObjectSize > 0) {
+            // All uploads completed and the current object has data — finish it.
+            logger.debug(
+              s"No pending uploads, finishing current object ${state.currentObject.key}"
+            )
+            finishCurrentObject()
+          } else {
+            // No data was written to the current object (e.g., stream was empty
+            // or upstream closed right after the previous object was finalized).
+            logger.debug("No pending uploads and no data in current object, completing stage.")
+            completeStage()
+          }
+        } else {
+          // Uploads are still in flight — the uploadCallback will trigger
+          // finishCurrentObject() when the last one completes.
+          logger.debug(
+            s"Waiting for ${state.numPendingPartUploads} pending uploads to complete before finishing object ${state.currentObject.key}"
+          )
+        }
       }
 
       setHandlers(in, out, this)

@@ -93,6 +93,12 @@ case class ZstdGroupedWeight(
     new GraphStageLogic(shape) with InHandler with OutHandler {
       private val zstd = new AtomicReference[ZSTD](new ZSTD(compressionLevel))
       private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
+      // Tracks whether any data has been compressed into the current zstd frame
+      // since the last reset (i.e., since the last complete chunk was pushed).
+      // This is needed to distinguish "upstream finished with pending compressed data"
+      // from "upstream finished right after we just flushed a complete chunk".
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      private var hasPendingData: Boolean = false
 
       override def postStop(): Unit = {
         super.postStop()
@@ -103,14 +109,16 @@ case class ZstdGroupedWeight(
 
       private def reset(): Unit = {
         zstd.get().close()
-        zstd.set(new ZSTD(3))
+        zstd.set(new ZSTD(compressionLevel))
         state.set(State.empty())
+        hasPendingData = false
       }
 
       override def onPush(): Unit = {
         val elem = grab(in)
         val compressed = zstd.get().compress(elem)
         state.set(state.get().append(compressed))
+        hasPendingData = true
         logger.debug(
           s"Received input of size ${elem.size}, compressed to ${compressed.size}, current state size is ${state.get().bytes.size}, left is ${state.get().left}"
         )
@@ -139,8 +147,10 @@ case class ZstdGroupedWeight(
       }
 
       override def onUpstreamFinish(): Unit = {
-        logger.debug("Upstream finished")
-        if (state.get().bytes.nonEmpty) {
+        logger.debug(s"Upstream finished, hasPendingData=$hasPendingData")
+        if (hasPendingData) {
+          // There is compressed data in the current zstd frame that hasn't been
+          // pushed yet. Finalize the compressor and try to push.
           state.set(state.get().append(zstd.get().zstdFinish()))
           if (isAvailable(out)) {
             logger.debug(
@@ -150,17 +160,15 @@ case class ZstdGroupedWeight(
             completeStage()
           } else {
             logger.debug(
-              s"Output is not available, waiting to emit final output of size ${state.get().bytes.size} (isLast=true) and complete stage"
+              s"Output is not available, deferring final output of size ${state.get().bytes.size} (isLast=true) to onPull"
             )
+            // Don't completeStage() here — onPull will see isClosed(in), push the
+            // buffered data with isLast=true, and then complete.
           }
         } else {
-          if (isAvailable(out)) {
-            logger.debug(
-              s"No remaining data to emit, but output is available, emitting empty final output and completing stage"
-            )
-            push(out, ByteStringWithTermination(ByteString.empty, true))
-          }
-          logger.debug("Completing stage with no remaining data")
+          // No data has been compressed since the last chunk was pushed (or ever).
+          // Nothing to emit — just complete the stage.
+          logger.debug("No pending data, completing stage")
           completeStage()
         }
       }
