@@ -73,11 +73,16 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
         .getDecentralizedNamespaceDefinition(
           synchronizerId,
           dsoParty.uid.namespace,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
     } { oldMapping =>
       val decentralizedSynchronizerDecentralizedNamespaceDefinition =
         nodes.head.oldParticipantConnection
-          .getDecentralizedNamespaceDefinition(synchronizerId, dsoParty.uid.namespace)
+          .getDecentralizedNamespaceDefinition(
+            synchronizerId,
+            dsoParty.uid.namespace,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
       oldMapping.mapping shouldBe decentralizedSynchronizerDecentralizedNamespaceDefinition.mapping
     }

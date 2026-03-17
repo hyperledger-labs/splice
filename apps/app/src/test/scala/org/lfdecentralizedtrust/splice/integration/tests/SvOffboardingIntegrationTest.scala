@@ -285,7 +285,10 @@ class SvOffboardingIntegrationTest
             clue("Check mediator offboarding") {
               val mediators =
                 sv3Backend.appState.participantAdminConnection
-                  .getMediatorSynchronizerState(decentralizedSynchronizerId)
+                  .getMediatorSynchronizerState(
+                    decentralizedSynchronizerId,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
                   .futureValue
                   .mapping
                   .active
@@ -317,7 +320,10 @@ class SvOffboardingIntegrationTest
             clue("Check sequencer offboarding") {
               val sequencers =
                 sv3Backend.appState.participantAdminConnection
-                  .getSequencerSynchronizerState(decentralizedSynchronizerId)
+                  .getSequencerSynchronizerState(
+                    decentralizedSynchronizerId,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
                   .futureValue
                   .mapping
                   .active
