@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.config.{
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
+import org.lfdecentralizedtrust.splice.store.Limit
 
 trait BaseScanAppConfig {}
 
@@ -80,6 +81,7 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
