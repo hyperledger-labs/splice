@@ -89,6 +89,9 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   override val timeouts = parameters.processingTimeouts
 
+  private val participantTarget =
+    s"${participantClient.ledgerApi.clientConfig.address}:${participantClient.ledgerApi.clientConfig.port.unwrap}"
+
   private val isInitializedVar: AtomicReference[Boolean] = new AtomicReference(false)
 
   protected def isInitialized = isInitializedVar.get()
@@ -165,6 +168,9 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
               logger,
             )
       }
+    logger.info(
+      s"Creating ledger API client to participant at $participantTarget"
+    )
     new SpliceLedgerClient(
       participantClient.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
@@ -181,11 +187,11 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   private def waitForUser(
       connection: BaseLedgerConnection
   )(implicit tc: TraceContext): Future[Unit] = {
-    logger.info(s"Waiting for user $serviceUser")
+    logger.info(s"Waiting for user $serviceUser on participant at $participantTarget")
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
       "wait_user",
-      s"user $serviceUser",
+      s"user $serviceUser on participant at $participantTarget",
       connection.getUser(serviceUser).map(_ => ()),
       logger,
       additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
@@ -279,15 +285,16 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
       .andThen {
         case Success(_) =>
           logger.info(
-            s"$appInitMessage: Initialization complete, running on version ${BuildInfo.compiledVersion}"
+            s"$appInitMessage: Initialization complete (participant: $participantTarget), running on version ${BuildInfo.compiledVersion}"
           )
           isInitializedVar.set(true)
         case Failure(err) if this.isClosing =>
           logger.info(
-            s"$appInitMessage: Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
+            s"$appInitMessage: Ignoring initialization failure (participant: $participantTarget), we are actually shutting down. Message was: ${err.getMessage()}"
           )
         case Failure(err) =>
-          val msg = s"$appInitMessage: Initialization failed"
+          val msg =
+            s"$appInitMessage: Initialization failed (participant: $participantTarget)"
           logger.error(msg, err)
           System.err.println(s"$msg, so exiting; check the application logs for details")
           err.printStackTrace()
