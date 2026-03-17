@@ -26,7 +26,7 @@ class DbScanRewardsReferenceStoreTest
 
   "DbScanRewardsReferenceStore" should {
 
-    "lookupFeaturedAppRightsAsOf and lookupFeaturedAppRightsActiveWithin return correct contracts" in {
+    "lookupFeaturedAppRightsAsOf returns correct contracts" in {
       val store = mkStore()
       val far1 = featuredAppRight(userParty(1))
         .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
@@ -52,7 +52,6 @@ class DbScanRewardsReferenceStoreTest
           store.multiDomainAcsStore
         )
 
-        // lookupFeaturedAppRightsAsOf point-in-time checks
         resultAt50 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(50))
         _ = resultAt50 shouldBe empty
 
@@ -67,70 +66,6 @@ class DbScanRewardsReferenceStoreTest
 
         resultAt400 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(400))
         _ = resultAt400.map(_.contract) shouldBe Seq(far2)
-
-        // lookupFeaturedAppRightsActiveWithin: [100, 400] should return all 3 contracts
-        resultRange_100_400 <- store.lookupFeaturedAppRightsActiveWithin(
-          CantonTimestamp.ofEpochSecond(100),
-          CantonTimestamp.ofEpochSecond(400),
-        )
-        _ = resultRange_100_400
-          .map(_.contractWithState.contract)
-          .toSet shouldBe Set(far1, far2, far3)
-
-        // contractsActiveAsOf on the range result should match lookupFeaturedAppRightsAsOf
-        _ = TcsStore
-          .contractsActiveAsOf(
-            resultRange_100_400,
-            CantonTimestamp.ofEpochSecond(100),
-          ) shouldBe resultAt100
-        _ = TcsStore
-          .contractsActiveAsOf(
-            resultRange_100_400,
-            CantonTimestamp.ofEpochSecond(250),
-          ) shouldBe resultAt250
-        _ = TcsStore
-          .contractsActiveAsOf(
-            resultRange_100_400,
-            CantonTimestamp.ofEpochSecond(300),
-          ) shouldBe resultAt300
-        _ = TcsStore
-          .contractsActiveAsOf(
-            resultRange_100_400,
-            CantonTimestamp.ofEpochSecond(400),
-          ) shouldBe resultAt400
-
-        // Also confirm lookupFeaturedAppRightsActiveWithin for various ranges
-        resultRange_100_200 <- store.lookupFeaturedAppRightsActiveWithin(
-          CantonTimestamp.ofEpochSecond(100),
-          CantonTimestamp.ofEpochSecond(200),
-        )
-        _ = resultRange_100_200
-          .map(_.contractWithState.contract)
-          .toSet shouldBe Set(far1, far2)
-
-        resultRange_100_300 <- store.lookupFeaturedAppRightsActiveWithin(
-          CantonTimestamp.ofEpochSecond(100),
-          CantonTimestamp.ofEpochSecond(300),
-        )
-        _ = resultRange_100_300
-          .map(_.contractWithState.contract)
-          .toSet shouldBe Set(far1, far2, far3)
-
-        resultRange_200_300 <- store.lookupFeaturedAppRightsActiveWithin(
-          CantonTimestamp.ofEpochSecond(200),
-          CantonTimestamp.ofEpochSecond(300),
-        )
-        _ = resultRange_200_300
-          .map(_.contractWithState.contract)
-          .toSet shouldBe Set(far1, far2, far3)
-
-        resultRange_300_400 <- store.lookupFeaturedAppRightsActiveWithin(
-          CantonTimestamp.ofEpochSecond(300),
-          CantonTimestamp.ofEpochSecond(400),
-        )
-        _ = resultRange_300_400
-          .map(_.contractWithState.contract)
-          .toSet shouldBe Set(far2, far3)
       } yield succeed
     }
 

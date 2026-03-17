@@ -59,21 +59,6 @@ class DbScanRewardsReferenceStore(
     )
     with ScanRewardsReferenceStore {
 
-  def lookupFeaturedAppRightsActiveWithin(
-      lowerBoundIncl: CantonTimestamp,
-      upperBoundIncl: CantonTimestamp,
-  )(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[TcsStore.TemporalContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]
-  ] =
-    multiDomainAcsStore.listAllContractsActiveWithin(
-      FeaturedAppRight.COMPANION,
-      lowerBoundIncl,
-      upperBoundIncl,
-      synchronizerId,
-    )
-
   def lookupOpenMiningRoundsActiveWithin(
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
