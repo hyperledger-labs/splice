@@ -57,6 +57,7 @@ services:
       - app-provider
       - app-user
       - sv
+      - multi-sync
 
   nginx:
     image: "nginx:${NGINX_VERSION}"
@@ -130,6 +131,7 @@ services:
       - app-provider
       - app-user
       - sv
+      - multi-sync
 
   splice:
     image: "${IMAGE_REPO}splice-app:${IMAGE_TAG}"
@@ -166,12 +168,15 @@ services:
       - app-provider
       - app-user
       - sv
+      - multi-sync
 
   console:
     build:
       context: ${LOCALNET_DIR}/docker/console
       args:
         BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
+    environment:
+      - MULTI_SYNC=false
     env_file:
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
@@ -189,6 +194,18 @@ services:
     tty: true
     profiles:
       - console
+
+  multi-sync-startup:
+    extends:
+      service: console
+    container_name: multi-sync-startup
+    environment:
+      - MULTI_SYNC=true
+    depends_on:
+      splice:
+        condition: service_healthy
+    profiles:
+      - multi-sync
 
   swagger-ui:
     image: swaggerapi/swagger-ui

@@ -4,6 +4,14 @@
 
 set -eou pipefail
 
+CONSOLE_OP=""
+CONSOLE_SCRIPT=""
+if [[ $MULTI_SYNC == true ]]; then
+  echo "Running in multi synchronizer mode"
+  CONSOLE_OP="run"
+  CONSOLE_SCRIPT="/app/app-synchronizer.sc"
+fi
+
 generate_jwt() {
   local sub="$1"
   local aud="$2"
@@ -22,4 +30,4 @@ for script in /app/pre-startup/on/*.sh; do
 # shellcheck disable=SC1090
   [ -f "$script" ] && source "$script"
 done
-/app/bin/canton --no-tty -c /app/app.conf --bootstrap /app/app-synchronizer.sc
+/app/bin/canton ${CONSOLE_OP} --no-tty -c /app/app.conf ${CONSOLE_SCRIPT}

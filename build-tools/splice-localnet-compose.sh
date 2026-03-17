@@ -40,6 +40,7 @@ DOCKER_COMPOSE_CMD=( docker compose
     --profile sv
     --profile app-provider
     --profile app-user
+    --profile multi-sync
 )
 
 case $ACTION in
