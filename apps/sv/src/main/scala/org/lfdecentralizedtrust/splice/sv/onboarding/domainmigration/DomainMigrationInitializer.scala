@@ -254,8 +254,6 @@ class DomainMigrationInitializer(
       _ <- establishInitialRound(
         readOnlyConnection,
         upgradesConfig,
-        packageVersionSupport,
-        svStore.key.svParty,
       )
       latestKnownSynchronizerParameters <- participantAdminConnection
         .getSynchronizerParametersState(decentralizedSynchronizerId)

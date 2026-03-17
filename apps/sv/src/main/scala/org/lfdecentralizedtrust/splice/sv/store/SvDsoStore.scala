@@ -64,6 +64,7 @@ trait SvDsoStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
+    with ExternalPartyConfigStateStore
     with ActiveVotesStore {
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
@@ -131,6 +132,18 @@ trait SvDsoStore
     ]
   ] =
     lookupAmuletRulesWithOffset().map(_.value)
+
+  def lookupBootstrapExternalPartyConfigStateInstruction()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[
+    splice.dsorules.BootstrapExternalPartyConfigStateInstruction.ContractId,
+    splice.dsorules.BootstrapExternalPartyConfigStateInstruction,
+  ]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(
+        splice.dsorules.BootstrapExternalPartyConfigStateInstruction.COMPANION
+      )
+      .map(_.value.map(_.contract))
 
   def getAmuletRules()(implicit
       tc: TraceContext
@@ -983,6 +996,12 @@ trait SvDsoStore
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
 
+  def listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ]
+
   def listFeaturedAppActivityMarkers(limit: Int)(implicit tc: TraceContext): Future[Seq[Contract[
     splice.amulet.FeaturedAppActivityMarker.ContractId,
     splice.amulet.FeaturedAppActivityMarker,
@@ -1405,6 +1424,19 @@ object SvDsoStore {
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
+      },
+      mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          miningRound = Some(contract.payload.holdingFeesOpenRoundNumber.number),
+        )
+      },
+      mkFilter(splice.dsorules.BootstrapExternalPartyConfigStateInstruction.COMPANION)(co =>
+        co.payload.dso == dso
+      ) {
+        DsoAcsStoreRowData(_)
       },
     )
 

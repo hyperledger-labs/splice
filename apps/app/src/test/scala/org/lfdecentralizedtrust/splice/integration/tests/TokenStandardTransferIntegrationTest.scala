@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAllScanAppConfigs_,
-  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType as HttpTransactionType
@@ -22,7 +21,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
-import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
@@ -32,7 +31,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 }
 
 import java.util.UUID
-import scala.jdk.CollectionConverters.*
 
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
@@ -50,11 +48,6 @@ class TokenStandardTransferIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
-        )(config)
-      )
-      .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(
-          _.copy(zeroTransferFees = true)
         )(config)
       )
       .addConfigTransforms((_, config) =>
@@ -399,26 +392,10 @@ class TokenStandardTransferIntegrationTest
       // Wait until expiry is reached. A time-based test would be a bit cleaner but
       // environment setup is slower than sleeping for 5s so we do it here anyway.
       Threading.sleep(5000)
-      val openRound = sv1ScanBackend.getLatestOpenMiningRound(env.environment.clock.now)
       // We don't have a locked expiry trigger atm so trigger expiry manually.
       actAndCheck(
         "Alice expires locked amulet",
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitJava(
-            Seq(aliceParty),
-            commands = locked.contract.contractId
-              .exerciseLockedAmulet_OwnerExpireLock(
-                openRound.contractId
-              )
-              .commands()
-              .asScala
-              .toSeq,
-            disclosedContracts = DisclosedContracts
-              .forTesting(
-                openRound
-              )
-              .toLedgerApiDisclosedContracts,
-          ),
+        ownerExpireLock(aliceParty, locked.contract.contractId),
       )(
         "Scan ingests update",
         _ => {

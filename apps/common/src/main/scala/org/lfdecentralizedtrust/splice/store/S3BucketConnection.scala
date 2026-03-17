@@ -4,9 +4,12 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.async.AsyncRequestBody
+import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
@@ -48,6 +51,20 @@ class S3BucketConnection(
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+
+  def readObject(
+      key: String
+  )(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+
+    s3Client
+      .getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
+      .asScala
+      .map { publisher =>
+        org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
+      }
+      .map { _.map(ByteString.fromByteBuffer) }
+  }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */

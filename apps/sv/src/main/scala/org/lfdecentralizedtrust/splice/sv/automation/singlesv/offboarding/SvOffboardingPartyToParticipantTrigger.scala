@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
@@ -53,6 +54,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .getPartyToParticipant(
           dsoRules.domain,
           dsoParty,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
         .map(_.mapping.participantIds)
     } yield currentHostingParticipantIds.filter(e => offboardedParticipants.contains(e))
@@ -86,6 +88,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .getPartyToParticipant(
           dsoRules.domain,
           dsoParty,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
       notConnected <- isNotConnectedToSync()
     } yield {

@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   bumpUrl,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithIsolatedEnvironment,
@@ -330,7 +331,11 @@ class SvReonboardingIntegrationTest
               sv3Party,
             ).map(_.toProtoPrimitive)
             val mapping = sv1Backend.appState.participantAdminConnection
-              .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
+              .getPartyToParticipant(
+                decentralizedSynchronizerId,
+                sv1Backend.getDsoInfo().dsoParty,
+                topologySnapshot = TopologySnapshot.Sequenced,
+              )
               .futureValue
               .mapping
             mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
@@ -430,7 +435,11 @@ class SvReonboardingIntegrationTest
           .name shouldBe sv4Name
 
         val mapping = sv1Backend.appState.participantAdminConnection
-          .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
+          .getPartyToParticipant(
+            decentralizedSynchronizerId,
+            sv1Backend.getDsoInfo().dsoParty,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
         mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
@@ -505,6 +514,7 @@ class SvReonboardingIntegrationTest
             .getPartyToParticipant(
               decentralizedSynchronizerId,
               sv4Party,
+              topologySnapshot = TopologySnapshot.Sequenced,
             )
             .futureValue
             .mapping

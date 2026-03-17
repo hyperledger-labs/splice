@@ -404,6 +404,7 @@ networkWide:
   maxVettingDelay: 1m
 validators:
   validator-runbook:
+    postgresPvcSize: '200Gi'
     partyAllocator:
       enable: true
       maxParties: 1234

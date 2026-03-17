@@ -115,11 +115,36 @@ class NodeInitializer(
       // Note that Canton nodes enable their endpoints one at a time, and return NOT_IMPLEMENTED while an endpoint
       // is not yet enabled. E.g., even if a node returned something to a getStatus() request, it might still fail
       // a subsequent getId() request with NOT_IMPLEMENTED.
+      //
+      // Because initialized == uniqueIdentifier.isDefined, we cannot distinguish between:
+      //   (a) no ID has been set yet (node has fully booted and is waiting for an ID), and
+      //   (b) the node is still booting and hasn't yet loaded its previously-set ID.
+      // To disambiguate, we cross-check with the status endpoint:
+
       nodeId <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "node_id",
-        s"${connection.serviceName} answers the getId request",
-        connection.getIdOption(),
+        s"${connection.serviceName} answers the getId request with an ID or confirms uninitialized state",
+        connection.getIdOption().flatMap { result =>
+          if (result.uniqueIdentifier.isDefined || result.initialized) {
+            Future.successful(result)
+          } else {
+            // No ID set yet according to GetId. Check the status endpoint to determine whether
+            // the node is genuinely waiting for an ID. If not we assume that it is still bootstrapping.
+            connection.getStatus.flatMap {
+              case NodeStatus.NotInitialized(_, Some(WaitingForId)) =>
+                Future.successful(result)
+              case status =>
+                Future.failed(
+                  Status.UNAVAILABLE
+                    .withDescription(
+                      s"Node is still bootstrapping (status: $status). Retrying getId..."
+                    )
+                    .asRuntimeException()
+                )
+            }
+          }
+        },
         logger,
       )
       _ <- nodeId.uniqueIdentifier match {
