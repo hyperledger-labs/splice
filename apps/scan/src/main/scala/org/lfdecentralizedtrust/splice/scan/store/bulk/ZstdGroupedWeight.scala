@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
@@ -22,7 +24,10 @@ case class ByteStringWithTermination(
 case class ZstdGroupedWeight(
     compressionLevel: Int,
     minSize: Long,
-) extends GraphStage[FlowShape[ByteString, ByteStringWithTermination]] {
+    loggerFactory: NamedLoggerFactory,
+)(implicit tc: TraceContext)
+    extends GraphStage[FlowShape[ByteString, ByteStringWithTermination]]
+    with NamedLogging {
   require(minSize > 0, "minSize must be greater than 0")
 
   val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
@@ -106,8 +111,14 @@ case class ZstdGroupedWeight(
         val elem = grab(in)
         val compressed = zstd.get().compress(elem)
         state.set(state.get().append(compressed))
+        logger.debug(
+          s"Received input of size ${elem.size}, compressed to ${compressed.size}, current state size is ${state.get().bytes.size}, left is ${state.get().left}"
+        )
         if (state.get().left <= 0) {
           state.set(state.get().append(zstd.get().zstdFinish()))
+          logger.debug(
+            s"Emitting output of size ${state.get().bytes.size} (isLast=false), resetting state"
+          )
           push(out, ByteStringWithTermination(state.get().bytes, false))
           reset()
         } else {
@@ -117,9 +128,10 @@ case class ZstdGroupedWeight(
 
       override def onPull(): Unit = {
         if (isClosed(in)) {
-          if (state.get().bytes.nonEmpty) {
-            push(out, ByteStringWithTermination(state.get().bytes, true))
-          }
+          logger.debug(
+            s"Upstream is closed in onPull(), emitting remaining data (${state.get().bytes.length} bytes) and completing"
+          )
+          push(out, ByteStringWithTermination(state.get().bytes, true))
           completeStage()
         } else {
           pull(in)
@@ -127,13 +139,28 @@ case class ZstdGroupedWeight(
       }
 
       override def onUpstreamFinish(): Unit = {
+        logger.debug("Upstream finished")
         if (state.get().bytes.nonEmpty) {
           state.set(state.get().append(zstd.get().zstdFinish()))
           if (isAvailable(out)) {
+            logger.debug(
+              s"Emitting final output of size ${state.get().bytes.size} (isLast=true) and completing stage"
+            )
             push(out, ByteStringWithTermination(state.get().bytes, true))
             completeStage()
+          } else {
+            logger.debug(
+              s"Output is not available, waiting to emit final output of size ${state.get().bytes.size} (isLast=true) and complete stage"
+            )
           }
         } else {
+          if (isAvailable(out)) {
+            logger.debug(
+              s"No remaining data to emit, but output is available, emitting empty final output and completing stage"
+            )
+            push(out, ByteStringWithTermination(ByteString.empty, true))
+          }
+          logger.debug("Completing stage with no remaining data")
           completeStage()
         }
       }

@@ -74,7 +74,7 @@ class ZstdTest extends StoreTestBase {
 
       val (pub, sub) = TestSource
         .probe[ByteString]
-        .via(ZstdGroupedWeight(3, zstdChunkSize))
+        .via(ZstdGroupedWeight(3, zstdChunkSize, loggerFactory))
         .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
         .run()
 
@@ -122,7 +122,7 @@ class ZstdTest extends StoreTestBase {
     val zstdChunkSize = 10L
     val (pub, sub) = TestSource
       .probe[ByteString]
-      .via(ZstdGroupedWeight(3, zstdChunkSize))
+      .via(ZstdGroupedWeight(3, zstdChunkSize, loggerFactory))
       .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
       .run()
     val randInput = new Array[Byte](100)

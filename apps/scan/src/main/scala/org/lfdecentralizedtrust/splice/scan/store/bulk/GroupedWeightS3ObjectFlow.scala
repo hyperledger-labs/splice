@@ -123,7 +123,7 @@ case class GroupedWeightS3ObjectFlow(
             isLastObject = upstreamFinished,
           ),
         )
-        if (upstreamFinished) {
+        if (upstreamFinished || isClosed(in)) {
           logger.debug("This was the last input in the stream, completing.")
           completeStage()
         } else {
@@ -135,6 +135,9 @@ case class GroupedWeightS3ObjectFlow(
       override def onPush(): Unit = {
         val elem = grab(in)
         val curState = state
+        logger.debug(
+          s"Received new element of size ${elem.bytes.length} (isLast=${elem.isLast}) from upstream, current object ${curState.currentObject.key} has size ${curState.currentObjectSize} and ${curState.numPendingPartUploads} pending uploads"
+        )
         state = curState.addPart(elem.bytes.length)
         if (elem.isLast) {
           upstreamFinished = true
@@ -171,7 +174,9 @@ case class GroupedWeightS3ObjectFlow(
       }
 
       override def onPull(): Unit = {
-        pull(in)
+        if (!isClosed(in)) {
+          pull(in)
+        }
       }
 
       private def finishCurrentObject(): Unit =
