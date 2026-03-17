@@ -39,6 +39,9 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem
 import java.time.Duration
 import java.util.UUID
 
+// We rely on external party config state tick durations here which are not
+// available before.
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_17
 class WalletTxLogTimeBasedIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -506,9 +509,9 @@ class WalletTxLogTimeBasedIntegrationTest
               inside(value.eventsById.values) { case trees =>
                 forExactly(1, trees) {
                   case TreeEvent.members.ExercisedEvent(value) =>
-                    value.choice should be(
+                    value.choice should (equal(
                       splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLockV2.name
-                    )
+                    ) or equal(splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLock.name))
                   case _ => fail("irrelevant")
                 }
               }

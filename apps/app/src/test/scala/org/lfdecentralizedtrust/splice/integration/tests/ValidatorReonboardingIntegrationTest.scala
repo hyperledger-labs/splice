@@ -11,6 +11,7 @@ import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
 import org.lfdecentralizedtrust.splice.environment.RetryFor
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -221,6 +222,7 @@ trait ValidatorReonboardingIntegrationTestBase
       .getPartyToParticipant(
         decentralizedSynchronizerId,
         partyId,
+        topologySnapshot = TopologySnapshot.Sequenced,
       )
       .futureValue
       .mapping

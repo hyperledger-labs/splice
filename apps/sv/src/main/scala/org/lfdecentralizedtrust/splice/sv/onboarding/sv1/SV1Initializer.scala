@@ -721,6 +721,7 @@ class SV1Initializer(
                     developmentFundManager = sv1Config.developmentFundManager,
                     initialExternalPartyConfigStateTickDuration =
                       sv1Config.initialExternalPartyConfigStateTickDuration,
+                    optValidatorFaucetCap = sv1Config.optValidatorFaucetCap,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,

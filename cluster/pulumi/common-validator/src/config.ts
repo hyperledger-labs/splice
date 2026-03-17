@@ -95,6 +95,7 @@ export const ValidatorNodeConfigSchema = z.object({
     })
     .default({}),
   kms: KmsConfigSchema.optional(),
+  postgresPvcSize: z.string().optional(),
   participantPruningSchedule: z
     .object({
       cron: z.string(),

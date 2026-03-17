@@ -17,6 +17,7 @@ import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -48,6 +49,7 @@ class SvOffboardingSequencerTrigger(
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       currentSequencerState <- participantAdminConnection.getSequencerSynchronizerState(
         rulesAndStates.dsoRules.domain,
+        TopologySnapshot.Sequenced,
         AuthorizedState,
       )
     } yield {
@@ -100,6 +102,7 @@ class SvOffboardingSequencerTrigger(
       dsoRules <- dsoStore.getDsoRules()
       sequencerSyncState <- participantAdminConnection.getSequencerSynchronizerState(
         dsoRules.domain,
+        TopologySnapshot.Sequenced,
         AuthorizedState,
       )
     } yield {

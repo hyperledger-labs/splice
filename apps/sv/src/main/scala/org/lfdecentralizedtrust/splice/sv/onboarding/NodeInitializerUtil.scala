@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.config.{
   UpgradesConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
@@ -442,6 +443,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
             ),
           svcStore.key.dsoParty.uid.namespace,
           AuthorizedState,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
         .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
   } yield isMemberOfDecentralizedNamespace
