@@ -20,12 +20,12 @@
          ================== =======
          name               version
          ================== =======
-         amulet             0.1.17
-         amuletNameService  0.1.18
-         dsoGovernance      0.1.23
-         validatorLifecycle 0.1.6
-         wallet             0.1.18
-         walletPayments     0.1.17
+         amulet             0.1.14
+         amuletNameService  0.1.14
+         dsoGovernance      0.1.19
+         validatorLifecycle 0.1.5
+         wallet             0.1.14
+         walletPayments     0.1.14
          ================== =======
 
     .. important::
