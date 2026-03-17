@@ -588,9 +588,10 @@ class UpdateHistory(
       .map(lengthLimited)
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
-    val safeExternalTransactionHash = sanitizedExtTxnHash(tree.getExternalTransactionHash)
+    val externalTransactionHash = Option(tree.getExternalTransactionHash)
 
     import storage.DbStorageConverters.setParameterOptionalByteArray
+
     (sql"""
       insert into update_history_transactions(
         history_id, update_id, record_time,
@@ -600,7 +601,7 @@ class UpdateHistory(
       values (
         $historyId, $safeUpdateId, $safeRecordTime,
         $safeParticipantOffset, $safeSynchronizerId, $migrationId,
-        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId, $safeExternalTransactionHash
+        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId, $externalTransactionHash
       )
       returning row_id
     """.asUpdateReturning[Long].head)

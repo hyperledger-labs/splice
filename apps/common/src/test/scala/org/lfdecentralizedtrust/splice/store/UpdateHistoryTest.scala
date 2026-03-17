@@ -1013,9 +1013,8 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         val recordDate = Instant.parse("2026-07-02T00:00:00Z")
 
         val store = mkStore(
-          storeName = "null_hash_store",
           externalTransactionHashThresholdTimestamp =
-            Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate)),
+            Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate))
         )
 
         // Simulate receiving null from java APIs and writing it to Scan DB
@@ -1049,9 +1048,8 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         val recordDate = Instant.parse("2026-07-01T00:00:00Z")
 
         val store = mkStore(
-          storeName = "store",
           externalTransactionHashThresholdTimestamp =
-            Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate)),
+            Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate))
         )
 
         val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"

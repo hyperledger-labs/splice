@@ -217,7 +217,7 @@ class ScanApp(
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore.history,
         externalTransactionHashThresholdTimestamp = config.externalTransactionHashThresholdDate
-          .map(s => CantonTimestamp.assertFromInstant(java.time.Instant.parse(s))),
+          .map(s => CantonTimestamp.assertFromInstant(s)),
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,

@@ -50,6 +50,18 @@ trait AcsJdbcTypes {
   ): SetParameter[ByteString] =
     (bs: ByteString, pp: PositionedParameters) => setParameterByteArray.apply(bs.toByteArray, pp)
 
+  /** Binds an Option[ByteString] to a nullable bytea column.
+    * None or empty ByteString → SQL NULL.
+    */
+  protected implicit def optionalByteStringSetParameter(implicit
+      setParameterOptionalByteArray: SetParameter[Option[Array[Byte]]]
+  ): SetParameter[Option[ByteString]] =
+    (obs: Option[ByteString], pp: PositionedParameters) =>
+      setParameterOptionalByteArray.apply(
+        obs.filterNot(_.isEmpty).map(_.toByteArray),
+        pp,
+      )
+
   protected implicit lazy val acsStoreIdJdbcType: JdbcType[AcsStoreId] =
     AcsStoreId.subst(implicitly[BaseColumnType[Int]])
 
@@ -365,24 +377,6 @@ trait AcsJdbcTypes {
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
-
-  /** Transaction hash is SHA-256 (32 bytes), but we apply a relaxed future-proof limit of 1024 bytes just in case.
-    *  The hash is not guaranteed to be present. For consistency with historical data,
-    *  we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
-    */
-  protected def sanitizedExtTxnHash(
-      extTxnHash: ByteString,
-      maxLength: Int = 1024,
-  ): Option[Array[Byte]] = {
-    Option(extTxnHash)
-      .filterNot(_.isEmpty)
-      .map { nonNullExtTxnHash =>
-        val trimmedExtTxnHash =
-          if (nonNullExtTxnHash.size() > maxLength) nonNullExtTxnHash.substring(0, maxLength)
-          else nonNullExtTxnHash
-        trimmedExtTxnHash.toByteArray
-      }
-  }
 
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],

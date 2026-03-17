@@ -43,7 +43,9 @@ class TokenStandardCliIntegrationTest
       // Set externalTransactionHashThresholdDate to a past date so that updates include external transaction hashes
       .addConfigTransforms((_, config) =>
         updateAllScanAppConfigs_(
-          _.copy(externalTransactionHashThresholdDate = Some("2026-02-20T00:00:00Z"))
+          _.copy(externalTransactionHashThresholdDate =
+            Some(java.time.Instant.parse("2026-02-20T00:00:00Z"))
+          )
         )(config)
       )
   }
