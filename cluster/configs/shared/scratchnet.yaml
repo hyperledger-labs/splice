@@ -60,10 +60,10 @@ svs:
               enabled = true
               messages = {
                 confirmation-request = {
-                  global-tps-cap = 50
-                  per-client-tps-cap = 25
+                  global-tps-cap = 100
+                  per-client-tps-cap = 60
                   global-kbps-cap = 20000
-                  per-client-kbps-cap = 10000
+                  per-client-kbps-cap = 12000
                 }
                 topology = {
                   global-tps-cap = 200
