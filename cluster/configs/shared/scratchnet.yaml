@@ -82,5 +82,5 @@ svs:
         clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY
 loadTester:
   enable: true
-  iterationsPerMinute: 360
+  iterationsPerMinute: 720
   minRate: 0.95
