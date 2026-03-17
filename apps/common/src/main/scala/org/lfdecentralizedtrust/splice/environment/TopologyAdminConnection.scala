@@ -48,7 +48,6 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.ExportTopologySnapshotResponse
-import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, TimeQuery}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -240,7 +239,7 @@ abstract class TopologyAdminConnection(
       // get only active (non-removed) mappings by default; this matches the Canton console defaults
       operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
-      topologySnapshot: TopologySnapshot = TopologySnapshot.Effective,
+      topologySnapshot: TopologySnapshot,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
     findPartyToParticipant(
       synchronizerId,
@@ -289,11 +288,16 @@ abstract class TopologyAdminConnection(
 
   def getSequencerSynchronizerState(
       synchronizerId: SynchronizerId,
+      topologySnapshot: TopologySnapshot,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[SequencerSynchronizerState]] =
-    listSequencerSynchronizerState(synchronizerId, HeadState, topologyTransactionType).map { txs =>
+    listSequencerSynchronizerState(
+      synchronizerId,
+      topologySnapshot.timeQuery,
+      topologyTransactionType,
+    ).map { txs =>
       txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
@@ -304,6 +308,7 @@ abstract class TopologyAdminConnection(
 
   def getMediatorSynchronizerState(
       synchronizerId: SynchronizerId,
+      topologySnapshot: TopologySnapshot,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit
       traceContext: TraceContext
@@ -312,6 +317,7 @@ abstract class TopologyAdminConnection(
       TopologyStoreId.Synchronizer(synchronizerId),
       synchronizerId,
       topologyTransactionType,
+      topologySnapshot,
     ).map { txs =>
       txs.headOption
         .getOrElse(
@@ -325,12 +331,14 @@ abstract class TopologyAdminConnection(
       store: TopologyStoreId,
       synchronizerId: SynchronizerId,
       topologyTransactionType: TopologyTransactionType,
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[MediatorSynchronizerState]]] = {
     runCommand(
       store,
       topologyTransactionType,
+      timeQuery = topologySnapshot.timeQuery,
     )(baseQuery =>
       TopologyAdminCommands.Read.ListMediatorSynchronizerState(
         baseQuery,
@@ -343,6 +351,7 @@ abstract class TopologyAdminConnection(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
@@ -350,6 +359,7 @@ abstract class TopologyAdminConnection(
       synchronizerId,
       decentralizedNamespace,
       topologyTransactionType,
+      topologySnapshot,
     ).map { txs =>
       txs.headOption
         .getOrElse(
@@ -365,10 +375,12 @@ abstract class TopologyAdminConnection(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
       topologyTransactionType: TopologyTransactionType,
+      topologySnapshot: TopologySnapshot,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[DecentralizedNamespaceDefinition]]] = {
     runCommand(
       TopologyStoreId.Synchronizer(synchronizerId),
       topologyTransactionType,
+      timeQuery = topologySnapshot.timeQuery,
     )(baseQuery =>
       TopologyAdminCommands.Read.ListDecentralizedNamespaceDefinition(
         baseQuery,
@@ -943,7 +955,11 @@ abstract class TopologyAdminConnection(
       description,
       topologyTransactionType =>
         EitherT(
-          getSequencerSynchronizerState(synchronizerId, topologyTransactionType).map(result => {
+          getSequencerSynchronizerState(
+            synchronizerId,
+            TopologySnapshot.Sequenced,
+            topologyTransactionType,
+          ).map(result => {
             val newSequencers = sequencerChange(result.mapping.active)
             // we need to check the threshold as well because we reset it to 1 in tests (see ResetSequencerSynchronizerStateThreshold)
             val newThreshold = Thresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
@@ -1042,7 +1058,11 @@ abstract class TopologyAdminConnection(
       description,
       topologyTransactionType =>
         EitherT(
-          getMediatorSynchronizerState(synchronizerId, topologyTransactionType).map(result =>
+          getMediatorSynchronizerState(
+            synchronizerId,
+            TopologySnapshot.Sequenced,
+            topologyTransactionType,
+          ).map(result =>
             Either
               .cond(
                 result.mapping.active.forgetNE == mediatorChange(result.mapping.active),
@@ -1144,6 +1164,7 @@ abstract class TopologyAdminConnection(
           decentralizedNamespace,
           ownerChange,
           topologyTransactionType,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
       },
       previous => {
@@ -1166,13 +1187,18 @@ abstract class TopologyAdminConnection(
       decentralizedNamespace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
       topologyType: TopologyTransactionType,
+      topologySnapshot: TopologySnapshot,
   )(implicit tc: TraceContext): EitherT[Future, TopologyResult[
     DecentralizedNamespaceDefinition
   ], TopologyResult[DecentralizedNamespaceDefinition]] = {
     EitherT(
-      getDecentralizedNamespaceDefinition(synchronizerId, decentralizedNamespace, topologyType).map(
-        result =>
-          Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
+      getDecentralizedNamespaceDefinition(
+        synchronizerId,
+        decentralizedNamespace,
+        topologyType,
+        topologySnapshot,
+      ).map(result =>
+        Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
       )
     )
   }

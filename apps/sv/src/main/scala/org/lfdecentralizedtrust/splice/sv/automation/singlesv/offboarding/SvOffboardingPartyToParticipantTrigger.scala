@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -51,6 +52,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .getPartyToParticipant(
           dsoRules.domain,
           dsoParty,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
         .map(_.mapping.participantIds)
     } yield currentHostingParticipantIds.filter(e => offboardedParticipants.contains(e))
@@ -84,6 +86,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .getPartyToParticipant(
           dsoRules.domain,
           dsoParty,
+          topologySnapshot = TopologySnapshot.Sequenced,
         )
     } yield {
       !currentHostingParticipants.mapping.participantIds.contains(task)

@@ -696,7 +696,7 @@ class ParticipantAdminConnection(
       description,
       queryType =>
         EitherT(
-          getPartyToParticipant(synchronizerId, party, None, queryType)
+          getPartyToParticipant(synchronizerId, party, None, queryType, TopologySnapshot.Sequenced)
             .map { result =>
               val newHostingParticipants = participantChange(result.mapping.participants)
               Either.cond(
@@ -748,6 +748,7 @@ class ParticipantAdminConnection(
             synchronizerId,
             party,
             topologyTransactionType = topologyTransactionType,
+            topologySnapshot = TopologySnapshot.Sequenced,
           ).map(result => {
             Either.cond(
               result.mapping.participants

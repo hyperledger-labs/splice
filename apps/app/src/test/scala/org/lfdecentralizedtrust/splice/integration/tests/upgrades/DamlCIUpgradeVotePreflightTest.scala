@@ -49,7 +49,7 @@ class DamlCIUpgradeVotePreflightTest
 
       clue(s"sv1 create vote request") {
         withWebUiSv("sv1") { implicit webDriver =>
-          eventuallyClickOn(id("navlink-votes"))
+          eventuallyClickOn(id("navlink-governance"))
           val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
           dropDownAction.selectByValue("CRARC_SetConfig")
 
@@ -102,7 +102,7 @@ class DamlCIUpgradeVotePreflightTest
         svsF.par.foreach { svF =>
           svF { implicit webDriver =>
             eventuallySucceeds() {
-              eventuallyClickOn(id("navlink-votes"))
+              eventuallyClickOn(id("navlink-governance"))
               eventuallyClickOn(id("tab-panel-action-needed"))
               eventuallyClickOn(className("vote-row-action"))
             }
@@ -116,7 +116,7 @@ class DamlCIUpgradeVotePreflightTest
 
       clue("The request is displayed in the in progress section") {
         withWebUiSv("sv1") { implicit webDriver =>
-          eventuallyClickOn(id("navlink-votes"))
+          eventuallyClickOn(id("navlink-governance"))
           eventuallyClickOn(id("tab-panel-in-progress"))
 
           val tbody = find(id("sv-voting-in-progress-table-body"))

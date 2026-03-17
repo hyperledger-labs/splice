@@ -37,7 +37,10 @@ import org.lfdecentralizedtrust.splice.config.{
   UpgradesConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
+  TopologySnapshot,
+  TopologyTransactionType,
+}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -558,8 +561,13 @@ class JoiningNodeInitializer(
       "submission_rights",
       description,
       for {
+        // We do actually want to be able to submit after this so wait until the effective time.
         dsoPartyHosting <- participantAdminConnection
-          .getPartyToParticipant(synchronizerId, dsoParty)
+          .getPartyToParticipant(
+            synchronizerId,
+            dsoParty,
+            topologySnapshot = TopologySnapshot.Effective,
+          )
       } yield {
         dsoPartyHosting.mapping.participants.find(_.participantId == participantId) match {
           case None =>

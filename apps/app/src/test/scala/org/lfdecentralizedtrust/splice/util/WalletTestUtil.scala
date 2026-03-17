@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
@@ -18,6 +19,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.console.{ValidatorAppBackendReference, *}
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
@@ -1362,6 +1364,46 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           DisclosedContracts.forTesting(amuletRules, openRound).toLedgerApiDisclosedContracts,
       )
     }
+
+  def ownerExpireLock(
+      owner: PartyId,
+      lockedAmuletCid: LockedAmulet.ContractId,
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    if (
+      PackageVersion.assertFromString(
+        sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue.packageConfig.amulet
+      ) >= DarResources.amulet_0_1_17.metadata.version
+    ) {
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitJava(
+          Seq(owner),
+          commands = lockedAmuletCid
+            .exerciseLockedAmulet_OwnerExpireLockV2(
+            )
+            .commands()
+            .asScala
+            .toSeq,
+        )
+    } else {
+      val openRound = sv1ScanBackend.getLatestOpenMiningRound(env.environment.clock.now)
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitJava(
+          Seq(owner),
+          commands = lockedAmuletCid
+            .exerciseLockedAmulet_OwnerExpireLock(
+              openRound.contractId
+            )
+            .commands()
+            .asScala
+            .toSeq,
+          disclosedContracts = DisclosedContracts
+            .forTesting(
+              openRound
+            )
+            .toLedgerApiDisclosedContracts,
+        )
+    }
+  }
 
   // Creating rewards normally can require a fair amount of setup now that fees are gone
   // (the two easiest options are usually either a transfer through a featured TransferPreapproval or
