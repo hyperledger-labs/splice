@@ -50,7 +50,6 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.wallet,
       // this is the first version implementing the token standard
       DarResources.wallet_0_1_9,
-      ignoreRedundantCheck = true,
     )
   }
 
@@ -65,7 +64,6 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.wallet,
       // this is when the description field was added to transfer preapprovals
       DarResources.wallet_0_1_9,
-      ignoreRedundantCheck = true,
     )
   }
 
@@ -123,7 +121,7 @@ trait PackageVersionSupport extends NamedLogging {
       at: CantonTimestamp,
       packageResource: PackageResource,
       dar: DarResource,
-      ignoreRedundantCheck: Boolean = false,
+      ignoreRedundantCheck: Boolean = true,
   )(implicit tc: TraceContext): Future[FeatureSupport] =
     isDarSupported(Seq(packageId -> parties), at, packageResource, dar, ignoreRedundantCheck)
 

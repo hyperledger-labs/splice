@@ -51,15 +51,8 @@ class RewardExpiryIntegrationTest
 
   // Exact config does not matter all that much, just want one that is older than the default versions
   // for at least the amulet package.
-  val initialAmuletPackage = DarResources.amulet_0_1_14
-  private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = initialAmuletPackage.metadata.version.toString,
-    amuletNameServiceVersion = initialAmuletPackage.metadata.version.toString,
-    dsoGovernanceVersion = "0.1.19",
-    validatorLifecycleVersion = "0.1.5",
-    walletVersion = initialAmuletPackage.metadata.version.toString,
-    walletPaymentsVersion = initialAmuletPackage.metadata.version.toString,
-  )
+  val initialAmuletPackage = DarResources.amulet_0_1_17
+  private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

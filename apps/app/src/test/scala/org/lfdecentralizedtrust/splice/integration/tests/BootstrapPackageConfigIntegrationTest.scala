@@ -64,7 +64,7 @@ class BootstrapPackageConfigIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   // Factored out so we can reuse it in the test
-  val initialAmulet: DarResource = DarResources.amulet_0_1_14
+  val initialAmulet: DarResource = DarResources.amulet_0_1_17
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
