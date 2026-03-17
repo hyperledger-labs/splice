@@ -653,6 +653,42 @@ class AcsSnapshotTriggerTest
         )
         .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Done
     }
+
+    "use the backfillingMigrationIdO value" in {
+      // A snapshot with recordTime < targetRecordTime
+      val incrementalSnapshot = IncrementalAcsSnapshot(
+        snapshotId = 1L,
+        historyId = 1L,
+        tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill.tableName,
+        recordTime = snapshotTime2.minusSeconds(100L),
+        migrationId = migration1,
+        targetRecordTime = snapshotTime2,
+      )
+      val recordTimeRange = DomainRecordTimeRange(snapshotTime1, snapshotTime3)
+
+      // Update the incremental snapshot with 30sec worth of data.
+      AcsSnapshotBackfillingTrigger
+        .retrieveTaskForBackfillingMigration(
+          backfillingMigrationIdO = Some(migration1),
+          currentMigrationId = migration4,
+          isHistoryBackfilled = returnForMigration(migration1 -> true),
+          getIncrementalSnapshot = () => Future.successful(Some(incrementalSnapshot)),
+          getLatestSnapshot = unused1,
+          getMinRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.min)),
+          getMaxRecordTime = returnForMigration(migration1 -> Some(recordTimeRange.max)),
+          getPreviousMigrationId = unused1,
+          storageConfig = storageConfig,
+          updateInterval = java.time.Duration.ofSeconds(30L),
+          logger = logger,
+        )
+        .futureValue shouldBe RetrieveTaskForBackfillingMigrationResult.Task(
+        migration1,
+        AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
+          snapshot = incrementalSnapshot,
+          updateUntil = incrementalSnapshot.recordTime.plusSeconds(30L),
+        ),
+      )
+    }
   }
 
   private def storageConfig = ScanStorageConfig(
