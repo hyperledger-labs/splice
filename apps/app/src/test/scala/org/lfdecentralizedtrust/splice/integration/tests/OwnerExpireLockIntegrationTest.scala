@@ -1,12 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.concurrent.Threading
-import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{
-  DisclosedContracts,
   SplitwellTestUtil,
   SvTestUtil,
   TriggerTestUtil,
@@ -60,22 +58,7 @@ class ScanTxLogOwnerExpireLockIntegrationTest
         _ => aliceWalletClient.list().lockedAmulets.loneElement,
       )
       Threading.sleep(5000)
-      val openRound = sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now())
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-        .submitJava(
-          Seq(aliceParty),
-          commands = locked.contract.contractId
-            .exerciseLockedAmulet_OwnerExpireLockV2(
-            )
-            .commands()
-            .asScala
-            .toSeq,
-          disclosedContracts = DisclosedContracts
-            .forTesting(
-              openRound
-            )
-            .toLedgerApiDisclosedContracts,
-        )
+      ownerExpireLock(aliceParty, locked.contract.contractId)
     }
   }
 }

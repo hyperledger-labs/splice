@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.HasExecutionContext
@@ -12,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   holdingv1,
   metadatav1,
 }
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithIsolatedEnvironment,
@@ -28,7 +30,10 @@ import org.lfdecentralizedtrust.splice.util.{
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 import com.digitalasset.canton.util.ShowUtil.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppActivityMarker
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  AppRewardCoupon,
+  FeaturedAppActivityMarker,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
@@ -236,10 +241,28 @@ class TokenStandardAllocationIntegrationTest
         val events = tree.getEventsById().asScala.values
         forExactly(1, events) {
           inside(_) { case c: CreatedEvent =>
-            val decoded = JavaDecodeUtil
-              .decodeCreated(FeaturedAppActivityMarker.COMPANION)(c)
-              .value
-            decoded.data.provider shouldBe allocatedOtcTrade.venueParty.toProtoPrimitive
+            if (
+              PackageVersion.assertFromString(
+                sv1ScanBackend
+                  .getAmuletRules()
+                  .payload
+                  .configSchedule
+                  .initialValue
+                  .packageConfig
+                  .amulet
+              ) >= DarResources.amulet_0_1_17.metadata.version
+            ) {
+              val decoded = JavaDecodeUtil
+                .decodeCreated(FeaturedAppActivityMarker.COMPANION)(c)
+                .value
+              decoded.data.provider shouldBe allocatedOtcTrade.venueParty.toProtoPrimitive
+            } else {
+              val decoded = JavaDecodeUtil
+                .decodeCreated(AppRewardCoupon.COMPANION)(c)
+                .value
+              decoded.data.featured shouldBe true
+              decoded.data.provider shouldBe allocatedOtcTrade.venueParty.toProtoPrimitive
+            }
           }
         }
       },
