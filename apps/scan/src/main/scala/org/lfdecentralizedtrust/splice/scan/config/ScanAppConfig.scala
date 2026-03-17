@@ -74,6 +74,7 @@ case class ScanAppBackendConfig(
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
     updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
+    updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
@@ -81,7 +82,6 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
-    updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
