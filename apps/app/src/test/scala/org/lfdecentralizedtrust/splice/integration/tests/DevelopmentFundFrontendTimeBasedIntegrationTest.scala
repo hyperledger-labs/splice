@@ -302,7 +302,9 @@ class DevelopmentFundFrontendTimeBasedIntegrationTest
               eventually() {
                 val rows = findAll(cssSelector("#coupon-history-table tbody tr")).toSeq
                 rows.nonEmpty shouldBe true
-                rows.exists(row => row.text.contains("Claimed") || row.text.contains("Withdrawn")) shouldBe true
+                rows.exists(row =>
+                  row.text.contains("Claimed") || row.text.contains("Withdrawn")
+                ) shouldBe true
               }
             }
           }
