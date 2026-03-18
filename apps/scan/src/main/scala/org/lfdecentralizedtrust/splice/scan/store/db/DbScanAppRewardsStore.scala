@@ -483,62 +483,46 @@ class DbScanAppRewardsStore(
   }
 
   /** Aggregate per-party and per-round activity totals for the given round from
-    * `app_activity_record_store`, restricted to the supplied featured app parties.
-    * Both inserts use ON CONFLICT DO NOTHING for idempotency.
+    * `app_activity_record_store`.
     */
   def aggregateActivityTotals(
       historyId: Long,
       roundNumber: Long,
-      featuredAppParties: Seq[String],
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
-    if (featuredAppParties.isEmpty) {
-      logger.debug(
-        s"No featured app parties for round $roundNumber; inserting empty round total."
-      )
-      runUpdate(
-        insertEmptyRoundTotal(historyId, roundNumber).map(_ => ()),
-        "appRewards.aggregateActivityTotals-empty",
-      )
-    } else {
-      runUpdate(
-        (insertPartyTotals(historyId, roundNumber, featuredAppParties)
-          >> insertRoundTotals(historyId, roundNumber))
-          .map(_ =>
-            logger.debug(
-              s"Aggregated activity totals for round $roundNumber with ${featuredAppParties.size} featured parties."
-            )
+    runUpdate(
+      (insertPartyTotals(historyId, roundNumber)
+        >> insertRoundTotals(historyId, roundNumber))
+        .map(_ =>
+          logger.debug(
+            s"Aggregated activity totals for round $roundNumber."
           )
-          .transactionally,
-        "appRewards.aggregateActivityTotals",
-      )
-    }
+        )
+        .transactionally,
+      "appRewards.aggregateActivityTotals",
+    )
   }
 
   private def insertPartyTotals(
       historyId: Long,
       roundNumber: Long,
-      featuredAppParties: Seq[String],
   ) = {
-    val isFeaturedParty = inClause("party", featuredAppParties)
-    (sql"""with unnested as (
+    sqlu"""with unnested as (
              select round_number, party, weight
              from app_activity_record_store,
                   lateral unnest(app_provider_parties, app_activity_weights)
                   as party_and_weight(party, weight)
              where round_number = $roundNumber
            ),
-           filtered as (
+           aggregated as (
              select party, sum(weight) as total_weight
              from unnested
-             where""" ++ isFeaturedParty ++
-      sql"""
              group by party
            ),
            numbered as (
              select party, total_weight,
                     (row_number() over (order by party) - 1)::int as seq_num
-             from filtered
+             from aggregated
            )
            insert into #${Tables.appActivityPartyTotals}
              (history_id,
@@ -548,19 +532,6 @@ class DbScanAppRewardsStore(
               app_provider_party)
            select $historyId, $roundNumber, total_weight, seq_num, party
            from numbered
-           on conflict do nothing""").asUpdate
-  }
-
-  private def insertEmptyRoundTotal(
-      historyId: Long,
-      roundNumber: Long,
-  ) = {
-    sqlu"""insert into #${Tables.appActivityRoundTotals}
-             (history_id,
-             round_number,
-             total_round_app_activity_weight,
-             active_app_provider_parties_count)
-           values ($historyId, $roundNumber, 0, 0)
            on conflict do nothing"""
   }
 

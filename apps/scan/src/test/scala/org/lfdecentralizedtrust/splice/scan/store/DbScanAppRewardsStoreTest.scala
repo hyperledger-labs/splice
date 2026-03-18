@@ -301,7 +301,7 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
-        _ <- store.aggregateActivityTotals(historyId, roundNumber, Seq("alice::provider"))
+        _ <- store.aggregateActivityTotals(historyId, roundNumber)
         partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
         roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
       } yield {
@@ -331,11 +331,7 @@ class DbScanAppRewardsStoreTest
           Seq("alice::provider", "charlie::provider"),
           Seq(100L, 400L),
         )
-        _ <- store.aggregateActivityTotals(
-          historyId,
-          roundNumber,
-          Seq("alice::provider", "bob::provider", "charlie::provider"),
-        )
+        _ <- store.aggregateActivityTotals(historyId, roundNumber)
         partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
         roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
       } yield {
@@ -358,34 +354,11 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    "aggregateActivityTotals — non-featured party excluded" in {
-      for {
-        (store, historyId) <- newStore()
-        _ <- insertActivityRecord(
-          historyId,
-          roundNumber,
-          Seq("alice::provider", "notfeatured::provider"),
-          Seq(200L, 800L),
-        )
-        // Only alice is featured
-        _ <- store.aggregateActivityTotals(historyId, roundNumber, Seq("alice::provider"))
-        partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
-        roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
-      } yield {
-        partyTotals should have size 1
-        partyTotals.head.appProviderParty shouldBe "alice::provider"
-        partyTotals.head.totalAppActivityWeight shouldBe 200L
-
-        roundTotal.value.totalRoundAppActivityWeight shouldBe 200L
-        roundTotal.value.activeAppProviderPartiesCount shouldBe 1L
-      }
-    }
-
-    "aggregateActivityTotals — empty round produces no rows" in {
+    "aggregateActivityTotals — empty round produces zero totals" in {
       for {
         (store, historyId) <- newStore()
         // No activity records for this round
-        _ <- store.aggregateActivityTotals(historyId, roundNumber, Seq("alice::provider"))
+        _ <- store.aggregateActivityTotals(historyId, roundNumber)
         partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
         roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
       } yield {
@@ -399,9 +372,9 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
-        _ <- store.aggregateActivityTotals(historyId, roundNumber, Seq("alice::provider"))
+        _ <- store.aggregateActivityTotals(historyId, roundNumber)
         // Run again — ON CONFLICT DO NOTHING
-        _ <- store.aggregateActivityTotals(historyId, roundNumber, Seq("alice::provider"))
+        _ <- store.aggregateActivityTotals(historyId, roundNumber)
         partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
         roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
       } yield {
@@ -427,8 +400,8 @@ class DbScanAppRewardsStoreTest
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
         _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        _ <- store.aggregateActivityTotals(historyId, 10L, Seq("alice::provider"))
-        _ <- store.aggregateActivityTotals(historyId, 20L, Seq("alice::provider"))
+        _ <- store.aggregateActivityTotals(historyId, 10L)
+        _ <- store.aggregateActivityTotals(historyId, 20L)
         earliest <- store.getEarliestActivityRound(historyId)
       } yield {
         earliest.value shouldBe 10L
