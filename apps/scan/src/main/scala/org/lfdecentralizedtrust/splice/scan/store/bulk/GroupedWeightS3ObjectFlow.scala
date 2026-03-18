@@ -132,23 +132,23 @@ case class GroupedWeightS3ObjectFlow(
         state = curState.addPart(elem.length)
         val partNumber = curState.currentObject.prepareUploadNext(elem.asByteBuffer)
         logger.debug(
-          s"Received ${elem.length} bytes uploading as part $partNumber of object ${curState.currentObject.key}"
+          s"Received ${elem.length} bytes. Uploading as part $partNumber of object ${curState.currentObject.key}"
         )
         curState.currentObject.upload(partNumber, elem.asByteBuffer).onComplete {
           case Success(_) => uploadCallback.invoke(())
           case Failure(ex) => failCallback.invoke(ex)
         }
-        if (!objectDone) {
+        if (objectDone) {
+          logger.trace(
+            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, done with this object"
+          )
+        } else {
           logger.trace(
             s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, not done with it yet"
           )
           if (state.numPendingPartUploads < maxParallelPartUploads) {
             pull(in)
           }
-        } else {
-          logger.trace(
-            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, done with this object"
-          )
         }
       }
 
