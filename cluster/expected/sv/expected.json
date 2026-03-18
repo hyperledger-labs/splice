@@ -348,7 +348,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -588,7 +588,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -857,7 +857,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
