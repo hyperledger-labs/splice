@@ -110,7 +110,7 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Making sure canton node has an identity")
-    var idDeadline: Option[Deadline] = None
+    val deadline = 5.seconds.fromNow
     for {
       // If the node was started concurrently with the app, it might not immediately be responding, so we're
       // retrying the getId() call.
@@ -121,7 +121,7 @@ class NodeInitializer(
       nodeId <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "node_id",
-        s"${connection.serviceName} answers the getId request with an ID or confirms uninitialized state",
+        s"${connection.serviceName} answers the getId request",
         connection.getIdOption().flatMap { result =>
           if (result.uniqueIdentifier.isDefined || result.initialized) {
             Future.successful(result)
@@ -132,11 +132,6 @@ class NodeInitializer(
             // as a (temporary) work around, if participant has no id set, we retry getId for a maximum of 5s duration
             // we chose 5s, because, according to logs, 5s is enough for the participant to set it's id, if it already has one
 
-            val deadline = idDeadline.getOrElse {
-              val d = 5.seconds.fromNow
-              idDeadline = Some(d)
-              d
-            }
             if (deadline.hasTimeLeft()) {
               Future.failed(
                 Status.UNAVAILABLE
