@@ -208,7 +208,7 @@ svs:
       topology:
         backupInterval: '12h'
         bucketName: 'cn-topology-snapshots'
-        bucketSaKeySecret: 'gcp-bucket-sa-key-secret'
+        bucketSaKeySecret: 'gcp-topology-snapshot-bucket-sa-key-secret'
         bucketSaIamAccount: 'da-cn-example@da-cn-shared.iam.gserviceaccount.com'
         projectId: 'da-cn-shared'
     logging:
