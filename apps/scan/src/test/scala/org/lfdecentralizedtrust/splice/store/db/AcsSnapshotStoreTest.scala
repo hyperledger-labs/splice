@@ -1049,16 +1049,36 @@ class AcsSnapshotStoreTest
       }
 
       "initialize from snapshot" in {
+        val c1 = amuletRules()
+        val c2 = amulet(providerParty(2), 1, 1L, 0.1)
+        val c3 = amulet(providerParty(3), 1, 1L, 0.1)
+
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
-          _ <- ingestCreate(
-            updateHistory,
-            amuletRules(),
-            timestamp1.minusSeconds(1L),
-          )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-          snapshot1 <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
+
+          snapshot1 <- clueF(s"Create non-incremental snapshot")(for {
+            _ <- ingestCreate(
+              updateHistory,
+              c1,
+              timestamp1.minusSeconds(3L),
+            )
+            _ <- ingestCreate(
+              updateHistory,
+              c2,
+              timestamp1.minusSeconds(2L),
+            )
+            _ <- ingestCreate(
+              updateHistory,
+              c3,
+              timestamp1.minusSeconds(1L),
+            )
+            _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+            snapshot1 <- store.lookupSnapshotAtOrBefore(
+              DefaultMigrationId,
+              CantonTimestamp.MaxValue,
+            )
+          } yield snapshot1)
 
           _ <- store.initializeIncrementalSnapshot(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
@@ -1072,6 +1092,37 @@ class AcsSnapshotStoreTest
           incrementalSnapshotB <- store.getIncrementalSnapshot(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
           )
+
+          _ <- clueF(s"Update snapshot")(for {
+            snapshot <- store.getIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            )
+            _ <- store.updateIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              snapshot.value,
+              timestamp2,
+            )
+          } yield ())
+
+          _ <- clueF(s"Save snapshot")(for {
+            snapshot <- store.getIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            )
+            _ <- store.saveIncrementalSnapshot(
+              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              snapshot.value,
+              nextSnapshotTargetRecordTime = timestamp3,
+            )
+          } yield ())
+
+          snapshotContent <- store.queryAcsSnapshot(
+            DefaultMigrationId,
+            timestamp2,
+            None,
+            PageLimit.tryCreate(10),
+            Seq.empty,
+            Seq.empty,
+          )
         } yield {
           incrementalSnapshotB shouldBe None
 
@@ -1080,6 +1131,10 @@ class AcsSnapshotStoreTest
           incrementalSnapshotN.value.recordTime shouldBe snapshot1.value.snapshotRecordTime
           incrementalSnapshotN.value.migrationId shouldBe snapshot1.value.migrationId
           incrementalSnapshotN.value.targetRecordTime shouldBe timestamp2
+
+          snapshotContent.createdEventsInPage.map(
+            _.event.getContractId
+          ) should contain theSameElementsInOrderAs Seq(c1, c2, c3).map(_.contractId.contractId)
         }
       }
 
