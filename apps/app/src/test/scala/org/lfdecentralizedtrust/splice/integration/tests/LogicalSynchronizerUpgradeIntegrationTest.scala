@@ -271,7 +271,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         None,
       ),
       participants = false,
-      logSuffix = "global-domain-migration",
+      logSuffix = "global-synchronizer-upgrade",
     )() {
 
       clue(s"wait for lsu announcement") {

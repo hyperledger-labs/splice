@@ -15,12 +15,12 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
   BulkStorageConfig,
   MediatorVerdictIngestionConfig,
-  SequencerTrafficIngestionConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
   ScanSynchronizerConfig,
   ScanSynchronizerNodesConfig,
+  SequencerTrafficIngestionConfig,
   CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
@@ -460,8 +460,8 @@ object SpliceConfig {
       deriveReader[ScanSynchronizerConfig]
     // a bit more elaborate because the automatic derivation wants us to use `p-2p-url`
     implicit val bftSequencerConfigReader: ConfigReader[BftSequencerConfig] =
-      ConfigReader.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(
-        BftSequencerConfig(_, _, _)
+      ConfigReader.forProduct1("p2p-url")(
+        BftSequencerConfig(_)
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
@@ -913,9 +913,7 @@ object SpliceConfig {
       deriveWriter[ScanSynchronizerConfig]
     // a bit more elaborate because the automatic derivation wants us to use `p-2p-url`
     implicit val bftSequencerConfigWriter: ConfigWriter[BftSequencerConfig] =
-      ConfigWriter.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(c =>
-        (c.migrationId, c.sequencerAdminClient, c.p2pUrl)
-      )
+      ConfigWriter.forProduct1("p2p-url")(c => c.p2pUrl)
     implicit val scanSynchronizerNodes: ConfigWriter[ScanSynchronizerNodesConfig] =
       deriveWriter[ScanSynchronizerNodesConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =

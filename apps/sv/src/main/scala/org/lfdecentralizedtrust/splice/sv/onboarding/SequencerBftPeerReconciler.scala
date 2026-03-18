@@ -20,7 +20,6 @@ import scala.util.control.NonFatal
 abstract class SequencerBftPeerReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
-    migrationId: Long,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
 
@@ -29,59 +28,73 @@ abstract class SequencerBftPeerReconciler(
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      sequencers = dsoRulesAndState
-        .currentSynchronizerNodeConfigs()
-        .flatMap(config =>
-          config.sequencerIdentity.toScala
-            .map(_.sequencerId)
-            .orElse(config.sequencer.toScala.map(_.sequencerId))
-        )
-        .flatMap(sequencerId =>
-          SequencerId
-            .fromProtoPrimitive(sequencerId, "sequencerId")
-            .fold(
-              error => {
-                logger.warn(s"Failed to parse sequencer id $sequencerId. $error")
-                None
-              },
-              Some(_),
-            )
-        )
-      dsoSequencersWithoutSelf = sequencers.filter(_ != sequencerId)
-      sequencersFromScan <- getAllBftSequencers()
-      dsoSequencersWithScanInfo = dsoSequencersWithoutSelf.map { sequencerId =>
-        sequencerId -> sequencersFromScan.find(scanSequencer =>
-          scanSequencer.id == sequencerId && scanSequencer.migrationId == migrationId
-        )
-      }
-      // TODO(#1929) Reconsider whether we can really ignore incoming connections.
-      currentPeers <- sequencerAdminConnection.listCurrentOutgoingPeerEndpoints()
-
-      peersToAdd = dsoSequencersWithScanInfo
-        .collect { case (id, Some(config)) =>
-          id -> config
-        }
-        .filterNot { case (dsoSequencerId, peer) =>
-          currentPeers.exists { case (peerSequencerId, endpointId) =>
-            peerSequencerId.forall(_ == dsoSequencerId) && peer.peerId.id == endpointId
+      sequencerInitialized <- sequencerAdminConnection.isNodeInitialized()
+      result <-
+        if (!sequencerInitialized) Future.successful(Seq.empty)
+        else
+          for {
+            psid <- sequencerAdminConnection.getPhysicalSynchronizerId()
+            serialId = psid.serial.unwrap.toLong
+            sequencers = dsoRulesAndState
+              .currentSynchronizerNodeConfigs()
+              .flatMap(config =>
+                config.sequencerIdentity.toScala
+                  .map(_.sequencerId)
+                  .orElse(config.sequencer.toScala.map(_.sequencerId))
+              )
+              .flatMap(sequencerId =>
+                SequencerId
+                  .fromProtoPrimitive(sequencerId, "sequencerId")
+                  .fold(
+                    error => {
+                      logger.warn(s"Failed to parse sequencer id $sequencerId. $error")
+                      None
+                    },
+                    Some(_),
+                  )
+              )
+            dsoSequencersWithoutSelf = sequencers.filter(_ != sequencerId)
+            sequencersFromScan <- getAllBftSequencers()
+            dsoSequencersWithScanInfo = dsoSequencersWithoutSelf.map { sequencerId =>
+              sequencerId -> sequencersFromScan.find(scanSequencer =>
+                scanSequencer.id == sequencerId && scanSequencer.serialId == serialId
+              )
+            }
+            // TODO(#1929) Reconsider whether we can really ignore incoming connections.
+            currentPeers <- sequencerAdminConnection
+              .listCurrentOutgoingPeerEndpoints()
+            peersToAdd = dsoSequencersWithScanInfo
+              .collect { case (id, Some(config)) =>
+                id -> config
+              }
+              .filterNot { case (dsoSequencerId, peer) =>
+                currentPeers.exists { case (peerSequencerId, endpointId) =>
+                  peerSequencerId.forall(_ == dsoSequencerId) && peer.peerId.id == endpointId
+                }
+              }
+            peersToRemove = currentPeers
+              .filterNot {
+                case (Some(peerSequencerId), endpointId) =>
+                  dsoSequencersWithScanInfo.exists { case (sequencerId, config) =>
+                    sequencerId == peerSequencerId && config.forall(_.peerId.id == endpointId)
+                  }
+                case (None, endpointId) =>
+                  dsoSequencersWithScanInfo.exists { case (_, config) =>
+                    config.exists(_.peerId.id == endpointId)
+                  }
+              }
+          } yield {
+            if (peersToAdd.nonEmpty || peersToRemove.nonEmpty)
+              Seq(
+                BftPeerDifference(
+                  peersToAdd.map(_._2.peerId),
+                  peersToRemove.map(_._2),
+                  currentPeers,
+                )
+              )
+            else Seq()
           }
-        }
-      peersToRemove = currentPeers
-        .filterNot {
-          case (Some(peerSequencerId), endpointId) =>
-            dsoSequencersWithScanInfo.exists { case (sequencerId, config) =>
-              sequencerId == peerSequencerId && config.forall(_.peerId.id == endpointId)
-            }
-          case (None, endpointId) =>
-            dsoSequencersWithScanInfo.exists { case (_, config) =>
-              config.exists(_.peerId.id == endpointId)
-            }
-        }
-    } yield {
-      if (peersToAdd.nonEmpty || peersToRemove.nonEmpty)
-        Seq(BftPeerDifference(peersToAdd.map(_._2.peerId), peersToRemove.map(_._2), currentPeers))
-      else Seq()
-    }
+    } yield result
   }
 
   private def getAllBftSequencers()(implicit ec: ExecutionContext, tc: TraceContext) = {
