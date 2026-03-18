@@ -2,6 +2,13 @@ package org.lfdecentralizedtrust.splice.wart
 
 import org.wartremover.{WartTraverser, WartUniverse}
 
+/** Flags calls to `parTraverse`, `parTraverse_`, and `parFlatTraverse` which perform
+  * unbounded parallel traversal. Use `MonadUtil.parTraverseWithLimit` instead.
+  *
+  * Uses name-based matching (like the Println wart) rather than Cats receiver-type matching
+  * because no code in `apps/` defines custom methods with these names, and the type-narrowing
+  * approach would require `cats` as a compile dependency of the wart module.
+  */
 object ParTraverse extends WartTraverser {
   val message =
     "Do not use parTraverse without a parallelism limit. Use MonadUtil.parTraverseWithLimit instead."
