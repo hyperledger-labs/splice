@@ -13,10 +13,7 @@ import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
-class HttpRequestLoggerTest
-    extends AnyWordSpec
-    with BaseTest
-    with ScalatestRouteTest {
+class HttpRequestLoggerTest extends AnyWordSpec with BaseTest with ScalatestRouteTest {
 
   private val apiLoggingConfig = ApiLoggingConfig()
 
@@ -30,34 +27,14 @@ class HttpRequestLoggerTest
     loggerFactory,
   )
 
-  /** Simulates the OLD behavior: HttpRequestLogger is placed inside each sibling route
-    * in a concat. This causes duplicate "received request" log entries because each
-    * sibling's logger fires independently when the request is evaluated.
-    */
-  private def oldStyleRoute: Route =
-    concat(
-      // simulates commonAdminRoute with its own logger
-      loggerDirective {
-        pathPrefix("api" / "admin") {
-          complete(StatusCodes.OK, "admin")
-        }
-      },
-      // simulates app route with its own logger
-      loggerDirective {
-        pathPrefix("api" / "app") {
-          complete(StatusCodes.OK, "app")
-        }
-      },
-    )
-
-  /** Simulates the NEW behavior: a single HttpRequestLogger at the top level
+  /** Simulates the behavior: a single HttpRequestLogger at the top level
     * with handleRejections(loggingRejectionHandler) INSIDE the logger.
     * The logger logs the request and uses mapResponse to log the response.
     * handleRejections seals the route, converting rejections to HTTP responses
     * so mapResponse sees all outcomes. loggingRejectionHandler additionally
     * logs the rejection status code during conversion.
     */
-  private def newStyleRoute: Route =
+  private def route: Route =
     loggerDirective {
       handleRejections(rejectionHandler) {
         concat(
@@ -73,27 +50,10 @@ class HttpRequestLoggerTest
 
   "HttpRequestLogger" should {
 
-    "old style: log duplicate 'received request' for non-matching sibling" in {
+    "log exactly one 'received request' and one response for a matching route" in {
       loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.DEBUG))(
         {
-          Get("/api/app") ~> oldStyleRoute ~> check {
-            status shouldBe StatusCodes.OK
-            responseAs[String] shouldBe "app"
-          }
-        },
-        { logEntries =>
-          // The old style produces two "received request" log lines:
-          // one from the admin route's logger, one from the app route's logger
-          val receivedLogs = logEntries.filter(_.message.contains("received request"))
-          receivedLogs should have size 2
-        },
-      )
-    }
-
-    "new style: log exactly one 'received request' and one response for a matching route" in {
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.DEBUG))(
-        {
-          Get("/api/app") ~> newStyleRoute ~> check {
+          Get("/api/app") ~> route ~> check {
             status shouldBe StatusCodes.OK
             responseAs[String] shouldBe "app"
           }
@@ -114,10 +74,10 @@ class HttpRequestLoggerTest
       )
     }
 
-    "new style: log rejection with status code for a non-matching route" in {
+    "log rejection with status code for a non-matching route" in {
       loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.DEBUG))(
         {
-          Get("/api/unknown") ~> newStyleRoute ~> check {
+          Get("/api/unknown") ~> route ~> check {
             status shouldBe StatusCodes.NotFound
           }
         },
@@ -139,56 +99,7 @@ class HttpRequestLoggerTest
       )
     }
 
-    "old style: log duplicate 'received request' for completely unmatched route" in {
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.DEBUG))(
-        {
-          Get("/api/unknown") ~> Route.seal(oldStyleRoute) ~> check {
-            status shouldBe StatusCodes.NotFound
-          }
-        },
-        { logEntries =>
-          // Both sibling loggers fire "received request"
-          val receivedLogs = logEntries.filter(_.message.contains("received request"))
-          receivedLogs should have size 2
-        },
-      )
-    }
-
-    "old style: log duplicate entries when methods conflict across siblings" in {
-      val oldStyleMethodRoute: Route =
-        concat(
-          loggerDirective {
-            pathPrefix("api" / "data") {
-              post {
-                complete(StatusCodes.OK, "posted")
-              }
-            }
-          },
-          loggerDirective {
-            pathPrefix("api" / "data") {
-              get {
-                complete(StatusCodes.OK, "got")
-              }
-            }
-          },
-        )
-
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.DEBUG))(
-        {
-          Get("/api/data") ~> oldStyleMethodRoute ~> check {
-            status shouldBe StatusCodes.OK
-            responseAs[String] shouldBe "got"
-          }
-        },
-        { logEntries =>
-          // Two "received request" log lines — one per sibling logger
-          val receivedLogs = logEntries.filter(_.message.contains("received request"))
-          receivedLogs should have size 2
-        },
-      )
-    }
-
-    "new style: one log entry per request when methods conflict across siblings" in {
+    "one log entry per request when methods conflict across siblings" in {
       val newStyleMethodRoute: Route =
         loggerDirective {
           handleRejections(rejectionHandler) {

@@ -465,31 +465,31 @@ class ScanApp(
             }
 
             concat(
-                ScanResource.routes(
-                  scanHandler,
-                  buildRouteForOperation(_, "scan"),
-                ),
-                ScanStreamResource.routes(
-                  scanStreamHandler,
-                  buildRouteForOperation(_, "scan_stream"),
-                ),
-                TokenStandardTransferInstructionResource.routes(
-                  tokenStandardTransferInstructionHandler,
-                  buildRouteForOperation(_, "token_standard_transfer_instruction"),
-                ),
-                TokenStandardAllocationInstructionResource.routes(
-                  tokenStandardAllocationInstructionHandler,
-                  buildRouteForOperation(_, "token_standard_allocation_instruction"),
-                ),
-                TokenStandardMetadataResource.routes(
-                  tokenStandardMetadataHandler,
-                  buildRouteForOperation(_, "token_standard_metadata"),
-                ),
-                TokenStandardAllocationResource.routes(
-                  tokenStandardAllocationHandler,
-                  buildRouteForOperation(_, "token_standard_allocation"),
-                ),
-              )
+              ScanResource.routes(
+                scanHandler,
+                buildRouteForOperation(_, "scan"),
+              ),
+              ScanStreamResource.routes(
+                scanStreamHandler,
+                buildRouteForOperation(_, "scan_stream"),
+              ),
+              TokenStandardTransferInstructionResource.routes(
+                tokenStandardTransferInstructionHandler,
+                buildRouteForOperation(_, "token_standard_transfer_instruction"),
+              ),
+              TokenStandardAllocationInstructionResource.routes(
+                tokenStandardAllocationInstructionHandler,
+                buildRouteForOperation(_, "token_standard_allocation_instruction"),
+              ),
+              TokenStandardMetadataResource.routes(
+                tokenStandardMetadataHandler,
+                buildRouteForOperation(_, "token_standard_metadata"),
+              ),
+              TokenStandardAllocationResource.routes(
+                tokenStandardAllocationHandler,
+                buildRouteForOperation(_, "token_standard_allocation"),
+              ),
+            )
           }
         }
       }

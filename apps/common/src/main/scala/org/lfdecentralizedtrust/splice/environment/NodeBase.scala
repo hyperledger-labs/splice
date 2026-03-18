@@ -110,7 +110,6 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
     logger,
   )
 
-
   final def isActive: Boolean = {
     // initialized and the state reports itself as healthy
     isInitialized && initializeF.value.exists(_.toOption.exists(_.isHealthy))

@@ -4,11 +4,7 @@
 package org.lfdecentralizedtrust.splice.admin.api
 
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
-import org.apache.pekko.http.scaladsl.server.{
-  Directive0,
-  RejectionHandler,
-  RequestContext,
-}
+import org.apache.pekko.http.scaladsl.server.{Directive0, RejectionHandler, RequestContext}
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
