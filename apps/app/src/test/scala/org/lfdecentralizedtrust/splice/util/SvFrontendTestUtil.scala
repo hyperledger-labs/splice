@@ -6,10 +6,16 @@ import org.lfdecentralizedtrust.splice.integration.tests.FrontendTestCommon
 trait SvFrontendTestUtil extends TestCommon {
   this: CommonAppInstanceReferences & FrontendTestCommon =>
 
-  def setLegacyExpirationDate(party: String, dateTime: String)(implicit
+  def setLegacyExpiryDate(party: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ) = {
     setDateTime(party, "datetime-picker-vote-request-expiration", dateTime)
+  }
+
+  def setExpiryDate(party: String, formPrefix: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    setDateTime(party, s"$formPrefix-expiry-date", dateTime)
   }
 
   def setLegacyEffectiveDate(party: String, dateTime: String)(implicit

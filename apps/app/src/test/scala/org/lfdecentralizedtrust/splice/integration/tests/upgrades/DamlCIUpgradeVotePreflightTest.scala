@@ -4,7 +4,11 @@ import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.SvUiPreflightIntegrationTestUtil
+import org.lfdecentralizedtrust.splice.util.SvFrontendTestUtil
 import org.openqa.selenium.By
+
+import java.time.{Instant, ZoneOffset}
+import java.time.format.DateTimeFormatter
 
 import scala.collection.parallel.CollectionConverters.*
 import scala.jdk.CollectionConverters.*
@@ -20,7 +24,8 @@ class DamlCIUpgradeVotePreflightTest
       "svda1",
       "sv",
     )
-    with SvUiPreflightIntegrationTestUtil {
+    with SvUiPreflightIntegrationTestUtil
+    with SvFrontendTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
@@ -42,6 +47,10 @@ class DamlCIUpgradeVotePreflightTest
       val validatorLifecycle_current = DarResources.validatorLifecycle_current.metadata.version
 
       val formPrefix = "set-amulet-config-rules"
+      val now = Instant.now()
+      val dateTimeFormat = DateTimeFormatter
+        .ofPattern("yyyy-MM-dd HH:mm")
+        .withZone(ZoneOffset.UTC)
 
       clue(s"sv1 create vote request") {
         withWebUiSv("sv1") { implicit webDriver =>
@@ -67,6 +76,19 @@ class DamlCIUpgradeVotePreflightTest
           eventually() {
             find(id(s"$formPrefix-summary")) should not be empty
           }
+
+          // 20m to be effective so as to give enough time to upgrade the SV and Validator runbooks.
+          // The expiration needs to be enough for SVs to vote, but less than the effective date.
+          setExpiryDate(
+            "sv1",
+            formPrefix,
+            dateTimeFormat.format(now.plusSeconds(60L * 5)),
+          )
+          setEffectiveDate(
+            "sv1",
+            formPrefix,
+            dateTimeFormat.format(now.plusSeconds(60L * 20)),
+          )
 
           Seq(
             "packageConfigAmulet" -> amulet_current,

@@ -626,7 +626,7 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              setLegacyExpirationDate("sv1", expirationDate)
+              setLegacyExpiryDate("sv1", expirationDate)
 
               clickLegacyVoteRequestSubmitButtonOnceEnabled()
             },
