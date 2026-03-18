@@ -81,7 +81,6 @@ case class GroupedWeightS3ObjectFlow(
     new GraphStageLogic(shape) with InHandler with OutHandler {
       // The usage of callbacks makes this thread safe, so we use vars here and not Atomic's
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
-      @volatile
       private var state = State.initial()
 
       private def objectDone = state.currentObjectSize >= maxObjectSize || isClosed(in)

@@ -9,8 +9,6 @@ import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import org.apache.pekko.util.ByteString
 
-import java.util.concurrent.atomic.AtomicReference
-
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
   * Somewhat similar to Pekko's built-in GroupedWeight, but outputs valid zstd compressed objects.
   */
@@ -81,33 +79,35 @@ case class ZstdGroupedWeight(
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
-      private val zstd = new AtomicReference[ZSTD](new ZSTD(compressionLevel))
-      private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      private var zstd = new ZSTD(compressionLevel)
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      private var state = State.empty()
 
       override def postStop(): Unit = {
         super.postStop()
-        if (zstd.get() != null) {
-          zstd.get().close()
+        if (zstd != null) {
+          zstd.close()
         }
       }
 
       private def reset(): Unit = {
-        zstd.get().close()
-        zstd.set(new ZSTD(compressionLevel))
-        state.set(State.empty())
+        zstd.close()
+        zstd = new ZSTD(compressionLevel)
+        state = State.empty()
       }
 
       private def finishAndPush(): Unit = {
-        state.set(state.get().append(zstd.get().zstdFinish()))
-        push(out, state.get().bytes)
+        state = state.append(zstd.zstdFinish())
+        push(out, state.bytes)
         reset()
       }
 
       override def onPush(): Unit = {
         val elem = grab(in)
-        val compressed = zstd.get().compress(elem)
-        state.set(state.get().append(compressed))
-        if (state.get().left <= 0) {
+        val compressed = zstd.compress(elem)
+        state = state.append(compressed)
+        if (state.left <= 0) {
           finishAndPush()
         } else {
           pull(in)
@@ -117,7 +117,7 @@ case class ZstdGroupedWeight(
       override def onPull(): Unit = pull(in)
 
       override def onUpstreamFinish(): Unit = {
-        if (state.get().bytes.nonEmpty) {
+        if (state.bytes.nonEmpty) {
           finishAndPush()
         }
         completeStage()

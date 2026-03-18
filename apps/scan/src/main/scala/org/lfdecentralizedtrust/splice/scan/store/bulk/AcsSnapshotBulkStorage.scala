@@ -105,8 +105,8 @@ class AcsSnapshotBulkStorage(
             logger.info("No dumped snapshots yet, starting from genesis")
             getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
         }
-        .filter { case TimestampWithMigrationId(ts, _) =>
-          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+        .filter { ts =>
+          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts.timestamp)
           if (ret) {
             logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
           } else {
