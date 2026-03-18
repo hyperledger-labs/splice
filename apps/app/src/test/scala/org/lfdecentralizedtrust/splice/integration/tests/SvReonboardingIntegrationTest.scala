@@ -269,7 +269,10 @@ class SvReonboardingIntegrationTest
         ).map(_.toProtoPrimitive)
 
         sv1Backend.appState.participantAdminConnection
-          .getMediatorSynchronizerState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .active
@@ -280,7 +283,10 @@ class SvReonboardingIntegrationTest
           sv4MediatorId,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerSynchronizerState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .active
@@ -344,7 +350,10 @@ class SvReonboardingIntegrationTest
               sv3Backend.participantClient.id,
             )
             sv1Backend.appState.participantAdminConnection
-              .getMediatorSynchronizerState(decentralizedSynchronizerId)
+              .getMediatorSynchronizerState(
+                decentralizedSynchronizerId,
+                topologySnapshot = TopologySnapshot.Sequenced,
+              )
               .futureValue
               .mapping
               .active
@@ -354,7 +363,10 @@ class SvReonboardingIntegrationTest
               sv3MediatorId,
             )
             sv1Backend.appState.participantAdminConnection
-              .getSequencerSynchronizerState(decentralizedSynchronizerId)
+              .getSequencerSynchronizerState(
+                decentralizedSynchronizerId,
+                topologySnapshot = TopologySnapshot.Sequenced,
+              )
               .futureValue
               .mapping
               .active
@@ -453,7 +465,10 @@ class SvReonboardingIntegrationTest
         val sv4SequencerIdNew =
           sv4ReonboardBackend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
         sv1Backend.appState.participantAdminConnection
-          .getMediatorSynchronizerState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .active
@@ -464,7 +479,10 @@ class SvReonboardingIntegrationTest
           sv4MediatorIdNew,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerSynchronizerState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .active
