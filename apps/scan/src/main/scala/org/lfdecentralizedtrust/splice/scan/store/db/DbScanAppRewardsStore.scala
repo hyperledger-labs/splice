@@ -484,6 +484,9 @@ class DbScanAppRewardsStore(
 
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.
+    *
+    * Raises on duplicate key to detect unexpected re-runs; use getNextRoundWithoutRootHash
+    * as a guard to avoid this.
     */
   def aggregateActivityTotals(
       historyId: Long,
@@ -508,7 +511,7 @@ class DbScanAppRewardsStore(
       roundNumber: Long,
   ) = {
     sqlu"""with unnested as (
-             select round_number, party, weight
+             select party, weight
              from app_activity_record_store,
                   lateral unnest(app_provider_parties, app_activity_weights)
                   as party_and_weight(party, weight)
@@ -531,8 +534,7 @@ class DbScanAppRewardsStore(
               app_provider_party_seq_num,
               app_provider_party)
            select $historyId, $roundNumber, total_weight, seq_num, party
-           from numbered
-           on conflict do nothing"""
+           from numbered"""
   }
 
   private def insertRoundTotals(
@@ -550,8 +552,7 @@ class DbScanAppRewardsStore(
                   count(*)
            from #${Tables.appActivityPartyTotals}
            where
-             history_id = $historyId and round_number = $roundNumber
-             on conflict do nothing"""
+             history_id = $historyId and round_number = $roundNumber"""
   }
 
   // -- Private helpers -------------------------------------------------------

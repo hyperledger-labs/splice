@@ -368,19 +368,14 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    "aggregateActivityTotals — idempotent re-run does not duplicate" in {
+    "aggregateActivityTotals — re-run for same round raises error" in {
       for {
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
         _ <- store.aggregateActivityTotals(historyId, roundNumber)
-        // Run again — ON CONFLICT DO NOTHING
-        _ <- store.aggregateActivityTotals(historyId, roundNumber)
-        partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
-        roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
+        result <- store.aggregateActivityTotals(historyId, roundNumber).failed
       } yield {
-        partyTotals should have size 1
-        partyTotals.head.totalAppActivityWeight shouldBe 500L
-        roundTotal.value.totalRoundAppActivityWeight shouldBe 500L
+        result.getMessage should (include("unique constraint") or include("duplicate key"))
       }
     }
 
