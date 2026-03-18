@@ -25,6 +25,7 @@ import Splice.Util
 
 data AmuletAllocation_DsoExpireResult = AmuletAllocation_DsoExpireResult 
   with
+    senderHoldingCids : [ContractId Holding]
     meta : Metadata
   deriving (Show, Eq)
 
@@ -74,9 +75,10 @@ template AmuletAllocation
                 values = TextMap.fromList [(expireLockKey, toAnyValue expireLock)]
               meta = emptyMetadata
 
-        _senderHoldingCids <- unlockAmuletAllocation this extraArgs
+        senderHoldingCids <- unlockAmuletAllocation this extraArgs
 
         pure AmuletAllocation_DsoExpireResult with
+          senderHoldingCids
           meta = Metadata with 
             values = TextMap.fromList [(reasonMetaKey, "expired as settleBefore has passed")]        
 
