@@ -59,7 +59,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         )
       ),
     )
-    new DbTcsStore(acsStore, archiveTableName)
+    new DbTcsStore(acsStore)
   }
 
   protected def c(i: Int): Contract[AppRewardCoupon.ContractId, AppRewardCoupon] =

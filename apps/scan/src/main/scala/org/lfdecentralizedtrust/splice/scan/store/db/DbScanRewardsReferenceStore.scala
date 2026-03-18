@@ -65,8 +65,7 @@ class DbScanRewardsReferenceStore(
     with ScanRewardsReferenceStore {
 
   private val tcsStore = new DbTcsStore(
-    multiDomainAcsStore,
-    ScanRewardsReferenceTables.archiveTableName,
+    multiDomainAcsStore
   )
 
   def lookupOpenMiningRoundsActiveWithin(

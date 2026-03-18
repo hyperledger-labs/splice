@@ -97,7 +97,7 @@ final class DbMultiDomainAcsStore[TXE](
       */
     handleIngestionSummary: IngestionSummary => Unit = _ => (),
     override val defaultLimit: Limit,
-    acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
+    private[db] val acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,

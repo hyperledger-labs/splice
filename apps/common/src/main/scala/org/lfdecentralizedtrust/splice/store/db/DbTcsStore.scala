@@ -17,8 +17,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import scala.concurrent.{ExecutionContext, Future}
 
 class DbTcsStore(
-    val acsStore: DbMultiDomainAcsStore[?],
-    archiveTableName: String,
+    val acsStore: DbMultiDomainAcsStore[?]
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -28,6 +27,13 @@ class DbTcsStore(
     with AcsQueries
     with TcsQueries {
 
+  private val archiveTableName = acsStore.acsArchiveConfigOpt
+    .getOrElse(
+      throw new IllegalArgumentException(
+        "DbTcsStore requires an AcsArchiveConfig on the underlying acsStore"
+      )
+    )
+    .archiveTableName
   private val storage = acsStore.tcsStorage
   private val acsTableName = acsStore.tcsAcsTableName
 
