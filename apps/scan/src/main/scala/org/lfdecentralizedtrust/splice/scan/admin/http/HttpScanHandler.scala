@@ -164,7 +164,7 @@ class HttpScanHandler(
     new java.util.concurrent.ConcurrentHashMap[Int, definitions.SynchronizerBftSequencer]().asScala
 
   private val uninitializedBftSequencersCooldown: Cache[Int, Unit] =
-    Scaffeine().expireAfterWrite(30.seconds).build[Int, Unit]()
+    Scaffeine().expireAfterWrite(10.seconds).build[Int, Unit]()
 
   private implicit val offsetDateTimeCodecInstance: Codec[CantonTimestamp, OffsetDateTime] =
     Codec.OffsetDateTime.instance
