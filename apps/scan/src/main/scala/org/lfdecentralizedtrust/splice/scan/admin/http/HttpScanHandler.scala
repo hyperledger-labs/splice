@@ -2412,24 +2412,15 @@ class HttpScanHandler(
               )
             )
           case Some(roundTotal) =>
-            appRewardsStore
-              .getAppActivityPartyTotalsByRound(updateHistory.historyId, roundNumber)
-              .map { partyTotals =>
-                ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
-                  definitions.GetRewardAccountingActivityTotalsResponse(
-                    roundNumber = roundTotal.roundNumber,
-                    totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
-                    activePartiesCount = roundTotal.activeAppProviderPartiesCount,
-                    partyTotals = partyTotals.map { pt =>
-                      definitions.RewardAccountingPartyActivityTotal(
-                        appProviderParty = pt.appProviderParty,
-                        appProviderPartySeqNum = pt.appProviderPartySeqNum,
-                        totalAppActivityWeight = pt.totalAppActivityWeight,
-                      )
-                    }.toVector,
-                  )
+            Future.successful(
+              ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
+                definitions.GetRewardAccountingActivityTotalsResponse(
+                  roundNumber = roundTotal.roundNumber,
+                  totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
+                  activePartiesCount = roundTotal.activeAppProviderPartiesCount,
                 )
-              }
+              )
+            )
         }
       } yield result
     }

@@ -4045,7 +4045,6 @@ components:
         - round_number
         - total_app_activity_weight
         - active_parties_count
-        - party_totals
       properties:
         round_number:
           type: integer
@@ -4056,24 +4055,3 @@ components:
         active_parties_count:
           type: integer
           format: int64
-        party_totals:
-          type: array
-          items:
-            "$ref": "#/components/schemas/RewardAccountingPartyActivityTotal"
-
-    RewardAccountingPartyActivityTotal:
-      type: object
-      required:
-        - app_provider_party
-        - app_provider_party_seq_num
-        - total_app_activity_weight
-      properties:
-        app_provider_party:
-          type: string
-        app_provider_party_seq_num:
-          type: integer
-          format: int32
-        total_app_activity_weight:
-          type: integer
-          format: int64
-
