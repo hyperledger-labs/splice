@@ -7,8 +7,8 @@ import { clusterSubConfig } from './config';
 const HyperdiskSupportConfigSchema = z.object({
   hyperdiskSupport: z
     .object({
-      enabled: z.boolean().default(false),
-      enabledForInfra: z.boolean().default(false),
+      enabled: z.boolean().default(true),
+      enabledForInfra: z.boolean().default(true),
       migrating: z.boolean().default(false),
       migratingInfra: z.boolean().default(false),
     })
