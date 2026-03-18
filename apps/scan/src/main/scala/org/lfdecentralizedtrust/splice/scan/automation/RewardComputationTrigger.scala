@@ -4,8 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.automation
 
 import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
-import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.scan.store.{ScanAppRewardsStore, ScanStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -18,15 +17,12 @@ import scala.concurrent.{ExecutionContext, Future}
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
   *
-  * Note: FeaturedAppRight filtering is handled upstream by AppActivityComputation,
-  * which only produces activity records for parties with FeaturedAppRight.
-  *
   * TODO(#4384): Add CalculateRewardsV2 / ProcessRewardsV2 contract that gates
   * triggering
   */
 class RewardComputationTrigger(
     store: ScanStore,
-    appRewardsStore: DbScanAppRewardsStore,
+    appRewardsStore: ScanAppRewardsStore,
     updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
 )(implicit val ec: ExecutionContext, val tracer: Tracer)
@@ -44,7 +40,7 @@ class RewardComputationTrigger(
             completedAggregation <- nextRoundO match {
               case Some(nextRound) =>
                 appRewardsStore
-                  .aggregateActivityTotals(historyId, nextRound)
+                  .computeRewards(historyId, nextRound)
                   .map(_ => true)
               case None => Future.successful(false)
             }

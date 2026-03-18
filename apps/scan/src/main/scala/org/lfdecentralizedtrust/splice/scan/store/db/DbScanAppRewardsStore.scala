@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -81,7 +82,8 @@ class DbScanAppRewardsStore(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends NamedLogging
+) extends ScanAppRewardsStore
+    with NamedLogging
     with FlagCloseable
     with HasCloseContext
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries {
@@ -482,13 +484,24 @@ class DbScanAppRewardsStore(
     )
   }
 
+  /** Runs the full reward computation pipeline for a single round.
+    *
+    * TODO(CIP-0104): Will be extended to run CC conversion (stage 2) and
+    * Merkle tree hashing (stage 3) in a single transaction.
+    */
+  def computeRewards(
+      historyId: Long,
+      roundNumber: Long,
+  )(implicit tc: TraceContext): Future[Unit] =
+    aggregateActivityTotals(historyId, roundNumber)
+
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.
     *
     * Raises on duplicate key to detect unexpected re-runs; use getNextRoundWithoutRootHash
     * as a guard to avoid this.
     */
-  def aggregateActivityTotals(
+  private[store] def aggregateActivityTotals(
       historyId: Long,
       roundNumber: Long,
   )(implicit tc: TraceContext): Future[Unit] = {
