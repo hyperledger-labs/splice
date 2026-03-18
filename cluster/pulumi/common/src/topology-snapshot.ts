@@ -4,17 +4,15 @@ import { TopologySnapshotSchema } from '@lfdecentralizedtrust/splice-pulumi-comm
 import { z } from 'zod';
 
 import { bootstrapBucket, BucketConfig } from './buckets';
-import { config } from './config';
 
 export async function topologySnapshotConfig(
   configuration: z.infer<typeof TopologySnapshotSchema>,
   prefix: string
 ): Promise<BucketConfig> {
-  const gcpSecretName = config.requireEnv('TOPOLOGY_SNAPSHOT_BUCKET_SA_KEY_SECRET');
   const bucketSpec = await bootstrapBucket(
     configuration.projectId,
     configuration.bucketName,
-    gcpSecretName
+    configuration.bucketSaKeySecret
   );
   return {
     backupInterval: configuration.backupInterval,

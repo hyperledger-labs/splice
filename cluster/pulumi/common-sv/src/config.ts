@@ -85,9 +85,11 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
 }
 
 export const TopologySnapshotSchema = z.object({
-  projectId: z.string(),
-  bucketName: z.string(),
   backupInterval: z.string(),
+  bucketName: z.string(),
+  bucketSaKeySecret: z.string(),
+  bucketSaIamAccount: z.string(),
+  projectId: z.string(),
 });
 
 export const SvConfigSchema = z.object({
