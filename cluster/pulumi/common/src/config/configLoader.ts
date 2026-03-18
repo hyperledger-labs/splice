@@ -1,8 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as Yaml from 'js-yaml';
-import { existsSync, readFileSync, realpathSync } from 'fs';
-import { merge, mergeWith } from 'lodash';
+import { readFileSync } from 'fs';
+import { mergeWith } from 'lodash';
 import { dirname, join, resolve, sep as pathSeparator } from 'path';
 import { env } from 'process';
 
@@ -150,21 +150,9 @@ class ConfigError extends Error {
 }
 
 export function loadClusterYamlConfig(): unknown {
-  const baseConfig = readAndParseYaml(
-    `${spliceEnvConfig.context.splicePath}/cluster/deployment/config.yaml`
-  );
-  // Load an additional common overrides config if it exists;
-  // if the file is identical to the base config for some reason, loading it will not change anything.
-  // It is resolved against the cluster path with expanded symlinks to ensure that additional
-  // overrides from the internal repository are not applied to clusters defined in splice.
-  const commonOverridesConfigPath = `${realpathSync(spliceEnvConfig.context.clusterPath())}/../config.yaml`;
-  const commonOverridesConfig = existsSync(commonOverridesConfigPath)
-    ? readAndParseYaml(commonOverridesConfigPath)
-    : {};
-  const clusterOverridesConfig = readAndParseYaml(getMainConfigPath());
-  return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
+  return readAndParseYaml(getClusterConfigPath());
 }
 
-export function getMainConfigPath(): string {
+export function getClusterConfigPath(): string {
   return join(spliceEnvConfig.context.clusterPath(), 'config.yaml');
 }
