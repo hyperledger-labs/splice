@@ -3,9 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
-import org.lfdecentralizedtrust.splice.automation.{PollingTrigger, TriggerContext}
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.{
+  PollingParallelTaskExecutionTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import org.lfdecentralizedtrust.splice.scan.store.{ScanAppRewardsStore, ScanStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -25,28 +32,44 @@ class RewardComputationTrigger(
     appRewardsStore: ScanAppRewardsStore,
     updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
-)(implicit val ec: ExecutionContext, val tracer: Tracer)
-    extends PollingTrigger {
+)(implicit
+    override val ec: ExecutionContext,
+    override val tracer: Tracer,
+    mat: Materializer,
+) extends PollingParallelTaskExecutionTrigger[RewardComputationTrigger.Task] {
 
-  def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
+  override def retrieveTasks()(implicit
+      tc: TraceContext
+  ): Future[Seq[RewardComputationTrigger.Task]] = {
     for {
       _ <- updateHistory.waitUntilInitialized
-      historyId = updateHistory.historyId
       lastClosedO <- store.lookupRoundOfLatestData()
-      result <- lastClosedO match {
+      tasks <- lastClosedO match {
         case Some((lastClosed, _)) =>
-          for {
-            nextRoundO <- appRewardsStore.getNextRoundWithoutRootHash(historyId, lastClosed)
-            completedAggregation <- nextRoundO match {
-              case Some(nextRound) =>
-                appRewardsStore
-                  .computeRewards(historyId, nextRound)
-                  .map(_ => true)
-              case None => Future.successful(false)
-            }
-          } yield completedAggregation
-        case None => Future.successful(false)
+          appRewardsStore
+            .getNextRoundWithoutRootHash(updateHistory.historyId, lastClosed)
+            .map(_.toList.map(r => RewardComputationTrigger.Task(r)))
+        case None => Future.successful(Seq.empty)
       }
-    } yield result
+    } yield tasks
+  }
+
+  override protected def completeTask(
+      task: RewardComputationTrigger.Task
+  )(implicit tc: TraceContext): Future[TaskOutcome] =
+    appRewardsStore
+      .computeRewards(updateHistory.historyId, task.roundNumber)
+      .map(_ => TaskSuccess(s"Computed rewards for round ${task.roundNumber}"))
+
+  override protected def isStaleTask(
+      task: RewardComputationTrigger.Task
+  )(implicit tc: TraceContext): Future[Boolean] =
+    Future.successful(false)
+}
+
+object RewardComputationTrigger {
+  final case class Task(roundNumber: Long) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("roundNumber", _.roundNumber))
   }
 }
