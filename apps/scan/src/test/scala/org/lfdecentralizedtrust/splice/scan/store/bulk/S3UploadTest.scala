@@ -4,16 +4,13 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import org.apache.pekko.stream.scaladsl.Keep
-import org.apache.pekko.stream.testkit.{TestPublisher, TestSubscriber}
 import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.store.{HasS3Mock, StoreTestBase}
 
-import scala.concurrent.Future
 import scala.util.Random
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import org.scalatest.Assertion
 
 import java.nio.ByteBuffer
 
@@ -42,19 +39,8 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
 
   "GroupedWeightS3Object" should {
 
-    def testWithInput(
-        inputSizes: Seq[Int],
-        expectedObjectSizes: Seq[Int],
-        checkStreamOutput: (String, Int) => Assertion,
-        runAfterInputs: (
-            TestPublisher.Probe[ByteString],
-            TestSubscriber.Probe[String],
-        ) => Assertion,
-        runAfterOutputs: (
-            TestPublisher.Probe[ByteString],
-            TestSubscriber.Probe[String],
-        ) => Assertion,
-    ): Future[Assertion] = {
+    "just work" in {
+
       val data = ByteString(Random.nextBytes(100))
       val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
 
@@ -76,15 +62,21 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       def sendBytes(n: Int) =
         pub.sendNext(it.getByteString(n))
 
+      val inputSizes =
+        Seq.fill(9)(3) :+ // 9 inputs of size 3, to test the basic functionality
+          7 :+ // add 7 to exactly hit the edge of the object size (10)
+          25 :+ // add an input that does not fit
+          1 // finish with a tiny input
       inputSizes.foreach(sendBytes)
-      runAfterInputs(pub, sub)
+      pub.sendComplete()
 
-      sub.request(expectedObjectSizes.length.toLong)
-      expectedObjectSizes.zipWithIndex.foreach { case (_, i) =>
-        val next = sub.expectNext(20.seconds)
-        checkStreamOutput(next, i)
-      }
-      runAfterOutputs(pub, sub)
+      sub.request(5)
+      val expectedObjectSizes = Seq(12, 12, 10, 25, 1)
+      expectedObjectSizes.indices.foreach(i =>
+        sub.expectNext(20.seconds) shouldBe s"test_$i"
+      )
+      sub.expectComplete()
+
       val s3Objects = bucketConnection.listObjects.futureValue
       val s3ObjKeys = s3Objects.contents.asScala.sortBy(_.key())
       val s3ObjData = s3ObjKeys.map { obj =>
@@ -95,41 +87,35 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       dataFromS3 shouldBe data.take(expectedObjectSizes.sum)
     }
 
-    "just work" in {
-      val inputSizes =
-        Seq.fill(9)(3) :+ // 9 inputs of size 3, to test the basic functionality
-          7 :+ // add 7 to exactly hit the edge of the object size (10)
-          25 :+ // add an input that does not fit
-          1 // finish with a tiny input
-      val expectedObjectSizes = Seq(12, 12, 10, 25, 1)
-      testWithInput(
-        inputSizes,
-        expectedObjectSizes,
-        checkStreamOutput = { (objectKey, i) => objectKey shouldBe s"test_$i" },
-        runAfterInputs = { (_, _) => succeed },
-        runAfterOutputs = { (_, sub) =>
-          sub.expectComplete()
-          succeed
-        },
-      )
-    }
-
     "handle errors correctly" in {
-      val inputSizes = Seq(6, 6, 3)
-      val expectedObjectSizes = Seq(12)
-      testWithInput(
-        inputSizes,
-        expectedObjectSizes,
-        { (objectKey, i) => objectKey shouldBe s"test_$i" },
-        runAfterInputs = { (_, _) => succeed },
-        runAfterOutputs = { (pub, sub) =>
-          sub.request(1)
-          sub.expectNoMessage(20.seconds)
-          pub.sendError(new RuntimeException("Injected error"))
-          sub.expectError()
-          succeed
-        },
-      )
+
+      val data = ByteString(Random.nextBytes(100))
+      val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+
+      val (pub, sub) = TestSource
+        .probe[ByteString]
+        .via(
+          GroupedWeightS3ObjectFlow(
+            bucketConnection,
+            getObjectKey = i => s"test_$i",
+            maxObjectSize = 10L,
+            maxParallelPartUploads = 2,
+            loggerFactory,
+          )
+        )
+        .toMat(TestSink.probe[String])(Keep.both)
+        .run()
+
+      val it = data.iterator
+      def sendBytes(n: Int) =
+        pub.sendNext(it.getByteString(n))
+
+      val inputSizes = Seq(6,6,3)
+      inputSizes.foreach(sendBytes)
+      pub.sendError(new RuntimeException("Injected error"))
+      sub.request(1)
+      sub.expectError()
+      succeed
     }
   }
 }

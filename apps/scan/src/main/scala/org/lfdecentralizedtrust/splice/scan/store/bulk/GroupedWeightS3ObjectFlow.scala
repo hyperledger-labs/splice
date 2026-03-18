@@ -84,7 +84,7 @@ case class GroupedWeightS3ObjectFlow(
       @volatile
       private var state = State.initial()
 
-      private def objectDone = state.currentObjectSize >= maxObjectSize
+      private def objectDone = state.currentObjectSize >= maxObjectSize || isClosed(in)
 
       private val uploadCallback = getAsyncCallback[Unit] { _ =>
         state = state.completePart()
