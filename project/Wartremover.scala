@@ -27,6 +27,7 @@ object Wartremover {
 
   lazy val spliceWarts = Seq(
     wartremoverErrors ++= extraWartRemoverErrors,
+    wartremoverErrors += Wart.custom("org.lfdecentralizedtrust.splice.wart.ParTraverse"),
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `splice-wartremover-extension`
     ),
