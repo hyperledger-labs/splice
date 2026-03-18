@@ -14,11 +14,11 @@ cluster:
     apps:
       maxNodes: 20
       minNodes: 0
-      nodeType: 'e2-standard-16'
+      nodeType: 'n4d-standard-16'
     infra:
       maxNodes: 3
       minNodes: 1
-      nodeType: 'e2-standard-8'
+      nodeType: 'n4d-standard-8'
 infra:
   gkeGateway:
     proxyForIstioHttp: false

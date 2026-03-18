@@ -2743,7 +2743,9 @@
           "name": "cn-mocknet"
         },
         "db": {
-          "volumeSize": "20Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "20Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -2798,6 +2800,9 @@
             "logFormat": "json",
             "storage": {
               "volumeClaimTemplate": {
+                "metadata": {
+                  "name": "alertmanager-hd-pvc"
+                },
                 "spec": {
                   "accessModes": [
                     "ReadWriteOnce"
@@ -2807,7 +2812,7 @@
                       "storage": "5Gi"
                     }
                   },
-                  "storageClassName": "standard-rwo"
+                  "storageClassName": "hyperdisk-standard-rwo"
                 }
               }
             },
@@ -3000,7 +3005,7 @@
             ],
             "enabled": true,
             "size": "5Gi",
-            "storageClassName": "standard-rwo",
+            "storageClassName": "hyperdisk-standard-rwo",
             "type": "pvc"
           },
           "sidecar": {
@@ -3275,6 +3280,9 @@
             },
             "storageSpec": {
               "volumeClaimTemplate": {
+                "metadata": {
+                  "name": "prometheus-hd-pvc"
+                },
                 "spec": {
                   "accessModes": [
                     "ReadWriteOnce"
@@ -3284,7 +3292,7 @@
                       "storage": "2Ti"
                     }
                   },
-                  "storageClassName": "premium-rwo"
+                  "storageClassName": "hyperdisk-balanced-rwo"
                 }
               }
             },
