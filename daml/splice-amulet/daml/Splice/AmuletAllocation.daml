@@ -14,7 +14,11 @@ import Splice.Api.Token.AllocationV1
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
+import Splice.Amulet.TokenApiUtils
 
+data AmuletAllocation_DsoExpireResult = AmuletAllocation_DsoExpireResult with
+    meta : Metadata
+  deriving (Show, Eq)
 
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
@@ -24,6 +28,15 @@ template AmuletAllocation
   where
     signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
     observer allocation.settlement.executor
+
+    choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult
+      controller allocation.settlement.executor
+        -- TODO: pass in flag whether to expire the locked amulet
+      do
+        assertDeadlineExceeded "allocation.settlement.settleBefore" allocation.settlement.settleBefore
+        pure AmuletAllocation_DsoExpireResult
+          with
+            meta = [(reasonMetadataKey, "expired as settleBefore has passed")]
 
     interface instance Allocation for AmuletAllocation where
       view = AllocationView with
