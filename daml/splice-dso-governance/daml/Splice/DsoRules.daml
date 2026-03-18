@@ -1143,6 +1143,7 @@ template DsoRules with
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
 
+    -- Implemented directly in DsoRules to avoid a cyclic module dependency between AmuletRules and AmuletAllocation.
     nonconsuming choice DsoRules_ExpireAmuletAllocations : DsoRules_ExpireAmuletAllocationsResult
       with
         expireRequest : DsoRules_ExpireAmuletAllocationsRequest
