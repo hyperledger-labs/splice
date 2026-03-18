@@ -29,6 +29,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
           ttl: '720h',
         },
         persistence: {
+          storageClass: 'hyperdisk-balanced-rwo',
           enabled: true,
           size: '20Gi',
         },
