@@ -2306,10 +2306,12 @@ object DbMultiDomainAcsStore {
         recordTimes: Map[SynchronizerId, CantonTimestamp] = Map.empty,
     ): State = {
       val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
+      // Merge recordTimes with existing ones, keeping the max per synchronizer
       val updatedRecordTimes = recordTimes.foldLeft(lastIngestedRecordTimes) {
         case (acc, (syncId, rt)) =>
           acc.updated(syncId, acc.get(syncId).fold(rt)(_.max(rt)))
       }
+      // Remove waiters whose target record time has been reached
       val remainingWaiters = recordTimeWaiters.flatMap { case (syncId, waiters) =>
         updatedRecordTimes.get(syncId) match {
           case Some(reachedTime) =>
