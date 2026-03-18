@@ -103,12 +103,13 @@ final class HttpRequestLogger(
                 )
               )
 
-            case Rejected(rejections) =>
+            case Rejected(rejections) if rejections.nonEmpty =>
               if (rejections.contains(AuthorizationFailedRejection)) {
                 logger.debug(msg("Rejected: Unauthorized."))
               } else {
                 logger.debug(msg(s"""Rejected: ${rejections.mkString(",")}"""))
               }
+            case Rejected(_) => // do nothing, part of normal route resolution
           }
           result
         }
