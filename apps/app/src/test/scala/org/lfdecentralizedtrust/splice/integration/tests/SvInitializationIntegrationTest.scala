@@ -201,17 +201,24 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .getDecentralizedNamespaceDefinition(
             decentralizedSynchronizerId,
             dsoParty.uid.namespace,
+            topologySnapshot = TopologySnapshot.Sequenced,
           )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(3)
         participantAdminConnection
-          .getSequencerSynchronizerState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getMediatorSynchronizerState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
