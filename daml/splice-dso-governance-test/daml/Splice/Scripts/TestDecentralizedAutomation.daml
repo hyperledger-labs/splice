@@ -913,3 +913,4 @@ testExpireAmuletAllocationAlreadyUnlocked = do
   allocations <- query @AmuletAllocation app.dso
   allocations === []
   pure ()
+  
