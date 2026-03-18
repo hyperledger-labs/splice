@@ -1,3 +1,4 @@
+!include(../../configs/shared/base.yaml)
 validator1:
   kms:
     type: gcp
