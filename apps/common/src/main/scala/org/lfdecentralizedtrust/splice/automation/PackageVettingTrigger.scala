@@ -82,9 +82,7 @@ abstract class PackageVettingTrigger(
       input: Seq[String]
   )(run: => Future[Unit])(implicit tc: TraceContext) = {
     val previouslyRunInput = previouslyRunInputRef.get()
-    if (previouslyRunInput.isEmpty) {
-      Future.unit.map(_ => previouslyRunInputRef.set(input.toSet))
-    } else if (previouslyRunInput != input.toSet) {
+    if (previouslyRunInput != input.toSet) {
       logger.info(
         s"Running package vetting as the input has changed from $previouslyRunInput to $input"
       )

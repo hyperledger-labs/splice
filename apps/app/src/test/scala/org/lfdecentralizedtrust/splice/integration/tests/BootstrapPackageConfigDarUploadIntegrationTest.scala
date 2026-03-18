@@ -152,7 +152,10 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           AuthorizedState,
         )
         .futureValue
-        .map(_.base.serial.value) should contain only serial
+        .loneElement
+        .base
+        .serial
+        .value shouldBe serial
     }
   }
 

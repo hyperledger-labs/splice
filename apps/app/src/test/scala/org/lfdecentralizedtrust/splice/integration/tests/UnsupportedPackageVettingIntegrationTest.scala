@@ -28,8 +28,6 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
         DarResources.walletPayments_0_1_0,
         DarResources.amuletNameService_0_1_0,
         DarResources.amulet_0_1_0,
-        DarResources.splitwell_0_1_0,
-        DarResources.splitwell_0_1_1,
       )
       val synchronizerId =
         sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
