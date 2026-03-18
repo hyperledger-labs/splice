@@ -103,6 +103,7 @@ case class AutomationConfig(
     futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
     ignoredExpiredRewardsPartyIds: Set[PartyId] = Set.empty,
     ignoredExpiredAmuletPartyIds: Set[PartyId] = Set.empty,
+    ignoredFeaturedAppActivityMarkerPartyIds: Set[PartyId] = Set.empty,
     ingestion: IngestionConfig = IngestionConfig(),
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
