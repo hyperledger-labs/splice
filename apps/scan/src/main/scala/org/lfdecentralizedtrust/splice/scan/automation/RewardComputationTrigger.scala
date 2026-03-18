@@ -33,27 +33,24 @@ class RewardComputationTrigger(
     extends PollingTrigger {
 
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    if (!updateHistory.isReady) {
-      Future.successful(false)
-    } else {
-      val historyId = updateHistory.historyId
-      for {
-        lastClosedO <- store.lookupRoundOfLatestData()
-        result <- lastClosedO match {
-          case Some((lastClosed, _)) =>
-            for {
-              nextRoundO <- appRewardsStore.getNextRoundWithoutRootHash(historyId, lastClosed)
-              completedAggregation <- nextRoundO match {
-                case Some(nextRound) =>
-                  appRewardsStore
-                    .aggregateActivityTotals(historyId, nextRound)
-                    .map(_ => true)
-                case None => Future.successful(false)
-              }
-            } yield completedAggregation
-          case None => Future.successful(false)
-        }
-      } yield result
-    }
+    for {
+      _ <- updateHistory.waitUntilInitialized
+      historyId = updateHistory.historyId
+      lastClosedO <- store.lookupRoundOfLatestData()
+      result <- lastClosedO match {
+        case Some((lastClosed, _)) =>
+          for {
+            nextRoundO <- appRewardsStore.getNextRoundWithoutRootHash(historyId, lastClosed)
+            completedAggregation <- nextRoundO match {
+              case Some(nextRound) =>
+                appRewardsStore
+                  .aggregateActivityTotals(historyId, nextRound)
+                  .map(_ => true)
+              case None => Future.successful(false)
+            }
+          } yield completedAggregation
+        case None => Future.successful(false)
+      }
+    } yield result
   }
 }
