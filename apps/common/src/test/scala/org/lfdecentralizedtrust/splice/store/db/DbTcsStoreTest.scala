@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.store.{
   MultiDomainAcsStore,
   StoreTestBase,
   TcsStore,
-  TestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -30,14 +29,7 @@ import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import slick.jdbc.JdbcProfile
 
 class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
-  private def mkStore(
-      acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = Some(
-        DbMultiDomainAcsStore.AcsArchiveConfig(
-          "acs_store_archived_test",
-          DbMultiDomainAcsStore.AcsArchiveConfig.defaultBaseColumns,
-        )
-      )
-  ): DbMultiDomainAcsStore[TestTxLogEntry] = {
+  private def mkStore(): DbTcsStore = {
     val participantId = mkParticipantId("DbTcsStoreTest")
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -46,7 +38,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    new DbMultiDomainAcsStore(
+    val acsStore = new DbMultiDomainAcsStore(
       storage,
       "acs_store_template",
       Some("txlog_store_template"),
@@ -60,8 +52,14 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       IngestionConfig(),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-      acsArchiveConfigOpt = acsArchiveConfigOpt,
+      acsArchiveConfigOpt = Some(
+        DbMultiDomainAcsStore.AcsArchiveConfig(
+          archiveTableName,
+          DbMultiDomainAcsStore.AcsArchiveConfig.defaultBaseColumns,
+        )
+      ),
     )
+    new DbTcsStore(acsStore, archiveTableName)
   }
 
   protected def c(i: Int): Contract[AppRewardCoupon.ContractId, AppRewardCoupon] =
@@ -70,14 +68,14 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
   "DbTcsStore" should {
 
     "lookupContractByIdAsOf is visible in [created_at, archived_at) interval" in {
-      implicit val store = mkStore()
+      val store = mkStore()
       val createTime = CantonTimestamp.ofEpochSecond(100)
       val archiveTime = CantonTimestamp.ofEpochSecond(200)
       val coupon = c(1).copy(createdAt = createTime.toInstant)
       for {
-        _ <- initWithAcs()(store)
-        _ <- d1.create(coupon, recordTime = createTime.toInstant)(store)
-        _ <- d1.archive(coupon, recordTime = archiveTime.toInstant)(store)
+        _ <- initWithAcs()(store.acsStore)
+        _ <- d1.create(coupon, recordTime = createTime.toInstant)(store.acsStore)
+        _ <- d1.archive(coupon, recordTime = archiveTime.toInstant)(store.acsStore)
         resultBefore <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           CantonTimestamp.ofEpochSecond(50),
@@ -105,17 +103,27 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "listAllContractsAsOf and listAllContractsActiveWithin return correct contracts" in {
-      implicit val store = mkStore()
+      val store = mkStore()
       val coupon1 = c(1).copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val coupon2 = c(2).copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
       val coupon3 = c(3).copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
       for {
-        _ <- initWithAcs()(store)
-        _ <- d1.create(coupon1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
-        _ <- d1.create(coupon2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
-        _ <- d1.create(coupon3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(store)
-        _ <- d1.archive(coupon1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(store)
-        _ <- d1.archive(coupon3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(store)
+        _ <- initWithAcs()(store.acsStore)
+        _ <- d1.create(coupon1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+          store.acsStore
+        )
+        _ <- d1.create(coupon2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
+          store.acsStore
+        )
+        _ <- d1.create(coupon3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.acsStore
+        )
+        _ <- d1.archive(coupon1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.acsStore
+        )
+        _ <- d1.archive(coupon3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
+          store.acsStore
+        )
 
         // listAllContractsAsOf point-in-time checks
         resultAt50 <- store.listAllContractsAsOf(
@@ -231,7 +239,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached completes when record time is reached via offset checkpoint" in {
-      implicit val store = mkStore()
+      val store = mkStore().acsStore
       val d1CheckpointTime = CantonTimestamp.ofEpochSecond(200)
       val d2CheckpointTime = CantonTimestamp.ofEpochSecond(150)
       for {
@@ -280,7 +288,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached complete when record time is reached via transaction ingestion" in {
-      implicit val store = mkStore()
+      val store = mkStore().acsStore
       for {
         _ <- initWithAcs()(store)
         // Ingest a transaction on d1 at t=100
@@ -298,7 +306,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached blocks on a synchronizer with no ingested contracts" in {
-      implicit val store = mkStore()
+      val store = mkStore().acsStore
       for {
         _ <- initWithAcs()(store)
         // No contracts ingested for d1 yet, so waiting should block
@@ -329,43 +337,6 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       } yield succeed
     }
 
-    "temporal store query methods throw when archive config is None" in {
-      implicit val store = mkStore(acsArchiveConfigOpt = None)
-      for {
-        _ <- initWithAcs()(store)
-        _ <- d1.create(c(1))(store)
-      } yield {
-        val lookupError = the[IllegalStateException] thrownBy {
-          store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
-            c(1).contractId,
-            CantonTimestamp.Epoch,
-            d1,
-          )
-        }
-        lookupError.getMessage should include("lookupContractByIdAsOf requires an AcsArchiveConfig")
-
-        val listError = the[IllegalStateException] thrownBy {
-          store.listAllContractsAsOf(
-            AppRewardCoupon.COMPANION,
-            CantonTimestamp.Epoch,
-            d1,
-          )
-        }
-        listError.getMessage should include("listAllContractsAsOf requires an AcsArchiveConfig")
-
-        val rangeError = the[IllegalStateException] thrownBy {
-          store.listAllContractsActiveWithin(
-            AppRewardCoupon.COMPANION,
-            CantonTimestamp.Epoch,
-            CantonTimestamp.Epoch,
-            d1,
-          )
-        }
-        rangeError.getMessage should include(
-          "listAllContractsActiveWithin requires an AcsArchiveConfig"
-        )
-      }
-    }
   }
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile

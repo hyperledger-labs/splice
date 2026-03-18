@@ -16,7 +16,12 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
-import org.lfdecentralizedtrust.splice.store.db.{DbAppStore, DbMultiDomainAcsStore, StoreDescriptor}
+import org.lfdecentralizedtrust.splice.store.db.{
+  DbAppStore,
+  DbMultiDomainAcsStore,
+  DbTcsStore,
+  StoreDescriptor,
+}
 import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDecoder}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -59,6 +64,11 @@ class DbScanRewardsReferenceStore(
     )
     with ScanRewardsReferenceStore {
 
+  private val tcsStore = new DbTcsStore(
+    multiDomainAcsStore,
+    ScanRewardsReferenceTables.archiveTableName,
+  )
+
   def lookupOpenMiningRoundsActiveWithin(
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
@@ -67,7 +77,7 @@ class DbScanRewardsReferenceStore(
   ): Future[
     Seq[TcsStore.TemporalContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]
   ] =
-    multiDomainAcsStore.listAllContractsActiveWithin(
+    tcsStore.listAllContractsActiveWithin(
       OpenMiningRound.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
@@ -79,12 +89,12 @@ class DbScanRewardsReferenceStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    multiDomainAcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId)
+    tcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId)
 
   def lookupOpenMiningRoundsAsOf(
       asOf: CantonTimestamp
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    multiDomainAcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId)
+    tcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId)
 }

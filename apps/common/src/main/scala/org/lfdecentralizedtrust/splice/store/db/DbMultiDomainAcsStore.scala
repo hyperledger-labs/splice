@@ -105,9 +105,7 @@ final class DbMultiDomainAcsStore[TXE](
 ) extends MultiDomainAcsStore
     with AcsTables
     with AcsQueries
-    with TcsQueries
     with TxLogQueries[TXE]
-    with TcsStore
     with StoreErrors
     with NamedLogging
     with LimitHelpers {
@@ -140,6 +138,9 @@ final class DbMultiDomainAcsStore[TXE](
   }
 
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
+
+  private[db] def tcsStorage: DbStorage = storage
+  private[db] def tcsAcsTableName: String = acsTableName
 
   private[this] def txLogTableName =
     txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
@@ -214,107 +215,6 @@ final class DbMultiDomainAcsStore[TXE](
       )
       .map(result => contractWithStateFromRow(companion)(result))
       .value
-  }
-
-  private def requireArchiveConfig(methodName: String): DbMultiDomainAcsStore.AcsArchiveConfig =
-    acsArchiveConfigOpt.getOrElse(
-      throw new IllegalStateException(
-        s"$methodName requires an AcsArchiveConfig but none was provided for store $acsStoreDescriptor"
-      )
-    )
-
-  override def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](companion: C)(
-      id: ContractId[?],
-      asOf: CantonTimestamp,
-      synchronizerId: SynchronizerId,
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Option[ContractWithState[TCid, T]]] = {
-    val archiveConfig = requireArchiveConfig("lookupContractByIdAsOf")
-    waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
-      storage
-        .querySingle(
-          selectFromTcsTableWithStateAsOf(
-            acsTableName,
-            archiveConfig.archiveTableName,
-            acsStoreId,
-            domainMigrationId,
-            companion,
-            asOf,
-            additionalWhere = sql"""and acs.contract_id = ${lengthLimited(id.contractId)}""",
-          ).headOption,
-          "lookupContractByIdAsOf",
-        )
-        .map(result => contractWithStateFromRow(companion)(result))
-        .value
-    }
-  }
-
-  override def listAllContractsAsOf[C, TCid <: ContractId[?], T](
-      companion: C,
-      asOf: CantonTimestamp,
-      synchronizerId: SynchronizerId,
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Seq[ContractWithState[TCid, T]]] = {
-    val archiveConfig = requireArchiveConfig("listAllContractsAsOf")
-    waitUntilRecordTimeReached(synchronizerId, asOf).flatMap { _ =>
-      val templateId = companionClass.typeId(companion)
-      val opName = s"listAllContractsAsOf:${templateId.getEntityName}"
-      for {
-        result <- storage.query(
-          selectFromTcsTableWithStateAsOf(
-            acsTableName,
-            archiveConfig.archiveTableName,
-            acsStoreId,
-            domainMigrationId,
-            companion,
-            asOf,
-          ),
-          opName,
-        )
-        withState = result.map(contractWithStateFromRow(companion)(_))
-      } yield withState
-    }
-  }
-
-  override def listAllContractsActiveWithin[C, TCid <: ContractId[?], T](
-      companion: C,
-      lowerBoundIncl: CantonTimestamp,
-      upperBoundIncl: CantonTimestamp,
-      synchronizerId: SynchronizerId,
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Seq[TcsStore.TemporalContractWithState[TCid, T]]] = {
-    val archiveConfig = requireArchiveConfig("listAllContractsActiveWithin")
-    waitUntilRecordTimeReached(synchronizerId, upperBoundIncl).flatMap { _ =>
-      val templateId = companionClass.typeId(companion)
-      val opName = s"listAllContractsActiveWithin:${templateId.getEntityName}"
-      for {
-        result <- storage.query(
-          selectFromTcsTableWithStateActiveWithin(
-            acsTableName,
-            archiveConfig.archiveTableName,
-            acsStoreId,
-            domainMigrationId,
-            companion,
-            lowerBoundIncl,
-            upperBoundIncl,
-          ),
-          opName,
-        )
-        withState = result.map { row =>
-          TcsStore.TemporalContractWithState(
-            contractWithState = contractWithStateFromRow(companion)(row.withStateRow),
-            createdAt = CantonTimestamp.assertFromLong(row.withStateRow.acsRow.createdAt.micros),
-            archivedAt = row.archivedAt,
-          )
-        }
-      } yield withState
-    }
   }
 
   /** Returns any contract of the same template as the passed companion.
