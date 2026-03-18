@@ -76,6 +76,7 @@ class MediatorAdminConnection(
       synchronizerId: PhysicalSynchronizerId,
       sequencerConnection: SequencerConnection,
       submissionRequestAmplification: SubmissionRequestAmplification,
+      sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
       MediatorAdministrationCommands.Initialize(
@@ -86,8 +87,7 @@ class MediatorAdminConnection(
           // Mediators do not have BFT connections.
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
-          // TODO(#2666) Make the delays configurable.
-          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+          sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
         ),
         SequencerConnectionValidation.ThresholdActive,
       )
@@ -113,6 +113,7 @@ class MediatorAdminConnection(
   def setSequencerConnection(
       sequencerConnection: SequencerConnection,
       submissionRequestAmplification: SubmissionRequestAmplification,
+      sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
@@ -124,8 +125,7 @@ class MediatorAdminConnection(
           // Mediators do not have BFT connections.
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
-          // TODO(#2666) Make the delays configurable.
-          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+          sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
         ),
         SequencerConnectionValidation.ThresholdActive,
       )

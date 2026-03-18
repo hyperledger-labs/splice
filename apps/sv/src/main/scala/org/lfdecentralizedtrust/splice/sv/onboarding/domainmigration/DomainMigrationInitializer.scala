@@ -490,6 +490,7 @@ class DomainMigrationInitializer(
                   synchronizerId,
                   localSynchronizerNode.sequencerConnection,
                   localSynchronizerNode.mediatorSequencerAmplification,
+                  localSynchronizerNode.mediatorSequencerConnectionPoolDelays,
                 ),
               logger,
             )
