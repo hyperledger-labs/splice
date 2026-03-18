@@ -29,8 +29,7 @@ const DevelopmentFund: React.FC = () => {
             party was formerly the development fund manager you can use this page to manage your
             active development fund allocations and review the history of your past allocations. If
             your party is a beneficiary of allocations, you can view relevant entries in the
-            unclaimed allocations table and coupon history. Otherwise, you likely want to ignore the
-            content on this page.
+            unclaimed allocations table and coupon history.
           </Alert>
         )}
         <DevelopmentFundTotal />

@@ -36,8 +36,7 @@ export const useActiveDevelopmentFundCoupons = (
   const filteredCoupons = React.useMemo(() => {
     if (!primaryParty) return allCoupons;
     return allCoupons.filter(
-      (c: DevelopmentFundCoupon) =>
-        c.fundManager === primaryParty || c.beneficiary === primaryParty
+      (c: DevelopmentFundCoupon) => c.fundManager === primaryParty || c.beneficiary === primaryParty
     );
   }, [allCoupons, primaryParty]);
 
