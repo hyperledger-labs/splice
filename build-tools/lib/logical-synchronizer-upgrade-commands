@@ -46,3 +46,18 @@ function subcmd_vote_for_lsu() {
     "${next_physical_synchronizer_serial}" \
     "${new_protocol_version}"
 }
+
+subcommand_whitelist[retire_old_physical_synchronizer]='Update the cluster config.yaml to retire the old physical synchronizer'
+
+function subcmd_retire_old_physical_synchronizer() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
+  yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
+  "${SPLICE_ROOT}/cluster/scripts/resolve-config.sh"
+}
