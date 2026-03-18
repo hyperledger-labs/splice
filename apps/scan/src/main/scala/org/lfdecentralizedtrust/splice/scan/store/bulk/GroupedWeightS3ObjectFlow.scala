@@ -93,7 +93,7 @@ case class GroupedWeightS3ObjectFlow(
         )
         if (state.numPendingPartUploads == maxParallelPartUploads - 1) {
           if (!objectDone) {
-            logger.debug(
+            logger.trace(
               "More parallel upload capacity freed up, and we're not done yet, pull more input"
             )
             pull(in)
@@ -101,7 +101,7 @@ case class GroupedWeightS3ObjectFlow(
         }
         if (state.numPendingPartUploads == 0) {
           if (objectDone) {
-            logger.debug(
+            logger.trace(
               s"Finishing upload of ${state.currentObject.key}"
             )
             finishCurrentObject()
@@ -114,11 +114,11 @@ case class GroupedWeightS3ObjectFlow(
         logger.debug(s"Finished uploading and finalizing object ${state.currentObject.key}")
         push(out, state.currentObject.key)
         if (isClosed(in)) {
-          logger.debug("Upstream completed, completing too.")
+          logger.trace("Upstream completed, completing too.")
           completeStage()
         } else {
           state = state.nextObject()
-          logger.debug(s"Ready for object ${state.currentObject.key}")
+          logger.trace(s"Ready for object ${state.currentObject.key}")
         }
       }
 
@@ -139,14 +139,14 @@ case class GroupedWeightS3ObjectFlow(
           case Failure(ex) => failCallback.invoke(ex)
         }
         if (!objectDone) {
-          logger.debug(
+          logger.trace(
             s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, not done with it yet"
           )
           if (state.numPendingPartUploads < maxParallelPartUploads) {
             pull(in)
           }
         } else {
-          logger.debug(
+          logger.trace(
             s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, done with this object"
           )
         }

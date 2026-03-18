@@ -116,7 +116,6 @@ class ZstdTest extends StoreTestBase {
       }
     }
 
-
     "handle upstream close when buffer was just flushed" in {
       val zstdChunkSize = 10L // very small so a single 100-byte input crosses the threshold
       val (pub, sub) = TestSource

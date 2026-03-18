@@ -72,9 +72,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
 
       sub.request(5)
       val expectedObjectSizes = Seq(12, 12, 10, 25, 1)
-      expectedObjectSizes.indices.foreach(i =>
-        sub.expectNext(20.seconds) shouldBe s"test_$i"
-      )
+      expectedObjectSizes.indices.foreach(i => sub.expectNext(20.seconds) shouldBe s"test_$i")
       sub.expectComplete()
 
       val s3Objects = bucketConnection.listObjects.futureValue
@@ -110,7 +108,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       def sendBytes(n: Int) =
         pub.sendNext(it.getByteString(n))
 
-      val inputSizes = Seq(6,6,3)
+      val inputSizes = Seq(6, 6, 3)
       inputSizes.foreach(sendBytes)
       pub.sendError(new RuntimeException("Injected error"))
       sub.request(1)
