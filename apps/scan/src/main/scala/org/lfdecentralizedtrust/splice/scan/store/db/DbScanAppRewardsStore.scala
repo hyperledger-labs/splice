@@ -486,7 +486,7 @@ class DbScanAppRewardsStore(
 
   /** Runs the full reward computation pipeline for a single round.
     *
-    * TODO(CIP-0104): Will be extended to run CC conversion (stage 2) and
+    * TODO(#4384): Will be extended to run CC conversion (stage 2) and
     * Merkle tree hashing (stage 3) in a single transaction.
     */
   def computeRewards(
