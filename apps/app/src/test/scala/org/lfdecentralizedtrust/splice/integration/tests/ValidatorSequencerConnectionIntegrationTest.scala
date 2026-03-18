@@ -127,6 +127,14 @@ class ValidatorSequencerConnectionIntegrationTest
         }
       }
 
+      withClue("Connection aliases should be sequencer IDs, not SV names") {
+        val aliases = getSequencerAliases(
+          aliceValidatorBackend.participantClientWithAdminToken,
+          globalSyncAlias,
+        )
+        all(aliases) should startWith("SEQ::")
+      }
+
       withClue("Alice's validator should remain functional after the URL change") {
         eventuallySucceeds() {
           aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
@@ -164,6 +172,20 @@ class ValidatorSequencerConnectionIntegrationTest
     sequencerConnections.connections.forgetNE.collect {
       case GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints.head1.toString
     }.toSet
+  }
+
+  private def getSequencerAliases(
+      participantConnection: ParticipantClientReference,
+      synchronizerAlias: SynchronizerAlias,
+  ): Seq[String] = {
+    val sequencerConnections = participantConnection.synchronizers
+      .config(synchronizerAlias)
+      .value
+      .sequencerConnections
+
+    sequencerConnections.connections.forgetNE.collect {
+      case GrpcSequencerConnection(_, _, _, alias, _) => alias.unwrap
+    }
   }
 
   private def setSequencerUrl(
