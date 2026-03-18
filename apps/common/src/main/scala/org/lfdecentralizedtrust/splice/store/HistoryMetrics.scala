@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Meter, Timer}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
-import com.daml.metrics.api.MetricQualification.{Debug, Latency, Traffic}
+import com.daml.metrics.api.MetricQualification.{Debug, Errors, Latency, Traffic}
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
+import org.lfdecentralizedtrust.splice.store.HistoryMetrics.AcsSnapshotsMetrics
 
 class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     metricsContext: MetricsContext
@@ -136,6 +137,114 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         ),
         initial = 0,
       )(metricsContext)
+  }
+
+  object AcsSnapshots extends AcsSnapshotsMetrics {
+    private val acsSnapshotsPrefix: MetricName = prefix :+ "acs-snapshots"
+
+    override lazy val latestRecordTimeSave: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latest-record-time-save",
+          summary = "The record time of the latest acs snapshot",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    override lazy val latestRecordTimeUpdate: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latest-record-time-update",
+          summary = "The record time of the latest incremental acs snapshot",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    override lazy val latencyUpdate: Timer =
+      metricsFactory.timer(
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latency-update",
+          summary = "How long it takes to update an incremental snapshot",
+          qualification = Latency,
+        )
+      )(metricsContext)
+
+    override lazy val latencySave: Timer =
+      metricsFactory.timer(
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latency-save",
+          summary = "How long it takes to save an incremental snapshot",
+          qualification = Latency,
+        )
+      )(metricsContext)
+
+    override lazy val waitingForLock: Gauge[Int] = metricsFactory.gauge(
+      MetricInfo(
+        name = acsSnapshotsPrefix :+ "waiting-for-lock",
+        summary =
+          "Whether the last acs snapshot task had to be skipped because it could not acquire a lock",
+        qualification = Errors,
+      ),
+      -1,
+    )(metricsContext)
+  }
+
+  object AcsSnapshotsBackfilling extends AcsSnapshotsMetrics {
+    private val acsSnapshotsPrefix: MetricName = prefix :+ "acs-snapshots-backfilling"
+
+    override lazy val latestRecordTimeSave: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latest-record-time-save",
+          summary = "The record time of the latest backfilled acs snapshot",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    override lazy val latestRecordTimeUpdate: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latest-record-time-update",
+          summary = "The record time of the latest incremental acs snapshot for backfilling",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
+    override lazy val latencyUpdate: Timer =
+      metricsFactory.timer(
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latency-update",
+          summary = "How long it takes to update an incremental snapshot for backfilling",
+          qualification = Latency,
+        )
+      )(metricsContext)
+
+    override lazy val latencySave: Timer =
+      metricsFactory.timer(
+        MetricInfo(
+          name = acsSnapshotsPrefix :+ "latency-save",
+          summary = "How long it takes to save an incremental snapshot for backfilling",
+          qualification = Latency,
+        )
+      )(metricsContext)
+
+    override lazy val waitingForLock: Gauge[Int] = metricsFactory.gauge(
+      MetricInfo(
+        name = acsSnapshotsPrefix :+ "waiting-for-lock",
+        summary =
+          "Whether the last acs snapshot backfilling task had to be skipped because it could not acquire a lock",
+        qualification = Errors,
+      ),
+      -1,
+    )(metricsContext)
   }
 
   object CorruptAcsSnapshots {
@@ -307,6 +416,12 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     TxLogBackfilling.latestRecordTime.close()
     ImportUpdatesBackfilling.latestMigrationId.close()
     ImportUpdatesBackfilling.completed.close()
+    AcsSnapshots.latestRecordTimeSave.close()
+    AcsSnapshots.latestRecordTimeUpdate.close()
+    AcsSnapshots.waitingForLock.close()
+    AcsSnapshotsBackfilling.latestRecordTimeSave.close()
+    AcsSnapshotsBackfilling.latestRecordTimeUpdate.close()
+    AcsSnapshotsBackfilling.waitingForLock.close()
   }
 }
 
@@ -314,4 +429,12 @@ object HistoryMetrics {
   def apply(metricsFactory: LabeledMetricsFactory, currentMigrationId: Long) = new HistoryMetrics(
     metricsFactory
   )(MetricsContext("current_migration_id" -> currentMigrationId.toString))
+
+  trait AcsSnapshotsMetrics {
+    def latestRecordTimeUpdate: Gauge[CantonTimestamp]
+    def latestRecordTimeSave: Gauge[CantonTimestamp]
+    def latencyUpdate: Timer
+    def latencySave: Timer
+    def waitingForLock: Gauge[Int]
+  }
 }

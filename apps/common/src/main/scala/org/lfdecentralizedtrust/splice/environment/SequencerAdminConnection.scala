@@ -52,6 +52,7 @@ import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.{BackupDumpConfig, GcpCredentialsConfig}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import java.util.{Base64, Collections}
@@ -331,12 +332,16 @@ class SequencerAdminConnection(
     )
   }
 
-  def getSequencerSynchronizerState()(implicit
+  def getSequencerSynchronizerState(topologySnapshot: TopologySnapshot)(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[SequencerSynchronizerState]] = {
     for {
       synchronizerId <- getStatus.map(_.trySuccess.synchronizerId)
-      sequencerState <- getSequencerSynchronizerState(synchronizerId.logical, AuthorizedState)
+      sequencerState <- getSequencerSynchronizerState(
+        synchronizerId.logical,
+        topologySnapshot,
+        AuthorizedState,
+      )
     } yield sequencerState
   }
 
@@ -363,7 +368,9 @@ class SequencerAdminConnection(
     // There are multiple cases where we need the caller to retry: we (ab)use gRPC Status codes to communicate this.
     def checkSuccessOrAbort(): Future[Option[io.grpc.Status]] = for {
       (sequencerState, trafficState) <- (
-        getSequencerSynchronizerState(),
+        getSequencerSynchronizerState(topologySnapshot =
+          TopologySnapshot.Effective
+        ), // The thresholds only change when it becomes effective
         getSequencerTrafficControlState(currentTrafficState.member),
       ).tupled
     } yield {

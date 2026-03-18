@@ -43,11 +43,16 @@ case class AutomationConfig(
       */
     rewardOperationPollingJitter: Double = 0.5,
     /** Polling interval used for the top-up trigger.
-      *  Only set as different from the base pollingInterval for some tests.
+      * Only set as different from the base pollingInterval for some tests.
       * This allows running the top-up trigger at a higher frequency to ensure that a validator's first top-up gets
       * done quickly enough during init preventing tests from failing due to lack of traffic.
       */
     topupTriggerPollingInterval: Option[NonNegativeFiniteDuration] = None,
+    /** Polling interval used for the acs snapshot triggers.
+      * Only set as different from the base pollingInterval for some tests.
+      * This allows the trigger to process history faster than real time in simtime tests.
+      */
+    acsSnapshotTriggerPollingInterval: Option[NonNegativeFiniteDuration] = None,
     /** Polling interval to check for domain connection changes.
       * There are a large number of domain stores, e.g. one per user on the
       * validator app; with few domain changes, more checks aren't needed.

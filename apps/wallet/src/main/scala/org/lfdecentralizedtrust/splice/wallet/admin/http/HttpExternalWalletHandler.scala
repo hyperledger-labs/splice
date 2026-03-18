@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryProvider,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupOffset
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as r0
 import org.lfdecentralizedtrust.splice.http.v0.{external, definitions as d0}
@@ -164,6 +165,8 @@ class HttpExternalWalletHandler(
           .getPartyToParticipant(
             synchronizerId,
             receivingValidator,
+            topologySnapshot = TopologySnapshot.Effective,
+            // Follow the usual Canton APIs to use the effective state although for the currently short delay we have it doesn't really matter.
           )
           .transform(
             _.mapping.participantIds,

@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 
 import scala.concurrent.duration.DurationInt
@@ -46,7 +47,11 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       def checkPartyToParticipant(expected: Seq[ParticipantId]) = {
         eventually() {
           val mapping = sv1Backend.appState.participantAdminConnection
-            .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
+            .getPartyToParticipant(
+              decentralizedSynchronizerId,
+              sv1Backend.getDsoInfo().dsoParty,
+              topologySnapshot = TopologySnapshot.Sequenced,
+            )
             .futureValue
             .mapping
           mapping.threshold shouldBe PositiveInt.tryCreate(2)

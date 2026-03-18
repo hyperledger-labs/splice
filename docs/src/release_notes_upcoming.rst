@@ -23,6 +23,11 @@
          ``/v0/admin/external-party/transfer-preapproval/submit-send``
          are deprecated and will be removed in a future version. Use the token standard APIs for initiating transfers instead.
 
+       - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
+         in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
+         persisted scan connections from previous runs, removing the dependency on seedUrls
+         scan availability for successful reboots.
+
     - Daml:
 
       .. important::
@@ -80,6 +85,8 @@
         <token_standard>`.
 
       - Add missing validation of ``sv`` party to ``DsoRules_ClaimExpiredRewards``.
+
+      - Add missing TransferInstruction_Update choice for AmuletTransferInstruction to support expiry.
 
       These Daml changes require an upgrade to the following Daml versions **before**
       voting to set the transfer fees to zero:
