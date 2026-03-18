@@ -4,10 +4,13 @@
 -- Store for reference data for the off-ledger reward computations.
 create table scan_rewards_reference_store_active
 (
-    like acs_store_template including all,
+    like acs_store_template including all excluding indexes,
 
     -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
     foreign key (store_id) references store_descriptors (id),
+
+    -- reestablish primary key as that one is not copied by the LIKE statement above
+    primary key (event_number),
 
     -- index columns
     ----------------
@@ -32,9 +35,9 @@ create table scan_rewards_reference_store_archived
 
 -- temporal query support: created_at filtering for point-in-time lookups on the live table
 create index scan_rewards_reference_store_active_temporal
-    on scan_rewards_reference_store_active (store_id, migration_id, template_id_qualified_name, created_at);
+    on scan_rewards_reference_store_active (store_id, migration_id, package_name, template_id_qualified_name, created_at);
 
 -- temporal query support: created_at + archived_at filtering for point-in-time lookups on the archive table
 -- Since we would be typically doing lookups for recently archived contracts, index on archived_at will help skip past events more efficiently
 create index scan_rewards_reference_store_archived_temporal
-    on scan_rewards_reference_store_archived (store_id, migration_id, template_id_qualified_name, archived_at) include (created_at);
+    on scan_rewards_reference_store_archived (store_id, migration_id, package_name, template_id_qualified_name, archived_at) include (created_at);
