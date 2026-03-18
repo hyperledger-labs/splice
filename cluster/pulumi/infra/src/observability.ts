@@ -908,15 +908,6 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$SEQUENCER_RATE_LIMIT_CIRCUIT_BREAKER_STATE_THRESHOLD',
                 monitoringConfig.alerting.alerts.sequencerRateLimits.circuitBreakerStateThreshold.toString()
               ),
-            'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
-              ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
               readGrafanaAlertingFile('templates.yaml')
