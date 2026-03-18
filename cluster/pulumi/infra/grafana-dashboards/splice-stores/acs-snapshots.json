@@ -228,7 +228,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Time to update an incremental snapshot",
+      "description": "Time to update an incremental snapshot, i.e., the time to update an incremental snapshot by processing ~30sec worth of update history.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -327,7 +327,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Time to save an incremental snapshot",
+      "description": "Time to save an incremental snapshot, i.e., the time to copy an incremental snapshot to the the big table containing all historical snapshots.",
       "fieldConfig": {
         "defaults": {
           "color": {
