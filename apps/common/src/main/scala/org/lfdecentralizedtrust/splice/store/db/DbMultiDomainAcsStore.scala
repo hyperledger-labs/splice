@@ -97,7 +97,7 @@ final class DbMultiDomainAcsStore[TXE](
       */
     handleIngestionSummary: IngestionSummary => Unit = _ => (),
     override val defaultLimit: Limit,
-    acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = None,
+    acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -1891,7 +1891,7 @@ final class DbMultiDomainAcsStore[TXE](
       else {
         DBIO.sequence(deletes.grouped(ingestionConfig.maxDeletesPerStatement).map { deletes =>
           val performDeleteSql = acsArchiveConfigOpt match {
-            case Some(DbMultiDomainAcsStore.AcsArchiveConfig(archiveTableName, baseColumns)) =>
+            case Some(AcsArchiveConfig(archiveTableName, baseColumns)) =>
               val valuesPairs = deletes.map { d =>
                 val cid = lengthLimited(d.evt.getContractId)
                 val archivedAt = CantonTimestamp.assertFromInstant(d.recordTime).toMicros
@@ -2256,37 +2256,6 @@ final class DbMultiDomainAcsStore[TXE](
 }
 
 object DbMultiDomainAcsStore {
-
-  /** Configuration for archiving deleted ACS rows into a separate table.
-    * @param archiveTableName The name of the archive table to copy deleted rows into.
-    * @param baseColumns Comma-separated column names to copy from the ACS table to the archive table.
-    */
-  case class AcsArchiveConfig(
-      archiveTableName: String,
-      baseColumns: String,
-  )
-
-  object AcsArchiveConfig {
-
-    /** Default base columns matching acs_store_template (18 columns). */
-    val defaultBaseColumns: String =
-      "store_id, migration_id, event_number, contract_id, " +
-        "template_id_package_id, template_id_qualified_name, package_name, " +
-        "create_arguments, created_event_blob, created_at, contract_expires_at, " +
-        "state_number, assigned_domain, reassignment_counter, " +
-        "reassignment_target_domain, reassignment_source_domain, " +
-        "reassignment_submitter, reassignment_unassign_id"
-
-    def withIndexColumns(
-        archiveTableName: String,
-        indexColumns: Seq[String],
-    ): AcsArchiveConfig =
-      AcsArchiveConfig(
-        archiveTableName,
-        if (indexColumns.isEmpty) defaultBaseColumns
-        else defaultBaseColumns + indexColumns.mkString(", ", ", ", ""),
-      )
-  }
 
   /** @param acsStoreId The primary key of this stores ACS entry in the store_descriptors table
     * @param txLogStoreId The primary key of this stores TxLog entry in the store_descriptors table

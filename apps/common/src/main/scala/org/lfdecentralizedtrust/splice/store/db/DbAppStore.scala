@@ -23,7 +23,7 @@ abstract class DbTxLogAppStore[TXE](
     txLogStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     ingestionConfig: IngestionConfig,
-    acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = None,
+    acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -66,7 +66,7 @@ abstract class DbAppStore(
     acsStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     ingestionConfig: IngestionConfig,
-    acsArchiveConfigOpt: Option[DbMultiDomainAcsStore.AcsArchiveConfig] = None,
+    acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,

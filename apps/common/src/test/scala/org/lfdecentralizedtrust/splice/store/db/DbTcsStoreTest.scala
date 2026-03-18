@@ -53,9 +53,9 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       IngestionConfig(),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
       acsArchiveConfigOpt = Some(
-        DbMultiDomainAcsStore.AcsArchiveConfig(
+        AcsArchiveConfig(
           archiveTableName,
-          DbMultiDomainAcsStore.AcsArchiveConfig.defaultBaseColumns,
+          AcsArchiveConfig.defaultBaseColumns,
         )
       ),
     )

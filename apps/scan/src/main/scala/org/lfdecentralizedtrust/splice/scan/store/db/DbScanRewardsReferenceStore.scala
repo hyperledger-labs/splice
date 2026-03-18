@@ -17,8 +17,8 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{Limit, TcsStore}
 import org.lfdecentralizedtrust.splice.store.db.{
+  AcsArchiveConfig,
   DbAppStore,
-  DbMultiDomainAcsStore,
   DbTcsStore,
   StoreDescriptor,
 }
@@ -56,7 +56,7 @@ class DbScanRewardsReferenceStore(
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig = ingestionConfig,
       acsArchiveConfigOpt = Some(
-        DbMultiDomainAcsStore.AcsArchiveConfig.withIndexColumns(
+        AcsArchiveConfig.withIndexColumns(
           ScanRewardsReferenceTables.archiveTableName,
           ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData.hasIndexColumns.indexColumnNames,
         )
