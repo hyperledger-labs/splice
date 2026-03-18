@@ -1,7 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.either.*
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   IntegrationTestWithIsolatedEnvironment,
@@ -298,7 +299,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   protected def stopWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Stopping web drivers")
     // We process all browsers in parallel, for faster test termination.
-    webDrivers.values.toList.parTraverse { webDriver =>
+    MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) { webDriver =>
       Future {
         webDriver.quit()
       }
@@ -309,7 +310,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   protected def clearWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Clearing web drivers")
     eventually(60.seconds) {
-      webDrivers.values.toList.parTraverse { implicit webDriver =>
+      MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) { implicit webDriver =>
         Future {
           // Reset session storage so we see the login window again.
           // You cannot reset session storage of about:blank so

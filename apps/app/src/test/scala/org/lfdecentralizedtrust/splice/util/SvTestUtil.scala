@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Transaction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -156,7 +157,7 @@ trait SvTestUtil extends TestCommon {
 
         // Concurrent uses of log suppression don't work so we suppress here instead of within eventually succeeds
         loggerFactory.suppressErrors {
-          svsToCastVotes.parTraverse { sv =>
+          MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(svsToCastVotes) { sv =>
             Future {
               clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
                 val svVoteRequest = eventually() {

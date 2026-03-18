@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
@@ -170,7 +170,7 @@ class DistributedDomainIntegrationTest
         clue(
           s"un-pause decentralized synchronizer to not crash other tests"
         ) {
-          Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
+          MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
             Future {
               sv.unpauseDecentralizedSynchronizer()
             }
@@ -180,7 +180,7 @@ class DistributedDomainIntegrationTest
     ) {
       actAndCheck(
         "SVs can pause the decentralizedSynchronizer",
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
+        MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
           Future {
             sv.pauseDecentralizedSynchronizer()
           }
@@ -200,7 +200,7 @@ class DistributedDomainIntegrationTest
 
       actAndCheck(
         "SVs can unpause the decentralizedSynchronizer",
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
+        MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
           Future {
             sv.unpauseDecentralizedSynchronizer()
           }

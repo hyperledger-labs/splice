@@ -1,7 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File.apply
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.SynchronizerAlias
@@ -699,7 +700,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             val namespaceChangeResult =
               withClueAndLog("decentralized namespace can be modified on the new domain") {
-                majorityUpgradeNodes.parTraverse { upgradeNode =>
+                MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(majorityUpgradeNodes) { upgradeNode =>
                   val connection = upgradeNode.newParticipantConnection
                   for {
                     result <- connection
@@ -1146,8 +1147,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
   ): Unit = {
-    nodes
-      .parTraverse { node =>
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes) { node =>
         SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
           node,
           decentralizedSynchronizerId,

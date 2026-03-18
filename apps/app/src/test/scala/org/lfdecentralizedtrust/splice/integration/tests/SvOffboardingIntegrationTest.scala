@@ -34,7 +34,8 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import cats.instances.seq.*
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
   pauseAllDsoDelegateTriggers,
@@ -193,7 +194,7 @@ class SvOffboardingIntegrationTest
         }
       }
       withClue("pause offboarding triggers") {
-        cantonMediatorSequencerTriggers.parTraverse_(_.pause()).futureValue
+        MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(cantonMediatorSequencerTriggers)(_.pause()).futureValue
       }
 
       actAndCheck(

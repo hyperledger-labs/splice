@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{ApiLoggingConfig, FullClientConfig}
@@ -106,8 +107,8 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
   )(assert: T => Assertion)(implicit ec: ExecutionContext): Unit = {
     withClueAndLog(description) {
       eventuallySucceeds(timeUntilSuccess = 1.minute) {
-        nodes
-          .parTraverse { node =>
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes) { node =>
             getData(node)
           }
           .map(

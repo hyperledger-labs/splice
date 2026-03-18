@@ -14,7 +14,8 @@ import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Identifier
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
@@ -86,10 +87,10 @@ class AnsIntegrationTest
 
       // Concurrently, request an entry as alice and bob
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        Seq(
+        MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(2))(Seq(
           aliceRefs,
           bobRefs,
-        ).parTraverse { ref =>
+        )) { ref =>
           Future { requestAndPayForEntry(ref, testEntryName) }
         }.futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(40, "seconds"))),
         lines => {

@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
@@ -272,8 +273,8 @@ class WalletBuyTrafficRequestIntegrationTest
 
       val successes = loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
-          (1 to 10).toList
-            .parTraverse(_ =>
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.tryCreate(10))((1 to 10).toList)(_ =>
               Future {
                 try {
                   createValidTrafficRequest(

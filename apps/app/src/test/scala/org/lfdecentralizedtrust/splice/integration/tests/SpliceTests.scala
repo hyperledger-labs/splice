@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
@@ -506,7 +507,7 @@ object SpliceTests extends LazyLogging {
     protected def stopAllAsync(
         nodes: AppBackendReference*
     )(implicit ec: ExecutionContext): Future[Unit] = {
-      nodes.parTraverse(node => Future { node.stop() }).map(_ => ())
+      MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes.toSeq)(node => Future { node.stop() }).map(_ => ())
     }
 
     def registerHttpConnectionPoolsCleanup(implicit
