@@ -37,6 +37,7 @@ import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
+import Splice.AmuletAllocation
 
 
 -- Types
@@ -323,6 +324,17 @@ data DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult = DsoRule
   with
     instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
   deriving (Show, Eq)
+
+data DsoRules_ExpireAmuletAllocationInput = DsoRules_ExpireAmuletAllocationInput
+  with
+    allocationCid : ContractId AmuletAllocation
+    expireLock : Bool
+  deriving (Eq, Show)
+
+data DsoRules_ExpireAmuletAllocationsResult = DsoRules_ExpireAmuletAllocationsResult
+  with
+    results : [AmuletAllocation_DsoExpireResult]
+  deriving (Eq, Show)  
 
 -- Workflow templates
 ---------------------
@@ -1124,6 +1136,21 @@ template DsoRules with
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
 
+    nonconsuming choice DsoRules_ExpireAmuletAllocations : DsoRules_ExpireAmuletAllocationsResult
+      with
+        inputs : [DsoRules_ExpireAmuletAllocationInput]
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+
+        individualResults <- forA inputs $ \input -> do
+          exercise input.allocationCid AmuletAllocation_DsoExpire with
+            expireLock = input.expireLock
+
+        pure DsoRules_ExpireAmuletAllocationsResult with
+          results = individualResults
+    
     nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
       with
         amuletRulesCid : ContractId AmuletRules

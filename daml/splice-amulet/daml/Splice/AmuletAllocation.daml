@@ -3,7 +3,9 @@
 
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
+  AmuletAllocation_DsoExpireResult,
   allocationToTwoStepTransfer,
+  AmuletAllocation_DsoExpire(..),
 ) where
 
 import DA.Text as Text
