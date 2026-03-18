@@ -29,16 +29,22 @@ object DarResourcesUtil {
   def getRequiredPackageVersions(
       name: PackageName,
       upToRequiredVersion: PackageVersion,
+      enableUnsupportedDarsUnvetting: Boolean,
       latestPackagesOnly: Boolean = false,
   ): Seq[DarResource] = {
     val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
+    // TODO(hyperledger-labs/splice#4049): remove enableUnsupportedDarsUnvetting
     packageResources.view
       .flatMap(_.all)
       .toSeq
       .filter(_.metadata.name == name)
       .filter(pkg => {
         val version = pkg.metadata.version
-        (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
+        if (enableUnsupportedDarsUnvetting) {
+          (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
+        } else {
+          (!latestPackagesOnly && version < upToRequiredVersion) || version == upToRequiredVersion
+        }
       })
       .distinct
   }

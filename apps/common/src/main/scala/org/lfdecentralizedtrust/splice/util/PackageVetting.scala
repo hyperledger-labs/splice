@@ -26,6 +26,7 @@ class PackageVetting(
     participantAdminConnection: ParticipantAdminConnection,
     override val loggerFactory: NamedLoggerFactory,
     latestPackagesOnly: Boolean,
+    enableUnsupportedDarsUnvetting: Boolean,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
     with Spanning {
@@ -40,7 +41,7 @@ class PackageVetting(
       packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResourcesUtil
-        .getRequiredPackageVersions(pkg.packageName, packageVersion)
+        .getRequiredPackageVersions(pkg.packageName, packageVersion, enableUnsupportedDarsUnvetting)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
     // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
@@ -60,6 +61,7 @@ class PackageVetting(
           .getRequiredPackageVersions(
             pkg.packageName,
             PackageIdResolver.readPackageVersion(currentPackageConfig, pkg),
+            enableUnsupportedDarsUnvetting,
           )
           .map(versionToVet => pkg -> versionToVet.metadata.version)
       )
@@ -230,7 +232,11 @@ class PackageVetting(
           val configPackageVersion = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
           val allPackageVersions =
             DarResourcesUtil
-              .getRequiredPackageVersions(pkg.packageName, configPackageVersion)
+              .getRequiredPackageVersions(
+                pkg.packageName,
+                configPackageVersion,
+                enableUnsupportedDarsUnvetting,
+              )
               .map(_.metadata.version)
           allPackageVersions
             .map(version => time -> (pkg -> version))

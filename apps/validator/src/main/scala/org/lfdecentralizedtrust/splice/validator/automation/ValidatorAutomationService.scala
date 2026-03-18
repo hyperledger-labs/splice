@@ -240,6 +240,7 @@ class ValidatorAutomationService(
       maxVettingDelay,
       latestPackagesOnly,
       svValidator,
+      enabledFeatures.enableUnsupportedDarsUnvetting,
     )
   )
 

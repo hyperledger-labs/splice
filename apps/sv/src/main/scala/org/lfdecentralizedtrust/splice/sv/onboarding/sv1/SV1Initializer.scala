@@ -246,6 +246,7 @@ class SV1Initializer(
             )
             .map(_.nonEmpty), {
             val packages = requiredDars(sv1Config.initialPackageConfig)
+            logger.info(s"PACKS:: ${packages.size}")
             if (config.latestPackagesOnly)
               logger.warn(
                 "latestPackagesOnly is enabled, only the latest versions of the initial packages will be uploaded and vetted"
@@ -619,6 +620,7 @@ class SV1Initializer(
         .getRequiredPackageVersions(
           packageResource.latest.metadata.name,
           PackageVersion.assertFromString(requiredVersion),
+          enabledFeatures.enableUnsupportedDarsUnvetting,
           config.latestPackagesOnly,
         )
         .map(UploadablePackage.fromResource)

@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, EnabledFeaturesConfig}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
@@ -33,7 +33,9 @@ class BootstrapPackageConfigDarUploadIntegrationTest
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
-  override def environmentDefinition: SpliceEnvironmentDefinition =
+  protected val enableUnsupportedDarsUnvetting: Boolean = true
+
+  override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       // Technically a single SV test but withCanton doesn't handle that atm.
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -66,11 +68,14 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
         ),
       )() {
-        clue("Initialize sv1 and alice validator") {
+        clue("Initialize sv1, sv2 and alice validator") {
           startAllSync(
             sv1ScanBackend,
             sv1Backend,
             sv1ValidatorBackend,
+            sv2Backend,
+            sv2ScanBackend,
+            sv2ValidatorBackend,
             aliceValidatorBackend,
           )
         }
@@ -98,6 +103,18 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           ),
           aliceValidatorBackend.appState.participantAdminConnection,
           2,
+        )
+        checkDarVersions(
+          decentralizedSynchronizerId,
+          Seq(
+            DarResources.amulet -> initialPackageConfig.amuletVersion,
+            DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
+            DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
+            DarResources.wallet -> initialPackageConfig.walletVersion,
+            DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
+          ),
+          sv2Backend.appState.participantAdminConnection,
+          3,
         )
       }
   }
@@ -140,7 +157,12 @@ class BootstrapPackageConfigDarUploadIntegrationTest
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
         ) {
-          checkDarLatestVersion(vettedDarNameAndVersions, packageResource, upToVersion)
+          checkDarLatestVersion(
+            vettedDarNameAndVersions,
+            packageResource,
+            upToVersion,
+            enableUnsupportedDarsUnvetting,
+          )
         }
       }
     }
@@ -163,6 +185,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       uploadedDars: Seq[(PackageName, PackageVersion)],
       packageResource: PackageResource,
       requiredVersion: String,
+      enableUnsupportedDarsUnvetting: Boolean,
   ): Unit = {
     val dars =
       uploadedDars.filter { case (name, _) =>
@@ -181,16 +204,48 @@ class BootstrapPackageConfigDarUploadIntegrationTest
         .getRequiredPackageVersions(
           packageResource.latest.metadata.name,
           PackageVersion.assertFromString(requiredVersion),
+          enableUnsupportedDarsUnvetting,
         )
         .map(_.metadata.version)
         .distinct
     }
-    clue(
-      s"versions older than minimumInitialization for package ${packageResource.latest.metadata.name} should not be vetted"
-    ) {
-      dars.map(_._2) should contain noElementsOf DarResources.packageResources.view.flatMap { p =>
-        p.all.filter(pkg => pkg.metadata.version < p.minimumInitialization.metadata.version)
+    if (enableUnsupportedDarsUnvetting) {
+      clue(
+        s"versions older than minimumInitialization for package ${packageResource.latest.metadata.name} should not be vetted"
+      ) {
+        dars.map(_._2) should contain noElementsOf DarResources.packageResources.view.flatMap { p =>
+          p.all.filter(pkg => pkg.metadata.version < p.minimumInitialization.metadata.version)
+        }
       }
     }
   }
+}
+
+class BootstrapPackageConfigDarUploadWithUnsupportedVersionsIntegrationTest
+    extends BootstrapPackageConfigDarUploadIntegrationTest {
+
+  override def dbsSuffix = "bootstrappackageconfigdarupload2"
+
+  override val enableUnsupportedDarsUnvetting: Boolean = false
+
+  override def environmentDefinition: EnvironmentDefinition =
+    super.environmentDefinition
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs { case (_, c) =>
+          c.copy(parameters =
+            c.parameters.copy(enabledFeatures =
+              EnabledFeaturesConfig(enableUnsupportedDarsUnvetting = enableUnsupportedDarsUnvetting)
+            )
+          )
+        }(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs { case (_, c) =>
+          c.copy(parameters =
+            c.parameters.copy(enabledFeatures =
+              EnabledFeaturesConfig(enableUnsupportedDarsUnvetting = enableUnsupportedDarsUnvetting)
+            )
+          )
+        }(config)
+      )
 }

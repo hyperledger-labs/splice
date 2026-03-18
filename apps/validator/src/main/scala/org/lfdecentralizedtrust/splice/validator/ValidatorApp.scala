@@ -331,6 +331,7 @@ class ValidatorApp(
                   participantAdminConnection,
                   loggerFactory,
                   config.latestPackagesOnly,
+                  config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
                 )
                 _ <-
                   MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
