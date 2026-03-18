@@ -166,7 +166,7 @@ class S3BucketConnection(
           .destinationKey(key)
           .sourceBucket(bucketName)
           .sourceKey(key)
-          // CRITICAL: Tells S3/GCS to ignore old metadata and use the new map
+          // Tells S3/GCS to ignore old metadata and use the new map
           .metadataDirective(MetadataDirective.REPLACE)
           .metadata(metadata.asJava)
           .build()
