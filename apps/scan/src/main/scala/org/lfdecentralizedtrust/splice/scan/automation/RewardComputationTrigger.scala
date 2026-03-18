@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.scan.store.{ScanAppRewardsStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore, ScanStore}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -28,8 +28,12 @@ import scala.concurrent.{ExecutionContext, Future}
   * triggering
   */
 class RewardComputationTrigger(
+    // TODO(#4118): replace this. #4118 will provide ScanRewardsReferenceStore;
+    // it provides a function to determine the actual round numbers to use
+    // allowing the full synchronization algorithm to be implemented
     store: ScanStore,
     appRewardsStore: ScanAppRewardsStore,
+    appActivityStore: AppActivityStore,
     updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
 )(implicit
@@ -44,12 +48,20 @@ class RewardComputationTrigger(
     for {
       _ <- updateHistory.waitUntilInitialized
       lastClosedO <- store.lookupRoundOfLatestData()
-      tasks <- lastClosedO match {
-        case Some((lastClosed, _)) =>
+      earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
+      tasks <- (lastClosedO, earliestCompleteO) match {
+        case (Some((lastClosed, _)), Some(earliestComplete)) =>
           appRewardsStore
             .getNextRoundWithoutRootHash(updateHistory.historyId, lastClosed)
-            .map(_.toList.map(r => RewardComputationTrigger.Task(r)))
-        case None => Future.successful(Seq.empty)
+            .flatMap {
+              case Some(round) if round >= earliestComplete =>
+                appActivityStore.isAppActivityCompleteForRound(round).map {
+                  case true => List(RewardComputationTrigger.Task(round))
+                  case false => Seq.empty
+                }
+              case _ => Future.successful(Seq.empty)
+            }
+        case _ => Future.successful(Seq.empty)
       }
     } yield tasks
   }

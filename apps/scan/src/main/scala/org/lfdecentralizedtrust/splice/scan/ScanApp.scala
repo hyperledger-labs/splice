@@ -234,6 +234,15 @@ class ScanApp(
         nodeMetrics.grpcClientMetrics,
         retryProvider,
       )
+      appActivityRecordStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new DbAppActivityRecordStore(
+              storage,
+              loggerFactory,
+            )
+          )
+        } else None
       appRewardsStore = new DbScanAppRewardsStore(storage, loggerFactory)
       automation = new ScanAutomationService(
         config,
@@ -244,6 +253,7 @@ class ScanApp(
         store,
         updateHistory,
         appRewardsStore,
+        appActivityRecordStoreO,
         storage,
         acsSnapshotStore,
         serviceUserPrimaryParty,
@@ -274,15 +284,6 @@ class ScanApp(
               config.sequencerAdminClient,
               ScanApp.this,
               nodeMetrics.grpcClientMetrics,
-              loggerFactory,
-            )
-          )
-        } else None
-      appActivityRecordStoreO =
-        if (config.sequencerTrafficIngestion.enabled) {
-          Some(
-            new DbAppActivityRecordStore(
-              storage,
               loggerFactory,
             )
           )
