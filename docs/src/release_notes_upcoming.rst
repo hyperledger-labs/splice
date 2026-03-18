@@ -88,7 +88,7 @@
 
       - Add missing TransferInstruction_Update choice for AmuletTransferInstruction to support expiry.
 
-      - Add AmuletAllocation_DsoExpire choice to support batch expiry of stale allocations via DsoRules.
+      - Add AmuletAllocation_DsoExpire choice to support expiry of expired allocations.
 
       These Daml changes require an upgrade to the following Daml versions **before**
       voting to set the transfer fees to zero:
