@@ -202,7 +202,6 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      disableZeroFees(),
       updateAllAutomationConfigs(
         _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
       ),
@@ -303,9 +302,6 @@ object ConfigTransforms {
       )
     )
 
-  def disableZeroFees(): ConfigTransform =
-    updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
-
   def disableDevelopmentFund(): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(0.0)))
 
@@ -355,6 +351,14 @@ object ConfigTransforms {
           pollingInterval = tick
         )
       else config
+    )
+  }
+
+  def updateInitialExternalPartyConfigStateTickDuration(
+      tick: NonNegativeFiniteDuration
+  ): ConfigTransform = {
+    ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+      _.copy(initialExternalPartyConfigStateTickDuration = Some(tick))
     )
   }
 
@@ -757,6 +761,9 @@ object ConfigTransforms {
       )
     }
   }
+
+  def withValidatorFaucetCap(cap: BigDecimal): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(optValidatorFaucetCap = Some(cap)))
 
   def withDevelopmentFundPercentage(percentage: BigDecimal): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(percentage)))

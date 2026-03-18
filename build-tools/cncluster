@@ -7,6 +7,7 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
+source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 SCRIPTNAME=${0##*/}
 
@@ -304,6 +305,7 @@ declare -A subcommand_whitelist
 source "${TOOLS_LIB}/pulumi-helpers"
 source "${TOOLS_LIB}/pulumi-commands"
 source "${TOOLS_LIB}/hard-domain-migration-commands"
+source "${TOOLS_LIB}/logical-synchronizer-upgrade-commands"
 source "${TOOLS_LIB}/disaster-recovery-commands"
 
 function _prompt_to_confirm() {
@@ -438,7 +440,7 @@ function k8s_labels_for_app() {
     local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
     local logical_synchronizer_deployment_mode
     logical_synchronizer_deployment_mode=$( \
-        get_resolved_config | yq ".synchronizerMigration[] | select(.id == ${domain}).enableLogicalSynchronizerDeploymentMode" \
+        get_resolved_config | yq ".synchronizerMigration[]? | select(.id == ${domain}) | .enableLogicalSynchronizerDeploymentMode" 2>/dev/null || true \
     )
 
     # shellcheck disable=SC2076

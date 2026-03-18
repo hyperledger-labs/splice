@@ -59,6 +59,7 @@ export function pulumiOptsWithPrefix(
 ): {
   parallel: 128;
   onOutput: (output: string) => void;
+  onError: (output: string) => void;
   signal: AbortSignal;
   color: 'always';
   policyPacks: string[];
@@ -71,6 +72,12 @@ export function pulumiOptsWithPrefix(
       // do not output empty lines or lines containing just '.'
       if (output.trim().length > 1) {
         console.log(`${prefix}${output.trim()}`);
+      }
+    },
+    onError: (output: string) => {
+      // do not output empty lines or lines containing just '.'
+      if (output.trim().length > 1) {
+        console.log(`${prefix} - error - ${output.trim()}`);
       }
     },
     signal: abortSignal,
@@ -220,6 +227,7 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
       return op.promise.then(
         () => console.error(`Operation ${op.name} succeeded.`),
         err => {
+          const errorDivider = '─'.repeat(60);
           if (err instanceof automation.CommandError) {
             console.error(`Operation ${op.name} failed`);
             const cmdResult = (err as any).commandResult;
@@ -230,6 +238,12 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
             writeOperationErrorOutput(op.name, output);
           } else {
             console.error(`Operation ${op.name} failed with an unknown error.`);
+            const output = err instanceof Error ? err.message : String(err);
+            console.error(`\n${errorDivider}`);
+            console.error(`  Error output for: ${op.name}`);
+            console.error(errorDivider);
+            console.error(output);
+            console.error(errorDivider);
           }
           throw err;
         }

@@ -17,6 +17,7 @@ import Splice.Api.FeaturedAppRightV1 (FeaturedAppRight_CreateActivityMarkerResul
 import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultFeaturedAppActivityMarkerAmount)
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 
 testFeaturedAppActivityMarkers : Script ()
 testFeaturedAppActivityMarkers = do
@@ -136,55 +137,11 @@ testFeaturedAppActivityMarkers = do
   runNextIssuanceD app amuletPrice
   runNextIssuanceD app amuletPrice
   -- advance until the opensAt
-  advanceToNextRoundChange app
+  advanceToNextRoundChange app.dso
   -- Check that coupons are archived, we don't check the detailed minting computations
   -- as these are identical to any other app reward coupons.
   runAmuletDepositBots app
   forA_ couponCids $ \couponCid -> do
     None <- queryContractId dso couponCid
     pure ()
-  pure ()
-
-testFeaturedAppActivityMarkersConfigDisabled : Script ()
-testFeaturedAppActivityMarkersConfigDisabled = do
-  DefaultAppWithUsers{app, alice} <- setupDefaultAppWithUsers
-  featuredAppRightCid <- featureApp app alice
-  FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
-    with
-      beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary alice.primaryParty 1.0]
-
-  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
-
-  submit app.dso $
-    archiveCmd amuletRulesCid
-  amuletRulesCid <- submit app.dso $
-    createCmd amuletRules with
-      configSchedule.initialValue.featuredAppActivityMarkerAmount = None
-
-  (openMiningRoundCid, _) <- getLatestOpenRound app
-
-  AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
-      markerCids = [fromInterfaceContractId markerIface]
-      openMiningRoundCid
-      observers = Some [alice.primaryParty]
-  couponCids === []
-  None <- queryInterfaceContractId app.dso markerIface
-
-  submit app.dso $
-    archiveCmd amuletRulesCid
-  amuletRulesCid <- submit app.dso $
-    createCmd amuletRules with
-      configSchedule.initialValue.featuredAppActivityMarkerAmount = Some 0.0
-
-  FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
-    with
-      beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary alice.primaryParty 1.0]
-
-  AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
-      markerCids = [fromInterfaceContractId markerIface]
-      openMiningRoundCid
-      observers = Some [alice.primaryParty]
-  couponCids === []
-  None <- queryInterfaceContractId app.dso markerIface
-
   pure ()

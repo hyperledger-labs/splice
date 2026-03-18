@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
   SynchronizerNodeService,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
@@ -2317,6 +2318,8 @@ class HttpScanHandler(
               domain,
               party,
               topologyTransactionType = AuthorizedState,
+              topologySnapshot =
+                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
             )
           )
         participantId <- response.mapping.participantIds match {

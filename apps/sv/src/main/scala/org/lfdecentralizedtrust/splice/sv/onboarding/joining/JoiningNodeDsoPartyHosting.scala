@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   RetryProvider,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
@@ -119,6 +120,7 @@ class JoiningNodeDsoPartyHosting(
                             .getPartyToParticipant(
                               synchronizerId,
                               dsoParty,
+                              topologySnapshot = TopologySnapshot.Sequenced,
                             )
                             .map(result =>
                               if (

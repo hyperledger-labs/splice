@@ -13,7 +13,6 @@ import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppFoundDsoConfigs_
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.environment.{
@@ -75,9 +74,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms
           .updateAllSvAppConfigs { (_, config) =>
             config.copy(
-              localSynchronizerNodes = config.localSynchronizerNodes.copy(successor =
-                config.localSynchronizerNodes.current.some
-              ),
+              localSynchronizerNodes = config.localSynchronizerNodes
+                .copy(successor = config.localSynchronizerNodes.current.some),
               parameters = config.parameters.copy(
                 spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
                   physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
@@ -103,9 +101,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .withAmuletPrice(walletAmuletPrice)
-      .addConfigTransform((_, config) => {
-        updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = true))(config)
-      })
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>

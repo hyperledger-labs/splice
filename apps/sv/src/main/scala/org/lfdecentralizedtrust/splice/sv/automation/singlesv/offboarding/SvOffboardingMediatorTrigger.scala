@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
@@ -52,6 +53,7 @@ class SvOffboardingMediatorTrigger(
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       currentMediatorState <- participantAdminConnection.getMediatorSynchronizerState(
         rulesAndStates.dsoRules.domain,
+        TopologySnapshot.Sequenced,
         AuthorizedState,
       )
     } yield {

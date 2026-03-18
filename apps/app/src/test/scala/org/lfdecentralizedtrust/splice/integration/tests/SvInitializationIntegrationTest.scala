@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.RetryFor
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 
 import scala.jdk.CollectionConverters.*
@@ -226,22 +227,33 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .getDecentralizedNamespaceDefinition(
             decentralizedSynchronizerId,
             dsoParty.uid.namespace,
+            topologySnapshot = TopologySnapshot.Sequenced,
           )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(3)
         participantAdminConnection
-          .getSequencerSynchronizerState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getMediatorSynchronizerState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(
+            decentralizedSynchronizerId,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getPartyToParticipant(decentralizedSynchronizerId, dsoParty)
+          .getPartyToParticipant(
+            decentralizedSynchronizerId,
+            dsoParty,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .threshold
@@ -252,7 +264,11 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       eventually() {
         val participantAdminConnection = sv1Backend.appState.participantAdminConnection
         val dsoHostingParticipants = participantAdminConnection
-          .getPartyToParticipant(decentralizedSynchronizerId, dsoParty)
+          .getPartyToParticipant(
+            decentralizedSynchronizerId,
+            dsoParty,
+            topologySnapshot = TopologySnapshot.Sequenced,
+          )
           .futureValue
           .mapping
           .participants
