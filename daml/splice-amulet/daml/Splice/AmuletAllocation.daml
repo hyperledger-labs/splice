@@ -19,6 +19,8 @@ import Splice.Amulet.TwoStepTransfer
 import DA.TextMap qualified as TextMap
 import DA.Assert (assertDeadlineExceeded)
 import Splice.Amulet.TokenApiUtils
+import Splice.Types
+import Splice.Util
 
 
 data AmuletAllocation_DsoExpireResult = AmuletAllocation_DsoExpireResult 
@@ -113,3 +115,7 @@ unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId Hol
 unlockAmuletAllocation amuletAllocation extraArgs = do
   let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
   abortTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+
+
+instance HasCheckedFetch AmuletAllocation ForDso where
+  contractGroupId AmuletAllocation{..} = ForDso with dso = allocationInstrumentAdmin allocation
