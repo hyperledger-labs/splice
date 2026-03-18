@@ -1073,7 +1073,6 @@ class ValidatorApp(
           .withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { implicit traceContext =>
-          requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
                 (Seq(
@@ -1273,7 +1272,6 @@ class ValidatorApp(
                 })*
               )
             }
-          }
         }
       }
       _ = adminRoutes.updateRoute(route)

@@ -33,6 +33,7 @@ object HttpAdminService {
       nodeTypeName: String,
       adminApi: AdminServerConfig,
       parameterConfig: CantonNodeParameters,
+      apiLoggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
       node: => Option[CantonNode],
   )(implicit
@@ -45,6 +46,7 @@ object HttpAdminService {
     adminApi.address,
     adminApi.port,
     parameterConfig,
+    apiLoggingConfig,
     loggerFactory,
     node,
   )
@@ -54,6 +56,7 @@ object HttpAdminService {
       address: String,
       port: Port,
       parameterConfig: CantonNodeParameters,
+      apiLoggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
       node: => Option[CantonNode],
   )(implicit ac: ActorSystem, ec: ExecutionContext, tracer: Tracer, elc: ErrorLoggingContext)
@@ -71,19 +74,30 @@ object HttpAdminService {
     )
     private val routes: AtomicReference[List[Route]] = new AtomicReference(List())
     private val dynamicRoute: Route = ctx => {
-      encodeResponse(concat((commonAdminRoute +: routes.get())*))(ctx)
+      withTraceContext { traceContext =>
+        // The logger logs the request and uses mapResponse to log the response.
+        // handleRejections (inside the logger) seals the route: rejections are
+        // converted to HTTP responses so mapResponse sees all outcomes.
+        // loggingRejectionHandler additionally logs the rejection status code.
+        HttpRequestLogger(apiLoggingConfig, loggerFactory)(traceContext) {
+          handleRejections(
+            HttpRequestLogger
+              .loggingRejectionHandler(apiLoggingConfig, loggerFactory)(traceContext)
+          ) {
+            encodeResponse(concat((commonAdminRoute +: routes.get())*))
+          }
+        }
+      }(ctx)
     }
 
     val commonAdminRoute: Route =
       withTraceContext { traceContext =>
         HttpErrorHandler(loggerFactory)(traceContext) {
-          HttpRequestLogger(ApiLoggingConfig(), loggerFactory)(traceContext) {
-            concat(
-              pathPrefix("api" / nodeTypeName.toLowerCase)(
-                CommonAdminResource.routes(adminHandler, _ => provide(traceContext))
-              )
+          concat(
+            pathPrefix("api" / nodeTypeName.toLowerCase)(
+              CommonAdminResource.routes(adminHandler, _ => provide(traceContext))
             )
-          }
+          )
         }
       }
     private val bindingF = Http()

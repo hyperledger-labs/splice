@@ -637,7 +637,6 @@ class SvApp(
           .withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { implicit traceContext =>
-          requestLogger(traceContext) {
             val errorHandler = new HttpErrorHandler(loggerFactory)
             def buildOperation(service: String, operation: String) = {
               metrics.httpServerMetrics
@@ -694,7 +693,6 @@ class SvApp(
                 ),
               )
             }
-          }
         }
 
       }

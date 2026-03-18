@@ -464,8 +464,7 @@ class ScanApp(
                 )
             }
 
-            requestLogger(traceContext) {
-              concat(
+            concat(
                 ScanResource.routes(
                   scanHandler,
                   buildRouteForOperation(_, "scan"),
@@ -491,7 +490,6 @@ class ScanApp(
                   buildRouteForOperation(_, "token_standard_allocation"),
                 ),
               )
-            }
           }
         }
       }

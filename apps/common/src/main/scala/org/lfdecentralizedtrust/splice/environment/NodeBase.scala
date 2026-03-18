@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.environment
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import org.lfdecentralizedtrust.splice.SpliceMetrics
-import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
 import org.lfdecentralizedtrust.splice.auth.{
   AuthToken,
   AuthTokenManager,
@@ -45,7 +44,6 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.server.Directive0
 import java.time
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
@@ -112,8 +110,6 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
     logger,
   )
 
-  def requestLogger(implicit traceContext: TraceContext): Directive0 =
-    HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
 
   final def isActive: Boolean = {
     // initialized and the state reports itself as healthy

@@ -5,12 +5,11 @@ package org.lfdecentralizedtrust.splice.admin.api
 
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
 import org.apache.pekko.http.scaladsl.server.{
-  AuthorizationFailedRejection,
   Directive0,
+  RejectionHandler,
   RequestContext,
 }
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.RouteResult.{Complete, Rejected}
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -44,6 +43,33 @@ object HttpRequestLogger {
     maxMetadataSize = loggingConfig.maxMetadataSize,
     loggerFactory = loggerFactory,
   )
+
+  /** Creates a RejectionHandler that logs the rejection status code, then delegates to the
+    * default handler to produce the appropriate HTTP response. This should be used at the
+    * top level of the route tree (via handleRejections) to seal the route — ensuring all
+    * rejections become Complete responses with their reason logged.
+    *
+    * Must be placed OUTSIDE the HttpRequestLogger directive so that the logger's
+    * mapResponse sees the rejection-converted responses too.
+    */
+  def loggingRejectionHandler(
+      loggingConfig: ApiLoggingConfig,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit traceContext: TraceContext): RejectionHandler = {
+    val inst = new HttpRequestLogger(
+      loggingConfig.messagePayloads,
+      loggingConfig.maxMethodLength,
+      loggingConfig.maxStringLength,
+      loggingConfig.maxMetadataSize,
+      loggerFactory,
+    )
+    RejectionHandler.default.mapRejectionResponse { response =>
+      if (response.status.isFailure()) {
+        inst.logger.debug(s"HTTP request rejected with status code: ${response.status}")
+      }
+      response
+    }
+  }
 }
 
 final class HttpRequestLogger(
@@ -81,37 +107,26 @@ final class HttpRequestLogger(
           logger.debug(msg(s"query string: ${ctx.request.uri.queryString()}"))
         }
         logger.trace(msg(s"headers: ${ctx.request.headers.toString.limit(maxMetadataSize)}"))
-        mapRouteResult { result =>
-          result match {
-            case Complete(response) =>
-              logger.debug(msg(s"Responding with status code: ${response.status}"))
-              if (messagePayloads) {
-                response.entity match {
-                  // Only logging strict messages which are already in memory, not attempting to log streams
-                  case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-                    logger.debug(
-                      msg(
-                        s"Responding with entity data: ${data.utf8String.limit(maxStringLength)}"
-                      )
-                    )
-                  case _ => logger.debug(msg(s"omitting logging of response entity data."))
-                }
-              }
-              logger.trace(
-                msg(
-                  s"Responding with headers: ${response.headers.toString.limit(maxMetadataSize)}"
+        mapResponse { response =>
+          logger.debug(msg(s"Responding with status code: ${response.status}"))
+          if (messagePayloads) {
+            response.entity match {
+              // Only logging strict messages which are already in memory, not attempting to log streams
+              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+                logger.debug(
+                  msg(
+                    s"Responding with entity data: ${data.utf8String.limit(maxStringLength)}"
+                  )
                 )
-              )
-
-            case Rejected(rejections) if rejections.nonEmpty =>
-              if (rejections.contains(AuthorizationFailedRejection)) {
-                logger.debug(msg("Rejected: Unauthorized."))
-              } else {
-                logger.debug(msg(s"""Rejected: ${rejections.mkString(",")}"""))
-              }
-            case Rejected(_) => // do nothing, part of normal route resolution
+              case _ => logger.debug(msg(s"omitting logging of response entity data."))
+            }
           }
-          result
+          logger.trace(
+            msg(
+              s"Responding with headers: ${response.headers.toString.limit(maxMetadataSize)}"
+            )
+          )
+          response
         }
       }
     }
