@@ -75,7 +75,7 @@ class ZstdTest extends StoreTestBase {
       val (pub, sub) = TestSource
         .probe[ByteString]
         .via(ZstdGroupedWeight(3, zstdChunkSize))
-        .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
+        .toMat(TestSink.probe[ByteString])(Keep.both)
         .run()
 
       sub.request(3)
@@ -86,17 +86,17 @@ class ZstdTest extends StoreTestBase {
       }
       val zstd1 = clue("More input, now first element will be closed") {
         send(pub, 200, 700)
-        sub.expectNext().bytes
+        sub.expectNext()
       }
       val zstd2 = clue("Another large input, enough to close the second element") {
         send(pub, 700, 1700)
-        sub.expectNext().bytes
+        sub.expectNext()
       }
       val zstd3 =
         clue("A small input, followed by completing the source, should emit another element") {
           send(pub, 1700, 1800)
           pub.sendComplete()
-          sub.expectNext().bytes
+          sub.expectNext()
         }
 
       val allEncodedTxs = encode(txs)

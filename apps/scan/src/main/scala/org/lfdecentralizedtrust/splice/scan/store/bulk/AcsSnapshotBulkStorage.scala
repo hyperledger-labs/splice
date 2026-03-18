@@ -116,26 +116,37 @@ class AcsSnapshotBulkStorage(
           }
           ret
         }
-        .via(
-          SingleAcsSnapshotBulkStorage.asFlow(
-            storageConfig,
-            appConfig,
-            acsSnapshotStore,
-            s3Connection,
-            historyMetrics,
-            loggerFactory,
-          )
-        )
-        .mapAsync(1) { (ts: TimestampWithMigrationId) =>
-          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
-          for {
-            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
-          } yield {
-            logger.info(
-              s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+        .flatMapConcat(ts =>
+          Source
+            .single(ts)
+            .via(
+              SingleAcsSnapshotBulkStorage
+                .asFlow(
+                  storageConfig,
+                  appConfig,
+                  acsSnapshotStore,
+                  s3Connection,
+                  historyMetrics,
+                  loggerFactory,
+                )
+                .map(keys => {
+                  logger.debug(
+                    s"Successfully dumped snapshot from migration ${ts.migrationId}, timestamp ${ts.timestamp} to bulk storage, with object keys: $keys"
+                  )
+                  ts
+                })
             )
-            ts
-          }
+        )
+        .mapAsync(1) { ts =>
+          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
+          kvProvider
+            .setLatestAcsSnapshotsInBulkStorage(ts)
+            .map(_ => {
+              logger.info(
+                s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+              )
+              ts
+            })
         }
     }
   }

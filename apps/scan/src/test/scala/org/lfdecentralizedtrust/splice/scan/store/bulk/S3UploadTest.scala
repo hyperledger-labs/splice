@@ -45,22 +45,21 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
     def testWithInput(
         inputSizes: Seq[Int],
         expectedObjectSizes: Seq[Int],
-        checkStreamOutput: (GroupedWeightS3ObjectFlow.Output, Int) => Assertion,
+        checkStreamOutput: (String, Int) => Assertion,
         runAfterInputs: (
-            TestPublisher.Probe[ByteStringWithTermination],
-            TestSubscriber.Probe[GroupedWeightS3ObjectFlow.Output],
+            TestPublisher.Probe[ByteString],
+            TestSubscriber.Probe[String],
         ) => Assertion,
         runAfterOutputs: (
-            TestPublisher.Probe[ByteStringWithTermination],
-            TestSubscriber.Probe[GroupedWeightS3ObjectFlow.Output],
+            TestPublisher.Probe[ByteString],
+            TestSubscriber.Probe[String],
         ) => Assertion,
-        labelLast: Boolean = true,
     ): Future[Assertion] = {
       val data = ByteString(Random.nextBytes(100))
       val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
 
       val (pub, sub) = TestSource
-        .probe[ByteStringWithTermination]
+        .probe[ByteString]
         .via(
           GroupedWeightS3ObjectFlow(
             bucketConnection,
@@ -70,19 +69,14 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
             loggerFactory,
           )
         )
-        .toMat(TestSink.probe[GroupedWeightS3ObjectFlow.Output])(Keep.both)
+        .toMat(TestSink.probe[String])(Keep.both)
         .run()
 
       val it = data.iterator
-      def sendBytes(n: Int, isLast: Boolean) =
-        pub.sendNext(ByteStringWithTermination(it.getByteString(n), isLast))
+      def sendBytes(n: Int) =
+        pub.sendNext(it.getByteString(n))
 
-      inputSizes.zipWithIndex.foreach { case (size, i) =>
-        sendBytes(
-          size,
-          isLast = i == inputSizes.length - 1 && labelLast,
-        )
-      }
+      inputSizes.foreach(sendBytes)
       runAfterInputs(pub, sub)
 
       sub.request(expectedObjectSizes.length.toLong)
@@ -111,10 +105,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       testWithInput(
         inputSizes,
         expectedObjectSizes,
-        checkStreamOutput = { (out, i) =>
-          out.objectKey shouldBe s"test_$i"
-          out.isLastObject shouldBe (i == expectedObjectSizes.length - 1)
-        },
+        checkStreamOutput = { (objectKey, i) => objectKey shouldBe s"test_$i" },
         runAfterInputs = { (_, _) => succeed },
         runAfterOutputs = { (_, sub) =>
           sub.expectComplete()
@@ -129,10 +120,7 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
       testWithInput(
         inputSizes,
         expectedObjectSizes,
-        { (out, i) =>
-          out.objectKey shouldBe s"test_$i"
-          out.isLastObject shouldBe false
-        },
+        { (objectKey, i) => objectKey shouldBe s"test_$i" },
         runAfterInputs = { (_, _) => succeed },
         runAfterOutputs = { (pub, sub) =>
           sub.request(1)
@@ -141,29 +129,6 @@ class S3UploadTest extends StoreTestBase with HasS3Mock {
           sub.expectError()
           succeed
         },
-        labelLast = false,
-      )
-    }
-
-    "supports an empty final input" in {
-      val inputSizes = Seq(6, 6, 3)
-      val expectedObjectSizes = Seq(12, 3)
-      testWithInput(
-        inputSizes,
-        expectedObjectSizes,
-        checkStreamOutput = { (out, i) =>
-          out.objectKey shouldBe s"test_$i"
-          out.isLastObject shouldBe (i == expectedObjectSizes.length - 1)
-        },
-        runAfterInputs = { (pub, _) =>
-          pub.sendNext(ByteStringWithTermination(ByteString.empty, isLast = true))
-          succeed
-        },
-        runAfterOutputs = { (_, sub) =>
-          sub.expectComplete()
-          succeed
-        },
-        labelLast = false,
       )
     }
   }
