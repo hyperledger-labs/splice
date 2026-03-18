@@ -79,6 +79,15 @@ class ScanTimeBasedIntegrationTest
           )
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Scan)(
+          _.copy(
+            // By default, the acs snapshot trigger processes 30sec of history per invocation,
+            // which is too slow for this test which advances time by hours or days.
+            acsSnapshotTriggerPollingInterval = Some(NonNegativeFiniteDuration.ofHours(1))
+          )
+        )(config)
+      )
 
   override protected lazy val sanityChecksIgnoredRootCreates = Seq(
     AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
