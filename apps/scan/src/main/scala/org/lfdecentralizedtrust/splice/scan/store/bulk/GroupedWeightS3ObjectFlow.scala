@@ -122,6 +122,10 @@ case class GroupedWeightS3ObjectFlow(
         }
       }
 
+      private val failCallback = getAsyncCallback[Throwable] { ex =>
+        failStage(ex)
+      }
+
       override def onPush(): Unit = {
         val elem = grab(in)
         val curState = state
@@ -132,7 +136,7 @@ case class GroupedWeightS3ObjectFlow(
         )
         curState.currentObject.upload(partNumber, elem.asByteBuffer).onComplete {
           case Success(_) => uploadCallback.invoke(())
-          case Failure(ex) => failStage(ex) // FIXME: thread safety
+          case Failure(ex) => failCallback.invoke(ex)
         }
         if (!objectDone) {
           logger.debug(
@@ -155,7 +159,7 @@ case class GroupedWeightS3ObjectFlow(
       private def finishCurrentObject(): Unit =
         state.currentObject.finish().onComplete {
           case Success(_) => finishCallback.invoke(())
-          case Failure(ex) => failStage(ex)
+          case Failure(ex) => failCallback.invoke(ex)
         }
 
       override def onUpstreamFinish(): Unit = {

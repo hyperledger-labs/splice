@@ -93,7 +93,7 @@ case class ZstdGroupedWeight(
 
       private def reset(): Unit = {
         zstd.get().close()
-        zstd.set(new ZSTD(3))
+        zstd.set(new ZSTD(compressionLevel))
         state.set(State.empty())
       }
 

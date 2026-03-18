@@ -116,5 +116,23 @@ class ZstdTest extends StoreTestBase {
       }
     }
 
+
+    "handle upstream close when buffer was just flushed" in {
+      val zstdChunkSize = 10L // very small so a single 100-byte input crosses the threshold
+      val (pub, sub) = TestSource
+        .probe[ByteString]
+        .via(ZstdGroupedWeight(3, zstdChunkSize))
+        .toMat(TestSink.probe[ByteString])(Keep.both)
+        .run()
+      val randInput = new Array[Byte](100)
+      scala.util.Random.nextBytes(randInput)
+      // This single input is large enough to cross minSize, so onPush will push and reset.
+      pub.sendNext(ByteString.fromArray(randInput))
+      pub.sendComplete()
+      sub.request(1)
+      sub.expectNext(20.seconds)
+      sub.expectComplete()
+      succeed
+    }
   }
 }
