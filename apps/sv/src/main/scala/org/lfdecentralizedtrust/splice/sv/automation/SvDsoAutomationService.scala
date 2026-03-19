@@ -346,6 +346,7 @@ class SvDsoAutomationService(
         triggerContext,
         config.maxVettingDelay,
         config.latestPackagesOnly,
+        enabledFeatures.enableUnsupportedDarsUnvetting,
       )
     )
 
