@@ -20,7 +20,7 @@
 
 .. release-notes:: 0.5.16
 
-  - Daml:
+  - Daml
 
     .. important::
 
@@ -44,7 +44,7 @@
 
     - Support 24h signing delays for token standard CC transfers and allocations, see `CIP 107 <https://github.com/canton-foundation/cips/blob/main/cip-0107/cip-0107.md>`_.
 
-      - This change concern the CC implementation of the token standard APIs,
+      - This change concerns the CC implementation of the token standard APIs,
         so no change is required for clients of these APIs to make use of the
         new 24h submission delay. However, Scan returns a slightly different choice
         context, so make sure that your app passes that along opaquely.
@@ -65,7 +65,7 @@
       - The check that the lock on a locked amulet expires before the underlying amulet
         expires has been removed.
 
-    - ``TransferCommand`` is deprecated and will removed in a future
+    - ``TransferCommand`` is deprecated and will be removed in a future
       version. It was originally introduced to support 24h signing
       delays and is no longer required now that this is also available
       through the token standard APIs. This also applies to the
@@ -94,7 +94,7 @@
     walletPayments     0.1.17
     ================== =======
 
-  - Validators
+  - Validator App
 
     .. important::
 
@@ -115,7 +115,7 @@
   - Scan
 
     - Improve the performance of ACS snapshot generation, reducing the magnitude of periodic spikes in database activity and avoiding log warnings about advisory locks.
-    - Add a new grafana dashboard to monitor the progress of ACS snapshot generation.
+    - Add a new Grafana dashboard to monitor the progress of ACS snapshot generation.
 
   - Infrastructure
 
@@ -124,14 +124,14 @@
 
   - Canton
 
-      - Internal: Replaced the sequencer's internal event signaller based on Pekko's `BroadcastHub` with an implementation with better runtime characteristics.
-        The old event signaller can be turned on again with `canton.sequencers.<sequencer>.parameters.use-legacy-event-signaller = true`.
+    - Internal: Replaced the sequencer's internal event signaller based on Pekko's `BroadcastHub` with an implementation with better runtime characteristics.
+      The old event signaller can be turned on again with `canton.sequencers.<sequencer>.parameters.use-legacy-event-signaller = true`.
 
-      - Sequencer Inspection Service
+    - Sequencer Inspection Service
 
-        - A new field `paid_traffic_cost` exposes the traffic cost paid by the node on completion events and update events
-          - On completions, the field contains the cost paid by the node for the submission of the transaction. May be 0 for failed transactions that did not incur any traffic cost.
-          - On updates, the field contains the cost paid by the node for the submission of the transaction, if available on this node and to the querying parties. In particular, the cost is only available on the submitting node and when querying with a filter that includes submitting parties. The cost is available for Daml transactions and re-assignments. Not for topology transactions.
+      - A new field `paid_traffic_cost` exposes the traffic cost paid by the node on completion events and update events
+        - On completions, the field contains the cost paid by the node for the submission of the transaction. May be 0 for failed transactions that did not incur any traffic cost.
+        - On updates, the field contains the cost paid by the node for the submission of the transaction, if available on this node and to the querying parties. In particular, the cost is only available on the submitting node and when querying with a filter that includes submitting parties. The cost is available for Daml transactions and re-assignments. Not for topology transactions.
 
 .. release-notes:: 0.5.15
 
