@@ -47,6 +47,7 @@ class RewardComputationTrigger(
   ): Future[Seq[RewardComputationTrigger.Task]] = {
     for {
       _ <- updateHistory.waitUntilInitialized
+      // TODO(#4118): replace this approximation with proper retrieval from the ScanRewardsReferenceStore
       lastClosedO <- store.lookupRoundOfLatestData()
       earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
       tasks <- (lastClosedO, earliestCompleteO) match {
