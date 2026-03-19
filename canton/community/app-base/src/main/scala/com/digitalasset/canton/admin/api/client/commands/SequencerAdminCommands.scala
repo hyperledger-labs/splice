@@ -25,6 +25,7 @@ import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   TimestampSelector,
 }
 import com.digitalasset.canton.synchronizer.sequencer.{SequencerPruningStatus, SequencerSnapshot}
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.util.GrpcStreamingUtils
 import com.google.protobuf.ByteString
@@ -602,6 +603,26 @@ object SequencerAdminCommands {
       service.setLsuTrafficControlState(request)
     override protected def handleResponse(
         response: proto.SetLsuTrafficControlStateResponse
+    ): Either[String, Unit] = Either.unit
+  }
+
+  final case class PerformLsuSequencingTest(recipientMediatorGroup: MediatorGroupIndex)
+      extends BaseSequencerAdministrationCommand[
+        proto.PerformLsuSequencingTestRequest,
+        proto.PerformLsuSequencingTestResponse,
+        Unit,
+      ] {
+    override protected def createRequest(): Either[String, proto.PerformLsuSequencingTestRequest] =
+      Right(proto.PerformLsuSequencingTestRequest(recipientMediatorGroup.unwrap))
+
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.PerformLsuSequencingTestRequest,
+    ): Future[proto.PerformLsuSequencingTestResponse] =
+      service.performLsuSequencingTest(request)
+
+    override protected def handleResponse(
+        response: proto.PerformLsuSequencingTestResponse
     ): Either[String, Unit] = Either.unit
   }
 }
