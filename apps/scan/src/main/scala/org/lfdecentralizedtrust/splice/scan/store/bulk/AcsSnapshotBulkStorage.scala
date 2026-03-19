@@ -17,13 +17,9 @@ import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{AcsSnapshotObjects, ObjectKeyAndChecksum}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryMetrics,
-  S3BucketConnection,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -174,17 +170,9 @@ class AcsSnapshotBulkStorage(
     }
   }
 
-  // TODO(#3429): we probably wanna move this and the pipeline below to S3BucketConnection,
-  //  to reuse with the updates workflow (but there we'll need to be careful with the size of the return)
-  //  we'll do that in the next PR, when we add support for querying the bulk storage for updates as well
-  case class ObjectKeyAndChecksum(
-      key: String,
-      checksum: String,
-  )
-
   def getAcsSnapshotAtOrBefore(
       atOrBeforeTimestamp: CantonTimestamp
-  )(implicit tc: TraceContext): Future[(CantonTimestamp, Seq[(String, String)])] = {
+  )(implicit tc: TraceContext): Future[AcsSnapshotObjects] = {
 
     for {
       snapshotTs <- kvProvider
@@ -207,9 +195,9 @@ class AcsSnapshotBulkStorage(
         .listObjectsSource(prefix)
         .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
         .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
-          s3Connection.readChecksum(obj.key).map(checksum => obj.key -> checksum)
+          s3Connection.readChecksum(obj.key).map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
         }
-        .runWith(Sink.seq[(String, String)])
+        .runWith(Sink.seq[ObjectKeyAndChecksum])
 
     } yield {
       if (objects.isEmpty) {
@@ -220,10 +208,27 @@ class AcsSnapshotBulkStorage(
           .asRuntimeException()
       }
       logger.trace(
-        s"Found snapshot in bulk storage at timestamp ${snapshotTs}, with objects: ${objects.map(_._1)}"
+        s"Found snapshot in bulk storage at timestamp $snapshotTs, with objects: ${objects.map(_.key).mkString(", ")}"
       )
-      (snapshotTs, objects) // FIXME: put in a nicer case class
+      AcsSnapshotObjects(snapshotTs, objects)
     }
   }
+
+}
+
+object AcsSnapshotBulkStorage {
+  // TODO(#3429): we probably want to move this case class and part of the pipeline in getAcsSnapshotAtOrBefore to
+  //  S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the
+  //  size of the return). we'll do that in a coming PR, when we add support for querying the bulk storage
+  //  for updates as well.
+  case class ObjectKeyAndChecksum(
+      key: String,
+      checksum: String,
+  )
+
+  case class AcsSnapshotObjects(
+      timestamp: CantonTimestamp,
+      objects: Seq[ObjectKeyAndChecksum],
+  )
 
 }

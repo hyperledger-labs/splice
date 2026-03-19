@@ -167,9 +167,9 @@ class AcsSnapshotBulkStorageTest
       }
       def assertGetObjects(queryTs: CantonTimestamp, expectedTs: CantonTimestamp, expectedNumObjects: Int) = {
         val getObjectsResult = bulkStorage.getAcsSnapshotAtOrBefore(queryTs).futureValue
-        getObjectsResult._2.map(_._1) should contain theSameElementsInOrderAs
+        getObjectsResult.objects.map(_.key) should contain theSameElementsInOrderAs
           (0 until expectedNumObjects).map(i => s"$expectedTs-Migration-0-${expectedTs.add(1.days)}/ACS_$i.zstd")
-        getObjectsResult._2.map(_._2).foreach {
+        getObjectsResult.objects.map(_.checksum).foreach {
           // We test elsewhere that computed and persisted checksums are correct, so here we just check that they are present and not empty
           _ should not be empty
         }
@@ -181,7 +181,7 @@ class AcsSnapshotBulkStorageTest
         val ex = bulkStorage.getAcsSnapshotAtOrBefore(ts1).failed.futureValue
         ex shouldBe a [StatusRuntimeException]
         ex.asInstanceOf[StatusRuntimeException].getStatus.getCode shouldBe io.grpc.Status.Code.NOT_FOUND
-        ex.getMessage shouldBe ("no snapshot in bulk storage yet")
+        ex.getMessage should include ("no snapshot in bulk storage yet")
 
         clue("Initially, a single snapshot is dumped") {
           eventually(4.minutes) {

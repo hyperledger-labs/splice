@@ -12,56 +12,19 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
-  ExternalPartyAmuletRules,
-  TransferCommand,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
-  ClosedMiningRound,
-  IssuingMiningRound,
-  OpenMiningRound,
-  SummarizingMiningRound,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{ExternalPartyAmuletRules, TransferCommand}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, IssuingMiningRound, OpenMiningRound, SummarizingMiningRound}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
-import org.lfdecentralizedtrust.splice.environment.{
-  PackageVersionSupport,
-  ParticipantAdminConnection,
-  SequencerAdminConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, ParticipantAdminConnection, SequencerAdminConnection}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  AcsRequest,
-  BatchListVotesByVoteRequestsRequest,
-  DamlValueEncoding,
-  ErrorResponse,
-  EventHistoryRequest,
-  HoldingsStateRequest,
-  HoldingsSummaryRequest,
-  ListVoteResultsRequest,
-  MaybeCachedContractWithState,
-  UpdateHistoryItem,
-  UpdateHistoryItemV2,
-  UpdateHistoryRequestV2,
-  UpdateHistoryTransactionV2,
-}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsRequest, BatchListVotesByVoteRequestsRequest, DamlValueEncoding, ErrorResponse, EventHistoryRequest, HoldingsStateRequest, HoldingsSummaryRequest, ListVoteResultsRequest, MaybeCachedContractWithState, UpdateHistoryItem, UpdateHistoryItemV2, UpdateHistoryRequestV2, UpdateHistoryTransactionV2}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
-import org.lfdecentralizedtrust.splice.scan.store.{
-  AcsSnapshotStore,
-  ScanEventStore,
-  ScanStore,
-  TxLogEntry,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore, TxLogEntry}
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
-import org.lfdecentralizedtrust.splice.util.{
-  Codec,
-  Contract,
-  ContractWithState,
-  PackageQualifiedName,
-  QualifiedName,
-}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, PackageQualifiedName, QualifiedName}
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
@@ -82,26 +45,10 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.lang.UnsupportedOperationException
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
-  AbortTransferInstruction,
-  DevnetTap,
-  Mint,
-  Transfer,
-}
-import org.lfdecentralizedtrust.splice.http.{
-  HttpFeatureSupportHandler,
-  HttpValidatorLicensesHandler,
-  HttpVotesHandler,
-  UrlValidator,
-}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{AbortTransferInstruction, DevnetTap, Mint, Transfer}
+import org.lfdecentralizedtrust.splice.http.{HttpFeatureSupportHandler, HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{
-  AppStore,
-  AppStoreWithIngestion,
-  PageLimit,
-  SortOrder,
-  VotesStore,
-}
+import org.lfdecentralizedtrust.splice.store.{AppStore, AppStoreWithIngestion, PageLimit, SortOrder, VotesStore}
 import AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
@@ -110,6 +57,7 @@ import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{AcsSnapshotObjects, ObjectKeyAndChecksum}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
@@ -2340,13 +2288,13 @@ class HttpScanHandler(
           new UnsupportedOperationException("Bulk storage is not configured")
         )
       )(acsSnapshotBulkStorage =>
-        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map { case (ts, objects) =>
+        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map { case AcsSnapshotObjects(ts, objects) =>
           ScanResource.GetBulkAcsSnapshotResponse.OK(
             definitions.GetBulkAcsSnapshotResponse(
               Codec.encode(ts),
-              objects.map { case (key, checksum) =>
+              objects.map { case ObjectKeyAndChecksum(key, checksum) =>
                 definitions.BulkStorageObject(
-                  // TODO: map the key to a url
+                  // TODO(#3429): for now we return just the key, but this should be mapped to a full url in scan
                   key,
                   checksum,
                 )

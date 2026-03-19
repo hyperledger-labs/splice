@@ -2490,7 +2490,7 @@ object HttpScanAppClient {
       atOrBeforeTimestamp: CantonTimestamp
   ) extends InternalBaseCommand[
         http.GetBulkAcsSnapshotResponse,
-        (CantonTimestamp, Seq[(String, String)]),
+        definitions.GetBulkAcsSnapshotResponse,
       ] {
     override def submitRequest(
         client: Client,
@@ -2502,12 +2502,9 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[GetBulkAcsSnapshotResponse, Either[
       String,
-      (CantonTimestamp, Seq[(String, String)]), // TODO: nicer object
+      definitions.GetBulkAcsSnapshotResponse,
     ]] = { case http.GetBulkAcsSnapshotResponse.OK(response) =>
-      Right((
-        CantonTimestamp.assertFromInstant(response.timestamp.toInstant),
-        response.objects.map(obj => obj.url -> obj.checksum).toSeq,
-      ))
+      Right(response)
     }
   }
 
