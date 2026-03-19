@@ -23,24 +23,11 @@ import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.{
-  AcsSnapshotStore,
-  ScanKeyValueProvider,
-  ScanKeyValueStore,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  HasS3Mock,
-  HistoryMetrics,
-  Limit,
-  S3BucketConnection,
-  StoreTestBase,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HasS3Mock, HistoryMetrics, Limit, S3BucketConnection, StoreTestBase, TimestampWithMigrationId, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -49,6 +36,7 @@ import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.NoSuchElementException
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*
@@ -142,6 +130,28 @@ class AcsSnapshotBulkStorageTest
       val updateHistory = mockUpdateHistory()
       val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
       val metricsFactory = new InMemoryMetricsFactory
+
+      val kvProvider = mkProvider.futureValue
+
+      val retryProvider =
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
+      val bulkStorage = new AcsSnapshotBulkStorage(
+        bulkStorageTestConfig,
+        appConfig,
+        store.store,
+        updateHistory,
+        s3BucketConnection,
+        kvProvider,
+        new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
+        loggerFactory,
+      )
+
+      val svc = bulkStorage.asRetryableService(
+        AutomationConfig(pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)), // Fast retries
+        new WallClock(timeouts, loggerFactory),
+        retryProvider,
+      )
+
       def assertLatestSnapshotInMetrics(ts: CantonTimestamp) = {
         val latestSnapshotMetrics = metricsFactory.metrics.gauges
           .get(
@@ -155,33 +165,30 @@ class AcsSnapshotBulkStorageTest
           .get()
           ._1 shouldBe ts.toEpochMilli * 1000
       }
-
-      val kvProvider = mkProvider.futureValue
-
-      val retryProvider =
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
-      val svc = new AcsSnapshotBulkStorage(
-        bulkStorageTestConfig,
-        appConfig,
-        store.store,
-        updateHistory,
-        s3BucketConnection,
-        kvProvider,
-        new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
-        loggerFactory,
-      ).asRetryableService(
-        AutomationConfig(pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)), // Fast retries
-        new WallClock(timeouts, loggerFactory),
-        retryProvider,
-      )
+      def assertGetObjects(queryTs: CantonTimestamp, expectedTs: CantonTimestamp, expectedNumObjects: Int) = {
+        val getObjectsResult = bulkStorage.getAcsSnapshotAtOrBefore(queryTs).futureValue
+        getObjectsResult.map(_._1) should contain theSameElementsInOrderAs
+          (0 until expectedNumObjects).map(i => s"$expectedTs-Migration-0-${expectedTs.add(1.days)}/ACS_$i.zstd")
+        getObjectsResult.map(_._2).foreach {
+          // We test elsewhere that computed and persisted checksums are correct, so here we just check that they are present and not empty
+          _ should not be empty
+        }
+        succeed
+      }
 
       Using.resources(svc, retryProvider) { (_, _) =>
+
+        val ex = bulkStorage.getAcsSnapshotAtOrBefore(ts1).failed.futureValue
+        ex shouldBe a [NoSuchElementException]
+        ex.getMessage shouldBe ("no snapshot in bulk storage yet")
+
         clue("Initially, a single snapshot is dumped") {
           eventually(4.minutes) {
             val persistedTs1 = kvProvider.getLatestAcsSnapshotInBulkStorage().value.futureValue
             persistedTs1 shouldBe Some(TimestampWithMigrationId(ts1, 0))
-            assertLatestSnapshotInMetrics(ts1)
           }
+          assertLatestSnapshotInMetrics(ts1)
+          assertGetObjects(ts1, ts1, 7)
         }
 
         clue(
@@ -199,6 +206,7 @@ class AcsSnapshotBulkStorageTest
             },
           )
           assertLatestSnapshotInMetrics(ts1)
+          assertGetObjects(ts2, ts1, 7)
         }
 
         clue("Add one more snapshot to the store, at the end of the period") {
@@ -207,9 +215,14 @@ class AcsSnapshotBulkStorageTest
           eventually(4.minutes) {
             val persistedTs3 = kvProvider.getLatestAcsSnapshotInBulkStorage().value.futureValue
             persistedTs3.value shouldBe TimestampWithMigrationId(ts3, 0)
-            assertLatestSnapshotInMetrics(ts3)
           }
+          assertLatestSnapshotInMetrics(ts3)
+          assertGetObjects(ts3, ts3, 7)
         }
+
+        val ex1 = bulkStorage.getAcsSnapshotAtOrBefore(ts1.minus(java.time.Duration.ofDays(1))).failed.futureValue
+        ex1 shouldBe a [NoSuchElementException]
+        ex1.getMessage should include ("this may be because the timestamp is before network genesis")
 
       }
     }

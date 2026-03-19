@@ -66,7 +66,7 @@ case class ScanStorageConfig(
       periodHours: Int,
   ): CantonTimestamp = {
     val (hourForSnapshot, plusDays) = timesToDoSnapshot(periodHours)
-      .find(_ > afterRecordTime.toInstant.get(ChronoField.HOUR_OF_DAY)) match {
+      .find(_ > afterRecordTime.toInstant.atZone(ZoneOffset.UTC).getHour) match {
       case Some(hour) => hour -> 0 // current day at hour
       case None => 0 -> 1 // next day at 00:00
     }
@@ -77,7 +77,7 @@ case class ScanStorageConfig(
       upToRecordTime: CantonTimestamp,
       periodHours: Int,
   ): CantonTimestamp = {
-    val rtHours = upToRecordTime.toInstant.get(ChronoField.HOUR_OF_DAY)
+    val rtHours = upToRecordTime.toInstant.atZone(ZoneOffset.UTC).getHour
     val hourForSnapshot = timesToDoSnapshot(periodHours)
       .find(_ <= rtHours)
       .getOrElse(

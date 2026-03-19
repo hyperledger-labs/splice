@@ -13,8 +13,6 @@ import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransfo
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
 
 import java.net.URI
 import java.nio.ByteBuffer
@@ -68,17 +66,18 @@ class S3BucketConnection(
   }
 
   def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
-    val checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
+
+    val headRequest = HeadObjectRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .build()
     for {
-      checksumResponse <- s3Client
-        .getObjectTagging(checksumRequest)
+      head <- s3Client.headObject(headRequest).asScala
+      checksum = head
+        .metadata()
         .asScala
-      checksum = checksumResponse
-        .tagSet()
-        .asScala
-        .find(_.key() == "splice-checksum")
-        .map(_.value())
-        .getOrElse(throw new RuntimeException("Missing checksum tag"))
+        .getOrElse("splice-checksum", throw new RuntimeException("Missing checksum metadata"))
     } yield checksum
   }
 

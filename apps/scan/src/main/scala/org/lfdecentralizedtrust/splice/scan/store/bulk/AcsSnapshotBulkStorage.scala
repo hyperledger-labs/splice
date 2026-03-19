@@ -168,7 +168,9 @@ class AcsSnapshotBulkStorage(
     )
   }
 
-  // TODO: probably wanna move this and the pipeline below to S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the size of the return)
+  // TODO(#3429): we probably wanna move this and the pipeline below to S3BucketConnection,
+  //  to reuse with the updates workflow (but there we'll need to be careful with the size of the return)
+  //  we'll do that in the next PR, when we add support for querying the bulk storage for updates as well
   case class ObjectKeyAndChecksum(
       key: String,
       checksum: String,
@@ -196,12 +198,17 @@ class AcsSnapshotBulkStorage(
       objects <- s3Connection
         .listObjectsSource(prefix)
         .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
-        .mapAsync(4) { obj => // TODO: configurable parallelism
+        .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
           s3Connection.readChecksum(obj.key).map(checksum => obj.key -> checksum)
         }
         .runWith(Sink.seq[(String, String)])
 
     } yield {
+      if (objects.isEmpty) {
+        throw new NoSuchElementException(
+          s"No snapshot objects found in bulk storage at expected timestamp at or before $atOrBeforeTimestamp, this may be because the timestamp is before network genesis"
+        )
+      }
       logger.trace(
         s"Found snapshot in bulk storage at timestamp ${snapshotTs}, with objects: ${objects.map(_._1)}"
       )

@@ -1617,6 +1617,29 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+    /v0/history/bulk/v0/history/bulk/acs:
+      get:
+        tags: [ external, scan ]
+        x-jvm-package: scan
+        operationId: "getBulkAcsSnapshot"
+        description: |
+          Get download URLs and metadata for an ACS snapshot available for bulk download, at or before a certain record time.
+        parameters:
+          - name: "record_time"
+            in: "query"
+            required: true
+            schema:
+              type: string
+        responses:
+          "200":
+            description: ok
+            content:
+              application/json:
+                schema:
+                  "$ref": "#/components/schemas/GetBulkAcsSnapshotResponse"
+          "404":
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -3914,3 +3937,34 @@ components:
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    GetBulkAcsSnapshotResponse:
+      type: object
+      properties:
+        timestamp:
+          description: |
+            The timestamp at which the ACS snapshot was taken.
+          type: string
+          format: date-time
+        objects:
+          description: |
+            The list of bulk storage objects containing the ACS snapshot data.
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkStorageObject"
+
+    BulkStorageObject:
+      type: object
+      required:
+        - url
+        - checksum
+      properties:
+        url:
+          description: |
+            The URL from which the bulk storage object can be downloaded.
+          type: string
+        checksum:
+          description: |
+            The checksum of the bulk storage object, for verification of integrity and consistency across SVs.
+          type: string
+
