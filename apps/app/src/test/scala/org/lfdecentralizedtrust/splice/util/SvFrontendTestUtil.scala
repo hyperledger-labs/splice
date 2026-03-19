@@ -15,7 +15,9 @@ trait SvFrontendTestUtil extends TestCommon {
   def setExpiryDate(party: String, formPrefix: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ) = {
-    setDateTime(party, s"$formPrefix-expiry-date", dateTime)
+    eventuallySucceeds() {
+      setDateTime(party, s"$formPrefix-expiry-date-field", dateTime)
+    }
   }
 
   def setLegacyEffectiveDate(party: String, dateTime: String)(implicit
@@ -27,7 +29,9 @@ trait SvFrontendTestUtil extends TestCommon {
   def setEffectiveDate(party: String, formPrefix: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ) = {
-    setDateTime(party, s"$formPrefix-effective-date-field", dateTime)
+    eventuallySucceeds() {
+      setDateTime(party, s"$formPrefix-effective-date-field", dateTime)
+    }
   }
 
   def clickLegacyVoteRequestSubmitButtonOnceEnabled(
