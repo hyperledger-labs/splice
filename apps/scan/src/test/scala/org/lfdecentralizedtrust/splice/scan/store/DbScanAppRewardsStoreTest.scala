@@ -406,7 +406,7 @@ class DbScanAppRewardsStoreTest
     "getNextRoundWithoutRootHash returns None when no activity records" in {
       for {
         (store, historyId) <- newStore()
-        result <- store.getNextRoundWithoutRootHash(lastClosedRound = 100L)
+        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
       } yield {
         result shouldBe None
       }
@@ -417,7 +417,7 @@ class DbScanAppRewardsStoreTest
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
         _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        result <- store.getNextRoundWithoutRootHash(lastClosedRound = 100L)
+        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
       } yield {
         result.value shouldBe 10L
       }
@@ -437,7 +437,7 @@ class DbScanAppRewardsStoreTest
             )
           )
         )
-        result <- store.getNextRoundWithoutRootHash(lastClosedRound = 100L)
+        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
       } yield {
         result.value shouldBe 20L
       }
@@ -456,7 +456,7 @@ class DbScanAppRewardsStoreTest
             )
           )
         )
-        result <- store.getNextRoundWithoutRootHash(lastClosedRound = 100L)
+        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
       } yield {
         result shouldBe None
       }
@@ -467,9 +467,20 @@ class DbScanAppRewardsStoreTest
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
         _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        result <- store.getNextRoundWithoutRootHash(lastClosedRound = 15L)
+        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 15L)
       } yield {
         result.value shouldBe 10L
+      }
+    }
+
+    "getNextRoundWithoutRootHash respects earliestRound lower bound" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
+        _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
+        result <- store.getNextRoundWithoutRootHash(earliestRound = 15L, lastClosedRound = 100L)
+      } yield {
+        result.value shouldBe 20L
       }
     }
   }

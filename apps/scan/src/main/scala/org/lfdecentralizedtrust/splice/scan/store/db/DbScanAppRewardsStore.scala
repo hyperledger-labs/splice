@@ -462,17 +462,19 @@ class DbScanAppRewardsStore(
   // -- Aggregation ------------------------------------------------------------
 
   /** Find the earliest closed round that has activity records but no root hash.
+    * Only considers rounds in [earliestRound, lastClosedRound].
     * Returns None if all rounds with activity already have root hashes,
-    * or if there are no activity records at all.
+    * or if there are no activity records in the range.
     */
-  def getNextRoundWithoutRootHash(lastClosedRound: Long)(implicit
+  def getNextRoundWithoutRootHash(earliestRound: Long, lastClosedRound: Long)(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
     val historyId = updateHistory.historyId
     runQuerySingle(
       sql"""select min(aar.round_number)
             from (select distinct round_number from app_activity_record_store
-                  where round_number <= $lastClosedRound) aar
+                  where round_number >= $earliestRound
+                    and round_number <= $lastClosedRound) aar
             where not exists (
               select 1 from #${Tables.appRewardRootHashes} rh
               where rh.history_id = $historyId and rh.round_number = aar.round_number

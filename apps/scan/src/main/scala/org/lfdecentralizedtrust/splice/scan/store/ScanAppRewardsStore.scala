@@ -14,8 +14,9 @@ trait ScanAppRewardsStore {
 
   /** Finds the next round requiring reward computation — one that has
     * ingested activity records but has not yet produced a root hash.
+    * Only considers rounds in [earliestRound, lastClosedRound].
     */
-  def getNextRoundWithoutRootHash(lastClosedRound: Long)(implicit
+  def getNextRoundWithoutRootHash(earliestRound: Long, lastClosedRound: Long)(implicit
       tc: TraceContext
   ): Future[Option[Long]]
 

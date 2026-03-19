@@ -51,9 +51,9 @@ class RewardComputationTrigger(
       tasks <- (lastClosedO, earliestCompleteO) match {
         case (Some((lastClosed, _)), Some(earliestComplete)) =>
           appRewardsStore
-            .getNextRoundWithoutRootHash(lastClosed)
+            .getNextRoundWithoutRootHash(earliestComplete, lastClosed)
             .flatMap {
-              case Some(round) if round >= earliestComplete =>
+              case Some(round) =>
                 appActivityStore.isAppActivityCompleteForRound(round).map {
                   case true => List(RewardComputationTrigger.Task(round))
                   case false => Seq.empty
