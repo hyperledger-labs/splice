@@ -15,7 +15,7 @@ trait ScanAppRewardsStore {
   /** Finds the next round requiring reward computation — one that has
     * ingested activity records but has not yet produced a root hash.
     */
-  def getNextRoundWithoutRootHash(historyId: Long, lastClosedRound: Long)(implicit
+  def getNextRoundWithoutRootHash(lastClosedRound: Long)(implicit
       tc: TraceContext
   ): Future[Option[Long]]
 
@@ -23,7 +23,7 @@ trait ScanAppRewardsStore {
     * aggregation, CC conversion, and Merkle tree hashing.
     * Raises on duplicate key if already computed.
     */
-  def computeRewards(historyId: Long, roundNumber: Long)(implicit
+  def computeRewards(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Unit]
 }

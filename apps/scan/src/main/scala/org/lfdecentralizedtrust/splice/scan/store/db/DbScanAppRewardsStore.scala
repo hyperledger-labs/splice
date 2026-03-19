@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -79,6 +80,7 @@ object DbScanAppRewardsStore {
 
 class DbScanAppRewardsStore(
     storage: DbStorage,
+    updateHistory: UpdateHistory,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -457,9 +459,10 @@ class DbScanAppRewardsStore(
     * Returns None if all rounds with activity already have root hashes,
     * or if there are no activity records at all.
     */
-  def getNextRoundWithoutRootHash(historyId: Long, lastClosedRound: Long)(implicit
+  def getNextRoundWithoutRootHash(lastClosedRound: Long)(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
+    val historyId = updateHistory.historyId
     runQuerySingle(
       sql"""select min(aar.round_number)
             from (select distinct round_number from app_activity_record_store
@@ -490,10 +493,9 @@ class DbScanAppRewardsStore(
     * Merkle tree hashing (stage 3) in a single transaction.
     */
   def computeRewards(
-      historyId: Long,
-      roundNumber: Long,
+      roundNumber: Long
   )(implicit tc: TraceContext): Future[Unit] =
-    aggregateActivityTotals(historyId, roundNumber)
+    aggregateActivityTotals(updateHistory.historyId, roundNumber)
 
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.

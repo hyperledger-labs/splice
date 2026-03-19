@@ -243,7 +243,7 @@ class ScanApp(
             )
           )
         } else None
-      appRewardsStore = new DbScanAppRewardsStore(storage, loggerFactory)
+      appRewardsStore = new DbScanAppRewardsStore(storage, updateHistory, loggerFactory)
       automation = new ScanAutomationService(
         config,
         clock,

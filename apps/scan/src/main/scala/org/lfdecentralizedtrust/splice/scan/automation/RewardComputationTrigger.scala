@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore, ScanStore}
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -34,7 +33,6 @@ class RewardComputationTrigger(
     store: ScanStore,
     appRewardsStore: ScanAppRewardsStore,
     appActivityStore: AppActivityStore,
-    updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
 )(implicit
     override val ec: ExecutionContext,
@@ -46,14 +44,13 @@ class RewardComputationTrigger(
       tc: TraceContext
   ): Future[Seq[RewardComputationTrigger.Task]] = {
     for {
-      _ <- updateHistory.waitUntilInitialized
       // TODO(#4118): replace this approximation with proper retrieval from the ScanRewardsReferenceStore
       lastClosedO <- store.lookupRoundOfLatestData()
       earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
       tasks <- (lastClosedO, earliestCompleteO) match {
         case (Some((lastClosed, _)), Some(earliestComplete)) =>
           appRewardsStore
-            .getNextRoundWithoutRootHash(updateHistory.historyId, lastClosed)
+            .getNextRoundWithoutRootHash(lastClosed)
             .flatMap {
               case Some(round) if round >= earliestComplete =>
                 appActivityStore.isAppActivityCompleteForRound(round).map {
@@ -71,7 +68,7 @@ class RewardComputationTrigger(
       task: RewardComputationTrigger.Task
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     appRewardsStore
-      .computeRewards(updateHistory.historyId, task.roundNumber)
+      .computeRewards(task.roundNumber)
       .map(_ => TaskSuccess(s"Computed rewards for round ${task.roundNumber}"))
 
   override protected def isStaleTask(

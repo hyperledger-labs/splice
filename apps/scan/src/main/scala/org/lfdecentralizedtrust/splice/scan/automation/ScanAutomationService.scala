@@ -79,7 +79,6 @@ class ScanAutomationService(
         store,
         appRewardsStore,
         appActivityStore,
-        updateHistory,
         triggerContext,
       )
     )
