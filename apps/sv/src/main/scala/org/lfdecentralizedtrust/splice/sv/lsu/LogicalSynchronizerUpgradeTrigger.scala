@@ -200,6 +200,7 @@ class LogicalSynchronizerUpgradeTrigger(
             psid,
             successorSynchronizerNode.internalSequencerConnection,
             successorSynchronizerNode.mediatorSequencerAmplification.toInternal,
+            successorSynchronizerNode.mediatorSequencerConnectionPoolDelays.toInternal,
           )
         },
         logger,

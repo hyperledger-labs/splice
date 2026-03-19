@@ -28,6 +28,10 @@
          persisted scan connections from previous runs, removing the dependency on seedUrls
          scan availability for successful reboots.
 
+    - Wallet UI
+      - Extended the `/development-fund` page to make active coupons visible to beneficiaries. But beneficiaries cannot withdraw coupons.
+      - Updated `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
+
     - Daml:
 
       .. important::
@@ -85,6 +89,8 @@
         <token_standard>`.
 
       - Add missing validation of ``sv`` party to ``DsoRules_ClaimExpiredRewards``.
+
+      - Add missing TransferInstruction_Update choice for AmuletTransferInstruction to support expiry.
 
       These Daml changes require an upgrade to the following Daml versions **before**
       voting to set the transfer fees to zero:

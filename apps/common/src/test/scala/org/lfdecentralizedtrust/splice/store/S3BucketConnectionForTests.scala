@@ -5,7 +5,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
-import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 
 import java.io.IOException
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,16 +25,16 @@ class S3BucketConnectionForTests(
     for {
       dataSrc <- readObject(key)
       data <- dataSrc.runWith(Sink.fold(ByteString.empty)(_ ++ _))
-      checksumRequest = GetObjectTaggingRequest.builder().bucket(bucketName).key(key).build()
-      checksumResponse <- s3Client
-        .getObjectTagging(checksumRequest)
+      headRequest = HeadObjectRequest
+        .builder()
+        .bucket(bucketName)
+        .key(key)
+        .build()
+      head <- s3Client.headObject(headRequest).asScala
+      checksum = head
+        .metadata()
         .asScala
-      checksum = checksumResponse
-        .tagSet()
-        .asScala
-        .find(_.key() == "splice-checksum")
-        .map(_.value())
-        .getOrElse(throw new RuntimeException("Missing checksum tag"))
+        .getOrElse("splice-checksum", throw new RuntimeException("Missing checksum metadata"))
     } yield {
       val bis = data.asInputStream
       // We compare the computed & stored checksum to one we independently compute via the system's `sha256sum` executable for sanity

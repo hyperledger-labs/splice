@@ -3,7 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
-import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSequencerConfig}
@@ -17,6 +20,7 @@ abstract class SvSynchronizerNode(
     val sequencerAvailabilityDelay: Duration,
     val sequencerConfig: SequencerConfig,
     val mediatorSequencerAmplification: SubmissionRequestAmplification,
+    val mediatorSequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     val cometbftNode: Option[CometBftNode],
 ) extends SynchronizerNode(sequencerAdminConnection) {}
 

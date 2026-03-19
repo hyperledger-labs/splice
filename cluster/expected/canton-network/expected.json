@@ -197,7 +197,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2623,7 +2623,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2714,7 +2714,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2948,7 +2948,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3062,7 +3062,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3216,8 +3216,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "sv-app-global-domain-migration-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "sv-app-global-domain-migration-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -3319,7 +3319,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3380,8 +3380,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "domain-migration-validator-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "domain-migration-validator-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -3594,7 +3594,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3685,7 +3685,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3919,7 +3919,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4037,7 +4037,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4152,8 +4152,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "sv-app-global-domain-migration-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "sv-app-global-domain-migration-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -4261,7 +4261,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4322,8 +4322,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "domain-migration-validator-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "domain-migration-validator-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {

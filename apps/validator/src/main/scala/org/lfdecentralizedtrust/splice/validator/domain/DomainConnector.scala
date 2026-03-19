@@ -13,7 +13,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -224,8 +223,7 @@ class DomainConnector(
                     ),
                     sequencerLivenessMargin =
                       Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
-                    // TODO(#2666) Make the delays configurable.
-                    sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+                    sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays.toInternal,
                   )
               }
             }.toMap
@@ -289,18 +287,11 @@ class DomainConnector(
     // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
     sequencers
       .collect {
-        case DsoSequencer(
-              _,
-              _,
-              _,
-              url,
-              svName,
-              availableAfter,
-            )
+        case DsoSequencer(_, _, id, url, _, availableAfter)
             if url.nonEmpty && !domainTime.toInstant
               .isBefore(availableAfter) =>
           for {
-            sequencerAlias <- SequencerAlias.create(svName)
+            sequencerAlias <- SequencerAlias.create(id.toProtoPrimitive)
             grpcSequencerConnection <- GrpcSequencerConnection.create(
               url,
               None,

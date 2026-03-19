@@ -502,6 +502,7 @@ class DomainMigrationInitializer(
                   synchronizerId,
                   currentNode.internalSequencerConnection,
                   currentNode.mediatorSequencerAmplification.toInternal,
+                  currentNode.mediatorSequencerConnectionPoolDelays.toInternal,
                 ),
               logger,
             )

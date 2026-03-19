@@ -860,7 +860,7 @@ class DbSvDsoStore(
   override def listExpiredAmulets(
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] = {
-    val filterClause = if (ignoredParties.nonEmpty) {
+    val filterClause: SQLActionBuilder = if (ignoredParties.nonEmpty) {
       (sql" and " ++ notInClause("create_arguments->>'owner'", ignoredParties)).toActionBuilder
     } else {
       sql""
@@ -1579,14 +1579,26 @@ class DbSvDsoStore(
       )
     }
 
-  override def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+  override def featuredAppActivityMarkerCountAboveOrEqualTo(
+      threshold: Int,
+      ignoredParties: Set[PartyId],
+  )(implicit
       tc: TraceContext
-  ): Future[Boolean] =
+  ): Future[Boolean] = {
+    val filterClause: SQLActionBuilder = if (ignoredParties.nonEmpty) {
+      (sql" and " ++ notInClause("create_arguments->>'provider'", ignoredParties) ++
+        sql" and " ++ notInClause(
+          "create_arguments->>'beneficiary'",
+          ignoredParties,
+        )).toActionBuilder
+    } else {
+      sql""
+    }
     waitUntilAcsIngested {
       futureUnlessShutdownToFuture(
         storage
           .query(
-            sql"""
+            (sql"""
             select count(contract_id) as num_markers
               from (
                 select contract_id
@@ -1598,22 +1610,34 @@ class DbSvDsoStore(
                    template_id_qualified_name = ${QualifiedName(
                 FeaturedAppActivityMarker.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
+                 """ ++ filterClause ++ sql"""
                  limit $threshold
               ) as markers;
-                   """.toActionBuilder.as[Int],
+                   """).toActionBuilder.as[Int],
             "featuredAppActivityMarkerCountAboveOrEqualTo",
           )
       ).map(results => results.contains(threshold))
     }
+  }
 
   override def listFeaturedAppActivityMarkersByContractIdHash(
       contractIdHashLbIncl: Int,
       contractIdHashUbIncl: Int,
       limit: Int,
+      ignoredParties: Set[PartyId],
   )(implicit tc: TraceContext): Future[Seq[Contract[
     splice.amulet.FeaturedAppActivityMarker.ContractId,
     splice.amulet.FeaturedAppActivityMarker,
-  ]]] =
+  ]]] = {
+    val filterClause = if (ignoredParties.nonEmpty) {
+      (sql" and " ++ notInClause("create_arguments->>'provider'", ignoredParties) ++
+        sql" and " ++ notInClause(
+          "create_arguments->>'beneficiary'",
+          ignoredParties,
+        )).toActionBuilder
+    } else {
+      sql""
+    }
     for {
       result <- storage
         .query(
@@ -1622,15 +1646,16 @@ class DbSvDsoStore(
             acsStoreId,
             domainMigrationId,
             FeaturedAppActivityMarker.COMPANION,
-            where = sql"""
+            where = (sql"""
                   $contractIdHashLbIncl <= stable_int32_hash(contract_id)
               AND stable_int32_hash(contract_id) <= $contractIdHashUbIncl
-            """,
+            """ ++ filterClause).toActionBuilder,
             orderLimit = sql"""order by stable_int32_hash(contract_id) limit $limit""",
           ),
           "listFeaturedAppActivityMarkersByContractIdHash",
         )
     } yield result.map(contractFromRow(FeaturedAppActivityMarker.COMPANION)(_))
+  }
 
   override def close(): Unit = {
     dsoStoreMetrics.close()
