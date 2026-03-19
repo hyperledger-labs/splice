@@ -20,29 +20,6 @@
 
 .. release-notes:: 0.5.16
 
-  .. important::
-
-     The validator APIs ``/v0/admin/external-party/transfer-preapproval/prepare-send``
-     and ``/v0/admin/external-party/transfer-preapproval/submit-send`` are deprecated and will be removed in a future version.
-     Replace any usages you  by the :ref:`Token Standard APIs <token_standard>`.
-
-  - Validator app
-
-     - The endpoints
-       ``/v0/admin/external-party/transfer-preapproval/prepare-send``
-       and
-       ``/v0/admin/external-party/transfer-preapproval/submit-send``
-       are deprecated and will be removed in a future version. Use the token standard APIs for initiating transfers instead.
-
-     - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
-       in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
-       persisted scan connections from previous runs, removing the dependency on seedUrls
-       scan availability for successful reboots.
-
-  - Wallet UI
-    - Extended the `/development-fund` page to make active coupons visible to beneficiaries. But beneficiaries cannot withdraw coupons.
-    - Updated `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
-
   - Daml:
 
     .. important::
@@ -116,6 +93,29 @@
     wallet             0.1.18
     walletPayments     0.1.17
     ================== =======
+
+  - Validators
+
+    .. important::
+
+       The validator APIs ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+       and ``/v0/admin/external-party/transfer-preapproval/submit-send`` are deprecated and will be removed in a future version.
+       Replace any usages you  by the :ref:`Token Standard APIs <token_standard>`.
+
+     - The endpoints
+       ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+       and
+       ``/v0/admin/external-party/transfer-preapproval/submit-send``
+       are deprecated and will be removed in a future version. Use the token standard APIs for initiating transfers instead.
+
+     - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
+       in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
+       persisted scan connections from previous runs, removing the dependency on seedUrls
+       scan availability for successful reboots.
+
+  - Wallet UI
+    - Extended the `/development-fund` page to make active coupons visible to beneficiaries. But beneficiaries cannot withdraw coupons.
+    - Updated `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
 
   - Canton
 
