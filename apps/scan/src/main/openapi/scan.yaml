@@ -1627,7 +1627,7 @@ paths:
       operationId: "getRewardAccountingEarliestAvailableRound"
       description: |
         SV node internal API that returns the earliest round for which CIP-0104 reward accounting activity
-        totals have been computed.
+        totals are available.
       responses:
         "200":
           description: ok
