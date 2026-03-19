@@ -507,69 +507,66 @@ class DbScanAppRewardsStore(
   private[store] def aggregateActivityTotals(
       roundNumber: Long
   )(implicit tc: TraceContext): Future[Unit] = {
-    import profile.api.jdbcActionExtensionMethods
     val historyId = updateHistory.historyId
     runUpdate(
-      (insertPartyTotals(historyId, roundNumber)
-        >> insertRoundTotals(historyId, roundNumber))
+      (sql"with " ++ unnestAndAggregate(roundNumber) ++ sql", "
+        ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
+        ++ insertRoundTotals(historyId, roundNumber)).asUpdate
         .map(_ =>
           logger.debug(
             s"Aggregated activity totals for round $roundNumber."
           )
-        )
-        .transactionally,
+        ),
       "appRewards.aggregateActivityTotals",
     )
   }
 
-  private def insertPartyTotals(
-      historyId: Long,
-      roundNumber: Long,
-  ) = {
-    sqlu"""with unnested as (
-             select party, weight
-             from app_activity_record_store,
-                  lateral unnest(app_provider_parties, app_activity_weights)
-                  as party_and_weight(party, weight)
-             where round_number = $roundNumber
-           ),
-           aggregated as (
-             select party, sum(weight) as total_weight
-             from unnested
-             group by party
-           ),
-           numbered as (
-             select party, total_weight,
-                    (row_number() over (order by party) - 1)::int as seq_num
-             from aggregated
-           )
-           insert into #${Tables.appActivityPartyTotals}
-             (history_id,
-              round_number,
-              total_app_activity_weight,
-              app_provider_party_seq_num,
-              app_provider_party)
-           select $historyId, $roundNumber, total_weight, seq_num, party
-           from numbered"""
-  }
+  /** Unnest per-verdict activity arrays and aggregate weights by party. */
+  private def unnestAndAggregate(roundNumber: Long) =
+    sql"""unnested as (
+            select party, weight
+            from app_activity_record_store,
+                 lateral unnest(app_provider_parties, app_activity_weights)
+                 as party_and_weight(party, weight)
+            where round_number = $roundNumber
+          ),
+          aggregated as (
+            select party, sum(weight) as total_weight
+            from unnested
+            group by party
+          ),
+          numbered as (
+            select party, total_weight,
+                   (row_number() over (order by party) - 1)::int as seq_num
+            from aggregated
+          )"""
 
-  private def insertRoundTotals(
-      historyId: Long,
-      roundNumber: Long,
-  ) = {
-    sqlu"""insert into #${Tables.appActivityRoundTotals}
-             (history_id,
-              round_number,
-              total_round_app_activity_weight,
-              active_app_provider_parties_count)
-           select $historyId,
-                  $roundNumber,
-                  coalesce(sum(total_app_activity_weight), 0),
-                  count(*)
-           from #${Tables.appActivityPartyTotals}
-           where
-             history_id = $historyId and round_number = $roundNumber"""
-  }
+  /** Insert per-party totals and return the inserted weights via RETURNING. */
+  private def insertPartyTotals(historyId: Long, roundNumber: Long) =
+    sql"""inserted_parties as (
+            insert into #${Tables.appActivityPartyTotals}
+              (history_id,
+               round_number,
+               total_app_activity_weight,
+               app_provider_party_seq_num,
+               app_provider_party)
+            select $historyId, $roundNumber, total_weight, seq_num, party
+            from numbered
+            returning total_app_activity_weight
+          )"""
+
+  /** Insert the round-level totals from the RETURNING output of insertPartyTotals. */
+  private def insertRoundTotals(historyId: Long, roundNumber: Long) =
+    sql"""insert into #${Tables.appActivityRoundTotals}
+            (history_id,
+             round_number,
+             total_round_app_activity_weight,
+             active_app_provider_parties_count)
+          select $historyId,
+                 $roundNumber,
+                 coalesce(sum(total_app_activity_weight), 0),
+                 count(*)
+          from inserted_parties"""
 
   // -- Private helpers -------------------------------------------------------
 
