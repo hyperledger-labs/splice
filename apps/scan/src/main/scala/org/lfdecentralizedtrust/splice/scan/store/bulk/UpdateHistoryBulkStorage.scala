@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.pattern.after
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
@@ -36,10 +36,13 @@ class UpdateHistoryBulkStorage(
     val s3Connection: S3BucketConnection,
     val historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
-    extends NamedLogging {
+)(implicit actorSystem: ActorSystem, ec: ExecutionContext)
+    extends NamedLogging
+    with Spanning {
 
-  private def getMigrationIdForAcsSnapshot(snapshotTimestamp: CantonTimestamp): Future[Long] = {
+  private def getMigrationIdForAcsSnapshot(
+      snapshotTimestamp: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Long] = {
     /* The migration ID in ACS snapshots is always the lowest migration that has updates with a later record time,
        because we only create an ACS snapshot in an app if it has seen updates with a later timestamp.
        If no such updates exist, then we assume that the current migration will be that of the snapshot. If a migration
@@ -51,7 +54,9 @@ class UpdateHistoryBulkStorage(
       .map(_.getOrElse(currentMigrationId))
   }
 
-  private def getSegmentEndAfter(ts: TimestampWithMigrationId): Future[TimestampWithMigrationId] = {
+  private def getSegmentEndAfter(
+      ts: TimestampWithMigrationId
+  )(implicit tc: TraceContext): Future[TimestampWithMigrationId] = {
     val endTs = storageConfig.computeBulkSnapshotTimeAfter(ts.timestamp)
     for {
       endMigration <-
@@ -77,7 +82,9 @@ class UpdateHistoryBulkStorage(
     * May return None if unknown yet. This could happen if no updates have been ingested,
     * so we do not know the genesis record time yet. The caller should then schedule a retry.
     */
-  private def getFirstSegmentFromGenesis: Future[Option[UpdatesSegment]] =
+  private def getFirstSegmentFromGenesis(implicit
+      tc: TraceContext
+  ): Future[Option[UpdatesSegment]] =
     for {
       firstUpdate <- updateHistory.getUpdatesWithoutImportUpdates(None, PageLimit.tryCreate(1))
       segmentEnd <- firstUpdate.headOption match {
@@ -94,13 +101,15 @@ class UpdateHistoryBulkStorage(
   /** Gets the segment from which this app should start dumping, e.g. after a restart.
     * May return None if unknown yet. The caller should then sleep and retry.
     */
-  private def getFirstSegment: Future[Option[UpdatesSegment]] =
+  private def getFirstSegment(implicit tc: TraceContext): Future[Option[UpdatesSegment]] =
     kvProvider.getLatestUpdatesSegmentInBulkStorage().value.flatMap {
       case None => getFirstSegmentFromGenesis
       case Some(after) => getNextSegment(Some(after))
     }
 
-  private def getNextSegment(afterO: Option[UpdatesSegment]): Future[Option[UpdatesSegment]] =
+  private def getNextSegment(
+      afterO: Option[UpdatesSegment]
+  )(implicit tc: TraceContext): Future[Option[UpdatesSegment]] =
     afterO match {
       case Some(previous) =>
         getSegmentEndAfter(previous.toTimestamp).map(end =>
@@ -112,6 +121,7 @@ class UpdateHistoryBulkStorage(
   private def mksrc()(implicit
       ec: ExecutionContext,
       actorSystem: org.apache.pekko.actor.ActorSystem,
+      tc: TraceContext,
   ): Source[UpdatesSegment, Cancellable] = {
 
     // Wait for update history to initialize and for history backfilling to complete before starting bulk storage dumps
@@ -174,15 +184,17 @@ class UpdateHistoryBulkStorage(
       backoffClock: Clock,
       retryProvider: RetryProvider,
   )(implicit tracer: Tracer): PekkoRetryingService[UpdatesSegment] = {
-    val src = mksrc()
-    new PekkoRetryingService(
-      src,
-      Sink.ignore,
-      automationConfig,
-      backoffClock,
-      "Update History Bulk Storage",
-      retryProvider,
-      loggerFactory,
-    )
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      val src = mksrc()
+      new PekkoRetryingService(
+        src,
+        Sink.ignore,
+        automationConfig,
+        backoffClock,
+        "Update History Bulk Storage",
+        retryProvider,
+        loggerFactory,
+      )
+    }
   }
 }
