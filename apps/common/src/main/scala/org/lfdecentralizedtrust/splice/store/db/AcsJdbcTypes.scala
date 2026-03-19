@@ -50,18 +50,6 @@ trait AcsJdbcTypes {
   ): SetParameter[ByteString] =
     (bs: ByteString, pp: PositionedParameters) => setParameterByteArray.apply(bs.toByteArray, pp)
 
-  /** Binds an ByteString to a nullable bytea column.
-    * Empty ByteString → SQL NULL.
-    */
-  protected implicit def nullableByteStringSetParameter(implicit
-      setParameterOptionalByteArray: SetParameter[Option[Array[Byte]]]
-  ): SetParameter[ByteString] =
-    (bs: ByteString, pp: PositionedParameters) =>
-      setParameterOptionalByteArray.apply(
-        Option(bs).filterNot(_.isEmpty).map(_.toByteArray),
-        pp,
-      )
-
   protected implicit lazy val acsStoreIdJdbcType: JdbcType[AcsStoreId] =
     AcsStoreId.subst(implicitly[BaseColumnType[Int]])
 
@@ -387,9 +375,14 @@ trait AcsJdbcTypes {
   }
 
   /** Transaction hash is SHA-256 (32 bytes), but we apply a relaxed future-proof limit of 1024 bytes just in case.
+    * The hash is not guaranteed to be present. For consistency with historical data,
+    * we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
     */
-  protected def lengthLimitedExtTxnHash(extTxnHash: ByteString): ByteString =
-    lengthLimitedByteString(extTxnHash, maxLength = 1024)
+  protected def sanitizedExtTxnHash(extTxnHash: ByteString): Option[Array[Byte]] = {
+    Option(lengthLimitedByteString(extTxnHash, maxLength = 1024))
+      .filterNot(_.isEmpty)
+      .map(_.toByteArray)
+  }
 
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],

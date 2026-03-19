@@ -587,8 +587,9 @@ class UpdateHistory(
       .map(lengthLimited)
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
-    val safeExternalTransactionHash =
-      lengthLimitedExtTxnHash(tree.getExternalTransactionHash)
+    val safeExternalTransactionHash: Option[Array[Byte]] = sanitizedExtTxnHash(
+      tree.getExternalTransactionHash
+    )
 
     import storage.DbStorageConverters.setParameterOptionalByteArray
 
