@@ -114,9 +114,8 @@
 
   - Scan
 
-    - ACS snapshots are now generated incrementally by applying create/archive deltas since the previous snapshot, replacing the previous approach of periodic full rebuilds.
-      On the first startup after upgrade, the latest existing full snapshot is used to initialize the incremental state; a background backfilling trigger then fills in any gaps for earlier migrations.
-    - The maximum page size for the ``getUpdateHistory`` and ``getEventHistory`` endpoints is now configurable via ``update-history-max-page-size`` (default: 1000, unchanged from previous behavior).
+    - Improve the performance of ACS snapshot generation, reducing the magnitude of periodic spikes in database activity and avoiding log warnings about advisory locks.
+    - Add a new grafana dashboard to monitor the progress of ACS snapshot generation.
 
   - Infrastructure
 
