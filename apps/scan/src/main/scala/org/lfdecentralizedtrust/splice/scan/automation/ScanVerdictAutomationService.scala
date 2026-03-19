@@ -28,10 +28,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.ExecutionContextExecutor
 import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion.prettyVerdictBatch
-import org.lfdecentralizedtrust.splice.scan.rewards.{
-  AppActivityComputation,
-  StoreBackedRewardsReferenceDataProvider,
-}
+import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 
 class ScanVerdictAutomationService(
@@ -63,7 +60,7 @@ class ScanVerdictAutomationService(
 
   private val appActivityComputationO: Option[AppActivityComputation] =
     rewardsReferenceStoreO.map { store =>
-      new AppActivityComputation(new StoreBackedRewardsReferenceDataProvider(store), loggerFactory)
+      new AppActivityComputation(store, loggerFactory)
     }
 
   registerTrigger(

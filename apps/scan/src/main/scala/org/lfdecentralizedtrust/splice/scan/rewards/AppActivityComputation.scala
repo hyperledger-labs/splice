@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.rewards
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 
 import scala.collection.immutable.SortedMap
@@ -19,7 +20,7 @@ object AppActivityComputation {
 }
 
 class AppActivityComputation(
-    dataProvider: RewardsReferenceDataProvider,
+    dataProvider: ScanRewardsReferenceStore,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {

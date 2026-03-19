@@ -9,6 +9,7 @@ import com.digitalasset.canton.mediator.admin.v30
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.timestamp.Timestamp as ProtoTimestamp
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -178,18 +179,14 @@ class AppActivityComputationTest extends AnyWordSpec with BaseTest {
       featured: Set[String],
       input: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
   ): Seq[DbAppActivityRecordStore.AppActivityRecordT] = {
-    val provider = new RewardsReferenceDataProvider {
-      override def lookupActiveOpenMiningRounds(
-          recordTimes: Seq[CantonTimestamp]
-      )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]] =
-        Future.successful(recordTimes.map(_ -> (0L, roundOpensAt)).toMap)
-
-      override def lookupFeaturedAppPartiesAsOf(
-          asOf: CantonTimestamp
-      )(implicit tc: TraceContext): Future[Set[String]] =
-        Future.successful(featured)
-    }
-    new AppActivityComputation(provider, loggerFactory)(directExecutionContext)
+    val store = mock[ScanRewardsReferenceStore]
+    when(store.lookupActiveOpenMiningRounds(any[Seq[CantonTimestamp]])(any[TraceContext]))
+      .thenAnswer { (times: Seq[CantonTimestamp]) =>
+        Future.successful(times.map(_ -> (0L, roundOpensAt)).toMap)
+      }
+    when(store.lookupFeaturedAppPartiesAsOf(any[CantonTimestamp])(any[TraceContext]))
+      .thenReturn(Future.successful(featured))
+    new AppActivityComputation(store, loggerFactory)(directExecutionContext)
       .computeActivities(input)(traceContext)
       .futureValue
       .flatMap { case (_, _, recordO) => recordO }

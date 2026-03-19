@@ -3,12 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
+
+import scala.concurrent.Future
 
 /** This is a temporal contract store (TcsStore) to provide efficient asOf round
   * lookups of FeaturedAppRight and OpenMiningRound contracts
@@ -19,6 +23,18 @@ import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 trait ScanRewardsReferenceStore extends AppStore {
 
   def key: ScanRewardsReferenceStore.Key
+
+  /** For a batch of record times, resolve the oldest open mining round at each time.
+    * Returns map from record_time to (roundNumber, roundOpensAt).
+    * It is expected that all record_time are present in returned map
+    */
+  def lookupActiveOpenMiningRounds(
+      recordTimes: Seq[CantonTimestamp]
+  )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]]
+
+  def lookupFeaturedAppPartiesAsOf(
+      asOf: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Set[String]]
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
     ScanRewardsReferenceStoreRowData,
