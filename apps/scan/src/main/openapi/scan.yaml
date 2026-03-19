@@ -1644,7 +1644,7 @@ paths:
       x-jvm-package: scan
       operationId: "getRewardAccountingActivityTotals"
       description: |
-        Return the CIP-0104 per-round and per-party activity totals for the
+        Return the CIP-0104 per-round activity totals for the
         specified round number.
       parameters:
         - name: "round_number"
