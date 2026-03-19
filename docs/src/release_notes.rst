@@ -124,9 +124,6 @@
 
   - Canton
 
-    - Internal: Replaced the sequencer's internal event signaller based on Pekko's `BroadcastHub` with an implementation with better runtime characteristics.
-      The old event signaller can be turned on again with `canton.sequencers.<sequencer>.parameters.use-legacy-event-signaller = true`.
-
     - Sequencer Inspection Service
 
       - A new field `paid_traffic_cost` exposes the traffic cost paid by the node on completion events and update events
@@ -251,6 +248,7 @@
             The JSON API server remains compatible with specification files from all 3.4.x versions (e.g., 3.4.9).
 
       - Sequencer Inspection Service
+
         A new service is available on the Admin API of the sequencer.
         It provides an RPC that allows to query for traffic summaries of sequenced events.
         Refer to the `traffic documentation <https://docs.digitalasset.com/subnet/3.4/howtos/operate/traffic.html>`__ for more details.
