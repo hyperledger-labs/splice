@@ -8,10 +8,9 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
-import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, DarResourcesUtil}
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.definitions
 
@@ -118,7 +117,7 @@ object HttpTokenStandardAllocationInstructionHandler {
         debugPackageName =
           if (excludeDebugFields) None
           else
-            DarResources
+            DarResourcesUtil
               .lookupPackageId(contract.identifier.getPackageId)
               .map(_.metadata.name),
         debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),

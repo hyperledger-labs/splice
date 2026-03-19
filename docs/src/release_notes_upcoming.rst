@@ -9,6 +9,25 @@
 
 .. release-notes:: Upcoming
 
+    - SV and Validator app
+
+    - Going forward unusable splice DARs will be automatically unvetted by the super validators.
+      This will be used for DARs that can already not be used,
+      e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
+
+      The minimum supported versions are:
+
+         ================== =======
+         name               version
+         ================== =======
+         amulet             0.1.14
+         amuletNameService  0.1.14
+         dsoGovernance      0.1.19
+         validatorLifecycle 0.1.5
+         wallet             0.1.14
+         walletPayments     0.1.14
+         ================== =======
+
     .. important::
 
        The validator APIs ``/v0/admin/external-party/transfer-preapproval/prepare-send``
@@ -27,10 +46,6 @@
          in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
          persisted scan connections from previous runs, removing the dependency on seedUrls
          scan availability for successful reboots.
-
-    - Wallet UI
-      - Extended the `/development-fund` page to make active coupons visible to beneficiaries. But beneficiaries cannot withdraw coupons.
-      - Updated `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
 
     - Daml:
 
