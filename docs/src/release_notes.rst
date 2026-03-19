@@ -100,22 +100,28 @@
 
        The validator APIs ``/v0/admin/external-party/transfer-preapproval/prepare-send``
        and ``/v0/admin/external-party/transfer-preapproval/submit-send`` are deprecated and will be removed in a future version.
-       Replace any usages you  by the :ref:`Token Standard APIs <token_standard>`.
+       Replace any usages of validator API endpoints by calls to the :ref:`Token Standard APIs <token_standard>`.
 
-     - The endpoints
-       ``/v0/admin/external-party/transfer-preapproval/prepare-send``
-       and
-       ``/v0/admin/external-party/transfer-preapproval/submit-send``
-       are deprecated and will be removed in a future version. Use the token standard APIs for initiating transfers instead.
-
-     - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
-       in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
-       persisted scan connections from previous runs, removing the dependency on seedUrls
-       scan availability for successful reboots.
+    - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
+      in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
+      persisted scan connections from previous runs, removing the dependency on seedUrls
+      scan availability for successful reboots.
 
   - Wallet UI
-    - Extended the `/development-fund` page to make active coupons visible to beneficiaries. But beneficiaries cannot withdraw coupons.
-    - Updated `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
+
+    - Extend the `/development-fund` page to make active coupons visible to beneficiaries. Note: Beneficiaries cannot withdraw coupons.
+    - Update `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
+
+  - Scan
+
+    - ACS snapshots are now generated incrementally by applying create/archive deltas since the previous snapshot, replacing the previous approach of periodic full rebuilds.
+      On the first startup after upgrade, the latest existing full snapshot is used to initialize the incremental state; a background backfilling trigger then fills in any gaps for earlier migrations.
+    - The maximum page size for the ``getUpdateHistory`` and ``getEventHistory`` endpoints is now configurable via ``update-history-max-page-size`` (default: 1000, unchanged from previous behavior).
+
+  - Infrastructure
+
+    - Update the JDK base image for all Splice and Canton images from 21.0.7 to 21.0.10 (Eclipse Temurin).
+      This includes a fix for `JDK-8347811 <https://bugs.openjdk.org/browse/JDK-8347811>`_, which caused incorrect detection of cgroup controllers on cgroupv2 hosts, potentially leading to the JVM ignoring container memory and CPU limits.
 
   - Canton
 
