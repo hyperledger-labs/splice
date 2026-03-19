@@ -30,8 +30,6 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue
 import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.matchers.should.Matchers
-//import com.digitalasset.canton.util.HexString
-//import com.google.protobuf.ByteString
 
 import java.time.Instant
 import scala.util.Random

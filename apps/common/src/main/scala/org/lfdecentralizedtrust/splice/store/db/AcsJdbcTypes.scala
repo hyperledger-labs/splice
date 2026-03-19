@@ -50,15 +50,15 @@ trait AcsJdbcTypes {
   ): SetParameter[ByteString] =
     (bs: ByteString, pp: PositionedParameters) => setParameterByteArray.apply(bs.toByteArray, pp)
 
-  /** Binds an Option[ByteString] to a nullable bytea column.
-    * None or empty ByteString → SQL NULL.
+  /** Binds an ByteString to a nullable bytea column.
+    * Empty ByteString → SQL NULL.
     */
-  protected implicit def optionalByteStringSetParameter(implicit
+  protected implicit def nullableByteStringSetParameter(implicit
       setParameterOptionalByteArray: SetParameter[Option[Array[Byte]]]
-  ): SetParameter[Option[ByteString]] =
-    (obs: Option[ByteString], pp: PositionedParameters) =>
+  ): SetParameter[ByteString] =
+    (bs: ByteString, pp: PositionedParameters) =>
       setParameterOptionalByteArray.apply(
-        obs.filterNot(_.isEmpty).map(_.toByteArray),
+        Option(bs).filterNot(_.isEmpty).map(_.toByteArray),
         pp,
       )
 
@@ -377,6 +377,19 @@ trait AcsJdbcTypes {
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
+
+  private def lengthLimitedByteString(bs: ByteString, maxLength: Int): ByteString = {
+    require(
+      bs.size() <= maxLength,
+      s"ByteString should have a maximum length of $maxLength bytes but a ByteString of length ${bs.size()} was given",
+    )
+    bs
+  }
+
+  /** Transaction hash is SHA-256 (32 bytes), but we apply a relaxed future-proof limit of 1024 bytes just in case.
+    */
+  protected def lengthLimitedExtTxnHash(extTxnHash: ByteString): ByteString =
+    lengthLimitedByteString(extTxnHash, maxLength = 1024)
 
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],
