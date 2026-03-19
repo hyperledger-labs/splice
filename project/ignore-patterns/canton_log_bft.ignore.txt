@@ -1,2 +1,4 @@
 # Expected warning until https://github.com/DACH-NY/canton/pull/31166 lands
 discarding expired batches
+# can happen temporarily, retries fix it but it produces a warning log
+failed the following topology transactions
