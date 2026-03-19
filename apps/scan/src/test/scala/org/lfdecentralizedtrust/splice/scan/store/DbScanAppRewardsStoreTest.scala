@@ -379,25 +379,25 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    // -- getNextRoundWithoutRootHash / getEarliestActivityRound --------------
+    // -- getNextRoundWithoutRootHash / getEarliestRoundWithActivityTotals --------------
 
-    "getEarliestActivityRound returns None when empty" in {
+    "getEarliestRoundWithActivityTotals returns None when empty" in {
       for {
         (store, historyId) <- newStore()
-        result <- store.getEarliestActivityRound()
+        result <- store.getEarliestRoundWithActivityTotals()
       } yield {
         result shouldBe None
       }
     }
 
-    "getEarliestActivityRound with data" in {
+    "getEarliestRoundWithActivityTotals with data" in {
       for {
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
         _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
         _ <- store.aggregateActivityTotals(10L)
         _ <- store.aggregateActivityTotals(20L)
-        earliest <- store.getEarliestActivityRound()
+        earliest <- store.getEarliestRoundWithActivityTotals()
       } yield {
         earliest.value shouldBe 10L
       }

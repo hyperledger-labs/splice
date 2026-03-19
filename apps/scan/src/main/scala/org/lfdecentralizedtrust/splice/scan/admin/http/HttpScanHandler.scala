@@ -2377,7 +2377,7 @@ class HttpScanHandler(
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getRewardAccountingEarliestAvailableRound") { _ => _ =>
-      appRewardsStore.getEarliestActivityRound().map {
+      appRewardsStore.getEarliestRoundWithActivityTotals().map {
         case Some(round) =>
           ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
             definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)

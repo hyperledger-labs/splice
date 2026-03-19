@@ -484,7 +484,7 @@ class DbScanAppRewardsStore(
     )
   }
 
-  def getEarliestActivityRound()(implicit
+  def getEarliestRoundWithActivityTotals()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
     val historyId = updateHistory.historyId
@@ -492,7 +492,7 @@ class DbScanAppRewardsStore(
       sql"""select min(round_number) from #${Tables.appActivityRoundTotals}
             where history_id = $historyId
       """.as[Option[Long]].headOption.map(_.flatten),
-      "appRewards.getEarliestActivityRound",
+      "appRewards.getEarliestRoundWithActivityTotals",
     )
   }
 
