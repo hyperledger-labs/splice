@@ -12,11 +12,10 @@ import scala.concurrent.Future
   */
 trait ScanAppRewardsStore {
 
-  /** Finds the next round requiring reward computation — one that has
-    * ingested activity records but has not yet produced a root hash.
-    * Only considers rounds in [earliestRound, lastClosedRound].
+  /** Returns the latest round for which reward computation has completed
+    * (i.e. a root hash exists). None if no rounds have been computed.
     */
-  def getNextRoundWithoutRootHash(earliestRound: Long, lastClosedRound: Long)(implicit
+  def lookupLatestRoundWithRewardComputation()(implicit
       tc: TraceContext
   ): Future[Option[Long]]
 

@@ -67,28 +67,6 @@ class DbAppActivityRecordStore(
       )
   }
 
-  /** Check whether app activity ingestion is complete for a round.
-    * Returns true if activity records exist for the given round AND for
-    * the prior round (proving ingestion was running continuously through
-    * round N, not that it jumped in mid-stream).
-    */
-  def isAppActivityCompleteForRound(roundNumber: Long)(implicit
-      tc: TraceContext
-  ): Future[Boolean] = {
-    runQuerySingle(
-      sql"""select exists(
-              select 1 from #${Tables.appActivityRecords}
-              where round_number = $roundNumber
-            )
-            and exists(
-              select 1 from #${Tables.appActivityRecords}
-              where round_number = $roundNumber - 1
-            )
-      """.as[Boolean].headOption,
-      "appActivity.isAppActivityCompleteForRound",
-    ).map(_.getOrElse(false))
-  }
-
   /** Find the earliest round with complete app activity.
     * A round is complete if the prior round also has activity records,
     * proving ingestion was running continuously through it.
@@ -106,6 +84,26 @@ class DbAppActivityRecordStore(
             )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.earliestRoundWithCompleteAppActivity",
+    )
+  }
+
+  /** Find the latest round with complete app activity.
+    * A round is complete if the prior round also has activity records,
+    * proving ingestion was running continuously through it.
+    * Returns None if fewer than two consecutive rounds have been ingested.
+    */
+  def latestRoundWithCompleteAppActivity()(implicit
+      tc: TraceContext
+  ): Future[Option[Long]] = {
+    runQuerySingle(
+      sql"""select max(aar.round_number)
+            from #${Tables.appActivityRecords} aar
+            where exists(
+              select 1 from #${Tables.appActivityRecords}
+              where round_number = aar.round_number - 1
+            )
+      """.as[Option[Long]].headOption.map(_.flatten),
+      "appActivity.latestRoundWithCompleteAppActivity",
     )
   }
 

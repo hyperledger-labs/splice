@@ -48,21 +48,19 @@ class RewardComputationTrigger(
       // TODO(#4118): replace this approximation with proper retrieval from the ScanRewardsReferenceStore
       lastClosedO <- store.lookupRoundOfLatestData()
       earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
-      tasks <- (lastClosedO, earliestCompleteO) match {
-        case (Some((lastClosed, _)), Some(earliestComplete)) =>
-          appRewardsStore
-            .getNextRoundWithoutRootHash(earliestComplete, lastClosed)
-            .flatMap {
-              case Some(round) =>
-                appActivityStore.isAppActivityCompleteForRound(round).map {
-                  case true => List(RewardComputationTrigger.Task(round))
-                  case false => Seq.empty
-                }
-              case _ => Future.successful(Seq.empty)
-            }
-        case _ => Future.successful(Seq.empty)
+      latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
+      latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
+    } yield {
+      (lastClosedO, earliestCompleteO, latestCompleteO) match {
+        case (Some((lastClosed, _)), Some(earliestComplete), Some(latestComplete)) =>
+          val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
+          val end = math.min(lastClosed, latestComplete)
+          (start to end)
+            .take(RewardComputationTrigger.MaxParallelRounds)
+            .map(RewardComputationTrigger.Task(_))
+        case _ => Seq.empty
       }
-    } yield tasks
+    }
   }
 
   override protected def completeTask(
@@ -79,6 +77,8 @@ class RewardComputationTrigger(
 }
 
 object RewardComputationTrigger {
+  val MaxParallelRounds = 4
+
   final case class Task(roundNumber: Long) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("roundNumber", _.roundNumber))

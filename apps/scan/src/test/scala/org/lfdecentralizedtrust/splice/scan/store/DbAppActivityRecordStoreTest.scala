@@ -341,97 +341,85 @@ class DbAppActivityRecordStoreTest
     }
   }
 
-  "isAppActivityCompleteForRound" should {
+  "latestRoundWithCompleteAppActivity" should {
 
-    "return false when no activity records exist" in {
+    "return None when no activity records exist" in {
       for {
         (store, _) <- newStore()
-        result <- store.isAppActivityCompleteForRound(42L)
+        result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        result shouldBe false
+        result shouldBe None
       }
     }
 
-    "return false when only the target round has records" in {
+    "return None when only one round has records" in {
       for {
         (store, historyId) <- newStore()
-        rowId <- insertVerdictRow(historyId, CantonTimestamp.now(), "update-only-round")
+        rowId <- insertVerdictRow(historyId, CantonTimestamp.now(), "update-single-round")
         _ <- store.insertAppActivityRecords(
           Seq(mkRecord(rowId, 42L, Seq("app1::provider"), Seq(100L)))
         )
-        result <- store.isAppActivityCompleteForRound(42L)
+        result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        result shouldBe false
+        result shouldBe None
       }
     }
 
-    "return true when target round and prior round have records" in {
+    "return the second round when two consecutive rounds have records" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
-        rowId1 <- insertVerdictRow(historyId, baseTs, "update-round-41")
-        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-round-42")
-        _ <- store.insertAppActivityRecords(
-          Seq(
-            mkRecord(rowId1, 41L, Seq("app1::provider"), Seq(100L)),
-            mkRecord(rowId2, 42L, Seq("app1::provider"), Seq(200L)),
-          )
-        )
-        result <- store.isAppActivityCompleteForRound(42L)
-      } yield {
-        result shouldBe true
-      }
-    }
-
-    "return false when only a later round has records" in {
-      for {
-        (store, historyId) <- newStore()
-        rowId <- insertVerdictRow(historyId, CantonTimestamp.now(), "update-later-only")
-        _ <- store.insertAppActivityRecords(
-          Seq(mkRecord(rowId, 43L, Seq("app1::provider"), Seq(100L)))
-        )
-        result <- store.isAppActivityCompleteForRound(42L)
-      } yield {
-        result shouldBe false
-      }
-    }
-
-    "return false when only a later round has records (no prior round)" in {
-      for {
-        (store, historyId) <- newStore()
-        baseTs = CantonTimestamp.now()
-        rowId1 <- insertVerdictRow(historyId, baseTs, "update-round-42")
-        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-round-43")
+        rowId1 <- insertVerdictRow(historyId, baseTs, "update-latest-42")
+        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-latest-43")
         _ <- store.insertAppActivityRecords(
           Seq(
             mkRecord(rowId1, 42L, Seq("app1::provider"), Seq(100L)),
             mkRecord(rowId2, 43L, Seq("app1::provider"), Seq(200L)),
           )
         )
-        // round 42 has a later round (43) but no prior round (41)
-        result <- store.isAppActivityCompleteForRound(42L)
+        result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        result shouldBe false
+        // 43 has prior round 42, so 43 is both earliest and latest complete
+        result.value shouldBe 43L
       }
     }
 
-    "return true for a middle round with prior and later records" in {
+    "return the latest complete round when multiple consecutive rounds have records" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
-        rowId1 <- insertVerdictRow(historyId, baseTs, "update-r42")
-        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-r43")
-        rowId3 <- insertVerdictRow(historyId, baseTs.plusSeconds(2L), "update-r44")
+        rowId1 <- insertVerdictRow(historyId, baseTs, "update-multi-10")
+        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-multi-11")
+        rowId3 <- insertVerdictRow(historyId, baseTs.plusSeconds(2L), "update-multi-12")
         _ <- store.insertAppActivityRecords(
           Seq(
-            mkRecord(rowId1, 42L, Seq("app1::provider"), Seq(100L)),
-            mkRecord(rowId2, 43L, Seq("app1::provider"), Seq(200L)),
-            mkRecord(rowId3, 44L, Seq("app1::provider"), Seq(300L)),
+            mkRecord(rowId1, 10L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2, 11L, Seq("app1::provider"), Seq(200L)),
+            mkRecord(rowId3, 12L, Seq("app1::provider"), Seq(300L)),
           )
         )
-        result <- store.isAppActivityCompleteForRound(43L)
+        result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        result shouldBe true
+        // 12 has prior round 11, so 12 is the latest complete
+        result.value shouldBe 12L
+      }
+    }
+
+    "return None when rounds are not consecutive" in {
+      for {
+        (store, historyId) <- newStore()
+        baseTs = CantonTimestamp.now()
+        rowId1 <- insertVerdictRow(historyId, baseTs, "update-gap-10")
+        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-gap-12")
+        _ <- store.insertAppActivityRecords(
+          Seq(
+            mkRecord(rowId1, 10L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2, 12L, Seq("app1::provider"), Seq(200L)),
+          )
+        )
+        result <- store.latestRoundWithCompleteAppActivity()
+      } yield {
+        result shouldBe None
       }
     }
   }

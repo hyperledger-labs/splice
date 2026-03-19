@@ -379,7 +379,7 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    // -- getNextRoundWithoutRootHash / getEarliestRoundWithActivityTotals --------------
+    // -- lookupLatestRoundWithRewardComputation / getEarliestRoundWithActivityTotals ------
 
     "getEarliestRoundWithActivityTotals returns None when empty" in {
       for {
@@ -403,84 +403,53 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    "getNextRoundWithoutRootHash returns None when no activity records" in {
+    "lookupLatestRoundWithRewardComputation returns None when no root hashes" in {
       for {
         (store, historyId) <- newStore()
-        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
+        result <- store.lookupLatestRoundWithRewardComputation()
       } yield {
         result shouldBe None
       }
     }
 
-    "getNextRoundWithoutRootHash returns earliest round with activity but no root hash" in {
+    "lookupLatestRoundWithRewardComputation returns latest round with root hash" in {
       for {
         (store, historyId) <- newStore()
-        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
-        _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
-      } yield {
-        result.value shouldBe 10L
-      }
-    }
-
-    "getNextRoundWithoutRootHash skips rounds that already have a root hash" in {
-      for {
-        (store, historyId) <- newStore()
-        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
-        _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
         _ <- store.insertAppRewardRootHashes(
           Seq(
             AppRewardRootHashT(
               historyId = historyId,
               roundNumber = 10L,
               rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
-            )
+            ),
+            AppRewardRootHashT(
+              historyId = historyId,
+              roundNumber = 20L,
+              rootHash = ByteString.copyFrom(Array[Byte](5, 6, 7, 8)),
+            ),
           )
         )
-        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
+        result <- store.lookupLatestRoundWithRewardComputation()
       } yield {
         result.value shouldBe 20L
       }
     }
 
-    "getNextRoundWithoutRootHash returns None when all rounds have root hashes" in {
+    "lookupLatestRoundWithRewardComputation returns single round" in {
       for {
         (store, historyId) <- newStore()
-        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
         _ <- store.insertAppRewardRootHashes(
           Seq(
             AppRewardRootHashT(
               historyId = historyId,
-              roundNumber = 10L,
+              roundNumber = 5L,
               rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
             )
           )
         )
-        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 100L)
+        result <- store.lookupLatestRoundWithRewardComputation()
       } yield {
-        result shouldBe None
-      }
-    }
-
-    "getNextRoundWithoutRootHash respects lastClosedRound upper bound" in {
-      for {
-        (store, historyId) <- newStore()
-        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
-        _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        result <- store.getNextRoundWithoutRootHash(earliestRound = 0L, lastClosedRound = 15L)
-      } yield {
-        result.value shouldBe 10L
-      }
-    }
-
-    "getNextRoundWithoutRootHash respects earliestRound lower bound" in {
-      for {
-        (store, historyId) <- newStore()
-        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
-        _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        result <- store.getNextRoundWithoutRootHash(earliestRound = 15L, lastClosedRound = 100L)
-      } yield {
-        result.value shouldBe 20L
+        result.value shouldBe 5L
       }
     }
   }

@@ -461,26 +461,18 @@ class DbScanAppRewardsStore(
 
   // -- Aggregation ------------------------------------------------------------
 
-  /** Find the earliest closed round that has activity records but no root hash.
-    * Only considers rounds in [earliestRound, lastClosedRound].
-    * Returns None if all rounds with activity already have root hashes,
-    * or if there are no activity records in the range.
+  /** Returns the latest round for which reward computation has completed
+    * (i.e. a root hash exists). None if no rounds have been computed.
     */
-  def getNextRoundWithoutRootHash(earliestRound: Long, lastClosedRound: Long)(implicit
+  def lookupLatestRoundWithRewardComputation()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
     val historyId = updateHistory.historyId
     runQuerySingle(
-      sql"""select min(aar.round_number)
-            from (select distinct round_number from app_activity_record_store
-                  where round_number >= $earliestRound
-                    and round_number <= $lastClosedRound) aar
-            where not exists (
-              select 1 from #${Tables.appRewardRootHashes} rh
-              where rh.history_id = $historyId and rh.round_number = aar.round_number
-            )
+      sql"""select max(round_number) from #${Tables.appRewardRootHashes}
+            where history_id = $historyId
       """.as[Option[Long]].headOption.map(_.flatten),
-      "appRewards.getNextRoundWithoutRootHash",
+      "appRewards.lookupLatestRoundWithRewardComputation",
     )
   }
 
@@ -509,8 +501,8 @@ class DbScanAppRewardsStore(
   /** Aggregate per-party and per-round activity totals for the given round from
     * `app_activity_record_store`.
     *
-    * Raises on duplicate key to detect unexpected re-runs; use getNextRoundWithoutRootHash
-    * as a guard to avoid this.
+    * Raises on duplicate key to detect unexpected re-runs; the trigger's
+    * range-based task selection avoids this.
     */
   private[store] def aggregateActivityTotals(
       roundNumber: Long
