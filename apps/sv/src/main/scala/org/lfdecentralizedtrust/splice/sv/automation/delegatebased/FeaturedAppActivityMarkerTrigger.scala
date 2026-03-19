@@ -63,7 +63,8 @@ class FeaturedAppActivityMarkerTrigger(
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] =
     store
       .featuredAppActivityMarkerCountAboveOrEqualTo(
-        activityMarkerCatchupModeThreshold
+        activityMarkerCatchupModeThreshold,
+        context.config.ignoredFeaturedAppActivityMarkerPartyIds,
       )
       .flatMap {
         case false =>
@@ -178,6 +179,7 @@ class FeaturedAppActivityMarkerTrigger(
         hashMinBoundIncl,
         hashMaxBoundIncl,
         numMarkers,
+        context.config.ignoredFeaturedAppActivityMarkerPartyIds,
       )
       .map(markers =>
         markers

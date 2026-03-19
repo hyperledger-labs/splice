@@ -134,6 +134,7 @@ class HttpScanHandler(
     protected val packageVersionSupport: PackageVersionSupport,
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
     initialRound: String,
+    updateHistoryMaxPageSize: Int,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -747,12 +748,12 @@ class HttpScanHandler(
           if (includeImportUpdates)
             updateHistory.getAllUpdates(
               afterO,
-              PageLimit.tryCreate(pageSize),
+              PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
             )
           else
             updateHistory.getUpdatesWithoutImportUpdates(
               afterO,
-              PageLimit.tryCreate(pageSize),
+              PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
             )
       } yield txs
         .map(
@@ -909,7 +910,7 @@ class HttpScanHandler(
         events <- eventStore.getEvents(
           afterO = afterO,
           currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
-          limit = PageLimit.tryCreate(pageSize),
+          limit = PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
         )
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO

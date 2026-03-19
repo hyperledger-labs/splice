@@ -105,37 +105,48 @@ class AcsSnapshotBulkStorage(
             logger.info("No dumped snapshots yet, starting from genesis")
             getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
         }
-        .filter { case TimestampWithMigrationId(ts, _) =>
-          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+        .filter { ts =>
+          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts.timestamp)
           if (ret) {
-            logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+            logger.debug(s"Dumping snapshot at timestamp ${ts.timestamp} to bulk storage")
           } else {
             logger.info(
-              s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+              s"Skipping snapshot at timestamp ${ts.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
             )
           }
           ret
         }
-        .via(
-          SingleAcsSnapshotBulkStorage.asFlow(
-            storageConfig,
-            appConfig,
-            acsSnapshotStore,
-            s3Connection,
-            historyMetrics,
-            loggerFactory,
-          )
-        )
-        .mapAsync(1) { (ts: TimestampWithMigrationId) =>
-          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
-          for {
-            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
-          } yield {
-            logger.info(
-              s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+        .flatMapConcat(ts =>
+          Source
+            .single(ts)
+            .via(
+              SingleAcsSnapshotBulkStorage
+                .asFlow(
+                  storageConfig,
+                  appConfig,
+                  acsSnapshotStore,
+                  s3Connection,
+                  historyMetrics,
+                  loggerFactory,
+                )
+                .map(keys => {
+                  logger.debug(
+                    s"Successfully dumped snapshot from migration ${ts.migrationId}, timestamp ${ts.timestamp} to bulk storage, with object keys: $keys"
+                  )
+                  ts
+                })
             )
-            ts
-          }
+        )
+        .mapAsync(1) { ts =>
+          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
+          kvProvider
+            .setLatestAcsSnapshotsInBulkStorage(ts)
+            .map(_ => {
+              logger.info(
+                s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+              )
+              ts
+            })
         }
     }
   }

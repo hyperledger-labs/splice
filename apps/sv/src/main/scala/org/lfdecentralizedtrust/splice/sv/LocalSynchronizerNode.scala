@@ -14,6 +14,7 @@ import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -62,6 +63,7 @@ final class LocalSynchronizerNode(
     override val sequencerAvailabilityDelay: Duration,
     val sequencerPruningConfig: Option[SequencerPruningConfig],
     override val mediatorSequencerAmplification: SubmissionRequestAmplification,
+    val mediatorSequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
@@ -296,6 +298,7 @@ final class LocalSynchronizerNode(
               synchronizerId,
               sequencerConnection,
               mediatorSequencerAmplification,
+              mediatorSequencerConnectionPoolDelays,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -501,6 +504,7 @@ final class LocalSynchronizerNode(
         mediatorAdminConnection.setSequencerConnection(
           sequencerConnection,
           mediatorSequencerAmplification,
+          mediatorSequencerConnectionPoolDelays,
         ),
       logger,
     )

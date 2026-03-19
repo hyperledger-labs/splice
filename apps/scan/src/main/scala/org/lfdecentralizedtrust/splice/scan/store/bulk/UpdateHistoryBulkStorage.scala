@@ -141,19 +141,27 @@ class UpdateHistoryBulkStorage(
           }
         }
         .collect { case Some(segment) => segment }
-        .via(
-          UpdateHistorySegmentBulkStorage.asFlow(
-            storageConfig,
-            appConfig,
-            updateHistory,
-            s3Connection,
-            historyMetrics,
-            loggerFactory,
-          )
+        .flatMapConcat(segment =>
+          Source
+            .single(segment)
+            .via(
+              UpdateHistorySegmentBulkStorage
+                .asFlow(
+                  storageConfig,
+                  appConfig,
+                  updateHistory,
+                  s3Connection,
+                  historyMetrics,
+                  loggerFactory,
+                )
+                .map(keys => {
+                  logger.debug(
+                    s"Successfully dumped updates segment $segment to bulk storage, with object keys: $keys"
+                  )
+                  segment
+                })
+            )
         )
-        .collect {
-          case UpdateHistorySegmentBulkStorage.Output(segment, _, isLast) if isLast => segment
-        }
         .mapAsync(1) { segment =>
           historyMetrics.BulkStorage.latestUpdatesSegment.updateValue(segment.toTimestamp.timestamp)
           kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)

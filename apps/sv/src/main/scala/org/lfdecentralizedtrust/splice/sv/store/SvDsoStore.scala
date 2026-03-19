@@ -1002,14 +1002,6 @@ trait SvDsoStore
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
 
-  def listFeaturedAppActivityMarkers(limit: Int)(implicit tc: TraceContext): Future[Seq[Contract[
-    splice.amulet.FeaturedAppActivityMarker.ContractId,
-    splice.amulet.FeaturedAppActivityMarker,
-  ]]] =
-    multiDomainAcsStore
-      .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
-      .map(_.map(_.contract))
-
   final def listUnclaimedDevelopmentFundCoupons(
       limit: Limit
   )(implicit
@@ -1026,7 +1018,10 @@ trait SvDsoStore
     } yield unclaimedDevelopmentFundCoupon map (_.contract)
 
   /** Whether there are more than the given number of featured app activity markers. */
-  def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+  def featuredAppActivityMarkerCountAboveOrEqualTo(
+      threshold: Int,
+      ignoredParties: Set[PartyId],
+  )(implicit
       tc: TraceContext
   ): Future[Boolean]
 
@@ -1034,6 +1029,7 @@ trait SvDsoStore
       contractIdHashLbIncl: Int,
       contractIdHashUbIncl: Int,
       limit: Int,
+      ignoredParties: Set[PartyId],
   )(implicit tc: TraceContext): Future[Seq[Contract[
     splice.amulet.FeaturedAppActivityMarker.ContractId,
     splice.amulet.FeaturedAppActivityMarker,

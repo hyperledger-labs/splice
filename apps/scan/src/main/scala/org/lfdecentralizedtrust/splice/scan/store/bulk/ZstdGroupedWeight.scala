@@ -9,27 +9,20 @@ import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import org.apache.pekko.util.ByteString
 
-import java.util.concurrent.atomic.AtomicReference
-
-case class ByteStringWithTermination(
-    bytes: ByteString,
-    isLast: Boolean,
-)
-
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
   * Somewhat similar to Pekko's built-in GroupedWeight, but outputs valid zstd compressed objects.
   */
 case class ZstdGroupedWeight(
     compressionLevel: Int,
     minSize: Long,
-) extends GraphStage[FlowShape[ByteString, ByteStringWithTermination]] {
+) extends GraphStage[FlowShape[ByteString, ByteString]] {
   require(minSize > 0, "minSize must be greater than 0")
 
   val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
 
   val in = Inlet[ByteString]("ZstdGroupedWeight.in")
-  val out = Outlet[ByteStringWithTermination]("ZstdGroupedWeight.out")
-  override val shape: FlowShape[ByteString, ByteStringWithTermination] = FlowShape(in, out)
+  val out = Outlet[ByteString]("ZstdGroupedWeight.out")
+  override val shape: FlowShape[ByteString, ByteString] = FlowShape(in, out)
 
   override def initialAttributes: Attributes = Attributes.name("ZstdGroupedWeight")
 
@@ -86,30 +79,36 @@ case class ZstdGroupedWeight(
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
-      private val zstd = new AtomicReference[ZSTD](new ZSTD(compressionLevel))
-      private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      private var zstd = new ZSTD(compressionLevel)
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      private var state = State.empty()
 
       override def postStop(): Unit = {
         super.postStop()
-        if (zstd.get() != null) {
-          zstd.get().close()
+        if (zstd != null) {
+          zstd.close()
         }
       }
 
       private def reset(): Unit = {
-        zstd.get().close()
-        zstd.set(new ZSTD(3))
-        state.set(State.empty())
+        zstd.close()
+        zstd = new ZSTD(compressionLevel)
+        state = State.empty()
+      }
+
+      private def finishAndPush(): Unit = {
+        state = state.append(zstd.zstdFinish())
+        push(out, state.bytes)
+        reset()
       }
 
       override def onPush(): Unit = {
         val elem = grab(in)
-        val compressed = zstd.get().compress(elem)
-        state.set(state.get().append(compressed))
-        if (state.get().left <= 0) {
-          state.set(state.get().append(zstd.get().zstdFinish()))
-          push(out, ByteStringWithTermination(state.get().bytes, false))
-          reset()
+        val compressed = zstd.compress(elem)
+        state = state.append(compressed)
+        if (state.left <= 0) {
+          finishAndPush()
         } else {
           pull(in)
         }
@@ -118,10 +117,9 @@ case class ZstdGroupedWeight(
       override def onPull(): Unit = pull(in)
 
       override def onUpstreamFinish(): Unit = {
-        if (state.get().bytes.nonEmpty) {
-          state.set(state.get().append(zstd.get().zstdFinish()))
+        if (state.bytes.nonEmpty) {
+          finishAndPush()
         }
-        push(out, ByteStringWithTermination(state.get().bytes, true))
         completeStage()
       }
 
