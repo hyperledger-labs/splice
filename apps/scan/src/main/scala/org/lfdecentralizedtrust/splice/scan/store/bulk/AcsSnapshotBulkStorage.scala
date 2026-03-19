@@ -108,10 +108,10 @@ class AcsSnapshotBulkStorage(
         .filter { ts =>
           val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts.timestamp)
           if (ret) {
-            logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+            logger.debug(s"Dumping snapshot at timestamp ${ts.timestamp} to bulk storage")
           } else {
             logger.info(
-              s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+              s"Skipping snapshot at timestamp ${ts.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
             )
           }
           ret
