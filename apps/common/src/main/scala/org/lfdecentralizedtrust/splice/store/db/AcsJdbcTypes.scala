@@ -366,22 +366,22 @@ trait AcsJdbcTypes {
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
 
+  private def lengthLimitedByteString(bs: ByteString, maxLength: Int): ByteString = {
+    require(
+      bs.size() <= maxLength,
+      s"ByteString should have a maximum length of $maxLength bytes but a ByteString of length ${bs.size()} was given",
+    )
+    bs
+  }
+
   /** Transaction hash is SHA-256 (32 bytes), but we apply a relaxed future-proof limit of 1024 bytes just in case.
-    *  The hash is not guaranteed to be present. For consistency with historical data,
-    *  we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
+    * The hash is not guaranteed to be present. For consistency with historical data,
+    * we represent a missing hash as NULL in the database, and not as an empty byte array (\x).
     */
-  protected def sanitizedExtTxnHash(
-      extTxnHash: ByteString,
-      maxLength: Int = 1024,
-  ): Option[Array[Byte]] = {
-    Option(extTxnHash)
+  protected def sanitizedExtTxnHash(extTxnHash: ByteString): Option[Array[Byte]] = {
+    Option(lengthLimitedByteString(extTxnHash, maxLength = 1024))
       .filterNot(_.isEmpty)
-      .map { nonNullExtTxnHash =>
-        val trimmedExtTxnHash =
-          if (nonNullExtTxnHash.size() > maxLength) nonNullExtTxnHash.substring(0, maxLength)
-          else nonNullExtTxnHash
-        trimmedExtTxnHash.toByteArray
-      }
+      .map(_.toByteArray)
   }
 
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](

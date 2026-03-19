@@ -44,13 +44,12 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.util.HexString
-import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
 import org.scalatest.Assertion
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import com.digitalasset.canton.util.HexString
 
 trait UpdateHistoryTestUtil extends TestCommon {
 
@@ -209,11 +208,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
             TransactionTreeUpdate(actualTx),
             TransactionTreeUpdate(recordedTx),
           ) =>
-        def toByteArray(hash: ByteString): Array[Byte] =
-          Option(hash).map(_.toByteArray).getOrElse(Array.emptyByteArray)
-
-        toByteArray(actualTx.getExternalTransactionHash) shouldBe
-          toByteArray(recordedTx.getExternalTransactionHash)
+        actualTx.getExternalTransactionHash shouldBe recordedTx.getExternalTransactionHash
 
       case _ =>
         succeed
@@ -240,7 +235,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val historyFromStoreWithoutLostData =
       historyFromStore
         .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-        .map(ScanHttpEncodings.makeConsistentAcrossSvs)
+        .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
 
@@ -290,7 +285,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-      .map(ScanHttpEncodings.makeConsistentAcrossSvs)
+      .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(

@@ -531,6 +531,7 @@ object ScanHttpEncodings {
       update: TreeUpdateWithMigrationId,
       encoding: definitions.DamlValueEncoding,
       version: ApiVersion,
+      externalTransactionHashThresholdTime: Option[Instant] = None,
   )(implicit
       elc: ErrorLoggingContext
   ): definitions.UpdateHistoryItem = {
@@ -538,7 +539,7 @@ object ScanHttpEncodings {
       case V0 =>
         update
       case V1 =>
-        ScanHttpEncodings.makeConsistentAcrossSvs(update)
+        ScanHttpEncodings.makeConsistentAcrossSvs(update, externalTransactionHashThresholdTime)
     }
     val encodings: ScanHttpEncodings = encoding match {
       case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings()
@@ -563,24 +564,31 @@ object ScanHttpEncodings {
     * Note: both offsets and event ids are assigned locally by the participant.
     */
   def makeConsistentAcrossSvs(
-      update: TreeUpdateWithMigrationId
+      update: TreeUpdateWithMigrationId,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): TreeUpdateWithMigrationId = {
-    update.copy(update = makeConsistentAcrossSvs(update.update))
+    update.copy(update =
+      makeConsistentAcrossSvs(update.update, externalTransactionHashThresholdTime)
+    )
   }
 
   def makeConsistentAcrossSvs(
-      response: UpdateHistoryResponse
+      response: UpdateHistoryResponse,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): UpdateHistoryResponse = {
-    response.copy(update = makeConsistentAcrossSvs(response.update))
+    response.copy(update =
+      makeConsistentAcrossSvs(response.update, externalTransactionHashThresholdTime)
+    )
   }
 
   def makeConsistentAcrossSvs(
-      update: ledgerApi.TreeUpdate
+      update: ledgerApi.TreeUpdate,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): ledgerApi.TreeUpdate = {
     update match {
       case ledgerApi.TransactionTreeUpdate(tree) =>
         ledgerApi.TransactionTreeUpdate(
-          makeConsistentAcrossSvs(tree)
+          makeConsistentAcrossSvs(tree, externalTransactionHashThresholdTime)
         )
       case ledgerApi.ReassignmentUpdate(transfer) =>
         transfer.event match {
@@ -626,7 +634,8 @@ object ScanHttpEncodings {
   }
 
   def makeConsistentAcrossSvs(
-      tree: javaApi.Transaction
+      tree: javaApi.Transaction,
+      externalTransactionHashThresholdTime: Option[Instant],
   ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
@@ -685,6 +694,15 @@ object ScanHttpEncodings {
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
 
+    // Only include the external transaction hash for transactions recorded on or after the threshold timestamp.
+    val externalTransactionHash: ByteString =
+      externalTransactionHashThresholdTime match {
+        case Some(threshold) if !tree.getRecordTime.isBefore(threshold) =>
+          tree.getExternalTransactionHash
+        case _ =>
+          ByteString.EMPTY
+      }
+
     new javaApi.Transaction(
       tree.getUpdateId,
       tree.getCommandId,
@@ -695,7 +713,7 @@ object ScanHttpEncodings {
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
-      tree.getExternalTransactionHash,
+      externalTransactionHash,
     )
   }
 }

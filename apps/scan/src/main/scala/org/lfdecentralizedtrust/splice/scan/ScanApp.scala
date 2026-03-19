@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
+import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
@@ -28,6 +29,7 @@ import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource 
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
+  HttpScanStreamHandler,
   HttpTokenStandardAllocationHandler,
   HttpTokenStandardAllocationInstructionHandler,
   HttpTokenStandardMetadataHandler,
@@ -58,13 +60,13 @@ import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.store.{
   ChoiceContextContractFetcher,
   PageLimit,
+  S3BucketConnection,
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
@@ -216,8 +218,6 @@ class ScanApp(
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore.history,
-        externalTransactionHashThresholdTimestamp = config.externalTransactionHashThresholdDate
-          .map(s => CantonTimestamp.assertFromInstant(java.time.Instant.parse(s))),
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
@@ -370,6 +370,11 @@ class ScanApp(
         packageVersionSupport,
         bftSequencersWithAdminConnections,
         initialRound,
+        externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
+        config.updateHistoryMaxPageSize,
+      )
+      scanStreamHandler = new HttpScanStreamHandler(
+        config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))
       )
       contractFetcher = ChoiceContextContractFetcher.createStoreWithLedgerFallback(
         config.parameters.contractFetchLedgerFallbackConfig,
@@ -445,6 +450,10 @@ class ScanApp(
                 ScanResource.routes(
                   scanHandler,
                   buildRouteForOperation(_, "scan"),
+                ),
+                ScanStreamResource.routes(
+                  scanStreamHandler,
+                  buildRouteForOperation(_, "scan_stream"),
                 ),
                 TokenStandardTransferInstructionResource.routes(
                   tokenStandardTransferInstructionHandler,

@@ -22,7 +22,7 @@ jobs:
 
       - name: Setup
         shell: bash
-        run: ./.github/actions/scripts/common_setup.sh
+        run: ./splice-shared-gha/.github/actions/scripts/common_setup.sh
 
       - name: Set up Nix (Self hosted)
         uses: ./splice-shared-gha/.github/actions/nix/setup_nix

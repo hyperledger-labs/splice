@@ -1156,6 +1156,15 @@ lazy val `apps-scan` =
             pkg = "org.lfdecentralizedtrust.splice.http.v0",
           ),
           ScalaServer(
+            new File(s"apps/scan/src/main/openapi/scan-stream-server.yaml"),
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
+            modules = List("pekko-http-v1.0.0", "circe"),
+            imports = List(
+              "org.lfdecentralizedtrust.splice.scan.admin.http.ResponseEntityGuardrailSupport._"
+            ),
+            customExtraction = true,
+          ),
+          ScalaServer(
             new File(
               "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction-v1.yaml"
             ),
@@ -1901,7 +1910,7 @@ checkErrors := {
     val ignorePatternsFilenames = ignorePatterns.map(ignorePatternsFilename)
     val cmd =
       Seq(
-        ".github/actions/scripts/check-logs.sh",
+        "splice-shared-gha/.github/actions/scripts/check-logs.sh",
         logFileName,
       ) ++ ignorePatternsFilenames
     if (cmd.! != 0) {
@@ -1918,7 +1927,12 @@ checkErrors := {
     val logFileAfter = s"log/${logName}_after_shutdown.clog"
 
     // Note that this will split the given file and then delete it, so it is idempotent.
-    Seq(".github/actions/scripts/split-canton-logs.sh", logFile, logFileBefore, logFileAfter).!
+    Seq(
+      "splice-shared-gha/.github/actions/scripts/split-canton-logs.sh",
+      logFile,
+      logFileBefore,
+      logFileAfter,
+    ).!
 
     import better.files.File
     val logSpecificIgnores =

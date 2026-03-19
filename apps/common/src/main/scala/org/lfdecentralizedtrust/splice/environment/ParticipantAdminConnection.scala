@@ -63,6 +63,7 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   RecreateOnAuthorizedStateChange,
   TopologyResult,
+  TopologySnapshot,
 }
 
 import java.time.Instant
@@ -636,6 +637,7 @@ class ParticipantAdminConnection(
       party: PartyId,
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
+      topologySnapshot: TopologySnapshot = TopologySnapshot.Sequenced,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
@@ -646,6 +648,7 @@ class ParticipantAdminConnection(
             synchronizerId = synchronizerId,
             partyId = party,
             topologyTransactionType = topologyTransactionType,
+            topologySnapshot = topologySnapshot,
           )
             .map(result =>
               Either
@@ -693,7 +696,7 @@ class ParticipantAdminConnection(
       description,
       queryType =>
         EitherT(
-          getPartyToParticipant(synchronizerId, party, None, queryType)
+          getPartyToParticipant(synchronizerId, party, None, queryType, TopologySnapshot.Sequenced)
             .map { result =>
               val newHostingParticipants = participantChange(result.mapping.participants)
               Either.cond(
@@ -745,6 +748,7 @@ class ParticipantAdminConnection(
             synchronizerId,
             party,
             topologyTransactionType = topologyTransactionType,
+            topologySnapshot = TopologySnapshot.Sequenced,
           ).map(result => {
             Either.cond(
               result.mapping.participants

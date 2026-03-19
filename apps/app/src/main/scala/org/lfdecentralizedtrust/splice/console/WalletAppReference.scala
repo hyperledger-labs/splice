@@ -658,8 +658,8 @@ abstract class WalletAppReference(
 
   @Help.Summary("List the history of development fund coupons")
   @Help.Description(
-    "Lists archived development fund coupons for the configured user acting as the development fund manager, " +
-      "starting with the most recently archived ones and returning paginated results."
+    "Lists archived development fund coupons for the configured user acting as the development fund manager or as " +
+      "the beneficiary, starting with the most recently archived ones and returning paginated results."
   )
   def listDevelopmentFundCouponHistory(
       after: Option[Long] = None,
