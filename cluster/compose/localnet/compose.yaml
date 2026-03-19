@@ -207,6 +207,15 @@ services:
     profiles:
       - multi-sync
 
+  multi-sync-ready:
+    container_name: multi-sync-ready
+    image: busybox:1.37.0
+    depends_on:
+      multi-sync-startup:
+        condition: service_completed_successfully
+    profiles:
+      - multi-sync
+
   swagger-ui:
     image: swaggerapi/swagger-ui
     container_name: swagger-ui
