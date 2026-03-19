@@ -22,6 +22,7 @@ class SvBftSequencerPeerOnboardingTrigger(
     store: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
+    migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -43,6 +44,7 @@ class SvBftSequencerPeerOnboardingTrigger(
       sequencerAdminConnection,
       loggerFactory,
       scanConnection,
+      migrationId,
     )
 
 }

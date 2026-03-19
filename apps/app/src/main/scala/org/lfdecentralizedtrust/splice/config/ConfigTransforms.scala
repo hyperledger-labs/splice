@@ -413,6 +413,18 @@ object ConfigTransforms {
   ): ConfigTransform =
     updateAllRemoteSplitwellAppConfigs((_, config) => update(config))
 
+  def bumpScanCantonDomainPortsBy(bump: Int) = {
+    updateAllScanAppConfigs_(
+      _.focus(_.bftSequencers).modify(
+        _.map(
+          _.focus(_.p2pUrl).modify(
+            bumpUrl(bump, _)
+          )
+        )
+      )
+    )
+  }
+
   def bumpOptionalUrl(o: Option[String], bump: Int): Option[String] = {
     o.map(bumpUrl(bump, _))
   }
@@ -452,8 +464,15 @@ object ConfigTransforms {
           conf
             .focus(_.synchronizerNodes)
             .modify(portTransform(bump, _))
-            .focus(_.synchronizerNodes.current.bftSequencerConfig)
-            .modify(_.map(c => c.copy(p2pUrl = bumpUrl(bump, c.p2pUrl))))
+            .focus(_.bftSequencers)
+            .modify(
+              _.map(
+                _.focus(_.sequencerAdminClient)
+                  .modify(portTransform(bump, _))
+                  .focus(_.p2pUrl)
+                  .modify(bumpUrl(bump, _))
+              )
+            )
         else conf
       ),
       updateAllValidatorConfigs((name, conf) =>
@@ -617,6 +636,8 @@ object ConfigTransforms {
           .modify(_.map(setPortPrefix(range)))
           .focus(_.synchronizerNodes)
           .modify(setPortPrefix(range, _))
+          .focus(_.bftSequencers)
+          .modify(_.map(_.focus(_.sequencerAdminClient.port).modify(setPortPrefix(range))))
       } else {
         config
       }
@@ -710,17 +731,18 @@ object ConfigTransforms {
   def withBftSequencer(
       name: String,
       config: ScanAppBackendConfig,
+      migrationId: Long = 0,
       basePort: Int = 5010,
   ): ScanAppBackendConfig =
-    config
-      .focus(_.synchronizerNodes.current.bftSequencerConfig)
-      .replace(
-        Some(
-          BftSequencerConfig(
-            s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}"
-          )
+    config.copy(
+      bftSequencers = Seq(
+        BftSequencerConfig(
+          migrationId,
+          config.synchronizerNodes.current.sequencer,
+          s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}",
         )
       )
+    )
 
   def withBftSequencers(): ConfigTransform = {
     updateAllSvAppConfigs_(withBftSequencer) compose {

@@ -22,7 +22,6 @@ trait BaseScanAppConfig {}
 final case class ScanSynchronizerConfig(
     sequencer: FullClientConfig,
     mediator: FullClientConfig,
-    bftSequencerConfig: Option[BftSequencerConfig],
 )
 
 final case class MediatorVerdictIngestionConfig(
@@ -78,6 +77,7 @@ case class ScanAppBackendConfig(
     updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
+    bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
@@ -94,7 +94,6 @@ case class ScanAppBackendConfig(
 final case class ScanSynchronizerNodesConfig(
     current: ScanSynchronizerConfig,
     successor: Option[ScanSynchronizerConfig],
-    legacy: Option[ScanSynchronizerConfig],
 )
 
 final case class ScanCacheConfig(

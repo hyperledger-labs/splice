@@ -1,2 +1,4 @@
-# Expected warning until https://github.com/DACH-NY/canton/pull/31166 lands
-discarding expired batches
+# TODO(DACH-NY/canton-network-internal#349) - remove when fixed
+synchronizer outbox flusher The synchronizer Synchronizer 'global' failed the following topology transactions
+# TODO(#930) - check if the sequencer is initialized before reconciling peers
+UNIMPLEMENTED: Method not found: com.digitalasset.canton.sequencer.admin.v30.SequencerBftAdministrationService/GetPeerNetworkStatus

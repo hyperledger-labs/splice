@@ -1941,11 +1941,11 @@ components:
             $ref: "#/components/schemas/SynchronizerBftSequencer"
     SynchronizerBftSequencer:
       type: object
-      required: ["serialId", "id", "p2pUrl"]
+      required: ["migrationId", "id", "p2pUrl"]
       properties:
-        serialId:
+        migrationId:
           description: |
-            The synchronizer serial corresponding to this sequencer.
+            The synchronizer migration id corresponding to this sequencer.
           type: integer
           format: int64
         id:

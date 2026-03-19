@@ -163,6 +163,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 config
                   .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
                   .copy(domainMigrationId = 1L),
+                migrationId = 1L,
                 basePort = 5010,
               )
           ),

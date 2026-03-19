@@ -20,7 +20,8 @@ class SequencerBftPeerRemoveReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
     val loggerFactory: NamedLoggerFactory,
     scanConnection: AggregatingScanConnection,
-) extends SequencerBftPeerReconciler(sequencerAdminConnection, scanConnection) {
+    migrationId: Long,
+) extends SequencerBftPeerReconciler(sequencerAdminConnection, scanConnection, migrationId) {
 
   override def reconcileTask(
       task: BftPeerDifference
