@@ -130,3 +130,32 @@ export interface ListSubscriptionRequestsResponse {
 export interface ListSubscriptionsResponse {
   subscriptionsList: WalletSubscription[];
 }
+
+export interface DevelopmentFundCoupon {
+  id: string;
+  createdAt: Date;
+  fundManager: string;
+  beneficiary: string;
+  amount: BigNumber;
+  expiresAt: Date;
+  reason: string;
+  withdrawalReason?: string;
+}
+
+export type ArchivedDevelopmentFundCouponStatusEnum =
+  | 'claimed'
+  | 'withdrawn'
+  | 'rejected'
+  | 'expired';
+
+export interface CouponHistoryEvent {
+  id: string;
+  couponId: string;
+  eventType: ArchivedDevelopmentFundCouponStatusEnum;
+  timestamp: Date;
+  fundManager: string;
+  beneficiary: string;
+  amount: BigNumber;
+  allocationReason: string;
+  withdrawalReason?: string;
+}

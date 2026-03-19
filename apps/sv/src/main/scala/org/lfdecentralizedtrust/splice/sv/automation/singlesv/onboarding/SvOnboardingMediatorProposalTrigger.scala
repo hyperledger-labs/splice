@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingMediatorProposalTrigger.MediatorToOnboard
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.MemberIdUtil
@@ -53,6 +54,7 @@ class SvOnboardingMediatorProposalTrigger(
       synchronizerId = rulesAndStates.dsoRules.domain
       currentMediatorState <- participantAdminConnection.getMediatorSynchronizerState(
         synchronizerId,
+        TopologySnapshot.Sequenced,
         AuthorizedState,
       )
     } yield {
@@ -98,8 +100,13 @@ class SvOnboardingMediatorProposalTrigger(
         RetryFor.Automation,
         "sequencer_added_to_topology_state",
         s"Sequencer is added to the topology state for $task",
+        // Read at effective state as that is when the mediator will get counters.
         participantAdminConnection
-          .getSequencerSynchronizerState(task.synchronizerId, AuthorizedState)
+          .getSequencerSynchronizerState(
+            task.synchronizerId,
+            TopologySnapshot.Effective,
+            AuthorizedState,
+          )
           .map(state =>
             // required so that the mediator doesn't have an assigned counter when the sequencer initializes from the snapshot
             // if the mediator would have a counter, it will not be able to initialize from the sequencer
@@ -124,7 +131,11 @@ class SvOnboardingMediatorProposalTrigger(
       tc: TraceContext
   ): Future[Boolean] =
     participantAdminConnection
-      .getMediatorSynchronizerState(task.synchronizerId, AuthorizedState)
+      .getMediatorSynchronizerState(
+        task.synchronizerId,
+        TopologySnapshot.Sequenced,
+        AuthorizedState,
+      )
       .map { state =>
         state.mapping.active.contains(task.mediatorId)
       }

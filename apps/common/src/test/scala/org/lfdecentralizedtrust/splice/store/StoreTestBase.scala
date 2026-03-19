@@ -182,6 +182,7 @@ abstract class StoreTestBase
       dsoParty.toProtoPrimitive,
       schedule(initialTickDuration),
       false,
+      java.util.Optional.empty(), // contractStateSchemaVersion
     )
     contract(
       identifier = templateId,
@@ -1168,9 +1169,16 @@ abstract class StoreTestBase
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
         implementedInterfaces: Seq[Identifier] = Seq.empty,
+        recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx =
-        mkTx(nextOffset(), Seq(toArchivedEvent(c, implementedInterfaces)), domain, txEffectiveAt)
+        mkTx(
+          nextOffset(),
+          Seq(toArchivedEvent(c, implementedInterfaces)),
+          domain,
+          txEffectiveAt,
+          recordTime = recordTime,
+        )
       store.testIngestionSink
         .ingestUpdate(
           domain,

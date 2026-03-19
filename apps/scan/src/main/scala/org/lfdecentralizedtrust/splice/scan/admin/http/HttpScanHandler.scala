@@ -30,6 +30,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   SequencerAdminConnection,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
@@ -134,6 +135,7 @@ class HttpScanHandler(
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
     initialRound: String,
     externalTransactionHashThresholdTime: Option[Instant] = None,
+    updateHistoryMaxPageSize: Int,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -747,12 +749,12 @@ class HttpScanHandler(
           if (includeImportUpdates)
             updateHistory.getAllUpdates(
               afterO,
-              PageLimit.tryCreate(pageSize),
+              PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
             )
           else
             updateHistory.getUpdatesWithoutImportUpdates(
               afterO,
-              PageLimit.tryCreate(pageSize),
+              PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
             )
       } yield txs
         .map(
@@ -910,7 +912,7 @@ class HttpScanHandler(
         events <- eventStore.getEvents(
           afterO = afterO,
           currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
-          limit = PageLimit.tryCreate(pageSize),
+          limit = PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
         )
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
@@ -2207,6 +2209,8 @@ class HttpScanHandler(
           domain,
           party,
           topologyTransactionType = AuthorizedState,
+          topologySnapshot =
+            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
         )
         participantId <- response.mapping.participantIds match {
           case Seq() =>

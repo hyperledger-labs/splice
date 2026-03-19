@@ -1830,7 +1830,7 @@ class UpdateHistory(
 
   /** Returns the record time range of sequenced events excluding ACS imports after a HDM.
     */
-  def getRecordTimeRange(
+  def getRecordTimeRangeBySynchronizer(
       migrationId: Long
   )(implicit tc: TraceContext): Future[Map[SynchronizerId, DomainRecordTimeRange]] = {
     // This query is rather tricky, there are two parts we need to tackle:
@@ -1878,6 +1878,46 @@ class UpdateHistory(
     } yield {
       rangeTransactions |+| rangeUnassignments |+| rangeAssignments
     }
+  }
+
+  /** Returns the record time range of sequenced events excluding ACS imports after a HDM,
+    * or None if there are no sequenced events for the given migration id.
+    */
+  def getRecordTimeRange(
+      migrationId: Long
+  )(implicit tc: TraceContext): Future[Option[DomainRecordTimeRange]] = {
+
+    def rangeForTable(table: String): SQLActionBuilder = {
+      sql"""
+        select min(record_time) as min_record_time, max(record_time) as max_record_time
+        from #$table
+        where history_id = $historyId
+        and migration_id = $migrationId
+        and record_time > ${CantonTimestamp.MinValue}
+      """
+    }
+    storage
+      .query(
+        (sql"""
+          select min(min_record_time) as min_record_time, max(max_record_time) as max_record_time
+          from (
+            (""" ++ rangeForTable("update_history_transactions") ++ sql""")
+            union all
+            (""" ++ rangeForTable("update_history_assignments") ++ sql""")
+            union all
+            (""" ++ rangeForTable("update_history_unassignments") ++ sql""")
+          ) all_ranges
+        """).toActionBuilder
+          .as[(Option[CantonTimestamp], Option[CantonTimestamp])]
+          .head
+          .map(row =>
+            for {
+              min <- row._1
+              max <- row._2
+            } yield DomainRecordTimeRange(min, max)
+          ),
+        s"getRecordTimeRange",
+      )
   }
 
   def getLastImportUpdateId(
@@ -2156,7 +2196,7 @@ class UpdateHistory(
         // from before the update history was initialized.
         state <- getBackfillingState()
         previousMigrationId <- getPreviousMigrationId(migrationId)
-        recordTimeRange <- getRecordTimeRange(migrationId)
+        recordTimeRange <- getRecordTimeRangeBySynchronizer(migrationId)
         lastImportUpdateId <- getLastImportUpdateId(migrationId)
       } yield {
         state match {
@@ -2220,7 +2260,7 @@ class UpdateHistory(
       state <- OptionT.liftF(getBackfillingState())
       if state != BackfillingState.NotInitialized
       migrationId <- OptionT(getFirstMigrationId(historyId))
-      recordTimeRange <- OptionT.liftF(getRecordTimeRange(migrationId))
+      recordTimeRange <- OptionT.liftF(getRecordTimeRangeBySynchronizer(migrationId))
     } yield DestinationBackfillingInfo(
       migrationId = migrationId,
       backfilledAt = recordTimeRange.view.mapValues(_.min).toMap,

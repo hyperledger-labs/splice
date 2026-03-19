@@ -18,6 +18,53 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.5.15
+
+  - Validator App
+
+    - Remove the ``new-sequencer-connection-pool`` flag as it didn't
+      do what it was supposed to do. If you did set it, you can
+      safely remove it regardless of whether you disabled the new sequencer connection
+      pools in the participant or not.
+
+  - Scan
+
+    - **Experimental**: Add an optional ``traffic_summary`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
+      When enabled by SV configuration, traffic summaries are included alongside verdicts in event history items.
+      This is part of the CIP-104 preview and is subject to change.
+
+      Traffic summaries will be enabled step-by-step on Dev/Test/MainNet,
+      once the SVs have successfully concluded their performance testing.
+
+  - Wallet UI
+
+    - Introduce a new ``/development-fund`` panel providing a complete UI for managing Development Fund allocations (see `CIP-0082 <https://github.com/canton-foundation/cips/blob/main/cip-0082/cip-0082.md>`_ and `CIP-0100 <https://github.com/canton-foundation/cips/blob/main/cip-0100/cip-0100.md>`_ for context).
+
+    - The panel includes:
+
+      - Display of total available Development Fund balance
+      - Allocation form for Development Fund coupons (Development Fund Manager only)
+      - Unclaimed allocations table with withdrawal support
+      - Coupon history with lifecycle event tracking (claimed, withdrawn, rejected, expired)
+
+    - Role-based behavior is enforced:
+
+      - Simple Users: read-only access to fund total
+      - Current Development Fund Manager: full allocation and withdrawal capabilities
+      - Former Development Fund Manager: can manage and view allocations created under their tenure, but cannot create new ones
+
+  - Docs
+
+    - Add a new :ref:`development_fund` page documenting the Development Fund.
+
+  - Canton
+
+    .. important::
+
+      - Fix the bug in the new topology client cache. It is recommended to remove the temporary additional flags `ADDITIONAL_CONFIG_DISABLE_NEW_TOPOLOGY_CLIENT` set in your participants and mediators configurations.
+
+    - JSON API: Synthetic `value` fields in oneOf wrapper types (e.g., `AssignCommand`, `UnassignCommand`, `Completion`) are now marked as required in the OpenAPI and AsyncAPI specifications, matching the actual API logic where these fields must always be present.
+
 .. release-notes:: 0.5.14
 
   - Participant
@@ -45,7 +92,7 @@
     - Fix issue where sequencer startup could take more than 10 minutes.
 
     - APIs:
-    
+
       - *BREAKING* The
 
           - ``/v2/updates`` HTTP POST and websocket GET endpoints
@@ -367,6 +414,8 @@
       You can either directly reinstall the new version or first do the reinstall on the old version and then upgrade.
 
 .. release-notes:: 0.5.7
+
+   Daml:
 
   .. important::
 
