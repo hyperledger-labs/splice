@@ -42,6 +42,7 @@ import {
   approvedSvIdentities,
   CantonBftSynchronizerNode,
   configForSv,
+  DecentralizedSynchronizerNode,
   installScanBulkStorage,
   installSvLoopback,
   SynchronizerNodes,
@@ -539,8 +540,14 @@ function installScan(
   const lsuEnabled = decentralizedSynchronizerMigrationConfig.lsuEnabled;
   const { active, participant } = synchronizerNodes;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
-  const externalSequencerP2pAddress = (active as unknown as CantonBftSynchronizerNode)
-    .externalSequencerP2pAddress;
+
+  const bftSequencerConfigFor = (node: DecentralizedSynchronizerNode) => {
+    return {
+      bftSequencerConfig: {
+        p2pUrl: (node as unknown as CantonBftSynchronizerNode).externalSequencerP2pAddress,
+      },
+    };
+  };
 
   const synchronizerValues = lsuEnabled
     ? {
@@ -548,12 +555,27 @@ function installScan(
           current: {
             sequencer: active.namespaceInternalSequencerAddress,
             mediator: active.namespaceInternalMediatorAddress,
+            ...(useCantonBft ? bftSequencerConfigFor(active) : {}),
           },
           ...(synchronizerNodes.upgrade
             ? {
                 successor: {
                   sequencer: synchronizerNodes.upgrade.namespaceInternalSequencerAddress,
                   mediator: synchronizerNodes.upgrade.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(synchronizerNodes.upgrade)
+                    : {}),
+                },
+              }
+            : {}),
+          ...(synchronizerNodes.legacy
+            ? {
+                legacy: {
+                  sequencer: synchronizerNodes.legacy.namespaceInternalSequencerAddress,
+                  mediator: synchronizerNodes.legacy.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(synchronizerNodes.legacy)
+                    : {}),
                 },
               }
             : {}),
@@ -578,17 +600,6 @@ function installScan(
       id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
     },
     ...synchronizerValues,
-    ...(useCantonBft
-      ? {
-          bftSequencers: [
-            {
-              p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId,
-              sequencerAddress: active.namespaceInternalSequencerAddress,
-            },
-          ],
-        }
-      : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     apiRequestLogLevel: config.logging?.apiRequestLogLevel,

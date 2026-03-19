@@ -55,6 +55,7 @@ import {
   approvedSvIdentitiesFile,
   CantonBftSynchronizerNode,
   configForSv,
+  DecentralizedSynchronizerNode,
   getChainIdSuffix,
   installSvLoopback,
   sv1Config,
@@ -386,20 +387,41 @@ async function installSvAndValidator(
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
-  const externalSequencerP2pAddress = (canton.active as unknown as CantonBftSynchronizerNode)
-    .externalSequencerP2pAddress;
+  const bftSequencerConfigFor = (node: DecentralizedSynchronizerNode) => {
+    return {
+      bftSequencerConfig: {
+        p2pUrl: (node as unknown as CantonBftSynchronizerNode).externalSequencerP2pAddress,
+      },
+    };
+  };
+
   const synchronizerValues = decentralizedSynchronizerMigrationConfig.lsuEnabled
     ? {
         synchronizers: {
           current: {
             sequencer: canton.active.namespaceInternalSequencerAddress,
             mediator: canton.active.namespaceInternalMediatorAddress,
+            ...(useCantonBft ? bftSequencerConfigFor(canton.active) : {}),
           },
           ...(canton.upgrade
             ? {
                 successor: {
                   sequencer: canton.upgrade.namespaceInternalSequencerAddress,
                   mediator: canton.upgrade.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(canton.upgrade)
+                    : {}),
+                },
+              }
+            : {}),
+          ...(canton.legacy
+            ? {
+                legacy: {
+                  sequencer: canton.legacy.namespaceInternalSequencerAddress,
+                  mediator: canton.legacy.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(canton.legacy)
+                    : {}),
                 },
               }
             : {}),
@@ -425,17 +447,6 @@ async function installSvAndValidator(
         }
       : {}),
     ...synchronizerValues,
-    ...(useCantonBft
-      ? {
-          bftSequencers: [
-            {
-              p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId,
-              sequencerAddress: canton.active.namespaceInternalSequencerAddress,
-            },
-          ],
-        }
-      : {}),
     resources: svConfig.scanApp?.resources,
   };
 

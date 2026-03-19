@@ -37,6 +37,7 @@ export const MigrationInfoSchema = z
       .object({
         enableBftSequencer: z.boolean().default(false),
       })
+      .strict()
       .default({}),
   })
   .strict();

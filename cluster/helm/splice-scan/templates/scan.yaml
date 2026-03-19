@@ -81,23 +81,32 @@ spec:
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
             canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}
-        {{- if .Values.bftSequencers }}
-        - name: ADDITIONAL_CONFIG_BFT_SEQUENCERS
+        {{- if .Values.synchronizers }}
+        {{- with .Values.synchronizers.current.bftSequencerConfig }}
+        - name: ADDITIONAL_CONFIG_BFT_SEQUENCER_CURRENT
           value: |
-            canton.scan-apps.scan-app {
-              bft-sequencers = [
-                {{- range .Values.bftSequencers }}
-                {
-                  p2p-url = "{{ .p2pUrl }}"
-                  migration-id = {{ .migrationId }}
-                  sequencer-admin-client {
-                    address = "{{ .sequencerAddress }}"
-                    port = 5009
-                  }
-                }
-                {{- end }}
-              ]
+            canton.scan-apps.scan-app.synchronizer-nodes.current.bft-sequencer-config {
+              p2p-url = "{{ .p2pUrl }}"
             }
+        {{- end }}
+        {{- with .Values.synchronizers.successor }}
+        {{- with .bftSequencerConfig }}
+        - name: ADDITIONAL_CONFIG_BFT_SEQUENCER_SUCCESSOR
+          value: |
+            canton.scan-apps.scan-app.synchronizer-nodes.successor.bft-sequencer-config {
+              p2p-url = "{{ .p2pUrl }}"
+            }
+        {{- end }}
+        {{- end }}
+        {{- with .Values.synchronizers.legacy }}
+        {{- with .bftSequencerConfig }}
+        - name: ADDITIONAL_CONFIG_BFT_SEQUENCER_LEGACY
+          value: |
+            canton.scan-apps.scan-app.synchronizer-nodes.legacy.bft-sequencer-config {
+              p2p-url = "{{ .p2pUrl }}"
+            }
+        {{- end }}
+        {{- end }}
         {{- end }}
         {{- with .Values.persistence.acsStoreDescriptorUserVersion }}
         - name: ADDITIONAL_CONFIG_ACS_STORE_DESCRIPTOR_USER_VERSION
@@ -144,6 +153,20 @@ spec:
         - name: ADDITIONAL_CONFIG_SYNCHRONIZER_SUCCESSOR
           value: |
             canton.scan-apps.scan-app.synchronizer-nodes.successor {
+              sequencer {
+                address = "{{ .sequencer }}"
+                port = 5009
+              }
+              mediator {
+                address = "{{ .mediator }}"
+                port = 5007
+              }
+            }
+        {{- end }}
+        {{- with .Values.synchronizers.legacy }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_LEGACY
+          value: |
+            canton.scan-apps.scan-app.synchronizer-nodes.legacy {
               sequencer {
                 address = "{{ .sequencer }}"
                 port = 5009
