@@ -2503,8 +2503,12 @@ object HttpScanAppClient {
     ): PartialFunction[GetBulkAcsSnapshotResponse, Either[
       String,
       definitions.GetBulkAcsSnapshotResponse,
-    ]] = { case http.GetBulkAcsSnapshotResponse.OK(response) =>
+    ]] = {
+      case http.GetBulkAcsSnapshotResponse.OK(response) =>
       Right(response)
+      case http.GetBulkAcsSnapshotResponse.NotFound(err) =>
+        Left(err.error)
+
     }
   }
 
