@@ -66,6 +66,8 @@ allocations decided in accordance with `CIP-0100 <https://github.com/canton-foun
 
 This tab provides visibility into the current Development Fund balance and
 allows the Development Fund Manager to allocate and manage coupons.
+It also allows beneficiaries to view active and historical coupons where
+their party is the beneficiary.
 
 .. important::
 
@@ -122,11 +124,13 @@ The **Unclaimed Development Fund Allocations** section lists all active
 - Have been allocated by the current or a former manager, and
 - Have not been collected, expired, withdrawn, or rejected.
 
-A beneficiary does not see their coupon in this list.
-Only users who are or have been Development Fund Manager can view these entries.
+This list is visible to:
 
-From this list, the Development Fund Manager (current or former) may withdraw
-an allocation by providing a withdrawal reason.
+- Current or former Development Fund Managers (for coupons they allocated), and
+- Beneficiaries (for coupons allocated to their party).
+
+Only the Development Fund Manager of a given coupon may withdraw
+that allocation by providing a withdrawal reason.
 
 Withdrawing an allocation:
 

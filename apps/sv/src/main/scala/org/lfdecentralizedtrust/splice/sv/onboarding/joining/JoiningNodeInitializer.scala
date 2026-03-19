@@ -15,11 +15,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
-  SequencerConnections,
-}
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -157,8 +153,8 @@ class JoiningNodeInitializer(
           // We only have a single connection here.
           sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification.toInternal,
-          // TODO(#2666) Make the delays configurable.
-          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+          sequencerConnectionPoolDelays =
+            config.participantClient.sequencerConnectionPoolDelays.toInternal,
         ),
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
         // This is changed to false after SV onboarding completes.
