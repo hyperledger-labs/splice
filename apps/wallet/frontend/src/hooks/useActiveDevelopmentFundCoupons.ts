@@ -21,7 +21,7 @@ export type UseActiveDevelopmentFundCouponsResult = {
 };
 
 export const useActiveDevelopmentFundCoupons = (
-  fundManager?: string
+  primaryParty?: string
 ): UseActiveDevelopmentFundCouponsResult => {
   const { listActiveDevelopmentFundCoupons } = useWalletClient();
 
@@ -34,9 +34,11 @@ export const useActiveDevelopmentFundCoupons = (
 
   const allCoupons = React.useMemo(() => couponsQuery.data || [], [couponsQuery.data]);
   const filteredCoupons = React.useMemo(() => {
-    if (!fundManager) return allCoupons;
-    return allCoupons.filter((c: DevelopmentFundCoupon) => c.fundManager === fundManager);
-  }, [allCoupons, fundManager]);
+    if (!primaryParty) return allCoupons;
+    return allCoupons.filter(
+      (c: DevelopmentFundCoupon) => c.fundManager === primaryParty || c.beneficiary === primaryParty
+    );
+  }, [allCoupons, primaryParty]);
 
   const sortedCoupons = React.useMemo(
     () => [...filteredCoupons].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),

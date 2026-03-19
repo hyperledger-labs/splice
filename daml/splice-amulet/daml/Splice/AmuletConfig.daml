@@ -63,7 +63,7 @@ data AmuletConfig unit = AmuletConfig with
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
-    externalPartyConfigStateTickDuration : Optional RelTime 
+    externalPartyConfigStateTickDuration : Optional RelTime
       -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts. Default: 24h.
   deriving (Eq, Show)
 
@@ -110,7 +110,9 @@ validTransferConfig TransferConfig
     createFee == FixedFee 0.0 &&
     lockHolderFee == FixedFee 0.0 &&
     lockHolderFee == FixedFee 0.0 &&
-    transferFee.initialRate == 0.0 && null transferFee.steps &&
+    transferFee.initialRate == 0.0 &&
+    -- TODO(#4424) Enforce `null transferFee.steps`
+    all (\(_step, rate) -> rate == 0.0) transferFee.steps &&
     positiveRatePerRound holdingFee &&
     extraFeaturedAppRewardAmount >= 0.0 &&
     maxNumInputs >= 1 &&

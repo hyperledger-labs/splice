@@ -21,7 +21,9 @@ import org.slf4j.event.Level
 
 import java.time.Duration
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
+// We rely on external party config state tick durations here which are not
+// available before.
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_17
 class AmuletExpiryIntegrationTest
     extends IntegrationTest
     with WalletTestUtil

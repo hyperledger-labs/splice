@@ -10,15 +10,18 @@ cloudArmor:
         maxRequestsBeforeHttp429: 0
         withinIntervalSeconds: 60
 cluster:
+  hyperdiskSupport:
+    enabled: true
+    enabledForInfra: true
   nodePools:
     apps:
       maxNodes: 20
       minNodes: 0
-      nodeType: 'e2-standard-16'
+      nodeType: 'n4d-standard-16'
     infra:
       maxNodes: 3
       minNodes: 1
-      nodeType: 'e2-standard-8'
+      nodeType: 'n4d-standard-8'
 infra:
   gkeGateway:
     proxyForIstioHttp: false
@@ -32,6 +35,11 @@ initialRound: 0
 monitoring:
   alerting:
     alerts:
+      acsCommitments:
+        checkpointDelay:
+          seconds: 600
+        completedDelay:
+          seconds: 3600
       cloudSql:
         maintenance: false
       cometbft:

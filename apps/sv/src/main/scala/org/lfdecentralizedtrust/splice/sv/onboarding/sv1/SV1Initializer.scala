@@ -47,6 +47,7 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
+  DarResourcesUtil,
   TemplateJsonDecoder,
   UploadablePackage,
 }
@@ -64,7 +65,6 @@ import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, U
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
   SequencerConnections,
   TrafficControlParameters,
 }
@@ -200,10 +200,8 @@ class SV1Initializer(
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
-            // TODO(#2666) Make the delays configurable.
-            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+            sequencerConnectionPoolDelays = config.participantClient.sequencerConnectionPoolDelays,
           ),
-          manualConnect = false,
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
             minObservationDuration = config.timeTrackerMinObservationDuration,
@@ -245,6 +243,7 @@ class SV1Initializer(
             )
             .map(_.nonEmpty), {
             val packages = requiredDars(sv1Config.initialPackageConfig)
+            logger.info(s"PACKS:: ${packages.size}")
             if (config.latestPackagesOnly)
               logger.warn(
                 "latestPackagesOnly is enabled, only the latest versions of the initial packages will be uploaded and vetted"
@@ -600,6 +599,7 @@ class SV1Initializer(
               physicalSynchronizerId,
               synchronizerNode.sequencerConnection,
               synchronizerNode.mediatorSequencerAmplification,
+              synchronizerNode.mediatorSequencerConnectionPoolDelays,
             ),
             logger,
           )
@@ -609,21 +609,19 @@ class SV1Initializer(
   }
 
   private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
-    def darsUpToInitialConfig(packageResource: PackageResource, requiredVersion: String) = {
-      packageResource.all
-        .filter { darResource =>
-          val required = PackageVersion.assertFromString(requiredVersion)
-          darResource.metadata.version == required || !config.latestPackagesOnly && darResource.metadata.version < required
-        }
-        .map(UploadablePackage.fromResource)
-    }
-
     Seq(
       DarResources.amulet -> initialPackageConfig.amuletVersion,
       DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
       DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
     ).flatMap { case (packageResource, requiredVersion) =>
-      darsUpToInitialConfig(packageResource, requiredVersion)
+      DarResourcesUtil
+        .getRequiredPackageVersions(
+          packageResource.latest.metadata.name,
+          PackageVersion.assertFromString(requiredVersion),
+          enabledFeatures.enableUnsupportedDarsUnvetting,
+          config.latestPackagesOnly,
+        )
+        .map(UploadablePackage.fromResource)
     }
   }
 

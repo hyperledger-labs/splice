@@ -44,6 +44,7 @@ import com.digitalasset.canton.util.ShowUtil.showPretty
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.{Seq, SortedMap, VectorMap}
+import scala.jdk.CollectionConverters.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -96,6 +97,7 @@ final class DbMultiDomainAcsStore[TXE](
       */
     handleIngestionSummary: IngestionSummary => Unit = _ => (),
     override val defaultLimit: Limit,
+    private[db] val acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -137,6 +139,9 @@ final class DbMultiDomainAcsStore[TXE](
 
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
+  private[db] def tcsStorage: DbStorage = storage
+  private[db] def tcsAcsTableName: String = acsTableName
+
   private[this] def txLogTableName =
     txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
 
@@ -151,6 +156,32 @@ final class DbMultiDomainAcsStore[TXE](
   // Unlike waitUntilAcsIngested().isCompleted, this method returns true immediately after the ingestAcs() method finishes.
   // The former is slightly more asynchronous due to RetryProvider/FutureUnlessShutdown.
   def hasFinishedAcsIngestion: Boolean = finishedAcsIngestion.isCompleted
+
+  def lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp] =
+    state.get().lastIngestedRecordTimes
+
+  def waitUntilRecordTimeReached(
+      synchronizerId: SynchronizerId,
+      asOf: CantonTimestamp,
+  ): Future[Unit] = {
+    state
+      .updateAndGet(_.withRecordTimeWaiter(synchronizerId, asOf))
+      .recordTimeWaiters
+      .get(synchronizerId)
+      .flatMap(_.get(asOf)) match {
+      case None => Future.unit
+      case Some(promise) =>
+        retryProvider
+          .waitUnlessShutdown(promise.future)
+          .failOnShutdownTo {
+            io.grpc.Status.UNAVAILABLE
+              .withDescription(
+                s"Aborted waitUntilRecordTimeReached($asOf), as RetryProvider(${retryProvider.loggerFactory.properties}) is shutting down in store $acsStoreDescriptor"
+              )
+              .asRuntimeException()
+          }
+    }
+  }
 
   def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
     waitUntilAcsIngested().flatMap(_ => f)
@@ -1338,9 +1369,10 @@ final class DbMultiDomainAcsStore[TXE](
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       lastTree.getOffset,
+                      synchronizerIdToRecordTime.toMap,
                     )
                   )
-                  .signalOffsetChanged(lastTree.getOffset)
+                  .signalWaiters(lastTree.getOffset, synchronizerIdToRecordTime.toMap)
                 val summary =
                   summaryState.toIngestionSummary(
                     offset = lastTree.getOffset,
@@ -1360,17 +1392,19 @@ final class DbMultiDomainAcsStore[TXE](
                 "ingestReassignment",
               )
               .map { summaryState =>
+                val reassignmentRecordTimes = Map(synchronizerId -> reassignment.recordTime)
                 state
                   .getAndUpdate(s =>
                     s.withUpdate(
                       s.acsSize + summaryState.acsSizeDiff,
                       reassignment.offset,
+                      reassignmentRecordTimes,
                     )
                   )
-                  .signalOffsetChanged(reassignment.offset)
+                  .signalWaiters(reassignment.offset, reassignmentRecordTimes)
                 val summary =
                   summaryState.toIngestionSummary(
-                    synchronizerIdToRecordTime = Map(synchronizerId -> reassignment.recordTime),
+                    synchronizerIdToRecordTime = reassignmentRecordTimes,
                     offset = reassignment.offset,
                     newAcsSize = state.get().acsSize,
                     metrics = metrics,
@@ -1380,6 +1414,11 @@ final class DbMultiDomainAcsStore[TXE](
               }
           case UpdateCheckpoint(checkpoint) =>
             val offset = checkpoint.checkpoint.getOffset
+            val synchronizerIdToRecordTime =
+              checkpoint.checkpoint.getSynchronizerTimes.asScala.map { syncTime =>
+                SynchronizerId.tryFromString(syncTime.getSynchronizerId) ->
+                  CantonTimestamp.assertFromInstant(syncTime.getRecordTime)
+              }.toMap
             storage
               .queryAndUpdate(
                 ingestUpdateAtOffset(offset, DBIO.unit, isOffsetCheckpoint = true),
@@ -1387,11 +1426,11 @@ final class DbMultiDomainAcsStore[TXE](
               )
               .map { _ =>
                 state
-                  .getAndUpdate(s => s.withUpdate(s.acsSize, offset))
-                  .signalOffsetChanged(offset)
+                  .getAndUpdate(s => s.withUpdate(s.acsSize, offset, synchronizerIdToRecordTime))
+                  .signalWaiters(offset, synchronizerIdToRecordTime)
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
-                    synchronizerIdToRecordTime = Map.empty,
+                    synchronizerIdToRecordTime = synchronizerIdToRecordTime,
                     offset = offset,
                     newAcsSize = state.get().acsSize,
                     metrics = metrics,
@@ -1544,7 +1583,7 @@ final class DbMultiDomainAcsStore[TXE](
               },
               onExercise = (st, ev, _) => {
                 if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
-                  st + (ev.getContractId -> Delete(ev))
+                  st + (ev.getContractId -> Delete(ev, tree.tree.getRecordTime))
                 } else {
                   st
                 }
@@ -1554,7 +1593,7 @@ final class DbMultiDomainAcsStore[TXE](
         // optimization: a delete on a contract cancels-out with the corresponding insert
         .foldLeft(VectorMap.empty[String, OperationToDo]) { case (acc, treeOps) =>
           val (toRemove, toAdd) = treeOps.partition {
-            case (contractId, Delete(_)) if acc.contains(contractId) => true
+            case (contractId, Delete(_, _)) if acc.contains(contractId) => true
             case _ => false
           }
           (acc -- toRemove.keys) ++ toAdd
@@ -1602,9 +1641,7 @@ final class DbMultiDomainAcsStore[TXE](
             DBIO.successful(())
         }
         _ <- doDeleteContracts(
-          workTodo.collect { case Delete(exercisedEvent) =>
-            exercisedEvent
-          },
+          workTodo.collect { case d: Delete => d },
           summary,
         )
         // TODO (#3048): batch this
@@ -1849,26 +1886,52 @@ final class DbMultiDomainAcsStore[TXE](
               """ ++ indexColumnNameValues ++ sql")")
     }
 
-    private def doDeleteContracts(events: Seq[ExercisedEvent], summary: MutableIngestionSummary) = {
-      if (events.isEmpty) DBIO.successful(())
+    private def doDeleteContracts(deletes: Seq[Delete], summary: MutableIngestionSummary) = {
+      if (deletes.isEmpty) DBIO.successful(())
       else {
-        DBIO.sequence(events.grouped(ingestionConfig.maxDeletesPerStatement).map { events =>
-          (sql"""
-            delete from #$acsTableName
-            where store_id = $acsStoreId
-              and migration_id = $domainMigrationId
-              and """ ++ inClause(
-            "contract_id",
-            events.map(e => lengthLimited(e.getContractId)),
-          ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
+        DBIO.sequence(deletes.grouped(ingestionConfig.maxDeletesPerStatement).map { deletes =>
+          val performDeleteSql = acsArchiveConfigOpt match {
+            case Some(AcsArchiveConfig(archiveTableName, baseColumns)) =>
+              val valuesPairs = deletes.map { d =>
+                val cid = lengthLimited(d.evt.getContractId)
+                val archivedAt = CantonTimestamp.assertFromInstant(d.recordTime).toMicros
+                sql"($cid, $archivedAt)"
+              }
+              val valuesClause = sqlCommaSeparated(valuesPairs)
+              (sql"""
+                WITH deleted AS (
+                  DELETE FROM #$acsTableName
+                  USING (VALUES """ ++ valuesClause ++ sql""") AS at(cid, archived_at)
+                  WHERE store_id = $acsStoreId
+                    AND migration_id = $domainMigrationId
+                    AND #$acsTableName.contract_id = at.cid
+                  RETURNING #$baseColumns, at.archived_at
+                )
+                INSERT INTO #$archiveTableName (#$baseColumns, archived_at)
+                SELECT * FROM deleted
+                RETURNING contract_id
+              """).toActionBuilder.as[String]
+            case None =>
+              val contractIds = deletes.map(d => lengthLimited(d.evt.getContractId))
+              (sql"""DELETE FROM #$acsTableName
+                  WHERE store_id = $acsStoreId
+                    AND migration_id = $domainMigrationId
+                    AND """ ++ inClause(
+                "contract_id",
+                contractIds,
+              ) ++ sql" RETURNING contract_id").toActionBuilder
+                .as[String]
+          }
+
+          performDeleteSql.map { deletedCids =>
             val deletedCidSet = deletedCids.toSet
             val ingestedArchivedEvents =
-              events.filter(evt => deletedCidSet.contains(evt.getContractId))
+              deletes.filter(d => deletedCidSet.contains(d.evt.getContractId)).map(_.evt)
             summary.ingestedArchivedEvents.addAll(ingestedArchivedEvents)
             // there were no contracts with some id. This can happen because:
             // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
             // but that might still satisfy some other filter, so the contract was never inserted
-            summary.numFilteredArchivedEvents += (events.length - deletedCids.size)
+            summary.numFilteredArchivedEvents += (deletes.length - deletedCids.size)
           }
         })
       }
@@ -1989,7 +2052,7 @@ final class DbMultiDomainAcsStore[TXE](
 
     sealed trait OperationToDo
     case class Insert(evt: CreatedEvent, synchronizerId: SynchronizerId) extends OperationToDo
-    case class Delete(evt: ExercisedEvent) extends OperationToDo
+    case class Delete(evt: ExercisedEvent, recordTime: Instant) extends OperationToDo
   }
 
   private def getIndexColumnValues(
@@ -2202,6 +2265,8 @@ object DbMultiDomainAcsStore {
     * @param offsetIngestionsToSignal A map from offsets to promises. The keys are offsets that are not ingested yet.
     *                                 The values are promises that are not completed, and will be completed when
     *                                 the corresponding offset is ingested.
+    * @param lastIngestedRecordTimes The highest record time ingested per synchronizer.
+    * @param recordTimeWaiters Pending promises keyed by (synchronizerId, recordTime) that are completed when the corresponding record time is ingested.
     */
   private case class State(
       acsStoreId: Option[AcsStoreId],
@@ -2210,6 +2275,8 @@ object DbMultiDomainAcsStore {
       acsSize: Int,
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
+      lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp],
+      recordTimeWaiters: Map[SynchronizerId, SortedMap[CantonTimestamp, Promise[Unit]]],
   ) {
     def withInitialState(
         acsStoreId: AcsStoreId,
@@ -2233,8 +2300,26 @@ object DbMultiDomainAcsStore {
       )
     }
 
-    def withUpdate(newAcsSize: Int, newOffset: Long): State = {
+    def withUpdate(
+        newAcsSize: Int,
+        newOffset: Long,
+        recordTimes: Map[SynchronizerId, CantonTimestamp] = Map.empty,
+    ): State = {
       val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
+      // Merge recordTimes with existing ones, keeping the max per synchronizer
+      val updatedRecordTimes = recordTimes.foldLeft(lastIngestedRecordTimes) {
+        case (acc, (syncId, rt)) =>
+          acc.updated(syncId, acc.get(syncId).fold(rt)(_.max(rt)))
+      }
+      // Remove waiters whose target record time has been reached
+      val remainingWaiters = recordTimeWaiters.flatMap { case (syncId, waiters) =>
+        updatedRecordTimes.get(syncId) match {
+          case Some(reachedTime) =>
+            val remaining = waiters.filter { case (waitTime, _) => waitTime > reachedTime }
+            if (remaining.isEmpty) None else Some(syncId -> remaining)
+          case None => Some(syncId -> waiters)
+        }
+      }
       this.copy(
         acsSize = newAcsSize,
         offset = Some(newOffset),
@@ -2242,6 +2327,8 @@ object DbMultiDomainAcsStore {
         offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
           offsetToSignal > newOffset
         },
+        lastIngestedRecordTimes = updatedRecordTimes,
+        recordTimeWaiters = remainingWaiters,
       )
     }
 
@@ -2254,6 +2341,28 @@ object DbMultiDomainAcsStore {
           }
         }
       }
+    }
+
+    def signalRecordTimesReached(
+        recordTimes: Map[SynchronizerId, CantonTimestamp]
+    ): Unit = {
+      recordTimes.foreach { case (syncId, reachedTime) =>
+        recordTimeWaiters.get(syncId).foreach { waiters =>
+          waiters.foreach { case (waitTime, promise) =>
+            if (waitTime <= reachedTime) {
+              promise.success(())
+            }
+          }
+        }
+      }
+    }
+
+    def signalWaiters(
+        newOffset: Long,
+        recordTimes: Map[SynchronizerId, CantonTimestamp],
+    ): Unit = {
+      signalOffsetChanged(newOffset)
+      signalRecordTimesReached(recordTimes)
     }
 
     /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
@@ -2275,6 +2384,30 @@ object DbMultiDomainAcsStore {
         }
       }
     }
+
+    def withRecordTimeWaiter(
+        synchronizerId: SynchronizerId,
+        asOf: CantonTimestamp,
+    ): State = {
+      if (lastIngestedRecordTimes.get(synchronizerId).exists(_ >= asOf)) {
+        this
+      } else {
+        val waitersForSync =
+          recordTimeWaiters.getOrElse(
+            synchronizerId,
+            SortedMap.empty[CantonTimestamp, Promise[Unit]],
+          )
+        waitersForSync.get(asOf) match {
+          case Some(_) => this
+          case None =>
+            val p = Promise[Unit]()
+            copy(
+              recordTimeWaiters =
+                recordTimeWaiters.updated(synchronizerId, waitersForSync + (asOf -> p))
+            )
+        }
+      }
+    }
   }
   private object State {
     def empty(): State = State(
@@ -2284,6 +2417,8 @@ object DbMultiDomainAcsStore {
       acsSize = 0,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
+      lastIngestedRecordTimes = Map.empty,
+      recordTimeWaiters = Map.empty,
     )
   }
 
