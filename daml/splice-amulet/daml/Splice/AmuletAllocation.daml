@@ -61,7 +61,7 @@ template AmuletAllocation
             senderHoldingCids
             meta = emptyMetadata
 
-    -- Implemented on the concrete template to avoid a breaking change to the shared Allocation interface.
+    -- Implemented on the concrete template as you cannot upgrade interfaces so we cannot add a choice to the Allocation interface.
     
     choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult
       with
