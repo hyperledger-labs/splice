@@ -2377,7 +2377,7 @@ class HttpScanHandler(
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getRewardAccountingEarliestAvailableRound") { _ => _ =>
-      appRewardsStore.getEarliestActivityRound(updateHistory.historyId).map {
+      appRewardsStore.getEarliestActivityRound().map {
         case Some(round) =>
           ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
             definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)
@@ -2399,8 +2399,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getRewardAccountingActivityTotals") { _ => _ =>
       for {
         roundTotalO <- appRewardsStore.getAppActivityRoundTotalByRound(
-          updateHistory.historyId,
-          roundNumber,
+          roundNumber
         )
         result <- roundTotalO match {
           case None =>

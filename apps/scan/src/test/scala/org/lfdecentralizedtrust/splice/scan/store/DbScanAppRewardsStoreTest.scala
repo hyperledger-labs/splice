@@ -42,7 +42,7 @@ class DbScanAppRewardsStoreTest
           appProviderParty = "alice::provider",
         )
         _ <- store.insertAppActivityPartyTotals(Seq(row))
-        loaded <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppActivityPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size 1
         loaded.head shouldBe row
@@ -59,7 +59,7 @@ class DbScanAppRewardsStoreTest
           activeAppProviderPartiesCount = 5L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
-        loaded <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
+        loaded <- store.getAppActivityRoundTotalByRound(roundNumber)
       } yield {
         loaded.value shouldBe row
       }
@@ -83,7 +83,7 @@ class DbScanAppRewardsStoreTest
           totalAppRewardAmount = BigDecimal("12345678901234567890.1234567891"),
         )
         _ <- store.insertAppRewardPartyTotals(Seq(rewardRow))
-        loaded <- store.getAppRewardPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size 1
         loaded.head shouldBe rewardRow
@@ -128,7 +128,7 @@ class DbScanAppRewardsStoreTest
           )
         }
         _ <- store.insertAppRewardPartyTotals(rewardRows)
-        loaded <- store.getAppRewardPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size testValues.size.toLong
         loaded.map(_.totalAppRewardAmount) shouldBe testValues
@@ -147,7 +147,7 @@ class DbScanAppRewardsStoreTest
           rewardedAppProviderPartiesCount = 3L,
         )
         _ <- store.insertAppRewardRoundTotals(Seq(row))
-        loaded <- store.getAppRewardRoundTotalByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardRoundTotalByRound(roundNumber)
       } yield {
         loaded.value shouldBe row
       }
@@ -168,7 +168,7 @@ class DbScanAppRewardsStoreTest
           batchHash = hash,
         )
         _ <- store.insertAppRewardBatchHashes(Seq(row))
-        loaded <- store.getAppRewardBatchHashesByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardBatchHashesByRound(roundNumber)
       } yield {
         loaded should have size 1
         loaded.head shouldBe row
@@ -185,7 +185,7 @@ class DbScanAppRewardsStoreTest
           rootHash = hash,
         )
         _ <- store.insertAppRewardRootHashes(Seq(row))
-        loaded <- store.getAppRewardRootHashByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardRootHashByRound(roundNumber)
       } yield {
         loaded.value shouldBe row
       }
@@ -206,7 +206,7 @@ class DbScanAppRewardsStoreTest
           )
         }
         _ <- store.insertAppActivityPartyTotals(rows)
-        loaded <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppActivityPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size 10
         loaded.head shouldBe rows(0)
@@ -229,7 +229,7 @@ class DbScanAppRewardsStoreTest
           )
         }
         _ <- store.insertAppRewardBatchHashes(rows)
-        loaded <- store.getAppRewardBatchHashesByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardBatchHashesByRound(roundNumber)
       } yield {
         loaded should have size 5
         loaded.head shouldBe rows(0)
@@ -301,9 +301,9 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
-        _ <- store.aggregateActivityTotals(historyId, roundNumber)
-        partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
-        roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
       } yield {
         partyTotals should have size 1
         partyTotals.head.appProviderParty shouldBe "alice::provider"
@@ -331,9 +331,9 @@ class DbScanAppRewardsStoreTest
           Seq("alice::provider", "charlie::provider"),
           Seq(100L, 400L),
         )
-        _ <- store.aggregateActivityTotals(historyId, roundNumber)
-        partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
-        roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
       } yield {
         partyTotals should have size 3
         // Sorted alphabetically: alice, bob, charlie → seq_nums 0, 1, 2
@@ -358,9 +358,9 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         // No activity records for this round
-        _ <- store.aggregateActivityTotals(historyId, roundNumber)
-        partyTotals <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
-        roundTotal <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
       } yield {
         partyTotals shouldBe empty
         roundTotal.value.totalRoundAppActivityWeight shouldBe 0L
@@ -372,8 +372,8 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
-        _ <- store.aggregateActivityTotals(historyId, roundNumber)
-        result <- store.aggregateActivityTotals(historyId, roundNumber).failed
+        _ <- store.aggregateActivityTotals(roundNumber)
+        result <- store.aggregateActivityTotals(roundNumber).failed
       } yield {
         result.getMessage should (include("unique constraint") or include("duplicate key"))
       }
@@ -384,7 +384,7 @@ class DbScanAppRewardsStoreTest
     "getEarliestActivityRound returns None when empty" in {
       for {
         (store, historyId) <- newStore()
-        result <- store.getEarliestActivityRound(historyId)
+        result <- store.getEarliestActivityRound()
       } yield {
         result shouldBe None
       }
@@ -395,9 +395,9 @@ class DbScanAppRewardsStoreTest
         (store, historyId) <- newStore()
         _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
         _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        _ <- store.aggregateActivityTotals(historyId, 10L)
-        _ <- store.aggregateActivityTotals(historyId, 20L)
-        earliest <- store.getEarliestActivityRound(historyId)
+        _ <- store.aggregateActivityTotals(10L)
+        _ <- store.aggregateActivityTotals(20L)
+        earliest <- store.getEarliestActivityRound()
       } yield {
         earliest.value shouldBe 10L
       }
