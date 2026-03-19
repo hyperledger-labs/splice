@@ -334,14 +334,14 @@ data DsoRules_ExpireAmuletAllocationInput = DsoRules_ExpireAmuletAllocationInput
 data DsoRules_ExpireAmuletAllocationsResult = DsoRules_ExpireAmuletAllocationsResult
   with
     results : [AmuletAllocation_DsoExpireResult]
-  deriving (Eq, Show)  
+  deriving (Eq, Show)
 
 data DsoRules_ExpireAmuletAllocationsRequest = DsoRules_ExpireAmuletAllocationsRequest
   with
     expectedDso : Party
     inputs : [DsoRules_ExpireAmuletAllocationInput]
     observers : [Party]
-  deriving (Eq, Show)  
+  deriving (Eq, Show)
 
 -- Workflow templates
 ---------------------
@@ -1152,19 +1152,19 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        
+
         require ("expectedDso " <> show expireRequest.expectedDso <> " matches the actualDso " <> show dso) (expireRequest.expectedDso == dso)
 
         individualResults <- forA expireRequest.inputs $ \input -> do
           alloc <- fetchButArchiveLater (ForDso with dso) input.allocationCid
-          require "The controller must be the admin of the allocation's instrument" (alloc.allocation.transferLeg.instrumentId.admin == dso)
+          require "The dsoParty must be the admin of the allocation's instrument" (alloc.allocation.transferLeg.instrumentId.admin == dso)
 
           exercise input.allocationCid AmuletAllocation_DsoExpire with
             expireLock = input.expireLock
 
         pure DsoRules_ExpireAmuletAllocationsResult with
           results = individualResults
-    
+
     nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
       with
         amuletRulesCid : ContractId AmuletRules
