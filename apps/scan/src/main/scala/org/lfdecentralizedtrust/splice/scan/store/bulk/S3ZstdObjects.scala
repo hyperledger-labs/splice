@@ -36,7 +36,7 @@ class S3ZstdObjects(
 
   private def getFlow(
       getObjectKey: Int => String
-  ): Flow[ByteString, GroupedWeightS3ObjectFlow.Output, NotUsed] =
+  ): Flow[ByteString, String, NotUsed] =
     Flow[ByteString]
       .via(ZstdGroupedWeight(appConfig.zstdCompressionLevel, storageConfig.bulkZstdFrameSize))
       .via(
@@ -60,6 +60,6 @@ object S3ZstdObjects {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[ByteString, GroupedWeightS3ObjectFlow.Output, NotUsed] =
+  ): Flow[ByteString, String, NotUsed] =
     new S3ZstdObjects(config, appConfig, s3Connection, loggerFactory).getFlow(getObjectKey)
 }
