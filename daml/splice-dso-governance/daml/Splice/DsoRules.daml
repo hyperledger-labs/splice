@@ -38,7 +38,6 @@ import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
 
-
 -- Types
 ---------
 
@@ -323,6 +322,12 @@ data DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult = DsoRule
   with
     instructionCid : ContractId BootstrapExternalPartyConfigStateInstruction
   deriving (Show, Eq)
+
+data DsoRules_ExpireAmuletAllocationsResult = DsoRules_ExpireAmuletAllocationsResult
+  with
+    result : ExternalPartyAmuletRules_ExpireAmuletAllocationsResult
+  deriving (Eq, Show)
+
 
 -- Workflow templates
 ---------------------
@@ -1123,6 +1128,21 @@ template DsoRules with
 
     -- Amulet management driven directly by the DSO delegates
     ---------------------------------------------------------
+
+    nonconsuming choice DsoRules_ExpireAmuletAllocations : DsoRules_ExpireAmuletAllocationsResult
+      with
+        extAmuletRulesCid : ContractId ExternalPartyAmuletRules
+        expireAllocations : ExternalPartyAmuletRules_ExpireAmuletAllocations
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+
+        require ("expectedDso " <> show expireAllocations.expectedDso <> " matches the actualDso " <> show dso) (expireAllocations.expectedDso == dso)
+
+        res <- exercise extAmuletRulesCid (expireAllocations with expectedDso = dso)
+
+        pure DsoRules_ExpireAmuletAllocationsResult with result = res
 
     nonconsuming choice DsoRules_Amulet_ExpireTransferInstructions : DsoRules_Amulet_ExpireTransferInstructionsResult
       with
