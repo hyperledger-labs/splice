@@ -86,9 +86,8 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
         totals.value.roundNumber shouldBe earliest
       }
 
-      val (lastRound, _) = sv1ScanBackend.getRoundOfLatestData()
       clue("Verify 404 for non-existent round") {
-        sv1ScanBackend.getRewardAccountingActivityTotals(lastRound + 1000L) shouldBe None
+        sv1ScanBackend.getRewardAccountingActivityTotals(earliest + 1) shouldBe None
       }
     }
   }
