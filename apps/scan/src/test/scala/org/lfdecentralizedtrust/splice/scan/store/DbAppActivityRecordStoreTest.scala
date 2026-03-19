@@ -262,7 +262,7 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return the first round when two rounds have records" in {
+    "return the second round when two consecutive rounds have records" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
@@ -276,11 +276,12 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.earliestRoundWithCompleteAppActivity()
       } yield {
-        result.value shouldBe 42L
+        // 43 has prior round 42, so 43 is the earliest complete round
+        result.value shouldBe 43L
       }
     }
 
-    "return the earliest round when multiple rounds have records" in {
+    "return the earliest complete round when multiple consecutive rounds have records" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
@@ -296,11 +297,31 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.earliestRoundWithCompleteAppActivity()
       } yield {
-        result.value shouldBe 10L
+        // 11 has prior round 10, so 11 is earliest complete
+        result.value shouldBe 11L
       }
     }
 
-    "not return the latest round (it has no later round)" in {
+    "return None when rounds are not consecutive" in {
+      for {
+        (store, historyId) <- newStore()
+        baseTs = CantonTimestamp.now()
+        rowId1 <- insertVerdictRow(historyId, baseTs, "update-gap-10")
+        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-gap-12")
+        _ <- store.insertAppActivityRecords(
+          Seq(
+            mkRecord(rowId1, 10L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2, 12L, Seq("app1::provider"), Seq(200L)),
+          )
+        )
+        result <- store.earliestRoundWithCompleteAppActivity()
+      } yield {
+        // No round has a prior round with records (11 is missing)
+        result shouldBe None
+      }
+    }
+
+    "not return the first round (it has no prior round)" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
@@ -314,8 +335,8 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.earliestRoundWithCompleteAppActivity()
       } yield {
-        // Should return 20, not 21, because 21 is the latest and has no later round
-        result.value shouldBe 20L
+        // 21 has prior round 20, but 20 has no prior round
+        result.value shouldBe 21L
       }
     }
   }
@@ -344,16 +365,16 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return true when target round and a later round have records" in {
+    "return true when target round and prior round have records" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
-        rowId1 <- insertVerdictRow(historyId, baseTs, "update-round-42")
-        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-round-43")
+        rowId1 <- insertVerdictRow(historyId, baseTs, "update-round-41")
+        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-round-42")
         _ <- store.insertAppActivityRecords(
           Seq(
-            mkRecord(rowId1, 42L, Seq("app1::provider"), Seq(100L)),
-            mkRecord(rowId2, 43L, Seq("app1::provider"), Seq(200L)),
+            mkRecord(rowId1, 41L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2, 42L, Seq("app1::provider"), Seq(200L)),
           )
         )
         result <- store.isAppActivityCompleteForRound(42L)
@@ -375,7 +396,26 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "return false for the latest round with records" in {
+    "return false when only a later round has records (no prior round)" in {
+      for {
+        (store, historyId) <- newStore()
+        baseTs = CantonTimestamp.now()
+        rowId1 <- insertVerdictRow(historyId, baseTs, "update-round-42")
+        rowId2 <- insertVerdictRow(historyId, baseTs.plusSeconds(1L), "update-round-43")
+        _ <- store.insertAppActivityRecords(
+          Seq(
+            mkRecord(rowId1, 42L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2, 43L, Seq("app1::provider"), Seq(200L)),
+          )
+        )
+        // round 42 has a later round (43) but no prior round (41)
+        result <- store.isAppActivityCompleteForRound(42L)
+      } yield {
+        result shouldBe false
+      }
+    }
+
+    "return true for a middle round with prior and later records" in {
       for {
         (store, historyId) <- newStore()
         baseTs = CantonTimestamp.now()
@@ -389,9 +429,9 @@ class DbAppActivityRecordStoreTest
             mkRecord(rowId3, 44L, Seq("app1::provider"), Seq(300L)),
           )
         )
-        result <- store.isAppActivityCompleteForRound(44L)
+        result <- store.isAppActivityCompleteForRound(43L)
       } yield {
-        result shouldBe false
+        result shouldBe true
       }
     }
   }

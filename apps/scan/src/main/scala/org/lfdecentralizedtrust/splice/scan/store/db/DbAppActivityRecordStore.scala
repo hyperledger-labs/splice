@@ -69,8 +69,8 @@ class DbAppActivityRecordStore(
 
   /** Check whether app activity ingestion is complete for a round.
     * Returns true if activity records exist for the given round AND for
-    * any later round (proving ingestion has moved past round N, since
-    * verdicts are ingested in record_time order).
+    * the prior round (proving ingestion was running continuously through
+    * round N, not that it jumped in mid-stream).
     */
   def isAppActivityCompleteForRound(roundNumber: Long)(implicit
       tc: TraceContext
@@ -82,7 +82,7 @@ class DbAppActivityRecordStore(
             )
             and exists(
               select 1 from #${Tables.appActivityRecords}
-              where round_number > $roundNumber
+              where round_number = $roundNumber - 1
             )
       """.as[Boolean].headOption,
       "appActivity.isAppActivityCompleteForRound",
@@ -90,9 +90,9 @@ class DbAppActivityRecordStore(
   }
 
   /** Find the earliest round with complete app activity.
-    * A round is complete if a later round also has activity records,
-    * proving ingestion has moved past it.
-    * Returns None if fewer than two rounds have been ingested.
+    * A round is complete if the prior round also has activity records,
+    * proving ingestion was running continuously through it.
+    * Returns None if fewer than two consecutive rounds have been ingested.
     */
   def earliestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
@@ -102,7 +102,7 @@ class DbAppActivityRecordStore(
             from #${Tables.appActivityRecords} aar
             where exists(
               select 1 from #${Tables.appActivityRecords}
-              where round_number > aar.round_number
+              where round_number = aar.round_number - 1
             )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.earliestRoundWithCompleteAppActivity",
