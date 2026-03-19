@@ -238,7 +238,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val historyFromStoreWithoutLostData =
       historyFromStore
         .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-        .map(ScanHttpEncodings.makeConsistentAcrossSvs)
+        .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
 
@@ -263,7 +263,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-      .map(ScanHttpEncodings.makeConsistentAcrossSvs)
+      .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(

@@ -933,6 +933,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -945,6 +946,7 @@ abstract class StoreTestBase
     recordTime,
     createdEventObservers,
     updateId,
+    externalTxnHash,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -959,6 +961,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
@@ -975,6 +978,7 @@ abstract class StoreTestBase
     workflowId,
     recordTime = recordTime,
     updateId = updateId,
+    externalTransactionHash = externalTxnHash,
   )
 
   protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {

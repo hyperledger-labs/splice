@@ -970,16 +970,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
 
     "getExternalTransactionHash" should {
       "return stored external transaction hash when empty" in {
-        val externalTxnHashThresholdDate = Instant.parse("2026-06-30T23:59:59Z")
-        // recordDate must be after the externalTxnHashThresholdDate for the hash to be included
-        val recordDate = Instant.parse("2026-07-02T00:00:00Z")
-
-        val store = mkStore(
-          storeName = "store",
-          externalTransactionHashThresholdTimestamp =
-            Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate)),
-        )
-
+        val store = mkStore()
         val externalTransactionHash = ByteString.EMPTY
         for {
           _ <- initStore(store)
@@ -988,8 +979,6 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               offset = offset,
               events = Seq(),
               synchronizerId = domain1,
-              effectiveAt = recordDate,
-              recordTime = recordDate,
               externalTransactionHash = externalTransactionHash,
             )
           })(store)
@@ -1008,14 +997,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
       }
 
       "return stored external transaction hash when not empty" in {
-        val externalTxnHashThresholdDate = Instant.parse("2026-06-30T23:59:59Z")
-        // recordDate must be after the externalTxnHashThresholdDate for the hash to be included
-        val recordDate = Instant.parse("2026-07-01T00:00:00Z")
-
-        val store = mkStore(
-          externalTransactionHashThresholdTimestamp =
-            Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate))
-        )
+        val store = mkStore()
 
         val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
         val externalTxnHashByteString =
@@ -1028,8 +1010,6 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               offset = offset,
               events = Seq(),
               synchronizerId = domain1,
-              effectiveAt = recordDate,
-              recordTime = recordDate,
               externalTransactionHash = externalTxnHashByteString,
             )
           })(store)
@@ -1045,44 +1025,6 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             expectedUpdate.getExternalTransactionHash
           )
         }
-      }
-    }
-
-    "do not return external transaction hashes stored before the threshold date " in {
-      val externalTxnHashThresholdDate = Instant.parse("2026-06-30T00:00:00Z")
-      // recordDate must be before the externalTxnHashThresholdDate for the hash to be excluded
-      val recordDate = Instant.parse("2026-06-29T23:59:59Z")
-
-      val store = mkStore(
-        storeName = "store",
-        externalTransactionHashThresholdTimestamp =
-          Some(CantonTimestamp.assertFromInstant(externalTxnHashThresholdDate)),
-      )
-
-      val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
-      val externalTxnHashByteString =
-        HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
-
-      for {
-        _ <- initStore(store)
-        expectedUpdate <- domain1.ingest(offset => {
-          mkTx(
-            offset = offset,
-            events = Seq(),
-            synchronizerId = domain1,
-            effectiveAt = recordDate,
-            recordTime = recordDate,
-            externalTransactionHash = externalTxnHashByteString,
-          )
-        })(store)
-        updates <- store.getAllUpdates(
-          None,
-          PageLimit.Max,
-        )
-      } yield {
-        updates should have size 1
-        val storedTransaction = extractTransactionTree(updates)
-        storedTransaction.getExternalTransactionHash shouldBe ByteString.EMPTY
       }
     }
   }

@@ -241,7 +241,6 @@ abstract class UpdateHistoryTestBase
       storeName: String = storeName1,
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.NeedsBackfilling,
       migrationTimeInfo: Option[MigrationTimeInfo] = None,
-      externalTransactionHashThresholdTimestamp: Option[CantonTimestamp] = None,
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
@@ -257,7 +256,6 @@ abstract class UpdateHistoryTestBase
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
       HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
-      externalTransactionHashThresholdTimestamp,
     )
   }
 
