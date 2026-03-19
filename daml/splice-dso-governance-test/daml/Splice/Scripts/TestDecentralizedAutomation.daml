@@ -788,27 +788,30 @@ testExpireAmuletAllocation = do
   assertMsg "Sender liquid wallet should be truly empty" (null liquidAmuletsBeforeExpire)
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(extRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
   [(allocCid, alloc)] <- query @AmuletAllocation app.dso
   
   let stakeholders = [alloc.allocation.transferLeg.sender, alloc.allocation.settlement.executor, alloc.allocation.transferLeg.receiver]
 
-  let expireBatchRequest = DsoRules_ExpireAmuletAllocationsRequest with
+  let expireBatchRequest = ExternalPartyAmuletRules_ExpireAmuletAllocations with
         expectedDso = app.dso
-        inputs = [DsoRules_ExpireAmuletAllocationInput with 
+        inputs = [ExternalPartyAmuletRules_ExpireAmuletAllocationInput with 
                     allocationCid = allocCid
                     expireLock = True]
         observers = stakeholders
 
   submitMultiMustFail [sv1] [app.dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
-      expireRequest = expireBatchRequest 
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequest 
       sv = sv1    
 
   passTime (hours 2)
 
   submitMulti [sv1] [app.dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
-      expireRequest = expireBatchRequest 
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequest 
       sv = sv1
 
   lockedAmuletsAfterExpire <- query @LockedAmulet sender.primaryParty
@@ -882,35 +885,37 @@ testExpireAmuletAllocationAlreadyUnlocked = do
   lockedAmuletsAfterOwnerExpire === []  
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
+  [(extRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
   [(allocCid, alloc)] <- query @AmuletAllocation app.dso
   
   let stakeholders = [alloc.allocation.transferLeg.sender, alloc.allocation.settlement.executor, alloc.allocation.transferLeg.receiver]
 
-  let expireBatchRequestTrue = DsoRules_ExpireAmuletAllocationsRequest with
+  let expireBatchRequestTrue = ExternalPartyAmuletRules_ExpireAmuletAllocations with
         expectedDso = app.dso
-        inputs = [DsoRules_ExpireAmuletAllocationInput with 
+        inputs = [ExternalPartyAmuletRules_ExpireAmuletAllocationInput with 
                     allocationCid = allocCid
                     expireLock = True]
         observers = stakeholders
 
   submitMultiMustFail [sv1] [app.dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
-      expireRequest = expireBatchRequestTrue 
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequestTrue 
       sv = sv1    
 
-  let expireBatchRequestFalse = DsoRules_ExpireAmuletAllocationsRequest with
+  let expireBatchRequestFalse = ExternalPartyAmuletRules_ExpireAmuletAllocations with
         expectedDso = app.dso
-        inputs = [DsoRules_ExpireAmuletAllocationInput with 
+        inputs = [ExternalPartyAmuletRules_ExpireAmuletAllocationInput with 
                     allocationCid = allocCid
                     expireLock = False]
         observers = stakeholders
 
   submitMulti [sv1] [app.dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
-      expireRequest = expireBatchRequestFalse 
+      extAmuletRulesCid = extRulesCid
+      expireAllocations = expireBatchRequestFalse 
       sv = sv1
 
   allocations <- query @AmuletAllocation app.dso
   allocations === []
-  pure ()
-  
+  pure ()  
