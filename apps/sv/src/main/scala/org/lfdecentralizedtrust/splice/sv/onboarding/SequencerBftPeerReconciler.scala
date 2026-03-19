@@ -27,12 +27,12 @@ abstract class SequencerBftPeerReconciler(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
     for {
-      sequencerId <- sequencerAdminConnection.getSequencerId
       sequencerInitialized <- sequencerAdminConnection.isNodeInitialized()
       result <-
         if (!sequencerInitialized) Future.successful(Seq.empty)
         else
           for {
+            sequencerId <- sequencerAdminConnection.getSequencerId
             psid <- sequencerAdminConnection.getPhysicalSynchronizerId()
             serialId = psid.serial.unwrap.toLong
             sequencers = dsoRulesAndState

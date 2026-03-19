@@ -10,12 +10,12 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeL
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
-import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
+import com.digitalasset.canton.util.HexString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
@@ -99,17 +99,21 @@ class LogicalSynchronizerUpgradeIntegrationTest
                 )
               ),
             )
-          })
-          .andThen(ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000))
+          })(config)
+      })
+      .withBftSequencersSuccessor
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms
+          .bumpCantonSyncSuccessorPortsBy(22_000)
           .andThen(
             ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
               // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
               _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
             )
           )(config)
-      })
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .withAmuletPrice(walletAmuletPrice)
 
@@ -282,6 +286,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         None,
       ),
       participants = false,
+      enableBftSequencer = true,
       logSuffix = "global-synchronizer-upgrade",
     )() {
 
