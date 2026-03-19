@@ -361,6 +361,7 @@ class ScanApp(
         updateHistory,
         acsSnapshotStore,
         scanEventStore,
+        bulkStorage,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,

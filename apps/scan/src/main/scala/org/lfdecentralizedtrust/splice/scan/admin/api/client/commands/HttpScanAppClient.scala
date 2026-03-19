@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.tokenstandard.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
+  GetBulkAcsSnapshotResponse,
   GetDateOfFirstSnapshotAfterResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
 }
@@ -2482,6 +2483,31 @@ object HttpScanAppClient {
           ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
         )
         .leftMap(_.toString)
+    }
+  }
+
+  case class GetBulkAcsSnapshot(
+      atOrBeforeTimestamp: CantonTimestamp
+  ) extends InternalBaseCommand[
+        http.GetBulkAcsSnapshotResponse,
+        (CantonTimestamp, Seq[(String, String)]),
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], GetBulkAcsSnapshotResponse] =
+      client.getBulkAcsSnapshot(atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC), headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[GetBulkAcsSnapshotResponse, Either[
+      String,
+      (CantonTimestamp, Seq[(String, String)]), // TODO: nicer object
+    ]] = { case http.GetBulkAcsSnapshotResponse.OK(response) =>
+      Right((
+        CantonTimestamp.assertFromInstant(response.timestamp.toInstant),
+        response.objects.map(obj => obj.url -> obj.checksum).toSeq,
+      ))
     }
   }
 

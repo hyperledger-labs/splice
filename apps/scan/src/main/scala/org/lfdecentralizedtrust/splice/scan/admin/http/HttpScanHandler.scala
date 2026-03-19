@@ -54,6 +54,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -80,6 +81,7 @@ import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.lang.UnsupportedOperationException
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
   DevnetTap,
@@ -125,6 +127,7 @@ class HttpScanHandler(
     updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
+    bulkStorage: BulkStorage,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
@@ -2323,6 +2326,35 @@ class HttpScanHandler(
           coupons.map(_.toHttp).toVector
         )
       }
+    }
+  }
+
+  override def getBulkAcsSnapshot(respond: ScanResource.GetBulkAcsSnapshotResponse.type)(
+    atOrBeforeTimestamp: OffsetDateTime
+  )(extracted: TraceContext): Future[ScanResource.GetBulkAcsSnapshotResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeTimestamp)
+      bulkStorage.getAcsSnapshotBulkStorage.fold(
+        Future.failed[ScanResource.GetBulkAcsSnapshotResponse](
+          new UnsupportedOperationException("Bulk storage is not configured")
+        )
+      )(acsSnapshotBulkStorage =>
+        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map { case (ts, objects) =>
+          ScanResource.GetBulkAcsSnapshotResponse.OK(
+            definitions.GetBulkAcsSnapshotResponse(
+              Codec.encode(ts),
+              objects.map { case (key, checksum) =>
+                definitions.BulkStorageObject(
+                  // TODO: map the key to a url
+                  key,
+                  checksum,
+                )
+              }.toVector,
+            )
+          )
+        }
+      )
     }
   }
 }

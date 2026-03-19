@@ -17,6 +17,7 @@ import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import io.grpc.StatusRuntimeException
 import org.apache.pekko.stream.scaladsl.Sink
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics}
@@ -36,7 +37,6 @@ import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.NoSuchElementException
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*
@@ -92,10 +92,10 @@ class AcsSnapshotBulkStorageTest
           )
           .map(_.createdEventsInPage)
       } yield {
-        val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+        val objectKeys = s3Objects.contents.asScala.map(_.key()).sorted
         objectKeys should have length 7
         objectKeys.foreach(
-          _.key() should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
+          _ should startWith("2026-01-02T00:00:00Z-Migration-0-2026-01-03T00:00:00Z/ACS_")
         )
         val objectCountMetrics = metricsFactory.metrics.counters.get(
           SpliceMetrics.MetricsPrefix :+ "history" :+ "bulk-storage" :+ "object-count"
@@ -167,9 +167,9 @@ class AcsSnapshotBulkStorageTest
       }
       def assertGetObjects(queryTs: CantonTimestamp, expectedTs: CantonTimestamp, expectedNumObjects: Int) = {
         val getObjectsResult = bulkStorage.getAcsSnapshotAtOrBefore(queryTs).futureValue
-        getObjectsResult.map(_._1) should contain theSameElementsInOrderAs
+        getObjectsResult._2.map(_._1) should contain theSameElementsInOrderAs
           (0 until expectedNumObjects).map(i => s"$expectedTs-Migration-0-${expectedTs.add(1.days)}/ACS_$i.zstd")
-        getObjectsResult.map(_._2).foreach {
+        getObjectsResult._2.map(_._2).foreach {
           // We test elsewhere that computed and persisted checksums are correct, so here we just check that they are present and not empty
           _ should not be empty
         }
@@ -179,7 +179,8 @@ class AcsSnapshotBulkStorageTest
       Using.resources(svc, retryProvider) { (_, _) =>
 
         val ex = bulkStorage.getAcsSnapshotAtOrBefore(ts1).failed.futureValue
-        ex shouldBe a [NoSuchElementException]
+        ex shouldBe a [StatusRuntimeException]
+        ex.asInstanceOf[StatusRuntimeException].getStatus.getCode shouldBe io.grpc.Status.Code.NOT_FOUND
         ex.getMessage shouldBe ("no snapshot in bulk storage yet")
 
         clue("Initially, a single snapshot is dumped") {
@@ -221,7 +222,8 @@ class AcsSnapshotBulkStorageTest
         }
 
         val ex1 = bulkStorage.getAcsSnapshotAtOrBefore(ts1.minus(java.time.Duration.ofDays(1))).failed.futureValue
-        ex1 shouldBe a [NoSuchElementException]
+        ex1 shouldBe a [StatusRuntimeException]
+        ex1.asInstanceOf[StatusRuntimeException].getStatus.getCode shouldBe io.grpc.Status.Code.NOT_FOUND
         ex1.getMessage should include ("this may be because the timestamp is before network genesis")
 
       }
