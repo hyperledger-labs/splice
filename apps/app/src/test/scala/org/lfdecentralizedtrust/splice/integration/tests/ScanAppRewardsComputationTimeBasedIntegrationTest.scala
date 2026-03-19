@@ -53,10 +53,7 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
     }
 
     "return activity totals after aggregation trigger runs" in { implicit _env =>
-      // TODO(#4118): Correct the time advancement
-      // Currently this test advances time to ensure there are enough closed mining
-      // rounds (rather than open mining rounds) because the trigger has not been
-      // switched to use the as yet unmerged ScanRewardsReferenceStore
+      // TODO(#4118): Update the time management here
       //
       // Advance enough ticks so that at least two rounds are fully closed and aggregated.
       // (advanceRoundsToNextRoundOpening advances by 1 tick)
@@ -76,13 +73,12 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
 
       val earliest = clue("Verify earliest available round is returned") {
         val e = sv1ScanBackend.getRewardAccountingEarliestAvailableRound()
-        e should not be empty
+        e.value shouldBe 1
         e.value
       }
 
       clue("Verify activity totals for the aggregated round") {
         val totals = sv1ScanBackend.getRewardAccountingActivityTotals(earliest)
-        totals should not be empty
         totals.value.roundNumber shouldBe earliest
       }
 
