@@ -10,8 +10,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
   TransferFactory,
   TransferInstruction,
 }
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.CompactJson
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
@@ -33,6 +35,19 @@ class TokenStandardCliIntegrationTest
     with ExternallySignedPartyTestUtil
     with HasTempDirectory
     with UpdateHistoryTestUtil {
+
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
+      .simpleTopology1Sv(this.getClass.getSimpleName)
+      // Set externalTransactionHashThresholdDate to a past date so that updates include external transaction hashes
+      .addConfigTransforms((_, config) =>
+        updateAllScanAppConfigs_(
+          _.copy(externalTransactionHashThresholdTime =
+            Some(java.time.Instant.parse("2020-01-01T00:00:00Z"))
+          )
+        )(config)
+      )
+  }
 
   "Token Standard CLI" should {
 
