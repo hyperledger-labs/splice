@@ -117,6 +117,17 @@
     walletPayments     0.1.17
     ================== =======
 
+  - Canton
+
+      - Internal: Replaced the sequencer's internal event signaller based on Pekko's `BroadcastHub` with an implementation with better runtime characteristics.
+        The old event signaller can be turned on again with `canton.sequencers.<sequencer>.parameters.use-legacy-event-signaller = true`.
+
+      - Sequencer Inspection Service
+
+        - A new field `paid_traffic_cost` exposes the traffic cost paid by the node on completion events and update events
+          - On completions, the field contains the cost paid by the node for the submission of the transaction. May be 0 for failed transactions that did not incur any traffic cost.
+          - On updates, the field contains the cost paid by the node for the submission of the transaction, if available on this node and to the querying parties. In particular, the cost is only available on the submitting node and when querying with a filter that includes submitting parties. The cost is available for Daml transactions and re-assignments. Not for topology transactions.
+
 .. release-notes:: 0.5.15
 
   - Validator App
