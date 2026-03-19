@@ -2397,31 +2397,22 @@ class HttpScanHandler(
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getRewardAccountingActivityTotals") { _ => _ =>
-      for {
-        roundTotalO <- appRewardsStore.getAppActivityRoundTotalByRound(
-          roundNumber
-        )
-        result <- roundTotalO match {
-          case None =>
-            Future.successful(
-              ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
-                ErrorResponse(
-                  s"Activity totals not yet computed for round $roundNumber"
-                )
-              )
+      appRewardsStore.getAppActivityRoundTotalByRound(roundNumber).map {
+        case None =>
+          ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+            ErrorResponse(
+              s"Activity totals not yet computed for round $roundNumber"
             )
-          case Some(roundTotal) =>
-            Future.successful(
-              ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
-                definitions.GetRewardAccountingActivityTotalsResponse(
-                  roundNumber = roundTotal.roundNumber,
-                  totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
-                  activePartiesCount = roundTotal.activeAppProviderPartiesCount,
-                )
-              )
+          )
+        case Some(roundTotal) =>
+          ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
+            definitions.GetRewardAccountingActivityTotalsResponse(
+              roundNumber = roundTotal.roundNumber,
+              totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
+              activePartiesCount = roundTotal.activeAppProviderPartiesCount,
             )
-        }
-      } yield result
+          )
+      }
     }
   }
 }
