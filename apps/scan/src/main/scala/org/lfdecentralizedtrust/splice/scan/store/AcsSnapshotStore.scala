@@ -513,27 +513,29 @@ class AcsSnapshotStore(
         )
         returning snapshot_id
       """.as[Long].head
-      _ <- (sql"""
+      insertedRows <- (sql"""
         insert into #${table.tableName} (
           """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
           snapshot_id
         )
-
-
         select
           """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
           $snapshotId
         from acs_snapshot_data d
         join update_history_creates c on d.create_id=c.row_id
         where
-          d.row_id <= ${initializeFrom.firstRowId}
-          and d.row_id >= ${initializeFrom.lastRowId}
+          d.row_id between ${initializeFrom.firstRowId} and ${initializeFrom.lastRowId}
           -- The source table `acs_snapshot_data` contains one row per stakeholder for each contract,
           -- the target table contains only one row per contract.
           -- We know the DSO is a stakeholder of all contracts in the scan ACS, so we can filter by that.
           and d.stakeholder = $dsoParty
       """).toActionBuilder.asUpdate
-    } yield ()
+    } yield {
+      logger.info(
+        s"Initialized incremental snapshot $snapshotId at ${initializeFrom.snapshotRecordTime} from historical snapshot. " +
+          s"ACS: $insertedRows."
+      )
+    }
 
     storage.queryAndUpdate(
       withIncrementalSnapshotIdempotencyCheck(table, statement, None),
@@ -594,7 +596,6 @@ class AcsSnapshotStore(
       logger.debug(
         s"Initialized incremental snapshot $snapshotId at $recordTime from import updates. ACS: $insertedRows."
       )
-      ()
     }
 
     storage.queryAndUpdate(

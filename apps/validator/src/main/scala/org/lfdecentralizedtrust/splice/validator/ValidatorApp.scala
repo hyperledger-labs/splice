@@ -896,6 +896,7 @@ class ValidatorApp(
         retryProvider,
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
+        config.sequencerConnectionPoolDelays,
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,
