@@ -64,7 +64,6 @@ import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, U
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
   SequencerConnections,
   TrafficControlParameters,
 }
@@ -200,10 +199,8 @@ class SV1Initializer(
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
-            // TODO(#2666) Make the delays configurable.
-            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+            sequencerConnectionPoolDelays = config.participantClient.sequencerConnectionPoolDelays,
           ),
-          manualConnect = false,
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
             minObservationDuration = config.timeTrackerMinObservationDuration,
@@ -600,6 +597,7 @@ class SV1Initializer(
               physicalSynchronizerId,
               synchronizerNode.sequencerConnection,
               synchronizerNode.mediatorSequencerAmplification,
+              synchronizerNode.mediatorSequencerConnectionPoolDelays,
             ),
             logger,
           )
@@ -721,6 +719,9 @@ class SV1Initializer(
                     developmentFundPercentage =
                       if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
                     developmentFundManager = sv1Config.developmentFundManager,
+                    initialExternalPartyConfigStateTickDuration =
+                      sv1Config.initialExternalPartyConfigStateTickDuration,
+                    optValidatorFaucetCap = sv1Config.optValidatorFaucetCap,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,

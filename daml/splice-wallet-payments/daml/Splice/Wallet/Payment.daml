@@ -214,11 +214,11 @@ template AcceptedAppPayment
         contextRound <- fetchPublicReferenceData (ForDso with dso) context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock amulet and transfer the remainder to the receiver
-        result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
+        result <- exercise lockedAmulet LockedAmulet_UnlockV2
         let transfer = Transfer with
               sender
               provider
-              inputs = [InputAmulet result.amuletSum.amulet]
+              inputs = [InputAmulet result.amuletCid]
               outputs = map mkReceiverOutput amuletReceiverAmounts
               beneficiaries = None -- not set for now, could extend later but we probably prefer investment in allocations through the token standard.
         result <- exerciseAppTransfer dso context transfer
@@ -233,9 +233,10 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller map (\r -> r.receiver) amuletReceiverAmounts
       do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
-         result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
+         result <- exercise lockedAmulet LockedAmulet_UnlockV2
+         amuletSum <- legacyAmuletCreateSummary dso sender context.openMiningRound result.amuletCid
          return AcceptedAppPayment_RejectResult with
-            amulet = result.amuletSum
+            amulet = amuletSum
 
     choice AcceptedAppPayment_Expire : AcceptedAppPayment_ExpireResult
       with
@@ -243,6 +244,7 @@ template AcceptedAppPayment
       controller sender
       do -- TODO(#3152) Split out amulet unlocking from payment expiry
          create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
-         result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock context.openMiningRound)
+         result <- exercise lockedAmulet LockedAmulet_OwnerExpireLockV2
+         amuletSum <- legacyAmuletCreateSummary dso sender context.openMiningRound result.amuletCid
          return AcceptedAppPayment_ExpireResult with
-            amulet = result.amuletSum
+            amulet = amuletSum

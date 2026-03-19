@@ -4,9 +4,12 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.async.AsyncRequestBody
+import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
@@ -77,6 +80,20 @@ class S3BucketConnection(
         .map(_.value())
         .getOrElse(throw new RuntimeException("Missing checksum tag"))
     } yield checksum
+  }
+
+  def readObject(
+      key: String
+  )(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+
+    s3Client
+      .getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
+      .asScala
+      .map { publisher =>
+        org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
+      }
+      .map { _.map(ByteString.fromByteBuffer) }
   }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
@@ -170,25 +187,21 @@ class S3BucketConnection(
 
         _ <- s3Client.completeMultipartUpload(completeRequest).asScala
 
-        taggingRequest = PutObjectTaggingRequest
+        // Copy-in-place of the object to add the final checksum to its metadata
+        metadata = Map("splice-checksum" -> Base64.getEncoder.encodeToString(md.digest()))
+
+        copyReq = CopyObjectRequest
           .builder()
-          .bucket(bucketName)
-          .key(key)
-          .tagging(
-            Tagging
-              .builder()
-              .tagSet(
-                Tag
-                  .builder()
-                  .key("splice-checksum")
-                  .value(Base64.getEncoder.encodeToString(md.digest()))
-                  .build()
-              )
-              .build()
-          )
+          .destinationBucket(bucketName)
+          .destinationKey(key)
+          .sourceBucket(bucketName)
+          .sourceKey(key)
+          // Tells S3/GCS to ignore old metadata and use the new map
+          .metadataDirective(MetadataDirective.REPLACE)
+          .metadata(metadata.asJava)
           .build()
 
-        _ <- s3Client.putObjectTagging(taggingRequest).asScala
+        _ <- s3Client.copyObject(copyReq).asScala
 
       } yield {
         ()

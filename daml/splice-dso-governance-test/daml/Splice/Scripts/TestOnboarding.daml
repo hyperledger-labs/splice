@@ -18,8 +18,8 @@ import Splice.DsoRules
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.SvOnboarding
 
-import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
+import Splice.Testing.Registries.AmuletRegistry (getActiveOpenRoundsSorted)
 import Splice.AmuletRules (AmuletRules)
 import Splice.Types
 
@@ -155,7 +155,7 @@ testSvOnboarding = do
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
   -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
-  [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+  [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app.dso
 
   [(amuletRulesCid, _)] <- query @AmuletRules dso
 
@@ -449,7 +449,7 @@ testSvReonboarding = do
   executeAllConfirmedActions app
   [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed dso
 
-  [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+  [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app.dso
 
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -536,7 +536,7 @@ test_MergeValidatorLicense = do
 testBootstrapDevNetWithNonZeroRound : Script ()
 testBootstrapDevNetWithNonZeroRound = do
   (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound True 34
-  [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app
+  [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app.dso
   earliestRound.round === Round 34
   middleRound.round === Round 35
   latestRound.round === Round 36
@@ -545,7 +545,7 @@ testBootstrapDevNetWithNonZeroRound = do
 testBootstrapMainNetWithNonZeroRound : Script ()
 testBootstrapMainNetWithNonZeroRound = do
   (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound False 34
-  [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app
+  [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app.dso
   earliestRound.round === Round 34
   middleRound.round === Round 35
   latestRound.round === Round 36

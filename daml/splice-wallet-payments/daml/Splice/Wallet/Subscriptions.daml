@@ -215,9 +215,10 @@ template SubscriptionInitialPayment
       controller subscriptionData.receiver
       do
         _ <- create TerminatedSubscription with ..
-        result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+        result <- exercise lockedAmulet LockedAmulet_UnlockV2
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         return SubscriptionInitialPayment_RejectResult with
-          amuletSum = result.amuletSum
+          amuletSum
 
     choice SubscriptionInitialPayment_Expire : SubscriptionInitialPayment_ExpireResult
       with
@@ -228,9 +229,10 @@ template SubscriptionInitialPayment
         -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         _ <- create TerminatedSubscription with ..
-        result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        result <- exercise lockedAmulet LockedAmulet_OwnerExpireLockV2 -- would fail if we can't expire yet
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         return SubscriptionInitialPayment_ExpireResult with
-          amuletSum = result.amuletSum
+          amuletSum
 
 
 -- | The base state in our subscription flow.
@@ -333,10 +335,11 @@ template SubscriptionPayment
         subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+        result <- exercise lockedAmulet LockedAmulet_UnlockV2
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         pure SubscriptionPayment_RejectResult with
           subscriptionState
-          amuletSum = result.amuletSum
+          amuletSum
 
     choice SubscriptionPayment_Expire : SubscriptionPayment_ExpireResult
       with
@@ -350,10 +353,11 @@ template SubscriptionPayment
         subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        result <- exercise lockedAmulet LockedAmulet_OwnerExpireLockV2 -- would fail if we can't expire yet
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         pure SubscriptionPayment_ExpireResult with
           subscriptionState
-          amuletSum = result.amuletSum
+          amuletSum = amuletSum
 
 
 lockAndMakeChange
@@ -401,11 +405,11 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
   let SubscriptionData { sender; receiver; provider } = subscriptionData
 
   -- unlock amulet and transfer the remainder to the receiver
-  result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+  result <- exercise lockedAmulet LockedAmulet_UnlockV2
   let transfer = Transfer with
         sender
         provider
-        inputs = [InputAmulet result.amuletSum.amulet]
+        inputs = [InputAmulet result.amuletCid]
         outputs = [mkTransferOutput receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
   result <- exerciseAppTransfer subscriptionData.dso transferContext transfer

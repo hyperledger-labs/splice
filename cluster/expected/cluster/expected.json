@@ -46,8 +46,12 @@
       "cluster": "cn-mocknet",
       "initialNodeCount": 0,
       "nodeConfig": {
+        "bootDisk": {
+          "diskType": "hyperdisk-balanced",
+          "sizeGb": 100
+        },
         "labels": {
-          "cn_apps": "standard"
+          "cn_apps": "hyperdisk"
         },
         "loggingVariant": "DEFAULT",
         "machineType": "n2-standard-16",
@@ -58,9 +62,12 @@
             "value": "true"
           }
         ]
-      }
+      },
+      "nodeLocations": [
+        "europe-west6-z"
+      ]
     },
-    "name": "cn-apps-node-pool",
+    "name": "cn-apps-node-pool-hd",
     "provider": "",
     "type": "gcp:container/nodePool:NodePool"
   },
@@ -79,7 +86,7 @@
           "cn_infra": "true"
         },
         "loggingVariant": "DEFAULT",
-        "machineType": "e2-standard-8",
+        "machineType": "n4d-standard-8",
         "taints": [
           {
             "effect": "NO_SCHEDULE",

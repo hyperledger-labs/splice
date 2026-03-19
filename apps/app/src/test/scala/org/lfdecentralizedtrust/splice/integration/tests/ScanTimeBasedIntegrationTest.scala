@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
-import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   AppRewardCoupon,
   ValidatorRewardCoupon,
 }
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -30,6 +31,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 
+import java.io.ByteArrayOutputStream
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
@@ -40,7 +42,8 @@ class ScanTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil
     with HasExecutionContext
-    with HasS3Mock {
+    with HasS3Mock
+    with HasActorSystem {
 
   val initialRound = 4815L
 
@@ -73,6 +76,15 @@ class ScanTimeBasedIntegrationTest
               updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
               s3 = Some(s3ConfigMock),
             )
+          )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Scan)(
+          _.copy(
+            // By default, the acs snapshot trigger processes 30sec of history per invocation,
+            // which is too slow for this test which advances time by hours or days.
+            acsSnapshotTriggerPollingInterval = Some(NonNegativeFiniteDuration.ofHours(1))
           )
         )(config)
       )
@@ -617,12 +629,14 @@ class ScanTimeBasedIntegrationTest
 
       val updateObjs = s3Objs.filter(_.key().contains("/updates"))
       val updatesFromS3 = updateObjs
-        .flatMap(
-          readUncompressAndDecode(
-            bucketConnection,
+        .flatMap { obj =>
+          val out = new ByteArrayOutputStream()
+          sv1ScanBackend.bulkStorageDownload(obj.key(), out).futureValue
+          uncompressAndDecode(
+            ByteString(out.toByteArray),
             io.circe.parser.decode[definitions.UpdateHistoryItemV2],
           )
-        )
+        }
         .filter(isInTimeRange)
       val updatesFromScan = sv1ScanBackend
         .getUpdateHistory(1000, None, CompactJson)

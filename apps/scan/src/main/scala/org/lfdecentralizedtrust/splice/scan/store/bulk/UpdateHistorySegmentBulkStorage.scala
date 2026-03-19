@@ -13,8 +13,8 @@ import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
-  PageLimit,
   HistoryMetrics,
+  PageLimit,
   S3BucketConnection,
   TimestampWithMigrationId,
   TreeUpdateWithMigrationId,
@@ -135,7 +135,7 @@ class UpdateHistorySegmentBulkStorage(
 
   private def getSource(implicit
       actorSystem: ActorSystem
-  ): Source[UpdateHistorySegmentBulkStorage.Output, NotUsed] = {
+  ): Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(
@@ -157,19 +157,11 @@ class UpdateHistorySegmentBulkStorage(
         logger.warn(s"No updates found in segment ${segment.fromTimestamp}-${segment.toTimestamp}")
         Source.empty
       })
-      .map((o: GroupedWeightS3ObjectFlow.Output) => {
-        historyMetrics.BulkStorage.incUpdateObjects()
-        UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
-      })
+      .wireTap(_ => historyMetrics.BulkStorage.incUpdateObjects())
+      .fold(Seq.empty[String])(_ :+ _)
   }
 }
 object UpdateHistorySegmentBulkStorage {
-
-  case class Output(
-      segment: UpdatesSegment,
-      objectKey: String,
-      isLastObjectInSegment: Boolean,
-  )
 
   def asFlow(
       storageConfig: ScanStorageConfig,
@@ -182,7 +174,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[UpdatesSegment, Output, NotUsed] =
+  ): Flow[UpdatesSegment, Seq[String], NotUsed] =
     Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
       new UpdateHistorySegmentBulkStorage(
         storageConfig,
@@ -207,7 +199,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Source[Output, NotUsed] =
+  ): Source[Seq[String], NotUsed] =
     new UpdateHistorySegmentBulkStorage(
       storageConfig,
       appConfig,

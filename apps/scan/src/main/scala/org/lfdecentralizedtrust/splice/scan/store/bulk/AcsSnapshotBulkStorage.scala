@@ -105,37 +105,48 @@ class AcsSnapshotBulkStorage(
             logger.info("No dumped snapshots yet, starting from genesis")
             getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
         }
-        .filter { case TimestampWithMigrationId(ts, _) =>
-          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+        .filter { ts =>
+          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts.timestamp)
           if (ret) {
-            logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+            logger.debug(s"Dumping snapshot at timestamp ${ts.timestamp} to bulk storage")
           } else {
             logger.info(
-              s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+              s"Skipping snapshot at timestamp ${ts.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
             )
           }
           ret
         }
-        .via(
-          SingleAcsSnapshotBulkStorage.asFlow(
-            storageConfig,
-            appConfig,
-            acsSnapshotStore,
-            s3Connection,
-            historyMetrics,
-            loggerFactory,
-          )
-        )
-        .mapAsync(1) { (ts: TimestampWithMigrationId) =>
-          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
-          for {
-            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
-          } yield {
-            logger.info(
-              s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+        .flatMapConcat(ts =>
+          Source
+            .single(ts)
+            .via(
+              SingleAcsSnapshotBulkStorage
+                .asFlow(
+                  storageConfig,
+                  appConfig,
+                  acsSnapshotStore,
+                  s3Connection,
+                  historyMetrics,
+                  loggerFactory,
+                )
+                .map(keys => {
+                  logger.debug(
+                    s"Successfully dumped snapshot from migration ${ts.migrationId}, timestamp ${ts.timestamp} to bulk storage, with object keys: $keys"
+                  )
+                  ts
+                })
             )
-            ts
-          }
+        )
+        .mapAsync(1) { ts =>
+          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
+          kvProvider
+            .setLatestAcsSnapshotsInBulkStorage(ts)
+            .map(_ => {
+              logger.info(
+                s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+              )
+              ts
+            })
         }
     }
   }
@@ -157,26 +168,6 @@ class AcsSnapshotBulkStorage(
     )
   }
 
-//  def getAcsSnapshotAtOrBefore(atOrBeforeTimestamp: CantonTimestamp): Future[Seq[ObjectKeyAndChecksum]] = {
-//    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
-//    val prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTimestamp)
-//    kvProvider
-//      .getLatestAcsSnapshotInBulkStorage()
-//      .value
-//      .map(_.fold(false)(_.timestamp >= snapshotTimestamp))
-//      .flatMap {
-//        case false =>
-//          throw new NoSuchElementException("bulk storage not caught up to the requested date")
-//        case true =>
-//          for {
-//            objects <- s3Connection.listObjectsWithChecksums(Some(prefix))
-//            filteredObjects = objects.filter(_.key.matches(".*ACS_\\d+\\.zstd")).toSeq
-//          } yield {
-//            filteredObjects
-//          }
-//      }
-//  }
-
   // TODO: probably wanna move this and the pipeline below to S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the size of the return)
   case class ObjectKeyAndChecksum(
       key: String,
@@ -186,25 +177,36 @@ class AcsSnapshotBulkStorage(
   def getAcsSnapshotAtOrBefore(
       atOrBeforeTimestamp: CantonTimestamp
   ): Future[Seq[(String, String)]] = {
-    val snapshotTimestamp = storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
-    val prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTimestamp)
-    kvProvider
-      .getLatestAcsSnapshotInBulkStorage()
-      .value
-      .map(_.fold(false)(_.timestamp >= snapshotTimestamp))
-      .flatMap {
-        case false =>
-          throw new NoSuchElementException("bulk storage not caught up to the requested date")
-        case true =>
-          s3Connection
-            .listObjectsSource(prefix)
-            .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
-            .mapAsync(4) { obj => // TODO: configurable parallelism
-              s3Connection.readChecksum(obj.key).map(checksum => obj.key -> checksum)
-            }
-            .runWith(Sink.seq[(String, String)])
 
-      }
+    for {
+      snapshotTs <- kvProvider
+        .getLatestAcsSnapshotInBulkStorage()
+        .value
+        .map {
+          case None =>
+            throw new NoSuchElementException("no snapshot in bulk storage yet")
+          case Some(ts) if ts.timestamp < atOrBeforeTimestamp =>
+            logger.trace(
+              s"Latest snapshot in bulk storage is at ${ts.timestamp}, which is before the requested timestamp ${atOrBeforeTimestamp}, returning that one"
+            )
+            ts.timestamp
+          case Some(ts) => storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
+        }
+      prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTs)
+      objects <- s3Connection
+        .listObjectsSource(prefix)
+        .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
+        .mapAsync(4) { obj => // TODO: configurable parallelism
+          s3Connection.readChecksum(obj.key).map(checksum => obj.key -> checksum)
+        }
+        .runWith(Sink.seq[(String, String)])
+
+    } yield {
+      logger.trace(
+        s"Found snapshot in bulk storage at timestamp ${snapshotTs}, with objects: ${objects.map(_._1)}"
+      )
+      objects
+    }
   }
 
 }

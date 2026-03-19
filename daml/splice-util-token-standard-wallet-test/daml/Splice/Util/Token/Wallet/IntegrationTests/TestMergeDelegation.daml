@@ -124,9 +124,12 @@ testMultiRegistryAirdrop = do
   forA_ [alice] $ checkExactlyOneHolding registry2 101.0
   forA_ [bob] $ checkExactlyOneHolding registry2 1.0
 
-  -- one app marker was created as alice already had registry2 funds
+  -- three markers were created:
+  -- 1 through each of the preapprovals for the incoming transfer
+  -- 1 for the marker created from the top-level batch airdrop
   markers <- query @Amulet.FeaturedAppActivityMarker operator
-  length markers === 1
+  debug markers
+  length markers === 3
 
   -- round 2
   runMultiRegistryAirdrop (registry1, Some featuredAppRight) (registry2, Some featuredAppRight) operator [alice, bob] 1.0
@@ -134,9 +137,9 @@ testMultiRegistryAirdrop = do
   forA_ [alice] $ checkExactlyOneHolding registry2 102.0
   forA_ [bob] $ checkExactlyOneHolding registry2 2.0
 
-  -- another four app markers were created as all users had funds that needed to be merged in
+  -- another six app markers were created as all users had funds that needed to be merged in
   markers <- query @Amulet.FeaturedAppActivityMarker operator
-  length markers === 5
+  length markers === 9
 
 
 -- setup utilities

@@ -42,6 +42,7 @@ const ActiveCouponsTable: React.FC = () => {
     spliceInstanceNames: { amuletNameAcronym },
   } = useWalletConfig();
   const {
+    primaryParty,
     coupons: {
       coupons,
       isLoading,
@@ -141,7 +142,7 @@ const ActiveCouponsTable: React.FC = () => {
                   coupons.map(coupon => (
                     <TableRow key={coupon.id}>
                       <TableCell>
-                        <DateDisplay datetime={coupon.createdAt} format="MMMM d, yyyy" />
+                        <DateDisplay datetime={coupon.createdAt} format="MMM d, yyyy hh:mm a" />
                       </TableCell>
                       <TableCell>
                         <BftAnsEntry partyId={coupon.beneficiary} />
@@ -150,17 +151,23 @@ const ActiveCouponsTable: React.FC = () => {
                         {coupon.amount.toFixed(4)} {amuletNameAcronym}
                       </TableCell>
                       <TableCell>
-                        <DateDisplay datetime={coupon.expiresAt} format="MMMM d, yyyy" />
+                        <DateDisplay datetime={coupon.expiresAt} format="MMM d, yyyy hh:mm a" />
                       </TableCell>
                       <TableCell>{coupon.reason}</TableCell>
                       <TableCell>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleWithdrawClick(coupon.id)}
-                        >
-                          Withdraw
-                        </Button>
+                        {coupon.fundManager === primaryParty ? (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleWithdrawClick(coupon.id)}
+                          >
+                            Withdraw
+                          </Button>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
