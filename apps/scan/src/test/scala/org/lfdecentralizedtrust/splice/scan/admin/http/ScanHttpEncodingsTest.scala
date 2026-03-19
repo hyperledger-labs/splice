@@ -4,6 +4,8 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.util.HexString
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -28,6 +30,8 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue
 import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.matchers.should.Matchers
+//import com.digitalasset.canton.util.HexString
+//import com.google.protobuf.ByteString
 
 import java.time.Instant
 import scala.util.Random
@@ -290,7 +294,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     )
 
     val withoutLocalData = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original)
+      .makeConsistentAcrossSvs(original, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -336,7 +340,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
     // makeConsistentAcrossSvs() should be idempotent
     val withoutLocalData2 = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original)
+      .makeConsistentAcrossSvs(original, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -631,5 +635,63 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
     encoded.totalTrafficCost shouldBe 0L
     encoded.envelopeTrafficSummaries shouldBe empty
+  }
+
+  "external transaction hash" should {
+    val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+    val externalTxnHash =
+      HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
+    val recordTime = Instant.parse("2026-06-30T00:00:00Z")
+
+    def mkTree = TreeUpdateWithMigrationId(
+      update = UpdateHistoryResponse(
+        update = TransactionTreeUpdate(
+          mkCreateTx(
+            10,
+            Seq(
+              amulet(mkPartyId("Alice"), 42.0, 13L, 2.0)
+            ),
+            Instant.now(),
+            createdEventSignatories = Seq.empty,
+            dummyDomain,
+            "",
+            recordTime = recordTime,
+            createdEventObservers = Seq.empty,
+            externalTxnHash = externalTxnHash,
+          )
+        ),
+        synchronizerId = dummyDomain,
+      ),
+      migrationId = 42L,
+    )
+
+    "return the hash when record time is after threshold" in {
+      val thresholdDate = Instant.parse("2026-06-29T23:59:59Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
+      }
+    }
+
+    "not return the hash when record time is before threshold" in {
+      val thresholdDate = Instant.parse("2026-06-30T00:00:01Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe None
+      }
+    }
   }
 }

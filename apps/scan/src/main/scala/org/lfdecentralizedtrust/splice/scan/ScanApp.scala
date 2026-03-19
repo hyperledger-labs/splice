@@ -216,7 +216,7 @@ class ScanApp(
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore.history,
-        externalTransactionHashThresholdTimestamp = config.externalTransactionHashThresholdDate
+        externalTransactionHashThresholdTimestamp = config.externalTransactionHashThresholdTime
           .map(s => CantonTimestamp.assertFromInstant(s)),
       )
       acsSnapshotStore = AcsSnapshotStore(
@@ -370,6 +370,7 @@ class ScanApp(
         packageVersionSupport,
         bftSequencersWithAdminConnections,
         initialRound,
+        externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
       )
       contractFetcher = ChoiceContextContractFetcher.createStoreWithLedgerFallback(
         config.parameters.contractFetchLedgerFallbackConfig,

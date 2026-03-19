@@ -133,6 +133,7 @@ class HttpScanHandler(
     protected val packageVersionSupport: PackageVersionSupport,
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
     initialRound: String,
+    externalTransactionHashThresholdTime: Option[Instant] = None,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -759,6 +760,7 @@ class HttpScanHandler(
             _,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
         .toVector

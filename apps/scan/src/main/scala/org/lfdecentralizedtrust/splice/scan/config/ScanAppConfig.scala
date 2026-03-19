@@ -84,7 +84,7 @@ case class ScanAppBackendConfig(
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
     // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
     // TODO(#4249): use on-ledger synchronization for switching record times
-    externalTransactionHashThresholdDate: Option[Instant] = Some(
+    externalTransactionHashThresholdTime: Option[Instant] = Some(
       java.time.Instant.parse("2030-01-01T00:00:00Z")
     ),
 ) extends SpliceBackendConfig
