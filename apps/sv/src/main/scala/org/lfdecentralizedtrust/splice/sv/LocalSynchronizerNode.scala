@@ -72,6 +72,7 @@ class LocalSynchronizerNode(
       config.sequencer.sequencerAvailabilityDelay.asJava,
       sequencerConfig,
       config.mediator.sequencerRequestAmplification,
+      config.mediator.sequencerConnectionPoolDelays,
       cometbftNode,
     )
     with RetryProvider.Has
@@ -310,6 +311,7 @@ class LocalSynchronizerNode(
               synchronizerId,
               internalSequencerConnection,
               mediatorSequencerAmplification.toInternal,
+              mediatorSequencerConnectionPoolDelays.toInternal,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -515,6 +517,7 @@ class LocalSynchronizerNode(
         mediatorAdminConnection.setSequencerConnection(
           sequencerConnection,
           mediatorSequencerAmplification.toInternal,
+          mediatorSequencerConnectionPoolDelays.toInternal,
         ),
       logger,
     )

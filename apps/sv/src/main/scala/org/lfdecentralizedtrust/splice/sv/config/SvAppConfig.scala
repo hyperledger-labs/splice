@@ -4,7 +4,10 @@
 package org.lfdecentralizedtrust.splice.sv.config
 
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeInt,
@@ -274,6 +277,8 @@ final case class SvParticipantClientConfig(
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 case class SvAppBackendConfig(
@@ -471,6 +476,8 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
     pruning: Option[PruningConfig] = Some(
       PruningConfig(
         cron = "0 /10 * * * ?", // Run every 10min,

@@ -38,6 +38,7 @@ class ReconcileSequencerConnectionsTrigger(
     scanConnection: BftScanConnection,
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     initialSynchronizerTimeO: Option[CantonTimestamp],
     reconnectOnSynchronizerConfigurationChange: Boolean,
 )(implicit
@@ -107,8 +108,7 @@ class ReconcileSequencerConnectionsTrigger(
                         ),
                         patience,
                       ),
-                      // TODO(#2666) Make the delays configurable.
-                      sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+                      sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
                     )
                 }
                 participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(

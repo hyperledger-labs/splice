@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { loadClusterYamlConfig, getMainConfigPath } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { loadClusterYamlConfig, getClusterConfigPath } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { writeFileSync } from 'fs';
 import { dump } from 'js-yaml';
 import { dirname, resolve } from 'path';
@@ -13,5 +13,5 @@ const resolvedConfigYaml = dump(config, {
   noRefs: true,
   forceQuotes: true,
 });
-const resolvedConfigPath = resolve(dirname(getMainConfigPath()), 'config.resolved.yaml');
+const resolvedConfigPath = resolve(dirname(getClusterConfigPath()), 'config.resolved.yaml');
 writeFileSync(resolvedConfigPath, `${header}${resolvedConfigYaml}`);

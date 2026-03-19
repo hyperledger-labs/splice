@@ -1893,6 +1893,11 @@ class DbSvDsoStoreTest
           appActivityMarker(
             provider = providerParty(n)
           )
+        ) ++ (1 to 3).map(n =>
+          appActivityMarker(
+            provider = providerParty(n),
+            beneficiary = Some(providerParty(1)),
+          )
         )
       val thresholds = Seq.range(0, 5)
       for {
@@ -1900,15 +1905,41 @@ class DbSvDsoStoreTest
         _ <- MonadUtil.sequentialTraverse(markers)(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
-        actualMarkers <- store.listFeaturedAppActivityMarkers(1000)
         results <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
           store
-            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold)
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold, Set.empty)
+            .map(result => (threshold, result))
+        )
+        resultsNoProvider1 <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold, Set(providerParty(1)))
+            .map(result => (threshold, result))
+        )
+        resultsNoProvider2 <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold, Set(providerParty(2)))
+            .map(result => (threshold, result))
+        )
+        resultsNoProvider1And2 <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(
+              threshold,
+              Set(providerParty(1), providerParty(2)),
+            )
             .map(result => (threshold, result))
         )
       } yield {
         forAll(results) { case (threshold, result) =>
-          result shouldBe (threshold <= actualMarkers.size)
+          result shouldBe (threshold <= markers.size)
+        }
+        forAll(resultsNoProvider1) { case (threshold, result) =>
+          result shouldBe (threshold <= 2)
+        }
+        forAll(resultsNoProvider2) { case (threshold, result) =>
+          result shouldBe (threshold <= 5)
+        }
+        forAll(resultsNoProvider1And2) { case (threshold, result) =>
+          result shouldBe (threshold <= 1)
         }
       }
     }
@@ -1921,7 +1952,13 @@ class DbSvDsoStoreTest
         appActivityMarker(
           provider = providerParty(n)
         )
-      )
+      ) ++
+        (1 to 10).map(n =>
+          appActivityMarker(
+            provider = providerParty(n),
+            beneficiary = Some(providerParty(1)),
+          )
+        )
 
     "fetch all contracts with complete bounds" in {
       for {
@@ -1933,14 +1970,16 @@ class DbSvDsoStoreTest
           .listFeaturedAppActivityMarkersByContractIdHash(
             Int.MinValue,
             0,
-            10,
+            20,
+            Set.empty,
           )
           .map(_.map(_.contractId))
         results2 <- store
           .listFeaturedAppActivityMarkersByContractIdHash(
             1,
             Int.MaxValue,
-            10,
+            20,
+            Set.empty,
           )
           .map(_.map(_.contractId))
       } yield {
@@ -1949,6 +1988,54 @@ class DbSvDsoStoreTest
         val set2: Set[ContractId[?]] = results2.toSet
         set1.union(set2) shouldBe markers.map(_.contractId).toSet
         set1.intersect(set2) shouldBe empty
+      }
+    }
+
+    "fetch all contracts for non-ignored parties" in {
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(markers)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        resultsNoProvider1 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            Int.MaxValue,
+            20,
+            Set(providerParty(1)),
+          )
+          .map(_.map(_.contractId))
+        resultsNoProvider2 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            Int.MaxValue,
+            20,
+            Set(providerParty(2)),
+          )
+          .map(_.map(_.contractId))
+        resultsNoProvider1And2 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            Int.MaxValue,
+            20,
+            Set(providerParty(1), providerParty(2)),
+          )
+          .map(_.map(_.contractId))
+      } yield {
+        def filteredMarkers(parties: Set[PartyId]) =
+          markers.filter(m =>
+            !parties.contains(PartyId.tryFromProtoPrimitive(m.payload.provider)) && !parties
+              .contains(PartyId.tryFromProtoPrimitive(m.payload.beneficiary))
+          )
+        resultsNoProvider1.toSet shouldBe filteredMarkers(Set(providerParty(1)))
+          .map(_.contractId)
+          .toSet
+        resultsNoProvider2.toSet shouldBe filteredMarkers(Set(providerParty(2)))
+          .map(_.contractId)
+          .toSet
+        resultsNoProvider1And2.toSet shouldBe filteredMarkers(
+          Set(providerParty(1), providerParty(2))
+        ).map(_.contractId).toSet
       }
     }
 
@@ -1962,6 +2049,7 @@ class DbSvDsoStoreTest
           Int.MinValue,
           Int.MaxValue,
           2,
+          Set.empty,
         )
       } yield {
         limitedResults should have(size(2))

@@ -10,8 +10,6 @@ Pruning
 
 The sequencer, participant and CometBFT have pruning options that can be used to ensure storage use is kept within reasonable bounds.
 
-Pruning can also be configured for the participant, but we don't currently recommend enabling it for the SVs.
-
 .. _sv-pruning-sequencer:
 
 Sequencer pruning

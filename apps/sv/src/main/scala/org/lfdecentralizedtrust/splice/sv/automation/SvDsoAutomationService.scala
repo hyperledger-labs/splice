@@ -474,6 +474,7 @@ class SvDsoAutomationService(
         dsoStore,
         synchronizerNodeService,
         config.participantClient.sequencerRequestAmplification.toInternal,
+        config.participantClient.sequencerConnectionPoolDelays.toInternal,
         config.domainMigrationId,
         reconnectOnSynchronizerConfigurationChange =
           enabledFeatures.reconnectOnSynchronizerConfigurationChange,

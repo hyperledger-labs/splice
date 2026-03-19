@@ -12,49 +12,9 @@ import cats.implicits.{
 }
 import cats.syntax.functorFilter.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.config.{
-  EnabledFeaturesConfig,
-  SpliceInstanceNamesConfig,
-  UpgradesConfig,
-}
-import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{
-  AppStoreWithIngestion,
-  DomainTimeSynchronization,
-  DomainUnpausedSynchronization,
-}
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
-import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.sv.config.{
-  SvAppBackendConfig,
-  SvCantonIdentifierConfig,
-  SvOnboardingConfig,
-}
-import org.lfdecentralizedtrust.splice.sv.onboarding.{
-  DsoPartyHosting,
-  NodeInitializerUtil,
-  SetupUtil,
-  SynchronizerNodeInitializer,
-  SynchronizerNodeReconciler,
-}
-import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
-import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.{
-  ContractWithState,
-  TemplateJsonDecoder,
-  UploadablePackage,
-}
-import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -62,18 +22,14 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.protocol.OnboardingRestriction.{RestrictedOpen, UnrestrictedOpen}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.{
-  SequencerConnectionPoolDelays,
-  SequencerConnections,
-  TrafficControlParameters,
-}
+import com.digitalasset.canton.sequencing.{SequencerConnections, TrafficControlParameters}
 import com.digitalasset.canton.time.{
   Clock,
   NonNegativeFiniteDuration,
   PositiveFiniteDuration,
   PositiveSeconds,
 }
-import com.digitalasset.canton.topology.{transaction, *}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -96,7 +52,47 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.{
+  AppStoreWithIngestion,
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.config.{
+  SvAppBackendConfig,
+  SvCantonIdentifierConfig,
+  SvOnboardingConfig,
+}
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.{
+  DsoPartyHosting,
+  NodeInitializerUtil,
+  SetupUtil,
+  SynchronizerNodeInitializer,
+  SynchronizerNodeReconciler,
+}
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.util.{
+  ContractWithState,
+  TemplateJsonDecoder,
+  UploadablePackage,
+}
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -189,8 +185,8 @@ class SV1Initializer(
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification.toInternal,
-            // TODO(#2666) Make the delays configurable.
-            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+            sequencerConnectionPoolDelays =
+              config.participantClient.sequencerConnectionPoolDelays.toInternal,
           ),
           synchronizerId = None,
           timeTracker = SynchronizerTimeTrackerConfig(
@@ -598,6 +594,7 @@ class SV1Initializer(
               physicalSynchronizerId,
               synchronizerNode.internalSequencerConnection,
               synchronizerNode.mediatorSequencerAmplification.toInternal,
+              synchronizerNode.mediatorSequencerConnectionPoolDelays.toInternal,
             ),
             logger,
           )

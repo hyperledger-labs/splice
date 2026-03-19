@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   WalletSweepConfig,
 }
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelays
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 
@@ -177,6 +178,8 @@ case class ValidatorAppBackendConfig(
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
       ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
     /** The configuration for sweeping funds periodically to other validator's wallet
       */
     walletSweep: Map[String, WalletSweepConfig] = Map.empty,

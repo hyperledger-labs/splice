@@ -68,7 +68,7 @@ function restore_pvc_from_snapshot() {
   local -r namespace=$1
   local -r snapshot_name=$2
   local -r pvc_name=$3
-  local -r storage_class_name=${4:-"standard-rwo"}
+  local -r storage_class_name=$4
 
   _warning "This operation will delete pvc $pvc_name, and restore it from backup."
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
@@ -158,10 +158,13 @@ function restore_pvc_postgres() {
   local -r hyperdisk_enabled=$4
 
   local template_name
+  local storage_class
   if [ "$hyperdisk_enabled" = "true" ]; then
     template_name="pg-data-hd"
+    storage_class="hyperdisk-standard-rwo"
   else
     template_name="pg-data"
+    storage_class="standard-rwo"
   fi
 
   local -r ss_name="$component-pg"
@@ -172,7 +175,7 @@ function restore_pvc_postgres() {
   _info "Scaling down postgres StatefulSet"
   kubectl scale statefulset -n "$namespace" "$ss_name" --replicas=0
 
-  restore_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name"
+  restore_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name" "$storage_class"
 
   _info "Scaling up postgres StatefulSet"
   kubectl scale statefulset -n "$namespace" "$ss_name" --replicas=1
@@ -284,7 +287,14 @@ function restore_component() {
       cometbft_snapshot_name="${cometbft_pvc_name}-$run_id"
     fi
 
-    restore_pvc_from_snapshot "$namespace" "$cometbft_snapshot_name" "$cometbft_pvc_name" "premium-rwo"
+    local cometbft_storage_class
+    if [ "$hyperdisk_enabled" = "true" ]; then
+      cometbft_storage_class="hyperdisk-standard-rwo"
+    else
+      cometbft_storage_class="premium-rwo"
+    fi
+
+    restore_pvc_from_snapshot "$namespace" "$cometbft_snapshot_name" "$cometbft_pvc_name" "$cometbft_storage_class"
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
