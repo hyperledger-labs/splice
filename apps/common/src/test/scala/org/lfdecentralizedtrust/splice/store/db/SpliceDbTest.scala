@@ -90,6 +90,8 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 update_history_backfilling,
                 acs_snapshot_data,
                 acs_snapshot,
+                scan_rewards_reference_store_active,
+                scan_rewards_reference_store_archived,
                 scan_verdict_store,
                 scan_verdict_transaction_view_store,
                 app_activity_record_store,

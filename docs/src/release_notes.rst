@@ -18,6 +18,116 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.5.16
+
+  - Daml
+
+    .. important::
+
+        **Action recommended from app devs:**
+
+        **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.17`` should recompile their Daml code
+        to link against ``splice-amulet >= 0.1.17`` in order to be ready to consume new field ``contractStateSchemaVersion`` added to ``AmuletRules``.
+
+        This is required because once the new fields are set, downgrades of `AmuletRules` will fail.
+        Note that the field will not be set automatically after this upgrade.
+        It is strongly recommended to avoid direct dependencies on amulet and replace them by dependencies through token standard interfaces.
+
+        No change is required for apps that build against the :ref:`token_standard`
+        or :ref:`featured_app_activity_markers_api`.
+
+    - Restrict ``AmuletConfig`` to not allow fees as part of `CIP 107 <https://github.com/canton-foundation/cips/blob/main/cip-0107/cip-0107.md>`_.
+      This has no functional effect as `CIP 78 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`_ set the fees to zero already.
+
+      This also disables the choice ``AmuletRules_ComputeFees`` as it always returned 0. Application providers that statically
+      link against ``splice-amulet`` will need to remove usages of this choice when recompiling against the new ``splice-amulet`` version.
+
+    - Support 24h signing delays for token standard CC transfers and allocations, see `CIP 107 <https://github.com/canton-foundation/cips/blob/main/cip-0107/cip-0107.md>`_.
+
+      - This change concerns the CC implementation of the token standard APIs,
+        so no change is required for clients of these APIs to make use of the
+        new 24h submission delay. However, Scan returns a slightly different choice
+        context, so make sure that your app passes that along opaquely.
+      - As part of this change additional constraints are imposed on ``AmuletConfig``. All of these constraints
+        are satisfied by the current configs on DevNet, TestNet and MainNet:
+
+        - CC usage fees can no longer be set to non-zero values. They were set to zero in CIP 78.
+
+        - ``extraFeaturedAppRewardAmount`` can no longer be set to a different value than ``featuredAppActivityMarkerAmount``.
+          Both of those are currently set to $1.
+
+        - The config schedule on ``AmuletRules`` can no longer contain ``futureValues``. The ability to do so through the UI was removed in CIP 51 but
+          in theory it would have still been possible to set this through internal APIs.
+
+      - This does change transaction structure, in particular, ``AmuletRules_Transfer`` is no longer a child node of the token standard operations and some other choices.
+        Token standard compliant history parsing should not require adjustments. However apps and wallets that parse the Splice choices directly may need to be adjusted.
+
+      - The check that the lock on a locked amulet expires before the underlying amulet
+        expires has been removed.
+
+    - ``TransferCommand`` is deprecated and will be removed in a future
+      version. It was originally introduced to support 24h signing
+      delays and is no longer required now that this is also available
+      through the token standard APIs. This also applies to the
+      corresponding validator APIs
+      ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+      and
+      ``/v0/admin/external-party/transfer-preapproval/submit-send``
+      which should be replaced by the :ref:`Token Standard APIs
+      <token_standard>`.
+
+    - Add missing validation of ``sv`` party to ``DsoRules_ClaimExpiredRewards``.
+
+    - Add missing TransferInstruction_Update choice for AmuletTransferInstruction to support expiry.
+
+    These Daml changes require an upgrade to the following Daml versions **before**
+    voting to set the transfer fees to zero:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.17
+    amuletNameService  0.1.18
+    dsoGovernance      0.1.23
+    validatorLifecycle 0.1.6
+    wallet             0.1.18
+    walletPayments     0.1.17
+    ================== =======
+
+  - Validator App
+
+    .. important::
+
+       The validator APIs ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+       and ``/v0/admin/external-party/transfer-preapproval/submit-send`` are deprecated and will be removed in a future version.
+       Replace any usages of validator API endpoints by calls to the :ref:`Token Standard APIs <token_standard>`.
+
+    - Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
+      in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
+      persisted scan connections from previous runs, removing the dependency on seedUrls
+      scan availability for successful reboots.
+
+  - Wallet UI
+
+    - Extend the `/development-fund` page to make active coupons visible to beneficiaries. Note: Beneficiaries cannot withdraw coupons.
+    - Update `/development-fund` page warning messages to reflect beneficiary visibility on active and historical coupons.
+
+  - Scan
+
+    - Improve the performance of ACS snapshot generation, reducing the magnitude of periodic spikes in database activity and avoiding log warnings about advisory locks.
+    - Add a new Grafana dashboard to monitor the progress of ACS snapshot generation.
+
+  - Infrastructure
+
+    - Update the JDK base image for all Splice and Canton images from 21.0.7 to 21.0.10 (Eclipse Temurin).
+      This includes a fix for `JDK-8347811 <https://bugs.openjdk.org/browse/JDK-8347811>`_, which caused incorrect detection of cgroup controllers on cgroupv2 hosts, potentially leading to the JVM ignoring container memory and CPU limits.
+
+  - Canton
+
+    - A new field `paid_traffic_cost` exposes the traffic cost paid by the node on completion events and update events
+      - On completions, the field contains the cost paid by the node for the submission of the transaction. May be 0 for failed transactions that did not incur any traffic cost.
+      - On updates, the field contains the cost paid by the node for the submission of the transaction, if available on this node and to the querying parties. In particular, the cost is only available on the submitting node and when querying with a filter that includes submitting parties. The cost is available for Daml transactions and re-assignments. Not for topology transactions.
+
 .. release-notes:: 0.5.15
 
   - Validator App
@@ -136,6 +246,7 @@
             The JSON API server remains compatible with specification files from all 3.4.x versions (e.g., 3.4.9).
 
       - Sequencer Inspection Service
+
         A new service is available on the Admin API of the sequencer.
         It provides an RPC that allows to query for traffic summaries of sequenced events.
         Refer to the `traffic documentation <https://docs.digitalasset.com/subnet/3.4/howtos/operate/traffic.html>`__ for more details.

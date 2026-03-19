@@ -28,7 +28,9 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.prettyString
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 
 class NodeInitializer(
     connection: TopologyAdminConnection & StatusAdminConnection,
@@ -109,39 +111,43 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     logger.info(s"Making sure canton node has an identity")
+    val emptyIdDeadline = new AtomicReference[Option[Deadline]](None)
     for {
       // If the node was started concurrently with the app, it might not immediately be responding, so we're
       // retrying the getId() call.
       // Note that Canton nodes enable their endpoints one at a time, and return NOT_IMPLEMENTED while an endpoint
       // is not yet enabled. E.g., even if a node returned something to a getStatus() request, it might still fail
       // a subsequent getId() request with NOT_IMPLEMENTED.
-      //
-      // Because initialized == uniqueIdentifier.isDefined, we cannot distinguish between:
-      //   (a) no ID has been set yet (node has fully booted and is waiting for an ID), and
-      //   (b) the node is still booting and hasn't yet loaded its previously-set ID.
-      // To disambiguate, we cross-check with the status endpoint:
 
       nodeId <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "node_id",
-        s"${connection.serviceName} answers the getId request with an ID or confirms uninitialized state",
+        s"${connection.serviceName} answers the getId request",
         connection.getIdOption().flatMap { result =>
           if (result.uniqueIdentifier.isDefined || result.initialized) {
             Future.successful(result)
           } else {
-            // No ID set yet according to GetId. Check the status endpoint to determine whether
-            // the node is genuinely waiting for an ID. If not we assume that it is still bootstrapping.
-            connection.getStatus.flatMap {
-              case NodeStatus.NotInitialized(_, Some(WaitingForId)) =>
-                Future.successful(result)
-              case status =>
+            // currently we don't have a mechanism to distinguish between the following 2 states.
+            //    a. a participant that has completed bootstrapping and waiting for the validator to set a new Id
+            //    b. a participant that is still bootstrapping, and not yet set its Id from the db
+            // as a (temporary) work around, if participant has no id set, we retry getId for a maximum of 5s duration
+            // we chose 5s, because, according to logs, 5s is enough for the participant to set its id, if it already has one
+            // TODO(hyperledger-labs/splice#4508): this shouldn't be required once we have a Canton fix
+            val currentDeadlineOpt = emptyIdDeadline.updateAndGet {
+              case None => Some(5.seconds.fromNow) // Start clock now
+              case existing => existing
+            }
+            currentDeadlineOpt match {
+              case Some(deadline) if deadline.hasTimeLeft() =>
                 Future.failed(
                   Status.UNAVAILABLE
                     .withDescription(
-                      s"Node is still bootstrapping (status: $status). Retrying getId..."
+                      s"Node returned empty ID. Retrying to ensure it is not still bootstrapping... (Time left: ${deadline.timeLeft.toMillis}ms)"
                     )
                     .asRuntimeException()
                 )
+              case _ =>
+                Future.successful(result)
             }
           }
         },
