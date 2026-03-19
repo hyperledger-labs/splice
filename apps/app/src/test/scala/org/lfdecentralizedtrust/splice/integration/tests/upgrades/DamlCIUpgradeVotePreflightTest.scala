@@ -6,11 +6,12 @@ import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.SvUiPreflightIntegrationTestUtil
 import org.lfdecentralizedtrust.splice.util.SvFrontendTestUtil
 import org.openqa.selenium.By
-import org.openqa.selenium.support.ui.Select
 
 import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
+
 import scala.collection.parallel.CollectionConverters.*
+import scala.jdk.CollectionConverters.*
 
 /** This test should run after a cluster has been upgraded, and will vote for new daml versions.
   * Note that it needs to run on the commit of the upgrade, so that DarResources.*_current points to the latest version.
@@ -45,54 +46,90 @@ class DamlCIUpgradeVotePreflightTest
       val walletPayments_current = DarResources.walletPayments_current.metadata.version
       val validatorLifecycle_current = DarResources.validatorLifecycle_current.metadata.version
 
+      val formPrefix = "set-amulet-config-rules"
       val now = Instant.now()
+      val dateTimeFormat = DateTimeFormatter
+        .ofPattern("yyyy-MM-dd HH:mm")
+        .withZone(ZoneOffset.UTC)
 
       clue(s"sv1 create vote request") {
         withWebUiSv("sv1") { implicit webDriver =>
           eventuallyClickOn(id("navlink-governance"))
-          val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-          dropDownAction.selectByValue("CRARC_SetConfig")
 
-          eventuallyClickOn(id("action-change-dialog-proceed"))
+          eventuallyClickOn(id("initiate-proposal-button"))
+
+          clue("select action and click next") {
+            eventually() {
+              val actionDropdown = webDriver.findElement(By.id("select-action"))
+              actionDropdown.click()
+            }
+            eventually() {
+              val actionOption =
+                webDriver.findElement(By.cssSelector("[data-testid='CRARC_SetConfig']"))
+              actionOption.click()
+            }
+            eventually() {
+              click on id("next-button")
+            }
+          }
+
+          eventually() {
+            find(id(s"$formPrefix-summary")) should not be empty
+          }
 
           // 20m to be effective so as to give enough time to upgrade the SV and Validator runbooks.
-          // The expiration doesn't matter so as long as it's enough for SVs to vote, but it needs to be less than the effective date.
-          Seq(
-            "datetime-picker-vote-request-effectivity" -> 20L,
-            "datetime-picker-vote-request-expiration" -> 5L,
-          ).foreach { case (picker, minutes) =>
-            setDateTime(
-              "sv1",
-              picker,
-              DateTimeFormatter
-                .ofPattern("yyyy-MM-dd HH:mm")
-                .withZone(ZoneOffset.UTC)
-                .format(now.plusSeconds(60L * minutes)),
-            )
-          }
-
-          inside(find(id("create-reason-summary"))) { case Some(element) =>
-            element.underlying.sendKeys("Upgrading DARs to latest version.")
-          }
-          inside(find(id("create-reason-url"))) { case Some(element) =>
-            element.underlying.sendKeys("https://example.com")
-          }
+          // The expiration needs to be enough for SVs to vote, but less than the effective date.
+          setExpiryDate(
+            "sv1",
+            formPrefix,
+            dateTimeFormat.format(now.plusSeconds(60L * 5)),
+          )
+          setEffectiveDate(
+            "sv1",
+            formPrefix,
+            dateTimeFormat.format(now.plusSeconds(60L * 20)),
+          )
 
           Seq(
-            "amulet" -> amulet_current,
-            "amuletNameService" -> amuletNameService_current,
-            "dsoGovernance" -> dsoGovernance_current,
-            "validatorLifecycle" -> validatorLifecycle_current,
-            "wallet" -> wallet_current,
-            "walletPayments" -> walletPayments_current,
-          ).foreach { case (inputSuffix, version) =>
-            val input = find(id(s"packageConfig.$inputSuffix-value")).value.underlying
-            input.clear()
-            input.sendKeys(version.toString)
+            "packageConfigAmulet" -> amulet_current,
+            "packageConfigAmuletNameService" -> amuletNameService_current,
+            "packageConfigDsoGovernance" -> dsoGovernance_current,
+            "packageConfigValidatorLifecycle" -> validatorLifecycle_current,
+            "packageConfigWallet" -> wallet_current,
+            "packageConfigWalletPayments" -> walletPayments_current,
+          ).foreach { case (fieldName, version) =>
+            eventually() {
+              val input =
+                webDriver.findElement(By.cssSelector(s"[data-testid='config-field-$fieldName']"))
+              input.clear()
+              input.sendKeys(version.toString)
+            }
+          }
+
+          eventually() {
+            inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
+              element.underlying.sendKeys("Upgrading DARs to latest version.")
+            }
+          }
+          eventually() {
+            inside(find(id(s"$formPrefix-url"))) { case Some(element) =>
+              element.underlying.sendKeys("https://example.com")
+            }
           }
 
           clue("sv1 creates the vote request") {
-            clickVoteRequestSubmitButtonOnceEnabled()
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              submitButton.click()
+            }
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              submitButton.getText shouldBe "Submit Proposal"
+            }
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              submitButton.click()
+            }
           }
         }
       }
@@ -101,30 +138,47 @@ class DamlCIUpgradeVotePreflightTest
         val svsF = Seq("sv2", "sv3", "svda1").map(withWebUiSv[Unit]) :+ withWebUiSvRunbook[Unit]
         svsF.par.foreach { svF =>
           svF { implicit webDriver =>
+            eventuallyClickOn(id("navlink-governance"))
+
             eventuallySucceeds() {
-              eventuallyClickOn(id("navlink-governance"))
-              eventuallyClickOn(id("tab-panel-action-needed"))
-              eventuallyClickOn(className("vote-row-action"))
+              find(
+                cssSelector("[data-testid='action-required-section']")
+              ) should not be empty withClue "'Action Required' section"
+              val actionsRequired =
+                webDriver.findElements(
+                  By.cssSelector("[data-testid='action-required-view-details']")
+                )
+              actionsRequired.size should be > 0
+              actionsRequired.asScala.head.click()
             }
-            eventuallyClickOn(id("cast-vote-button"))
-            eventuallyClickOn(id("accept-vote-button"))
-            eventuallyClickOn(id("save-vote-button"))
-            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
+
+            eventuallySucceeds() {
+              find(
+                cssSelector("[data-testid='your-vote-reason-input']")
+              ) should not be empty withClue "vote 'Reason' textfield"
+            }
+            click on cssSelector("[data-testid='your-vote-accept']")
+
+            clue("wait for the vote submission success message") {
+              eventuallySucceeds() {
+                inside(find(cssSelector("[data-testid='vote-submission-success']"))) {
+                  case Some(element) =>
+                    element.text shouldBe "Vote successfully updated!"
+                }
+              }
+            }
           }
         }
       }
 
-      clue("The request is displayed in the in progress section") {
+      clue("The request is displayed in the inflight votes section") {
         withWebUiSv("sv1") { implicit webDriver =>
           eventuallyClickOn(id("navlink-governance"))
-          eventuallyClickOn(id("tab-panel-in-progress"))
 
-          val tbody = find(id("sv-voting-in-progress-table-body"))
-          inside(tbody) { case Some(tb) =>
-            eventually() {
-              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size shouldBe 1
-            }
+          eventually() {
+            val proposals =
+              webDriver.findElements(By.cssSelector("[data-testid='inflight-proposals-row']"))
+            proposals.size shouldBe 1
           }
         }
       }
