@@ -893,6 +893,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$SEQUENCER_CLIENT_DELAY_THRESHOLD_SECONDS',
               monitoringConfig.alerting.alerts.sequencerClientDelay.seconds.toString()
             ),
+            'acs_commitment_alerts.yaml': readGrafanaAlertingFile('acs_commitment_alerts.yaml')
+              .replace(
+                '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
+              )
+              .replace(
+                '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
+              ),
             'sequencer_connection_pool_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_connection_pool_alerts.yaml'
             ),
