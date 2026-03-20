@@ -25,6 +25,18 @@ import Splice.Util
 
 import DA.Exception
 
+
+data ExternalPartyAmuletRules_ExpireAmuletAllocationInput = ExternalPartyAmuletRules_ExpireAmuletAllocationInput
+  with
+    allocationCid : ContractId AmuletAllocation
+    expireLock : Bool
+  deriving (Eq, Show)
+
+data ExternalPartyAmuletRules_ExpireAmuletAllocationsResult = ExternalPartyAmuletRules_ExpireAmuletAllocationsResult
+  with
+    results : [AmuletAllocation_DsoExpireResult]
+  deriving (Eq, Show)
+
 -- | Rules contract that can be used in transactions that require signatures
 -- from an external party. This is intended to get archived and recreated as rarely as possible
 -- to support long delays between preparing and signing a transaction.
@@ -33,6 +45,26 @@ template ExternalPartyAmuletRules
     dso : Party
   where
     signatory dso
+
+    nonconsuming choice ExternalPartyAmuletRules_ExpireAmuletAllocations : ExternalPartyAmuletRules_ExpireAmuletAllocationsResult
+      with
+        expectedDso : Party
+        inputs : [ExternalPartyAmuletRules_ExpireAmuletAllocationInput]
+        observers : [Party]
+      observer observers
+      controller dso
+      do
+        require ("expectedDso " <> show expectedDso <> " matches the dsoParty " <> show dso) (expectedDso == dso)
+
+        individualResults <- forA inputs $ \input -> do
+          alloc <- fetchButArchiveLater (ForDso with dso) input.allocationCid
+          require "The dsoParty must be the admin of the allocation's instrument" (alloc.allocation.transferLeg.instrumentId.admin == dso)
+
+          exercise input.allocationCid AmuletAllocation_DsoExpire with
+            expireLock = input.expireLock
+
+        pure ExternalPartyAmuletRules_ExpireAmuletAllocationsResult with
+          results = individualResults
 
     -- This choice is not guarded by any resource consumption other than the traffic required to pay for the submission of the exercising of this choice.
     -- If this is being abused the DSO party can blacklist (or rate limit) the submitting participant node.

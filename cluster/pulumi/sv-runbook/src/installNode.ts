@@ -4,7 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   ChartValues,
   config,
   exactNamespace,
@@ -190,7 +190,7 @@ type SvConfig = {
   xns: ExactNamespace;
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig;
   onboarding?: ExpectedValidatorOnboarding;
-  backupConfig?: BackupConfig;
+  backupConfig?: BucketConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
@@ -275,6 +275,7 @@ async function installSvAndValidator(
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     ...commonSvAppValues,
+    participantAddress: canton.participant.internalClusterAddress,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
@@ -370,6 +371,7 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
+    participantAddress: canton.participant.internalClusterAddress,
     metrics: {
       enable: true,
     },
@@ -429,6 +431,7 @@ async function installSvAndValidator(
         TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       }
     ),
+    participantAddress: canton.participant.internalClusterAddress,
     metrics: {
       enable: true,
     },

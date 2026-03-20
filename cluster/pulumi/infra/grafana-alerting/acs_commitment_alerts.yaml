@@ -1,0 +1,122 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: acs commitment checkpoint delay
+      folder: canton
+      interval: 1m
+      rules:
+        - uid: ffghab4ms1ds0b
+          title: ACS Commitment Checkpoint Delay
+          condition: acs commitment checkpoint delay threshold exceeded
+          data:
+            - refId: acs commitment checkpoint delay
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_locally_checkpointed) - (daml_participant_sync_commitments_last_locally_checkpointed > 0) / 1e6)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: acs commitment checkpoint delay
+            - refId: acs commitment checkpoint delay threshold exceeded
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - $ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: acs commitment checkpoint delay
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: acs commitment checkpoint delay threshold exceeded
+                type: threshold
+          dashboardUid: eesa90lstfk00b
+          panelId: 11
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: eesa90lstfk00b
+            __panelId__: "11"
+            severity: critical
+            summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} is reporting an ACS commitment checkpoint delay
+          labels: {}
+          isPaused: false
+    - orgId: 1
+      name: acs commitment delay
+      folder: canton
+      interval: 1m
+      rules:
+        - uid: ffghab4ms1ds0c
+          title: ACS Commitment Delay
+          condition: acs commitment delay threshold exceeded
+          data:
+            - refId: acs commitment delay
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_locally_completed) - (daml_participant_sync_commitments_last_locally_completed > 0) / 1e6)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: acs commitment delay
+            - refId: acs commitment delay threshold exceeded
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - $ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: acs commitment delay
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: acs commitment delay threshold exceeded
+                type: threshold
+          dashboardUid: eesa90lstfk00b
+          panelId: 10
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: eesa90lstfk00b
+            __panelId__: "10"
+            severity: critical
+            summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} is reporting an ACS commitment delay
+          labels: {}
+          isPaused: false
