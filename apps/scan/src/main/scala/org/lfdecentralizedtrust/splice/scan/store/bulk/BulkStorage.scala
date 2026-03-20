@@ -17,73 +17,88 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection, UpdateHistory}
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 
 class BulkStorage(
-    storageConfig: ScanStorageConfig,
-    appConfig: BulkStorageConfig,
-    acsSnapshotStore: AcsSnapshotStore,
-    updateHistory: UpdateHistory,
-    currentMigrationId: Long,
-    kvProvider: ScanKeyValueProvider,
-    metricsFactory: LabeledMetricsFactory,
-    automationConfig: AutomationConfig,
-    backoffClock: Clock,
+    val acsSnapshotBulkStorage: Option[AcsSnapshotBulkStorage],
+    val updateHistoryBulkStorage: Option[UpdateHistoryBulkStorage],
+    services: Seq[PekkoRetryingService[?]],
     override protected val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext, tracer: Tracer)
-    extends NamedLogging
+) extends NamedLogging
     with FlagCloseableAsync
     with RetryProvider.Has {
 
-  private val acsSnapshots: AtomicReference[Option[AcsSnapshotBulkStorage]] = new AtomicReference(
-    None
-  )
-  private val updateHistoryBulkStorage: AtomicReference[Option[UpdateHistoryBulkStorage]] =
-    new AtomicReference(
-      None
-    )
-
-  def getAcsSnapshotBulkStorage: Option[AcsSnapshotBulkStorage] = acsSnapshots.get()
-  def getUpdateHistoryBulkStorage: Option[UpdateHistoryBulkStorage] = updateHistoryBulkStorage.get()
-
-  private val services = appConfig.s3.fold {
-    logger.debug("s3 connection not configured, not dumping to bulk storage")
-    Seq.empty[PekkoRetryingService[?]]
-  } { s3Config =>
-    val s3Connection = S3BucketConnection(s3Config, loggerFactory)
-    val historyMetrics = HistoryMetrics(metricsFactory, currentMigrationId)
-
-    val acs = new AcsSnapshotBulkStorage(
-      storageConfig,
-      appConfig,
-      acsSnapshotStore,
-      updateHistory,
-      s3Connection,
-      kvProvider,
-      historyMetrics,
-      loggerFactory,
-    )
-    acsSnapshots.set(Some(acs))
-    val updates = new UpdateHistoryBulkStorage(
-      storageConfig,
-      appConfig,
-      updateHistory,
-      kvProvider,
-      currentMigrationId,
-      s3Connection,
-      historyMetrics,
-      loggerFactory,
-    )
-    updateHistoryBulkStorage.set(Some(updates))
-
-    Seq(
-      acs.asRetryableService(automationConfig, backoffClock, retryProvider),
-      updates.asRetryableService(automationConfig, backoffClock, retryProvider),
-    )
-  }
   final override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     services.flatMap(_.closeAsync())
+  }
+}
+
+object BulkStorage {
+  def apply(
+      storageConfig: ScanStorageConfig,
+      appConfig: BulkStorageConfig,
+      acsSnapshotStore: AcsSnapshotStore,
+      updateHistory: UpdateHistory,
+      currentMigrationId: Long,
+      kvProvider: ScanKeyValueProvider,
+      metricsFactory: LabeledMetricsFactory,
+      automationConfig: AutomationConfig,
+      backoffClock: Clock,
+      retryProvider: RetryProvider,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      actorSystem: ActorSystem,
+      tc: TraceContext,
+      ec: ExecutionContext,
+      tracer: Tracer,
+  ): BulkStorage = {
+    val logger = loggerFactory.getTracedLogger(classOf[BulkStorage])
+
+    appConfig.s3.fold {
+      logger.debug("s3 connection not configured, not dumping to bulk storage")(tc)
+      new BulkStorage(
+        acsSnapshotBulkStorage = None,
+        updateHistoryBulkStorage = None,
+        services = Seq.empty,
+        retryProvider = retryProvider,
+        loggerFactory = loggerFactory,
+      )
+    } { s3Config =>
+      val s3Connection = S3BucketConnection(s3Config, loggerFactory)
+      val historyMetrics = HistoryMetrics(metricsFactory, currentMigrationId)
+
+      val acs = new AcsSnapshotBulkStorage(
+        storageConfig,
+        appConfig,
+        acsSnapshotStore,
+        updateHistory,
+        s3Connection,
+        kvProvider,
+        historyMetrics,
+        loggerFactory,
+      )
+      val updates = new UpdateHistoryBulkStorage(
+        storageConfig,
+        appConfig,
+        updateHistory,
+        kvProvider,
+        currentMigrationId,
+        s3Connection,
+        historyMetrics,
+        loggerFactory,
+      )
+
+      new BulkStorage(
+        acsSnapshotBulkStorage = Some(acs),
+        updateHistoryBulkStorage = Some(updates),
+        services = Seq(
+          acs.asRetryableService(automationConfig, backoffClock, retryProvider),
+          updates.asRetryableService(automationConfig, backoffClock, retryProvider),
+        ),
+        retryProvider = retryProvider,
+        loggerFactory = loggerFactory,
+      )
+    }
   }
 }

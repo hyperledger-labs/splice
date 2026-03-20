@@ -2339,7 +2339,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
       val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeTimestamp)
-      bulkStorage.getAcsSnapshotBulkStorage.fold(
+      bulkStorage.acsSnapshotBulkStorage.fold(
         Future.failed[ScanResource.GetBulkAcsSnapshotResponse](
           new UnsupportedOperationException("Bulk storage is not configured")
         )
