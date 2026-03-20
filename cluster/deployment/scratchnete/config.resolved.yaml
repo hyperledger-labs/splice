@@ -35,6 +35,11 @@ initialRound: 0
 monitoring:
   alerting:
     alerts:
+      acsCommitments:
+        checkpointDelay:
+          seconds: 600
+        completedDelay:
+          seconds: 3600
       cloudSql:
         maintenance: false
       cometbft:

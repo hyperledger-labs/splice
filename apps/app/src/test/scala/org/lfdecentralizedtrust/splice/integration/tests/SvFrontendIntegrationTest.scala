@@ -315,16 +315,16 @@ class SvFrontendIntegrationTest
       }
     }
 
-    def loginToGovernanceBeta(uiPort: Int, ledgerApiUser: String)(implicit
+    def loginToGovernance(uiPort: Int, ledgerApiUser: String)(implicit
         webDriver: WebDriverType
     ): Unit =
       actAndCheck(
-        "operator can login and browse to the beta governance tab", {
+        "operator can login and browse to the governance page", {
           go to s"http://localhost:$uiPort/governance"
           loginOnCurrentPage(uiPort, ledgerApiUser)
         },
       )(
-        "can see the beta governance page",
+        "can see the governance page",
         _ =>
           eventuallySucceeds() {
             find(
@@ -547,7 +547,7 @@ class SvFrontendIntegrationTest
       val requestReasonBody = "This is a summary of the proposal"
 
       val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>
-        loginToGovernanceBeta(sv1UIPort, sv1Backend.config.ledgerApiUser)
+        loginToGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
         selectActionAndNavigateToForm(action, formPrefix)
         fillAndSubmitProposalForm(
           formPrefix,
@@ -598,7 +598,7 @@ class SvFrontendIntegrationTest
           )
 
           eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
 
           val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
             "sv1 operator can create a new vote request", {
@@ -611,7 +611,7 @@ class SvFrontendIntegrationTest
                   element.underlying.click()
                 }
               } else {
-                setEffectiveDate("sv1", effectiveDate)
+                setLegacyEffectiveDate("sv1", effectiveDate)
               }
 
               inside(find(id("create-reason-url"))) { case Some(element) =>
@@ -626,9 +626,9 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              setExpirationDate("sv1", expirationDate)
+              setLegacyExpiryDate("sv1", expirationDate)
 
-              clickVoteRequestSubmitButtonOnceEnabled()
+              clickLegacyVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -899,7 +899,7 @@ class SvFrontendIntegrationTest
           )
 
           eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
 
           actAndCheck(
             "sv1 operator can create a new vote request", {
@@ -918,7 +918,7 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              clickVoteRequestSubmitButtonOnceEnabled()
+              clickLegacyVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -974,7 +974,7 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              clickVoteRequestSubmitButtonOnceEnabled()
+              clickLegacyVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -1002,7 +1002,7 @@ class SvFrontendIntegrationTest
               enabled: Boolean = true,
           ): Unit = {
             // The `eventually` guards against `StaleElementReferenceException`s
-            // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
+            // eventually() must contain clickLegacyVoteRequestSubmitButtonOnceEnabled() to retry the whole process
             eventually() {
               changeAction("SRARC_SetConfig")
 
@@ -1023,7 +1023,7 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              clickVoteRequestSubmitButtonOnceEnabled(enabled)
+              clickLegacyVoteRequestSubmitButtonOnceEnabled(enabled)
             }
           }
 
@@ -1095,7 +1095,7 @@ class SvFrontendIntegrationTest
           )
 
           eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
 
           clue("Pausing vote request expiration automation") {
             sv1Backend.dsoDelegateBasedAutomation
@@ -1237,9 +1237,9 @@ class SvFrontendIntegrationTest
           )
 
           eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
           eventuallyClickOn(id("tab-panel-rejected"))
-          val previousVoteRequestsRejected = getVoteRequestsRejectedSize()
+          val previousVoteRequestsRejected = getLegacyVoteRequestsRejectedSize()
 
           clue("Pausing vote request expiration automation") {
             sv1Backend.dsoDelegateBasedAutomation
@@ -1332,7 +1332,7 @@ class SvFrontendIntegrationTest
           )
 
           eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
 
           actAndCheck(
             "sv1 operator can create a new vote request", {
@@ -1355,7 +1355,7 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              clickVoteRequestSubmitButtonOnceEnabled()
+              clickLegacyVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -1410,7 +1410,7 @@ class SvFrontendIntegrationTest
       val effectiveDate = "2099-01-31 00:12"
 
       assertCreateProposal("SRARC_OffboardSv", "offboard-sv", false) { implicit webDriver =>
-        setBetaEffectiveDate("sv1", "offboard-sv", effectiveDate)
+        setEffectiveDate("sv1", "offboard-sv", effectiveDate)
 
         eventually() {
           val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
@@ -1517,7 +1517,7 @@ class SvFrontendIntegrationTest
     }
   }
 
-  def getVoteRequestsInProgressSize()(implicit webDriver: WebDriverType) = {
+  def getLegacyVoteRequestsInProgressSize()(implicit webDriver: WebDriverType) = {
     val tbodyInProgress = find(id("sv-voting-in-progress-table-body"))
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
@@ -1532,7 +1532,7 @@ class SvFrontendIntegrationTest
     webDriver.findElements(By.cssSelector("[data-testid='action-required-view-details']"))
   }
 
-  def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
+  def getLegacyVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
     eventuallyFindAll(className("vote-row-action")).toSeq.size
   }
 

@@ -1922,7 +1922,7 @@
           "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

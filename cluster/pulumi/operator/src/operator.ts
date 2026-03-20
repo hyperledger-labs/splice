@@ -23,8 +23,8 @@ const secretName = (
 ).metadata.name;
 
 // If the operator version is updated the crd version might need to be upgraded as well, check the release notes https://github.com/pulumi/pulumi-kubernetes-operator/releases
-const operatorVersion = '2.4.1';
-const operatorCrdVersion = '2.4.1';
+const operatorVersion = '2.6.0';
+const operatorCrdVersion = '2.6.0';
 
 export const operator = new k8s.helm.v3.Release(
   'pulumi-kubernetes-operator',

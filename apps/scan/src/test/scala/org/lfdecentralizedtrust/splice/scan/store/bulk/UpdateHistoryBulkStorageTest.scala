@@ -84,10 +84,10 @@ class UpdateHistoryBulkStorageTest
           new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
           loggerFactory,
         )
-        .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
+        .toMat(TestSink.probe[Seq[String]])(Keep.right)
         .run()
 
-      probe.request(3)
+      probe.request(1)
 
       clue(
         "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
@@ -96,22 +96,12 @@ class UpdateHistoryBulkStorageTest
       }
 
       clue(
-        "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
+        "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the object keys"
       ) {
         mockStore.mockIngestion(1000)
-        probe.expectNext(20.seconds) should be(
-          UpdateHistorySegmentBulkStorage.Output(
-            segment,
-            "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
-            isLastObjectInSegment = false,
-          )
-        )
-        probe.expectNext(20.seconds) should be(
-          UpdateHistorySegmentBulkStorage.Output(
-            segment,
-            "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
-            isLastObjectInSegment = true,
-          )
+        probe.expectNext(20.seconds) should contain theSameElementsInOrderAs Seq(
+          "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_0.zstd",
+          "1970-01-01T00:00:00.100Z-Migration-0-1970-01-01T00:00:02.300Z/updates_1.zstd",
         )
         probe.expectComplete()
         val objectCountMetrics = metricsFactory.metrics.counters
@@ -181,10 +171,10 @@ class UpdateHistoryBulkStorageTest
               new HistoryMetrics(metricsFactory)(MetricsContext.Empty),
               loggerFactory,
             )
-            .toMat(TestSink.probe[UpdateHistorySegmentBulkStorage.Output])(Keep.right)
+            .toMat(TestSink.probe[Seq[String]])(Keep.right)
             .run()
           probe.request(1)
-
+          probe.expectNext(20.seconds) should be(empty)
           probe.expectComplete()
         },
         logEntries =>

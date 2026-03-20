@@ -4,8 +4,8 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
   Auth0Client,
-  BackupConfig,
-  BackupLocation,
+  BucketConfig,
+  BucketLocation,
   BootstrappingDumpConfig,
   CnInput,
   config,
@@ -33,8 +33,8 @@ interface DsoArgs {
   auth0Client: Auth0Client;
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
   isDevNet: boolean;
-  periodicBackupConfig?: BackupConfig;
-  identitiesBackupLocation: BackupLocation;
+  periodicBackupConfig?: BucketConfig;
+  identitiesBackupLocation: BucketLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
