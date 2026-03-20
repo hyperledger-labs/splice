@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.topology.SynchronizerId
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   DarResource,
@@ -17,9 +18,32 @@ import org.lfdecentralizedtrust.splice.util.UploadablePackage
 
 class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
 
+  private val extraPackagesToUnvet: Seq[DarResource] = Seq(
+    DarResources.wallet_0_1_15
+  )
+
+  private val supportedPackagesToUnvet: Map[String, Set[String]] =
+    extraPackagesToUnvet
+      .groupBy(_.metadata.name)
+      .map { case (name, resources) => name -> resources.map(_.metadata.version.toString).toSet }
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            additionalPackagesToUnvet = supportedPackagesToUnvet
+          )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_(
+          _.copy(
+            additionalPackagesToUnvet = supportedPackagesToUnvet
+          )
+        )(config)
+      )
 
   "Unsupported vetted packages are automatically removed by the package vetting trigger for SV and validator" in {
     implicit env =>
@@ -35,13 +59,13 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
         sv1Backend.appState.participantAdminConnection,
         synchronizerId,
         unsupportedDarsToVet,
-        unsupportedDarsToVet,
+        unsupportedDarsToVet ++ extraPackagesToUnvet,
       )
       test(
         sv1ValidatorBackend.appState.participantAdminConnection,
         synchronizerId,
         unsupportedDarsToVet,
-        unsupportedDarsToVet,
+        unsupportedDarsToVet ++ extraPackagesToUnvet,
       )
       // See https://github.com/DACH-NY/canton/issues/29834: set darsUnvettedByAutomation when unvetting works on non-sv validators
       test(

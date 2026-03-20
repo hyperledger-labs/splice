@@ -49,20 +49,15 @@ object DarResourcesUtil {
       .distinct
   }
 
-  def filterUnsupportedPackageVersions(packageIds: Seq[LfPackageId]): Seq[DarResource] = {
-    val unsupportedDarResources = packageIds
-      .diff(supportedPackageVersions.map(_.packageId))
+  def filterUnsupportedPackageVersions(
+      vettedPackageIds: Seq[LfPackageId],
+      additionalPackageIdsToUnvet: Seq[LfPackageId],
+  ): Seq[DarResource] = {
+    val allSupportedVersions =
+      supportedPackageVersions.map(_.packageId).diff(additionalPackageIdsToUnvet)
+    vettedPackageIds
+      .diff(allSupportedVersions)
       .flatMap(pkg => pkgIdToDarResource.get(pkg))
-    unsupportedDarResources.filter(pkg =>
-      packageResources
-        .find(_.latest.metadata.name == pkg.metadata.name)
-        .getOrElse(
-          throw new NoSuchElementException(s"Could not find PackageResource ${pkg.metadata.name}.")
-        )
-        .minimumInitialization
-        .metadata
-        .version > pkg.metadata.version
-    )
   }
 
   private val supportedPackageVersions: Seq[DarResource] =

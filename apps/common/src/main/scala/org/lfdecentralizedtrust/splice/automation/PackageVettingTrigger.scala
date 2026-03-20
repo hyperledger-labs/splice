@@ -3,9 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
+import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, DarResourcesUtil, PackageVetting}
@@ -19,6 +21,7 @@ abstract class PackageVettingTrigger(
     latestPackagesOnly: Boolean,
     enableUnvetting: Boolean,
     enableUnsupportedDarsUnvetting: Boolean,
+    additionalPackagesToUnvet: Map[String, Set[String]],
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
@@ -66,8 +69,11 @@ abstract class PackageVettingTrigger(
         domainId,
         AuthorizedState,
       )
+      vettedPackageIds = vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
+      additionalPackageIdsToUnvet = resolvePackageIdsToUnvet(additionalPackagesToUnvet)
       unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
-        vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
+        vettedPackageIds,
+        additionalPackageIdsToUnvet,
       )
       isUnvettingEnable =
         unsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
@@ -95,4 +101,24 @@ abstract class PackageVettingTrigger(
       Future.unit
     }
   }
+
+  private def resolvePackageIdsToUnvet(additionalPackagesToUnvet: Map[String, Set[String]])(implicit
+      tc: TraceContext
+  ): Seq[LfPackageId] =
+    additionalPackagesToUnvet.toSeq.flatMap { case (packageName, versions) =>
+      versions.toSeq.flatMap { version =>
+        DarResourcesUtil.lookupPackageMetadata(
+          PackageName.assertFromString(packageName),
+          PackageVersion.assertFromString(version),
+        ) match {
+          case None =>
+            logger.warn(
+              s"Package $packageName version $version requested for unvetting is not uploaded on this node."
+            )
+            None
+          case Some(resource) =>
+            Some(LfPackageId.assertFromString(resource.packageId))
+        }
+      }
+    }
 }

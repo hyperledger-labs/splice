@@ -80,6 +80,7 @@ class ValidatorAutomationService(
     params: SpliceParametersConfig,
     latestPackagesOnly: Boolean,
     enabledFeatures: EnabledFeaturesConfig,
+    additionalPackagesToUnvet: Map[String, Set[String]],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -244,6 +245,7 @@ class ValidatorAutomationService(
       latestPackagesOnly,
       svValidator,
       enabledFeatures.enableUnsupportedDarsUnvetting,
+      additionalPackagesToUnvet,
     )
   )
 
