@@ -287,7 +287,10 @@ class AcsSnapshotStore(
       }
       end = snapshot.lastRowId
       partyIdsFilter = partyIds match {
-        case Nil => sql""
+        case Nil =>
+          // This expression is always true (scan only processes data where the DSO is stakeholder).
+          // It is included to make sure the query plan uses the right index (acs_snapshot_data_all_filters)
+          sql"and stakeholder = ${dsoParty}"
         case partyIds =>
           (sql" and " ++ inClause("stakeholder", partyIds)).toActionBuilder
       }

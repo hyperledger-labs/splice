@@ -9,12 +9,12 @@ import {
 } from '../common/src/dump-config-common';
 
 async function main() {
-  initDumpConfig();
+  await initDumpConfig();
   const installNode = await import('./src/installNode');
 
   const secrets = new SecretsFixtureMap();
 
-  installNode.installNode({
+  await installNode.installNode({
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
     getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
@@ -24,4 +24,7 @@ async function main() {
   });
 }
 
-main();
+main().catch(e => {
+  console.error(e.stack ?? e.message ?? e);
+  process.exit(1);
+});
