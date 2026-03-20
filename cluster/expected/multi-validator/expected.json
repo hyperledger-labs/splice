@@ -332,7 +332,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -780,7 +780,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -1228,7 +1228,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -1676,7 +1676,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -2124,7 +2124,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -2496,7 +2496,7 @@
       "apiVersion": "v1",
       "kind": "PersistentVolumeClaim",
       "metadata": {
-        "name": "multi-validator-0-domain-migration-pvc",
+        "name": "multi-validator-0-domain-migration-hd-pvc",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2508,7 +2508,7 @@
             "storage": "20G"
           }
         },
-        "storageClassName": "standard-rwo"
+        "storageClassName": "hyperdisk-standard-rwo"
       }
     },
     "name": "multi-validator-0-domain-migration-pvc",
@@ -2598,7 +2598,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -2857,7 +2857,7 @@
               {
                 "name": "domain-upgrade-dump-volume",
                 "persistentVolumeClaim": {
-                  "claimName": "multi-validator-0-domain-migration-pvc"
+                  "claimName": "multi-validator-0-domain-migration-hd-pvc"
                 }
               }
             ]
@@ -2949,7 +2949,7 @@
       "apiVersion": "v1",
       "kind": "PersistentVolumeClaim",
       "metadata": {
-        "name": "multi-validator-1-domain-migration-pvc",
+        "name": "multi-validator-1-domain-migration-hd-pvc",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2961,7 +2961,7 @@
             "storage": "20G"
           }
         },
-        "storageClassName": "standard-rwo"
+        "storageClassName": "hyperdisk-standard-rwo"
       }
     },
     "name": "multi-validator-1-domain-migration-pvc",
@@ -3051,7 +3051,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -3310,7 +3310,7 @@
               {
                 "name": "domain-upgrade-dump-volume",
                 "persistentVolumeClaim": {
-                  "claimName": "multi-validator-1-domain-migration-pvc"
+                  "claimName": "multi-validator-1-domain-migration-hd-pvc"
                 }
               }
             ]
@@ -3402,7 +3402,7 @@
       "apiVersion": "v1",
       "kind": "PersistentVolumeClaim",
       "metadata": {
-        "name": "multi-validator-2-domain-migration-pvc",
+        "name": "multi-validator-2-domain-migration-hd-pvc",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -3414,7 +3414,7 @@
             "storage": "20G"
           }
         },
-        "storageClassName": "standard-rwo"
+        "storageClassName": "hyperdisk-standard-rwo"
       }
     },
     "name": "multi-validator-2-domain-migration-pvc",
@@ -3504,7 +3504,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -3763,7 +3763,7 @@
               {
                 "name": "domain-upgrade-dump-volume",
                 "persistentVolumeClaim": {
-                  "claimName": "multi-validator-2-domain-migration-pvc"
+                  "claimName": "multi-validator-2-domain-migration-hd-pvc"
                 }
               }
             ]
@@ -3855,7 +3855,7 @@
       "apiVersion": "v1",
       "kind": "PersistentVolumeClaim",
       "metadata": {
-        "name": "multi-validator-3-domain-migration-pvc",
+        "name": "multi-validator-3-domain-migration-hd-pvc",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -3867,7 +3867,7 @@
             "storage": "20G"
           }
         },
-        "storageClassName": "standard-rwo"
+        "storageClassName": "hyperdisk-standard-rwo"
       }
     },
     "name": "multi-validator-3-domain-migration-pvc",
@@ -3957,7 +3957,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -4216,7 +4216,7 @@
               {
                 "name": "domain-upgrade-dump-volume",
                 "persistentVolumeClaim": {
-                  "claimName": "multi-validator-3-domain-migration-pvc"
+                  "claimName": "multi-validator-3-domain-migration-hd-pvc"
                 }
               }
             ]
@@ -4308,7 +4308,7 @@
       "apiVersion": "v1",
       "kind": "PersistentVolumeClaim",
       "metadata": {
-        "name": "multi-validator-4-domain-migration-pvc",
+        "name": "multi-validator-4-domain-migration-hd-pvc",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -4320,7 +4320,7 @@
             "storage": "20G"
           }
         },
-        "storageClassName": "standard-rwo"
+        "storageClassName": "hyperdisk-standard-rwo"
       }
     },
     "name": "multi-validator-4-domain-migration-pvc",
@@ -4410,7 +4410,7 @@
                         },
                         {
                           "key": "cn_apps",
-                          "operator": "NotIn",
+                          "operator": "In",
                           "values": [
                             "hyperdisk"
                           ]
@@ -4669,7 +4669,7 @@
               {
                 "name": "domain-upgrade-dump-volume",
                 "persistentVolumeClaim": {
-                  "claimName": "multi-validator-4-domain-migration-pvc"
+                  "claimName": "multi-validator-4-domain-migration-hd-pvc"
                 }
               }
             ]
@@ -4906,7 +4906,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4930,7 +4930,7 @@
                       },
                       {
                         "key": "cn_apps",
-                        "operator": "NotIn",
+                        "operator": "In",
                         "values": [
                           "hyperdisk"
                         ]
@@ -4951,7 +4951,9 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "100Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "100Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -5002,7 +5004,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -5026,7 +5028,7 @@
                       },
                       {
                         "key": "cn_apps",
-                        "operator": "NotIn",
+                        "operator": "In",
                         "values": [
                           "hyperdisk"
                         ]
@@ -5047,7 +5049,9 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "100Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "100Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -5098,7 +5102,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -5122,7 +5126,7 @@
                       },
                       {
                         "key": "cn_apps",
-                        "operator": "NotIn",
+                        "operator": "In",
                         "values": [
                           "hyperdisk"
                         ]
@@ -5143,7 +5147,9 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "100Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "100Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -5194,7 +5200,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -5218,7 +5224,7 @@
                       },
                       {
                         "key": "cn_apps",
-                        "operator": "NotIn",
+                        "operator": "In",
                         "values": [
                           "hyperdisk"
                         ]
@@ -5239,7 +5245,9 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "100Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "100Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -5290,7 +5298,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -5314,7 +5322,7 @@
                       },
                       {
                         "key": "cn_apps",
-                        "operator": "NotIn",
+                        "operator": "In",
                         "values": [
                           "hyperdisk"
                         ]
@@ -5335,7 +5343,9 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "100Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "100Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {

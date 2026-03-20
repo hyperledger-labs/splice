@@ -12,6 +12,7 @@ const useGetAmuletRules = (): UseQueryResult<ContractWithState<AmuletRules>> => 
 
   return useQuery({
     queryKey: ['scan-api', 'getAmuletRules', AmuletRules],
+    gcTime: 0,
     queryFn: async () => {
       const response = await scanClient.getAmuletRules();
       const contract = Contract.decodeOpenAPI(response.amulet_rules.contract, AmuletRules);

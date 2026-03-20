@@ -49,7 +49,7 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
   }
 }
 
-main().catch(err => {
-  console.error(err);
+main().catch(e => {
+  console.error(e.stack ?? e.message ?? e);
   process.exit(1);
 });

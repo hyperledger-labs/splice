@@ -10,11 +10,10 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
-import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
-import org.lfdecentralizedtrust.splice.util.Contract
+import org.lfdecentralizedtrust.splice.util.{Contract, DarResourcesUtil}
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.definitions.GetChoiceContextRequest
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.{Resource, definitions}
@@ -174,7 +173,7 @@ object HttpTokenStandardAllocationHandler {
         debugPackageName =
           if (excludeDebugFields) None
           else
-            DarResources
+            DarResourcesUtil
               .lookupPackageId(contract.identifier.getPackageId)
               .map(_.metadata.name),
         debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),

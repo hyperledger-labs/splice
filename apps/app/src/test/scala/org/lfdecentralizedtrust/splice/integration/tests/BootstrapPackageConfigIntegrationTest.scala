@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyconfigstate.ExternalPartyConfigState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -40,7 +41,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SplitwellTestUtil}
+import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, SpliceUtil, SplitwellTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
@@ -63,7 +64,7 @@ class BootstrapPackageConfigIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   // Factored out so we can reuse it in the test
-  val initialAmulet: DarResource = DarResources.amulet_0_1_10
+  val initialAmulet: DarResource = DarResources.amulet_0_1_14
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
@@ -229,9 +230,10 @@ class BootstrapPackageConfigIntegrationTest
           DarResources.wallet.latest.metadata.version.toString(),
           DarResources.walletPayments.latest.metadata.version.toString(),
         ),
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
+        amuletConfig.transferPreapprovalFee,
+        amuletConfig.featuredAppActivityMarkerAmount,
+        amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -353,6 +355,13 @@ class BootstrapPackageConfigIntegrationTest
       }
     }
 
+    clue("ExternalPartyConfigState contracts are created") {
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ExternalPartyConfigState.COMPANION)(dsoParty) should have size 2
+      }
+    }
+
     // We check this as splice-amulet < 0.1.14 did not support setting the fees to zero;
     // and we want to ensure that the upgrade works as expected.
     clue("Change AmuletConfig to zero fees") {
@@ -363,17 +372,17 @@ class BootstrapPackageConfigIntegrationTest
       val amuletConfig = amuletRules.payload.configSchedule.initialValue
       val newAmuletConfig = new AmuletConfig(
         SpliceUtil.defaultTransferConfig(
-          amuletConfig.transferConfig.maxNumInputs.toInt,
+          amuletConfig.transferConfig.maxNumInputs,
           amuletConfig.transferConfig.holdingFee.rate,
-          zeroTransferFees = true,
         ),
         amuletConfig.issuanceCurve,
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
+        amuletConfig.transferPreapprovalFee,
+        amuletConfig.featuredAppActivityMarkerAmount,
+        amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -451,7 +460,7 @@ class BootstrapPackageConfigIntegrationTest
         bootstrapPackage: DarResource,
         packageName: PackageIdResolver.Package,
     ): Unit = {
-      val allPackagesVersions = DarResources.lookupAllPackageVersions(packageName.packageName)
+      val allPackagesVersions = DarResourcesUtil.lookupAllPackageVersions(packageName.packageName)
       val expectedToBeVettedVersions = allPackagesVersions
         .filter(
           _.metadata.version > PackageIdResolver.readPackageVersion(

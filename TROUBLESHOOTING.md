@@ -96,7 +96,7 @@ If you see **`Environment variable VERSION must be set`** or **`locale.Error: un
 - After a successful **`sbt bundle`**, start the Canton instance for testing:
 
     ```bash
-    ./scripts/start-canton.sh
+    ./start-canton.sh
     ```
 
 - If you encounter a **`java.net.BindException: Address already in use`** error:

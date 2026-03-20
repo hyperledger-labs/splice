@@ -93,12 +93,21 @@ class ScanAutomationService(
       snapshotStore,
       updateHistory,
       scanStorageConfigV1,
-      // The acs snapshot trigger should not attempt to backfill snapshots unless the backfilling
-      // UpdateHistory is fully enabled and complete.
-      config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled,
       triggerContext,
     )
   )
+  // The acs snapshot backfilling trigger should not attempt to backfill snapshots unless the
+  // backfilling UpdateHistory is fully enabled and complete.
+  if (config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled) {
+    registerTrigger(
+      new AcsSnapshotBackfillingTrigger(
+        snapshotStore,
+        updateHistory,
+        scanStorageConfigV1,
+        triggerContext,
+      )
+    )
+  }
   if (config.updateHistoryBackfillImportUpdatesEnabled) {
     registerTrigger(
       new DeleteCorruptAcsSnapshotTrigger(

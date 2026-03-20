@@ -331,6 +331,7 @@ class ValidatorApp(
                   participantAdminConnection,
                   loggerFactory,
                   config.latestPackagesOnly,
+                  config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
                 )
                 _ <-
                   MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
@@ -895,6 +896,7 @@ class ValidatorApp(
         retryProvider,
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
+        config.sequencerConnectionPoolDelays,
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,

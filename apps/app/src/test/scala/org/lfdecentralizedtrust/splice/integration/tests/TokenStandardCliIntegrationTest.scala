@@ -10,17 +10,16 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
   TransferFactory,
   TransferInstruction,
 }
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.CompactJson
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.{TokenStandardMetadata, UpdateHistoryTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
-
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 
 import java.io.FileOutputStream
 import scala.collection.mutable
@@ -43,7 +42,9 @@ class TokenStandardCliIntegrationTest
       // Set externalTransactionHashThresholdDate to a past date so that updates include external transaction hashes
       .addConfigTransforms((_, config) =>
         updateAllScanAppConfigs_(
-          _.copy(externalTransactionHashThresholdDate = Some("2026-02-20T00:00:00Z"))
+          _.copy(externalTransactionHashThresholdTime =
+            Some(java.time.Instant.parse("2020-01-01T00:00:00Z"))
+          )
         )(config)
       )
   }
@@ -226,7 +227,7 @@ class TokenStandardCliIntegrationTest
             sv1Backend.participantClient,
             sv1ScanBackend.appState.automation.updateHistory,
             sv1LedgerBeginOffset,
-            extTxnHashes = Set(
+            extTxnHashes = Seq(
               onboardingAliceExtPartySetupResult.txHash,
               onboardingBobExtPartySetupResult.txHash,
             ),
@@ -239,7 +240,7 @@ class TokenStandardCliIntegrationTest
           val scanClient = scancl("sv1ScanClient")
           compareHistoryViaLosslessScanApiWithExtTxnHashes(
             scanClient,
-            extTxnHashes = Set(
+            extTxnHashes = Seq(
               onboardingAliceExtPartySetupResult.txHash,
               onboardingBobExtPartySetupResult.txHash,
             ),

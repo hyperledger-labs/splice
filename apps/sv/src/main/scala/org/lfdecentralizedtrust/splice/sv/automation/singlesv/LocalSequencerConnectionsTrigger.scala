@@ -38,6 +38,7 @@ class LocalSequencerConnectionsTrigger(
     store: SvDsoStore,
     sequencerInternalConfig: ClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     migrationId: Long,
     reconnectOnSynchronizerConfigurationChange: Boolean,
 )(implicit
@@ -113,8 +114,7 @@ class LocalSequencerConnectionsTrigger(
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
-            // TODO(#2666) Make the delays configurable.
-            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+            sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
           )
           if (
             ParticipantAdminConnection.dropSequencerId(

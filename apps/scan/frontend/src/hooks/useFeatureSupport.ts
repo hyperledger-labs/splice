@@ -3,17 +3,14 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useScanClient } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 
-export const useFeatureSupport = (): UseQueryResult<{
-  noHoldingFeesOnTransfers: boolean;
-}> => {
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export const useFeatureSupport = (): UseQueryResult<{}> => {
   const scanClient = useScanClient();
   return useQuery({
     queryKey: ['featureSupport'],
     queryFn: async () => {
-      const result = await scanClient.featureSupport();
-      return {
-        noHoldingFeesOnTransfers: result.no_holding_fees_on_transfers,
-      };
+      await scanClient.featureSupport();
+      return {};
     },
   });
 };

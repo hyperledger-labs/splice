@@ -11,7 +11,10 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.sequencing.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
@@ -93,10 +96,9 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = SpliceUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
-      initialMaxNumInputs: Int = 100,
+      initialMaxNumInputs: Long = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -108,6 +110,8 @@ object SvOnboardingConfig {
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
+      optValidatorFaucetCap: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -272,6 +276,8 @@ final case class SvParticipantClientConfig(
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 case class SvAppBackendConfig(
@@ -472,6 +478,8 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
     pruning: Option[PruningConfig] = Some(
       PruningConfig(
         cron = "0 /10 * * * ?", // Run every 10min,

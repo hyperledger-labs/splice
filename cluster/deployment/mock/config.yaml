@@ -1,3 +1,4 @@
+!include(../../configs/shared/base.yaml)
 validator1:
   kms:
     type: gcp
@@ -206,9 +207,11 @@ svs:
   sv-1:
     periodicSnapshots:
       topology:
-        projectId: 'da-cn-test'
-        bucketName: 'da-cn-topology-snapshots'
-        backupInterval: '24h'
+        backupInterval: '12h'
+        bucketName: 'cn-topology-snapshots'
+        bucketSaKeySecret: 'gcp-topology-snapshot-bucket-sa-key-secret'
+        bucketSaIamAccount: 'da-cn-example@da-cn-shared.iam.gserviceaccount.com'
+        projectId: 'da-cn-shared'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -402,6 +405,7 @@ networkWide:
   maxVettingDelay: 1m
 validators:
   validator-runbook:
+    postgresPvcSize: '200Gi'
     partyAllocator:
       enable: true
       maxParties: 1234
