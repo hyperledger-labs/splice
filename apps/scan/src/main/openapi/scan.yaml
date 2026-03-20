@@ -1617,7 +1617,7 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/history/bulk/v0/history/bulk/acs:
+  /v0/history/bulk/acs:
     get:
       tags: [ external, scan ]
       x-jvm-package: scan
