@@ -15,6 +15,9 @@ tags:
   - name: scan
     description: |
       The internal and external endpoints.
+  - name: pre-alpha
+    description: |
+      Still under active development, highly unstable. Do not use in production.
 servers:
   - url: https://example.com/api/scan
 paths:
@@ -1616,6 +1619,32 @@ paths:
                 "$ref": "#/components/schemas/ListUnclaimedDevelopmentFundCouponsResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/history/bulk/acs:
+    get:
+      tags: [ pre-alpha, scan ]
+      x-jvm-package: scan
+      operationId: "listBulkAcsSnapshotObjects"
+      description: |
+        **Under Development, do not use in production yet** Get download URLs and metadata for an ACS snapshot available for bulk download, at or before a certain record time.
+      parameters:
+        - name: "at_or_before_record_time"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListBulkAcsSnapshotObjectsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
 
 components:
   schemas:
@@ -3924,3 +3953,37 @@ components:
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    ListBulkAcsSnapshotObjectsResponse:
+      type: object
+      required:
+        - record_time
+        - object_refs
+      properties:
+        record_time:
+          description: |
+            The record time for which the ACS snapshot was taken.
+          type: string
+          format: date-time
+        object_refs:
+          description: |
+            The list of references to the bulk storage objects containing the ACS snapshot data.
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkStorageObjectRef"
+
+    BulkStorageObjectRef:
+      type: object
+      required:
+        - url
+        - digest
+      properties:
+        url:
+          description: |
+            The URL from which the bulk storage object can be downloaded.
+          type: string
+        digest:
+          description: |
+            The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
+          type: string
+
