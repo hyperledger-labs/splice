@@ -1,3 +1,0 @@
-# This config is part of a legacy config loader feature which will soon be removed.
-# Please refrain from editing it. Instead edit cluster/configs/shared/base.yaml
-!include(../configs/shared/base.yaml) {}

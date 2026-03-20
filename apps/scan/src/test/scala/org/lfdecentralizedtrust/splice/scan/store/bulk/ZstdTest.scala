@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.protocol.LfContractId
@@ -71,8 +74,8 @@ class ZstdTest extends StoreTestBase {
 
       val (pub, sub) = TestSource
         .probe[ByteString]
-        .via(ZstdGroupedWeight(zstdChunkSize))
-        .toMat(TestSink.probe[ByteStringWithTermination])(Keep.both)
+        .via(ZstdGroupedWeight(3, zstdChunkSize))
+        .toMat(TestSink.probe[ByteString])(Keep.both)
         .run()
 
       sub.request(3)
@@ -83,17 +86,17 @@ class ZstdTest extends StoreTestBase {
       }
       val zstd1 = clue("More input, now first element will be closed") {
         send(pub, 200, 700)
-        sub.expectNext().bytes
+        sub.expectNext()
       }
       val zstd2 = clue("Another large input, enough to close the second element") {
         send(pub, 700, 1700)
-        sub.expectNext().bytes
+        sub.expectNext()
       }
       val zstd3 =
         clue("A small input, followed by completing the source, should emit another element") {
           send(pub, 1700, 1800)
           pub.sendComplete()
-          sub.expectNext().bytes
+          sub.expectNext()
         }
 
       val allEncodedTxs = encode(txs)
@@ -113,5 +116,22 @@ class ZstdTest extends StoreTestBase {
       }
     }
 
+    "handle upstream close when buffer was just flushed" in {
+      val zstdChunkSize = 10L // very small so a single 100-byte input crosses the threshold
+      val (pub, sub) = TestSource
+        .probe[ByteString]
+        .via(ZstdGroupedWeight(3, zstdChunkSize))
+        .toMat(TestSink.probe[ByteString])(Keep.both)
+        .run()
+      val randInput = new Array[Byte](100)
+      scala.util.Random.nextBytes(randInput)
+      // This single input is large enough to cross minSize, so onPush will push and reset.
+      pub.sendNext(ByteString.fromArray(randInput))
+      pub.sendComplete()
+      sub.request(1)
+      sub.expectNext(20.seconds)
+      sub.expectComplete()
+      succeed
+    }
   }
 }

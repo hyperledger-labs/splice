@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
@@ -97,7 +98,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       // We must read the state here again to pick up on new serials
       (trafficState, sequencerState) <- (
         sequencerAdminConnection.getSequencerTrafficControlState(task.memberId),
-        sequencerAdminConnection.getSequencerSynchronizerState(),
+        sequencerAdminConnection.getSequencerSynchronizerState(TopologySnapshot.Sequenced),
       ).tupled
       _ <- sequencerAdminConnection.setSequencerTrafficControlState(
         trafficState,

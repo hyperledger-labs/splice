@@ -21,6 +21,8 @@ class ValidatorPackageVettingTrigger(
     override protected val context: TriggerContext,
     maxVettingDelay: NonNegativeFiniteDuration,
     latestPackagesOnly: Boolean,
+    svValidator: Boolean,
+    enableUnsupportedDarsUnvetting: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -28,6 +30,8 @@ class ValidatorPackageVettingTrigger(
       ValidatorPackageVettingTrigger.packages,
       maxVettingDelay,
       latestPackagesOnly,
+      svValidator,
+      enableUnsupportedDarsUnvetting,
     ) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =

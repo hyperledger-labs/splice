@@ -24,8 +24,7 @@ class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
     with WalletTestUtil
-    with WalletTxLogTestUtil
-    with TimeTestUtil {
+    with WalletTxLogTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -50,7 +49,6 @@ class ScanEventHistoryIntegrationTest
   private val pageLimit = 1000
 
   "should provide new events with verdicts" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val (aliceParty, _) = onboardAliceAndBob()
@@ -112,11 +110,15 @@ class ScanEventHistoryIntegrationTest
     withClue("Mismatch between CompactJson and ProtobufJson update ids") {
       txIdsProtobuf shouldBe txIdsCompact
     }
+
+    withClue("Traffic summaries should not be served when serveTrafficSummaries is disabled") {
+      eventHistory.foreach { item =>
+        item.trafficSummary shouldBe None
+      }
+    }
   }
 
   "should resume verdict ingestion when mediator recovers" in { implicit env =>
-    initDsoWithSv1Only()
-
     // Disable mediator admin connectivity via proxy before starting scan
     toxiproxy.disableConnectionViaProxy(UseToxiproxy.mediatorAdminApi("sv1"))
 
@@ -236,7 +238,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should return event for valid updateId and 404 for missing updateId" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
@@ -287,7 +288,6 @@ class ScanEventHistoryIntegrationTest
   }
 
   "should resume verdict ingestion after scan restart without duplicates" in { implicit env =>
-    initDsoWithSv1Only()
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()

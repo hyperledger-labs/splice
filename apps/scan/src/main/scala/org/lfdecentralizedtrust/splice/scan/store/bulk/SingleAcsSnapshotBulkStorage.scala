@@ -11,8 +11,8 @@ import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
   HistoryMetrics,
+  PageLimit,
   S3BucketConnection,
   TimestampWithMigrationId,
 }
@@ -55,7 +55,7 @@ class SingleAcsSnapshotBulkStorage(
         timestamp.migrationId,
         snapshot = timestamp.timestamp,
         after,
-        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
+        PageLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
         Seq.empty,
         Seq.empty,
       )
@@ -73,7 +73,7 @@ class SingleAcsSnapshotBulkStorage(
 
   }
 
-  private def getSource: Source[TimestampWithMigrationId, NotUsed] = {
+  private def getSource: Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(Start: Position) {
         case Start => getAcsSnapshotChunk(timestamp, None).map(Some(_))
@@ -90,9 +90,7 @@ class SingleAcsSnapshotBulkStorage(
         )
       )
       .wireTap(_ => historyMetrics.BulkStorage.incAcsSnapshotObjects())
-      // emit back the timestamp w. migrationId upon completion
-      .collect { case S3ZstdObjects.Output(_, isLast) if isLast => timestamp }
-
+      .fold(Seq.empty[String])(_ :+ _)
   }
 }
 
@@ -112,7 +110,7 @@ object SingleAcsSnapshotBulkStorage {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] =
+  ): Flow[TimestampWithMigrationId, Seq[String], NotUsed] =
     Flow[TimestampWithMigrationId].flatMapConcat {
       new SingleAcsSnapshotBulkStorage(
         _,
@@ -138,7 +136,7 @@ object SingleAcsSnapshotBulkStorage {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Source[TimestampWithMigrationId, NotUsed] =
+  ): Source[Seq[String], NotUsed] =
     new SingleAcsSnapshotBulkStorage(
       timestamp,
       storageConfig,

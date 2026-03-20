@@ -1169,8 +1169,8 @@ class WalletTxLogIntegrationTest
           .getValidatorPartyId()
           .toProtoPrimitive
         logEntry.sender.value.amount should beWithin(
-          -preapprovalFee - smallAmount,
           -preapprovalFee,
+          -preapprovalFee + smallAmount,
         )
         logEntry.receivers shouldBe empty withClue "receivers"
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
@@ -1186,14 +1186,14 @@ class WalletTxLogIntegrationTest
         triggersToPauseAtStart = Seq(renewTransferPreapprovalTrigger),
         triggersToResumeAtStart = Seq.empty,
       ) {
-        val preapprovalCid =
+        val extPartySetupResult =
           createAndAcceptExternalPartySetupProposal(bobValidatorBackend, onboarding)
         checkTxHistory(
           bobValidatorWalletClient,
           Seq(creationTxLog, tapTxLog),
           trafficTopups = IgnoreTopupsDevNet,
         )
-        preapprovalCid
+        extPartySetupResult.transferPreapprovalCid
       }
 
       eventually() {
