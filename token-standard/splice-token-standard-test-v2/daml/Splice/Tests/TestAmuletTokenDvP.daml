@@ -36,7 +36,7 @@ import Splice.Testing.Apps.TradingApp hiding (require)
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
-import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient
 
 data AllocatedOTCTrade = AllocatedOTCTrade
   with

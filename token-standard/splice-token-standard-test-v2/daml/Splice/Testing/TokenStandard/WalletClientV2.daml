@@ -5,7 +5,7 @@
 -- based on the token standard.
 --
 -- NOTE: there are likely more functions that could/should be added to this module. PRs welcome.
-module Splice.Testing.TokenStandard.WalletClient
+module Splice.Testing.TokenStandard.WalletClientV2
   (
     -- * Reading/checking holdings
     listHoldings,
