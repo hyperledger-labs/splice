@@ -31,8 +31,10 @@ object DarResourcesUtil {
       upToRequiredVersion: PackageVersion,
       enableUnsupportedDarsUnvetting: Boolean,
       latestPackagesOnly: Boolean = false,
+      additionalPackagesToUnvet: Map[String, Set[String]] = Map.empty,
   ): Seq[DarResource] = {
     val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
+    val unsupportedVersions = additionalPackagesToUnvet.getOrElse(name, Set.empty)
     // TODO(hyperledger-labs/splice#4049): remove enableUnsupportedDarsUnvetting
     packageResources.view
       .flatMap(_.all)
@@ -40,7 +42,10 @@ object DarResourcesUtil {
       .filter(_.metadata.name == name)
       .filter(pkg => {
         val version = pkg.metadata.version
-        if (enableUnsupportedDarsUnvetting) {
+        val versionStr = version.toString
+        if (unsupportedVersions.contains(versionStr)) {
+          false
+        } else if (enableUnsupportedDarsUnvetting) {
           (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
         } else {
           (!latestPackagesOnly && version < upToRequiredVersion) || version == upToRequiredVersion

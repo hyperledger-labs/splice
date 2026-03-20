@@ -9,6 +9,7 @@ import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, EnabledFeaturesConfig}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
   DarResources,
   PackageResource,
   ParticipantAdminConnection,
@@ -35,6 +36,15 @@ class BootstrapPackageConfigDarUploadIntegrationTest
 
   protected val enableUnsupportedDarsUnvetting: Boolean = true
 
+  private val extraPackagesToUnvet: Seq[DarResource] = Seq(
+    DarResources.wallet_0_1_15
+  )
+
+  private val supportedPackagesToUnvet: Map[String, Set[String]] =
+    extraPackagesToUnvet
+      .groupBy(_.metadata.name)
+      .map { case (name, resources) => name -> resources.map(_.metadata.version.toString).toSet }
+
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       // Technically a single SV test but withCanton doesn't handle that atm.
@@ -44,6 +54,20 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(initialPackageConfig = initialPackageConfig)
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            additionalPackagesToUnvet = supportedPackagesToUnvet
+          )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_(
+          _.copy(
+            additionalPackagesToUnvet = supportedPackagesToUnvet
+          )
         )(config)
       )
       .withoutAliceValidatorConnectingToSplitwell

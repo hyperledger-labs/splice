@@ -48,18 +48,20 @@ abstract class PackageVettingTrigger(
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
       dsoRules <- getDsoRules()
+      additionalPackageIdsToUnvet = resolvePackageIdsToUnvet(additionalPackagesToUnvet)
       _ <- runIfInputChanged(
         Seq(
           domainId.toString,
           amuletRules.contractId.toString,
           dsoRules.contractId.toString,
-        ) ++ voteRequests.map(_.toString)
+        ) ++ voteRequests.map(_.toString) ++ additionalPackageIdsToUnvet
       )(
         vetting.vetPackages(
           domainId,
           amuletRules,
           AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
           Some((context.pollingClock, maxVettingDelay)),
+          additionalPackagesToUnvet,
         )
       )
       // ensure that unsupported versions are not vetted
@@ -70,7 +72,6 @@ abstract class PackageVettingTrigger(
         AuthorizedState,
       )
       vettedPackageIds = vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
-      additionalPackageIdsToUnvet = resolvePackageIdsToUnvet(additionalPackagesToUnvet)
       unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
         vettedPackageIds,
         additionalPackageIdsToUnvet,
