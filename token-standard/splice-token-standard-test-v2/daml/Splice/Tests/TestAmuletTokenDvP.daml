@@ -4,7 +4,7 @@
 -- | Daml script tests showing that the token standard can be used to execute
 -- DvP settlements of Amulet tokens; and how to do so.
 --
--- See this test and the 'Splice.Testing.TradingApp' module for an example of
+-- See this test and the 'Splice.Testing.TradingAppV2' module for an example of
 -- how to integrate with the allocation APIs of the token standard to execute
 -- DvP settlements.
 --
@@ -32,7 +32,7 @@ import Splice.Api.Token.AllocationInstructionV2
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils (burnedMetaKey)
 
-import Splice.Testing.Apps.TradingApp hiding (require)
+import Splice.Testing.Apps.TradingAppV2 hiding (require)
 import Splice.Testing.UtilsV2
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
