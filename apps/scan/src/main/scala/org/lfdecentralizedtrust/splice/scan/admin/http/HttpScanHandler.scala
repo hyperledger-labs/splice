@@ -2332,7 +2332,9 @@ class HttpScanHandler(
     }
   }
 
-  override def listBulkAcsSnapshotObjects(respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type)(
+  override def listBulkAcsSnapshotObjects(
+      respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type
+  )(
       atOrBeforeRecordTime: OffsetDateTime
   )(extracted: TraceContext): Future[ScanResource.ListBulkAcsSnapshotObjectsResponse] = {
     implicit val tc = extracted
