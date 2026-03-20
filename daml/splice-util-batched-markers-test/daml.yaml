@@ -11,7 +11,7 @@ data-dependencies:
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
   - ../splice-api-featured-app-v2/.daml/dist/splice-api-featured-app-v2-current.dar
   - ../splice-util-batched-markers/.daml/dist/splice-util-batched-markers-current.dar
-  - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
+  - ../../token-standard/splice-token-standard-test-v1/.daml/dist/splice-token-standard-test-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
