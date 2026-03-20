@@ -264,8 +264,6 @@ class DomainMigrationInitializer(
       _ <- establishInitialRound(
         readOnlyConnection,
         upgradesConfig,
-        packageVersionSupport,
-        svStore.key.svParty,
       )
       _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
         decentralizedSynchronizerId,
@@ -492,6 +490,7 @@ class DomainMigrationInitializer(
                   synchronizerId,
                   localSynchronizerNode.sequencerConnection,
                   localSynchronizerNode.mediatorSequencerAmplification,
+                  localSynchronizerNode.mediatorSequencerConnectionPoolDelays,
                 ),
               logger,
             )

@@ -1,16 +1,19 @@
 # Reference configuration options
 cluster:
+  hyperdiskSupport:
+    enabled: true
+    enabledForInfra: true
   nodePools:
     apps:
       minNodes: 0
       # A high max-nodes by default to support large deployments and hard migrations
       # Should be set to a lower number (currently 8) on CI clusters that do neither of those.
       maxNodes: 20
-      nodeType: e2-standard-16
+      nodeType: n4d-standard-16
     infra:
       minNodes: 1
       maxNodes: 3
-      nodeType: e2-standard-8
+      nodeType: n4d-standard-8
 infra:
   prometheus:
     retentionDuration: "1y"
@@ -98,9 +101,6 @@ monitoring:
         total:
           rate: 25
           overMinutes: 5
-        perMember:
-          rate: 3
-          overMinutes: 5
       cloudSql:
         maintenance: false
       cometbft:
@@ -113,6 +113,14 @@ monitoring:
         pendingPeriodMinutes: 5
       sequencerClientDelay:
         seconds: 90
+      acsCommitments:
+        checkpointDelay:
+          # Usually every 30s but while the commitment every 30min gets computed
+          # it gets blocked so we allow up to 10min
+          seconds: 600
+        completedDelay:
+          # Usually every 30min, we allow up to 1h to avoid false positives.
+          seconds: 3600
       sequencerRateLimits:
         rejectionRateThreshold: 0
         circuitBreakerStateThreshold: 0.5

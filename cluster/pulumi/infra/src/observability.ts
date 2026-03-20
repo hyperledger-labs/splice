@@ -254,11 +254,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             serviceMonitorSelector: {
               matchLabels: null,
             },
-            enableFeatures: [
-              'native-histograms',
-              'memory-snapshot-on-shutdown',
-              'promql-experimental-functions',
-            ],
+            enableFeatures: ['memory-snapshot-on-shutdown', 'promql-experimental-functions'],
             enableRemoteWriteReceiver: true,
             retention: infraConfig.prometheus.retentionDuration,
             retentionSize: infraConfig.prometheus.retentionSize,
@@ -272,6 +268,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             remoteWriteDashboards: true,
             // fix for https://github.com/prometheus/prometheus/issues/6857
             additionalArgs: [{ name: 'storage.tsdb.max-block-duration', value: '1d' }],
+            scrapeNativeHistograms: true,
             storageSpec: {
               volumeClaimTemplate: {
                 ...(hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
@@ -896,6 +893,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$SEQUENCER_CLIENT_DELAY_THRESHOLD_SECONDS',
               monitoringConfig.alerting.alerts.sequencerClientDelay.seconds.toString()
             ),
+            'acs_commitment_alerts.yaml': readGrafanaAlertingFile('acs_commitment_alerts.yaml')
+              .replace(
+                '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
+              )
+              .replace(
+                '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
+              ),
             'sequencer_connection_pool_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_connection_pool_alerts.yaml'
             ),
@@ -910,23 +916,6 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replace(
                 '$SEQUENCER_RATE_LIMIT_CIRCUIT_BREAKER_STATE_THRESHOLD',
                 monitoringConfig.alerting.alerts.sequencerRateLimits.circuitBreakerStateThreshold.toString()
-              ),
-            'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.perMember.overMinutes.toString()
-              )
-              .replaceAll(
-                '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.perMember.rate.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

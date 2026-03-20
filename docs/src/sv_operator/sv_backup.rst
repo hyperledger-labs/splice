@@ -44,10 +44,10 @@ Historical backups
 
 We need historical backups in order to preserve a gap-less history from genesis, which can be uses during audits and more generally prove the correctness of the current synchronizer state to outside observers.
 
-For the sequencer, when :ref:`pruning <sv-pruning-sequencer>` is enabled, historical backups must be kept for each pruning window.
-This means that backups must be preserved with a time difference between two historical backups smaller than the `retentionPeriod` set for the sequencer.
+For the sequencer and participant, when :ref:`pruning <sv-pruning>` is enabled, historical backups must be kept for each pruning window.
+This means that backups must be preserved with a time difference between two historical backups smaller than the `retentionPeriod` set for the sequencer and participant.
 
-For SVs, by default, the participant, mediator and the splice apps have no pruning enabled.
+For SVs, by default, the mediator and the splice apps have no pruning enabled.
 
 Furthermore, backups must be retained for previous :ref:`major upgrades <sv-upgrades>`. This includes all the historical sequencer backups and the backups of the other apps.
 

@@ -182,6 +182,7 @@ abstract class StoreTestBase
       dsoParty.toProtoPrimitive,
       schedule(initialTickDuration),
       false,
+      java.util.Optional.empty(), // contractStateSchemaVersion
     )
     contract(
       identifier = templateId,
@@ -933,6 +934,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -945,6 +947,7 @@ abstract class StoreTestBase
     recordTime,
     createdEventObservers,
     updateId,
+    externalTxnHash,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -959,6 +962,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
@@ -975,6 +979,7 @@ abstract class StoreTestBase
     workflowId,
     recordTime = recordTime,
     updateId = updateId,
+    externalTransactionHash = externalTxnHash,
   )
 
   protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {
@@ -1164,9 +1169,16 @@ abstract class StoreTestBase
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
         implementedInterfaces: Seq[Identifier] = Seq.empty,
+        recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx =
-        mkTx(nextOffset(), Seq(toArchivedEvent(c, implementedInterfaces)), domain, txEffectiveAt)
+        mkTx(
+          nextOffset(),
+          Seq(toArchivedEvent(c, implementedInterfaces)),
+          domain,
+          txEffectiveAt,
+          recordTime = recordTime,
+        )
       store.testIngestionSink
         .ingestUpdate(
           domain,
@@ -1300,6 +1312,7 @@ abstract class StoreTestBase
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
       updateId: String = nextUpdateId(),
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
@@ -1314,7 +1327,7 @@ abstract class StoreTestBase
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
-      ByteString.EMPTY,
+      externalTransactionHash,
     )
   }
 

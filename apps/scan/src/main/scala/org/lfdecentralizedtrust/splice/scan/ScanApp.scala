@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
+import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
@@ -28,6 +29,7 @@ import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource 
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
+  HttpScanStreamHandler,
   HttpTokenStandardAllocationHandler,
   HttpTokenStandardAllocationInstructionHandler,
   HttpTokenStandardMetadataHandler,
@@ -58,6 +60,7 @@ import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.store.{
   ChoiceContextContractFetcher,
   PageLimit,
+  S3BucketConnection,
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.HasHealth
@@ -361,11 +364,17 @@ class ScanApp(
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
+        config.serveTrafficSummaries,
         clock,
         loggerFactory,
         packageVersionSupport,
         bftSequencersWithAdminConnections,
         initialRound,
+        externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
+        config.updateHistoryMaxPageSize,
+      )
+      scanStreamHandler = new HttpScanStreamHandler(
+        config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))
       )
       contractFetcher = ChoiceContextContractFetcher.createStoreWithLedgerFallback(
         config.parameters.contractFetchLedgerFallbackConfig,
@@ -441,6 +450,10 @@ class ScanApp(
                 ScanResource.routes(
                   scanHandler,
                   buildRouteForOperation(_, "scan"),
+                ),
+                ScanStreamResource.routes(
+                  scanStreamHandler,
+                  buildRouteForOperation(_, "scan_stream"),
                 ),
                 TokenStandardTransferInstructionResource.routes(
                   tokenStandardTransferInstructionHandler,

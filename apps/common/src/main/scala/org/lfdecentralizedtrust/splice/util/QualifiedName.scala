@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.daml.ledger.javaapi.data.{Event, Identifier}
-import org.lfdecentralizedtrust.splice.environment.DarResources
 
 final case class QualifiedName(moduleName: String, entityName: String) {
   override def toString = s"$moduleName:$entityName"
@@ -16,7 +15,7 @@ final case class PackageQualifiedName(packageName: String, qualifiedName: Qualif
 
 object PackageQualifiedName {
   def lookupFromResources(identifier: Identifier): Option[PackageQualifiedName] = {
-    DarResources
+    DarResourcesUtil
       .lookupPackageId(identifier.getPackageId)
       .map { resource =>
         PackageQualifiedName(

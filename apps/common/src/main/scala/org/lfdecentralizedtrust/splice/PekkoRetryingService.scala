@@ -36,12 +36,12 @@ class PekkoRetryingService[S](
   private class PekkoServiceWithShutdown extends ServiceWithShutdown {
 
     private val (killSwitch, done) =
-      source.viaMat(KillSwitches.single)(Keep.right).toMat(sink)(Keep.both).run()
+      source
+        .viaMat(KillSwitches.single)(Keep.right)
+        .toMat(sink)(Keep.both)
+        .run()
 
-    override def initiateShutdown()(implicit tc: TraceContext): Unit = {
-      logger.debug(s"Shutting down Pekko stream for $description")
-      killSwitch.shutdown()
-    }
+    override def initiateShutdown(): Unit = killSwitch.shutdown()
 
     override def completed: Future[Done] = done
 

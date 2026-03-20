@@ -29,17 +29,14 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   });
 };
 
-export const useFeatureSupport = (): UseQueryResult<{
-  noHoldingFeesOnTransfers: boolean;
-}> => {
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export const useFeatureSupport = (): UseQueryResult<{}> => {
   const { featureSupport } = useSvAdminClient();
   return useQuery({
     queryKey: ['featureSupport'],
     queryFn: async () => {
-      const resp = await featureSupport();
-      return {
-        noHoldingFeesOnTransfers: resp.no_holding_fees_on_transfers,
-      };
+      await featureSupport();
+      return {};
     },
   });
 };

@@ -4,12 +4,11 @@ import * as pulumi from '@pulumi/pulumi';
 import { exit } from 'process';
 
 import {
-  BackupConfig,
   bootstrapDataBucketSpec,
   fetchAndInstallParticipantBootstrapDump,
-  installBootstrapDataBucketSecret,
   readAndInstallParticipantBootstrapDump,
 } from './backup';
+import { installBucketSecret, BucketConfig } from './buckets';
 import { isDevNet } from './config';
 import { ExactNamespace } from './utils';
 
@@ -29,7 +28,7 @@ type BootstrapParams = {
 type BootstrapResources = {
   participantBootstrapDumpSecret: pulumi.Resource | undefined;
   backupConfigSecret: pulumi.Resource | undefined;
-  backupConfig: BackupConfig | undefined;
+  backupConfig: BucketConfig | undefined;
 };
 
 export async function setupBootstrapping(config: BootstrapParams): Promise<BootstrapResources> {
@@ -52,7 +51,7 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
 
   let participantBootstrapDumpSecret: pulumi.Resource | undefined;
   let backupConfigSecret: pulumi.Resource | undefined;
-  let backupConfig: BackupConfig | undefined;
+  let backupConfig: BucketConfig | undefined;
 
   const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
 
@@ -64,7 +63,7 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
         prefix: `${CLUSTER_BASENAME}/${namespace}`,
       },
     };
-    backupConfigSecret = installBootstrapDataBucketSecret(xns, backupConfig.location.bucket);
+    backupConfigSecret = installBucketSecret(xns, backupConfig.location.bucket);
   }
 
   if (participantIdentitiesFile) {

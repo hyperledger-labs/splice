@@ -145,6 +145,7 @@ abstract class RehydrationIntegrationTest
     import env.*
 
     participant1.dars.upload(CantonExamplesPath)
+    sv1Backend.start()
 
     val runF = (1 to iterations: Seq[Int]).parTraverse_ { i =>
       Future {
