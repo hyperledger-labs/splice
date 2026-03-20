@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: min by (namespace, job) ((timestamp(daml_participant_sync_commitments_last_locally_checkpointed) - ((daml_participant_sync_commitments_last_locally_checkpointed > 0) / 1e6)))
+                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_locally_checkpointed) - (daml_participant_sync_commitments_last_locally_checkpointed > 0) / 1e6)
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -76,7 +76,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_locally_completed{namespace=~"$namespace",job=~"$job"}) - ((daml_participant_sync_commitments_last_locally_completed{namespace=~"$namespace",job=~"$job"} > 0) / 1e6))
+                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_locally_completed) - (daml_participant_sync_commitments_last_locally_completed > 0) / 1e6)
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
