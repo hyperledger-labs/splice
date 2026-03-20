@@ -62,7 +62,7 @@ import Splice.ValidatorLicense
 
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistryV2.Parameters
-import Splice.Testing.TokenStandard.RegistryApi
+import Splice.Testing.TokenStandard.RegistryApiV2
 
 import Daml.Script
 
@@ -70,7 +70,7 @@ import Daml.Script
 --------------------------
 
 -- | A reference to a mock amulet registry.
--- Use it via the the token standard functions provided by the "Splice.Testing.RegistryApi" module
+-- Use it via the the token standard functions provided by the "Splice.Testing.RegistryApiV2" module
 -- and type-class; or via the amulet specific functions exported from this module.
 data AmuletRegistry = AmuletRegistry with
     dso : Party

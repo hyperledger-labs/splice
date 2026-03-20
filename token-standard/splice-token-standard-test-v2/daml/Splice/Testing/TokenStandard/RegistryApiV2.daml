@@ -4,7 +4,7 @@
 -- | Support for using a token compliant registry API in tests.
 --
 -- These simulate the OpenAPI endpoints that would be served by the backend of the registry implementation.
-module Splice.Testing.TokenStandard.RegistryApi
+module Splice.Testing.TokenStandard.RegistryApiV2
   ( RegistryApi(..)
   ) where
 
