@@ -23,7 +23,7 @@ import DA.Time
 import Splice.Amulet (AppRewardCoupon(..), FeaturedAppActivityMarker(..))
 import Splice.Amulet.TokenApiUtils (createdInRoundMetaKey, ratePerRoundMetaKey, burnedMetaKey)
 
-import Splice.Testing.Utils
+import Splice.Testing.UtilsV2
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClient

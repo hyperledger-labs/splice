@@ -60,7 +60,7 @@ import Splice.Schedule
 import Splice.Round
 import Splice.ValidatorLicense
 
-import Splice.Testing.Utils
+import Splice.Testing.UtilsV2
 import Splice.Testing.Registries.AmuletRegistryV2.Parameters
 import Splice.Testing.TokenStandard.RegistryApiV2
 
