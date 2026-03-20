@@ -413,14 +413,6 @@ If the tool can be configured to use a static token, generate one on https://jwt
 ```
 and use HS256 as the signing algorithm with the HMAC secret set to "test".
 
-If the tool can be configured to fetch tokens from an OAuth2 server using client credentials,
-run
-```
-./scripts/test-oauth-server.sh
-```
-and point your tool to the displayed URL.
-Set the client id to the desired ledger API user name, and use an arbitrary value for the client secret.
-
 ### Testing App Upgrades
 
 Upgrades of the Splice apps are tested automatically in CI using AppUpgradeIntegrationTest.

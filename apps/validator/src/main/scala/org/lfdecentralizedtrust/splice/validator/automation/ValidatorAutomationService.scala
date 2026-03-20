@@ -242,6 +242,8 @@ class ValidatorAutomationService(
       triggerContext,
       maxVettingDelay,
       latestPackagesOnly,
+      svValidator,
+      enabledFeatures.enableUnsupportedDarsUnvetting,
     )
   )
 
