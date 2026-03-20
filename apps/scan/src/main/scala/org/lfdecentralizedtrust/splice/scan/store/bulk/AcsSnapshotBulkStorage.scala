@@ -17,9 +17,17 @@ import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{AcsSnapshotObjects, ObjectKeyAndChecksum}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
+  AcsSnapshotObjects,
+  ObjectKeyAndChecksum,
+}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection, TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryMetrics,
+  S3BucketConnection,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -195,7 +203,9 @@ class AcsSnapshotBulkStorage(
         .listObjectsSource(prefix)
         .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
         .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
-          s3Connection.readChecksum(obj.key).map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
+          s3Connection
+            .readChecksum(obj.key)
+            .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
         }
         .runWith(Sink.seq[ObjectKeyAndChecksum])
 

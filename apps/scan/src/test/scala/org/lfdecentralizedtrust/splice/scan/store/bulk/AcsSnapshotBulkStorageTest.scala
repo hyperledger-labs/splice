@@ -24,11 +24,24 @@ import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceMetrics
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider, ScanKeyValueStore}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanKeyValueProvider,
+  ScanKeyValueStore,
+}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{HardLimit, HasS3Mock, HistoryMetrics, Limit, S3BucketConnection, StoreTestBase, TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  HasS3Mock,
+  HistoryMetrics,
+  Limit,
+  S3BucketConnection,
+  StoreTestBase,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -165,10 +178,16 @@ class AcsSnapshotBulkStorageTest
           .get()
           ._1 shouldBe ts.toEpochMilli * 1000
       }
-      def assertGetObjects(queryTs: CantonTimestamp, expectedTs: CantonTimestamp, expectedNumObjects: Int) = {
+      def assertGetObjects(
+          queryTs: CantonTimestamp,
+          expectedTs: CantonTimestamp,
+          expectedNumObjects: Int,
+      ) = {
         val getObjectsResult = bulkStorage.getAcsSnapshotAtOrBefore(queryTs).futureValue
         getObjectsResult.objects.map(_.key) should contain theSameElementsInOrderAs
-          (0 until expectedNumObjects).map(i => s"$expectedTs-Migration-0-${expectedTs.add(1.days)}/ACS_$i.zstd")
+          (0 until expectedNumObjects).map(i =>
+            s"$expectedTs-Migration-0-${expectedTs.add(1.days)}/ACS_$i.zstd"
+          )
         getObjectsResult.objects.map(_.checksum).foreach {
           // We test elsewhere that computed and persisted checksums are correct, so here we just check that they are present and not empty
           _ should not be empty
@@ -177,11 +196,12 @@ class AcsSnapshotBulkStorageTest
       }
 
       Using.resources(svc, retryProvider) { (_, _) =>
-
         val ex = bulkStorage.getAcsSnapshotAtOrBefore(ts1).failed.futureValue
-        ex shouldBe a [StatusRuntimeException]
-        ex.asInstanceOf[StatusRuntimeException].getStatus.getCode shouldBe io.grpc.Status.Code.NOT_FOUND
-        ex.getMessage should include ("no snapshot in bulk storage yet")
+        ex shouldBe a[StatusRuntimeException]
+        ex.asInstanceOf[StatusRuntimeException]
+          .getStatus
+          .getCode shouldBe io.grpc.Status.Code.NOT_FOUND
+        ex.getMessage should include("no snapshot in bulk storage yet")
 
         clue("Initially, a single snapshot is dumped") {
           eventually(4.minutes) {
@@ -221,10 +241,16 @@ class AcsSnapshotBulkStorageTest
           assertGetObjects(ts3, ts3, 7)
         }
 
-        val ex1 = bulkStorage.getAcsSnapshotAtOrBefore(ts1.minus(java.time.Duration.ofDays(1))).failed.futureValue
-        ex1 shouldBe a [StatusRuntimeException]
-        ex1.asInstanceOf[StatusRuntimeException].getStatus.getCode shouldBe io.grpc.Status.Code.NOT_FOUND
-        ex1.getMessage should include ("this may be because the timestamp is before network genesis")
+        val ex1 = bulkStorage
+          .getAcsSnapshotAtOrBefore(ts1.minus(java.time.Duration.ofDays(1)))
+          .failed
+          .futureValue
+        ex1 shouldBe a[StatusRuntimeException]
+        ex1
+          .asInstanceOf[StatusRuntimeException]
+          .getStatus
+          .getCode shouldBe io.grpc.Status.Code.NOT_FOUND
+        ex1.getMessage should include("this may be because the timestamp is before network genesis")
 
       }
     }

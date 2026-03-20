@@ -4,11 +4,18 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon, ValidatorRewardCoupon}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  Amulet,
+  AppRewardCoupon,
+  ValidatorRewardCoupon,
+}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
@@ -590,7 +597,7 @@ class ScanTimeBasedIntegrationTest
       val getSnapshotResponse = eventuallySucceeds() {
         val getSnapshotResponse = sv1ScanBackend
           .getBulkAcsSnapshot(CantonTimestamp.assertFromInstant(lastMidnight))
-        getSnapshotResponse.timestamp should be (lastMidnight.atOffset(java.time.ZoneOffset.UTC))
+        getSnapshotResponse.timestamp should be(lastMidnight.atOffset(java.time.ZoneOffset.UTC))
         getSnapshotResponse
       }
       val allS3Objs = bucketConnection.listObjects.futureValue.contents().asScala

@@ -2496,7 +2496,10 @@ object HttpScanAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], GetBulkAcsSnapshotResponse] =
-      client.getBulkAcsSnapshot(atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC), headers)
+      client.getBulkAcsSnapshot(
+        atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        headers,
+      )
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -2505,7 +2508,7 @@ object HttpScanAppClient {
       definitions.GetBulkAcsSnapshotResponse,
     ]] = {
       case http.GetBulkAcsSnapshotResponse.OK(response) =>
-      Right(response)
+        Right(response)
       case http.GetBulkAcsSnapshotResponse.NotFound(err) =>
         Left(err.error)
 

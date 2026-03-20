@@ -37,10 +37,13 @@ class BulkStorage(
     with FlagCloseableAsync
     with RetryProvider.Has {
 
-  private val acsSnapshots: AtomicReference[Option[AcsSnapshotBulkStorage]] = new AtomicReference(None)
-  private val updateHistoryBulkStorage: AtomicReference[Option[UpdateHistoryBulkStorage]] = new AtomicReference(
+  private val acsSnapshots: AtomicReference[Option[AcsSnapshotBulkStorage]] = new AtomicReference(
     None
   )
+  private val updateHistoryBulkStorage: AtomicReference[Option[UpdateHistoryBulkStorage]] =
+    new AtomicReference(
+      None
+    )
 
   def getAcsSnapshotBulkStorage: Option[AcsSnapshotBulkStorage] = acsSnapshots.get()
   def getUpdateHistoryBulkStorage: Option[UpdateHistoryBulkStorage] = updateHistoryBulkStorage.get()
