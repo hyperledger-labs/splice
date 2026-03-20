@@ -73,6 +73,9 @@ synchronizerMigration:
   upgrade:
     id: 4
     version: 0.3.21
+    enableLogicalSynchronizerDeploymentMode: true
+    sequencer:
+      enableBftSequencer: true
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.21"
       repoUrl: https://github.com/hyperledger-labs/splice
