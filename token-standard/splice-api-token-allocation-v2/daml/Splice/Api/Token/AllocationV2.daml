@@ -6,10 +6,10 @@
 -- Contracts implementing the `Allocation` interface represent a reservation of
 -- assets to transfer them as part of an atomic on-ledger settlement requested
 -- by an app.
-module Splice.Api.Token.AllocationV1 where
+module Splice.Api.Token.AllocationV2 where
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1 (Holding, InstrumentId)
+import Splice.Api.Token.HoldingV2 (Holding, InstrumentId)
 
 -- | A generic type to refer to data defined within an app.
 
