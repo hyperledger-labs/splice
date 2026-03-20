@@ -102,7 +102,7 @@ export const ValidatorNodeConfigSchema = z.object({
       retention: z.string(),
     })
     .optional(),
-  participant: ParticipantConfigSchema.default({}),
+  participant: ParticipantConfigSchema.prefault({}),
   validatorApp: ValidatorAppConfigSchema.optional(),
   disableAuth: z.boolean().default(false), // Note that this is currently ignored everywhere except for validator1, where it is used for testing only
 });
@@ -127,7 +127,7 @@ export const ValidatorConfigSchema = z
     migrateParty: z.boolean().default(false),
     newParticipantId: z.string().optional(),
     onboardingSecret: z.string().optional(),
-    partyAllocator: PartyAllocatorConfigSchema.default({ enable: false }),
+    partyAllocator: PartyAllocatorConfigSchema.prefault({ enable: false }),
   })
   .and(ValidatorNodeConfigSchema);
 

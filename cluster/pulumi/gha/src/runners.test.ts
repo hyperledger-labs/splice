@@ -43,7 +43,7 @@ jest.mock('@lfdecentralizedtrust/splice-pulumi-common', () => ({
   GCP_ZONE: 'some-wonderful-place',
   imagePullSecretByNamespaceNameForServiceAccount: () => [],
   infraAffinityAndTolerations: {},
-  CloudSqlConfigSchema: z.object({ flags: z.record(z.string()).default({}) }),
+  CloudSqlConfigSchema: z.object({ flags: z.record(z.string(),z.string()).default({}) }),
   installPostgresPasswordSecret: () => {
     return { metadata: { name: 'secret' } };
   },

@@ -12,7 +12,7 @@ const HyperdiskSupportConfigSchema = z.object({
       migrating: z.boolean().default(false),
       migratingInfra: z.boolean().default(false),
     })
-    .default({}),
+    .prefault({}),
 });
 
 export type HyperdiskSupportConfig = z.infer<typeof HyperdiskSupportConfigSchema>;
