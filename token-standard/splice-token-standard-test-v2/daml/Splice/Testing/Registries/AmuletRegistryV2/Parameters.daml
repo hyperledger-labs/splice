@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Default configuration paramaters for the amulet registry used for testing.
-module Splice.Testing.Registries.AmuletRegistry.Parameters where
+module Splice.Testing.Registries.AmuletRegistryV2.Parameters where
 
 import qualified DA.Set as Set
 import DA.Time
