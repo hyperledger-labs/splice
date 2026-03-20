@@ -15,6 +15,9 @@ tags:
   - name: scan
     description: |
       The internal and external endpoints.
+  - name: pre-alpha
+    description: |
+      Still under active development, highly unstable. Do not use in production.
 servers:
   - url: https://example.com/api/scan
 paths:
@@ -1619,13 +1622,13 @@ paths:
 
   /v0/history/bulk/acs:
     get:
-      tags: [ external, scan ]
+      tags: [ pre-alpha, scan ]
       x-jvm-package: scan
-      operationId: "getBulkAcsSnapshot"
+      operationId: "listBulkAcsSnapshotObjects"
       description: |
-        Get download URLs and metadata for an ACS snapshot available for bulk download, at or before a certain record time.
+        **Under Development, do not use in production yet** Get download URLs and metadata for an ACS snapshot available for bulk download, at or before a certain record time.
       parameters:
-        - name: "record_time"
+        - name: "at_or_before_record_time"
           in: "query"
           required: true
           schema:
@@ -1637,9 +1640,11 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetBulkAcsSnapshotResponse"
+                "$ref": "#/components/schemas/ListBulkAcsSnapshotObjectsResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
 
 components:
   schemas:
@@ -3939,36 +3944,36 @@ components:
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
 
-    GetBulkAcsSnapshotResponse:
+    ListBulkAcsSnapshotObjectsResponse:
       type: object
       required:
-        - timestamp
-        - objects
+        - record_time
+        - object_refs
       properties:
-        timestamp:
+        record_time:
           description: |
-            The timestamp at which the ACS snapshot was taken.
+            The record time for which the ACS snapshot was taken.
           type: string
           format: date-time
-        objects:
+        object_refs:
           description: |
-            The list of bulk storage objects containing the ACS snapshot data.
+            The list of references to the bulk storage objects containing the ACS snapshot data.
           type: array
           items:
-            $ref: "#/components/schemas/BulkStorageObject"
+            $ref: "#/components/schemas/BulkStorageObjectRef"
 
-    BulkStorageObject:
+    BulkStorageObjectRef:
       type: object
       required:
         - url
-        - checksum
+        - digest
       properties:
         url:
           description: |
             The URL from which the bulk storage object can be downloaded.
           type: string
-        checksum:
+        digest:
           description: |
-            The checksum of the bulk storage object, for verification of integrity and consistency across SVs.
+            The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
           type: string
 

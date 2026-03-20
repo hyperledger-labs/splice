@@ -597,7 +597,7 @@ class ScanTimeBasedIntegrationTest
       val getSnapshotResponse = eventuallySucceeds() {
         val getSnapshotResponse = sv1ScanBackend
           .getBulkAcsSnapshot(CantonTimestamp.assertFromInstant(lastMidnight))
-        getSnapshotResponse.timestamp should be(lastMidnight.atOffset(java.time.ZoneOffset.UTC))
+        getSnapshotResponse.recordTime should be(lastMidnight.atOffset(java.time.ZoneOffset.UTC))
         getSnapshotResponse
       }
       val allS3Objs = bucketConnection.listObjects.futureValue.contents().asScala
@@ -617,7 +617,7 @@ class ScanTimeBasedIntegrationTest
         .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
         .createdEvents
-      val acsObjKey = getSnapshotResponse.objects.head.url
+      val acsObjKey = getSnapshotResponse.objectRefs.head.url
       val out = new ByteArrayOutputStream()
       sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
       val acsAtMidnightFromS3 = uncompressAndDecode(

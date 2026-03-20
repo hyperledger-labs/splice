@@ -81,7 +81,6 @@ import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
-import java.lang.UnsupportedOperationException
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
   DevnetTap,
@@ -2333,27 +2332,29 @@ class HttpScanHandler(
     }
   }
 
-  override def getBulkAcsSnapshot(respond: ScanResource.GetBulkAcsSnapshotResponse.type)(
-      atOrBeforeTimestamp: OffsetDateTime
-  )(extracted: TraceContext): Future[ScanResource.GetBulkAcsSnapshotResponse] = {
+  override def listBulkAcsSnapshotObjects(respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type)(
+      atOrBeforeRecordTime: OffsetDateTime
+  )(extracted: TraceContext): Future[ScanResource.ListBulkAcsSnapshotObjectsResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
-      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeTimestamp)
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
       bulkStorage.acsSnapshotBulkStorage.fold(
-        Future.failed[ScanResource.GetBulkAcsSnapshotResponse](
-          new UnsupportedOperationException("Bulk storage is not configured")
+        Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
+          Status.UNIMPLEMENTED
+            .withDescription("Bulk storage is not configured")
+            .asRuntimeException()
         )
       )(acsSnapshotBulkStorage =>
         acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
           case AcsSnapshotObjects(ts, objects) =>
-            ScanResource.GetBulkAcsSnapshotResponse.OK(
-              definitions.GetBulkAcsSnapshotResponse(
+            ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
+              definitions.ListBulkAcsSnapshotObjectsResponse(
                 Codec.encode(ts),
-                objects.map { case ObjectKeyAndChecksum(key, checksum) =>
-                  definitions.BulkStorageObject(
+                objects.map { case ObjectKeyAndChecksum(key, digest) =>
+                  definitions.BulkStorageObjectRef(
                     // TODO(#3429): for now we return just the key, but this should be mapped to a full url in scan
                     key,
-                    checksum,
+                    digest,
                   )
                 }.toVector,
               )

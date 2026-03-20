@@ -754,7 +754,7 @@ abstract class ScanAppReference(
   }
 
   @Help.Summary("List all objects in bulk storage for an ACS snapshot")
-  def getBulkAcsSnapshot(timestamp: CantonTimestamp): definitions.GetBulkAcsSnapshotResponse =
+  def getBulkAcsSnapshot(timestamp: CantonTimestamp): definitions.ListBulkAcsSnapshotObjectsResponse =
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetBulkAcsSnapshot(timestamp)

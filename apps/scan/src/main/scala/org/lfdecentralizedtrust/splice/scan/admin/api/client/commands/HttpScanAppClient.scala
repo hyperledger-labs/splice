@@ -40,7 +40,7 @@ import org.lfdecentralizedtrust.tokenstandard.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
-  GetBulkAcsSnapshotResponse,
+  ListBulkAcsSnapshotObjectsResponse,
   GetDateOfFirstSnapshotAfterResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
 }
@@ -2489,27 +2489,29 @@ object HttpScanAppClient {
   case class GetBulkAcsSnapshot(
       atOrBeforeTimestamp: CantonTimestamp
   ) extends InternalBaseCommand[
-        http.GetBulkAcsSnapshotResponse,
-        definitions.GetBulkAcsSnapshotResponse,
+        http.ListBulkAcsSnapshotObjectsResponse,
+        definitions.ListBulkAcsSnapshotObjectsResponse,
       ] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], GetBulkAcsSnapshotResponse] =
-      client.getBulkAcsSnapshot(
+    ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkAcsSnapshotObjectsResponse] =
+      client.listBulkAcsSnapshotObjects(
         atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
         headers,
       )
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): PartialFunction[GetBulkAcsSnapshotResponse, Either[
+    ): PartialFunction[ListBulkAcsSnapshotObjectsResponse, Either[
       String,
-      definitions.GetBulkAcsSnapshotResponse,
+      definitions.ListBulkAcsSnapshotObjectsResponse,
     ]] = {
-      case http.GetBulkAcsSnapshotResponse.OK(response) =>
+      case http.ListBulkAcsSnapshotObjectsResponse.OK(response) =>
         Right(response)
-      case http.GetBulkAcsSnapshotResponse.NotFound(err) =>
+      case http.ListBulkAcsSnapshotObjectsResponse.NotFound(err) =>
+        Left(err.error)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotImplemented(err) =>
         Left(err.error)
 
     }
