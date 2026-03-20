@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Testing utilities to simplify testing token standard usage and implementation.
-module Splice.Testing.Utils
+module Splice.Testing.UtilsV2
   (
     -- * Utilities for disclosures
     Disclosures'(..),
