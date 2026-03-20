@@ -275,6 +275,9 @@ async function installSvAndValidator(
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     ...commonSvAppValues,
+    ...(decentralizedSynchronizerMigrationConfig.active.enableLogicalSynchronizerDeploymentMode
+      ? { participantAddress: 'participant' }
+      : {}),
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
@@ -370,6 +373,9 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
+    ...(decentralizedSynchronizerMigrationConfig.active.enableLogicalSynchronizerDeploymentMode
+      ? { participantAddress: 'participant' }
+      : {}),
     metrics: {
       enable: true,
     },
@@ -429,6 +435,9 @@ async function installSvAndValidator(
         TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       }
     ),
+    ...(decentralizedSynchronizerMigrationConfig.active.enableLogicalSynchronizerDeploymentMode
+      ? { participantAddress: 'participant' }
+      : {}),
     metrics: {
       enable: true,
     },
