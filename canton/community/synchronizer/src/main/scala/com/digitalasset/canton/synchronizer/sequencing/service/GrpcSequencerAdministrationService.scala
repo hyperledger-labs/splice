@@ -28,6 +28,10 @@ import com.digitalasset.canton.sequencer.admin.v30.{
   SetLsuTrafficControlStateResponse,
   SetTrafficPurchasedRequest,
   SetTrafficPurchasedResponse,
+  SetThroughputCapRequest,
+  GetThroughputCapRequest,
+  GenerateAuthenticationTokenRequest,
+  PerformLsuSequencingTestRequest,
 }
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -449,4 +453,16 @@ class GrpcSequencerAdministrationService(
 
     mapErrNewEUS(result)
   }
+
+  // Implementation unused in splice
+  override def setThroughputCap(request: SetThroughputCapRequest) = ???
+
+  // Implementation unused in splice
+  override def getThroughputCap(request: GetThroughputCapRequest) = ???
+
+  // Implementation unused in splice
+  override def generateAuthenticationToken(request: GenerateAuthenticationTokenRequest) = ???
+
+  // Implementation unused in splice
+  override def performLsuSequencingTest(request: PerformLsuSequencingTestRequest) = ???
 }
