@@ -444,22 +444,19 @@ class HttpSvOperatorHandler(
               )
             }
           }
-          participantId <- partyToParticipant.mapping.participants match {
-            case Seq(participant) => Future.successful(participant.participantId.toProtoPrimitive)
+          participantIds <- partyToParticipant.mapping.participants match {
             case Seq() =>
               Future.failed(
                 HttpErrorHandler.notFound(s"No participant id found hosting party: $partyId")
               )
-            case _ =>
-              Future.failed(
-                HttpErrorHandler.internalServerError(
-                  s"Party $partyId is hosted on multiple participants, which is not currently supported"
-                )
+            case participants =>
+              Future.successful(
+                participants.map(_.participantId.toProtoPrimitive).toVector
               )
           }
         } yield {
           r0.GetPartyToParticipantResponse.OK(
-            definitions.GetPartyToParticipantResponse(participantId)
+            definitions.GetPartyToParticipantResponse(participantIds)
           )
         }
       }.recoverWith {

@@ -603,7 +603,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Party is hosted on a participant
+          description: Party is hosted on one or more participants
           content:
             application/json:
               schema:
@@ -1188,7 +1188,9 @@ components:
     GetPartyToParticipantResponse:
       type: object
       required:
-        - participant_id
+        - participant_ids
       properties:
-        participant_id:
-          type: string
+        participant_ids:
+          type: array
+          items:
+            type: string

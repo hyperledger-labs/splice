@@ -598,9 +598,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     val partyComponents = sv1Party.split("::", 2)
     val sv1PartyPrefix = s"${partyComponents(0)}::${partyComponents(1).take(1)}"
 
-    clue("looking up a known party returns a non-empty participant id") {
+    clue("looking up a known party returns a non-empty participant ids") {
       val response = sv1Backend.getPartyToParticipant(sv1Party)
-      response.participantId should not be empty withClue "participantId"
+      response.participantIds should not be empty withClue "participantIds"
     }
 
     clue("looking up a prefix of a known party fails with a 404") {
