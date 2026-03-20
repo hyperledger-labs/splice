@@ -24,10 +24,10 @@ import DA.Time
 import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1
-import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
-import Splice.Api.Token.AllocationRequestV1
-import Splice.Api.Token.AllocationInstructionV1
+import Splice.Api.Token.HoldingV2
+import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
+import Splice.Api.Token.AllocationRequestV2
+import Splice.Api.Token.AllocationInstructionV2
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils (burnedMetaKey)
@@ -75,7 +75,7 @@ setupOtcTrade  = do
   AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
   AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
 
-  let mkTransfer sender receiver amount = Api.Token.AllocationV1.TransferLeg with
+  let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
         sender
         receiver
         amount
@@ -172,7 +172,7 @@ setupOtcTrade  = do
     with
       expectedAdmin = registry.dso
       actor = alice
-  factoryView === Splice.Api.Token.AllocationInstructionV1.AllocationFactoryView registry.dso emptyMetadata
+  factoryView === Splice.Api.Token.AllocationInstructionV2.AllocationFactoryView registry.dso emptyMetadata
   pure AllocatedOTCTrade with
     alice
     bob

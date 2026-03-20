@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Types and interfaces for retrieving an investor's holdings.
-module Splice.Api.Token.HoldingV1 where
+module Splice.Api.Token.HoldingV2 where
 
 import DA.Time (RelTime)
 
