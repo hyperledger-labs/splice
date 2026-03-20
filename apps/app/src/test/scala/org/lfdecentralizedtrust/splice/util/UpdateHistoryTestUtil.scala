@@ -105,7 +105,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       updateHistory: UpdateHistory,
       ledgerBegin: Long,
       mustIncludeReassignments: Boolean = false,
-      extTxnHashes: Set[String] = Set.empty,
+      extTxnHashes: Seq[String] = Seq.empty,
   ): Assertion = {
     compareHistory(participant, updateHistory, ledgerBegin, mustIncludeReassignments)
     val actualUpdates = {
@@ -180,7 +180,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   private def compareExternalTxnHashes(
       actualUpdates: Seq[UpdateHistoryResponse],
       recordedUpdates: Seq[UpdateHistoryResponse],
-      extTxnHashes: Set[String],
+      extTxnHashes: Seq[String],
   ): Assertion = {
     // Ensure at least one transaction with external hash is available
     // and that all expected hashes are present in the recorded updates
@@ -252,7 +252,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
   def compareHistoryViaLosslessScanApiWithExtTxnHashes(
       scanClient: ScanAppClientReference,
-      extTxnHashes: Set[String] = Set.empty,
+      extTxnHashes: Seq[String] = Seq.empty,
   ): Assertion = {
     val historyThroughApi = scanClient
       .getUpdateHistory(

@@ -2431,12 +2431,6 @@ object UpdateHistory {
 
   sealed trait BackfillingRequirement
 
-  sealed trait ExternalHashInclusion
-  object ExternalHashInclusion {
-    case object ApplyThreshold extends ExternalHashInclusion
-    case object AlwaysInclude extends ExternalHashInclusion
-  }
-
   object BackfillingRequirement {
 
     /** This history is guaranteed to have started ingestion early enough
