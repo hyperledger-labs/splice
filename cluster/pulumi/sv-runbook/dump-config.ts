@@ -9,7 +9,9 @@ import {
 async function main() {
   await initDumpConfig();
 
+  /* eslint-disable no-process-env */
   process.env.ARTIFACTORY_USER = 'artie';
+  /* eslint-disable no-process-env */
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
 
   const installNode = await import('./src/installNode');
@@ -32,7 +34,7 @@ async function main() {
     walletUserName: svRunbookConfig.validatorWalletUser!,
   };
 
-  installNode.installNode(
+  await installNode.installNode(
     authOClient,
     svRunbookConfig.nodeName,
     svAppConfig,
@@ -41,4 +43,7 @@ async function main() {
   );
 }
 
-main();
+main().catch(e => {
+  console.error(e.stack ?? e.message ?? e);
+  process.exit(1);
+});

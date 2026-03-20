@@ -7,10 +7,14 @@ import { initDumpConfig } from '../common/src/dump-config-common';
 async function main() {
   await initDumpConfig();
 
+  /* eslint-disable no-process-env */
   process.env.SLACK_ACCESS_TOKEN = 's3cr3t';
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const infra: typeof import('./src/index') = await import('./src/index');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
-main();
+main().catch(e => {
+  console.error(e.stack ?? e.message ?? e);
+  process.exit(1);
+});
