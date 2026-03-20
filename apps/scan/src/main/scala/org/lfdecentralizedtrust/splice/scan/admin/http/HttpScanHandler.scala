@@ -2218,6 +2218,12 @@ class HttpScanHandler(
           topologySnapshot =
             TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
         )
+        _ <-
+          if (response.mapping.partyId == party) Future.unit
+          else
+            Future.failed(
+              HttpErrorHandler.notFound(s"Party not found: $party")
+            )
         participantIds <- response.mapping.participantIds match {
           case Seq() =>
             Future.failed(
