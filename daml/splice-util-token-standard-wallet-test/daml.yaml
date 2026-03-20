@@ -13,7 +13,7 @@ data-dependencies:
   - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
   - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
   - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
-  - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
+  - ../../token-standard/splice-token-standard-test-v1/.daml/dist/splice-token-standard-test-v1-current.dar
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
