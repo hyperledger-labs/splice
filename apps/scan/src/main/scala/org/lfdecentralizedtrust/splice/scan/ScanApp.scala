@@ -370,6 +370,7 @@ class ScanApp(
         packageVersionSupport,
         bftSequencersWithAdminConnections,
         initialRound,
+        externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
         config.updateHistoryMaxPageSize,
       )
       scanStreamHandler = new HttpScanStreamHandler(
