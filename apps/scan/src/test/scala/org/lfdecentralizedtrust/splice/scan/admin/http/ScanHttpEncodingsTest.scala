@@ -691,5 +691,17 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         value.externalTransactionHash shouldBe None
       }
     }
+
+    "not return the hash when threshold date is not provided" in {
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe None
+      }
+    }
   }
 }
