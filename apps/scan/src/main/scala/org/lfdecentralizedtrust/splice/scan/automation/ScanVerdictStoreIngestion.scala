@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
+import com.daml.grpc.GrpcException
 import org.lfdecentralizedtrust.splice.automation.{
   SourceBasedTrigger,
   TaskOutcome,
@@ -14,7 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.scan.mediator.MediatorVerdictsClient
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
-import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanVerdictStore}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -30,12 +31,13 @@ import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import monocle.Monocle.toAppliedFocusOps
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-
+import com.digitalasset.base.error.utils.ErrorDetails
 import org.lfdecentralizedtrust.splice.scan.rewards.AppActivityComputation
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import com.digitalasset.canton.mediator.admin.v30
+import io.grpc.protobuf.StatusProto
 
 class ScanVerdictStoreIngestion(
     originalContext: TriggerContext,
@@ -146,6 +148,25 @@ class ScanVerdictStoreIngestion(
                 DbScanVerdictStore
                   .fromProtoWithCorrelation(proto, viewHashToViewIdByTime, logger)
               })
+              // TODO(#4060): handle missing traffic summaries more robustly. In particular,
+              // note that the whole call will fail if ANY of the requested traffic summaries are missing.
+              // This workaround may therefore drop existing traffic summaries.
+              .recoverWith { case ex @ GrpcException(status, trailers) =>
+                val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+                val errorDetails = ErrorDetails.from(statusProto)
+                val errorCodeId = errorDetails
+                  .flatMap {
+                    case ed: ErrorDetails.ErrorInfoDetail =>
+                      Some(ed.errorCodeId)
+                    case _ => None
+                  }
+                  .headOption
+                  .getOrElse("none")
+                if (errorCodeId == "NO_EVENT_AT_TIMESTAMPS")
+                  Future.successful(Seq.empty)
+                else
+                  Future.failed(ex)
+              }
           case _ =>
             Future.successful(Seq.empty)
         }
