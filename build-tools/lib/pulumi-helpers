@@ -96,7 +96,7 @@ function _remove_pulumi_finalizers() {
             _info "$resource $name in namespace $namespace has no finalizers, skipping"
           else
             _info "$resource $name in namespace $namespace has finalizers $finalizers"
-            new_finalizers=$(jq 'del(.[] | select(. | IN("finalizers.stack.pulumi.com", "finalizers.fluxcd.io")))' <<< "$finalizers")
+            new_finalizers=$(jq 'del(.[] | select(. | IN("finalizers.stack.pulumi.com", "finalizer.stack.pulumi.com", "finalizers.fluxcd.io")))' <<< "$finalizers")
             patch_payload="{\"metadata\":{\"finalizers\": $new_finalizers}}"
             _info "Patch payload for $resource $name in namespace $namespace: $patch_payload"
             kubectl patch -n "$namespace" "$resource" "$name" -p "$patch_payload" --type=merge

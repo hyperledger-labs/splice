@@ -920,6 +920,7 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
           config.latestPackagesOnly,
+          config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
         )
         _ <- vetting.vetCurrentPackages(
           synchronizerId,
