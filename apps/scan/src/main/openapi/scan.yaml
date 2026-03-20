@@ -164,9 +164,7 @@ paths:
       x-jvm-package: scan
       operationId: "getPartyToParticipant"
       description: |
-        Get the ID of the participant hosting a given party.  This will fail if
-        there are multiple party-to-participant mappings for the given
-        synchronizer and party, which is not currently supported.
+        Get the IDs of the participants hosting a given party.
       parameters:
         - name: "domain_id"
           description: |
@@ -3656,13 +3654,15 @@ components:
           format: int64
     GetPartyToParticipantResponse:
       type: object
-      required: [ "participant_id" ]
+      required: [ "participant_ids" ]
       properties:
-        participant_id:
+        participant_ids:
           description: |
-            ID of the participant hosting the provided party, in the form
+            IDs of the participants hosting the provided party, each in the form
             `PAR::id::fingerprint`
-          type: string
+          type: array
+          items:
+            type: string
     GetValidatorFaucetsByValidatorResponse:
       type: object
       required: [ "validatorsReceivedFaucets" ]

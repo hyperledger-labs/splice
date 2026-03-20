@@ -327,12 +327,12 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "Get the id of the participant hosting a given party"
+    "Get the ids of the participants hosting a given party"
   )
   def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
-  ): ParticipantId =
+  ): Seq[ParticipantId] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
     }

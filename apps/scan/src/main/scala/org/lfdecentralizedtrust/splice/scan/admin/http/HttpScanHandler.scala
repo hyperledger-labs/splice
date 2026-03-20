@@ -2218,22 +2218,16 @@ class HttpScanHandler(
           topologySnapshot =
             TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
         )
-        participantId <- response.mapping.participantIds match {
+        participantIds <- response.mapping.participantIds match {
           case Seq() =>
             Future.failed(
               HttpErrorHandler.notFound(
                 s"No participant id found hosting party: $party"
               )
             )
-          case Seq(participantId) => Future.successful(participantId)
-          case _ =>
-            Future.failed(
-              HttpErrorHandler.internalServerError(
-                s"Party ${party} is hosted on multiple participants, which is not currently supported"
-              )
-            )
+          case ids => Future.successful(ids.map(_.toProtoPrimitive).toVector)
         }
-      } yield definitions.GetPartyToParticipantResponse(participantId.toProtoPrimitive)
+      } yield definitions.GetPartyToParticipantResponse(participantIds)
     }
   }
 
