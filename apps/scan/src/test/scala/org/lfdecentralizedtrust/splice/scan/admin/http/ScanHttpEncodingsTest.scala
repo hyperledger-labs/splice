@@ -298,7 +298,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     )
 
     val withoutLocalData = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original, None)
+      .makeConsistentAcrossSvs(original, ExternalHashInclusion.AlwaysInclude)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -344,7 +344,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
     // makeConsistentAcrossSvs() should be idempotent
     val withoutLocalData2 = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original, None)
+      .makeConsistentAcrossSvs(original, ExternalHashInclusion.AlwaysInclude)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -677,7 +677,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           mkTree,
           DamlValueEncoding.ProtobufJson,
           ScanHttpEncodings.V1,
-          externalTransactionHashThresholdTime = Some(thresholdDate),
+          hashInclusion = ExternalHashInclusion.ApplyThreshold(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
         value.externalTransactionHash shouldBe Some(extTxnHashHexString)
@@ -691,7 +691,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           mkTree,
           DamlValueEncoding.ProtobufJson,
           ScanHttpEncodings.V1,
-          externalTransactionHashThresholdTime = Some(thresholdDate),
+          hashInclusion = ExternalHashInclusion.ApplyThreshold(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
         value.externalTransactionHash shouldBe None

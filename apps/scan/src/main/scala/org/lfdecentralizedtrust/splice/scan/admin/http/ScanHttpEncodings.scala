@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
   TrafficSummaryT,
   TransactionViewT,
@@ -31,6 +32,21 @@ import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+
+/** Controls whether external transaction hashes are included in encoded responses.
+  *
+  * - `AlwaysInclude`: The hash is always included if present (used for by-ID lookups).
+  * - `ApplyThreshold(threshold)`: The hash is only included for transactions recorded on or after
+  *   the given threshold time
+  */
+sealed trait ExternalHashInclusion
+object ExternalHashInclusion {
+  case object AlwaysInclude extends ExternalHashInclusion
+  final case class ApplyThreshold(threshold: Instant) extends ExternalHashInclusion
+
+  def fromThresholdTime(thresholdTime: Option[Instant]): ExternalHashInclusion =
+    thresholdTime.fold[ExternalHashInclusion](AlwaysInclude)(ApplyThreshold(_))
+}
 
 /** Transcodes between different representations of ledger updates:
   *
@@ -531,7 +547,9 @@ object ScanHttpEncodings {
       update: TreeUpdateWithMigrationId,
       encoding: definitions.DamlValueEncoding,
       version: ApiVersion,
-      externalTransactionHashThresholdTime: Option[Instant] = None,
+      hashInclusion: ExternalHashInclusion = ExternalHashInclusion.fromThresholdTime(
+        ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime
+      ),
   )(implicit
       elc: ErrorLoggingContext
   ): definitions.UpdateHistoryItem = {
@@ -539,7 +557,7 @@ object ScanHttpEncodings {
       case V0 =>
         update
       case V1 =>
-        ScanHttpEncodings.makeConsistentAcrossSvs(update, externalTransactionHashThresholdTime)
+        ScanHttpEncodings.makeConsistentAcrossSvs(update, hashInclusion)
     }
     val encodings: ScanHttpEncodings = encoding match {
       case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings()
@@ -565,30 +583,26 @@ object ScanHttpEncodings {
     */
   def makeConsistentAcrossSvs(
       update: TreeUpdateWithMigrationId,
-      externalTransactionHashThresholdTime: Option[Instant],
+      hashInclusion: ExternalHashInclusion,
   ): TreeUpdateWithMigrationId = {
-    update.copy(update =
-      makeConsistentAcrossSvs(update.update, externalTransactionHashThresholdTime)
-    )
+    update.copy(update = makeConsistentAcrossSvs(update.update, hashInclusion))
   }
 
   def makeConsistentAcrossSvs(
       response: UpdateHistoryResponse,
-      externalTransactionHashThresholdTime: Option[Instant],
+      hashInclusion: ExternalHashInclusion,
   ): UpdateHistoryResponse = {
-    response.copy(update =
-      makeConsistentAcrossSvs(response.update, externalTransactionHashThresholdTime)
-    )
+    response.copy(update = makeConsistentAcrossSvs(response.update, hashInclusion))
   }
 
   def makeConsistentAcrossSvs(
       update: ledgerApi.TreeUpdate,
-      externalTransactionHashThresholdTime: Option[Instant],
+      hashInclusion: ExternalHashInclusion,
   ): ledgerApi.TreeUpdate = {
     update match {
       case ledgerApi.TransactionTreeUpdate(tree) =>
         ledgerApi.TransactionTreeUpdate(
-          makeConsistentAcrossSvs(tree, externalTransactionHashThresholdTime)
+          makeConsistentAcrossSvs(tree, hashInclusion)
         )
       case ledgerApi.ReassignmentUpdate(transfer) =>
         transfer.event match {
@@ -635,7 +649,7 @@ object ScanHttpEncodings {
 
   def makeConsistentAcrossSvs(
       tree: javaApi.Transaction,
-      externalTransactionHashThresholdTime: Option[Instant],
+      hashInclusion: ExternalHashInclusion,
   ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
@@ -694,10 +708,13 @@ object ScanHttpEncodings {
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
 
-    // Only include the external transaction hash for transactions recorded on or after the threshold timestamp.
+    // Only include the external transaction hash based on the hash inclusion policy.
     val externalTransactionHash: ByteString =
-      externalTransactionHashThresholdTime match {
-        case Some(threshold) if !tree.getRecordTime.isBefore(threshold) =>
+      hashInclusion match {
+        case ExternalHashInclusion.AlwaysInclude =>
+          tree.getExternalTransactionHash
+        case ExternalHashInclusion.ApplyThreshold(threshold)
+            if !tree.getRecordTime.isBefore(threshold) =>
           tree.getExternalTransactionHash
         case _ =>
           ByteString.EMPTY

@@ -147,6 +147,9 @@ class HttpScanHandler(
   import HttpScanHandler.*
   private val store = storeWithIngestion.store
 
+  private val externalHashInclusion: ExternalHashInclusion =
+    ExternalHashInclusion.fromThresholdTime(externalTransactionHashThresholdTime)
+
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
@@ -762,7 +765,7 @@ class HttpScanHandler(
             _,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+            hashInclusion = externalHashInclusion,
           )
         )
         .toVector
@@ -859,7 +862,14 @@ class HttpScanHandler(
         case None => Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
         case Some((verdictWithViewsO, updateO)) =>
           val encodedUpdateV2 = updateO
-            .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+            .map(
+              ScanHttpEncodings
+                .encodeUpdate(
+                  _,
+                  encoding,
+                  ScanHttpEncodings.V1,
+                )
+            )
             .map(toUpdateV2)
           val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
             ScanHttpEncodings.encodeVerdict(v, views)
@@ -916,7 +926,10 @@ class HttpScanHandler(
         )
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
-          .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+          .map(
+            ScanHttpEncodings
+              .encodeUpdate(_, encoding, ScanHttpEncodings.V1, externalHashInclusion)
+          )
           .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
@@ -1778,7 +1791,7 @@ class HttpScanHandler(
             txWithMigration,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+            hashInclusion = ExternalHashInclusion.AlwaysInclude,
           )
         )
       )
