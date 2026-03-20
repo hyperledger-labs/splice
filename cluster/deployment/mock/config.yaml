@@ -156,6 +156,9 @@ svs:
         limits:
           memory: '2048Mi'
     svApp:
+      additionalPackagesToUnvet:
+        splice-wallet-payments: [ "0.1.15", "0.1.16" ]
+        splice-amulet: [ "0.1.15" ]
       permissionedSynchronizer: false  # will be removed once the permissioned synchronizer is the default
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
