@@ -250,7 +250,7 @@ class ScanApp(
       )
       kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
       kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
-      bulkStorage = new BulkStorage(
+      bulkStorage = BulkStorage(
         scanStorageConfigV1,
         config.bulkStorage,
         acsSnapshotStore,
@@ -361,6 +361,7 @@ class ScanApp(
         updateHistory,
         acsSnapshotStore,
         scanEventStore,
+        bulkStorage,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
@@ -370,6 +371,7 @@ class ScanApp(
         packageVersionSupport,
         bftSequencersWithAdminConnections,
         initialRound,
+        externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
         config.updateHistoryMaxPageSize,
       )
       scanStreamHandler = new HttpScanStreamHandler(

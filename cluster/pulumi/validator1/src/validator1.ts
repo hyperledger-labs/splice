@@ -4,7 +4,7 @@ import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgr
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
   activeVersion,
@@ -40,7 +40,7 @@ export async function installValidator1(
   splitPostgresInstances: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
-  backupConfig?: BackupConfig,
+  backupConfig?: BucketConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig,
   autoAcceptTransfers?: AutoAcceptTransfersConfig

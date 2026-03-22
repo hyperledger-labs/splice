@@ -16,6 +16,8 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.store.Limit
 
+import java.time.Instant
+
 trait BaseScanAppConfig {}
 
 final case class ScanSynchronizerConfig(
@@ -82,6 +84,11 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
+    // TODO(#4249): use on-ledger synchronization for switching record times
+    externalTransactionHashThresholdTime: Option[Instant] = Some(
+      java.time.Instant.parse("2030-01-01T00:00:00Z")
+    ),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {

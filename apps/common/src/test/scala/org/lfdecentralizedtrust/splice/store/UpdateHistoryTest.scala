@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.{HexString, MonadUtil}
 import com.digitalasset.daml.lf.data.Bytes
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 }
 import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
+import com.daml.ledger.javaapi.data.Transaction
 
 import java.time.Instant
 import java.util.Collections
@@ -31,6 +32,7 @@ import scala.jdk.OptionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import StoreTestBase.*
 import cats.data.NonEmptyList
+import com.google.protobuf.ByteString
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -999,6 +1001,74 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           migrationId <- UpdateHistory.getHighestKnownMigrationId(storage)
         } yield {
           migrationId shouldBe Some(migration2)
+        }
+      }
+    }
+
+    def extractTransactionTree(
+        updates: Seq[TreeUpdateWithMigrationId]
+    ): Transaction =
+      updates.loneElement.update.update match {
+        case TransactionTreeUpdate(tree) => tree
+        case u => fail(s"unexpected update $u")
+      }
+
+    "getExternalTransactionHash" should {
+      "return stored external transaction hash when empty" in {
+        val store = mkStore()
+        val externalTransactionHash = ByteString.EMPTY
+        for {
+          _ <- initStore(store)
+          expectedUpdate <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(),
+              synchronizerId = domain1,
+              externalTransactionHash = externalTransactionHash,
+            )
+          })(store)
+          updates <- store.getAllUpdates(
+            None,
+            PageLimit.Max,
+          )
+        } yield {
+          updates should have size 1
+          val storedTransaction = extractTransactionTree(updates)
+          storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
+          storedTransaction.getExternalTransactionHash should be(
+            expectedUpdate.getExternalTransactionHash
+          )
+        }
+      }
+
+      "return stored external transaction hash when not empty" in {
+        val store = mkStore()
+
+        val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+        val externalTxnHashByteString =
+          HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
+        for {
+          _ <- initStore(store)
+          expectedUpdate <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(),
+              synchronizerId = domain1,
+              externalTransactionHash = externalTxnHashByteString,
+            )
+          })(store)
+          updates <- store.getAllUpdates(
+            None,
+            PageLimit.Max,
+          )
+        } yield {
+          updates should have size 1
+          val storedTransaction = extractTransactionTree(updates)
+          storedTransaction.getExternalTransactionHash should be(externalTxnHashByteString)
+          storedTransaction.getExternalTransactionHash should be(
+            expectedUpdate.getExternalTransactionHash
+          )
         }
       }
     }

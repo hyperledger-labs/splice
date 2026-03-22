@@ -3,7 +3,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   ChartValues,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
@@ -126,7 +126,7 @@ type ValidatorDeploymentConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
   onboardingSecret?: string;
-  backupConfig?: BackupConfig;
+  backupConfig?: BucketConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
