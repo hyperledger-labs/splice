@@ -26,20 +26,10 @@ export type ExternalRateLimit = z.infer<typeof RateLimitSchema>;
 
 export const RateLimitSchema = z.object({
   globalLimits: BucketRateLimitSchema,
-  rateLimits: z.array(
+  rateLimits: z.object({}).catchall(
     z.object({
-      actions: z.array(
-        z.union([
-          z.object({
-            name: z.string(),
-            pathPrefix: z.string(),
-          }),
-          z.object({
-            name: z.string(),
-            clientIp: z.boolean(),
-          }),
-        ])
-      ),
+      name: z.string(),
+      clientIp: z.boolean(),
       limits: RateLimitConfigSchema,
     })
   ),

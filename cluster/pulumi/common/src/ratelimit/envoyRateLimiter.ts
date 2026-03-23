@@ -26,21 +26,20 @@ export interface PathPrefixInfo {
   isBanned: boolean;
 }
 
-type LocalLimits<L> = LocalLimit<L>[];
+interface LocalLimits<L> {
+  [pathPrefix: string]: LocalLimit<L>;
+}
 
 interface LocalLimit<L> {
-  actions: (
-    | {
-        name: string;
-        pathPrefix: string;
-      }
-    | {
-        name: string;
-        clientIp: boolean;
-      }
-  )[];
+  name: string;
+  clientIp: boolean;
   limits: L;
 }
+
+// This is arbitrary, but must not match any limit `name` used for an EnvoyFilter
+// above. All existing manual YAML entries use 'client_ip' so this is the nicest
+// migration away from always specifying that.
+const clientIpEntryKey = 'client_ip';
 
 interface RateLimitEnvoyFilterArgs extends PerEndpointLimits {
   namespace: string;
@@ -67,19 +66,10 @@ export function extractPathPrefixes(
     return [];
   }
 
-  return rateLimits
-    .flatMap(rl => {
+  return Object.entries(rateLimits)
+    .map(([pathPrefix, rl]) => {
       const isBanned = 'type' in rl.limits && rl.limits.type === 'banned';
-      return rl.actions.flatMap(action =>
-        'pathPrefix' in action
-          ? [
-              {
-                pathPrefix: action.pathPrefix,
-                isBanned,
-              },
-            ]
-          : []
-      );
+      return { pathPrefix, isBanned };
     })
     .filter(info => info.pathPrefix.startsWith('/api/scan'));
 }
@@ -107,10 +97,9 @@ function validateEffectiveRateLimits(
   // Validate scan.yaml endpoint coverage
   const scanEndpoints = parseScanYamlEndpoints();
 
-  const configuredScanPrefixes = (args.rateLimits || [])
-    .flatMap(rl => rl.actions)
-    .filter(action => 'pathPrefix' in action && action.pathPrefix.startsWith('/api/scan'))
-    .map(action => ('pathPrefix' in action ? action.pathPrefix : ''));
+  const configuredScanPrefixes = Object.keys(args.rateLimits || {}).filter(pathPrefix =>
+    pathPrefix.startsWith('/api/scan')
+  );
 
   const { missing, orphaned } = validateEndpointCoverage(scanEndpoints, configuredScanPrefixes);
 
@@ -130,12 +119,15 @@ function validateEffectiveRateLimits(
   }
 
   // Filter out banned and unlimited entries
-  return args.rateLimits?.filter((rl): rl is LocalLimit<Limits> => {
-    // TODO (#4201): in banned case, implement actual banning with special short-circuit for whitelisted IPs
-    // Currently skipping banned endpoints instead of setting 0/0 limits
-    // in unlimited case, we fall back to globalRateLimit so don't need a rule
-    return !('type' in rl.limits);
-  });
+  return Object.fromEntries(
+    Object.entries(args.rateLimits || {}).filter((ent): ent is [string, LocalLimit<Limits>] => {
+      // TODO (#4201): in banned case, implement actual banning with special short-circuit for whitelisted IPs
+      // Currently skipping banned endpoints instead of setting 0/0 limits
+      // in unlimited case, we fall back to globalRateLimit so don't need a rule
+      const [, rl] = ent;
+      return !('type' in rl.limits);
+    })
+  );
 }
 
 export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
@@ -150,35 +142,35 @@ export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
     const effectiveRateLimits = validateEffectiveRateLimits(args);
 
     const rateLimitActions: unknown[] =
-      effectiveRateLimits?.map(rateLimit => {
+      Object.entries(effectiveRateLimits || {}).map(([pathPrefix, rateLimit]) => {
         return {
-          actions: rateLimit.actions.map(action => {
-            if ('pathPrefix' in action) {
-              return {
-                header_value_match: {
-                  descriptor_value: action.name,
-                  expect_match: true,
-                  headers: [
-                    {
-                      name: ':path',
-                      string_match: {
-                        prefix: action.pathPrefix,
-                        ignore_case: true,
-                      },
+          actions: [
+            {
+              header_value_match: {
+                descriptor_value: rateLimit.name,
+                expect_match: true,
+                headers: [
+                  {
+                    name: ':path',
+                    string_match: {
+                      prefix: pathPrefix,
+                      ignore_case: true,
                     },
-                  ],
-                },
-              };
-            } else if (action.clientIp) {
-              return {
-                request_headers: {
-                  descriptor_key: 'client_ip',
-                  header_name: 'x-forwarded-for',
-                },
-              };
-            }
-            throw new Error(`Unsupported action: ${JSON.stringify(action)}`);
-          }),
+                  },
+                ],
+              },
+            },
+            ...(rateLimit.clientIp
+              ? [
+                  {
+                    request_headers: {
+                      descriptor_key: 'client_ip',
+                      header_name: 'x-forwarded-for',
+                    },
+                  },
+                ]
+              : []),
+          ],
         };
       }) || [];
 
@@ -289,21 +281,15 @@ proxyStatsMatcher:
                       // simplified descriptors by combining with actions and requiring all the tokens of an action to be set
                       // a descriptor in practice is a subset of tags from a rate limit
                       // but important to note that for each rate limit only one descriptor can match, if multiple descriptors match, the first one is used
-                      descriptors: effectiveRateLimits?.map(rateLimit => {
+                      descriptors: Object.values(effectiveRateLimits || {}).map(rateLimit => {
                         return {
-                          entries: rateLimit.actions.map(action => {
-                            if ('pathPrefix' in action) {
-                              return {
-                                key: 'header_match',
-                                value: action.name,
-                              };
-                            } else if (action.clientIp) {
-                              return {
-                                key: action.name,
-                              };
-                            }
-                            throw new Error(`Unsupported action: ${JSON.stringify(action)}`);
-                          }),
+                          entries: [
+                            {
+                              key: 'header_match',
+                              value: rateLimit.name,
+                            },
+                            ...(rateLimit.clientIp ? [{ key: clientIpEntryKey }] : []),
+                          ],
                           token_bucket: {
                             max_tokens: rateLimit.limits.maxTokens,
                             tokens_per_fill: rateLimit.limits.tokensPerFill,
