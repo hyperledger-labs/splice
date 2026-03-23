@@ -205,6 +205,9 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    appsPg:
+      cloudSql:
+        tier: "apps-pg-override-tier"
     periodicSnapshots:
       topology:
         backupInterval: '12h'

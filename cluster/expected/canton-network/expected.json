@@ -2536,7 +2536,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "apps-pg-override-tier",
         "userLabels": {
           "cluster": "mock"
         }

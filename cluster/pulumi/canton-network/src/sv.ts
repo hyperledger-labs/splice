@@ -245,7 +245,7 @@ export async function installSvNode(
       `cn-apps-pg`,
       `cn-apps-pg`,
       config.version,
-      spliceConfig.pulumiProjectConfig.cloudSql,
+      svConfig.appsPg?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       {
         logicalDecoding: !!baseConfig.scanBigQuery,
