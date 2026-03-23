@@ -51,7 +51,7 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZ2NwLXRvcG9sb2d5LXNuYXBzaG90LWJ1Y2tldC1zYS1rZXktc2VjcmV0IiwianNvbkNyZWRlbnRpYWxzIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQtY3JlZHMiLCJidWNrZXRTYUtleVNlY3JldCI6ImdjcC10b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LWV4YW1wbGUiLCJidWNrZXRTYUlhbUFjY291bnQiOiJkYS1jbi1leGFtcGxldEBkYS1jbi1zaGFyZWQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ=="
+          "json-credentials": "eyJwcm9qZWN0SWQiOiJkYS1jbi1zaGFyZWQiLCJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZ2NwLXRvcG9sb2d5LXNuYXBzaG90LWJ1Y2tldC1zYS1rZXktc2VjcmV0IiwianNvbkNyZWRlbnRpYWxzIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQtY3JlZHMiLCJidWNrZXRTYUtleVNlY3JldCI6ImdjcC10b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LWV4YW1wbGUiLCJidWNrZXRTYUlhbUFjY291bnQiOiJkYS1jbi1leGFtcGxldEBkYS1jbi1zaGFyZWQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ=="
         }
       },
       "kind": "Secret",
@@ -3197,7 +3197,7 @@
           "location": {
             "bucket": {
               "bucketName": "cn-topology-snapshots",
-              "jsonCredentials": "{\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
+              "jsonCredentials": "{\"projectId\":\"da-cn-shared\",\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
               "projectId": "da-cn-shared",
               "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
             },
