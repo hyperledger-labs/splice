@@ -13,6 +13,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import io.grpc.Status
 import slick.jdbc.{GetResult, PostgresProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -509,17 +510,43 @@ class DbScanAppRewardsStore(
   )(implicit tc: TraceContext): Future[Unit] = {
     val historyId = updateHistory.historyId
     runUpdate(
-      (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
-        ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
-        ++ insertRoundTotals(historyId, roundNumber)).asUpdate
-        .map(_ =>
-          logger.debug(
-            s"Aggregated activity totals for round $roundNumber."
+      assertCompleteActivity(roundNumber).flatMap(_ =>
+        (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
+          ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
+          ++ insertRoundTotals(historyId, roundNumber)).asUpdate
+          .map(_ =>
+            logger.debug(
+              s"Aggregated activity totals for round $roundNumber."
+            )
           )
-        ),
+      ),
       "appRewards.aggregateActivityTotals",
     )
   }
+
+  /** Safety check: assert that activity records exist for both roundNumber - 1
+    * and roundNumber + 1, which is the completeness condition for roundNumber.
+    * A round with no activity of its own is valid (no featured app traffic),
+    * but surrounding rounds must have data to prove ingestion has covered it.
+    */
+  private def assertCompleteActivity(roundNumber: Long) =
+    for {
+      hasPrev <- sql"""select exists(
+                         select 1 from app_activity_record_store
+                         where round_number = ${roundNumber - 1}
+                       )""".as[Boolean].head
+      hasNext <- sql"""select exists(
+                         select 1 from app_activity_record_store
+                         where round_number = ${roundNumber + 1}
+                       )""".as[Boolean].head
+      _ = if (!hasPrev || !hasNext)
+        throw Status.FAILED_PRECONDITION
+          .withDescription(
+            s"Incomplete app activity for round $roundNumber: " +
+              s"round ${roundNumber - 1} exists=$hasPrev, round ${roundNumber + 1} exists=$hasNext"
+          )
+          .asRuntimeException()
+    } yield ()
 
   /** Unnest per-verdict activity arrays and aggregate weights by party. */
   private def unnestAndAggregate(historyId: Long, roundNumber: Long) =
