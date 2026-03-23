@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
@@ -138,8 +139,9 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           newExtraTrafficLimit = NonNegativeLong
             .tryCreate(trafficLimitOffset + totalPurchasedTraffic)
 
-          // Get current sequencer domain state
-          sequencerSynchronizerState <- sequencerAdminConnection.getSequencerSynchronizerState()
+          // Get current effective sequencer domain state
+          sequencerSynchronizerState <- sequencerAdminConnection
+            .getSequencerSynchronizerState(topologySnapshot = TopologySnapshot.Effective)
           currentExtraTrafficLimit = trafficState.extraTrafficLimit
 
           // Compare and reconcile old and new limits

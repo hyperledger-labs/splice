@@ -346,6 +346,7 @@ class SvDsoAutomationService(
         triggerContext,
         config.maxVettingDelay,
         config.latestPackagesOnly,
+        enabledFeatures.enableUnsupportedDarsUnvetting,
       )
     )
 
@@ -440,6 +441,7 @@ class SvDsoAutomationService(
           dsoStore,
           internalClientConfig.sequencerInternalConfig,
           config.participantClient.sequencerRequestAmplification,
+          config.participantClient.sequencerConnectionPoolDelays,
           config.domainMigrationId,
           reconnectOnSynchronizerConfigurationChange =
             enabledFeatures.reconnectOnSynchronizerConfigurationChange,
@@ -471,6 +473,15 @@ class SvDsoAutomationService(
       )
     }
   }
+
+  registerTrigger(
+    new CreateBootstrapExternalPartyConfigStateInstructionTrigger(
+      triggerContext,
+      packageVersionSupport,
+      dsoStore,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
 }
 
 object SvDsoAutomationService extends AutomationServiceCompanion {
@@ -522,5 +533,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
+      aTrigger[CreateBootstrapExternalPartyConfigStateInstructionTrigger],
     )
 }

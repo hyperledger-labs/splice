@@ -4,7 +4,9 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
@@ -14,6 +16,8 @@ import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
 
 import java.net.URI
 import java.nio.ByteBuffer
+import java.security.MessageDigest
+import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,40 +25,25 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 
 class S3BucketConnection(
-    val s3Client: S3AsyncClient,
-    bucketName: String,
+    s3Config: S3Config,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
-  // Reads the full content of an s3 object into a ByteBuffer.
-  // Use only for testing, when the object size is known to be small
-  def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
-    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
-    s3Client
-      .getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse])
-      .asScala
-      .map(_.asByteBuffer())
-  }
 
-  // Writes a full object from memory into an s3 object
-  def writeFullObject(key: String, content: ByteBuffer)(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Unit] = {
-    logger.debug(s"Writing ${content.array().length} bytes to S3 object $key")
-    val putObj: PutObjectRequest = PutObjectRequest
-      .builder()
-      .bucket(bucketName)
-      .key(key)
-      .build()
-    s3Client
-      .putObject(
-        putObj,
-        AsyncRequestBody.fromBytes(content.array()),
+  val s3Client = S3AsyncClient
+    .builder()
+    .endpointOverride(URI.create(s3Config.endpoint))
+    .region(
+      Region.of(s3Config.region)
+    ) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
+    .credentialsProvider(
+      StaticCredentialsProvider.create(
+        AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
       )
-      .asScala
-      // TODO(#3429): consider checking the checksum from the response
-      .map(_ => ())
-  }
+    )
+    // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
+    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+    .build()
+  val bucketName = s3Config.bucketName
 
   def newAppendWriteObject(
       key: String
@@ -62,6 +51,49 @@ class S3BucketConnection(
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+
+  def listObjectsSource(prefix: String): Source[S3Object, NotUsed] = {
+    val listRequest = ListObjectsV2Request
+      .builder()
+      .bucket(bucketName)
+      .prefix(prefix)
+      .build();
+    Source
+      .fromPublisher(
+        s3Client.listObjectsV2Paginator(listRequest)
+      )
+      .mapConcat(_.contents().asScala)
+  }
+
+  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+
+    val headRequest = HeadObjectRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .build()
+    for {
+      head <- s3Client.headObject(headRequest).asScala
+      checksum = head
+        .metadata()
+        .asScala
+        .getOrElse("splice-checksum", throw new RuntimeException("Missing checksum metadata"))
+    } yield checksum
+  }
+
+  def readObject(
+      key: String
+  )(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+
+    s3Client
+      .getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
+      .asScala
+      .map { publisher =>
+        org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
+      }
+      .map { _.map(ByteString.fromByteBuffer) }
+  }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */
@@ -72,21 +104,30 @@ class S3BucketConnection(
       .builder()
       .bucket(bucketName)
       .key(key)
-      .build();
+      .checksumAlgorithm(ChecksumAlgorithm.SHA256)
+      .build()
 
     private val uploadId = s3Client.createMultipartUpload(createRequest).asScala.map(_.uploadId())
     private val numParts = new AtomicInteger(0)
     private val parts = TrieMap.empty[Integer, CompletedPart]
+    private val md = MessageDigest.getInstance("SHA-256")
 
     /** Call this once before uploading a new part.
+      *  The content must already be provided for checksums, but will not be uploaded yet.
       */
-    def prepareUploadNext(): Int = numParts.incrementAndGet()
+    def prepareUploadNext(content: ByteBuffer): Int = {
+      md.update(content.duplicate())
+      numParts.incrementAndGet()
+    }
 
     /** Thread safe, may be called in parallel.
       *       partNumber must be an index returned from prepareUploadNext()
       */
     def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       require(numParts.get() >= partNumber)
+      val partMd = MessageDigest.getInstance("SHA-256")
+      partMd.update(content.duplicate())
+      val partDigest = partMd.digest()
       for {
         id <- uploadId
         partRequest = UploadPartRequest
@@ -95,6 +136,8 @@ class S3BucketConnection(
           .key(key)
           .uploadId(id)
           .partNumber(partNumber)
+          .checksumAlgorithm(ChecksumAlgorithm.SHA256)
+          .checksumSHA256(Base64.getEncoder.encodeToString(partDigest))
           .build()
         response <- s3Client
           .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
@@ -106,6 +149,7 @@ class S3BucketConnection(
               .builder()
               .partNumber(partNumber)
               .eTag(response.eTag())
+              .checksumSHA256(response.checksumSHA256())
               .build(),
           )
           .fold(
@@ -130,7 +174,7 @@ class S3BucketConnection(
         completedMultipartUpload = CompletedMultipartUpload
           .builder()
           .parts(parts.toSeq.sortBy(_._1).map(_._2).asJava)
-          .build();
+          .build()
 
         completeRequest = CompleteMultipartUploadRequest
           .builder()
@@ -141,8 +185,24 @@ class S3BucketConnection(
           .build()
 
         _ <- s3Client.completeMultipartUpload(completeRequest).asScala
+
+        // Copy-in-place of the object to add the final checksum to its metadata
+        metadata = Map("splice-checksum" -> Base64.getEncoder.encodeToString(md.digest()))
+
+        copyReq = CopyObjectRequest
+          .builder()
+          .destinationBucket(bucketName)
+          .destinationKey(key)
+          .sourceBucket(bucketName)
+          .sourceKey(key)
+          // Tells S3/GCS to ignore old metadata and use the new map
+          .metadataDirective(MetadataDirective.REPLACE)
+          .metadata(metadata.asJava)
+          .build()
+
+        _ <- s3Client.copyObject(copyReq).asScala
+
       } yield {
-        // TODO(#3429): consider checking the checksum from the response
         ()
       }
     }
@@ -155,21 +215,7 @@ object S3BucketConnection {
       loggerFactory: NamedLoggerFactory,
   ): S3BucketConnection = {
     new S3BucketConnection(
-      S3AsyncClient
-        .builder()
-        .endpointOverride(URI.create(s3Config.endpoint))
-        .region(
-          Region.of(s3Config.region)
-        ) // TODO(#3429): support global regions? The constructor with global=true seems to be private..
-        .credentialsProvider(
-          StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(s3Config.accessKeyId, s3Config.secretAccessKey)
-          )
-        )
-        // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .build(),
-      s3Config.bucketName,
+      s3Config,
       loggerFactory,
     )
   }

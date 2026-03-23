@@ -143,11 +143,8 @@ instance Monoid Metadata  where
 -- Choice context keys for splice
 ---------------------------------
 
-amuletRulesContextKey : Text
-amuletRulesContextKey = "amulet-rules"
-
-openRoundContextKey : Text
-openRoundContextKey = "open-round"
+externalPartyConfigStateContextKey : Text
+externalPartyConfigStateContextKey = "external-party-config-state"
 
 featuredAppRightContextKey : Text
 featuredAppRightContextKey = "featured-app-right"
@@ -177,16 +174,6 @@ expireLockKey = "expire-lock"
 
 -- Metadata utilities
 ---------------------
-
--- | Copy only the burn metadata. Used for token standard choices to copy the burn
--- from a transfer result.
-copyOnlyBurnMeta : Optional Metadata -> Metadata
-copyOnlyBurnMeta optOrigMeta = fromOptional emptyMetadata $ do
-  origMeta <- optOrigMeta
-  origValue <- TextMap.lookup burnedMetaKey origMeta.values
-  pure $ Metadata with
-    values =
-      TextMap.singleton burnedMetaKey origValue
 
 beneficiariesFromMetadata : Metadata -> Either Text (Optional [AppRewardBeneficiary])
 beneficiariesFromMetadata meta = do

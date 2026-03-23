@@ -24,7 +24,7 @@ data IssuanceConfig = IssuanceConfig with
     unfeaturedAppRewardCap : Decimal
     optValidatorFaucetCap : Optional Decimal
       -- ^ Maximal amount in $ for the per-validator issuance of validator faucet coupons;
-      -- Introduced as part of CIP-3. Defaults to 2.85 USD.
+      -- Introduced as part of CIP-0003. Will default to 0.00 USD once CIP-0096 becomes effective.
     optDevelopmentFundPercentage : Optional Decimal
       -- ^ Percentage of each mint emission allocated to the Development Fund under CIP-0082.
   deriving (Eq, Show)
@@ -166,6 +166,10 @@ computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons
   | totalCoupons <= 0.0 = IssuanceTranche with
       rewardsToIssue
       issuancePerCoupon = capPerCoupon  -- signal what could be earned with one coupon in this round
+      unclaimedRewards = rewardsToIssue
+  | capPerCoupon <= 0.0 = IssuanceTranche with
+      rewardsToIssue
+      issuancePerCoupon = 0.0
       unclaimedRewards = rewardsToIssue
   | otherwise =
       let

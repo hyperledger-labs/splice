@@ -6,7 +6,8 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
@@ -16,6 +17,10 @@ import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
+  AcsSnapshotObjects,
+  ObjectKeyAndChecksum,
+}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
@@ -36,15 +41,18 @@ class AcsSnapshotBulkStorage(
     kvProvider: ScanKeyValueProvider,
     historyMetrics: HistoryMetrics,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
-    extends NamedLogging {
+)(implicit actorSystem: ActorSystem, ec: ExecutionContext)
+    extends NamedLogging
+    with Spanning {
 
-  private def getStartTimestamp: Future[Option[TimestampWithMigrationId]] =
+  private def getStartTimestamp(implicit
+      tc: TraceContext
+  ): Future[Option[TimestampWithMigrationId]] =
     kvProvider.getLatestAcsSnapshotInBulkStorage().value
 
   private def getAcsSnapshotTimestampsAfter(
       start: TimestampWithMigrationId
-  ): Source[TimestampWithMigrationId, NotUsed] = {
+  )(implicit tc: TraceContext): Source[TimestampWithMigrationId, NotUsed] = {
     Source
       .unfoldAsync(start) { (last: TimestampWithMigrationId) =>
         acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
@@ -78,7 +86,7 @@ class AcsSnapshotBulkStorage(
     *   is successfully dumped, it persists to the DB its timestamp, and emits that timestamp as an output.
     *   It is an infinite source that should never complete.
     */
-  private def mksrc(): Source[TimestampWithMigrationId, Cancellable] = {
+  private def mksrc()(implicit tc: TraceContext): Source[TimestampWithMigrationId, Cancellable] = {
 
     // Wait for update history to initialize and for history backfilling to complete before starting bulk storage dumps
     val backfillingCompleteGate =
@@ -105,37 +113,48 @@ class AcsSnapshotBulkStorage(
             logger.info("No dumped snapshots yet, starting from genesis")
             getAcsSnapshotTimestampsAfter(TimestampWithMigrationId(CantonTimestamp.MinValue, 0))
         }
-        .filter { case TimestampWithMigrationId(ts, _) =>
-          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts)
+        .filter { ts =>
+          val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts.timestamp)
           if (ret) {
-            logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+            logger.debug(s"Dumping snapshot at timestamp ${ts.timestamp} to bulk storage")
           } else {
             logger.info(
-              s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+              s"Skipping snapshot at timestamp ${ts.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
             )
           }
           ret
         }
-        .via(
-          SingleAcsSnapshotBulkStorage.asFlow(
-            storageConfig,
-            appConfig,
-            acsSnapshotStore,
-            s3Connection,
-            historyMetrics,
-            loggerFactory,
-          )
-        )
-        .mapAsync(1) { (ts: TimestampWithMigrationId) =>
-          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
-          for {
-            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
-          } yield {
-            logger.info(
-              s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+        .flatMapConcat(ts =>
+          Source
+            .single(ts)
+            .via(
+              SingleAcsSnapshotBulkStorage
+                .asFlow(
+                  storageConfig,
+                  appConfig,
+                  acsSnapshotStore,
+                  s3Connection,
+                  historyMetrics,
+                  loggerFactory,
+                )
+                .map(keys => {
+                  logger.debug(
+                    s"Successfully dumped snapshot from migration ${ts.migrationId}, timestamp ${ts.timestamp} to bulk storage, with object keys: $keys"
+                  )
+                  ts
+                })
             )
-            ts
-          }
+        )
+        .mapAsync(1) { ts =>
+          historyMetrics.BulkStorage.latestAcsSnapshot.updateValue(ts.timestamp)
+          kvProvider
+            .setLatestAcsSnapshotsInBulkStorage(ts)
+            .map(_ => {
+              logger.info(
+                s"Successfully completed dumping snapshots from migration ${ts.migrationId}, timestamp ${ts.timestamp}"
+              )
+              ts
+            })
         }
     }
   }
@@ -145,15 +164,81 @@ class AcsSnapshotBulkStorage(
       backoffClock: Clock,
       retryProvider: RetryProvider,
   )(implicit tracer: Tracer): PekkoRetryingService[TimestampWithMigrationId] = {
-    val src = mksrc()
-    new PekkoRetryingService(
-      src,
-      Sink.ignore,
-      automationConfig,
-      backoffClock,
-      "ACS Snapshot Bulk Storage",
-      retryProvider,
-      loggerFactory,
-    )
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      val src = mksrc()
+      new PekkoRetryingService(
+        src,
+        Sink.ignore,
+        automationConfig,
+        backoffClock,
+        "ACS Snapshot Bulk Storage",
+        retryProvider,
+        loggerFactory,
+      )
+    }
   }
+
+  def getAcsSnapshotAtOrBefore(
+      atOrBeforeTimestamp: CantonTimestamp
+  )(implicit tc: TraceContext): Future[AcsSnapshotObjects] = {
+
+    for {
+      snapshotTs <- kvProvider
+        .getLatestAcsSnapshotInBulkStorage()
+        .value
+        .map {
+          case None =>
+            throw Status.NOT_FOUND
+              .withDescription("no snapshot in bulk storage yet")
+              .asRuntimeException()
+          case Some(ts) if ts.timestamp < atOrBeforeTimestamp =>
+            logger.trace(
+              s"Latest snapshot in bulk storage is at ${ts.timestamp}, which is before the requested timestamp ${atOrBeforeTimestamp}, returning that one"
+            )
+            ts.timestamp
+          case Some(ts) => storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
+        }
+      prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTs)
+      objects <- s3Connection
+        .listObjectsSource(prefix)
+        .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
+        .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
+          s3Connection
+            .readChecksum(obj.key)
+            .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
+        }
+        .runWith(Sink.seq[ObjectKeyAndChecksum])
+
+    } yield {
+      if (objects.isEmpty) {
+        throw Status.NOT_FOUND
+          .withDescription(
+            s"No snapshot objects found in bulk storage at expected timestamp at or before $atOrBeforeTimestamp, this may be because the timestamp is before network genesis"
+          )
+          .asRuntimeException()
+      }
+      logger.trace(
+        s"Found snapshot in bulk storage at timestamp $snapshotTs, with objects: ${objects.map(_.key).mkString(", ")}"
+      )
+      AcsSnapshotObjects(snapshotTs, objects)
+    }
+  }
+
+}
+
+object AcsSnapshotBulkStorage {
+  // TODO(#3429): we probably want to move this case class and part of the pipeline in getAcsSnapshotAtOrBefore to
+  //  S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the
+  //  size of the return). we'll do that in a coming PR, when we add support for querying the bulk storage
+  //  for updates as well.
+  case class ObjectKeyAndChecksum(
+      key: String,
+      checksum: String,
+  )
+
+  case class AcsSnapshotObjects(
+      timestamp: CantonTimestamp,
+      objects: Seq[ObjectKeyAndChecksum],
+  )
+
 }

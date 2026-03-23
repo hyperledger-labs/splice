@@ -54,12 +54,11 @@ abstract class BatchedMultiDomainExpiredContractTrigger[
       expiredContracts: Seq[AssignedContract[TCid, T]]
   )(implicit tc: TraceContext): Future[Seq[Batch[TCid, T]]] =
     vettingLookupService
-      .splitBatch[AssignedContract[TCid, T]](
+      .splitBatch(
         PackageIdResolver.Package.SpliceAmulet,
-        c => stakeholders(c.payload),
         expiredContracts,
         batchSize,
-      )
+      )(c => stakeholders(c.payload))
       .map {
         _.toSeq.flatMap {
           case (Some(version), contractBatches) => contractBatches.map(Batch(pkg, version, _))

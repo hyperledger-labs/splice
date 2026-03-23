@@ -4,6 +4,8 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.util.HexString
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -290,7 +292,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     )
 
     val withoutLocalData = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original)
+      .makeConsistentAcrossSvs(original, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -336,7 +338,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
     // makeConsistentAcrossSvs() should be idempotent
     val withoutLocalData2 = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original)
+      .makeConsistentAcrossSvs(original, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -596,5 +598,110 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         viewsIn,
       )
     encodedRejected.verdictResult shouldBe httpApi.VerdictResult.VerdictResultRejected
+  }
+
+  "encode traffic summary" in {
+    val summary = DbScanVerdictStore.TrafficSummaryT(
+      totalTrafficCost = 500L,
+      envelopeTrafficSummarys = Seq(
+        DbScanVerdictStore.EnvelopeT(trafficCost = 300L, viewIds = Seq(0, 2)),
+        DbScanVerdictStore.EnvelopeT(trafficCost = 200L, viewIds = Seq(1)),
+      ),
+      sequencingTime = CantonTimestamp.now(),
+    )
+
+    val encoded = ScanHttpEncodings.encodeTrafficSummary(summary)
+
+    encoded.totalTrafficCost shouldBe 500L
+    encoded.envelopeTrafficSummaries.size shouldBe 2
+
+    encoded.envelopeTrafficSummaries(0).trafficCost shouldBe 300L
+    encoded.envelopeTrafficSummaries(0).viewIds shouldBe Vector(0, 2)
+
+    encoded.envelopeTrafficSummaries(1).trafficCost shouldBe 200L
+    encoded.envelopeTrafficSummaries(1).viewIds shouldBe Vector(1)
+  }
+
+  "encode traffic summary with empty envelopes" in {
+    val summary = DbScanVerdictStore.TrafficSummaryT(
+      totalTrafficCost = 0L,
+      envelopeTrafficSummarys = Seq.empty,
+      sequencingTime = CantonTimestamp.now(),
+    )
+
+    val encoded = ScanHttpEncodings.encodeTrafficSummary(summary)
+
+    encoded.totalTrafficCost shouldBe 0L
+    encoded.envelopeTrafficSummaries shouldBe empty
+  }
+
+  "external transaction hash" should {
+    val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+    val externalTxnHash =
+      HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
+    val recordTime = Instant.parse("2026-06-30T00:00:00Z")
+
+    def mkTree = TreeUpdateWithMigrationId(
+      update = UpdateHistoryResponse(
+        update = TransactionTreeUpdate(
+          mkCreateTx(
+            10,
+            Seq(
+              amulet(mkPartyId("Alice"), 42.0, 13L, 2.0)
+            ),
+            Instant.now(),
+            createdEventSignatories = Seq.empty,
+            dummyDomain,
+            "",
+            recordTime = recordTime,
+            createdEventObservers = Seq.empty,
+            externalTxnHash = externalTxnHash,
+          )
+        ),
+        synchronizerId = dummyDomain,
+      ),
+      migrationId = 42L,
+    )
+
+    "return the hash when record time is after threshold" in {
+      val thresholdDate = Instant.parse("2026-06-29T23:59:59Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
+      }
+    }
+
+    "not return the hash when record time is before threshold" in {
+      val thresholdDate = Instant.parse("2026-06-30T00:00:01Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe None
+      }
+    }
+
+    "not return the hash when threshold date is not provided" in {
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe None
+      }
+    }
   }
 }

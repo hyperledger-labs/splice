@@ -24,35 +24,41 @@ import {
   EnvRefs,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
-export function getSpliceStacksFromMainReference(): StackFromRef[] {
-  const ret: StackFromRef[] = [];
+export function* getSpliceStacksFromMainReference(): Generator<StackFromRef> {
   if (deploymentConf.projectsToDeploy.has('sv-runbook')) {
-    ret.push({ project: 'sv-runbook', stack: `sv-runbook.${CLUSTER_BASENAME}` });
+    yield { project: 'sv-runbook', stack: `sv-runbook.${CLUSTER_BASENAME}` };
   }
   if (deploymentConf.projectsToDeploy.has('multi-validator')) {
-    ret.push({ project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` });
+    yield { project: 'multi-validator', stack: `multi-validator.${CLUSTER_BASENAME}` };
   }
   if (deploymentConf.projectsToDeploy.has('validator-runbook')) {
-    deployedValidators.forEach(validator => {
-      ret.push({
+    for (const validator of deployedValidators) {
+      yield {
         project: 'validator-runbook',
         stack: `${validatorRunbookStackName(validator)}.${CLUSTER_BASENAME}`,
-      });
-    });
+      };
+    }
   }
   if (deploymentConf.projectsToDeploy.has('validator1')) {
-    ret.push({ project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` });
+    yield { project: 'validator1', stack: `validator1.${CLUSTER_BASENAME}` };
   }
   if (deploymentConf.projectsToDeploy.has('splitwell')) {
-    ret.push({ project: 'splitwell', stack: `splitwell.${CLUSTER_BASENAME}` });
+    yield { project: 'splitwell', stack: `splitwell.${CLUSTER_BASENAME}` };
   }
   if (deploymentConf.projectsToDeploy.has('infra')) {
-    ret.push({ project: 'infra', stack: `infra.${CLUSTER_BASENAME}` });
+    yield { project: 'infra', stack: `infra.${CLUSTER_BASENAME}` };
   }
   if (deploymentConf.projectsToDeploy.has('canton-network')) {
-    ret.push({ project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` });
+    yield { project: 'canton-network', stack: `canton-network.${CLUSTER_BASENAME}` };
   }
-  return ret;
+  if (
+    deploymentConf.projectsToDeploy.has('sv') &&
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode
+  ) {
+    for (const sv of allSvNamesToDeploy) {
+      yield { project: 'sv', stack: `sv.${sv}.${CLUSTER_BASENAME}` };
+    }
+  }
 }
 
 export function installSpliceStacks(

@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.automation
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.UnknownContractSynchronizers
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors.ContractNotFound
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.UnknownContractSynchronizer
@@ -128,8 +129,8 @@ abstract class TaskbasedTrigger[T: Pretty](
                           .headOption
                           .getOrElse("none")
                         errorCodeId match {
-                          case ContractNotFound.id | LockedContracts.id |
-                              InactiveContracts.id | UnknownContractSynchronizer.id =>
+                          case ContractNotFound.id | LockedContracts.id | InactiveContracts.id |
+                              UnknownContractSynchronizer.id | UnknownContractSynchronizers.id =>
                             MetricsContext.withExtraMetricLabels(
                               ("statusCode", statusCode.toStatus.getCode.toString),
                               ("errorCodeId", errorCodeId),

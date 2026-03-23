@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
+  EnabledFeaturesConfig,
   NetworkAppClientConfig,
   ParticipantClientConfig,
 }
@@ -95,6 +96,25 @@ class DisasterRecoveryIntegrationTest
       .withPreSetup(_ => ())
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
+      .addConfigTransforms((_, conf) =>
+        // TODO(DACH-NY/cn-test-failures#7486): this shouldn't be required once we have a Canton fix
+        conf.copy(
+          validatorApps = conf.validatorApps.map { case (k, config) =>
+            k -> config.copy(parameters =
+              config.parameters.copy(enabledFeatures =
+                EnabledFeaturesConfig(reconnectOnSynchronizerConfigurationChange = false)
+              )
+            )
+          },
+          svApps = conf.svApps.map { case (k, config) =>
+            k -> config.copy(parameters =
+              config.parameters.copy(enabledFeatures =
+                EnabledFeaturesConfig(reconnectOnSynchronizerConfigurationChange = false)
+              )
+            )
+          },
+        )
+      )
       .addConfigTransforms(
         (_, conf) =>
           updateAutomationConfig(ConfigurableApp.Sv)(

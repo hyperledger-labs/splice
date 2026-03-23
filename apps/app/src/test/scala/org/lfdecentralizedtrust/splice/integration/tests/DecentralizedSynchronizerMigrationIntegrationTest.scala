@@ -50,6 +50,7 @@ import org.lfdecentralizedtrust.splice.console.{
   WalletAppClientReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
@@ -724,6 +725,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
+                    topologySnapshot = TopologySnapshot.Sequenced,
                   )
                   .futureValue
                   .base
@@ -749,6 +751,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
+                    topologySnapshot = TopologySnapshot.Sequenced,
                   )
                   .futureValue
                   .mapping

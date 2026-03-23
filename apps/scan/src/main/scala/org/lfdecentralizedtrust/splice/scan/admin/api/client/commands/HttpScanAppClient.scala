@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.tokenstandard.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
+  ListBulkAcsSnapshotObjectsResponse,
   GetDateOfFirstSnapshotAfterResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
 }
@@ -73,6 +74,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
@@ -84,6 +86,10 @@ import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.definitio
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
+}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
+  BulkStorageDownloadResponse,
+  ScanStreamClient,
 }
 
 import java.util.Base64
@@ -127,6 +133,12 @@ object HttpScanAppClient {
   abstract class TokenStandardAllocationBaseCommand[Res, Result]
       extends HttpCommand[Res, Result, AClient] {
     override val createGenClientFn = (fn, host, ec, mat) => AClient.httpClient(fn, host)(ec, mat)
+  }
+
+  abstract class ScanStreamBaseCommand[Res, Result]
+      extends HttpCommand[Res, Result, ScanStreamClient] {
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      ScanStreamClient.httpClient(fn, host)(ec, mat)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -2471,6 +2483,60 @@ object HttpScanAppClient {
           ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
         )
         .leftMap(_.toString)
+    }
+  }
+
+  case class GetBulkAcsSnapshot(
+      atOrBeforeTimestamp: CantonTimestamp
+  ) extends InternalBaseCommand[
+        http.ListBulkAcsSnapshotObjectsResponse,
+        definitions.ListBulkAcsSnapshotObjectsResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkAcsSnapshotObjectsResponse] =
+      client.listBulkAcsSnapshotObjects(
+        atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[ListBulkAcsSnapshotObjectsResponse, Either[
+      String,
+      definitions.ListBulkAcsSnapshotObjectsResponse,
+    ]] = {
+      case http.ListBulkAcsSnapshotObjectsResponse.OK(response) =>
+        Right(response)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotFound(err) =>
+        Left(err.error)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotImplemented(err) =>
+        Left(err.error)
+
+    }
+  }
+
+  case class BulkStorageDownload(
+      objectKey: String
+  ) extends ScanStreamBaseCommand[
+        BulkStorageDownloadResponse,
+        Source[org.apache.pekko.util.ByteString, Any],
+      ] {
+
+    override def submitRequest(
+        client: ScanStreamClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], BulkStorageDownloadResponse] =
+      client.bulkStorageDownload(objectKey)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[BulkStorageDownloadResponse, Either[
+      String,
+      Source[org.apache.pekko.util.ByteString, Any],
+    ]] = { case BulkStorageDownloadResponse.OK(response) =>
+      Right(response.dataBytes)
     }
   }
 }

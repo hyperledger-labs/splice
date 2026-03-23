@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.{HexString, MonadUtil}
 import com.digitalasset.daml.lf.data.Bytes
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 }
 import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
+import com.daml.ledger.javaapi.data.Transaction
 
 import java.time.Instant
 import java.util.Collections
@@ -31,6 +32,7 @@ import scala.jdk.OptionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import StoreTestBase.*
 import cats.data.NonEmptyList
+import com.google.protobuf.ByteString
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -505,8 +507,11 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         for {
           _ <- initStore(storeMigrationId1)
           _ <- storeMigrationId1
-            .getRecordTimeRange(1)
+            .getRecordTimeRangeBySynchronizer(1)
             .map(_ shouldBe Map.empty)
+          _ <- storeMigrationId1
+            .getRecordTimeRange(1)
+            .map(_ shouldBe None)
           _ <-
             MonadUtil.sequentialTraverse(1 to 10)(i =>
               create(
@@ -520,7 +525,27 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             )
           _ <- initStore(storeMigrationId2)
           _ <- storeMigrationId1
+            .getRecordTimeRangeBySynchronizer(1)
+            .map(
+              _ shouldBe Map(
+                domain1 -> DomainRecordTimeRange(
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(1)),
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(10)),
+                )
+              )
+            )
+          _ <- storeMigrationId1
             .getRecordTimeRange(1)
+            .map(
+              _ shouldBe Some(
+                DomainRecordTimeRange(
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(1)),
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(10)),
+                )
+              )
+            )
+          _ <- storeMigrationId2
+            .getRecordTimeRangeBySynchronizer(1)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(
@@ -532,14 +557,15 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           _ <- storeMigrationId2
             .getRecordTimeRange(1)
             .map(
-              _ shouldBe Map(
-                domain1 -> DomainRecordTimeRange(
+              _ shouldBe Some(
+                DomainRecordTimeRange(
                   CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(1)),
                   CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(10)),
                 )
               )
             )
-          _ <- storeMigrationId2.getRecordTimeRange(2).map(_ shouldBe Map())
+          _ <- storeMigrationId2.getRecordTimeRangeBySynchronizer(2).map(_ shouldBe Map())
+          _ <- storeMigrationId2.getRecordTimeRange(2).map(_ shouldBe None)
 
           // We exclude CantonTimestamp.MinValue which are the transactions imported as part of the HDM as opposed to transactions actually sequenced.
           _ <- create(
@@ -551,7 +577,8 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             CantonTimestamp.MinValue,
           )
 
-          _ <- storeMigrationId2.getRecordTimeRange(2).map(_ shouldBe Map())
+          _ <- storeMigrationId2.getRecordTimeRangeBySynchronizer(2).map(_ shouldBe Map())
+          _ <- storeMigrationId2.getRecordTimeRange(2).map(_ shouldBe None)
 
           // insert a transaction after CantonTimestamp.MinValue which now advances the record timestamp boundaries.
           _ <- create(
@@ -564,10 +591,20 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
 
           _ <- storeMigrationId2
-            .getRecordTimeRange(2)
+            .getRecordTimeRangeBySynchronizer(2)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(12)),
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(12)),
+                )
+              )
+            )
+          _ <- storeMigrationId2
+            .getRecordTimeRange(2)
+            .map(
+              _ shouldBe Some(
+                DomainRecordTimeRange(
                   CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(12)),
                   CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(12)),
                 )
@@ -584,7 +621,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             time(0),
           )
           _ <- storeMigrationId2
-            .getRecordTimeRange(2)
+            .getRecordTimeRangeBySynchronizer(2)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(
@@ -595,6 +632,16 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   CantonTimestamp.assertFromInstant(defaultEffectiveAt),
                   CantonTimestamp.assertFromInstant(defaultEffectiveAt),
                 ),
+              )
+            )
+          _ <- storeMigrationId2
+            .getRecordTimeRange(2)
+            .map(
+              _ shouldBe Some(
+                DomainRecordTimeRange(
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt),
+                  CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(12)),
+                )
               )
             )
 
@@ -954,6 +1001,74 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           migrationId <- UpdateHistory.getHighestKnownMigrationId(storage)
         } yield {
           migrationId shouldBe Some(migration2)
+        }
+      }
+    }
+
+    def extractTransactionTree(
+        updates: Seq[TreeUpdateWithMigrationId]
+    ): Transaction =
+      updates.loneElement.update.update match {
+        case TransactionTreeUpdate(tree) => tree
+        case u => fail(s"unexpected update $u")
+      }
+
+    "getExternalTransactionHash" should {
+      "return stored external transaction hash when empty" in {
+        val store = mkStore()
+        val externalTransactionHash = ByteString.EMPTY
+        for {
+          _ <- initStore(store)
+          expectedUpdate <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(),
+              synchronizerId = domain1,
+              externalTransactionHash = externalTransactionHash,
+            )
+          })(store)
+          updates <- store.getAllUpdates(
+            None,
+            PageLimit.Max,
+          )
+        } yield {
+          updates should have size 1
+          val storedTransaction = extractTransactionTree(updates)
+          storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
+          storedTransaction.getExternalTransactionHash should be(
+            expectedUpdate.getExternalTransactionHash
+          )
+        }
+      }
+
+      "return stored external transaction hash when not empty" in {
+        val store = mkStore()
+
+        val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+        val externalTxnHashByteString =
+          HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
+        for {
+          _ <- initStore(store)
+          expectedUpdate <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(),
+              synchronizerId = domain1,
+              externalTransactionHash = externalTxnHashByteString,
+            )
+          })(store)
+          updates <- store.getAllUpdates(
+            None,
+            PageLimit.Max,
+          )
+        } yield {
+          updates should have size 1
+          val storedTransaction = extractTransactionTree(updates)
+          storedTransaction.getExternalTransactionHash should be(externalTxnHashByteString)
+          storedTransaction.getExternalTransactionHash should be(
+            expectedUpdate.getExternalTransactionHash
+          )
         }
       }
     }

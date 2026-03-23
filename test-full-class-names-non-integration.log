@@ -11,6 +11,7 @@ org.lfdecentralizedtrust.splice.http.UrlValidatorTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
+org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigTest
 org.lfdecentralizedtrust.splice.scan.store.DbAppActivityRecordStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProviderTest
@@ -25,9 +26,11 @@ org.lfdecentralizedtrust.splice.store.UpdateHistoryTest
 org.lfdecentralizedtrust.splice.store.db.AcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbExternalPartyWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbScanRewardsReferenceStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbScanStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvDsoStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvSvStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbTcsStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest

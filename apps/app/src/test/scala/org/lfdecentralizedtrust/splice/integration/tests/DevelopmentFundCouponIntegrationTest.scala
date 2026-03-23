@@ -297,8 +297,12 @@ class DevelopmentFundCouponIntegrationTest
             beneficiary,
             Seq(expectedStatus),
           )
-          // Beneficiary cannot view the withdrawn coupon
-          assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+          // As the beneficiary, Bob can view the withdrawn coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            bobWalletClient,
+            beneficiary,
+            Seq(expectedStatus),
+          )
         },
       )
     }
@@ -372,7 +376,7 @@ class DevelopmentFundCouponIntegrationTest
       eventually() {
         aliceValidatorWalletClient
           .listActiveDevelopmentFundCoupons() shouldBe empty withClue "alice coupons"
-        val newBalance = 34 // 40 - fees
+        val newBalance = 40
         checkWallet(
           bobParty,
           bobWalletClient,
@@ -402,8 +406,12 @@ class DevelopmentFundCouponIntegrationTest
         beneficiary,
         Seq(expectedStatus),
       )
-      // Beneficiary cannot view the claimed coupon
-      assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+      // As the beneficiary, Bob can view the claimed coupon
+      assertListDevelopmentFundCouponHistoryStatuses(
+        bobWalletClient,
+        beneficiary,
+        Seq(expectedStatus),
+      )
     }
 
     clue("Claimed development fund coupon is included in the transaction history") {
@@ -519,8 +527,12 @@ class DevelopmentFundCouponIntegrationTest
           beneficiary,
           Seq(expectedStatus),
         )
-        // Beneficiary cannot view the expired coupon
-        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+        // As the beneficiary, Bob can view the expired coupon
+        assertListDevelopmentFundCouponHistoryStatuses(
+          bobWalletClient,
+          beneficiary,
+          Seq(expectedStatus),
+        )
       }
     }
   }
@@ -621,8 +633,12 @@ class DevelopmentFundCouponIntegrationTest
           beneficiary,
           Seq(expectedStatus),
         )
-        // Beneficiary cannot view the rejected coupon
-        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, beneficiary, Seq())
+        // As the beneficiary, Bob can view the rejected coupon
+        assertListDevelopmentFundCouponHistoryStatuses(
+          bobWalletClient,
+          beneficiary,
+          Seq(expectedStatus),
+        )
       }
     }
   }

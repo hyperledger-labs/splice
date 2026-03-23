@@ -240,6 +240,7 @@ class SvApp(
           svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
           svSynchronizerConfig.sequencer.pruning,
           svSynchronizerConfig.mediator.sequencerRequestAmplification,
+          svSynchronizerConfig.mediator.sequencerConnectionPoolDelays,
           loggerFactory,
           retryProvider,
           SequencerConfig.fromConfig(

@@ -1392,7 +1392,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1409,7 +1409,10 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "db": {},
+        "db": {
+          "pvcName": "cometbft-migration-3-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
+        },
         "genesis": {
           "chainId": "mock-3",
           "chainIdSuffix": "4"
@@ -1501,7 +1504,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1518,7 +1521,10 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "db": {},
+        "db": {
+          "pvcName": "cometbft-migration-4-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
+        },
         "genesis": {
           "chainId": "mock-4",
           "chainIdSuffix": "4"
@@ -1739,7 +1745,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1870,7 +1876,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2496,7 +2502,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2667,7 +2673,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3460,7 +3466,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3477,7 +3483,10 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "db": {},
+        "db": {
+          "pvcName": "cometbft-migration-3-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
+        },
         "genesis": {
           "chainId": "mock-3",
           "chainIdSuffix": "4"
@@ -3566,7 +3575,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3583,7 +3592,10 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "db": {},
+        "db": {
+          "pvcName": "cometbft-migration-4-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
+        },
         "genesis": {
           "chainId": "mock-4",
           "chainIdSuffix": "4"
@@ -3672,7 +3684,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3689,7 +3701,10 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "db": {},
+        "db": {
+          "pvcName": "cometbft-migration-3-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
+        },
         "genesis": {
           "chainId": "mock-3",
           "chainIdSuffix": "4"
@@ -3781,7 +3796,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3798,7 +3813,10 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "db": {},
+        "db": {
+          "pvcName": "cometbft-migration-4-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
+        },
         "genesis": {
           "chainId": "mock-4",
           "chainIdSuffix": "4"
@@ -4019,7 +4037,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4150,7 +4168,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4780,7 +4798,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4976,7 +4994,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -5763,7 +5781,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -5894,7 +5912,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -6520,7 +6538,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -6691,7 +6709,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]

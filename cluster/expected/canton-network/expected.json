@@ -51,17 +51,17 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+          "json-credentials": "eyJwcm9qZWN0SWQiOiJkYS1jbi1zaGFyZWQiLCJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZ2NwLXRvcG9sb2d5LXNuYXBzaG90LWJ1Y2tldC1zYS1rZXktc2VjcmV0IiwianNvbkNyZWRlbnRpYWxzIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQtY3JlZHMiLCJidWNrZXRTYUtleVNlY3JldCI6ImdjcC10b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LWV4YW1wbGUiLCJidWNrZXRTYUlhbUFjY291bnQiOiJkYS1jbi1leGFtcGxldEBkYS1jbi1zaGFyZWQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ=="
         }
       },
       "kind": "Secret",
       "metadata": {
-        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "name": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-shared-cn-topology-snapshots",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -197,7 +197,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1755,6 +1755,17 @@
         {
           "actions": [
             {
+              "name": "getBulkAcsSnapshot",
+              "pathPrefix": "/api/scan/v0/history/bulk/acs"
+            }
+          ],
+          "limits": {
+            "type": "unlimited"
+          }
+        },
+        {
+          "actions": [
+            {
               "name": "v1-updates",
               "pathPrefix": "/api/scan/v1/updates"
             }
@@ -2363,6 +2374,17 @@
         {
           "actions": [
             {
+              "name": "getBulkAcsSnapshot",
+              "pathPrefix": "/api/scan/v0/history/bulk/acs"
+            }
+          ],
+          "limits": {
+            "type": "unlimited"
+          }
+        },
+        {
+          "actions": [
+            {
               "name": "v1-updates",
               "pathPrefix": "/api/scan/v1/updates"
             }
@@ -2599,7 +2621,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2690,7 +2712,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -2924,7 +2946,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3030,7 +3052,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3171,13 +3193,13 @@
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
         "periodicTopologySnapshotConfig": {
-          "backupInterval": "24h",
+          "backupInterval": "12h",
           "location": {
             "bucket": {
-              "bucketName": "da-cn-topology-snapshots",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-test",
-              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+              "bucketName": "cn-topology-snapshots",
+              "jsonCredentials": "{\"projectId\":\"da-cn-shared\",\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
+              "projectId": "da-cn-shared",
+              "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
             },
             "prefix": "mock/sv-1"
           }
@@ -3192,8 +3214,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "sv-app-global-domain-migration-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "sv-app-global-domain-migration-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -3265,7 +3287,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3326,8 +3348,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "domain-migration-validator-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "domain-migration-validator-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -3540,7 +3562,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3631,7 +3653,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3865,7 +3887,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -3975,7 +3997,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4098,8 +4120,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "sv-app-global-domain-migration-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "sv-app-global-domain-migration-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -4175,7 +4197,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -4236,8 +4258,8 @@
           "user": "cnadmin"
         },
         "pvc": {
-          "volumeName": "domain-migration-validator-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "domain-migration-validator-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {

@@ -13,8 +13,8 @@ import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
   HistoryMetrics,
+  PageLimit,
   S3BucketConnection,
   TimestampWithMigrationId,
   TreeUpdateWithMigrationId,
@@ -62,7 +62,7 @@ class UpdateHistorySegmentBulkStorage(
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
-        HardLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
+        PageLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
         TimestampWithMigrationId(
@@ -135,33 +135,33 @@ class UpdateHistorySegmentBulkStorage(
 
   private def getSource(implicit
       actorSystem: ActorSystem
-  ): Source[UpdateHistorySegmentBulkStorage.Output, NotUsed] = {
+  ): Source[Seq[String], NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(
-        S3ZstdObjects(
-          storageConfig,
-          appConfig,
-          s3Connection,
-          { objIdx =>
-            s"${storageConfig.getSegmentKeyPrefix(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
-          },
-          loggerFactory,
+        // We use lazyFlow, so that in the case where no updates are emitted, we don't instantiate the S3ZstdObjects at all,
+        // since it assumes that it gets at least one chunk to write.
+        Flow.lazyFlow(() =>
+          S3ZstdObjects(
+            storageConfig,
+            appConfig,
+            s3Connection,
+            { objIdx =>
+              s"${storageConfig.getSegmentFolder(segment.fromTimestamp, Some(segment.toTimestamp))}/updates_$objIdx.zstd"
+            },
+            loggerFactory,
+          )
         )
       )
-      .map((o: S3ZstdObjects.Output) => {
-        historyMetrics.BulkStorage.incUpdateObjects()
-        UpdateHistorySegmentBulkStorage.Output(segment, o.objectKey, o.isLastObject)
+      .orElse(Source.lazySource { () =>
+        logger.warn(s"No updates found in segment ${segment.fromTimestamp}-${segment.toTimestamp}")
+        Source.empty
       })
+      .wireTap(_ => historyMetrics.BulkStorage.incUpdateObjects())
+      .fold(Seq.empty[String])(_ :+ _)
   }
 }
 object UpdateHistorySegmentBulkStorage {
-
-  case class Output(
-      segment: UpdatesSegment,
-      objectKey: String,
-      isLastObjectInSegment: Boolean,
-  )
 
   def asFlow(
       storageConfig: ScanStorageConfig,
@@ -174,7 +174,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[UpdatesSegment, Output, NotUsed] =
+  ): Flow[UpdatesSegment, Seq[String], NotUsed] =
     Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
       new UpdateHistorySegmentBulkStorage(
         storageConfig,
@@ -199,7 +199,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Source[Output, NotUsed] =
+  ): Source[Seq[String], NotUsed] =
     new UpdateHistorySegmentBulkStorage(
       storageConfig,
       appConfig,
