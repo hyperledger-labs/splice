@@ -21,7 +21,8 @@ trait ScanAppRewardsStore {
 
   /** Runs the full reward computation pipeline for a single round:
     * aggregation, CC conversion, and Merkle tree hashing.
-    * Raises on duplicate key if already computed.
+    * MUST only be called on rounds for which all app activity records have
+    * been ingested and for which the reward information has not yet been computed.
     */
   def computeRewards(roundNumber: Long)(implicit
       tc: TraceContext
