@@ -32,9 +32,7 @@ import org.lfdecentralizedtrust.splice.http.{
   HttpValidatorLicensesHandler,
   HttpVotesHandler,
 }
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
-import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStore, AppStoreWithIngestion}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
@@ -428,17 +426,10 @@ class HttpSvOperatorHandler(
         }
         dsoRules <- dsoStore.getDsoRules()
         scanConnection <- scanConnectionF
-        participantIds <- scanConnection
-          .getPartyToParticipant(
-            dsoRules.domain,
-            party,
-          )
-          .recoverWith {
-            case HttpCommandException(_, statusCode, _) if statusCode == StatusCodes.NotFound =>
-              Future.failed(
-                HttpErrorHandler.notFound(s"Party not found: $partyId")
-              )
-          }
+        participantIds <- scanConnection.getPartyToParticipant(
+          dsoRules.domain,
+          party,
+        )
       } yield {
         r0.GetPartyToParticipantResponse.OK(
           definitions.GetPartyToParticipantResponse(
