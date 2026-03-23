@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import better.files.File.apply
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
@@ -31,6 +32,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
+import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeSequencingTestTrigger
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
@@ -72,10 +74,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransforms((_, config) => {
         ConfigTransforms
-          .updateAllSvAppConfigs { (_, config) =>
+          .updateAllSvAppConfigs { (name, config) =>
             config.copy(
               localSynchronizerNodes = config.localSynchronizerNodes
                 .copy(successor = config.localSynchronizerNodes.current.some),
+              domainMigrationDumpPath = Some(
+                (DomainMigrationUtil.migrationTestDumpDir(name) / "domain_migration_dump.json").path
+              ),
               parameters = config.parameters.copy(
                 spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
                   physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
@@ -95,7 +100,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
               ),
             )
           })
-          .andThen(ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000))(config)
+          .andThen(ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000))
+          .andThen(
+            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
+              // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
+              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
+            )
+          )(config)
       })
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)

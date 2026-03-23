@@ -12,11 +12,14 @@ import io.grpc.stub.StreamObserver
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
-class FileStreamObserver[T](
-    inputFile: File,
+/** A StreamObserver that writes incoming elements to a file, using a provided converter to convert
+  * the elements to bytes.
+  */
+class OutputFileStreamObserver[T](
+    outputFile: File,
     converter: T => ByteString,
 ) extends StreamObserver[T] {
-  private val os = inputFile.newFileOutputStream(append = false)
+  private val os = outputFile.newFileOutputStream(append = false)
   private val requestComplete: Promise[Unit] = Promise[Unit]()
 
   def result: Future[Unit] = requestComplete.future

@@ -33,6 +33,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import java.net.URI
+import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future}
 
 class LogicalSynchronizerUpgradeTrigger(
@@ -41,6 +42,7 @@ class LogicalSynchronizerUpgradeTrigger(
     localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
     successorSynchronizerNode: LocalSynchronizerNode,
     store: SvDsoStore,
+    dumpPath: Path,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -51,6 +53,7 @@ class LogicalSynchronizerUpgradeTrigger(
 
   private val exporter =
     new LsuStateExporter(
+      dumpPath,
       currentSynchronizerNode.sequencerAdminConnection,
       currentSynchronizerNode.mediatorAdminConnection,
       loggerFactory,
@@ -174,7 +177,7 @@ class LogicalSynchronizerUpgradeTrigger(
             show"Initializing sequencer from predecessor with $parameters"
           )
           successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
-            state.synchronizerState,
+            state.synchronizerStatePath,
             parameters.copy(
               protocolVersion = task.work.announcement.successorSynchronizerId.protocolVersion
             ),

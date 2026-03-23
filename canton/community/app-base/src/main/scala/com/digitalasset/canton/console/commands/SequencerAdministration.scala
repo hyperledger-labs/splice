@@ -36,6 +36,7 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSeque
 import com.digitalasset.canton.topology.SequencerId
 import com.google.protobuf.ByteString
 
+import java.io.BufferedInputStream
 import scala.concurrent.ExecutionContext
 
 class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGroup.Impl(node) {
@@ -172,10 +173,10 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   }
 
   @Help.Summary(
-    "Initialize a sequencer for the logical upgrade from the state of its predecessor"
+    "Initialize a sequencer for the logical upgrade from the state of its predecessor, streaming the state from a file"
   )
   def initialize_from_lsu_predecessor(
-      predecessorState: ByteString,
+      inputFile: String,
       synchronizerParameters: StaticSynchronizerParameters,
       waitForReady: Boolean = true,
   ): Unit = {
@@ -184,7 +185,9 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     consoleEnvironment.run {
       runner.adminCommand(
         InitializeFromLsuPredecessor(
-          predecessorState,
+          new BufferedInputStream(
+            new java.io.FileInputStream(inputFile)
+          ),
           synchronizerParameters.toInternal,
         )
       )

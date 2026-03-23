@@ -5,14 +5,13 @@ package org.lfdecentralizedtrust.splice.sv.lsu
 
 import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
-import com.google.protobuf.ByteString
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 
+import java.nio.file.{Path, Paths}
 import java.time.Instant
-import java.util.Base64
 import scala.util.Try
 
 case class SynchronizerNodeIdentities(
@@ -62,7 +61,7 @@ object SynchronizerNodeIdentities {
 case class LsuState(
     upgradesAt: Instant,
     nodeIdentities: SynchronizerNodeIdentities,
-    synchronizerState: ByteString,
+    synchronizerStatePath: Path,
 )
 
 object LsuState {
@@ -73,15 +72,11 @@ object LsuState {
   implicit val decodeInstant: Decoder[Instant] =
     Decoder.decodeString.emapTry(str => Try(Instant.parse(str)))
 
-  implicit val encodeByteString: Encoder[ByteString] =
-    Encoder.instance(bs => Json.fromString(Base64.getEncoder.encodeToString(bs.toByteArray)))
+  implicit val encodePath: Encoder[Path] =
+    Encoder.instance(p => Json.fromString(p.toString))
 
-  implicit val decodeByteString: Decoder[ByteString] =
-    Decoder.decodeString.emap { str =>
-      Try(ByteString.copyFrom(Base64.getDecoder.decode(str))).toEither.leftMap(t =>
-        s"Failed to decode Base64 ByteString: ${t.getMessage}"
-      )
-    }
+  implicit val decodePath: Decoder[Path] =
+    Decoder.decodeString.emap { str => Right(Paths.get(str)) }
 
   implicit val encoder: Encoder[LsuState] = deriveEncoder[LsuState]
   implicit val decoder: Decoder[LsuState] = deriveDecoder[LsuState]

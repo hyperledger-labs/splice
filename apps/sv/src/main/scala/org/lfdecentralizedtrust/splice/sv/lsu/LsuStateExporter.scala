@@ -12,9 +12,11 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 
+import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future}
 
 class LsuStateExporter(
+    lsuStatePath: Path,
     sequencerAdminConnection: SequencerAdminConnection,
     mediatorAdminConnection: MediatorAdminConnection,
     val loggerFactory: NamedLoggerFactory,
@@ -29,7 +31,7 @@ class LsuStateExporter(
   def exportLSUState(upgradesAt: CantonTimestamp)(implicit tc: TraceContext): Future[LsuState] = {
     logger.info(s"Exporting LSU state for upgrade at $upgradesAt")
     for {
-      lsuState <- sequencerAdminConnection.getLsuState()
+      _ <- sequencerAdminConnection.getLsuState(lsuStatePath)
       sequencerIdentityDump <- sequencerIdentityStore.getNodeIdentitiesDump()
       mediatorIdentityDump <- mediatorIdentityStore.getNodeIdentitiesDump()
     } yield {
@@ -39,7 +41,7 @@ class LsuStateExporter(
           sequencerIdentityDump,
           mediatorIdentityDump,
         ),
-        lsuState,
+        lsuStatePath,
       )
     }
 

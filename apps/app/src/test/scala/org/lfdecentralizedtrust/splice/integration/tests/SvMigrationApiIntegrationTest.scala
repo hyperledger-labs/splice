@@ -6,11 +6,11 @@ import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.console.CommandFailure
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.{
   directoryForDump,
   migrationDumpPathForSv,
 }
+import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.migrationTestDumpDir
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -62,7 +62,7 @@ object SvMigrationApiIntegrationTest {
   }
 
   def migrationDumpPathForSv(name: String): File = {
-    migrationDumpDir(name) / "domain_migration_dump.json"
+    migrationTestDumpDir(name) / "domain_migration_dump.json"
   }
 
 }
