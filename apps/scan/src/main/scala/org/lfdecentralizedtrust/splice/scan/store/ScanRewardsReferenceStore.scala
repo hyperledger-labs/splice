@@ -26,7 +26,13 @@ trait ScanRewardsReferenceStore extends AppStore {
 
   /** For a batch of record times, resolve the oldest open mining round at each time.
     * Returns map from record_time to (roundNumber, roundOpensAt).
-    * It is expected that all record_time are present in returned map
+    * This will block till the round info could be obtained for record_times
+    * which are yet to be ingested.
+    *
+    * On the other hand if round info could not be obtained for a particular record_time
+    * then the Map will not contain the entry for that.
+    * This could happen when no contracts ingestion has happened in the store,
+    * or if the record_time is before the ingestion start.
     */
   def lookupActiveOpenMiningRounds(
       recordTimes: Seq[CantonTimestamp]
