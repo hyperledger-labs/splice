@@ -134,8 +134,7 @@ class HttpScanHandler(
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
-    serveTrafficSummaries: Boolean,
-    serveAppActivityRecords: Boolean,
+    serveAppActivityRecordsAndTraffic: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
@@ -870,7 +869,7 @@ class HttpScanHandler(
           val verdictRowIdO = verdictWithViewsO.map { case (v, _) => v.rowId }
           for {
             appActivityRecordO <-
-              if (serveAppActivityRecords)
+              if (serveAppActivityRecordsAndTraffic)
                 verdictRowIdO match {
                   case Some(rowId) =>
                     eventStore.getAppActivityRecords(Seq(rowId)).map(_.get(rowId))
@@ -885,7 +884,7 @@ class HttpScanHandler(
               ScanHttpEncodings.encodeVerdict(v, views)
             }
             val trafficSummaryEncoded =
-              if (serveTrafficSummaries)
+              if (serveAppActivityRecordsAndTraffic)
                 verdictWithViewsO.flatMap { case (v, _) =>
                   v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
                 }
@@ -947,7 +946,7 @@ class HttpScanHandler(
           verdictWithViewsO.map { case (v, _) => v.rowId }
         }
         appActivityRecordMap <-
-          if (serveAppActivityRecords) eventStore.getAppActivityRecords(verdictRowIds)
+          if (serveAppActivityRecordsAndTraffic) eventStore.getAppActivityRecords(verdictRowIds)
           else Future.successful(Map.empty[Long, eventStore.AppActivityRecordT])
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
@@ -957,7 +956,7 @@ class HttpScanHandler(
           ScanHttpEncodings.encodeVerdict(v, views)
         }
         val trafficSummaryEncoded =
-          if (serveTrafficSummaries)
+          if (serveAppActivityRecordsAndTraffic)
             verdictWithViewsO.flatMap { case (v, _) =>
               v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
             }

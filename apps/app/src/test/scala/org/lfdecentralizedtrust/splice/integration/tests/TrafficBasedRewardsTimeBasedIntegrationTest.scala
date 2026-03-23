@@ -63,8 +63,7 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
               restartDelay = NonNegativeFiniteDuration.ofMillis(500)
             ),
             sequencerTrafficIngestion = SequencerTrafficIngestionConfig(enabled = true),
-            serveTrafficSummaries = true,
-            serveAppActivityRecords = true,
+            serveAppActivityRecordsAndTraffic = true,
           )
         )(config)
       )
