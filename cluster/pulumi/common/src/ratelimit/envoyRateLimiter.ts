@@ -26,6 +26,8 @@ export interface PathPrefixInfo {
   isBanned: boolean;
 }
 
+type LocalLimits<L> = LocalLimit<L>[];
+
 interface LocalLimit<L> {
   actions: (
     | {
@@ -55,7 +57,7 @@ interface RateLimitEnvoyFilterArgs extends PerEndpointLimits {
 
 export interface PerEndpointLimits {
   // all the rate limits must be respected, there's an AND relationship between them
-  rateLimits?: LocalLimit<RateLimitConfig>[];
+  rateLimits?: LocalLimits<RateLimitConfig>;
 }
 
 export function extractPathPrefixes(
@@ -101,7 +103,7 @@ function validateEndpointCoverage(
 
 function validateEffectiveRateLimits(
   args: RateLimitEnvoyFilterArgs
-): LocalLimit<Limits>[] | undefined {
+): LocalLimits<Limits> | undefined {
   // Validate scan.yaml endpoint coverage
   const scanEndpoints = parseScanYamlEndpoints();
 
