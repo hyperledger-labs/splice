@@ -339,6 +339,31 @@ class DbAppActivityRecordStoreTest
         result.value shouldBe 21L
       }
     }
+
+    "only consider records from own history_id" in {
+      for {
+        (store1, historyId1) <- newStore()
+        (store2, historyId2) <- newStore()
+        baseTs = CantonTimestamp.now()
+        // store2 has consecutive rounds 10,11
+        rowId2a <- insertVerdictRow(historyId2, baseTs, "update-other-10")
+        rowId2b <- insertVerdictRow(historyId2, baseTs.plusSeconds(1L), "update-other-11")
+        _ <- store2.insertAppActivityRecords(
+          Seq(
+            mkRecord(rowId2a, 10L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2b, 11L, Seq("app1::provider"), Seq(200L)),
+          )
+        )
+        // store1 has only one round — no consecutive pair
+        rowId1 <- insertVerdictRow(historyId1, baseTs.plusSeconds(2L), "update-own-50")
+        _ <- store1.insertAppActivityRecords(
+          Seq(mkRecord(rowId1, 50L, Seq("app1::provider"), Seq(300L)))
+        )
+        result <- store1.earliestRoundWithCompleteAppActivity()
+      } yield {
+        result shouldBe None
+      }
+    }
   }
 
   "latestRoundWithCompleteAppActivity" should {
@@ -422,6 +447,31 @@ class DbAppActivityRecordStoreTest
         result shouldBe None
       }
     }
+
+    "only consider records from own history_id" in {
+      for {
+        (store1, historyId1) <- newStore()
+        (store2, historyId2) <- newStore()
+        baseTs = CantonTimestamp.now()
+        // store2 has consecutive rounds 10,11
+        rowId2a <- insertVerdictRow(historyId2, baseTs, "update-other-10")
+        rowId2b <- insertVerdictRow(historyId2, baseTs.plusSeconds(1L), "update-other-11")
+        _ <- store2.insertAppActivityRecords(
+          Seq(
+            mkRecord(rowId2a, 10L, Seq("app1::provider"), Seq(100L)),
+            mkRecord(rowId2b, 11L, Seq("app1::provider"), Seq(200L)),
+          )
+        )
+        // store1 has only one round — no consecutive pair
+        rowId1 <- insertVerdictRow(historyId1, baseTs.plusSeconds(2L), "update-own-50")
+        _ <- store1.insertAppActivityRecords(
+          Seq(mkRecord(rowId1, 50L, Seq("app1::provider"), Seq(300L)))
+        )
+        result <- store1.latestRoundWithCompleteAppActivity()
+      } yield {
+        result shouldBe None
+      }
+    }
   }
 
   private def mkRecord(
@@ -439,15 +489,18 @@ class DbAppActivityRecordStoreTest
 
   private val testDomain = SynchronizerId.tryFromString("test::domain")
 
+  private val storeCounter = new java.util.concurrent.atomic.AtomicLong(1)
+
   /** Creates a new store and returns it along with a unique history_id
     * obtained from UpdateHistory initialization.
     */
   private def newStore(): Future[(DbAppActivityRecordStore, Long)] = {
-    val participantId = mkParticipantId("activity-test")
+    val n = storeCounter.getAndIncrement()
+    val participantId = mkParticipantId(s"activity-test-$n")
     val updateHistory = new UpdateHistory(
       storage.underlying,
       new DomainMigrationInfo(migrationId, None),
-      "app_activity_test",
+      s"app_activity_test_$n",
       participantId,
       dsoParty,
       BackfillingRequirement.BackfillingNotRequired,
@@ -459,6 +512,7 @@ class DbAppActivityRecordStoreTest
     updateHistory.ingestionSink.initialize().map { _ =>
       val store = new DbAppActivityRecordStore(
         storage.underlying,
+        updateHistory,
         loggerFactory,
       )
       (store, updateHistory.historyId)
@@ -485,6 +539,7 @@ class DbAppActivityRecordStoreTest
     updateHistory.ingestionSink.initialize().map { _ =>
       val appStore = new DbAppActivityRecordStore(
         storage.underlying,
+        updateHistory,
         loggerFactory,
       )
       val verdictStore = new DbScanVerdictStore(

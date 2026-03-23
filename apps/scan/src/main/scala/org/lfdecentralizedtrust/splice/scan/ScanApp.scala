@@ -239,6 +239,7 @@ class ScanApp(
           Some(
             new DbAppActivityRecordStore(
               storage,
+              updateHistory,
               loggerFactory,
             )
           )

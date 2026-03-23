@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import org.lfdecentralizedtrust.splice.scan.store.AppActivityStore
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -37,6 +38,7 @@ object DbAppActivityRecordStore {
 
 class DbAppActivityRecordStore(
     storage: DbStorage,
+    updateHistory: UpdateHistory,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
@@ -67,6 +69,8 @@ class DbAppActivityRecordStore(
       )
   }
 
+  private val verdictTable = "scan_verdict_store"
+
   /** Find the earliest round with complete app activity.
     * A round is complete if the prior round also has activity records,
     * proving ingestion was running continuously through it.
@@ -75,12 +79,21 @@ class DbAppActivityRecordStore(
   def earliestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
+    val historyId = updateHistory.historyId
     runQuerySingle(
-      sql"""select min(aar.round_number)
-            from #${Tables.appActivityRecords} aar
-            where exists(
-              select 1 from #${Tables.appActivityRecords}
-              where round_number = aar.round_number - 1
+      sql"""select min_round + 1
+            from (
+              select min(a.round_number) as min_round
+              from #${Tables.appActivityRecords} a
+              join #$verdictTable v on a.verdict_row_id = v.row_id
+              where v.history_id = $historyId
+            ) sub
+            where exists (
+              select 1
+              from #${Tables.appActivityRecords} a
+              join #$verdictTable v on a.verdict_row_id = v.row_id
+              where a.round_number = sub.min_round + 1
+                and v.history_id = $historyId
             )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.earliestRoundWithCompleteAppActivity",
@@ -95,12 +108,21 @@ class DbAppActivityRecordStore(
   def latestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
+    val historyId = updateHistory.historyId
     runQuerySingle(
-      sql"""select max(aar.round_number)
-            from #${Tables.appActivityRecords} aar
-            where exists(
-              select 1 from #${Tables.appActivityRecords}
-              where round_number = aar.round_number - 1
+      sql"""select max_round
+            from (
+              select max(a.round_number) as max_round
+              from #${Tables.appActivityRecords} a
+              join #$verdictTable v on a.verdict_row_id = v.row_id
+              where v.history_id = $historyId
+            ) sub
+            where exists (
+              select 1
+              from #${Tables.appActivityRecords} a
+              join #$verdictTable v on a.verdict_row_id = v.row_id
+              where a.round_number = sub.max_round - 1
+                and v.history_id = $historyId
             )
       """.as[Option[Long]].headOption.map(_.flatten),
       "appActivity.latestRoundWithCompleteAppActivity",
