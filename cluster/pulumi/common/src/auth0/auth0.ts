@@ -79,8 +79,8 @@ export class Auth0Fetch implements Auth0Client {
     });
     // enable retries
     const reqOptions = {
-        ...withRetries(10),
-        timeoutInSeconds: 30
+      ...withRetries(10),
+      timeoutInSeconds: 30,
     };
 
     const secrets = new Map() as Auth0SecretMap;
