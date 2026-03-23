@@ -50,6 +50,7 @@ import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
+  AppActivityStore,
   ScanEventStore,
   ScanStore,
   TxLogEntry,
@@ -130,6 +131,7 @@ class HttpScanHandler(
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
     appRewardsStore: DbScanAppRewardsStore,
+    appActivityStoreO: Option[AppActivityStore],
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     bulkStorage: BulkStorage,
@@ -2377,14 +2379,23 @@ class HttpScanHandler(
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getRewardAccountingEarliestAvailableRound") { _ => _ =>
-      appRewardsStore.getEarliestRoundWithActivityTotals().map {
-        case Some(round) =>
-          ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
-            definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)
-          )
+      appActivityStoreO match {
+        case Some(appActivityStore) =>
+          appActivityStore.earliestRoundWithCompleteAppActivity().map {
+            case Some(round) =>
+              ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
+                definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)
+              )
+            case None =>
+              ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+                ErrorResponse("No reward accounting data available yet")
+              )
+          }
         case None =>
-          ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
-            ErrorResponse("No reward accounting data available yet")
+          Future.successful(
+            ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled")
+            )
           )
       }
     }

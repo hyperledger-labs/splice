@@ -477,18 +477,6 @@ class DbScanAppRewardsStore(
     )
   }
 
-  def getEarliestRoundWithActivityTotals()(implicit
-      tc: TraceContext
-  ): Future[Option[Long]] = {
-    val historyId = updateHistory.historyId
-    runQuerySingle(
-      sql"""select min(round_number) from #${Tables.appActivityRoundTotals}
-            where history_id = $historyId
-      """.as[Option[Long]].headOption.map(_.flatten),
-      "appRewards.getEarliestRoundWithActivityTotals",
-    )
-  }
-
   /** Runs the full reward computation pipeline for a single round.
     *
     * TODO(#4384): Will be extended to run CC conversion (stage 2) and

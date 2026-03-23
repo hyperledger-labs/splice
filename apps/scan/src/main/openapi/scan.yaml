@@ -1628,7 +1628,7 @@ paths:
       description: |
         SV node internal API (CIP-0104, subject to change).
         Returns the earliest round for which CIP-0104 reward accounting activity
-        totals are available.
+        records are complete.
       responses:
         "200":
           description: ok

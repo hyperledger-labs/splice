@@ -369,6 +369,7 @@ class ScanApp(
         automation,
         updateHistory,
         appRewardsStore,
+        appActivityRecordStoreO,
         acsSnapshotStore,
         scanEventStore,
         bulkStorage,

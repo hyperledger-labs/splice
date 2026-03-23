@@ -429,31 +429,7 @@ class DbScanAppRewardsStoreTest
       }
     }
 
-    // -- lookupLatestRoundWithRewardComputation / getEarliestRoundWithActivityTotals ------
-
-    "getEarliestRoundWithActivityTotals returns None when empty" in {
-      for {
-        (store, historyId) <- newStore()
-        result <- store.getEarliestRoundWithActivityTotals()
-      } yield {
-        result shouldBe None
-      }
-    }
-
-    "getEarliestRoundWithActivityTotals with data" in {
-      for {
-        (store, historyId) <- newStore()
-        _ <- insertSentinelRecords(historyId, 10L)
-        _ <- insertSentinelRecords(historyId, 20L)
-        _ <- insertActivityRecord(historyId, 10L, Seq("alice::provider"), Seq(100L))
-        _ <- insertActivityRecord(historyId, 20L, Seq("alice::provider"), Seq(200L))
-        _ <- store.aggregateActivityTotals(10L)
-        _ <- store.aggregateActivityTotals(20L)
-        earliest <- store.getEarliestRoundWithActivityTotals()
-      } yield {
-        earliest.value shouldBe 10L
-      }
-    }
+    // -- lookupLatestRoundWithRewardComputation ------
 
     "lookupLatestRoundWithRewardComputation returns None when no root hashes" in {
       for {
