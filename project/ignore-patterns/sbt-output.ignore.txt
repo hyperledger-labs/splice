@@ -128,3 +128,6 @@ Retried waiting for GCLocker too often allocating
 canton/base/errors
 
 Cannot use file /tmp/hsperfdata_ci
+
+# Produced by the console container build
+WARN: InvalidDefaultArgInFrom

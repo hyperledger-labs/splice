@@ -1249,6 +1249,17 @@
         {
           "actions": [
             {
+              "name": "getBulkAcsSnapshot",
+              "pathPrefix": "/api/scan/v0/history/bulk/acs"
+            }
+          ],
+          "limits": {
+            "type": "unlimited"
+          }
+        },
+        {
+          "actions": [
+            {
               "name": "v1-updates",
               "pathPrefix": "/api/scan/v1/updates"
             }

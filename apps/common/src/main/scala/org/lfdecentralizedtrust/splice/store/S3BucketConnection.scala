@@ -52,6 +52,35 @@ class S3BucketConnection(
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
 
+  def listObjectsSource(prefix: String): Source[S3Object, NotUsed] = {
+    val listRequest = ListObjectsV2Request
+      .builder()
+      .bucket(bucketName)
+      .prefix(prefix)
+      .build();
+    Source
+      .fromPublisher(
+        s3Client.listObjectsV2Paginator(listRequest)
+      )
+      .mapConcat(_.contents().asScala)
+  }
+
+  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+
+    val headRequest = HeadObjectRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .build()
+    for {
+      head <- s3Client.headObject(headRequest).asScala
+      checksum = head
+        .metadata()
+        .asScala
+        .getOrElse("splice-checksum", throw new RuntimeException("Missing checksum metadata"))
+    } yield checksum
+  }
+
   def readObject(
       key: String
   )(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
