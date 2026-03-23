@@ -26,7 +26,12 @@ export const ConfigSchema = z.object({
     .object({
       default: PulumiProjectConfigSchema,
     })
-    .and(z.record(z.string(), PulumiProjectConfigSchema.extend({cloudSql: CloudSqlConfigSchema.partial()}).partial())),
+    .and(
+      z.record(
+        z.string(),
+        PulumiProjectConfigSchema.extend({ cloudSql: CloudSqlConfigSchema.partial() }).partial()
+      )
+    ),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
