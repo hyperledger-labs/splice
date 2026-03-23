@@ -1626,7 +1626,8 @@ paths:
       x-jvm-package: scan
       operationId: "getRewardAccountingEarliestAvailableRound"
       description: |
-        SV node internal API that returns the earliest round for which CIP-0104 reward accounting activity
+        SV node internal API (CIP-0104, subject to change).
+        Returns the earliest round for which CIP-0104 reward accounting activity
         totals are available.
       responses:
         "200":
@@ -1644,6 +1645,7 @@ paths:
       x-jvm-package: scan
       operationId: "getRewardAccountingActivityTotals"
       description: |
+        SV node internal API (CIP-0104, subject to change).
         Return the CIP-0104 per-round activity totals for the
         specified round number.
       parameters:
