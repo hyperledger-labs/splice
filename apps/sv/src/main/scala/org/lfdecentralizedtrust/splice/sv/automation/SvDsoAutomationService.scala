@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingSc
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.lsu.{
   LogicalSynchronizerUpgradeAnnouncementTrigger,
+  LogicalSynchronizerUpgradeSequencingTestTrigger,
   LogicalSynchronizerUpgradeTrigger,
   LogicalSyncUpgradeTransferTrafficTrigger,
 }
@@ -259,6 +260,14 @@ class SvDsoAutomationService(
         )
         registerTrigger(
           new LogicalSyncUpgradeTransferTrafficTrigger(
+            triggerContext,
+            synchronizerNodeService.nodes.current,
+            successorSynchronizerNode,
+          )
+        )
+        registerTrigger(
+          new LogicalSynchronizerUpgradeSequencingTestTrigger(
+            config,
             triggerContext,
             synchronizerNodeService.nodes.current,
             successorSynchronizerNode,
@@ -571,5 +580,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[LogicalSynchronizerUpgradeTrigger],
       aTrigger[LogicalSynchronizerUpgradeAnnouncementTrigger],
       aTrigger[LogicalSyncUpgradeTransferTrafficTrigger],
+      aTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger],
     )
 }

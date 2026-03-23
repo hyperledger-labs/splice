@@ -35,6 +35,7 @@ import com.digitalasset.canton.topology.admin.v30.{
   GenesisStateV2Response,
   SequencerLsuStateResponse,
 }
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
 import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
@@ -509,6 +510,14 @@ class SequencerAdminConnection(
       case NodeStatus.NotInitialized(_, _) => false
       case NodeStatus.Success(_) => true
     }
+  }
+
+  def performLsuSequencingTest(
+      recipientMediatorGroup: MediatorGroupIndex
+  )(implicit tc: TraceContext): Future[Unit] = {
+    runCmd(
+      SequencerAdminCommands.PerformLsuSequencingTest(recipientMediatorGroup)
+    )
   }
 
 }
