@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -24,12 +24,9 @@ import scala.concurrent.{ExecutionContext, Future}
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
   *
+  * TODO(#4118): use ScanRewardsReferenceStore for synchronization in computeRewards needs it
   */
 class RewardComputationTrigger(
-    // TODO(#4118): replace this. #4118 will provide ScanRewardsReferenceStore;
-    // it provides a function to determine the actual round numbers to use
-    // allowing the full synchronization algorithm to be implemented
-    store: ScanStore,
     appRewardsStore: ScanAppRewardsStore,
     appActivityStore: AppActivityStore,
     override protected val context: TriggerContext,
@@ -43,18 +40,15 @@ class RewardComputationTrigger(
       tc: TraceContext
   ): Future[Seq[RewardComputationTrigger.Task]] = {
     for {
-      // TODO(#4118): replace this approximation with proper retrieval from the ScanRewardsReferenceStore
-      lastClosedO <- store.lookupRoundOfLatestData()
       earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
       latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
       latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
     } yield {
-      (lastClosedO, earliestCompleteO, latestCompleteO) match {
-        case (Some((lastClosed, _)), Some(earliestComplete), Some(latestComplete)) =>
+      (earliestCompleteO, latestCompleteO) match {
+        case (Some(earliestComplete), Some(latestComplete)) =>
           val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
-          val end = math.min(lastClosed, latestComplete)
           // TODO(#4570): Support parallel execution
-          Seq(start).filter(_ <= end).map(RewardComputationTrigger.Task(_))
+          Seq(start).filter(_ <= latestComplete).map(RewardComputationTrigger.Task(_))
         case _ => Seq.empty
       }
     }

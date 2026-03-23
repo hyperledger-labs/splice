@@ -76,7 +76,6 @@ class ScanAutomationService(
   appActivityStoreO.foreach { appActivityStore =>
     registerTrigger(
       new RewardComputationTrigger(
-        store,
         appRewardsStore,
         appActivityStore,
         triggerContext,
