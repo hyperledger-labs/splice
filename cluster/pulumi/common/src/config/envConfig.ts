@@ -66,13 +66,14 @@ export class SpliceEnvConfig {
         glob.sync(`${process.env.SPLICE_ROOT}/.envrc.vars.*`)
       );
       console.error(`Loading environment variables from ${envrcs.join(', ')}`);
-      const result = dotenvConfig({ path: envrcs });
+      const result = dotenvConfig({ path: envrcs , quiet: true});
       if (result.error) {
         throw new Error(`Failed to load base config ${result.error}`);
       }
       const overrideResult = dotenvConfig({
         path: `${this.context.clusterPath()}/.envrc.vars`,
         overload: true,
+        quiet: true,
       });
       if (overrideResult.error) {
         throw new Error(`Failed to load cluster config ${overrideResult.error}`);
