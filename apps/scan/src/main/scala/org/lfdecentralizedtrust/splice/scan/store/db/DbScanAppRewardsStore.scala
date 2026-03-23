@@ -509,7 +509,7 @@ class DbScanAppRewardsStore(
   )(implicit tc: TraceContext): Future[Unit] = {
     val historyId = updateHistory.historyId
     runUpdate(
-      (sql"with " ++ unnestAndAggregate(roundNumber) ++ sql", "
+      (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
         ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
         ++ insertRoundTotals(historyId, roundNumber)).asUpdate
         .map(_ =>
@@ -522,13 +522,15 @@ class DbScanAppRewardsStore(
   }
 
   /** Unnest per-verdict activity arrays and aggregate weights by party. */
-  private def unnestAndAggregate(roundNumber: Long) =
+  private def unnestAndAggregate(historyId: Long, roundNumber: Long) =
     sql"""unnested as (
             select party, weight
-            from app_activity_record_store,
-                 lateral unnest(app_provider_parties, app_activity_weights)
+            from app_activity_record_store a
+            join scan_verdict_store v on a.verdict_row_id = v.row_id
+            cross join lateral unnest(a.app_provider_parties, a.app_activity_weights)
                  as party_and_weight(party, weight)
-            where round_number = $roundNumber
+            where a.round_number = $roundNumber
+              and v.history_id = $historyId
           ),
           aggregated as (
             select party, sum(weight) as total_weight

@@ -368,6 +368,25 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    "aggregateActivityTotals — only aggregates records from own history_id" in {
+      for {
+        (store1, historyId1) <- newStore()
+        (_, historyId2) <- newStore()
+        // Insert activity records for the same round under both historyIds
+        _ <- insertActivityRecord(historyId1, roundNumber, Seq("alice::provider"), Seq(100L))
+        _ <- insertActivityRecord(historyId2, roundNumber, Seq("alice::provider"), Seq(900L))
+        // Aggregate with store1 — should only see historyId1's data
+        _ <- store1.aggregateActivityTotals(roundNumber)
+        partyTotals <- store1.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store1.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 1
+        partyTotals.head.appProviderParty shouldBe "alice::provider"
+        partyTotals.head.totalAppActivityWeight shouldBe 100L
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 100L
+      }
+    }
+
     "aggregateActivityTotals — re-run for same round raises error" in {
       for {
         (store, historyId) <- newStore()
@@ -493,12 +512,15 @@ class DbScanAppRewardsStoreTest
     }.map(_ => ())
   }
 
+  private val storeCounter = new java.util.concurrent.atomic.AtomicLong(1)
+
   private def newStore(): Future[(DbScanAppRewardsStore, Long)] = {
-    val participantId = mkParticipantId("rewards-test")
+    val n = storeCounter.getAndIncrement()
+    val participantId = mkParticipantId(s"rewards-test-$n")
     val updateHistory = new UpdateHistory(
       storage.underlying,
       new DomainMigrationInfo(migrationId, None),
-      "app_rewards_test",
+      s"app_rewards_test_$n",
       participantId,
       dsoParty,
       BackfillingRequirement.BackfillingNotRequired,
