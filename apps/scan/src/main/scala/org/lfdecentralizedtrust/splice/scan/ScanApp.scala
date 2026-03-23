@@ -341,13 +341,15 @@ class ScanApp(
       rewardsReferenceStoreO =
         if (config.sequencerTrafficIngestion.enabled) {
           val rewardsStore = new DbScanRewardsReferenceStore(
-            key = ScanRewardsReferenceStore.Key(dsoParty = dsoParty),
+            key = ScanRewardsReferenceStore.Key(
+              dsoParty = dsoParty,
+              synchronizerId = synchronizerId,
+            ),
             storage,
             loggerFactory,
             retryProvider,
             migrationInfo,
             participantId,
-            synchronizerId,
             config.automation.ingestion,
             config.parameters.defaultLimit,
           )
