@@ -64,7 +64,9 @@ class RewardComputationTrigger(
   override protected def isStaleTask(
       task: RewardComputationTrigger.Task
   )(implicit tc: TraceContext): Future[Boolean] =
-    Future.successful(false)
+    appRewardsStore
+      .lookupLatestRoundWithRewardComputation()
+      .map(_.exists(_ >= task.roundNumber))
 }
 
 object RewardComputationTrigger {
