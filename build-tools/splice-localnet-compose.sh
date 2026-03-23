@@ -25,12 +25,43 @@ export IMAGE_REPO
 TEST_PORT=""
 export TEST_PORT
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-    echo "Usage: $SCRIPTNAME <start|stop> [-D]"
+ACTION=""
+MULTI_SYNC_PROFILE=()
+DOWN_COMMAND=( stop )
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
     exit 1
 fi
 
-ACTION=$1
+case $1 in
+    start|stop)
+        ACTION=$1
+        ;;
+    *)
+        echo "Invalid action: $1. Use 'start' or 'stop'."
+        echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
+        exit 1
+        ;;
+esac
+shift
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -D)
+            DOWN_COMMAND=( down -v )
+            ;;
+        -M)
+            MULTI_SYNC_PROFILE=( --profile multi-sync )
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
+            exit 1
+            ;;
+    esac
+    shift
+done
 
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"
@@ -44,10 +75,6 @@ DOCKER_COMPOSE_CMD=( docker compose
 
 case $ACTION in
     start)
-        if [[ $# -ne 1 ]]; then
-            echo "Usage: $SCRIPTNAME <start|stop> [-D]"
-            exit 1
-        fi
         services_to_log=( canton splice postgres nginx )
         docker system events -f type=container \
                       -f event=start \
@@ -72,21 +99,9 @@ case $ACTION in
               done
           fi
         done >> "${SPLICE_ROOT}/log/compose.log" 2>&1 &
-
-        "${DOCKER_COMPOSE_CMD[@]}" up -d || _error "Failed to start localnet, please check ${SPLICE_ROOT}/log/console.log for details"
+        "${DOCKER_COMPOSE_CMD[@]}" "${MULTI_SYNC_PROFILE[@]}" up -d || _error "Failed to start localnet, please check ${SPLICE_ROOT}/log/console.log for details"
         ;;
     stop)
-        if [[ $# -eq 2 && $2 == "-D" ]]; then
-            "${DOCKER_COMPOSE_CMD[@]}" down -v
-        elif [[ $# -eq 1 ]]; then
-            "${DOCKER_COMPOSE_CMD[@]}" stop
-        else
-            echo "Usage: $SCRIPTNAME <start|stop> [-D]"
-            exit 1
-        fi
-        ;;
-    *)
-        echo "Invalid action: $ACTION. Use 'start' or 'stop'."
-        exit 1
+        "${DOCKER_COMPOSE_CMD[@]}" "${MULTI_SYNC_PROFILE[@]}" "${DOWN_COMMAND[@]}"
         ;;
 esac

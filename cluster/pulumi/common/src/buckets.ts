@@ -24,9 +24,11 @@ export type BucketConfig = {
 export async function bootstrapBucket(
   projectId: string,
   bucketName: string,
-  gcpSecretName: string
+  gcpSecretName: string,
+  isSharedBucket: boolean = false
 ): Promise<GcpBucket> {
   const cred = await gcp.secretmanager.getSecretVersion({
+    project: isSharedBucket ? projectId : undefined,
     secret: gcpSecretName,
   });
   return {

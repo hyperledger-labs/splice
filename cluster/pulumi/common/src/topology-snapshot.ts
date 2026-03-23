@@ -12,7 +12,8 @@ export async function topologySnapshotConfig(
   const bucketSpec = await bootstrapBucket(
     configuration.projectId,
     configuration.bucketName,
-    configuration.bucketSaKeySecret
+    configuration.bucketSaKeySecret,
+    true
   );
   return {
     backupInterval: configuration.backupInterval,
