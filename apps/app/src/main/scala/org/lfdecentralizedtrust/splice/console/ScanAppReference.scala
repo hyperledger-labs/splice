@@ -62,9 +62,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvOperatorAppClient
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.StreamConverters
 
+import java.io.OutputStream
 import scala.jdk.OptionConverters.*
 import java.time.Instant
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -748,6 +752,28 @@ abstract class ScanAppReference(
       )
     }
   }
+
+  @Help.Summary("List all objects in bulk storage for an ACS snapshot")
+  def getBulkAcsSnapshot(
+      timestamp: CantonTimestamp
+  ): definitions.ListBulkAcsSnapshotObjectsResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetBulkAcsSnapshot(timestamp)
+      )
+    }
+
+  @Help.Summary("Download a bulk storage object")
+  def bulkStorageDownload(objectKey: String, output: OutputStream)(implicit
+      ec: ExecutionContext,
+      as: ActorSystem,
+  ): Future[Long] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.BulkStorageDownload(objectKey)
+      ).map(_.runWith(StreamConverters.fromOutputStream(() => output)).map(_.count))
+    }
+
 }
 
 final class ScanAppBackendReference(

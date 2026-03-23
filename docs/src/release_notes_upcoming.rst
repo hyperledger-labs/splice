@@ -9,23 +9,28 @@
 
 .. release-notes:: Upcoming
 
-   - Validator App
+    - SV and Validator app
 
-     - Remove the ``new-sequencer-connection-pool`` flag as it didn't
-       do what it was supposed to do. If you did set it, you can
-       safely remove it regardless of whether you disabled the new sequencer connection
-       pools in the participant or not.
+    - Going forward unusable splice DARs will be automatically unvetted by the super validators.
+      This will be used for DARs that can already not be used,
+      e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
 
-       Fix a bug that caused the Validator App to fail during restarts when the Scan Apps defined
-       in ``scanClient.seedUrls`` were unavailable. This fix ensures the Validator App uses its
-       persisted scan connections from previous runs, removing the dependency on seedUrls
-       scan availability for successful reboots.
+      The minimum supported versions are:
 
-   - Scan
+         ================== =======
+         name               version
+         ================== =======
+         amulet             0.1.14
+         amuletNameService  0.1.14
+         dsoGovernance      0.1.19
+         validatorLifecycle 0.1.5
+         wallet             0.1.14
+         walletPayments     0.1.14
+         ================== =======
 
-     - **Experimental**: Added an optional ``traffic_summary`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
-       When enabled by SV configuration, traffic summaries are included alongside verdicts in event history items.
-       This is part of the CIP-104 preview and is subject to change.
+    - LocalNet
 
-       Traffic summaries will be enabled step-by-step on Dev/Test/MainNet,
-       once the SVs have successfully concluded their performance testing.
+       - LocalNet now supports running multiple synchronizers side by side for testing multi-synchronizer scenarios. By default, only the ``global``
+         synchronizer is active. To enable the second synchronizer called ``app-synchronizer``, start LocalNet with the ``multi-sync`` Docker
+         Compose profile (``--profile multi-sync``). The ``app-provider`` and ``app-user`` participant nodes are cross-connected to both
+         synchronizers. See :ref:`multi-sync-localnet` for details.

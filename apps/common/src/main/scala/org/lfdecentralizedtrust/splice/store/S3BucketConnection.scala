@@ -4,9 +4,12 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.async.AsyncRequestBody
+import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
@@ -48,6 +51,49 @@ class S3BucketConnection(
 
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
+
+  def listObjectsSource(prefix: String): Source[S3Object, NotUsed] = {
+    val listRequest = ListObjectsV2Request
+      .builder()
+      .bucket(bucketName)
+      .prefix(prefix)
+      .build();
+    Source
+      .fromPublisher(
+        s3Client.listObjectsV2Paginator(listRequest)
+      )
+      .mapConcat(_.contents().asScala)
+  }
+
+  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+
+    val headRequest = HeadObjectRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .build()
+    for {
+      head <- s3Client.headObject(headRequest).asScala
+      checksum = head
+        .metadata()
+        .asScala
+        .getOrElse("splice-checksum", throw new RuntimeException("Missing checksum metadata"))
+    } yield checksum
+  }
+
+  def readObject(
+      key: String
+  )(implicit ec: ExecutionContext): Future[Source[ByteString, NotUsed]] = {
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+
+    s3Client
+      .getObject(request, AsyncResponseTransformer.toPublisher[GetObjectResponse]())
+      .asScala
+      .map { publisher =>
+        org.apache.pekko.stream.scaladsl.Source.fromPublisher(publisher)
+      }
+      .map { _.map(ByteString.fromByteBuffer) }
+  }
 
   /** Wrapper around multi-part upload that simplifies uploading parts in order
     */
@@ -140,25 +186,21 @@ class S3BucketConnection(
 
         _ <- s3Client.completeMultipartUpload(completeRequest).asScala
 
-        taggingRequest = PutObjectTaggingRequest
+        // Copy-in-place of the object to add the final checksum to its metadata
+        metadata = Map("splice-checksum" -> Base64.getEncoder.encodeToString(md.digest()))
+
+        copyReq = CopyObjectRequest
           .builder()
-          .bucket(bucketName)
-          .key(key)
-          .tagging(
-            Tagging
-              .builder()
-              .tagSet(
-                Tag
-                  .builder()
-                  .key("splice-checksum")
-                  .value(Base64.getEncoder.encodeToString(md.digest()))
-                  .build()
-              )
-              .build()
-          )
+          .destinationBucket(bucketName)
+          .destinationKey(key)
+          .sourceBucket(bucketName)
+          .sourceKey(key)
+          // Tells S3/GCS to ignore old metadata and use the new map
+          .metadataDirective(MetadataDirective.REPLACE)
+          .metadata(metadata.asJava)
           .build()
 
-        _ <- s3Client.putObjectTagging(taggingRequest).asScala
+        _ <- s3Client.copyObject(copyReq).asScala
 
       } yield {
         ()

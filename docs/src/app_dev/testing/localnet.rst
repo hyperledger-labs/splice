@@ -231,3 +231,21 @@ of the Canton sequencer, mediator, and participant nodes in your LocalNet deploy
                   -f $LOCALNET_DIR/resource-constraints.yaml \
                   run --rm console
 
+.. _multi-sync-localnet:
+
+Multiple Synchronizers
+----------------------
+
+LocalNet supports running multiple synchronizers side by side.
+
+By default, a single synchronizer controlled by the Super Validator (sv) is active.
+This synchronizer simulates the **Global Synchronizer**.
+
+To enable a second synchronizer called ``app-synchronizer``, start LocalNet with
+the ``multi-sync`` Docker Compose profile (``--profile multi-sync``).
+The additional synchronizer has the following characteristics:
+
+- It is managed by the ``app-sequencer`` and ``app-mediator`` nodes.
+- It simulates a **private synchronizer**.
+- Both the ``app-provider`` and ``app-user`` participants are cross-connected
+  to the Global Synchronizer and the ``app-synchronizer``.

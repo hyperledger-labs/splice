@@ -64,7 +64,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -200,7 +200,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -558,7 +558,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1249,6 +1249,17 @@
         {
           "actions": [
             {
+              "name": "getBulkAcsSnapshot",
+              "pathPrefix": "/api/scan/v0/history/bulk/acs"
+            }
+          ],
+          "limits": {
+            "type": "unlimited"
+          }
+        },
+        {
+          "actions": [
+            {
               "name": "v1-updates",
               "pathPrefix": "/api/scan/v1/updates"
             }
@@ -1383,7 +1394,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1401,7 +1412,9 @@
           "name": "cn-mocknet"
         },
         "db": {
-          "volumeSize": "48Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "48Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -1459,7 +1472,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -1564,8 +1577,8 @@
           "secretName": "apps-pg-secret"
         },
         "pvc": {
-          "volumeName": "sv-app-global-domain-migration-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "sv-app-global-domain-migration-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "resources": {
           "limits": {
@@ -1852,7 +1865,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]

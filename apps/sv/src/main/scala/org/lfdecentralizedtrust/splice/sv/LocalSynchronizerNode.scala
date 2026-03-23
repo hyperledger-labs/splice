@@ -14,6 +14,7 @@ import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -38,6 +39,7 @@ import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandExce
 import org.lfdecentralizedtrust.splice.config.PruningConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
@@ -61,6 +63,7 @@ final class LocalSynchronizerNode(
     override val sequencerAvailabilityDelay: Duration,
     val sequencerPruningConfig: Option[SequencerPruningConfig],
     override val mediatorSequencerAmplification: SubmissionRequestAmplification,
+    val mediatorSequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
     sequencerConfig: SequencerConfig,
@@ -248,7 +251,11 @@ final class LocalSynchronizerNode(
         "local sequencer observes mediator as onboarded",
         // Otherwise we might fail with `PERMISSION_DENIED` during initialization
         sequencerAdminConnection
-          .getMediatorSynchronizerState(synchronizerId.logical, AuthorizedState)
+          .getMediatorSynchronizerState(
+            synchronizerId.logical,
+            topologySnapshot = TopologySnapshot.Effective,
+            AuthorizedState,
+          )
           .map { state =>
             if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
@@ -291,6 +298,7 @@ final class LocalSynchronizerNode(
               synchronizerId,
               sequencerConnection,
               mediatorSequencerAmplification,
+              mediatorSequencerConnectionPoolDelays,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -309,7 +317,11 @@ final class LocalSynchronizerNode(
         "mediator_onboarded",
         "mediator observes itself as onboarded",
         mediatorAdminConnection
-          .getMediatorSynchronizerState(synchronizerId.logical, AuthorizedState)
+          .getMediatorSynchronizerState(
+            synchronizerId.logical,
+            TopologySnapshot.Sequenced,
+            AuthorizedState,
+          )
           .map { state =>
             if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
@@ -492,6 +504,7 @@ final class LocalSynchronizerNode(
         mediatorAdminConnection.setSequencerConnection(
           sequencerConnection,
           mediatorSequencerAmplification,
+          mediatorSequencerConnectionPoolDelays,
         ),
       logger,
     )

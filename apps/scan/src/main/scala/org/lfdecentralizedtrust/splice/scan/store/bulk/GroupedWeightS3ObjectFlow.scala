@@ -9,9 +9,9 @@ import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
-import GroupedWeightS3ObjectFlow.Output
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.util.ByteString
 
 /** A Pekko Flow GraphStage that takes a stream of bytestrings, slices them into objects such that every object is slightly
   * larger than maxObjectSize (i.e. the cut is at the end of the byteString that passes that threshold), and uploads them
@@ -28,12 +28,12 @@ case class GroupedWeightS3ObjectFlow(
     maxParallelPartUploads: Int,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)
-    extends GraphStage[FlowShape[ByteStringWithTermination, Output]]
+    extends GraphStage[FlowShape[ByteString, String]]
     with NamedLogging {
 
-  val in = Inlet[ByteStringWithTermination]("GroupedWeightS3Object.in")
-  val out = Outlet[Output]("GroupedWeightS3Object.out")
-  override val shape: FlowShape[ByteStringWithTermination, Output] = FlowShape(in, out)
+  val in = Inlet[ByteString]("GroupedWeightS3Object.in")
+  val out = Outlet[String]("GroupedWeightS3Object.out")
+  override val shape: FlowShape[ByteString, String] = FlowShape(in, out)
 
   override def initialAttributes: Attributes = Attributes.name("GroupedWeightS3Object")
 
@@ -81,14 +81,9 @@ case class GroupedWeightS3ObjectFlow(
     new GraphStageLogic(shape) with InHandler with OutHandler {
       // The usage of callbacks makes this thread safe, so we use vars here and not Atomic's
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
-      @volatile
       private var state = State.initial()
-      @SuppressWarnings(Array("org.wartremover.warts.Var"))
-      @volatile
-      private var upstreamFinished = false
 
-      private def objectDone =
-        upstreamFinished || state.currentObjectSize >= maxObjectSize
+      private def objectDone = state.currentObjectSize >= maxObjectSize || isClosed(in)
 
       private val uploadCallback = getAsyncCallback[Unit] { _ =>
         state = state.completePart()
@@ -97,7 +92,7 @@ case class GroupedWeightS3ObjectFlow(
         )
         if (state.numPendingPartUploads == maxParallelPartUploads - 1) {
           if (!objectDone) {
-            logger.debug(
+            logger.trace(
               "More parallel upload capacity freed up, and we're not done yet, pull more input"
             )
             pull(in)
@@ -105,7 +100,7 @@ case class GroupedWeightS3ObjectFlow(
         }
         if (state.numPendingPartUploads == 0) {
           if (objectDone) {
-            logger.debug(
+            logger.trace(
               s"Finishing upload of ${state.currentObject.key}"
             )
             finishCurrentObject()
@@ -116,56 +111,42 @@ case class GroupedWeightS3ObjectFlow(
 
       private val finishCallback = getAsyncCallback[Unit] { _ =>
         logger.debug(s"Finished uploading and finalizing object ${state.currentObject.key}")
-        push(
-          out,
-          Output(
-            objectKey = state.currentObject.key,
-            isLastObject = upstreamFinished,
-          ),
-        )
-        if (upstreamFinished) {
-          logger.debug("This was the last input in the stream, completing.")
+        push(out, state.currentObject.key)
+        if (isClosed(in)) {
+          logger.trace("Upstream completed, completing too.")
           completeStage()
         } else {
           state = state.nextObject()
-          logger.debug(s"Ready for object ${state.currentObject.key}")
+          logger.trace(s"Ready for object ${state.currentObject.key}")
         }
+      }
+
+      private val failCallback = getAsyncCallback[Throwable] { ex =>
+        failStage(ex)
       }
 
       override def onPush(): Unit = {
         val elem = grab(in)
         val curState = state
-        state = curState.addPart(elem.bytes.length)
-        if (elem.isLast) {
-          upstreamFinished = true
+        state = curState.addPart(elem.length)
+        val partNumber = curState.currentObject.prepareUploadNext(elem.asByteBuffer)
+        logger.debug(
+          s"Received ${elem.length} bytes. Uploading as part $partNumber of object ${curState.currentObject.key}"
+        )
+        curState.currentObject.upload(partNumber, elem.asByteBuffer).onComplete {
+          case Success(_) => uploadCallback.invoke(())
+          case Failure(ex) => failCallback.invoke(ex)
         }
-        if (elem.bytes.isEmpty) {
-          // Upstream is allowed to send one last empty input with isLast if they did not recognize termination when creating their last non-empty element
-          if (!elem.isLast) {
-            throw new RuntimeException("Received an empty element that is not last")
-          }
-          logger.debug("Received a final empty element")
-          uploadCallback.invoke(())
-        } else {
-          val partNumber = curState.currentObject.prepareUploadNext(elem.bytes.asByteBuffer)
-          logger.debug(
-            s"Received ${elem.bytes.length} bytes (isLast=${elem.isLast}), uploading as part $partNumber of object ${curState.currentObject.key}"
+        if (objectDone) {
+          logger.trace(
+            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, done with this object"
           )
-          curState.currentObject.upload(partNumber, elem.bytes.asByteBuffer).onComplete {
-            case Success(_) => uploadCallback.invoke(())
-            case Failure(ex) => failStage(ex)
-          }
-          if (!objectDone) {
-            logger.debug(
-              s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.bytes.length}, not done with it yet"
-            )
-            if (state.numPendingPartUploads < maxParallelPartUploads) {
-              pull(in)
-            }
-          } else {
-            logger.debug(
-              s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.bytes.length}, done with this object"
-            )
+        } else {
+          logger.trace(
+            s"New object size for ${curState.currentObject.key} is ${curState.currentObjectSize + elem.length}, not done with it yet"
+          )
+          if (state.numPendingPartUploads < maxParallelPartUploads) {
+            pull(in)
           }
         }
       }
@@ -177,27 +158,30 @@ case class GroupedWeightS3ObjectFlow(
       private def finishCurrentObject(): Unit =
         state.currentObject.finish().onComplete {
           case Success(_) => finishCallback.invoke(())
-          case Failure(ex) => failStage(ex)
+          case Failure(ex) => failCallback.invoke(ex)
         }
 
       override def onUpstreamFinish(): Unit = {
-        if (!upstreamFinished) {
-          throw new RuntimeException(
-            "upstream finished unexpectedly, without omitting a final object first"
+        if (state.numPendingPartUploads == 0) {
+          if (state.currentObjectSize > 0) {
+            logger.debug(
+              s"Upstream finished, finishing current object ${state.currentObject.key} with size ${state.currentObjectSize}"
+            )
+            finishCurrentObject()
+          } else {
+            logger.debug(
+              "Upstream finished, no pending uploads and current object is empty, completing stage"
+            )
+            completeStage()
+          }
+        } else {
+          logger.debug(
+            s"Upstream finished, waiting for ${state.numPendingPartUploads} pending uploads to finish before completing stage"
           )
         }
-        // Note that we're not finishing the stage here, we're doing that above when the last object finishes uploading
       }
 
       setHandlers(in, out, this)
     }
   }
-}
-
-object GroupedWeightS3ObjectFlow {
-  case class Output(
-      objectKey: String,
-      isLastObject: Boolean,
-  )
-
 }

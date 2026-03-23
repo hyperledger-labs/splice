@@ -30,6 +30,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   SequencerAdminConnection,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
@@ -53,6 +54,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -107,6 +109,10 @@ import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
+  AcsSnapshotObjects,
+  ObjectKeyAndChecksum,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
@@ -124,6 +130,7 @@ class HttpScanHandler(
     updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
+    bulkStorage: BulkStorage,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
@@ -133,6 +140,8 @@ class HttpScanHandler(
     protected val packageVersionSupport: PackageVersionSupport,
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
     initialRound: String,
+    externalTransactionHashThresholdTime: Option[Instant] = None,
+    updateHistoryMaxPageSize: Int,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -746,12 +755,12 @@ class HttpScanHandler(
           if (includeImportUpdates)
             updateHistory.getAllUpdates(
               afterO,
-              PageLimit.tryCreate(pageSize),
+              PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
             )
           else
             updateHistory.getUpdatesWithoutImportUpdates(
               afterO,
-              PageLimit.tryCreate(pageSize),
+              PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
             )
       } yield txs
         .map(
@@ -759,6 +768,7 @@ class HttpScanHandler(
             _,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
         .toVector
@@ -908,7 +918,7 @@ class HttpScanHandler(
         events <- eventStore.getEvents(
           afterO = afterO,
           currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
-          limit = PageLimit.tryCreate(pageSize),
+          limit = PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
         )
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
@@ -2205,6 +2215,8 @@ class HttpScanHandler(
           domain,
           party,
           topologyTransactionType = AuthorizedState,
+          topologySnapshot =
+            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
         )
         participantId <- response.mapping.participantIds match {
           case Seq() =>
@@ -2319,6 +2331,40 @@ class HttpScanHandler(
           coupons.map(_.toHttp).toVector
         )
       }
+    }
+  }
+
+  override def listBulkAcsSnapshotObjects(
+      respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type
+  )(
+      atOrBeforeRecordTime: OffsetDateTime
+  )(extracted: TraceContext): Future[ScanResource.ListBulkAcsSnapshotObjectsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
+      bulkStorage.acsSnapshotBulkStorage.fold(
+        Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
+          Status.UNIMPLEMENTED
+            .withDescription("Bulk storage is not configured")
+            .asRuntimeException()
+        )
+      )(acsSnapshotBulkStorage =>
+        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
+          case AcsSnapshotObjects(ts, objects) =>
+            ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
+              definitions.ListBulkAcsSnapshotObjectsResponse(
+                Codec.encode(ts),
+                objects.map { case ObjectKeyAndChecksum(key, digest) =>
+                  definitions.BulkStorageObjectRef(
+                    // TODO(#3429): for now we return just the key, but this should be mapped to a full url in scan
+                    key,
+                    digest,
+                  )
+                }.toVector,
+              )
+            )
+        }
+      )
     }
   }
 }

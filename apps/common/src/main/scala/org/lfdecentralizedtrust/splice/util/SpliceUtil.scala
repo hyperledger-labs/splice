@@ -208,6 +208,7 @@ object SpliceUtil {
       validatorPercentage: Double,
       appPercentage: Double,
       developmentFundPercentage: Option[BigDecimal] = None,
+      optValidatorFaucetCap: Option[BigDecimal] = None,
   ): splice.issuance.IssuanceConfig = new IssuanceConfig(
     damlDecimal(amuletsToIssuePerYear),
     damlDecimal(validatorPercentage),
@@ -223,7 +224,7 @@ object SpliceUtil {
     damlDecimal(0.6),
 
     // validatorFaucetCap
-    Some(damlDecimal(2.85)).toJava,
+    Some(damlDecimal(optValidatorFaucetCap.getOrElse(BigDecimal(2.85)))).toJava,
 
     // developmentFundPercentage
     developmentFundPercentage.map(damlDecimal).toJava,
@@ -232,48 +233,35 @@ object SpliceUtil {
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
 
   def defaultIssuanceCurve(
-      developmentFundPercentage: Option[BigDecimal] = None
+      developmentFundPercentage: Option[BigDecimal] = None,
+      optValidatorFaucetCap: Option[BigDecimal] = None,
   ): splice.schedule.Schedule[RelTime, IssuanceConfig] =
     new Schedule(
-      issuanceConfig(40e9, 0.05, 0.15, developmentFundPercentage),
+      issuanceConfig(40e9, 0.05, 0.15, developmentFundPercentage, optValidatorFaucetCap),
       Seq(
-        new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4, developmentFundPercentage)),
+        new Tuple2(
+          hours(365 * 12),
+          issuanceConfig(20e9, 0.12, 0.4, developmentFundPercentage, optValidatorFaucetCap),
+        ),
         new Tuple2(
           hours(3 * 365 * 12),
-          issuanceConfig(10e9, 0.18, 0.62, developmentFundPercentage),
+          issuanceConfig(10e9, 0.18, 0.62, developmentFundPercentage, optValidatorFaucetCap),
         ),
-        new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69, developmentFundPercentage)),
+        new Tuple2(
+          hours(5 * 365 * 24),
+          issuanceConfig(5e9, 0.21, 0.69, developmentFundPercentage, optValidatorFaucetCap),
+        ),
         new Tuple2(
           hours(10 * 365 * 24),
-          issuanceConfig(2.5e9, 0.20, 0.75, developmentFundPercentage),
+          issuanceConfig(2.5e9, 0.20, 0.75, developmentFundPercentage, optValidatorFaucetCap),
         ),
       ).asJava,
     )
 
-  val defaultCreateFee = new splice.fees.FixedFee(damlDecimal(0.03))
-
-  val defaultTransferFee = new splice.fees.SteppedRate(
-    damlDecimal(0.01),
-    Seq(
-      new Tuple2(damlDecimal(100.0), damlDecimal(0.001)),
-      new Tuple2(damlDecimal(1000.0), damlDecimal(0.0001)),
-      new Tuple2(damlDecimal(1000000.0), damlDecimal(0.00001)),
-    ).asJava,
-  )
-
-  // TODO(#2251): set the extra steps to the empty list once the config in the live system is using an empty list as well
   val zeroTransferFee = new splice.fees.SteppedRate(
     damlDecimal(0.0),
-    Seq(
-      // Note that we use multiple steps for the zeros, as the SV UI does not support setting the list to empty yet
-      // TODO(#2264): set to the empty list once the SV UI supports it
-      new Tuple2(damlDecimal(100.0), damlDecimal(0.0)),
-      new Tuple2(damlDecimal(1000.0), damlDecimal(0.0)),
-      new Tuple2(damlDecimal(1000000.0), damlDecimal(0.0)),
-    ).asJava,
+    java.util.Collections.emptyList(),
   )
-
-  val defaultLockHolderFee = new splice.fees.FixedFee(damlDecimal(0.005))
 
   // These are dummy values only made use of by some unit tests.
   // The synchronizer fees parameters are provided in sv1 App config with the defaults in SynchronizerFeesConfig
@@ -286,7 +274,7 @@ object SpliceUtil {
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
   def defaultAmuletConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
-      initialMaxNumInputs: Int,
+      initialMaxNumInputs: Long,
       initialSynchronizerId: SynchronizerId,
       initialExtraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
       initialMinTopupAmount: Long = dummyMinTopupAmount,
@@ -295,7 +283,6 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
-      zeroTransferFees: Boolean = false,
       transferPreapprovalFee: Option[BigDecimal] = None,
   ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
     splice.amuletconfig.USD
@@ -311,7 +298,6 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor,
       initialPackageConfig,
       holdingFee,
-      zeroTransferFees,
       transferPreapprovalFee,
     ),
     List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
@@ -364,7 +350,7 @@ object SpliceUtil {
 
   def defaultAmuletConfig(
       initialTickDuration: NonNegativeFiniteDuration,
-      initialMaxNumInputs: Int,
+      initialMaxNumInputs: Long,
       initialSynchronizerId: SynchronizerId,
       initialExtraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
       initialMinTopupAmount: Long = dummyMinTopupAmount,
@@ -373,19 +359,20 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
-      zeroTransferFees: Boolean = false,
       transferPreapprovalFee: Option[BigDecimal] = None,
       featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
       nextSynchronizerId: Option[SynchronizerId] = None,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
+      optValidatorFaucetCap: Option[BigDecimal] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
-      defaultTransferConfig(initialMaxNumInputs, holdingFee, zeroTransferFees = zeroTransferFees),
+      defaultTransferConfig(initialMaxNumInputs, holdingFee),
 
       // issuance curve
-      defaultIssuanceCurve(developmentFundPercentage),
+      defaultIssuanceCurve(developmentFundPercentage, optValidatorFaucetCap),
 
       // global domain config
       defaultDecentralizedSynchronizerConfig(
@@ -404,6 +391,9 @@ object SpliceUtil {
       transferPreapprovalFee.map(_.bigDecimal).toJava,
       featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
       developmentFundManager.map(_.toProtoPrimitive).toJava,
+      initialExternalPartyConfigStateTickDuration
+        .map(t => new RelTime(TimeUnit.NANOSECONDS.toMicros(t.duration.toNanos)))
+        .toJava,
     )
 
   def defaultAnsConfig(
@@ -460,14 +450,13 @@ object SpliceUtil {
   }
 
   def defaultTransferConfig(
-      initialMaxNumInputs: Int,
+      initialMaxNumInputs: Long,
       holdingFee: BigDecimal,
-      zeroTransferFees: Boolean = false,
   ): splice.amuletconfig.TransferConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.TransferConfig(
       // Fee to create a new amulet.
       // Set to the fixed part of the transfer fee.
-      if (zeroTransferFees) new splice.fees.FixedFee(damlDecimal(0)) else defaultCreateFee,
+      new splice.fees.FixedFee(damlDecimal(0)),
 
       // Fee for keeping a amulet around.
       // This is roughly equivalent to 1$/360 days but expressed as rounds
@@ -479,19 +468,19 @@ object SpliceUtil {
       ),
 
       // Fee for transferring some amount of amulet to a new owner.
-      if (zeroTransferFees) zeroTransferFee else defaultTransferFee,
+      zeroTransferFee,
 
       // Fee per lock holder.
       // Chosen to match the update fee to cover the cost of informing lock-holders about
       // actions on the locked amulet.
-      if (zeroTransferFees) new splice.fees.FixedFee(damlDecimal(0)) else defaultLockHolderFee,
+      new splice.fees.FixedFee(damlDecimal(0)),
 
       // Extra featured app reward amount, chosen to be equal to the domain fee cost of a single CC transfer
       damlDecimal(1.0),
 
       // These should be large enough to ensure efficient batching, but not too large
       // to avoid creating very large transactions.
-      initialMaxNumInputs.toLong,
+      initialMaxNumInputs,
       100,
 
       // Maximum number of lock holders.
@@ -534,16 +523,6 @@ object SpliceUtil {
         .setScale(10, RoundingMode.HALF_EVEN)
     )
   }
-
-  def currentAmount(
-      amulet: Amulet,
-      currentRound: Long,
-      deductHoldingFees: Boolean = true,
-  ): java.math.BigDecimal =
-    if (deductHoldingFees)
-      amulet.amount.initialAmount.subtract(holdingFee(amulet, currentRound))
-    else
-      amulet.amount.initialAmount
 
   def amuletExpiresAt(amulet: Amulet): Round = {
     val rounds = amulet.amount.initialAmount

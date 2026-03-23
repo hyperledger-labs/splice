@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -100,15 +99,42 @@ trait UpdateHistoryTestUtil extends TestCommon {
       }
   }
 
+  def compareHistoryIncludingHashes(
+      participant: ParticipantClientReference,
+      updateHistory: UpdateHistory,
+      ledgerBegin: Long,
+      mustIncludeReassignments: Boolean = false,
+      extTxnHashes: Seq[String] = Seq.empty,
+  ): Assertion = {
+    compareHistory(participant, updateHistory, ledgerBegin, mustIncludeReassignments)
+    val actualUpdates = {
+      updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
+    }
+    val recordedUpdates = updateHistory
+      .getAllUpdates(
+        Some(
+          (
+            0L,
+            // The after0 argument to getUpdates() is exclusive, so we need to subtract a small value
+            // to include the first element
+            actualUpdates.head.update.recordTime.addMicros(-1L),
+          )
+        ),
+        PageLimit.tryCreate(actualUpdates.size),
+      )
+      .futureValue
+    compareExternalTxnHashes(actualUpdates, recordedUpdates.map(_.update), extTxnHashes)
+  }
+
   def compareHistory(
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
       ledgerBegin: Long,
       mustIncludeReassignments: Boolean = false,
   ): Assertion = {
-    val actualUpdates =
+    val actualUpdates = {
       updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
-
+    }
     val recordedUpdates = updateHistory
       .getAllUpdates(
         Some(
@@ -142,11 +168,54 @@ trait UpdateHistoryTestUtil extends TestCommon {
       actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInStoreIngestion))
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
     actualUpdatesWithoutLostData should have length recordedUpdatesWithoutLostData.size.longValue()
-    actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
-      case (actual, recorded) => actual shouldBe recorded
+
+    forAll(actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData)) {
+      case (actual, recorded) =>
+        actual shouldBe recorded
     }
     succeed
   }
+
+  private def compareExternalTxnHashes(
+      actualUpdates: Seq[UpdateHistoryResponse],
+      recordedUpdates: Seq[UpdateHistoryResponse],
+      extTxnHashes: Seq[String],
+  ): Assertion = {
+    // Ensure at least one transaction with external hash is available
+    // and that all expected hashes are present in the recorded updates
+    val recordedExtTxnHashes = recordedUpdates.collect {
+      case UpdateHistoryResponse(TransactionTreeUpdate(tx), _)
+          if Option(tx.getExternalTransactionHash).exists(!_.isEmpty) =>
+        Option(tx.getExternalTransactionHash)
+          .map(_.toByteArray)
+          .getOrElse(Array.emptyByteArray)
+          .map("%02x" format _)
+          .mkString
+    }
+
+    recordedExtTxnHashes should not be empty
+    recordedExtTxnHashes should contain allElementsOf extTxnHashes
+
+    forAll(actualUpdates.zip(recordedUpdates)) { case (actual, recorded) =>
+      compareExtTxnHashPerUpdate(actual, recorded)
+    }
+    succeed
+  }
+
+  private def compareExtTxnHashPerUpdate(
+      actual: UpdateHistoryResponse,
+      recorded: UpdateHistoryResponse,
+  ): Assertion =
+    (actual.update, recorded.update) match {
+      case (
+            TransactionTreeUpdate(actualTx),
+            TransactionTreeUpdate(recordedTx),
+          ) =>
+        actualTx.getExternalTransactionHash shouldBe recordedTx.getExternalTransactionHash
+
+      case _ =>
+        succeed
+    }
 
   def compareHistoryViaLosslessScanApi(
       scanBackend: ScanAppBackendReference,
@@ -169,7 +238,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val historyFromStoreWithoutLostData =
       historyFromStore
         .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-        .map(ScanHttpEncodings.makeConsistentAcrossSvs)
+        .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
 
@@ -194,7 +263,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-      .map(ScanHttpEncodings.makeConsistentAcrossSvs)
+      .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(
@@ -321,7 +390,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
-      ByteString.EMPTY,
+      t.getExternalTransactionHash,
     )
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =
