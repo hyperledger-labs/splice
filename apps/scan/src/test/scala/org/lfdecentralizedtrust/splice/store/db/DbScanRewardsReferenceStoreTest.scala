@@ -192,13 +192,12 @@ class DbScanRewardsReferenceStoreTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     new DbScanRewardsReferenceStore(
-      key = ScanRewardsReferenceStore.Key(dsoParty),
+      key = ScanRewardsReferenceStore.Key(dsoParty, d1),
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       DomainMigrationInfo(0L, None),
       participantId,
-      d1,
       IngestionConfig(),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )

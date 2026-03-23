@@ -26,10 +26,11 @@ import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
+import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 import slick.jdbc.JdbcProfile
 
 class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcTypes {
-  private def mkStore(): DbTcsStore = {
+  private def mkStore(synchronizerId: SynchronizerId): DbTcsStore = {
     val participantId = mkParticipantId("DbTcsStoreTest")
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -43,10 +44,10 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       "acs_store_template",
       Some("txlog_store_template"),
       None,
-      storeDescriptor(0, participantId),
-      Some(storeDescriptor(1, participantId)),
+      storeDescriptor(0, participantId, synchronizerId),
+      Some(storeDescriptor(1, participantId, synchronizerId)),
       loggerFactory,
-      defaultContractFilter,
+      contractFilter(synchronizerId),
       testTxLogConfig,
       DomainMigrationInfo(0L, None),
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
@@ -59,7 +60,10 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         )
       ),
     )
-    new DbTcsStore(acsStore)
+    new DbTcsStore(
+      acsStore,
+      descriptor => SynchronizerId.tryFromString(descriptor.key("synchronizerId")),
+    )
   }
 
   protected def c(i: Int): Contract[AppRewardCoupon.ContractId, AppRewardCoupon] =
@@ -68,7 +72,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
   "DbTcsStore" should {
 
     "lookupContractByIdAsOf is visible in [created_at, archived_at) interval" in {
-      val store = mkStore()
+      val store = mkStore(d1)
       val createTime = CantonTimestamp.ofEpochSecond(100)
       val archiveTime = CantonTimestamp.ofEpochSecond(200)
       val coupon = c(1).copy(createdAt = createTime.toInstant)
@@ -79,31 +83,27 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         resultBefore <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           CantonTimestamp.ofEpochSecond(50),
-          d1,
         )
         _ = resultBefore shouldBe None
         resultAtCreate <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           createTime,
-          d1,
         )
         _ = resultAtCreate.map(_.contract) shouldBe Some(coupon)
         resultBetween <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           CantonTimestamp.ofEpochSecond(150),
-          d1,
         )
         _ = resultBetween.map(_.contract) shouldBe Some(coupon)
         resultAtArchive <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           archiveTime,
-          d1,
         )
       } yield resultAtArchive shouldBe None
     }
 
     "listAllContractsAsOf and listAllContractsActiveWithin return correct contracts" in {
-      val store = mkStore()
+      val store = mkStore(d1)
       val coupon1 = c(1).copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val coupon2 = c(2).copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
       val coupon3 = c(3).copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
@@ -129,35 +129,30 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         resultAt50 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(50),
-          d1,
         )
         _ = resultAt50 shouldBe empty
 
         resultAt100 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
-          d1,
         )
         _ = resultAt100.map(_.contract) shouldBe Seq(coupon1)
 
         resultAt250 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(250),
-          d1,
         )
         _ = resultAt250.map(_.contract).toSet shouldBe Set(coupon1, coupon2)
 
         resultAt300 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(300),
-          d1,
         )
         _ = resultAt300.map(_.contract).toSet shouldBe Set(coupon2, coupon3)
 
         resultAt400 <- store.listAllContractsAsOf(
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(400),
-          d1,
         )
         _ = resultAt400.map(_.contract) shouldBe Seq(coupon2)
 
@@ -166,7 +161,6 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(400),
-          d1,
         )
         _ = resultRange_100_400
           .map(_.contractWithState.contract)
@@ -200,7 +194,6 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(200),
-          d1,
         )
         _ = resultRange_100_200
           .map(_.contractWithState.contract)
@@ -210,7 +203,6 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(100),
           CantonTimestamp.ofEpochSecond(300),
-          d1,
         )
         _ = resultRange_100_300
           .map(_.contractWithState.contract)
@@ -220,7 +212,6 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(200),
           CantonTimestamp.ofEpochSecond(300),
-          d1,
         )
         _ = resultRange_200_300
           .map(_.contractWithState.contract)
@@ -230,7 +221,6 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           AppRewardCoupon.COMPANION,
           CantonTimestamp.ofEpochSecond(300),
           CantonTimestamp.ofEpochSecond(400),
-          d1,
         )
         _ = resultRange_300_400
           .map(_.contractWithState.contract)
@@ -239,7 +229,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached completes when record time is reached via offset checkpoint" in {
-      val store = mkStore().acsStore
+      val store = mkStore(d1).acsStore
       val d1CheckpointTime = CantonTimestamp.ofEpochSecond(200)
       val d2CheckpointTime = CantonTimestamp.ofEpochSecond(150)
       for {
@@ -288,7 +278,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached complete when record time is reached via transaction ingestion" in {
-      val store = mkStore().acsStore
+      val store = mkStore(d1).acsStore
       for {
         _ <- initWithAcs()(store)
         // Ingest a transaction on d1 at t=100
@@ -306,7 +296,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached blocks on a synchronizer with no ingested contracts" in {
-      val store = mkStore().acsStore
+      val store = mkStore(d1).acsStore
       for {
         _ <- initWithAcs()(store)
         // No contracts ingested for d1 yet, so waiting should block
@@ -368,27 +358,35 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       }
   }
 
-  private val defaultContractFilter = {
+  private def contractFilter(synchronizerId: SynchronizerId) = {
     import MultiDomainAcsStore.mkFilter
 
-    MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData](
-      dsoParty,
-      templateFilters = Map(
-        mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured) { contract =>
-          GenericAcsRowData(contract)
-        }
-      ),
-    )
+    MultiDomainAcsStore
+      .SimpleContractFilter[GenericAcsRowData, AcsInterfaceViewRowData.NoInterfacesIngested](
+        dsoParty,
+        templateFilters = Map(
+          mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured) { contract =>
+            GenericAcsRowData(contract)
+          }
+        ),
+        interfaceFilters = Map.empty,
+        synchronizerFilter = Some(synchronizerId),
+      )
   }
 
-  private def storeDescriptor(id: Int, participantId: ParticipantId) =
+  private def storeDescriptor(
+      id: Int,
+      participantId: ParticipantId,
+      synchronizerId: SynchronizerId,
+  ) =
     StoreDescriptor(
       version = 1,
       name = "DbTcsStoreTest",
       party = dsoParty,
       participant = participantId,
       key = Map(
-        "id" -> id.toString
+        "id" -> id.toString,
+        "synchronizerId" -> synchronizerId.toProtoPrimitive,
       ),
     )
 
