@@ -25,7 +25,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.mem
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
-  ExternalHashInclusion,
+  ExternalHashInclusionPolicy,
   ProtobufJsonScanHttpEncodings,
   ScanHttpEncodings,
 }
@@ -236,7 +236,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val historyFromStoreWithoutLostData =
       historyFromStore
         .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-        .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, ExternalHashInclusion.AlwaysInclude))
+        .map(
+          ScanHttpEncodings
+            .makeConsistentAcrossSvs(_, ExternalHashInclusionPolicy.AlwaysInclude, None)
+        )
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
 
@@ -286,7 +289,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-      .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, ExternalHashInclusion.AlwaysInclude))
+      .map(
+        ScanHttpEncodings
+          .makeConsistentAcrossSvs(_, ExternalHashInclusionPolicy.AlwaysInclude, None)
+      )
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(

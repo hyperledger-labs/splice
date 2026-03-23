@@ -147,9 +147,6 @@ class HttpScanHandler(
   import HttpScanHandler.*
   private val store = storeWithIngestion.store
 
-  private val externalHashInclusion: ExternalHashInclusion =
-    ExternalHashInclusion.fromThresholdTime(externalTransactionHashThresholdTime)
-
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
@@ -765,7 +762,8 @@ class HttpScanHandler(
             _,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            hashInclusion = externalHashInclusion,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
         .toVector
@@ -928,7 +926,7 @@ class HttpScanHandler(
         val encodedUpdateV2 = updateO
           .map(
             ScanHttpEncodings
-              .encodeUpdate(_, encoding, ScanHttpEncodings.V1, externalHashInclusion)
+              .encodeUpdate(_, encoding, ScanHttpEncodings.V1)
           )
           .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
@@ -1791,7 +1789,7 @@ class HttpScanHandler(
             txWithMigration,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            hashInclusion = ExternalHashInclusion.AlwaysInclude,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
           )
         )
       )
