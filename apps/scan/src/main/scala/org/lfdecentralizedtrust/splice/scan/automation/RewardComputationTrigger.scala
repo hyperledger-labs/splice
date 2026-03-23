@@ -53,9 +53,8 @@ class RewardComputationTrigger(
         case (Some((lastClosed, _)), Some(earliestComplete), Some(latestComplete)) =>
           val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
           val end = math.min(lastClosed, latestComplete)
-          (start to end)
-            .take(RewardComputationTrigger.MaxParallelRounds)
-            .map(RewardComputationTrigger.Task(_))
+          // TODO(#4570): Support parallel execution
+          Seq(start).filter(_ <= end).map(RewardComputationTrigger.Task(_))
         case _ => Seq.empty
       }
     }
@@ -75,8 +74,6 @@ class RewardComputationTrigger(
 }
 
 object RewardComputationTrigger {
-  val MaxParallelRounds = 4
-
   final case class Task(roundNumber: Long) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("roundNumber", _.roundNumber))
