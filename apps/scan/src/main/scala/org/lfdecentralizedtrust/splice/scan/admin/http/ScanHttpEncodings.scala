@@ -35,8 +35,8 @@ import scala.jdk.OptionConverters.*
 
 /** Controls whether external transaction hashes are included in encoded responses.
   *
-  * - `AlwaysInclude`: The hash is always included if present (used for by-ID lookups).
-  * - `ApplyThreshold`: The hash is only included for transactions recorded on or after
+  * - AlwaysInclude: The hash is always included if present.
+  * - ApplyThreshold: The hash is only included for transactions recorded on or after
   *   the separately provided threshold time.
   */
 sealed trait ExternalHashInclusionPolicy

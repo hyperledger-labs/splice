@@ -685,6 +685,21 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       }
     }
 
+    "return the hash when policy is AlwaysInclude irrespective of record time" in {
+      val thresholdDate = Instant.parse("2100-06-30T00:00:01Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
+      }
+    }
+
     "not return the hash when record time is before threshold" in {
       val thresholdDate = Instant.parse("2026-06-30T00:00:01Z")
       inside(
@@ -692,7 +707,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           mkTree,
           DamlValueEncoding.ProtobufJson,
           ScanHttpEncodings.V1,
-          hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
           externalTransactionHashThresholdTime = Some(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
