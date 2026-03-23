@@ -228,6 +228,34 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
       } yield succeed
     }
 
+    "getEarliestArchivedAt returns None before archives, correct value after, and caches" in {
+      val store = mkStore(d1)
+      val coupon1 = c(1).copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
+      val coupon2 = c(2).copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
+      for {
+        _ <- initWithAcs()(store.acsStore)
+        resultEmpty <- store.getEarliestArchivedAt()
+        _ = resultEmpty shouldBe None
+        _ <- d1.create(coupon1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+          store.acsStore
+        )
+        _ <- d1.archive(coupon1, recordTime = CantonTimestamp.ofEpochSecond(150).toInstant)(
+          store.acsStore
+        )
+        result1 <- store.getEarliestArchivedAt()
+        _ = result1 shouldBe Some(CantonTimestamp.ofEpochSecond(150))
+        // Archive another contract result should not change
+        _ <- d1.create(coupon2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
+          store.acsStore
+        )
+        _ <- d1.archive(coupon2, recordTime = CantonTimestamp.ofEpochSecond(250).toInstant)(
+          store.acsStore
+        )
+        result2 <- store.getEarliestArchivedAt()
+        _ = result2 shouldBe Some(CantonTimestamp.ofEpochSecond(150))
+      } yield succeed
+    }
+
     "waitUntilRecordTimeReached completes when record time is reached via offset checkpoint" in {
       val store = mkStore(sync1).acsStore
       val sync1CheckpointTime = CantonTimestamp.ofEpochSecond(200)

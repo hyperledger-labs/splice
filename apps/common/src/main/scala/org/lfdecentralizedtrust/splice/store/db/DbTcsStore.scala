@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDeco
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
 // The DbTcsStore is currently implemented with support for single synchronizer only.
@@ -133,6 +134,37 @@ class DbTcsStore(
           )
         }
       } yield withState
+    }
+  }
+
+  private val earliestArchivedAtCache = new AtomicReference[Option[CantonTimestamp]](None)
+
+  /** Returns the earliest archived_at timestamp which serves as an
+    * approximation for ingestion start.
+    */
+  def getEarliestArchivedAt()(implicit
+      _traceContext: TraceContext
+  ): Future[Option[CantonTimestamp]] = {
+    earliestArchivedAtCache.get() match {
+      case some @ Some(_) => Future.successful(some)
+      case None =>
+        val storeId = acsStore.acsStoreId
+        val migrationId = acsStore.domainMigrationId
+        storage
+          .query(
+            sql"""SELECT MIN(archived_at) FROM #$archiveTableName
+                  WHERE store_id = $storeId
+                    AND migration_id = $migrationId
+               """.as[Option[Long]].head,
+            "getEarliestArchivedAt",
+          )
+          .map { minArchivedAtO =>
+            minArchivedAtO.map { micros =>
+              val ts = CantonTimestamp.assertFromLong(micros)
+              earliestArchivedAtCache.compareAndSet(None, Some(ts))
+              ts
+            }
+          }
     }
   }
 }

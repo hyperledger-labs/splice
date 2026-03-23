@@ -79,9 +79,6 @@ class AppActivityComputation(
                   )
                 }
               case None =>
-                logger.error(
-                  s"Open mining round info not provided by lookupActiveOpenMiningRounds for ${summary.sequencingTime}"
-                )
                 Future.successful((summary, verdict, None))
             }
         }

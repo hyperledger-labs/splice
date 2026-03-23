@@ -72,25 +72,33 @@ class DbScanRewardsReferenceStore(
   override def lookupActiveOpenMiningRounds(
       recordTimes: Seq[CantonTimestamp]
   )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]] = {
-    val (minTime, maxTime) = recordTimes.foldLeft(
-      (CantonTimestamp.MaxValue, CantonTimestamp.MinValue)
-    ) { case ((lo, hi), t) => (lo.min(t), hi.max(t)) }
-    lookupOpenMiningRoundsActiveWithin(minTime, maxTime).map { activeWithinResult =>
-      recordTimes.flatMap { recordTime =>
-        val roundsAtTime = TcsStore.contractsActiveAsOf(activeWithinResult, recordTime)
-        // Filter to rounds that are actually open (opensAt <= recordTime),
-        val openRounds = roundsAtTime.filter { r =>
-          CantonTimestamp.assertFromInstant(r.contract.payload.opensAt) <= recordTime
-        }
-        openRounds
-          .minByOption(_.contract.payload.round.number)
-          .map { r =>
-            recordTime -> (
-              r.contract.payload.round.number.toLong,
-              CantonTimestamp.assertFromInstant(r.contract.payload.opensAt)
-            )
+    tcsStore.getEarliestArchivedAt().flatMap {
+      case None =>
+        Future.successful(Map.empty)
+      case Some(ingestionStart) =>
+        val afterIngestionStartTimes = recordTimes.filter(_ >= ingestionStart)
+        if (afterIngestionStartTimes.isEmpty) Future.successful(Map.empty)
+        else {
+          val (minTime, maxTime) = afterIngestionStartTimes.foldLeft(
+            (CantonTimestamp.MaxValue, CantonTimestamp.MinValue)
+          ) { case ((lo, hi), t) => (lo.min(t), hi.max(t)) }
+          lookupOpenMiningRoundsActiveWithin(minTime, maxTime).map { activeWithinResult =>
+            afterIngestionStartTimes.flatMap { recordTime =>
+              val roundsAtTime = TcsStore.contractsActiveAsOf(activeWithinResult, recordTime)
+              val openRounds = roundsAtTime.filter { r =>
+                CantonTimestamp.assertFromInstant(r.contract.payload.opensAt) <= recordTime
+              }
+              openRounds
+                .minByOption(_.contract.payload.round.number)
+                .map { r =>
+                  recordTime -> (
+                    r.contract.payload.round.number.toLong,
+                    CantonTimestamp.assertFromInstant(r.contract.payload.opensAt)
+                  )
+                }
+            }.toMap
           }
-      }.toMap
+        }
     }
   }
 
