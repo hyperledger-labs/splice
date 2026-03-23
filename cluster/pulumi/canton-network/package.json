@@ -9,7 +9,7 @@
     "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-validator": "1.0.0",
     "@types/auth0": "^3.3.2",
-    "auth0": "^4.28.0",
+    "auth0": "^5.3.1",
     "ip": "^2.0.1"
   },
   "scripts": {
