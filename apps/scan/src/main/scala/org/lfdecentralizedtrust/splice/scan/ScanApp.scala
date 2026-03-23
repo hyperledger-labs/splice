@@ -362,6 +362,7 @@ class ScanApp(
         sequencerAdminConnection,
         automation,
         updateHistory,
+        appRewardsStore,
         acsSnapshotStore,
         scanEventStore,
         bulkStorage,

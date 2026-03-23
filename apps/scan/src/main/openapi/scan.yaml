@@ -1620,6 +1620,49 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/reward-accounting-process/rounds/earliest-available:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRewardAccountingEarliestAvailableRound"
+      description: |
+        Return the earliest round for which CIP-0104 reward accounting activity
+        totals have been computed.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardAccountingEarliestAvailableRoundResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/reward-accounting-process/rounds/{round_number}/activity-totals:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRewardAccountingActivityTotals"
+      description: |
+        Return the CIP-0104 per-round and per-party activity totals for the
+        specified round number.
+      parameters:
+        - name: "round_number"
+          in: "path"
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardAccountingActivityTotalsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /v0/history/bulk/acs:
     get:
       tags: [ pre-alpha, scan ]
@@ -3986,4 +4029,51 @@ components:
           description: |
             The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
           type: string
+
+    GetRewardAccountingEarliestAvailableRoundResponse:
+      type: object
+      required:
+        - earliest_round
+      properties:
+        earliest_round:
+          type: integer
+          format: int64
+
+    GetRewardAccountingActivityTotalsResponse:
+      type: object
+      required:
+        - round_number
+        - total_app_activity_weight
+        - active_parties_count
+        - party_totals
+      properties:
+        round_number:
+          type: integer
+          format: int64
+        total_app_activity_weight:
+          type: integer
+          format: int64
+        active_parties_count:
+          type: integer
+          format: int64
+        party_totals:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RewardAccountingPartyActivityTotal"
+
+    RewardAccountingPartyActivityTotal:
+      type: object
+      required:
+        - app_provider_party
+        - app_provider_party_seq_num
+        - total_app_activity_weight
+      properties:
+        app_provider_party:
+          type: string
+        app_provider_party_seq_num:
+          type: integer
+          format: int32
+        total_app_activity_weight:
+          type: integer
+          format: int64
 

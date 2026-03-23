@@ -54,6 +54,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
@@ -128,6 +129,7 @@ class HttpScanHandler(
     sequencerAdminConnection: SequencerAdminConnection,
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
+    appRewardsStore: DbScanAppRewardsStore,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     bulkStorage: BulkStorage,
@@ -2365,6 +2367,71 @@ class HttpScanHandler(
             )
         }
       )
+    }
+  }
+
+  def getRewardAccountingEarliestAvailableRound(
+      respond: ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.type
+  )()(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingEarliestAvailableRoundResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingEarliestAvailableRound") { _ => _ =>
+      appRewardsStore.getEarliestActivityRound(updateHistory.historyId).map {
+        case Some(round) =>
+          ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
+            definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)
+          )
+        case None =>
+          ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+            ErrorResponse("No reward accounting data available yet")
+          )
+      }
+    }
+  }
+
+  def getRewardAccountingActivityTotals(
+      respond: ScanResource.GetRewardAccountingActivityTotalsResponse.type
+  )(roundNumber: Long)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingActivityTotalsResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingActivityTotals") { _ => _ =>
+      for {
+        roundTotalO <- appRewardsStore.getAppActivityRoundTotalByRound(
+          updateHistory.historyId,
+          roundNumber,
+        )
+        result <- roundTotalO match {
+          case None =>
+            Future.successful(
+              ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+                ErrorResponse(
+                  s"Activity totals not yet computed for round $roundNumber"
+                )
+              )
+            )
+          case Some(roundTotal) =>
+            appRewardsStore
+              .getAppActivityPartyTotalsByRound(updateHistory.historyId, roundNumber)
+              .map { partyTotals =>
+                ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
+                  definitions.GetRewardAccountingActivityTotalsResponse(
+                    roundNumber = roundTotal.roundNumber,
+                    totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
+                    activePartiesCount = roundTotal.activeAppProviderPartiesCount,
+                    partyTotals = partyTotals.map { pt =>
+                      definitions.RewardAccountingPartyActivityTotal(
+                        appProviderParty = pt.appProviderParty,
+                        appProviderPartySeqNum = pt.appProviderPartySeqNum,
+                        totalAppActivityWeight = pt.totalAppActivityWeight,
+                      )
+                    }.toVector,
+                  )
+                )
+              }
+        }
+      } yield result
     }
   }
 }
