@@ -5,7 +5,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
 import { Output } from '@pulumi/pulumi';
-import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
+import { AuthenticationClient, ManagementClient, TokenSet, withRetries } from 'auth0';
 
 import { config, isMainNet } from '../config';
 import { infraStack } from '../stackReferences';
@@ -77,9 +77,14 @@ export class Auth0Fetch implements Auth0Client {
       clientId: this.cfg.auth0MgtClientId,
       clientSecret: this.cfg.auth0MgtClientSecret,
     });
+    // enable retries
+    const reqOptions = {
+        ...withRetries(10),
+        timeoutInSeconds: 30
+    };
 
     const secrets = new Map() as Auth0SecretMap;
-    let page = await client.clients.list({ per_page: 50 });
+    let page = await client.clients.list({ per_page: 50 }, reqOptions);
     for (const client of page.data) {
       if (client.client_id && client.client_secret) {
         secrets.set(client.client_id, client as Auth0ClientSecret);
