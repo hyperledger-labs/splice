@@ -240,15 +240,10 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
         }
       }
       val weightSum = activity.records.map(_.weight).sum
-      withClue(s"$cluePrefix sum of weights should not exceed total traffic cost") {
+      val numFeaturedAppParties = expectedProviders.size.toLong
+      withClue(s"$cluePrefix sum of weights should be within [totalTrafficCost - numFeaturedAppParties, totalTrafficCost]") {
+        weightSum should be > (totalTrafficCost - numFeaturedAppParties)
         weightSum should be <= totalTrafficCost
-      }
-      if (expectedProviders.size == 1) {
-        withClue(
-          s"$cluePrefix single provider weight should equal total traffic cost"
-        ) {
-          weightSum shouldBe totalTrafficCost
-        }
       }
     }
   }
