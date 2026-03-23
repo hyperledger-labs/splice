@@ -12,7 +12,7 @@ import scala.concurrent.Future
   */
 trait AppActivityStore {
 
-  /** Find the earliest round with complete app activity.
+  /** Find the earliest round for which all app activity records have been ingested.
     */
   def earliestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
