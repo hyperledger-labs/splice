@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
@@ -15,7 +17,10 @@ import org.apache.pekko.util.ByteString
 case class ZstdGroupedWeight(
     compressionLevel: Int,
     minSize: Long,
-) extends GraphStage[FlowShape[ByteString, ByteString]] {
+    loggerFactory: NamedLoggerFactory,
+)(implicit tc: TraceContext)
+    extends GraphStage[FlowShape[ByteString, ByteString]]
+    with NamedLogging {
   require(minSize > 0, "minSize must be greater than 0")
 
   val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
@@ -99,27 +104,47 @@ case class ZstdGroupedWeight(
 
       private def finishAndPush(): Unit = {
         state = state.append(zstd.zstdFinish())
+        logger.debug(s"Finished compressing object of size ${state.bytes.size}, pushing downstream")
         push(out, state.bytes)
         reset()
       }
 
       override def onPush(): Unit = {
         val elem = grab(in)
+        logger.trace(s"Received element of size ${elem.size}, compressing and adding to current object (currently has ${state.bytes.size} bytes, ${state.left} bytes left until target size of ${minSize} bytes)")
         val compressed = zstd.compress(elem)
         state = state.append(compressed)
         if (state.left <= 0) {
+          logger.trace(
+            s"Current object has reached target size of ${minSize} bytes (actual size ${state.bytes.size}), finishing and pushing downstream"
+          )
           finishAndPush()
         } else {
+          logger.trace(
+            s"Current object has ${state.left} bytes left until target size of ${minSize} bytes, pulling more input"
+          )
           pull(in)
         }
       }
 
-      override def onPull(): Unit = pull(in)
+      override def onPull(): Unit = {
+        logger.trace(
+          s"Downstream pulled, current object has ${state.left} bytes left until target size of ${minSize} bytes, pulling input"
+        )
+        pull(in)
+      }
 
       override def onUpstreamFinish(): Unit = {
+        logger.trace(
+          s"Upstream finished, current object has ${state.bytes.length} bytes, finishing and pushing downstream if not empty, then completing stage"
+        )
         if (state.bytes.nonEmpty) {
+          logger.trace(
+            s"Current object has ${state.bytes.length} bytes, finishing and pushing downstream"
+          )
           finishAndPush()
         }
+        logger.trace("Upstream finished, no more data to process, completing stage")
         completeStage()
       }
 

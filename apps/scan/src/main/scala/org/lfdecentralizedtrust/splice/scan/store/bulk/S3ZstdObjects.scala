@@ -38,7 +38,7 @@ class S3ZstdObjects(
       getObjectKey: Int => String
   ): Flow[ByteString, String, NotUsed] =
     Flow[ByteString]
-      .via(ZstdGroupedWeight(appConfig.zstdCompressionLevel, storageConfig.bulkZstdFrameSize))
+      .via(ZstdGroupedWeight(appConfig.zstdCompressionLevel, storageConfig.bulkZstdFrameSize, loggerFactory))
       .via(
         GroupedWeightS3ObjectFlow(
           s3Connection,
