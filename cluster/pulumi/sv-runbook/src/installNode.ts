@@ -244,7 +244,14 @@ async function installSvAndValidator(
 
   const canton = installCanton(onboardingName, decentralizedSynchronizerMigrationConfig);
 
-  const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
+  const appsPg = installPostgres(
+    xns,
+    'apps-pg',
+    'apps-pg-secret',
+    'postgres-values-apps.yaml',
+    true,
+    svConfig.appsPg?.cloudSql
+  );
 
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,

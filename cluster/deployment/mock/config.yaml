@@ -87,6 +87,9 @@ pulumiProjectConfig:
     hasPublicInfo: true
     cloudSql:
       enabled: true
+  sv-runbook:
+    cloudSql:
+      enabled: true
 monitoring:
   alerting:
     enableNoDataAlerts: true
@@ -129,6 +132,10 @@ loadTester:
     windowDurationMinutes: 150
 svs:
   default:
+    appsPg:
+      cloudSql:
+        enabled: true
+        tier: "apps-pg-override-tier"
     pruning:
       cometbft:
         retainBlocks: 5040000
@@ -205,6 +212,9 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    appsPg:
+      cloudSql:
+        tier: "apps-pg-override-tier-sv-1"
     periodicSnapshots:
       topology:
         projectId: 'da-cn-test'
