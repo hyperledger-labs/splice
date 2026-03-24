@@ -81,7 +81,7 @@ export class SpliceEnvConfig {
         throw new Error(`Failed to load cluster config ${overrideResult.error}`);
       }
     }
-    // eslint-disable-next-line no-process-env
+     
     this.env = process.env;
   }
 

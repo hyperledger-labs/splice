@@ -92,7 +92,7 @@ function stripJsonComments(rawText: string): string {
   return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? '' : m));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export function loadJsonFromFile(path: PathLike): any {
   try {
     const content = stripJsonComments(fs.readFileSync(path, 'utf8'));
@@ -172,7 +172,7 @@ export function externalIpRangesFile(): string | undefined {
 
 // Typically used for overriding chart values.
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export type ChartValues = { [key: string]: any };
 
 // base64 encoding
