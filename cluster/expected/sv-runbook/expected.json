@@ -571,12 +571,12 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 2,
+          "migrating": false
         },
         "participantAddress": "participant-2",
         "persistence": {
@@ -593,7 +593,6 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",

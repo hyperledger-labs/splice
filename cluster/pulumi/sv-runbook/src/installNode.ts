@@ -379,42 +379,36 @@ async function installSvAndValidator(
     };
   };
 
-  const synchronizerValues = decentralizedSynchronizerMigrationConfig.lsuEnabled
-    ? {
-        synchronizers: {
-          current: {
-            sequencer: canton.active.namespaceInternalSequencerAddress,
-            mediator: canton.active.namespaceInternalMediatorAddress,
-            ...(useCantonBft ? bftSequencerConfigFor(canton.active) : {}),
-          },
-          ...(canton.upgrade
-            ? {
-                successor: {
-                  sequencer: canton.upgrade.namespaceInternalSequencerAddress,
-                  mediator: canton.upgrade.namespaceInternalMediatorAddress,
-                  ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
-                    ? bftSequencerConfigFor(canton.upgrade)
-                    : {}),
-                },
-              }
-            : {}),
-          ...(canton.legacy
-            ? {
-                legacy: {
-                  sequencer: canton.legacy.namespaceInternalSequencerAddress,
-                  mediator: canton.legacy.namespaceInternalMediatorAddress,
-                  ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
-                    ? bftSequencerConfigFor(canton.legacy)
-                    : {}),
-                },
-              }
-            : {}),
-        },
-      }
-    : {
-        sequencerAddress: canton.active.namespaceInternalSequencerAddress,
-        mediatorAddress: canton.active.namespaceInternalMediatorAddress,
-      };
+  const synchronizerValues = {
+    synchronizers: {
+      current: {
+        ...defaultScanValues.synchronizers.current,
+        ...(useCantonBft ? bftSequencerConfigFor(canton.active) : {}),
+      },
+      ...(canton.upgrade
+        ? {
+            successor: {
+              sequencer: canton.upgrade.namespaceInternalSequencerAddress,
+              mediator: canton.upgrade.namespaceInternalMediatorAddress,
+              ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
+                ? bftSequencerConfigFor(canton.upgrade)
+                : {}),
+            },
+          }
+        : {}),
+      ...(canton.legacy
+        ? {
+            legacy: {
+              sequencer: canton.legacy.namespaceInternalSequencerAddress,
+              mediator: canton.legacy.namespaceInternalMediatorAddress,
+              ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
+                ? bftSequencerConfigFor(canton.legacy)
+                : {}),
+            },
+          }
+        : {}),
+    },
+  };
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
@@ -423,14 +417,7 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
-    ...(decentralizedSynchronizerMigrationConfig.lsuEnabled
-      ? {
-          migration: {
-            ...defaultScanValues.migration,
-            id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
-          },
-        }
-      : {}),
+    ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...synchronizerValues,
     resources: svConfig.scanApp?.resources,
   };

@@ -28,7 +28,7 @@ class RunbookSvSequencerInfoPreflightIntegrationTest extends IntegrationTest {
     val domainConfig = nodeState.state.synchronizerNodes.asScala.values.headOption.value
     val sequencerUrl = domainConfig.physicalSynchronizers.toScala
       .flatMap(_.asScala.get(migrationId).flatMap(_.sequencer.toScala.map(_.url)))
-      .orElse(domainConfig.sequencer.toScala.filter(_.migrationId == migrationId))
+      .orElse(domainConfig.sequencer.toScala.filter(_.migrationId == migrationId).map(_.url))
       .value
     sequencerUrl shouldBe s"https://sequencer-$migrationId.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
   }
