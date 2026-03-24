@@ -62,6 +62,12 @@ rateLimits: !append
       type: unlimited
 
   - actions:
+      - name: domains-v1
+        pathPrefix: /api/scan/v1/domains
+    limits:
+      type: unlimited
+
+  - actions:
       - name: closed-rounds
         pathPrefix: /api/scan/v0/closed-rounds
     limits:
