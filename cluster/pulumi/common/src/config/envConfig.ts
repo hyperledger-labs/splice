@@ -66,7 +66,7 @@ export class SpliceEnvConfig {
         glob.sync(`${process.env.SPLICE_ROOT}/.envrc.vars.*`)
       );
       console.error(`Loading environment variables from ${envrcs.join(', ')}`);
-      const result = dotenvConfig({ path: envrcs , quiet: true});
+      const result = dotenvConfig({ path: envrcs, quiet: true });
       if (result.error) {
         throw new Error(`Failed to load base config ${result.error}`);
       }
