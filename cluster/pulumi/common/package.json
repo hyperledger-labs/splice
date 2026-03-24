@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
+    "@dotenvx/dotenvx": "^1.57.2",
     "@google-cloud/storage": "^7.19.0",
     "@kubernetes/client-node": "^1.4.0",
     "@pulumi/command": "1.2.0",
@@ -13,8 +14,6 @@
     "@pulumi/std": "2.3.2",
     "@types/auth0": "^3.3.11",
     "auth0": "^5.3.1",
-    "dotenv": "^16.4.5",
-    "dotenv-expand": "^11.0.6",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "node-fetch": "^2.7.0",
