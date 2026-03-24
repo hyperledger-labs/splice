@@ -40,10 +40,10 @@ class BootstrapPackageConfigDarUploadIntegrationTest
     DarResources.wallet_0_1_15
   )
 
-  private val supportedPackagesToUnvet: Map[String, Set[String]] =
+  private val supportedPackagesToUnvet: Map[PackageName, Set[PackageVersion]] =
     extraPackagesToUnvet
       .groupBy(_.metadata.name)
-      .map { case (name, resources) => name -> resources.map(_.metadata.version.toString).toSet }
+      .map { case (name, resources) => name -> resources.map(_.metadata.version).toSet }
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition

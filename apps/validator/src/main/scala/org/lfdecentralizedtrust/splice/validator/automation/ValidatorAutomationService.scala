@@ -40,6 +40,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.SequencerConnectionPoolDelays
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
@@ -80,7 +81,7 @@ class ValidatorAutomationService(
     params: SpliceParametersConfig,
     latestPackagesOnly: Boolean,
     enabledFeatures: EnabledFeaturesConfig,
-    additionalPackagesToUnvet: Map[String, Set[String]],
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,

@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.daml.lf.data.Ref.{IdString, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{IdString, PackageName, PackageVersion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -34,7 +34,7 @@ class PackageVetting(
   def vetCurrentPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
-      additionalPackagesToUnvet: Map[String, Set[String]] = Map.empty,
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val currentPackageConfig = schedule.getConfigAsOf(clock.now).packageConfig
@@ -102,7 +102,7 @@ class PackageVetting(
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
-      additionalPackagesToUnvet: Map[String, Set[String]] = Map.empty,
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =
@@ -232,7 +232,7 @@ class PackageVetting(
       createdAt: Instant,
       amuletConfigSchedule: AmuletConfigSchedule,
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
-      additionalPackagesToUnvet: Map[String, Set[String]],
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   ) = {
     (futureAmuletConfigFromVoteRequests.collect { case (Some(effectiveAt), config) =>
       (effectiveAt, config)

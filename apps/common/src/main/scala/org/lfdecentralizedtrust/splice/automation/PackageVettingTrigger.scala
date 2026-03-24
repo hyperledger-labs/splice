@@ -21,7 +21,7 @@ abstract class PackageVettingTrigger(
     latestPackagesOnly: Boolean,
     enableUnvetting: Boolean,
     enableUnsupportedDarsUnvetting: Boolean,
-    additionalPackagesToUnvet: Map[String, Set[String]],
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
@@ -103,18 +103,20 @@ abstract class PackageVettingTrigger(
     }
   }
 
-  private def resolvePackageIdsToUnvet(additionalPackagesToUnvet: Map[String, Set[String]])(implicit
+  private def resolvePackageIdsToUnvet(
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]]
+  )(implicit
       tc: TraceContext
   ): Seq[LfPackageId] =
     additionalPackagesToUnvet.toSeq.flatMap { case (packageName, versions) =>
       versions.toSeq.flatMap { version =>
         DarResourcesUtil.lookupPackageMetadata(
-          PackageName.assertFromString(packageName),
-          PackageVersion.assertFromString(version),
+          packageName,
+          version,
         ) match {
           case None =>
             logger.warn(
-              s"Package $packageName version $version requested for unvetting is not uploaded on this node."
+              s"Package $packageName version $version requested for unvetting is not found on this node."
             )
             None
           case Some(resource) =>

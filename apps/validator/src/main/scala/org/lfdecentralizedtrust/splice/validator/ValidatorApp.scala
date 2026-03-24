@@ -336,11 +336,7 @@ class ValidatorApp(
                 _ <-
                   MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
                     synchronizerId =>
-                      packageVetting.vetCurrentPackages(
-                        synchronizerId,
-                        amuletRules,
-                        config.additionalPackagesToUnvet,
-                      )
+                      packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
                   }
               } yield ()
             }

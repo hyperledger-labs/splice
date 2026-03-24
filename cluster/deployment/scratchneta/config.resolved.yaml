@@ -460,12 +460,6 @@ svs:
           cpu: '1'
           memory: '2Gi'
     svApp:
-      additionalPackagesToUnvet:
-        splice-amulet:
-          - '0.1.15'
-        splice-wallet-payments:
-          - '0.1.15'
-          - '0.1.16'
       resources:
         limits:
           cpu: '3'

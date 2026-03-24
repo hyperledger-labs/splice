@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
@@ -22,10 +23,10 @@ class UnsupportedPackageVettingIntegrationTest extends IntegrationTest {
     DarResources.wallet_0_1_15
   )
 
-  private val supportedPackagesToUnvet: Map[String, Set[String]] =
+  private val supportedPackagesToUnvet: Map[PackageName, Set[PackageVersion]] =
     extraPackagesToUnvet
       .groupBy(_.metadata.name)
-      .map { case (name, resources) => name -> resources.map(_.metadata.version.toString).toSet }
+      .map { case (name, resources) => name -> resources.map(_.metadata.version).toSet }
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

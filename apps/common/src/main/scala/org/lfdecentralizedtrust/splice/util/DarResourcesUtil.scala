@@ -31,7 +31,7 @@ object DarResourcesUtil {
       upToRequiredVersion: PackageVersion,
       enableUnsupportedDarsUnvetting: Boolean,
       latestPackagesOnly: Boolean = false,
-      additionalPackagesToUnvet: Map[String, Set[String]] = Map.empty,
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
   ): Seq[DarResource] = {
     val minimumInitializationVersion = lookupMinimumPackageResource(name).metadata.version
     val unsupportedVersions = additionalPackagesToUnvet.getOrElse(name, Set.empty)
@@ -42,8 +42,7 @@ object DarResourcesUtil {
       .filter(_.metadata.name == name)
       .filter(pkg => {
         val version = pkg.metadata.version
-        val versionStr = version.toString
-        if (unsupportedVersions.contains(versionStr)) {
+        if (unsupportedVersions.contains(version)) {
           false
         } else if (enableUnsupportedDarsUnvetting) {
           (!latestPackagesOnly && minimumInitializationVersion <= version && version < upToRequiredVersion) || version == upToRequiredVersion
