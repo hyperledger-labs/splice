@@ -158,44 +158,45 @@ export class Auth0Fetch implements Auth0Client {
       data[clientId] = Buffer.from(JSON.stringify(cachedToken)).toString('base64');
     }
 
+    const secretBody = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: this.cfg.fixedTokenCacheName,
+      },
+      data,
+    };
+
     try {
       await pulumi.log.info('Attempting to create secret');
       const k8sApi = this.getK8sClient();
       await k8sApi.createNamespacedSecret({
         namespace: 'default',
-        body: {
-          apiVersion: 'v1',
-          kind: 'Secret',
-          metadata: {
-            name: this.cfg.fixedTokenCacheName,
-          },
-          data,
-        },
+        body: secretBody,
       });
-    } catch (_) {
+    } catch (createErr) {
       try {
-        await pulumi.log.info('Deleting existing secret');
+        // Create failed (e.g., secret already exists), attempt to replace it atomically.
+        await pulumi.log.info('Create failed, attempting to replace existing secret');
         const k8sApi = this.getK8sClient();
-        await k8sApi.deleteNamespacedSecret({
+        await k8sApi.replaceNamespacedSecret({
           name: this.cfg.fixedTokenCacheName,
           namespace: 'default',
+          body: secretBody,
         });
-
-        await pulumi.log.info('Creating new secret');
-        await k8sApi.createNamespacedSecret({
-          namespace: 'default',
-          body: {
-            apiVersion: 'v1',
-            kind: 'Secret',
-            metadata: {
-              name: this.cfg.fixedTokenCacheName,
-            },
-            data,
-          },
-        });
-      } catch (e) {
-        await pulumi.log.error(`Auth0 cache update failed: ${JSON.stringify(e)}`);
-        process.exit(1);
+      } catch (replaceErr) {
+        try {
+          // Replace also failed (e.g., secret was deleted concurrently), try create again.
+          await pulumi.log.info('Replace failed, attempting to create secret again');
+          const k8sApi = this.getK8sClient();
+          await k8sApi.createNamespacedSecret({
+            namespace: 'default',
+            body: secretBody,
+          });
+        } catch (e) {
+          await pulumi.log.error(`Auth0 cache update failed: ${JSON.stringify(e)}`);
+          process.exit(1);
+        }
       }
     }
 
