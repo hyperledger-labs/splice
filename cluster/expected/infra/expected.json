@@ -2859,7 +2859,7 @@
                 {
                   "continue": false,
                   "matchers": [
-                    "alertname=\"Watchdog|InfoInhibitor\""
+                    "alertname=~\"Watchdog|InfoInhibitor\""
                   ],
                   "receiver": "null"
                 }
