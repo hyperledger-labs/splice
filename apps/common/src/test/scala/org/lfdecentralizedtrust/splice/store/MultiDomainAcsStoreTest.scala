@@ -1502,8 +1502,8 @@ abstract class MultiDomainAcsStoreTest[
           )
         )
 
-      filter.contains(toCreatedEvent(goodContract)) should be(true)
-      filter.contains(toCreatedEvent(badContract)) should be(false)
+      filter.contains(toCreatedEvent(goodContract), d1) should be(true)
+      filter.contains(toCreatedEvent(badContract), d1) should be(false)
 
       for {
         _ <- initWithAcs()
@@ -1556,14 +1556,16 @@ abstract class MultiDomainAcsStoreTest[
         toCreatedEvent(
           goodContract,
           implementedInterfaces = goodImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(true)
 
       filter.contains(
         toCreatedEvent(
           badContract,
           implementedInterfaces = badImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(false)
 
       for {
@@ -1628,14 +1630,16 @@ abstract class MultiDomainAcsStoreTest[
         toCreatedEvent(
           goodContract,
           implementedInterfaces = goodImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(true)
 
       filter.contains(
         toCreatedEvent(
           fakeAmuletContract,
           implementedInterfaces = fakeAmuletImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(true) // as a Holding, it is included. But it should not be included as an Amulet.
 
       for {
