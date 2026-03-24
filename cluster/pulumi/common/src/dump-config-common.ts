@@ -240,7 +240,7 @@ export async function initDumpConfig(): Promise<void> {
     {
       newResource: function (args: pulumi.runtime.MockResourceArgs): {
         id: string;
-        state: any;  
+        state: any;
       } {
         const buffer = Buffer.from(JSON.stringify(args, undefined, 4), 'utf8');
         process.stdout.write(buffer);

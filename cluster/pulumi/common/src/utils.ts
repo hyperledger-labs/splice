@@ -92,7 +92,6 @@ function stripJsonComments(rawText: string): string {
   return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? '' : m));
 }
 
- 
 export function loadJsonFromFile(path: PathLike): any {
   try {
     const content = stripJsonComments(fs.readFileSync(path, 'utf8'));
@@ -172,7 +171,7 @@ export function externalIpRangesFile(): string | undefined {
 
 // Typically used for overriding chart values.
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
- 
+
 export type ChartValues = { [key: string]: any };
 
 // base64 encoding

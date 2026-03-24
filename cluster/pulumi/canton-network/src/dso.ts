@@ -211,9 +211,8 @@ export class Dso extends pulumi.ComponentResource {
 
     const dso = this.installDso();
 
-     
     this.sv1 = dso.then(r => r.sv1);
-     
+
     this.allSvs = dso.then(r => r.allSvs);
 
     this.registerOutputs({});

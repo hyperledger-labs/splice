@@ -26,7 +26,6 @@ async function main() {
   const auth0FetchOutput = getAuth0Config(Auth0ClientType.MAINSTACK);
 
   auth0FetchOutput.apply(async auth0Fetch => {
-     
     await auth0CacheAndInstallCluster(auth0Fetch);
 
     scheduleLoadGenerator(auth0Fetch, []);
