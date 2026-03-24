@@ -14,8 +14,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
-
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 

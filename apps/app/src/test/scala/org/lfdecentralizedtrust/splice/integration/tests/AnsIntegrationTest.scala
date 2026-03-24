@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Identifier

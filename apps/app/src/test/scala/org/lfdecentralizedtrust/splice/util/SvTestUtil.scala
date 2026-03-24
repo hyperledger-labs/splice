@@ -29,7 +29,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.Assertion
 
 import java.math.RoundingMode

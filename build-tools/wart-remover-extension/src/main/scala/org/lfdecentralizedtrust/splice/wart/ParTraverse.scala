@@ -11,7 +11,7 @@ import org.wartremover.{WartTraverser, WartUniverse}
   */
 object ParTraverse extends WartTraverser {
   val message =
-    "Do not use parTraverse without a parallelism limit. Use MonadUtil.parTraverseWithLimit instead."
+    "Do not use unbounded parallel traversals. Use MonadUtil.parTraverseWithLimit / parTraverseWithLimit_ instead."
 
   def apply(u: WartUniverse): u.Traverser = {
     import u.universe.*

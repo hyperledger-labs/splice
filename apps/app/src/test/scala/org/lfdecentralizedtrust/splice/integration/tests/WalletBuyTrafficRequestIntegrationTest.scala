@@ -20,8 +20,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
-import com.digitalasset.canton.util.FutureInstances.*
-
 import java.time.Duration
 import scala.concurrent.Future
 import scala.util.control.NonFatal

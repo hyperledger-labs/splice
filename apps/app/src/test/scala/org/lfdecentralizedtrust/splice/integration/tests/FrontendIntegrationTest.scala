@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   TestCommon,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.Event
 import org.openqa.selenium.bidi.log.{Log, LogEntry, LogLevel}
