@@ -12,6 +12,7 @@ interface Limits {
 }
 
 interface MatchedLimits extends Limits {
+  type: 'limited';
   clientIp: boolean;
 }
 
@@ -70,7 +71,7 @@ export function extractPathPrefixes(
 
   return Object.entries(rateLimits)
     .map(([pathPrefix, rl]) => {
-      const isBanned = 'type' in rl && rl.type === 'banned';
+      const isBanned = rl.type === 'banned';
       return { pathPrefix, isBanned };
     })
     .filter(info => info.pathPrefix.startsWith('/api/scan'));
@@ -137,7 +138,7 @@ function validateEffectiveRateLimits(
         // Currently skipping banned endpoints instead of setting 0/0 limits
         // in unlimited case, we fall back to globalRateLimit so don't need a rule
         const [, rl] = ent;
-        return !('type' in rl);
+        return rl.type === 'limited';
       }
     )
   );

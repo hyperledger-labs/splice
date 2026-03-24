@@ -1,6 +1,7 @@
 rateLimits:
   /api/scan/v0/acs:
     name: acs
+    type: limited
     clientIp: true
     maxTokens: 10
     tokensPerFill: 5

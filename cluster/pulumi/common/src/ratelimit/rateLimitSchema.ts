@@ -9,6 +9,7 @@ export const BucketRateLimitSchema = z.object({
 });
 
 const BucketMatchedRateLimitSchema = BucketRateLimitSchema.extend({
+  type: z.literal('limited'),
   clientIp: z.boolean(),
 });
 
@@ -20,7 +21,7 @@ export const UnlimitedSchema = z.object({
   type: z.literal('unlimited'),
 });
 
-export const RateLimitConfigSchema = z.xor([
+export const RateLimitConfigSchema = z.discriminatedUnion('type', [
   BucketMatchedRateLimitSchema,
   BannedSchema,
   UnlimitedSchema,
