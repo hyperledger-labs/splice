@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatusReport
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppConfigs_
 import org.lfdecentralizedtrust.splice.console.{

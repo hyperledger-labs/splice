@@ -2,8 +2,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.either.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   IntegrationTestWithIsolatedEnvironment,

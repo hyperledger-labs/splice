@@ -41,8 +41,8 @@ import java.time.Duration
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
-import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 
 class WalletIntegrationTest
     extends IntegrationTest
