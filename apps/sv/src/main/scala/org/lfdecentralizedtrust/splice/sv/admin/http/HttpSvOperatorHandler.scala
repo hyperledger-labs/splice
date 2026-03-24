@@ -432,7 +432,7 @@ class HttpSvOperatorHandler(
         )
       } yield {
         r0.GetPartyToParticipantResponse.OK(
-          definitions.GetPartyToParticipantResponse(
+          definitions.GetPartyToParticipantResponseV1(
             participantIds.map(_.toProtoPrimitive).toVector
           )
         )

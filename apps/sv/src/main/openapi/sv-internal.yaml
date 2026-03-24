@@ -607,7 +607,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetPartyToParticipantResponse"
+                $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetPartyToParticipantResponseV1"
         "404":
           description: Party not found
           content:
@@ -1185,12 +1185,3 @@ components:
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
 
-    GetPartyToParticipantResponse:
-      type: object
-      required:
-        - participant_ids
-      properties:
-        participant_ids:
-          type: array
-          items:
-            type: string
