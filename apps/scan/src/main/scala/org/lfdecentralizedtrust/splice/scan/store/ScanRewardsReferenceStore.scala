@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
@@ -30,10 +30,12 @@ trait ScanRewardsReferenceStore extends AppStore {
 object ScanRewardsReferenceStore {
 
   case class Key(
-      dsoParty: PartyId
+      dsoParty: PartyId,
+      synchronizerId: SynchronizerId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
-      param("dsoParty", _.dsoParty)
+      param("dsoParty", _.dsoParty),
+      param("synchronizerId", _.synchronizerId),
     )
   }
 
@@ -46,9 +48,12 @@ object ScanRewardsReferenceStore {
     import MultiDomainAcsStore.mkFilter
     val dso = key.dsoParty.toProtoPrimitive
 
-    MultiDomainAcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter[
+      ScanRewardsReferenceStoreRowData,
+      AcsInterfaceViewRowData.NoInterfacesIngested,
+    ](
       key.dsoParty,
-      Map(
+      templateFilters = Map(
         mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanRewardsReferenceStoreRowData(
             contract = contract,
@@ -64,6 +69,8 @@ object ScanRewardsReferenceStore {
             )
         },
       ),
+      interfaceFilters = Map.empty,
+      synchronizerFilter = Some(key.synchronizerId),
     )
   }
 }
