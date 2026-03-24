@@ -505,13 +505,15 @@ Allocation Request
     Daml reference for V2 <../api/splice-api-token-allocation-request-v2/index>
 
 
-Implementation Utilities
-------------------------
+.. add back
 
-See the following package for converting between V1 and V2 API versions, and for
-default implementations of token standard choices.
+    Implementation Utilities
+    ------------------------
 
-  .. toctree::
-    :maxdepth: 1
+    See the following package for converting between V1 and V2 API versions, and for
+    default implementations of token standard choices.
 
-    Daml reference for both V1 and V2 <../api/splice-token-standard-utils/index>
+      .. toctree::
+        :maxdepth: 1
+
+        Daml reference for both V1 and V2 <../api/splice-token-standard-utils/index>
