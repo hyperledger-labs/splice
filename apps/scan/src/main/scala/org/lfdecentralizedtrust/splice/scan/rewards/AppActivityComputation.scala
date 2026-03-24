@@ -20,7 +20,7 @@ object AppActivityComputation {
 }
 
 class AppActivityComputation(
-    dataProvider: ScanRewardsReferenceStore,
+    rewardsReferenceStore: ScanRewardsReferenceStore,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -65,7 +65,7 @@ class AppActivityComputation(
       Future.successful(summariesWithVerdicts.map { case (s, v) => (s, v, None) })
     } else {
       for {
-        roundInfoByTime <- dataProvider.lookupActiveOpenMiningRounds(eligibleTimes)
+        roundInfoByTime <- rewardsReferenceStore.lookupActiveOpenMiningRounds(eligibleTimes)
 
         results <- Future.traverse(tagged) {
           case (summary, verdict, false) =>
@@ -73,7 +73,7 @@ class AppActivityComputation(
           case (summary, verdict, true) =>
             roundInfoByTime.get(summary.sequencingTime) match {
               case Some((roundNumber, roundOpensAt)) =>
-                dataProvider.lookupFeaturedAppPartiesAsOf(roundOpensAt).map { providers =>
+                rewardsReferenceStore.lookupFeaturedAppPartiesAsOf(roundOpensAt).map { providers =>
                   (
                     summary,
                     verdict,
@@ -82,7 +82,8 @@ class AppActivityComputation(
                 }
               case None =>
                 // Skip activity record computation as we don't have the necessary round data ingested.
-                // This can happen for freshly onboarded SVs, but is not expected to happen once the first activity record has been computed.
+                // This can happen for freshly onboarded SVs, but is not
+                // expected to happen once the first activity record has been computed.
                 Future.successful((summary, verdict, None))
             }
         }
