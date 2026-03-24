@@ -13,9 +13,15 @@ on:
         type: boolean
         required: false
         default: false
+      oss_only:
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   check_canton_consistency:
+    # Skipped for external contributors (fork PRs) due to container registry auth constraints
+    if: ${{ !inputs.oss_only }}
     runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-x-small' || 'ubuntu-24.04' }}
     timeout-minutes: 15
     container:
