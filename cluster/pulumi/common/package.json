@@ -13,13 +13,13 @@
     "@pulumi/random": "4.19.1",
     "@pulumi/std": "2.3.2",
     "@types/auth0": "^3.3.11",
-    "auth0": "^4.28.0",
+    "auth0": "^5.3.1",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "node-fetch": "^2.7.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "zod": "^3.23.8"
+    "zod": "^4.3.6"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

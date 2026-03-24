@@ -5,7 +5,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
 import { Output } from '@pulumi/pulumi';
-import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
+import { AuthenticationClient, ManagementClient, TokenSet, withRetries } from 'auth0';
 
 import { config, isMainNet } from '../config';
 import { infraStack } from '../stackReferences';
@@ -76,32 +76,29 @@ export class Auth0Fetch implements Auth0Client {
       domain: this.cfg.auth0Domain,
       clientId: this.cfg.auth0MgtClientId,
       clientSecret: this.cfg.auth0MgtClientSecret,
-      // scope: 'read:clients read:client_keys',
-      retry: {
-        enabled: true,
-        maxRetries: 10,
-      },
     });
+    // enable retries
+    const reqOptions = {
+      ...withRetries(10),
+      timeoutInSeconds: 30,
+    };
 
     const secrets = new Map() as Auth0SecretMap;
-    let page = 0;
-    /* eslint-disable no-constant-condition */
-    while (true) {
-      const clients = await client.clients.getAll({
-        per_page: 50, // Even though 50 is the default, if it's not given explicitly, the page argument is ignored
-        page: page++,
-      });
-
-      if (clients.data.length === 0) {
-        return secrets;
+    let page = await client.clients.list({ per_page: 50 }, reqOptions);
+    for (const client of page.data) {
+      if (client.client_id && client.client_secret) {
+        secrets.set(client.client_id, client as Auth0ClientSecret);
       }
-
-      for (const client of clients.data) {
+    }
+    while (page.hasNextPage()) {
+      page = await page.getNextPage();
+      for (const client of page.data) {
         if (client.client_id && client.client_secret) {
           secrets.set(client.client_id, client as Auth0ClientSecret);
         }
       }
     }
+    return secrets;
   }
 
   private getK8sClient(): CoreV1Api {

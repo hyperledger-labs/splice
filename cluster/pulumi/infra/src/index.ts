@@ -22,6 +22,7 @@ import {
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
   installLoggedSecretsAlerts,
+  installGcpQuotaAlerts,
 } from './gcpAlerts';
 import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
@@ -81,6 +82,9 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     }
     if (monitoringConfig.alerting.loggedSecretsFilter) {
       installLoggedSecretsAlerts(notificationChannel);
+    }
+    if (monitoringConfig.alerting.alerts.gcpQuotas.enabled) {
+      installGcpQuotaAlerts(notificationChannel);
     }
   }
 }
