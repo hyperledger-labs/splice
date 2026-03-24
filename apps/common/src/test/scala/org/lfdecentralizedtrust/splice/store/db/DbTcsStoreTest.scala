@@ -72,14 +72,14 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
   "DbTcsStore" should {
 
     "lookupContractByIdAsOf is visible in [created_at, archived_at) interval" in {
-      val store = mkStore(d1)
+      val store = mkStore(sync1)
       val createTime = CantonTimestamp.ofEpochSecond(100)
       val archiveTime = CantonTimestamp.ofEpochSecond(200)
       val coupon = c(1).copy(createdAt = createTime.toInstant)
       for {
         _ <- initWithAcs()(store.acsStore)
-        _ <- d1.create(coupon, recordTime = createTime.toInstant)(store.acsStore)
-        _ <- d1.archive(coupon, recordTime = archiveTime.toInstant)(store.acsStore)
+        _ <- sync1.create(coupon, recordTime = createTime.toInstant)(store.acsStore)
+        _ <- sync1.archive(coupon, recordTime = archiveTime.toInstant)(store.acsStore)
         resultBefore <- store.lookupContractByIdAsOf(AppRewardCoupon.COMPANION)(
           coupon.contractId,
           CantonTimestamp.ofEpochSecond(50),
@@ -103,25 +103,25 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "listAllContractsAsOf and listAllContractsActiveWithin return correct contracts" in {
-      val store = mkStore(d1)
+      val store = mkStore(sync1)
       val coupon1 = c(1).copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
       val coupon2 = c(2).copy(createdAt = CantonTimestamp.ofEpochSecond(200).toInstant)
       val coupon3 = c(3).copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
       for {
         _ <- initWithAcs()(store.acsStore)
-        _ <- d1.create(coupon1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+        _ <- sync1.create(coupon1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
           store.acsStore
         )
-        _ <- d1.create(coupon2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
+        _ <- sync1.create(coupon2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
           store.acsStore
         )
-        _ <- d1.create(coupon3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+        _ <- sync1.create(coupon3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.acsStore
         )
-        _ <- d1.archive(coupon1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+        _ <- sync1.archive(coupon1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.acsStore
         )
-        _ <- d1.archive(coupon3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
+        _ <- sync1.archive(coupon3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
           store.acsStore
         )
 
@@ -229,9 +229,9 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     }
 
     "waitUntilRecordTimeReached completes when record time is reached via offset checkpoint" in {
-      val store = mkStore(d1).acsStore
-      val d1CheckpointTime = CantonTimestamp.ofEpochSecond(200)
-      val d2CheckpointTime = CantonTimestamp.ofEpochSecond(150)
+      val store = mkStore(sync1).acsStore
+      val sync1CheckpointTime = CantonTimestamp.ofEpochSecond(200)
+      val sync2CheckpointTime = CantonTimestamp.ofEpochSecond(150)
       for {
         _ <- initWithAcs()(store)
         _ = store.lastIngestedRecordTimes shouldBe empty
@@ -242,22 +242,22 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
               new OffsetCheckpoint(
                 nextOffset(),
                 java.util.List.of(
-                  new SynchronizerTime(d1.toProtoPrimitive, d1CheckpointTime.toInstant),
-                  new SynchronizerTime(d2.toProtoPrimitive, d2CheckpointTime.toInstant),
+                  new SynchronizerTime(sync1.toProtoPrimitive, sync1CheckpointTime.toInstant),
+                  new SynchronizerTime(sync2.toProtoPrimitive, sync2CheckpointTime.toInstant),
                 ),
               )
             )
           )
         )
         // Both domains should have their record times updated independently
-        _ = store.lastIngestedRecordTimes.get(d1) shouldBe Some(d1CheckpointTime)
-        _ = store.lastIngestedRecordTimes.get(d2) shouldBe Some(d2CheckpointTime)
-        _ <- store.waitUntilRecordTimeReached(d1, d1CheckpointTime)
-        _ <- store.waitUntilRecordTimeReached(d2, d2CheckpointTime)
-        // d2 is at 150, so waiting for 200 on d2 should not complete
-        waitD2Future = store.waitUntilRecordTimeReached(d2, CantonTimestamp.ofEpochSecond(200))
-        _ = waitD2Future.isCompleted shouldBe false
-        // Advance d2 via another checkpoint
+        _ = store.lastIngestedRecordTimes.get(sync1) shouldBe Some(sync1CheckpointTime)
+        _ = store.lastIngestedRecordTimes.get(sync2) shouldBe Some(sync2CheckpointTime)
+        _ <- store.waitUntilRecordTimeReached(sync1, sync1CheckpointTime)
+        _ <- store.waitUntilRecordTimeReached(sync2, sync2CheckpointTime)
+        // sync2 is at 150, so waiting for 200 on sync2should not complete
+        waitSync2Future = store.waitUntilRecordTimeReached(sync2, CantonTimestamp.ofEpochSecond(200))
+        _ = waitSync2Future.isCompleted shouldBe false
+        // Advance sync2via another checkpoint
         _ <- store.testIngestionSink.ingestUpdateBatch(
           NonEmptyList.of(
             TreeUpdateOrOffsetCheckpoint.Checkpoint(
@@ -265,7 +265,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
                 nextOffset(),
                 java.util.List.of(
                   new SynchronizerTime(
-                    d2.toProtoPrimitive,
+                    sync2.toProtoPrimitive,
                     CantonTimestamp.ofEpochSecond(200).toInstant,
                   )
                 ),
@@ -273,36 +273,36 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
             )
           )
         )
-        _ <- waitD2Future
+        _ <- waitSync2Future
       } yield succeed
     }
 
     "waitUntilRecordTimeReached complete when record time is reached via transaction ingestion" in {
-      val store = mkStore(d1).acsStore
+      val store = mkStore(sync1).acsStore
       for {
         _ <- initWithAcs()(store)
-        // Ingest a transaction on d1 at t=100
-        _ <- d1.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
-        // Waiting for t=200 on d1 should not complete immediately
-        waitD1Future = store.waitUntilRecordTimeReached(d1, CantonTimestamp.ofEpochSecond(200))
-        _ = waitD1Future.isCompleted shouldBe false
-        // Advancing d2 to t=200 should not unblock d1's wait
-        _ <- d2.create(c(2), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
-        _ = waitD1Future.isCompleted shouldBe false
-        // Advancing d1 to t=200 unblocks d1's wait
-        _ <- d1.create(c(3), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
-        _ <- waitD1Future
+        // Ingest a transaction on sync1at t=100
+        _ <- sync1.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
+        // Waiting for t=200 on sync1should not complete immediately
+        waitSync1Future = store.waitUntilRecordTimeReached(sync1, CantonTimestamp.ofEpochSecond(200))
+        _ = waitSync1Future.isCompleted shouldBe false
+        // Advancing sync2 to t=200 should not unblock sync1's wait
+        _ <- sync2.create(c(2), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
+        _ = waitSync1Future.isCompleted shouldBe false
+        // Advancing sync1 to t=200 unblocks sync1's wait
+        _ <- sync1.create(c(3), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
+        _ <- waitSync1Future
       } yield succeed
     }
 
     "waitUntilRecordTimeReached blocks on a synchronizer with no ingested contracts" in {
-      val store = mkStore(d1).acsStore
+      val store = mkStore(sync1).acsStore
       for {
         _ <- initWithAcs()(store)
-        // No contracts ingested for d1 yet, so waiting should block
-        waitFuture = store.waitUntilRecordTimeReached(d1, CantonTimestamp.ofEpochSecond(100))
+        // No contracts ingested for sync1yet, so waiting should block
+        waitFuture = store.waitUntilRecordTimeReached(sync1, CantonTimestamp.ofEpochSecond(100))
         _ = waitFuture.isCompleted shouldBe false
-        // An offset checkpoint advancing d1 to t=100 should unblock the wait
+        // An offset checkpoint advancing sync1to t=100 should unblock the wait
         _ <- store.testIngestionSink.ingestUpdateBatch(
           NonEmptyList.of(
             TreeUpdateOrOffsetCheckpoint.Checkpoint(
@@ -310,7 +310,7 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
                 nextOffset(),
                 java.util.List.of(
                   new SynchronizerTime(
-                    d1.toProtoPrimitive,
+                    sync1.toProtoPrimitive,
                     CantonTimestamp.ofEpochSecond(100).toInstant,
                   )
                 ),
@@ -319,11 +319,11 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
           )
         )
         _ <- waitFuture
-        // Also verify d2 with no ingested contracts, unblocked via transaction ingestion
-        waitD2Future = store.waitUntilRecordTimeReached(d2, CantonTimestamp.ofEpochSecond(100))
-        _ = waitD2Future.isCompleted shouldBe false
-        _ <- d2.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
-        _ <- waitD2Future
+        // Also verify sync2with no ingested contracts, unblocked via transaction ingestion
+        waitSync2Future = store.waitUntilRecordTimeReached(sync2, CantonTimestamp.ofEpochSecond(100))
+        _ = waitSync2Future.isCompleted shouldBe false
+        _ <- sync2.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
+        _ <- waitSync2Future
       } yield succeed
     }
 
@@ -331,8 +331,8 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
-  protected val d1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
-  protected val d2: SynchronizerId = SynchronizerId.tryFromString("domain2::domain")
+  protected val sync1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
+  protected val sync2: SynchronizerId = SynchronizerId.tryFromString("domain2::domain")
 
   case class GenericAcsRowData(contract: Contract[?, ?]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Timestamp] = None
