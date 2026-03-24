@@ -78,6 +78,7 @@ class ScanAutomationService(
       new RewardComputationTrigger(
         appRewardsStore,
         appActivityStore,
+        updateHistory,
         triggerContext,
       )
     )

@@ -467,17 +467,15 @@ class DbScanAppRewardsStore(
     */
   def lookupLatestRoundWithRewardComputation()(implicit
       tc: TraceContext
-  ): Future[Option[Long]] =
-    if (!updateHistory.isReady) Future.successful(None)
-    else {
-      val historyId = updateHistory.historyId
-      runQuerySingle(
-        sql"""select max(round_number) from #${Tables.appRewardRootHashes}
+  ): Future[Option[Long]] = {
+    val historyId = updateHistory.historyId
+    runQuerySingle(
+      sql"""select max(round_number) from #${Tables.appRewardRootHashes}
             where history_id = $historyId
       """.as[Option[Long]].headOption.map(_.flatten),
-        "appRewards.lookupLatestRoundWithRewardComputation",
-      )
-    }
+      "appRewards.lookupLatestRoundWithRewardComputation",
+    )
+  }
 
   /** Runs the full reward computation pipeline for a single round.
     *

@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.scan.store.{AppActivityStore, ScanAppRewardsStore}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -29,6 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class RewardComputationTrigger(
     appRewardsStore: ScanAppRewardsStore,
     appActivityStore: AppActivityStore,
+    updateHistory: UpdateHistory,
     override protected val context: TriggerContext,
 )(implicit
     override val ec: ExecutionContext,
@@ -39,19 +41,23 @@ class RewardComputationTrigger(
   override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[RewardComputationTrigger.Task]] = {
-    for {
-      earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
-      latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
-      latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
-    } yield {
-      (earliestCompleteO, latestCompleteO) match {
-        case (Some(earliestComplete), Some(latestComplete)) =>
-          val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
-          // TODO(#4570): Support parallel execution
-          Seq(start).filter(_ <= latestComplete).map(RewardComputationTrigger.Task(_))
-        case _ => Seq.empty
+    if (!updateHistory.isReady) {
+      logger.debug("Waiting for UpdateHistory to become ready.")
+      Future.successful(Seq.empty)
+    } else
+      for {
+        earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
+        latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
+        latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
+      } yield {
+        (earliestCompleteO, latestCompleteO) match {
+          case (Some(earliestComplete), Some(latestComplete)) =>
+            val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
+            // TODO(#4570): Support parallel execution
+            Seq(start).filter(_ <= latestComplete).map(RewardComputationTrigger.Task(_))
+          case _ => Seq.empty
+        }
       }
-    }
   }
 
   override protected def completeTask(
