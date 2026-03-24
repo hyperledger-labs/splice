@@ -2,55 +2,39 @@ rateLimits:
   # banned because deprecated
   /api/scan/v1/updates:
     name: v1-updates
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/aggregated-rounds:
     name: aggregated-rounds
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/round-totals:
     name: round-totals
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/round-party-totals:
     name: round-party-totals
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/amulet-config-for-round:
     name: amulet-config-for-round
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/round-of-latest-data:
     name: round-of-latest-data
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/rewards-collected:
     name: rewards-collected
-    clientIp: false
-    limits:
-      type: banned
+    type: banned
 
   # banned because deprecated
   /api/scan/v0/top-providers-by-app-rewards:
     name: top-providers
-    clientIp: false
-    limits:
-      type: banned
+    type: banned

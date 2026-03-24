@@ -2,279 +2,187 @@ rateLimits:
   # Health/status endpoints (unlimited)
   /api/scan/readyz:
     name: readyz
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/livez:
     name: livez
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/status:
     name: status
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/version:
     name: version
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   # External API endpoints (unlimited)
   /api/scan/v0/dso:
     name: dso-info
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/validators:
     name: validators
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/scans:
     name: scans
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/dso-sequencers:
     name: dso-sequencers
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/sv-bft-sequencers:
     name: bft-sequencers
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/domains:
     name: domains
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/closed-rounds:
     name: closed-rounds
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/open-and-issuing-mining-rounds:
     name: open-and-issuing-mining-rounds
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/updates:
     name: v0-updates
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v2/updates:
     name: v2-updates
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/state:
     name: state
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/holdings:
     name: holdings
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/ans-entries:
     name: ans-entries
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/dso-party-id:
     name: dso-party-id
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/transactions:
     name: transactions
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/backfilling:
     name: backfilling
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/admin/validator:
     name: validator-licenses
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/admin/sv/voterequests:
     name: sv-voterequests
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/admin/sv/voteresults:
     name: sv-voteresults
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/activities:
     name: activities
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/amulet-price:
     name: amulet-price-votes
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/amulet-rules:
     name: amulet-rules
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/ans-rules:
     name: ans-rules
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/events:
     name: events
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/external-party-amulet-rules:
     name: external-party-amulet-rules
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/feature-support:
     name: feature-support
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/featured-apps:
     name: featured-apps
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/migrations:
     name: migrations-schedule
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/splice-instance-names:
     name: splice-instance-names
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/synchronizer-bootstrapping-transactions:
     name: synchronizer-bootstrapping-transactions
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/synchronizer-identities:
     name: synchronizer-identities
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/top-validators-by-purchased-traffic:
     name: top-validators-by-purchased-traffic
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/top-validators-by-validator-faucets:
     name: top-validators-by-validator-faucets
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/top-validators-by-validator-rewards:
     name: top-validators-by-validator-rewards
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/transfer-command-counter:
     name: transfer-command-counter
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/transfer-command:
     name: transfer-command-status
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/transfer-preapprovals:
     name: transfer-preapprovals
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/unclaimed-development-fund-coupons:
     name: unclaimed-development-fund-coupons
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/voterequest:
     name: voterequest
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/voterequests:
     name: voterequests
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   /api/scan/v0/history/bulk/acs:
     name: getBulkAcsSnapshot
-    clientIp: false
-    limits:
-      type: unlimited
+    type: unlimited
 
   # TODO(#3429): This currently fails with "Orphaned rate limit prefixes not matching any scan.yaml endpoint",
   #              because the endpoint is in scan-stream-server.yaml, not in scan.yaml
-  # - actions:
-  #     - name: bulkStorageDownload
-  #       pathPrefix: /api/scan/v0/history/bulk/download
-  #   limits:
-  #     type: unlimited
+  # /api/scan/v0/history/bulk/download:
+  #   name: bulkStorageDownload
+  #   type: unlimited
