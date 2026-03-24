@@ -78,10 +78,12 @@ class DbAppActivityRecordStore(
     */
   def earliestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
-  ): Future[Option[Long]] = {
-    val historyId = updateHistory.historyId
-    runQuerySingle(
-      sql"""select min_round + 1
+  ): Future[Option[Long]] =
+    if (!updateHistory.isReady) Future.successful(None)
+    else {
+      val historyId = updateHistory.historyId
+      runQuerySingle(
+        sql"""select min_round + 1
             from (
               select min(a.round_number) as min_round
               from #${Tables.appActivityRecords} a
@@ -96,9 +98,9 @@ class DbAppActivityRecordStore(
                 and v.history_id = $historyId
             )
       """.as[Option[Long]].headOption.map(_.flatten),
-      "appActivity.earliestRoundWithCompleteAppActivity",
-    )
-  }
+        "appActivity.earliestRoundWithCompleteAppActivity",
+      )
+    }
 
   /** Find the latest round with complete app activity.
     * A round is complete if the prior round also has activity records,
@@ -107,10 +109,12 @@ class DbAppActivityRecordStore(
     */
   def latestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
-  ): Future[Option[Long]] = {
-    val historyId = updateHistory.historyId
-    runQuerySingle(
-      sql"""select max_round
+  ): Future[Option[Long]] =
+    if (!updateHistory.isReady) Future.successful(None)
+    else {
+      val historyId = updateHistory.historyId
+      runQuerySingle(
+        sql"""select max_round
             from (
               select max(a.round_number) as max_round
               from #${Tables.appActivityRecords} a
@@ -125,9 +129,9 @@ class DbAppActivityRecordStore(
                 and v.history_id = $historyId
             )
       """.as[Option[Long]].headOption.map(_.flatten),
-      "appActivity.latestRoundWithCompleteAppActivity",
-    )
-  }
+        "appActivity.latestRoundWithCompleteAppActivity",
+      )
+    }
 
   def getRecordByVerdictRowId(verdictRowId: Long)(implicit
       tc: TraceContext
