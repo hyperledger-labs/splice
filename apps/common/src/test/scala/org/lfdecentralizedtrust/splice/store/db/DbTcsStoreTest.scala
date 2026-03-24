@@ -255,7 +255,10 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         _ <- store.waitUntilRecordTimeReached(sync1, sync1CheckpointTime)
         _ <- store.waitUntilRecordTimeReached(sync2, sync2CheckpointTime)
         // sync2 is at 150, so waiting for 200 on sync2should not complete
-        waitSync2Future = store.waitUntilRecordTimeReached(sync2, CantonTimestamp.ofEpochSecond(200))
+        waitSync2Future = store.waitUntilRecordTimeReached(
+          sync2,
+          CantonTimestamp.ofEpochSecond(200),
+        )
         _ = waitSync2Future.isCompleted shouldBe false
         // Advance sync2via another checkpoint
         _ <- store.testIngestionSink.ingestUpdateBatch(
@@ -284,7 +287,10 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         // Ingest a transaction on sync1at t=100
         _ <- sync1.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
         // Waiting for t=200 on sync1should not complete immediately
-        waitSync1Future = store.waitUntilRecordTimeReached(sync1, CantonTimestamp.ofEpochSecond(200))
+        waitSync1Future = store.waitUntilRecordTimeReached(
+          sync1,
+          CantonTimestamp.ofEpochSecond(200),
+        )
         _ = waitSync1Future.isCompleted shouldBe false
         // Advancing sync2 to t=200 should not unblock sync1's wait
         _ <- sync2.create(c(2), recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(store)
@@ -320,7 +326,10 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
         )
         _ <- waitFuture
         // Also verify sync2with no ingested contracts, unblocked via transaction ingestion
-        waitSync2Future = store.waitUntilRecordTimeReached(sync2, CantonTimestamp.ofEpochSecond(100))
+        waitSync2Future = store.waitUntilRecordTimeReached(
+          sync2,
+          CantonTimestamp.ofEpochSecond(100),
+        )
         _ = waitSync2Future.isCompleted shouldBe false
         _ <- sync2.create(c(1), recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(store)
         _ <- waitSync2Future
