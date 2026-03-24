@@ -38,14 +38,6 @@ export function runSvProjectForAllSvs<T>(
   // used to ensure down/refresh always takes care of the runbook as well
   forceSvRunbook: boolean = false
 ): { name: string; promise: Promise<T> }[] {
-  const isLsuDeployment =
-    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
-  // For now we're skipping in all cases. When stack config files are versioned for all clusters and we start using
-  // the sv project regularly we should not skip on the down operation.
-  if (!isLsuDeployment) {
-    console.log('Not an LSU deployment. Skipping sv stacks.');
-    return [];
-  }
   const svsToRunFor = svsToDeploy.concat(
     !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
   );
@@ -60,4 +52,19 @@ export function runSvProjectForAllSvs<T>(
       })(),
     };
   });
+}
+export function runSvProjectForAllSvsIfLsu<T>(
+  operation: string,
+  runForStack: (stack: automation.Stack, sv: string) => Promise<T>,
+  requiresExistingStack: boolean,
+  forceSvRunbook: boolean = false
+): { name: string; promise: Promise<T> }[] {
+  const isLsuDeployment =
+    DecentralizedSynchronizerUpgradeConfig.active.enableLogicalSynchronizerDeploymentMode;
+  if (!isLsuDeployment) {
+    console.log('Not an LSU deployment. Skipping sv stacks.');
+    return [];
+  } else {
+    return runSvProjectForAllSvs(operation, runForStack, requiresExistingStack, forceSvRunbook);
+  }
 }
