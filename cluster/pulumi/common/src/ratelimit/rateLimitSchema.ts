@@ -20,7 +20,7 @@ export const UnlimitedSchema = z.object({
   type: z.literal('unlimited'),
 });
 
-export const RateLimitConfigSchema = z.union([
+export const RateLimitConfigSchema = z.xor([
   BucketMatchedRateLimitSchema,
   BannedSchema,
   UnlimitedSchema,
@@ -32,11 +32,10 @@ export const RateLimitSchema = z.object({
   globalLimits: BucketRateLimitSchema,
   rateLimits: z.object({}).catchall(
     z.intersection(
-      RateLimitConfigSchema,
       z.object({
         name: z.string(),
-        clientIp: z.boolean(),
-      })
+      }),
+      RateLimitConfigSchema
     )
   ),
 });
