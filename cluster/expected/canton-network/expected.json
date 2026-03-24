@@ -1252,384 +1252,223 @@
       "namespace": "sv-1",
       "rateLimits": {
         "/api/scan/livez": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "livez"
+          "name": "livez",
+          "type": "unlimited"
         },
         "/api/scan/readyz": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "readyz"
+          "name": "readyz",
+          "type": "unlimited"
         },
         "/api/scan/status": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "status"
+          "name": "status",
+          "type": "unlimited"
         },
         "/api/scan/v0/acs": {
           "clientIp": true,
-          "limits": {
-            "fillInterval": "60s",
-            "maxTokens": 10,
-            "tokensPerFill": 5
-          },
-          "name": "acs"
+          "fillInterval": "60s",
+          "maxTokens": 10,
+          "name": "acs",
+          "tokensPerFill": 5
         },
         "/api/scan/v0/activities": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "activities"
+          "name": "activities",
+          "type": "unlimited"
         },
         "/api/scan/v0/admin/sv/voterequests": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "sv-voterequests"
+          "name": "sv-voterequests",
+          "type": "unlimited"
         },
         "/api/scan/v0/admin/sv/voteresults": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "sv-voteresults"
+          "name": "sv-voteresults",
+          "type": "unlimited"
         },
         "/api/scan/v0/admin/validator": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "validator-licenses"
+          "name": "validator-licenses",
+          "type": "unlimited"
         },
         "/api/scan/v0/aggregated-rounds": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "aggregated-rounds"
+          "name": "aggregated-rounds",
+          "type": "banned"
         },
         "/api/scan/v0/amulet-config-for-round": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "amulet-config-for-round"
+          "name": "amulet-config-for-round",
+          "type": "banned"
         },
         "/api/scan/v0/amulet-price": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "amulet-price-votes"
+          "name": "amulet-price-votes",
+          "type": "unlimited"
         },
         "/api/scan/v0/amulet-rules": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "amulet-rules"
+          "name": "amulet-rules",
+          "type": "unlimited"
         },
         "/api/scan/v0/ans-entries": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "ans-entries"
+          "name": "ans-entries",
+          "type": "unlimited"
         },
         "/api/scan/v0/ans-rules": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "ans-rules"
+          "name": "ans-rules",
+          "type": "unlimited"
         },
         "/api/scan/v0/backfilling": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "backfilling"
+          "name": "backfilling",
+          "type": "unlimited"
         },
         "/api/scan/v0/closed-rounds": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "closed-rounds"
+          "name": "closed-rounds",
+          "type": "unlimited"
         },
         "/api/scan/v0/domains": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "domains"
+          "name": "domains",
+          "type": "unlimited"
         },
         "/api/scan/v0/dso": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "dso-info"
+          "name": "dso-info",
+          "type": "unlimited"
         },
         "/api/scan/v0/dso-party-id": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "dso-party-id"
+          "name": "dso-party-id",
+          "type": "unlimited"
         },
         "/api/scan/v0/dso-sequencers": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "dso-sequencers"
+          "name": "dso-sequencers",
+          "type": "unlimited"
         },
         "/api/scan/v0/events": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "events"
+          "name": "events",
+          "type": "unlimited"
         },
         "/api/scan/v0/external-party-amulet-rules": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "external-party-amulet-rules"
+          "name": "external-party-amulet-rules",
+          "type": "unlimited"
         },
         "/api/scan/v0/feature-support": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "feature-support"
+          "name": "feature-support",
+          "type": "unlimited"
         },
         "/api/scan/v0/featured-apps": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "featured-apps"
+          "name": "featured-apps",
+          "type": "unlimited"
         },
         "/api/scan/v0/history/bulk/acs": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "getBulkAcsSnapshot"
+          "name": "getBulkAcsSnapshot",
+          "type": "unlimited"
         },
         "/api/scan/v0/holdings": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "holdings"
+          "name": "holdings",
+          "type": "unlimited"
         },
         "/api/scan/v0/migrations": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "migrations-schedule"
+          "name": "migrations-schedule",
+          "type": "unlimited"
         },
         "/api/scan/v0/open-and-issuing-mining-rounds": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "open-and-issuing-mining-rounds"
+          "name": "open-and-issuing-mining-rounds",
+          "type": "unlimited"
         },
         "/api/scan/v0/rewards-collected": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "rewards-collected"
+          "name": "rewards-collected",
+          "type": "banned"
         },
         "/api/scan/v0/round-of-latest-data": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "round-of-latest-data"
+          "name": "round-of-latest-data",
+          "type": "banned"
         },
         "/api/scan/v0/round-party-totals": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "round-party-totals"
+          "name": "round-party-totals",
+          "type": "banned"
         },
         "/api/scan/v0/round-totals": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "round-totals"
+          "name": "round-totals",
+          "type": "banned"
         },
         "/api/scan/v0/scans": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "scans"
+          "name": "scans",
+          "type": "unlimited"
         },
         "/api/scan/v0/splice-instance-names": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "splice-instance-names"
+          "name": "splice-instance-names",
+          "type": "unlimited"
         },
         "/api/scan/v0/state": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "state"
+          "name": "state",
+          "type": "unlimited"
         },
         "/api/scan/v0/sv-bft-sequencers": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "bft-sequencers"
+          "name": "bft-sequencers",
+          "type": "unlimited"
         },
         "/api/scan/v0/synchronizer-bootstrapping-transactions": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "synchronizer-bootstrapping-transactions"
+          "name": "synchronizer-bootstrapping-transactions",
+          "type": "unlimited"
         },
         "/api/scan/v0/synchronizer-identities": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "synchronizer-identities"
+          "name": "synchronizer-identities",
+          "type": "unlimited"
         },
         "/api/scan/v0/top-providers-by-app-rewards": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "top-providers"
+          "name": "top-providers",
+          "type": "banned"
         },
         "/api/scan/v0/top-validators-by-purchased-traffic": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "top-validators-by-purchased-traffic"
+          "name": "top-validators-by-purchased-traffic",
+          "type": "unlimited"
         },
         "/api/scan/v0/top-validators-by-validator-faucets": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "top-validators-by-validator-faucets"
+          "name": "top-validators-by-validator-faucets",
+          "type": "unlimited"
         },
         "/api/scan/v0/top-validators-by-validator-rewards": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "top-validators-by-validator-rewards"
+          "name": "top-validators-by-validator-rewards",
+          "type": "unlimited"
         },
         "/api/scan/v0/transactions": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transactions"
+          "name": "transactions",
+          "type": "unlimited"
         },
         "/api/scan/v0/transfer-command": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transfer-command-status"
+          "name": "transfer-command-status",
+          "type": "unlimited"
         },
         "/api/scan/v0/transfer-command-counter": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transfer-command-counter"
+          "name": "transfer-command-counter",
+          "type": "unlimited"
         },
         "/api/scan/v0/transfer-preapprovals": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transfer-preapprovals"
+          "name": "transfer-preapprovals",
+          "type": "unlimited"
         },
         "/api/scan/v0/unclaimed-development-fund-coupons": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "unclaimed-development-fund-coupons"
+          "name": "unclaimed-development-fund-coupons",
+          "type": "unlimited"
         },
         "/api/scan/v0/updates": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "v0-updates"
+          "name": "v0-updates",
+          "type": "unlimited"
         },
         "/api/scan/v0/validators": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "validators"
+          "name": "validators",
+          "type": "unlimited"
         },
         "/api/scan/v0/voterequest": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "voterequest"
+          "name": "voterequest",
+          "type": "unlimited"
         },
         "/api/scan/v0/voterequests": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "voterequests"
+          "name": "voterequests",
+          "type": "unlimited"
         },
         "/api/scan/v1/updates": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "v1-updates"
+          "name": "v1-updates",
+          "type": "banned"
         },
         "/api/scan/v2/updates": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "v2-updates"
+          "name": "v2-updates",
+          "type": "unlimited"
         },
         "/api/scan/version": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "version"
+          "name": "version",
+          "type": "unlimited"
         }
       }
     },
@@ -1651,384 +1490,223 @@
       "namespace": "sv-da-1",
       "rateLimits": {
         "/api/scan/livez": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "livez"
+          "name": "livez",
+          "type": "unlimited"
         },
         "/api/scan/readyz": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "readyz"
+          "name": "readyz",
+          "type": "unlimited"
         },
         "/api/scan/status": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "status"
+          "name": "status",
+          "type": "unlimited"
         },
         "/api/scan/v0/acs": {
           "clientIp": true,
-          "limits": {
-            "fillInterval": "60s",
-            "maxTokens": 10,
-            "tokensPerFill": 5
-          },
-          "name": "acs"
+          "fillInterval": "60s",
+          "maxTokens": 10,
+          "name": "acs",
+          "tokensPerFill": 5
         },
         "/api/scan/v0/activities": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "activities"
+          "name": "activities",
+          "type": "unlimited"
         },
         "/api/scan/v0/admin/sv/voterequests": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "sv-voterequests"
+          "name": "sv-voterequests",
+          "type": "unlimited"
         },
         "/api/scan/v0/admin/sv/voteresults": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "sv-voteresults"
+          "name": "sv-voteresults",
+          "type": "unlimited"
         },
         "/api/scan/v0/admin/validator": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "validator-licenses"
+          "name": "validator-licenses",
+          "type": "unlimited"
         },
         "/api/scan/v0/aggregated-rounds": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "aggregated-rounds"
+          "name": "aggregated-rounds",
+          "type": "banned"
         },
         "/api/scan/v0/amulet-config-for-round": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "amulet-config-for-round"
+          "name": "amulet-config-for-round",
+          "type": "banned"
         },
         "/api/scan/v0/amulet-price": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "amulet-price-votes"
+          "name": "amulet-price-votes",
+          "type": "unlimited"
         },
         "/api/scan/v0/amulet-rules": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "amulet-rules"
+          "name": "amulet-rules",
+          "type": "unlimited"
         },
         "/api/scan/v0/ans-entries": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "ans-entries"
+          "name": "ans-entries",
+          "type": "unlimited"
         },
         "/api/scan/v0/ans-rules": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "ans-rules"
+          "name": "ans-rules",
+          "type": "unlimited"
         },
         "/api/scan/v0/backfilling": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "backfilling"
+          "name": "backfilling",
+          "type": "unlimited"
         },
         "/api/scan/v0/closed-rounds": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "closed-rounds"
+          "name": "closed-rounds",
+          "type": "unlimited"
         },
         "/api/scan/v0/domains": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "domains"
+          "name": "domains",
+          "type": "unlimited"
         },
         "/api/scan/v0/dso": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "dso-info"
+          "name": "dso-info",
+          "type": "unlimited"
         },
         "/api/scan/v0/dso-party-id": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "dso-party-id"
+          "name": "dso-party-id",
+          "type": "unlimited"
         },
         "/api/scan/v0/dso-sequencers": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "dso-sequencers"
+          "name": "dso-sequencers",
+          "type": "unlimited"
         },
         "/api/scan/v0/events": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "events"
+          "name": "events",
+          "type": "unlimited"
         },
         "/api/scan/v0/external-party-amulet-rules": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "external-party-amulet-rules"
+          "name": "external-party-amulet-rules",
+          "type": "unlimited"
         },
         "/api/scan/v0/feature-support": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "feature-support"
+          "name": "feature-support",
+          "type": "unlimited"
         },
         "/api/scan/v0/featured-apps": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "featured-apps"
+          "name": "featured-apps",
+          "type": "unlimited"
         },
         "/api/scan/v0/history/bulk/acs": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "getBulkAcsSnapshot"
+          "name": "getBulkAcsSnapshot",
+          "type": "unlimited"
         },
         "/api/scan/v0/holdings": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "holdings"
+          "name": "holdings",
+          "type": "unlimited"
         },
         "/api/scan/v0/migrations": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "migrations-schedule"
+          "name": "migrations-schedule",
+          "type": "unlimited"
         },
         "/api/scan/v0/open-and-issuing-mining-rounds": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "open-and-issuing-mining-rounds"
+          "name": "open-and-issuing-mining-rounds",
+          "type": "unlimited"
         },
         "/api/scan/v0/rewards-collected": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "rewards-collected"
+          "name": "rewards-collected",
+          "type": "banned"
         },
         "/api/scan/v0/round-of-latest-data": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "round-of-latest-data"
+          "name": "round-of-latest-data",
+          "type": "banned"
         },
         "/api/scan/v0/round-party-totals": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "round-party-totals"
+          "name": "round-party-totals",
+          "type": "banned"
         },
         "/api/scan/v0/round-totals": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "round-totals"
+          "name": "round-totals",
+          "type": "banned"
         },
         "/api/scan/v0/scans": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "scans"
+          "name": "scans",
+          "type": "unlimited"
         },
         "/api/scan/v0/splice-instance-names": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "splice-instance-names"
+          "name": "splice-instance-names",
+          "type": "unlimited"
         },
         "/api/scan/v0/state": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "state"
+          "name": "state",
+          "type": "unlimited"
         },
         "/api/scan/v0/sv-bft-sequencers": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "bft-sequencers"
+          "name": "bft-sequencers",
+          "type": "unlimited"
         },
         "/api/scan/v0/synchronizer-bootstrapping-transactions": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "synchronizer-bootstrapping-transactions"
+          "name": "synchronizer-bootstrapping-transactions",
+          "type": "unlimited"
         },
         "/api/scan/v0/synchronizer-identities": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "synchronizer-identities"
+          "name": "synchronizer-identities",
+          "type": "unlimited"
         },
         "/api/scan/v0/top-providers-by-app-rewards": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "top-providers"
+          "name": "top-providers",
+          "type": "banned"
         },
         "/api/scan/v0/top-validators-by-purchased-traffic": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "top-validators-by-purchased-traffic"
+          "name": "top-validators-by-purchased-traffic",
+          "type": "unlimited"
         },
         "/api/scan/v0/top-validators-by-validator-faucets": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "top-validators-by-validator-faucets"
+          "name": "top-validators-by-validator-faucets",
+          "type": "unlimited"
         },
         "/api/scan/v0/top-validators-by-validator-rewards": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "top-validators-by-validator-rewards"
+          "name": "top-validators-by-validator-rewards",
+          "type": "unlimited"
         },
         "/api/scan/v0/transactions": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transactions"
+          "name": "transactions",
+          "type": "unlimited"
         },
         "/api/scan/v0/transfer-command": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transfer-command-status"
+          "name": "transfer-command-status",
+          "type": "unlimited"
         },
         "/api/scan/v0/transfer-command-counter": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transfer-command-counter"
+          "name": "transfer-command-counter",
+          "type": "unlimited"
         },
         "/api/scan/v0/transfer-preapprovals": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "transfer-preapprovals"
+          "name": "transfer-preapprovals",
+          "type": "unlimited"
         },
         "/api/scan/v0/unclaimed-development-fund-coupons": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "unclaimed-development-fund-coupons"
+          "name": "unclaimed-development-fund-coupons",
+          "type": "unlimited"
         },
         "/api/scan/v0/updates": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "v0-updates"
+          "name": "v0-updates",
+          "type": "unlimited"
         },
         "/api/scan/v0/validators": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "validators"
+          "name": "validators",
+          "type": "unlimited"
         },
         "/api/scan/v0/voterequest": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "voterequest"
+          "name": "voterequest",
+          "type": "unlimited"
         },
         "/api/scan/v0/voterequests": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "voterequests"
+          "name": "voterequests",
+          "type": "unlimited"
         },
         "/api/scan/v1/updates": {
-          "clientIp": false,
-          "limits": {
-            "type": "banned"
-          },
-          "name": "v1-updates"
+          "name": "v1-updates",
+          "type": "banned"
         },
         "/api/scan/v2/updates": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "v2-updates"
+          "name": "v2-updates",
+          "type": "unlimited"
         },
         "/api/scan/version": {
-          "clientIp": false,
-          "limits": {
-            "type": "unlimited"
-          },
-          "name": "version"
+          "name": "version",
+          "type": "unlimited"
         }
       }
     },
