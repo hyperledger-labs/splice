@@ -1,7 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  infraAffinityAndTolerations,
+  standardStorageClassName,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 
 export function installDockerRegistryMirror(): k8s.helm.v3.Release {
@@ -29,7 +32,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
           ttl: '720h',
         },
         persistence: {
-          storageClass: 'hyperdisk-balanced-rwo',
+          storageClass: standardStorageClassName,
           enabled: true,
           size: '20Gi',
         },
