@@ -23,6 +23,8 @@ trait ScanAppRewardsStore {
     * aggregation, CC conversion, and Merkle tree hashing.
     * MUST only be called on rounds for which all app activity records have
     * been ingested and for which the reward information has not yet been computed.
+    * TODO(#4382): Update argument list so that it can invoke computeRewardTotals
+    * after aggregateActivityTotals.
     */
   def computeAndStoreRewards(roundNumber: Long)(implicit
       tc: TraceContext

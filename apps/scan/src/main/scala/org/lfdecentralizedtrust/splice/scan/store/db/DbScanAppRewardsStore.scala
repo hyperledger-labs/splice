@@ -483,6 +483,8 @@ class DbScanAppRewardsStore(
     *
     * TODO(#4384): Will be extended to run CC conversion (stage 2) and
     * Merkle tree hashing (stage 3) in a single transaction.
+    * TODO(#4382): Update argument list so that it can invoke computeRewardTotals
+    * after aggregateActivityTotals.
     */
   def computeAndStoreRewards(
       roundNumber: Long
@@ -561,6 +563,62 @@ class DbScanAppRewardsStore(
                  coalesce(sum(total_app_activity_weight), 0),
                  count(*)
           from inserted_parties"""
+
+  // -- Reward computation -----------------------------------------------------
+
+  /** Convert activity totals (bytes) to CC minting allowances, apply threshold
+    * filtering, and write to `app_reward_party_totals` and `app_reward_round_totals`.
+    */
+  private[store] def computeRewardTotals(
+      roundNumber: Long,
+      issuancePerFeaturedAppTrafficMB: BigDecimal,
+      threshold: BigDecimal,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    val insertPartyRewards =
+      (sql"""with computed as (
+               select history_id, round_number, app_provider_party_seq_num,
+                      (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
+                        * $issuancePerFeaturedAppTrafficMB as reward_amount
+               from #${Tables.appActivityPartyTotals}
+               where history_id = $historyId and round_number = $roundNumber
+             )
+             insert into #${Tables.appRewardPartyTotals}
+               (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
+             select history_id, round_number, app_provider_party_seq_num, reward_amount
+             from computed
+             where reward_amount >= $threshold""").asUpdate
+
+    val insertRoundRewards =
+      (sql"""with computed as (
+               select (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
+                        * $issuancePerFeaturedAppTrafficMB as reward_amount
+               from #${Tables.appActivityPartyTotals}
+               where history_id = $historyId and round_number = $roundNumber
+             )
+             insert into #${Tables.appRewardRoundTotals}
+               (history_id, round_number, total_app_reward_minting_allowance,
+                total_app_reward_thresholded, total_app_reward_unclaimed,
+                rewarded_app_provider_parties_count)
+             select $historyId, $roundNumber,
+               coalesce(sum(case when reward_amount >= $threshold then reward_amount else 0 end), 0),
+               coalesce(sum(case when reward_amount < $threshold then reward_amount else 0 end), 0),
+               0,
+               count(case when reward_amount >= $threshold then 1 end)
+             from computed""").asUpdate
+
+    runUpdate(
+      (insertPartyRewards >> insertRoundRewards)
+        .map(_ =>
+          logger.debug(
+            s"Computed reward totals for round $roundNumber."
+          )
+        )
+        .transactionally,
+      "appRewards.computeRewardTotals",
+    )
+  }
 
   // -- Private helpers -------------------------------------------------------
 
