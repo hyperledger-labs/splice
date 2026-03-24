@@ -15,6 +15,9 @@ tags:
   - name: scan
     description: |
       The internal and external endpoints.
+  - name: pre-alpha
+    description: |
+      Still under active development, highly unstable. Do not use in production.
 servers:
   - url: https://example.com/api/scan
 paths:
@@ -22,9 +25,11 @@ paths:
   # Note for developers working on this openAPI spec: we generate only server-side code from this file,
   # not client-side. Client-side code in `ScanStreamClient` must be modified manually to reflect any changes in this spec.
 
+  # TODO(#3429): include in autogen'ed docs
+
   /v0/history/bulk/download/{object_key}:
     get:
-      tags: [external, scan]
+      tags: [pre-alpha, scan]
       x-jvm-package: scanStream
       operationId: "bulkStorageDownload"
       description: Download a bulk storage object

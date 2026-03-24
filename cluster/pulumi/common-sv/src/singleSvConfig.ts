@@ -80,6 +80,11 @@ const Auth0ConfigSchema = z
     clientId: z.string().optional(),
   })
   .strict();
+const AppsPgConfigSchema = z
+  .object({
+    cloudSql: CloudSqlWithOverrideConfigSchema,
+  })
+  .strict();
 const SvAppConfigSchema = z
   .object({
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
@@ -139,6 +144,7 @@ const SingleSvConfigSchema = z
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
     mediator: SvMediatorConfigSchema.optional(),
+    appsPg: AppsPgConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
     validatorApp: SvValidatorAppConfigSchema.optional(),

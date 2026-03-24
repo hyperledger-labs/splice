@@ -38,6 +38,18 @@ export function getNotificationChannel(
     : undefined;
 }
 
+function getAlertStrategy(notificationChannel: gcp.monitoring.NotificationChannel) {
+  return {
+    autoClose: '3600s',
+    notificationChannelStrategies: [
+      {
+        notificationChannelNames: [notificationChannel.name],
+        renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+      },
+    ],
+  };
+}
+
 export function installGcpLoggingAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
@@ -81,15 +93,7 @@ ${Object.keys(logAlerts)
   const alertCount = enableChaosMesh ? 50 : 1;
   const displayName = `Log warnings and errors > ${alertCount} ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('logsAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -156,15 +160,7 @@ ${ensureTrailingNewline(loggedSecretsFilter)}`;
 
   const displayName = `Logged secrets detected in ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('loggedSecretsAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -222,15 +218,7 @@ jsonPayload.state=~"STARTED"`,
 
   const displayName = `Cluster ${CLUSTER_BASENAME} is being updated`;
   new gcp.monitoring.AlertPolicy('updateClusterAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -273,15 +261,7 @@ resource.type="cloudsql_database"
 
   const displayName = `Possible CloudSQL maintenance going on in ${CLUSTER_BASENAME}`;
   new gcp.monitoring.AlertPolicy('updateCloudSQLAlert', {
-    alertStrategy: {
-      autoClose: '3600s',
-      notificationChannelStrategies: [
-        {
-          notificationChannelNames: [notificationChannel.name],
-          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
-        },
-      ],
-    },
+    alertStrategy: getAlertStrategy(notificationChannel),
     combiner: 'OR',
     conditions: [
       {
@@ -307,5 +287,95 @@ resource.type="cloudsql_database"
     ],
     displayName: displayName,
     notificationChannels: [notificationChannel.name],
+  });
+}
+
+export function installGcpQuotaAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
+  const quotaUsageThreshold = 0.9;
+  const quotaUsageThresholdPercent = quotaUsageThreshold * 100;
+
+  const baseArgs: Pick<
+    gcp.monitoring.AlertPolicyArgs,
+    'alertStrategy' | 'combiner' | 'notificationChannels' | 'userLabels'
+  > = {
+    alertStrategy: getAlertStrategy(notificationChannel),
+    combiner: 'OR',
+    notificationChannels: [notificationChannel.name],
+    userLabels: { cluster: CLUSTER_BASENAME },
+  };
+
+  new gcp.monitoring.AlertPolicy('quotaExceededAlert', {
+    ...baseArgs,
+    displayName: `Quota Exceeded in ${CLUSTER_BASENAME}`,
+    conditions: [
+      {
+        // "Quota Full" (Exceeded right now)
+        displayName: `Quota Exceeded in ${CLUSTER_BASENAME}`,
+        conditionThreshold: {
+          aggregations: [
+            {
+              alignmentPeriod: '60s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              groupByFields: ['metric.label.quota_metric'],
+              perSeriesAligner: 'ALIGN_COUNT_TRUE',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          duration: '60s',
+          filter:
+            'resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"',
+          trigger: {
+            count: 1,
+          },
+        },
+      },
+    ],
+  });
+
+  // Allocation quotas track consumed capacity (for example CPUs, IPs, disk)
+  // against fixed limits, while rate quotas track request throughput over time
+  // windows (for example API calls per minute). These are tracked separately so
+  // we have separate alerts for them
+
+  new gcp.monitoring.AlertPolicy('quotaAllocationAlert', {
+    ...baseArgs,
+    displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+    conditions: [
+      {
+        // Tracks resources like CPUs, Static IPs, Disk Space
+        displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+        conditionPrometheusQueryLanguage: {
+          query: `
+            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"}
+            / ignoring(limit_name) group_right()
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
+            > ${quotaUsageThreshold}
+          `,
+          duration: '300s',
+        },
+      },
+    ],
+  });
+
+  new gcp.monitoring.AlertPolicy('quotaRateAlert', {
+    ...baseArgs,
+    displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+    conditions: [
+      {
+        // Tracks API requests, HSM operations per minute, etc.
+        displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
+        conditionPrometheusQueryLanguage: {
+          query: `
+            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"}
+            / ignoring(limit_name) group_right()
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
+            > ${quotaUsageThreshold}
+          `,
+          duration: '300s',
+        },
+      },
+    ],
   });
 }
