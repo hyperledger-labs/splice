@@ -1,4 +1,4 @@
-name: CI post-merge to main or release-line branches
+name: CI post-merge to token-standard-v2-upcoming
 # TODO(#4625): remove this entire file
 on:
   push:
@@ -38,8 +38,8 @@ jobs:
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
           test_name: docs
-          save_nix_cache: true
-          save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          save_nix_cache: false
+          save_nix_cache_to_gcp: false
           target: 'oss'
           upload_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}
           upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
