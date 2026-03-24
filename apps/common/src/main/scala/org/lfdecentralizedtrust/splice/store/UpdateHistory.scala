@@ -2430,7 +2430,6 @@ object UpdateHistory {
   }
 
   sealed trait BackfillingRequirement
-
   object BackfillingRequirement {
 
     /** This history is guaranteed to have started ingestion early enough
