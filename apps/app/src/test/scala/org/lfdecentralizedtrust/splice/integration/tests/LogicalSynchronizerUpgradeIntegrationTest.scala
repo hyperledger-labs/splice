@@ -530,6 +530,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
+      clue("sv and scan app can be restarted") {
+        sv1Backend.stop()
+        sv1ScanBackend.stop()
+        sv1Backend.startSync()
+        sv1ScanBackend.startSync()
+      }
+
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
         // manually stop stuff as we destroy the new synchronizer as it runs in process
         val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
