@@ -19,7 +19,6 @@ trait AppActivityStore {
   ): Future[Option[Long]]
 
   /** Find the latest round for which all app activity records have been ingested.
-    * Returns None if fewer than two consecutive rounds have been ingested.
     */
   def latestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
