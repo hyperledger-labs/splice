@@ -254,12 +254,20 @@ class DomainConnector(
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
         .map { sequencers =>
-          val (sequencersWithSerial, sequencersWithMigration) =
-            sequencers.sequencers.partition(_.serial.isDefined)
           val serialOrMigrationSequencers =
-            if (sequencersWithSerial.nonEmpty)
-              sequencersWithSerial.filter(_.serial.contains(synchronizerSerial.unwrap.toLong))
-            else sequencersWithMigration.filter(_.migrationId == migrationId)
+            sequencers.sequencers
+              .groupBy(_.id)
+              .view
+              .mapValues { sequencersForId =>
+                val serialMatch =
+                  sequencersForId.find(_.serial.contains(synchronizerSerial.unwrap.toLong))
+                serialMatch.orElse(
+                  sequencersForId.find(s => s.serial.isEmpty && s.migrationId == migrationId)
+                )
+              }
+              .values
+              .flatten
+              .toSeq
           val svFilteredSequencers = config.domains.global.trustedSynchronizerConfig match {
             case Some(config) =>
               val allowedNamesSet = config.svNames.toList.toSet
@@ -270,11 +278,15 @@ class DomainConnector(
             case None =>
               serialOrMigrationSequencers
           }
+          val validConnections = extractValidConnections(
+            svFilteredSequencers,
+            domainTime,
+          )
+          logger.debug(
+            s"For synchronizer ${config.domains.global.alias} at time $domainTime using $validConnections from scan"
+          )
           config.domains.global.alias ->
-            extractValidConnections(
-              svFilteredSequencers,
-              domainTime,
-            )
+            validConnections
         }
         .toMap -> domainTime
     }

@@ -4,7 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import {
   Auth0Client,
-  BackupConfig,
+  BucketConfig,
   ChartValues,
   config,
   exactNamespace,
@@ -55,6 +55,7 @@ import {
   approvedSvIdentitiesFile,
   CantonBftSynchronizerNode,
   configForSv,
+  DecentralizedSynchronizerNode,
   getChainIdSuffix,
   installSvLoopback,
   sv1Config,
@@ -192,7 +193,7 @@ type SvConfig = {
   xns: ExactNamespace;
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig;
   onboarding?: ExpectedValidatorOnboarding;
-  backupConfig?: BackupConfig;
+  backupConfig?: BucketConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
@@ -294,6 +295,7 @@ async function installSvAndValidator(
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     ...commonSvAppValues,
+    participantAddress: canton.participant.internalClusterAddress,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
@@ -386,20 +388,41 @@ async function installSvAndValidator(
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
-  const externalSequencerP2pAddress = (canton.active as unknown as CantonBftSynchronizerNode)
-    .externalSequencerP2pAddress;
+  const bftSequencerConfigFor = (node: DecentralizedSynchronizerNode) => {
+    return {
+      bftSequencerConfig: {
+        p2pUrl: (node as unknown as CantonBftSynchronizerNode).externalSequencerP2pAddress,
+      },
+    };
+  };
+
   const synchronizerValues = decentralizedSynchronizerMigrationConfig.lsuEnabled
     ? {
         synchronizers: {
           current: {
             sequencer: canton.active.namespaceInternalSequencerAddress,
             mediator: canton.active.namespaceInternalMediatorAddress,
+            ...(useCantonBft ? bftSequencerConfigFor(canton.active) : {}),
           },
           ...(canton.upgrade
             ? {
                 successor: {
                   sequencer: canton.upgrade.namespaceInternalSequencerAddress,
                   mediator: canton.upgrade.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(canton.upgrade)
+                    : {}),
+                },
+              }
+            : {}),
+          ...(canton.legacy
+            ? {
+                legacy: {
+                  sequencer: canton.legacy.namespaceInternalSequencerAddress,
+                  mediator: canton.legacy.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(canton.legacy)
+                    : {}),
                 },
               }
             : {}),
@@ -413,6 +436,7 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
+    participantAddress: canton.participant.internalClusterAddress,
     metrics: {
       enable: true,
     },
@@ -425,17 +449,6 @@ async function installSvAndValidator(
         }
       : {}),
     ...synchronizerValues,
-    ...(useCantonBft
-      ? {
-          bftSequencers: [
-            {
-              p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId,
-              sequencerAddress: canton.active.namespaceInternalSequencerAddress,
-            },
-          ],
-        }
-      : {}),
     resources: svConfig.scanApp?.resources,
   };
 
@@ -481,6 +494,7 @@ async function installSvAndValidator(
         TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
       }
     ),
+    participantAddress: canton.participant.internalClusterAddress,
     metrics: {
       enable: true,
     },

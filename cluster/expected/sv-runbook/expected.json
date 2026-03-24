@@ -608,6 +608,9 @@
             "sequencer": "global-domain-3-sequencer"
           },
           "successor": {
+            "bftSequencerConfig": {
+              "p2pUrl": "https://sequencer-p2p-4.sv.mock.global.canton.network.digitalasset.com"
+            },
             "mediator": "global-domain-4-mediator",
             "sequencer": "global-domain-4-sequencer"
           }
@@ -1617,10 +1620,7 @@
             "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com"
           },
           "successor": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
-              "enabled": true
-            },
+            "enableBftSequencer": true,
             "mediatorAddress": "global-domain-4-mediator",
             "sequencerAddress": "global-domain-4-sequencer",
             "sequencerPruningConfig": {
@@ -1922,7 +1922,7 @@
           "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

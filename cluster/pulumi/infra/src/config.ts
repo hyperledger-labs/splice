@@ -64,6 +64,14 @@ const MonitoringConfigSchema = z
         sequencerClientDelay: z.object({
           seconds: z.number(),
         }),
+        acsCommitments: z.object({
+          checkpointDelay: z.object({
+            seconds: z.number(),
+          }),
+          completedDelay: z.object({
+            seconds: z.number(),
+          }),
+        }),
         sequencerRateLimits: z.object({
           rejectionRateThreshold: z.number(),
           circuitBreakerStateThreshold: z.number(),

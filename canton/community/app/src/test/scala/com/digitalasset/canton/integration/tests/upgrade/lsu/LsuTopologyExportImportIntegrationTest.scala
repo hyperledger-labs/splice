@@ -4,7 +4,7 @@
 package com.digitalasset.canton.integration.tests.upgrade.lsu
 
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.console.{CommandFailure, InstanceReference}
+import com.digitalasset.canton.console.{CommandFailure, InstanceReference, LocalInstanceReference}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.EnvironmentDefinition.S1M1

@@ -70,7 +70,11 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           val latencyTimer = metrics.latency.startAsync()
           metrics.iterations.mark()
           waitForReadyToWork()
-            .flatMap(_ => performWorkIfAvailable())
+            .flatMap(_ =>
+              withSpan(s"${getClass.getSimpleName}-work") { implicit tc => _ =>
+                performWorkIfAvailable()(tc)
+              }
+            )
             .transform { performedWork =>
               val performedWorkMetricsString = performedWork match {
                 case Success(value) => s"Success($value)"

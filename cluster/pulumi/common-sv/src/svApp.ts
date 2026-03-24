@@ -4,6 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   CLUSTER_HOSTNAME,
   DecentralizedSynchronizerMigrationConfig,
+  MigrationInfo,
   pvcSuffix,
   standardStorageClassName,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -17,17 +18,16 @@ import { SynchronizerNodes } from './synchronizer/synchronizerNodes';
 
 function localSynchronizerNodeValues(
   node: DecentralizedSynchronizerNode,
-  migrationId: number,
+  nodeConfig: MigrationInfo,
   ingressName: string,
-  migrationConfig: DecentralizedSynchronizerMigrationConfig,
   cometBftGovernanceKey?: unknown,
   sequencerPruningConfig?: object
 ) {
-  const useCantonBft = migrationConfig.active.sequencer.enableBftSequencer;
+  const useCantonBft = nodeConfig.sequencer.enableBftSequencer;
   return {
     sequencerAddress: node.namespaceInternalSequencerAddress,
     mediatorAddress: node.namespaceInternalMediatorAddress,
-    sequencerPublicUrl: `https://sequencer-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
+    sequencerPublicUrl: `https://sequencer-${nodeConfig.id}.${ingressName}.${CLUSTER_HOSTNAME}`,
     ...(useCantonBft ? { enableBftSequencer: true } : {}),
     ...(!useCantonBft
       ? {
@@ -92,9 +92,8 @@ export function valuesForSvApp(
         synchronizers: {
           current: localSynchronizerNodeValues(
             synchronizerNodes.active,
-            decentralizedSynchronizerMigrationConfig.active.id,
+            decentralizedSynchronizerMigrationConfig.active,
             ingressName,
-            decentralizedSynchronizerMigrationConfig,
             config.cometBftGovernanceKey,
             config.pruning?.sequencer
           ),
@@ -102,9 +101,8 @@ export function valuesForSvApp(
             ? {
                 successor: localSynchronizerNodeValues(
                   synchronizerNodes.upgrade,
-                  decentralizedSynchronizerMigrationConfig.upgrade!.id,
+                  decentralizedSynchronizerMigrationConfig.upgrade!,
                   ingressName,
-                  decentralizedSynchronizerMigrationConfig,
                   config.cometBftGovernanceKey,
                   config.pruning?.sequencer
                 ),
@@ -114,9 +112,8 @@ export function valuesForSvApp(
             ? {
                 legacy: localSynchronizerNodeValues(
                   synchronizerNodes.legacy,
-                  decentralizedSynchronizerMigrationConfig.legacy!.id,
+                  decentralizedSynchronizerMigrationConfig.legacy!,
                   ingressName,
-                  decentralizedSynchronizerMigrationConfig,
                   config.cometBftGovernanceKey,
                   config.pruning?.sequencer
                 ),
@@ -144,7 +141,7 @@ export function valuesForSvApp(
 
   // if you add a top level field here that is an object make sure to handle merging it in the caller
   return {
-    ...(useCantonBft
+    ...(lsuEnabled || useCantonBft
       ? {}
       : {
           cometBFT: {

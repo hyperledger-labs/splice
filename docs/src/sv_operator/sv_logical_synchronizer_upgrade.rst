@@ -35,8 +35,13 @@ High-Level Overview
 4. All SVs deploy *successor* synchronizer nodes (sequencer, mediator, and optionally CometBFT if DABFT is not used) alongside their existing nodes. Note: There is no new participant, the participant is tied to a logical synchronizer so it does not change on an LSU. As part of that they also :ref:`configure <lsu_deployment_changes>` the successor synchronizer in their SV and scan config.
    This deployment should be completed before the freeze time.
 5. At the scheduled **topology freeze time**, the SV app automation of each SV transfers the topology state to the successor nodes and publishes the sequencer URL for the new sequencer in the topology state (this is the only topology transaction that can be published after the freeze time).
-6. Between the topology freeze time and the upgrade time, SV app automation will periodically send special health check events on the new physical synchronizer to verify its health.
-   Each super validator should use their metrics to validate that they observe at least one event from each other super validator as well as that the BFT peer connections (CometBFT or DABFT) of the successor nodes are healthy.
+6. Between the topology freeze time and the upgrade time, SV app
+   automation will periodically send special health check events on
+   the new physical synchronizer to verify its health.  Each super
+   validator should use their metrics to validate that they observe at
+   least one event from each other super validator in the ``LSU
+   Sequencing Test`` dashboard as well as that the BFT peer
+   connections (CometBFT or DABFT) of the successor nodes are healthy.
 
    .. todo:: add more details once we have added this
 

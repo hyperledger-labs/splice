@@ -41,7 +41,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SplitwellTestUtil}
+import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, SpliceUtil, SplitwellTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
@@ -460,7 +460,7 @@ class BootstrapPackageConfigIntegrationTest
         bootstrapPackage: DarResource,
         packageName: PackageIdResolver.Package,
     ): Unit = {
-      val allPackagesVersions = DarResources.lookupAllPackageVersions(packageName.packageName)
+      val allPackagesVersions = DarResourcesUtil.lookupAllPackageVersions(packageName.packageName)
       val expectedToBeVettedVersions = allPackagesVersions
         .filter(
           _.metadata.version > PackageIdResolver.readPackageVersion(

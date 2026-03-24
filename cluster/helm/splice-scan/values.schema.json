@@ -191,6 +191,15 @@
                 },
                 "mediator": {
                   "type": "string"
+                },
+                "bftSequencerConfig": {
+                  "type": "object",
+                  "required": ["p2pUrl"],
+                  "properties": {
+                    "p2pUrl": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             },
@@ -206,6 +215,39 @@
                 },
                 "mediator": {
                   "type": "string"
+                },
+                "bftSequencerConfig": {
+                  "type": "object",
+                  "required": ["p2pUrl"],
+                  "properties": {
+                    "p2pUrl": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "type": "object",
+              "required": [
+                "sequencer",
+                "mediator"
+              ],
+              "properties": {
+                "sequencer": {
+                  "type": "string"
+                },
+                "mediator": {
+                  "type": "string"
+                },
+                "bftSequencerConfig": {
+                  "type": "object",
+                  "required": ["p2pUrl"],
+                  "properties": {
+                    "p2pUrl": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

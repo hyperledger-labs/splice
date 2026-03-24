@@ -77,7 +77,7 @@ class SynchronizerNodeReconciler(
       synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala
         .get(synchronizerId.toProtoPrimitive)
       sequencerConfig = synchronizerNodeConfig.flatMap(_.sequencer.toScala)
-      sequencerIdentityConfig = synchronizerNodeConfig.flatMap(_.sequencerIdentity.toScala)
+      existingSequencerIdentityConfig = synchronizerNodeConfig.flatMap(_.sequencerIdentity.toScala)
       mediatorConfig = synchronizerNodeConfig.flatMap(_.mediator.toScala)
       existingScanConfig = synchronizerNodeConfig.flatMap(_.scan.toScala).toJava
       existingSequencerConfig = sequencerConfig.map(c =>
@@ -90,7 +90,7 @@ class SynchronizerNodeReconciler(
       shouldMarkSequencerAsOnboarded = state match {
         case SynchronizerNodeState.OnboardedAfterDelay |
             SynchronizerNodeState.OnboardedImmediately =>
-          sequencerIdentityConfig
+          existingSequencerIdentityConfig
             .flatMap(_.availableAfter.toScala)
             .orElse(sequencerConfig.flatMap(_.availableAfter.toScala))
             .isEmpty
@@ -172,7 +172,10 @@ class SynchronizerNodeReconciler(
                 .map(c =>
                   new SequencerIdentityConfig(
                     c.sequencerId,
-                    sequencerAvailableAfter.toJava,
+                    existingSequencerIdentityConfig
+                      .flatMap(_.availableAfter.toScala)
+                      .orElse(sequencerAvailableAfter)
+                      .toJava,
                   )
                 )
                 .toJava
@@ -187,7 +190,10 @@ class SynchronizerNodeReconciler(
                 c.migrationId,
                 c.sequencerId,
                 c.url,
-                sequencerAvailableAfter.toJava,
+                sequencerConfig
+                  .flatMap(_.availableAfter.toScala)
+                  .orElse(sequencerAvailableAfter)
+                  .toJava,
               )
             }.toJava,
             localMediatorConfig

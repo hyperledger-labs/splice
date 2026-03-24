@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import better.files.File
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
@@ -15,7 +16,7 @@ import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatu
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.grpc.ByteStringStreamObserver
+import com.digitalasset.canton.grpc.{ByteStringStreamObserver, OutputFileStreamObserver}
 import com.digitalasset.canton.lifecycle.LifeCycle.CloseableChannel
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -35,6 +36,7 @@ import com.digitalasset.canton.topology.admin.v30.{
   GenesisStateV2Response,
   SequencerLsuStateResponse,
 }
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TimeQuery.Snapshot
 import com.digitalasset.canton.topology.transaction.{SequencerSynchronizerState, TopologyMapping}
@@ -58,6 +60,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
+import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -106,31 +109,35 @@ class SequencerAdminConnection(
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
   }
 
-  def getLsuState()(implicit
+  def getLsuState(file: File)(implicit
       traceContext: TraceContext
-  ): Future[ByteString] = {
-    val responseObserver = new ByteStringStreamObserver[SequencerLsuStateResponse](_.chunk)
+  ): Future[Unit] = {
+    val responseObserver = new OutputFileStreamObserver[SequencerLsuStateResponse](
+      file,
+      _.chunk,
+    )
     runCmd(
       TopologyAdminCommands.Read
         .SequencerLsuState(
           store = None,
           observer = responseObserver,
         )
-    ).flatMap(_ => responseObserver.resultBytes)
+    ).map(_ => ())
   }
 
   def initializeFromPredecessor(
-      topologySnapshot: ByteString,
+      topologySnapshot: Path,
       staticSynchronizerParameters: StaticSynchronizerParameters,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
+    val inputStream = Files.newInputStream(topologySnapshot)
     runCmd(
       SequencerAdminCommands.InitializeFromLsuPredecessor(
-        topologySnapshot,
+        inputStream,
         staticSynchronizerParameters,
       )
-    )
+    ).andThen(_ => inputStream.close())
   }
 
   def getPhysicalSynchronizerId()(implicit
@@ -509,6 +516,14 @@ class SequencerAdminConnection(
       case NodeStatus.NotInitialized(_, _) => false
       case NodeStatus.Success(_) => true
     }
+  }
+
+  def performLsuSequencingTest(
+      recipientMediatorGroup: MediatorGroupIndex
+  )(implicit tc: TraceContext): Future[Unit] = {
+    runCmd(
+      SequencerAdminCommands.PerformLsuSequencingTest(recipientMediatorGroup)
+    )
   }
 
 }

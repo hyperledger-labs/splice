@@ -51,17 +51,17 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+          "json-credentials": "eyJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZ2NwLXRvcG9sb2d5LXNuYXBzaG90LWJ1Y2tldC1zYS1rZXktc2VjcmV0IiwianNvbkNyZWRlbnRpYWxzIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQtY3JlZHMiLCJidWNrZXRTYUtleVNlY3JldCI6ImdjcC10b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LWV4YW1wbGUiLCJidWNrZXRTYUlhbUFjY291bnQiOiJkYS1jbi1leGFtcGxldEBkYS1jbi1zaGFyZWQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ=="
         }
       },
       "kind": "Secret",
       "metadata": {
-        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "name": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-shared-cn-topology-snapshots",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -316,7 +316,7 @@
         "frozenMigrationId": 2,
         "lsuEnabled": true,
         "upgrade": {
-          "enableLogicalSynchronizerDeploymentMode": false,
+          "enableLogicalSynchronizerDeploymentMode": true,
           "id": 4,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
@@ -329,7 +329,7 @@
             "spliceRoot": "splice"
           },
           "sequencer": {
-            "enableBftSequencer": false
+            "enableBftSequencer": true
           },
           "version": {
             "type": "remote",
@@ -3010,6 +3010,9 @@
             "sequencer": "global-domain-3-sequencer"
           },
           "successor": {
+            "bftSequencerConfig": {
+              "p2pUrl": "https://sequencer-p2p-4.sv-2.mock.global.canton.network.digitalasset.com"
+            },
             "mediator": "global-domain-4-mediator",
             "sequencer": "global-domain-4-sequencer"
           }
@@ -3121,10 +3124,6 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "cometBFT": {
-          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-          "enabled": true
-        },
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
@@ -3195,13 +3194,13 @@
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
         "periodicTopologySnapshotConfig": {
-          "backupInterval": "24h",
+          "backupInterval": "12h",
           "location": {
             "bucket": {
-              "bucketName": "da-cn-topology-snapshots",
-              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
-              "projectId": "da-cn-test",
-              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+              "bucketName": "cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
+              "projectId": "da-cn-shared",
+              "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
             },
             "prefix": "mock/sv-1"
           }
@@ -3256,10 +3255,7 @@
             "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
           },
           "successor": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
-              "enabled": true
-            },
+            "enableBftSequencer": true,
             "mediatorAddress": "global-domain-4-mediator",
             "sequencerAddress": "global-domain-4-sequencer",
             "sequencerPruningConfig": {
@@ -3981,6 +3977,9 @@
             "sequencer": "global-domain-3-sequencer"
           },
           "successor": {
+            "bftSequencerConfig": {
+              "p2pUrl": "https://sequencer-p2p-4.sv-1.mock.global.canton.network.digitalasset.com"
+            },
             "mediator": "global-domain-4-mediator",
             "sequencer": "global-domain-4-sequencer"
           }
@@ -4096,11 +4095,6 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "cometBFT": {
-          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-          "enabled": true,
-          "externalGovernanceKey": true
-        },
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "delegatelessAutomationExpectedTaskDuration": 5000,
@@ -4193,11 +4187,7 @@
             "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com"
           },
           "successor": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
-              "enabled": true,
-              "externalGovernanceKey": true
-            },
+            "enableBftSequencer": true,
             "mediatorAddress": "global-domain-4-mediator",
             "sequencerAddress": "global-domain-4-sequencer",
             "sequencerPruningConfig": {

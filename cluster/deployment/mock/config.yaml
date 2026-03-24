@@ -73,6 +73,9 @@ synchronizerMigration:
   upgrade:
     id: 4
     version: 0.3.21
+    enableLogicalSynchronizerDeploymentMode: true
+    sequencer:
+      enableBftSequencer: true
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.21"
       repoUrl: https://github.com/hyperledger-labs/splice
@@ -209,9 +212,11 @@ svs:
   sv-1:
     periodicSnapshots:
       topology:
-        projectId: 'da-cn-test'
-        bucketName: 'da-cn-topology-snapshots'
-        backupInterval: '24h'
+        backupInterval: '12h'
+        bucketName: 'cn-topology-snapshots'
+        bucketSaKeySecret: 'gcp-topology-snapshot-bucket-sa-key-secret'
+        bucketSaIamAccount: 'da-cn-example@da-cn-shared.iam.gserviceaccount.com'
+        projectId: 'da-cn-shared'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO

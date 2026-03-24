@@ -6,7 +6,6 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   ansDomainPrefix,
   appsAffinityAndTolerations,
-  BackupConfig,
   btoa,
   ChartValues,
   CLUSTER_BASENAME,
@@ -23,7 +22,6 @@ import {
   imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
-  installBootstrapDataBucketSecret,
   InstalledHelmChart,
   installSpliceHelmChart,
   installSvAppSecrets,
@@ -42,6 +40,7 @@ import {
   approvedSvIdentities,
   CantonBftSynchronizerNode,
   configForSv,
+  DecentralizedSynchronizerNode,
   installScanBulkStorage,
   installSvLoopback,
   SynchronizerNodes,
@@ -50,6 +49,10 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SvConfig, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
+import {
+  BucketConfig,
+  installBucketSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/buckets';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
@@ -133,7 +136,7 @@ export async function installSvNode(
     baseConfig.auth0Client
   );
 
-  const periodicBackupConfig: BackupConfig | undefined = baseConfig.periodicBackupConfig
+  const periodicBackupConfig: BucketConfig | undefined = baseConfig.periodicBackupConfig
     ? {
         ...baseConfig.periodicBackupConfig,
         location: {
@@ -146,8 +149,7 @@ export async function installSvNode(
     : undefined;
 
   const svConfig = configForSv(baseConfig.nodeName);
-  const periodicTopologySnapshotConfig: BackupConfig | undefined = svConfig.periodicSnapshots
-    ?.topology
+  const periodicTopologySnapshotConfig = svConfig.periodicSnapshots?.topology
     ? await topologySnapshotConfig(
         svConfig.periodicSnapshots?.topology,
         `${CLUSTER_BASENAME}/${xns.logicalName}`
@@ -170,18 +172,17 @@ export async function installSvNode(
     bulkStorageBucket,
   };
 
-  const identitiesBackupConfigSecret = installBootstrapDataBucketSecret(
+  const identitiesBackupConfigSecret = installBucketSecret(
     xns,
     config.identitiesBackupLocation.bucket
   );
 
   const topologySnapshotConfigSecret = periodicTopologySnapshotConfig
-    ? installBootstrapDataBucketSecret(xns, periodicTopologySnapshotConfig.location.bucket)
+    ? installBucketSecret(xns, periodicTopologySnapshotConfig.location.bucket)
     : undefined;
-
   const backupConfigSecret: pulumi.Resource | undefined = config.periodicBackupConfig
     ? config.periodicBackupConfig.location.bucket != config.identitiesBackupLocation.bucket
-      ? installBootstrapDataBucketSecret(xns, config.periodicBackupConfig.location.bucket)
+      ? installBucketSecret(xns, config.periodicBackupConfig.location.bucket)
       : identitiesBackupConfigSecret
     : undefined;
 
@@ -539,8 +540,14 @@ function installScan(
   const lsuEnabled = decentralizedSynchronizerMigrationConfig.lsuEnabled;
   const { active, participant } = synchronizerNodes;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
-  const externalSequencerP2pAddress = (active as unknown as CantonBftSynchronizerNode)
-    .externalSequencerP2pAddress;
+
+  const bftSequencerConfigFor = (node: DecentralizedSynchronizerNode) => {
+    return {
+      bftSequencerConfig: {
+        p2pUrl: (node as unknown as CantonBftSynchronizerNode).externalSequencerP2pAddress,
+      },
+    };
+  };
 
   const synchronizerValues = lsuEnabled
     ? {
@@ -548,12 +555,27 @@ function installScan(
           current: {
             sequencer: active.namespaceInternalSequencerAddress,
             mediator: active.namespaceInternalMediatorAddress,
+            ...(useCantonBft ? bftSequencerConfigFor(active) : {}),
           },
           ...(synchronizerNodes.upgrade
             ? {
                 successor: {
                   sequencer: synchronizerNodes.upgrade.namespaceInternalSequencerAddress,
                   mediator: synchronizerNodes.upgrade.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(synchronizerNodes.upgrade)
+                    : {}),
+                },
+              }
+            : {}),
+          ...(synchronizerNodes.legacy
+            ? {
+                legacy: {
+                  sequencer: synchronizerNodes.legacy.namespaceInternalSequencerAddress,
+                  mediator: synchronizerNodes.legacy.namespaceInternalMediatorAddress,
+                  ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
+                    ? bftSequencerConfigFor(synchronizerNodes.legacy)
+                    : {}),
                 },
               }
             : {}),
@@ -578,17 +600,6 @@ function installScan(
       id: decentralizedSynchronizerMigrationConfig.activeMigrationId,
     },
     ...synchronizerValues,
-    ...(useCantonBft
-      ? {
-          bftSequencers: [
-            {
-              p2pUrl: externalSequencerP2pAddress,
-              migrationId: decentralizedSynchronizerMigrationConfig.activeMigrationId,
-              sequencerAddress: active.namespaceInternalSequencerAddress,
-            },
-          ],
-        }
-      : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     apiRequestLogLevel: config.logging?.apiRequestLogLevel,

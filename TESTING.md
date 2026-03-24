@@ -80,9 +80,10 @@ There are two types of cluster tests that can be requested on a PR:
 - A basic cluster test, which deploys a scratch cluster, and runs the test suite against it.
 - A Hard Migration test, which tests the full hard migration workflow on a scratch cluster.
 
-To request a cluster test to be run on your PR, comment on your pr `/cluster_test` or `/hdm_test`
-for a basic test or a hard-migration test respectively. After commenting, the job needs to be approved to actually run.
-If you're a Digital Asset employee, you can self-approve; otherwise, contact an existing maintainer to approve it.
+To request a cluster test to be run on your PR, comment on your pr `/cluster_test`, `/hdm_test` or `/lsu_test`
+for a basic test, a hard-migration test or a logical synchronizer upgrade test respectively. After commenting,
+the job needs to be approved to actually run. If you're a Digital Asset employee, you can self-approve; otherwise,
+contact an existing maintainer to approve it.
 
 ### Enabling the new Canton bft ordering layer
 
@@ -412,14 +413,6 @@ If the tool can be configured to use a static token, generate one on https://jwt
 }
 ```
 and use HS256 as the signing algorithm with the HMAC secret set to "test".
-
-If the tool can be configured to fetch tokens from an OAuth2 server using client credentials,
-run
-```
-./scripts/test-oauth-server.sh
-```
-and point your tool to the displayed URL.
-Set the client id to the desired ledger API user name, and use an arbitrary value for the client secret.
 
 ### Testing App Upgrades
 
