@@ -32,6 +32,8 @@ object DbAppActivityRecordStore {
       appProviderParties: Seq[String],
       appActivityWeights: Seq[Long],
   )
+
+  val DUMMY_VERDICT_ROW_ID: Long = -123456789L
 }
 
 class DbAppActivityRecordStore(

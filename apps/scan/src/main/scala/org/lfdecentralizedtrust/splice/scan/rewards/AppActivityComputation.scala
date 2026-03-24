@@ -118,7 +118,7 @@ class AppActivityComputation(
 
       Some(
         DbAppActivityRecordStore.AppActivityRecordT(
-          verdictRowId = 0L,
+          verdictRowId = DbAppActivityRecordStore.DUMMY_VERDICT_ROW_ID,
           roundNumber = roundNumber,
           appProviderParties = aggregatedWeights.keys.toSeq,
           appActivityWeights = aggregatedWeights.values.toSeq,
