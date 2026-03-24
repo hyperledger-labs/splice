@@ -31,8 +31,11 @@ trait ScanRewardsReferenceStore extends AppStore {
     *
     * On the other hand if round info could not be obtained for a particular record_time
     * then the Map will not contain the entry for that.
-    * This could happen when no contracts ingestion has happened in the store,
-    * or if the record_time is before the ingestion start.
+    * This could happen in two scenarios
+    * 1. If the record_time is before the ingestion start.
+    * 2. When the ingestion start could not be determined
+    *    This will happen if no contracts ingestion has happened in the archived table,
+    *    ie the store ingestion has just begun and no OpenMiningRound archival has been observed.
     */
   def lookupActiveOpenMiningRounds(
       recordTimes: Seq[CantonTimestamp]
