@@ -256,6 +256,9 @@ class SvDsoAutomationService(
             synchronizerNodeService.nodes,
             successorSynchronizerNode,
             store,
+            config.domainMigrationDumpPath.getOrElse(
+              throw new IllegalArgumentException("Domain migration dump path must be set for LSU")
+            ),
           )
         )
         registerTrigger(

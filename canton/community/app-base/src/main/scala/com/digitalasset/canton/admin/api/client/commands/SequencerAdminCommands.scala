@@ -33,6 +33,7 @@ import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, ManagedChannel}
 
+import java.io.InputStream
 import scala.concurrent.Future
 
 object SequencerAdminCommands {
@@ -251,7 +252,7 @@ object SequencerAdminCommands {
   }
 
   final case class InitializeFromLsuPredecessor(
-      topologySnapshot: ByteString,
+      topologySnapshotStream: InputStream,
       synchronizerParameters: com.digitalasset.canton.protocol.StaticSynchronizerParameters,
   ) extends GrpcAdminCommand[
         proto.InitializeSequencerFromLsuPredecessorRequest,
@@ -272,20 +273,26 @@ object SequencerAdminCommands {
     ): Future[proto.InitializeSequencerFromLsuPredecessorResponse] =
       GrpcStreamingUtils.streamToServer(
         service.initializeSequencerFromLsuPredecessor,
-        (topologySnapshot: Array[Byte]) =>
-          proto.InitializeSequencerFromLsuPredecessorRequest(
-            topologySnapshot = ByteString.copyFrom(topologySnapshot),
-            synchronizerParameters = Some(synchronizerParameters.toProtoV30),
-          ),
-        request.topologySnapshot,
+        _ => {
+          GrpcStreamingUtils.readChunkBytes(topologySnapshotStream) match {
+            case Array() => None
+            case bytes =>
+              val request = proto.InitializeSequencerFromLsuPredecessorRequest(
+                topologySnapshot = ByteString.copyFrom(bytes),
+                synchronizerParameters = Some(synchronizerParameters.toProtoV30),
+              )
+              Some(Right(request))
+          }
+        },
       )
 
     override protected def createRequest()
         : Either[String, proto.InitializeSequencerFromLsuPredecessorRequest] =
       Right(
+        // Unused, since we construct requests when streaming
         proto.InitializeSequencerFromLsuPredecessorRequest(
-          topologySnapshot = topologySnapshot,
-          synchronizerParameters = Some(synchronizerParameters.toProtoV30),
+          topologySnapshot = ByteString.EMPTY,
+          synchronizerParameters = None,
         )
       )
 

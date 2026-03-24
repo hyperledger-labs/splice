@@ -53,7 +53,6 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithIsolatedEnvironment,
@@ -74,7 +73,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.testDumpDir
+import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.{migrationTestDumpDir, testDumpDir}
 import org.lfdecentralizedtrust.splice.util.{
   DomainMigrationUtil,
   PackageQualifiedName,
@@ -87,7 +86,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger
-import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
@@ -202,7 +200,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient =
                     TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   restoreFromMigrationDump = Some(
-                    (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
+                    (migrationTestDumpDir("aliceValidator") / "domain_migration_dump.json").path
                   ),
                   domainMigrationId = 1L,
                 )
@@ -220,7 +218,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient =
                     TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
                   restoreFromMigrationDump = Some(
-                    (migrationDumpDir("splitwellValidator") / "domain_migration_dump.json").path
+                    (migrationTestDumpDir("splitwellValidator") / "domain_migration_dump.json").path
                   ),
                   onboarding = splitwellValidatorConfig.onboarding.map(onboarding =>
                     onboarding.copy(
@@ -275,7 +273,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             if (name == "aliceValidator" || name == "splitwellValidator")
               validatorConfig.copy(
                 domainMigrationDumpPath =
-                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+                  Some((migrationTestDumpDir(name) / "domain_migration_dump.json").path)
               )
             else validatorConfig
           )(conf)
@@ -288,7 +286,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 onboarding = Some(
                   DomainMigration(
                     c.onboarding.value.name,
-                    (migrationDumpDir(
+                    (migrationTestDumpDir(
                       name.stripSuffix("Local")
                     ) / "domain_migration_dump.json").path,
                   )
@@ -297,7 +295,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             } else
               c.copy(
                 domainMigrationDumpPath =
-                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+                  Some((migrationTestDumpDir(name) / "domain_migration_dump.json").path)
               )
           )(conf),
         // TODO(DACH-NY/canton-network-node#9014) Consider keeping this running and instead
@@ -616,14 +614,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   allNodes.map(_.oldParticipantConnection)
                 )
               }
-              deleteDirectoryRecursively(migrationDumpDir.toFile)
+              deleteDirectoryRecursively(testDumpDir.toFile)
             },
           ) {
 
             withClueAndLog("dump has been written in the configured location for the sv.") {
               eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
                 allNodes.foreach { node =>
-                  (migrationDumpDir(
+                  (migrationTestDumpDir(
                     node.oldBackend.name
                   ) / "domain_migration_dump.json").path.exists shouldBe true
                 }
@@ -633,7 +631,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             withClueAndLog("dump has been written in the configured location for the validator.") {
               eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
                 Seq(aliceValidatorBackend, splitwellValidatorBackend).foreach { validator =>
-                  (migrationDumpDir(
+                  (migrationTestDumpDir(
                     validator.name
                   ) / "domain_migration_dump.json").path.exists shouldBe true
                 }
@@ -1479,17 +1477,5 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       users,
       rights,
     )
-  }
-}
-
-object DecentralizedSynchronizerMigrationIntegrationTest extends OptionValues {
-  val migrationDumpDir: Path = testDumpDir.resolve(s"domain-migration-dump")
-  // Not using temp-files so test-generated outputs are easy to inspect.
-  def migrationDumpDir(node: String): Path = {
-    val dumpDir = migrationDumpDir.resolve(s"$node")
-    if (!dumpDir.toFile.exists()) {
-      dumpDir.toFile.mkdirs()
-    }
-    dumpDir
   }
 }
