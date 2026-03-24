@@ -1,8 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as glob from 'glob';
-import { config as dotenvConfig } from 'dotenv';
-import { expand } from 'dotenv-expand';
+import { config as dotenvConfig } from '@dotenvx/dotenvx';
 
 import Dict = NodeJS.Dict;
 
@@ -67,16 +66,15 @@ export class SpliceEnvConfig {
         glob.sync(`${process.env.SPLICE_ROOT}/.envrc.vars.*`)
       );
       console.error(`Loading environment variables from ${envrcs.join(', ')}`);
-      const result = expand(dotenvConfig({ path: envrcs }));
+      const result = dotenvConfig({ path: envrcs, quiet: true });
       if (result.error) {
         throw new Error(`Failed to load base config ${result.error}`);
       }
-      const overrideResult = expand(
-        dotenvConfig({
-          path: `${this.context.clusterPath()}/.envrc.vars`,
-          override: true,
-        })
-      );
+      const overrideResult = dotenvConfig({
+        path: `${this.context.clusterPath()}/.envrc.vars`,
+        overload: true,
+        quiet: true,
+      });
       if (overrideResult.error) {
         throw new Error(`Failed to load cluster config ${overrideResult.error}`);
       }
