@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.scan.config.SequencerTrafficIngestionConfig
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion
@@ -62,7 +61,7 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
             mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
               restartDelay = NonNegativeFiniteDuration.ofMillis(500)
             ),
-            sequencerTrafficIngestion = SequencerTrafficIngestionConfig(enabled = true),
+            enableAppActivityRecordAndTrafficIngestion = true,
             serveAppActivityRecordsAndTraffic = true,
           )
         )(config)

@@ -266,7 +266,7 @@ class ScanApp(
       )
       // Conditionally create traffic summary ingestion dependencies
       sequencerTrafficClientO =
-        if (config.sequencerTrafficIngestion.enabled) {
+        if (config.enableAppActivityRecordAndTrafficIngestion) {
           Some(
             new SequencerTrafficClient(
               config.sequencerAdminClient,
@@ -277,7 +277,7 @@ class ScanApp(
           )
         } else None
       appActivityRecordStoreO =
-        if (config.sequencerTrafficIngestion.enabled) {
+        if (config.enableAppActivityRecordAndTrafficIngestion) {
           Some(
             new DbAppActivityRecordStore(
               storage,
@@ -339,7 +339,7 @@ class ScanApp(
         loggerFactory,
       )
       rewardsReferenceStoreO =
-        if (config.sequencerTrafficIngestion.enabled) {
+        if (config.enableAppActivityRecordAndTrafficIngestion) {
           val rewardsStore = new DbScanRewardsReferenceStore(
             key = ScanRewardsReferenceStore.Key(
               dsoParty = dsoParty,
