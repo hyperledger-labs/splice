@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
   AppRewardCoupon,
@@ -75,7 +76,8 @@ class ScanTimeBasedIntegrationTest
               snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
               updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
               s3 = Some(s3ConfigMock),
-            )
+            ),
+            publicUrl = new Uri("http://foo.bar.com"),
           )
         )(config)
       )
@@ -617,7 +619,9 @@ class ScanTimeBasedIntegrationTest
         .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
         .createdEvents
-      val acsObjKey = getSnapshotResponse.objectRefs.head.url
+      val acsObjUrl = getSnapshotResponse.objectRefs.head.url
+      acsObjUrl should startWith("http://foo.bar.com/api/scan/v0/bulk-storage/download/")
+      val acsObjKey = acsObjUrl.stripPrefix("http://foo.bar.com/api/scan/v0/bulk-storage/download/")
       val out = new ByteArrayOutputStream()
       sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
       val acsAtMidnightFromS3 = uncompressAndDecode(

@@ -413,8 +413,12 @@ async function installValidator(
   });
 }
 
-function internalScanUrl(config: SvConfig): pulumi.Output<string> {
-  return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
+function publicScanUrl(config: SvConfig) {
+  return `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`
+}
+
+function internalScanUrl(config: SvConfig): string {
+  return `http://scan-app.${config.nodeName}:5012`;
 }
 
 function installSvApp(
@@ -468,7 +472,7 @@ function installSvApp(
         skipInitialization: svsConfig?.synchronizer?.skipInitialization,
       },
     scan: {
-      publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+      publicUrl: publicScanUrl(config),
       internalUrl: internalScanUrl(config),
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
@@ -597,6 +601,7 @@ function installScan(
           },
         }
       : {}),
+    publicUrl: publicScanUrl(config),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

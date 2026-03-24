@@ -2986,6 +2986,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
         "resources": {
           "limits": {
             "memory": "2048Mi"
@@ -3927,6 +3928,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com",
         "resources": {
           "limits": {
             "memory": "2048Mi"

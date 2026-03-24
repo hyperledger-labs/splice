@@ -373,6 +373,7 @@ class ScanApp(
         initialRound,
         externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
         config.updateHistoryMaxPageSize,
+        config.publicUrl,
       )
       scanStreamHandler = new HttpScanStreamHandler(
         config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))

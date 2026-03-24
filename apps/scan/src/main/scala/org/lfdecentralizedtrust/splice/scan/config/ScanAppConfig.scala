@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.*
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
   HttpClientConfig,
@@ -84,6 +85,7 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    publicUrl: Option[Uri] = None,
     // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
     // TODO(#4249): use on-ledger synchronization for switching record times
     externalTransactionHashThresholdTime: Option[Instant] = Some(

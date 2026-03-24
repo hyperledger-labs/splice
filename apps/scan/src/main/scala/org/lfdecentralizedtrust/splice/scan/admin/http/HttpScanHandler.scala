@@ -106,6 +106,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
@@ -142,6 +143,7 @@ class HttpScanHandler(
     initialRound: String,
     externalTransactionHashThresholdTime: Option[Instant] = None,
     updateHistoryMaxPageSize: Int,
+    publicUrl: Option[Uri],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -2349,21 +2351,28 @@ class HttpScanHandler(
             .asRuntimeException()
         )
       )(acsSnapshotBulkStorage =>
-        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
-          case AcsSnapshotObjects(ts, objects) =>
-            ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
-              definitions.ListBulkAcsSnapshotObjectsResponse(
-                Codec.encode(ts),
-                objects.map { case ObjectKeyAndChecksum(key, digest) =>
-                  definitions.BulkStorageObjectRef(
-                    // TODO(#3429): for now we return just the key, but this should be mapped to a full url in scan
-                    key,
-                    digest,
-                  )
-                }.toVector,
+        publicUrl.fold(
+          Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
+            Status.UNIMPLEMENTED
+              .withDescription("Public URL is not configured")
+              .asRuntimeException()
+          )
+        )(publicUrl =>
+          acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
+            case AcsSnapshotObjects(ts, objects) =>
+              ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
+                definitions.ListBulkAcsSnapshotObjectsResponse(
+                  Codec.encode(ts),
+                  objects.map { case ObjectKeyAndChecksum(key, digest) =>
+                    definitions.BulkStorageObjectRef(
+                      s"$publicUrl/api/scan/v0/history/bulk/download/$key",
+                      digest,
+                    )
+                  }.toVector,
+                )
               )
-            )
-        }
+          }
+        )
       )
     }
   }
