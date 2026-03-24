@@ -48,7 +48,7 @@ class AppActivityComputation(
         if (verdict.verdict != v30.VerdictResult.VERDICT_RESULT_ACCEPTED) false
         else if (summary.totalTrafficCost <= AppActivityComputation.MaxTrafficCostBytes) true
         else {
-          // Note we skip the computation to avoid integer overflows. 
+          // Note we skip the computation to avoid integer overflows.
           // This should never happen as Canton does not process 100MB transactions.
           logger.warn(
             s"Skipping app activity record at ${summary.sequencingTime}: " +
