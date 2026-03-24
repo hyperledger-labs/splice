@@ -94,6 +94,15 @@ function validateEndpointCoverage(
 function validateEffectiveRateLimits(
   args: RateLimitEnvoyFilterArgs
 ): LocalLimits<Limits> | undefined {
+  const collidingPathNames = Object.entries(args.rateLimits || {})
+    .filter(([, rl]) => rl.name === clientIpEntryKey)
+    .map(([path]) => path);
+  if (collidingPathNames.length > 0) {
+    throw new Error(
+      `${collidingPathNames.join(', ')} use reserved name ${clientIpEntryKey}; choose a different name`
+    );
+  }
+
   // Validate scan.yaml endpoint coverage
   const scanEndpoints = parseScanYamlEndpoints();
 
