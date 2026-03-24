@@ -2366,11 +2366,9 @@ class HttpScanHandler(
                 definitions.ListBulkAcsSnapshotObjectsResponse(
                   Codec.encode(ts),
                   objects.map { case ObjectKeyAndChecksum(key, digest) =>
+                    val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
                     definitions.BulkStorageObjectRef(
-                      URLEncoder.encode(
-                        s"$publicUrl/api/scan/v0/history/bulk/download/$key",
-                        StandardCharsets.UTF_8,
-                      ),
+                      s"$publicUrl/api/scan/v0/history/bulk/download/$encodedKey",
                       digest,
                     )
                   }.toVector,
