@@ -107,6 +107,12 @@ export class Auth0Fetch implements Auth0Client {
     return kc.makeApiClient(CoreV1Api);
   }
 
+  // Each Pulumi stack gets its own cache secret to avoid concurrent write races
+  // when multiple stacks (e.g., validator1, splitwell) run in parallel.
+  private get cacheSecretName(): string {
+    return `${this.cfg.fixedTokenCacheName}-${pulumi.getProject()}-${pulumi.getStack()}`;
+  }
+
   public async loadAuth0Cache(): Promise<void> {
     if (!fixedTokens()) {
       await pulumi.log.debug('Fixed tokens not enabled, skipping Auth0 cache load');
@@ -120,7 +126,7 @@ export class Auth0Fetch implements Auth0Client {
     try {
       const k8sApi = this.getK8sClient();
       const cacheSecret = await k8sApi.readNamespacedSecret({
-        name: this.cfg.fixedTokenCacheName,
+        name: this.cacheSecretName,
         namespace: 'default',
       });
 
@@ -158,40 +164,35 @@ export class Auth0Fetch implements Auth0Client {
       data[clientId] = Buffer.from(JSON.stringify(cachedToken)).toString('base64');
     }
 
+    const secretBody = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: this.cacheSecretName,
+      },
+      data,
+    };
+
     try {
       await pulumi.log.info('Attempting to create secret');
       const k8sApi = this.getK8sClient();
       await k8sApi.createNamespacedSecret({
         namespace: 'default',
-        body: {
-          apiVersion: 'v1',
-          kind: 'Secret',
-          metadata: {
-            name: this.cfg.fixedTokenCacheName,
-          },
-          data,
-        },
+        body: secretBody,
       });
     } catch (_) {
       try {
         await pulumi.log.info('Deleting existing secret');
         const k8sApi = this.getK8sClient();
         await k8sApi.deleteNamespacedSecret({
-          name: this.cfg.fixedTokenCacheName,
+          name: this.cacheSecretName,
           namespace: 'default',
         });
 
         await pulumi.log.info('Creating new secret');
         await k8sApi.createNamespacedSecret({
           namespace: 'default',
-          body: {
-            apiVersion: 'v1',
-            kind: 'Secret',
-            metadata: {
-              name: this.cfg.fixedTokenCacheName,
-            },
-            data,
-          },
+          body: secretBody,
         });
       } catch (e) {
         await pulumi.log.error(`Auth0 cache update failed: ${JSON.stringify(e)}`);
