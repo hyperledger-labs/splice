@@ -326,6 +326,18 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetMemberTrafficStatus(synchronizerId, memberId))
     }
 
+  @deprecated(message = "Use getPartyToParticipant instead", since = "0.5.17")
+  @Help.Summary(
+    "Get the id of the participant hosting a given party (fails if multiple)"
+  )
+  def getPartyToParticipantV0(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  ): ParticipantId =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
+    }
+
   @Help.Summary(
     "Get the ids of the participants hosting a given party"
   )
@@ -334,7 +346,7 @@ abstract class ScanAppReference(
       partyId: PartyId,
   ): Seq[ParticipantId] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
+      httpCommand(HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId))
     }
 
   @Help.Summary(

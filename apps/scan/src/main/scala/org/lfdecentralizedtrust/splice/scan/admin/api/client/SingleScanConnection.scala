@@ -333,7 +333,7 @@ class SingleScanConnection private[client] (
   )(implicit tc: TraceContext): Future[Seq[ParticipantId]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId),
+      HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId),
     )
   }
 

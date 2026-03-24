@@ -789,7 +789,7 @@ object HttpScanAppClient {
   case class GetPartyToParticipant(synchronizerId: SynchronizerId, partyId: PartyId)
       extends ExternalBaseCommand[
         http.GetPartyToParticipantResponse,
-        Seq[ParticipantId],
+        ParticipantId,
       ] {
 
     override def submitRequest(
@@ -807,6 +807,33 @@ object HttpScanAppClient {
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetPartyToParticipantResponse.OK(response) =>
+        for {
+          participantId <- Codec.decode(Codec.Participant)(response.participantId)
+        } yield participantId
+    }
+  }
+
+  case class GetPartyToParticipantV1(synchronizerId: SynchronizerId, partyId: PartyId)
+      extends ExternalBaseCommand[
+        http.GetPartyToParticipantV1Response,
+        Seq[ParticipantId],
+      ] {
+
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetPartyToParticipantV1Response] =
+      client.getPartyToParticipantV1(
+        synchronizerId.toProtoPrimitive,
+        partyId.toProtoPrimitive,
+        headers,
+      )
+
+    override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetPartyToParticipantV1Response.OK(response) =>
         response.participantIds.traverse(Codec.decode(Codec.Participant)(_))
     }
   }

@@ -2218,6 +2218,55 @@ class HttpScanHandler(
           topologySnapshot =
             TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
         )
+        participantId <- response.mapping.participantIds match {
+          case Seq() =>
+            Future.failed(
+              HttpErrorHandler.notFound(
+                s"No participant id found hosting party: $party"
+              )
+            )
+          case Seq(participantId) => Future.successful(participantId)
+          case _ =>
+            Future.failed(
+              HttpErrorHandler.internalServerError(
+                s"Party ${party} is hosted on multiple participants, which is not currently supported"
+              )
+            )
+        }
+      } yield definitions.GetPartyToParticipantResponse(participantId.toProtoPrimitive)
+    }
+  }
+
+  override def getPartyToParticipantV1(
+      respond: ScanResource.GetPartyToParticipantV1Response.type
+  )(
+      synchronizerId: String,
+      partyId: String,
+  )(extracted: TraceContext): Future[ScanResource.GetPartyToParticipantV1Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getPartyToParticipantV1") { _ => _ =>
+      for {
+        domain <- SynchronizerId.fromString(synchronizerId) match {
+          case Right(domain) => Future.successful(domain)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
+            )
+        }
+        party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
+            )
+        }
+        response <- sequencerAdminConnection.getPartyToParticipant(
+          domain,
+          party,
+          topologyTransactionType = AuthorizedState,
+          topologySnapshot =
+            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+        )
         _ <-
           if (response.mapping.partyId == party) Future.unit
           else
@@ -2233,7 +2282,7 @@ class HttpScanHandler(
             )
           case ids => Future.successful(ids.map(_.toProtoPrimitive).toVector)
         }
-      } yield definitions.GetPartyToParticipantResponse(participantIds)
+      } yield definitions.GetPartyToParticipantResponseV1(participantIds)
     }
   }
 
