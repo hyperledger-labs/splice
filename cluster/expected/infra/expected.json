@@ -4074,6 +4074,52 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionThreshold": {
+            "aggregations": [
+              {
+                "alignmentPeriod": "3600s",
+                "crossSeriesReducer": "REDUCE_NONE",
+                "perSeriesAligner": "ALIGN_MIN"
+              }
+            ],
+            "comparison": "COMPARISON_GT",
+            "duration": "21600s",
+            "filter": "resource.type = \"cloudsql_database\" AND metric.type = \"cloudsql.googleapis.com/database/postgresql/transaction_id_utilization\"",
+            "thresholdValue": 0.8,
+            "trigger": {
+              "count": 1
+            }
+          },
+          "displayName": "Cloud SQL Database - Transaction ID utilization mock"
+        }
+      ],
+      "displayName": "High Transaction ID Utilization in mock",
+      "notificationChannels": [
+        null
+      ]
+    },
+    "name": "txIdUtilizationAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "create": "bash SPLICE_ROOT/cluster/pulumi/infra/prometheus-crd-update.sh 0.89.0"
     },
     "name": "update-prometheus-crd-0.89.0",
