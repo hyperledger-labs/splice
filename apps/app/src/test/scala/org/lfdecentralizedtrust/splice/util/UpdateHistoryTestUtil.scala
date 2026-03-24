@@ -361,6 +361,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
           .map(com.digitalasset.canton.util.HexString.toHexString)
       case _ => None
     }
+    extTxnHash should not be empty
     extractedHash shouldBe Some(
       extTxnHash
     ) withClue "external transaction hash from Scan API for updateId did not match expected hash"

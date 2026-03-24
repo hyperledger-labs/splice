@@ -872,6 +872,8 @@ class HttpScanHandler(
                   _,
                   encoding,
                   ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
             )
             .map(toUpdateV2)
@@ -932,7 +934,13 @@ class HttpScanHandler(
         val encodedUpdateV2 = updateO
           .map(
             ScanHttpEncodings
-              .encodeUpdate(_, encoding, ScanHttpEncodings.V1)
+              .encodeUpdate(
+                _,
+                encoding,
+                ScanHttpEncodings.V1,
+                hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+              )
           )
           .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
@@ -1795,7 +1803,8 @@ class HttpScanHandler(
             txWithMigration,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
       )
@@ -2132,6 +2141,8 @@ class HttpScanHandler(
                   _,
                   encoding = definitions.DamlValueEncoding.members.ProtobufJson,
                   version = ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
               .toVector
@@ -2159,6 +2170,8 @@ class HttpScanHandler(
                   _,
                   encoding = definitions.DamlValueEncoding.members.ProtobufJson,
                   version = ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
               .toVector
