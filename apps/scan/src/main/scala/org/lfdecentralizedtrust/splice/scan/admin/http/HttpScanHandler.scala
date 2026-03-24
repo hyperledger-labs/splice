@@ -80,6 +80,8 @@ import scala.util.{Try, Using}
 import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
@@ -2365,7 +2367,7 @@ class HttpScanHandler(
                   Codec.encode(ts),
                   objects.map { case ObjectKeyAndChecksum(key, digest) =>
                     definitions.BulkStorageObjectRef(
-                      s"$publicUrl/api/scan/v0/history/bulk/download/$key",
+                      URLEncoder.encode(s"$publicUrl/api/scan/v0/history/bulk/download/$key", StandardCharsets.UTF_8),
                       digest,
                     )
                   }.toVector,
