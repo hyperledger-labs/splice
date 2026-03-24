@@ -503,7 +503,7 @@ class DbScanVerdictStore(
   /** Insert multiple verdicts, their transaction views and app activity records in a single transaction.
     *
     * Verdicts are inserted first to obtain their generated row_ids. The placeholder
-    * verdictRowId (= 0) in each pending app activity record is then resolved to the
+    * verdictRowId (= DUMMY_VERDICT_ROW_ID) in each app activity record is then resolved to the
     * actual row_id (matched by sequencingTime) before insertion.
     *
     * @param items verdicts with their transaction view constructors

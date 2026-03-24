@@ -191,7 +191,8 @@ class ScanVerdictStoreIngestion(
         }
 
         // Compute app activity records (before DB transaction).
-        // Records have verdictRowId = 0; the store resolves actual row_ids during insertion.
+        // Records have verdictRowId = DUMMY_VERDICT_ROW_ID
+        // the store resolves actual row_ids during insertion.
         appActivityRecords <- appActivityComputationO match {
           case Some(appActivityComputation) =>
             appActivityComputation.computeActivities(summariesWithVerdicts).map {

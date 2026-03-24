@@ -27,12 +27,12 @@ class AppActivityComputation(
 
   /** Compute app activity records for a batch of verdicts.
     *
-    * Records are returned with verdictRowId = 0 as a placeholder.
+    * Records are returned with verdictRowId = DUMMY_VERDICT_ROW_ID as a placeholder.
     * The caller is responsible for resolving the actual verdict row_ids
     * and patching them before insertion.
     *
     * @param summariesWithVerdicts paired traffic summaries and verdicts (pre-joined by sequencing time)
-    * @return annotated input: each pair with an optional computed activity record (verdictRowId = 0)
+    * @return annotated input: each pair with an optional computed activity record (verdictRowId = DUMMY_VERDICT_ROW_ID)
     */
   def computeActivities(
       summariesWithVerdicts: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)]
