@@ -33,7 +33,6 @@ class DbScanRewardsReferenceStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    synchronizerId: SynchronizerId,
     ingestionConfig: IngestionConfig,
     override val defaultLimit: Limit,
 )(implicit
@@ -50,7 +49,8 @@ class DbScanRewardsReferenceStore(
         party = key.dsoParty,
         participant = participantId,
         key = Map(
-          "dsoParty" -> key.dsoParty.toProtoPrimitive
+          "dsoParty" -> key.dsoParty.toProtoPrimitive,
+          "synchronizerId" -> key.synchronizerId.toProtoPrimitive,
         ),
       ),
       domainMigrationInfo = domainMigrationInfo,
@@ -65,7 +65,8 @@ class DbScanRewardsReferenceStore(
     with ScanRewardsReferenceStore {
 
   private val tcsStore = new DbTcsStore(
-    multiDomainAcsStore
+    multiDomainAcsStore,
+    descriptor => SynchronizerId.tryFromString(descriptor.key("synchronizerId")),
   )
 
   def lookupOpenMiningRoundsActiveWithin(
@@ -80,7 +81,6 @@ class DbScanRewardsReferenceStore(
       OpenMiningRound.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
-      synchronizerId,
     )
 
   def lookupFeaturedAppRightsAsOf(
@@ -88,12 +88,12 @@ class DbScanRewardsReferenceStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    tcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId)
+    tcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf)
 
   def lookupOpenMiningRoundsAsOf(
       asOf: CantonTimestamp
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    tcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId)
+    tcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf)
 }

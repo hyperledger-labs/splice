@@ -14,7 +14,7 @@ export const CloudSqlConfigSchema = z.object({
   protected: z.boolean(),
   tier: z.string(),
   enterprisePlus: z.boolean(),
-  flags: z.record(z.string()).default({
+  flags: z.record(z.string(), z.string()).default({
     random_page_cost: '1.1',
     temp_file_limit: '2147483647',
   }),

@@ -36,19 +36,19 @@ class DbScanRewardsReferenceStoreTest
         .copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
       for {
         _ <- initWithAcs()(store.multiDomainAcsStore)
-        _ <- d1.create(far1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+        _ <- sync1.create(far1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.create(far2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
+        _ <- sync1.create(far2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.create(far3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+        _ <- sync1.create(far3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.archive(far1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+        _ <- sync1.archive(far1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.archive(far3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
+        _ <- sync1.archive(far3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
           store.multiDomainAcsStore
         )
 
@@ -79,19 +79,19 @@ class DbScanRewardsReferenceStoreTest
         .copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
       for {
         _ <- initWithAcs()(store.multiDomainAcsStore)
-        _ <- d1.create(omr1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+        _ <- sync1.create(omr1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.create(omr2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
+        _ <- sync1.create(omr2, recordTime = CantonTimestamp.ofEpochSecond(200).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.create(omr3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+        _ <- sync1.create(omr3, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.archive(omr1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+        _ <- sync1.archive(omr1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
           store.multiDomainAcsStore
         )
-        _ <- d1.archive(omr3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
+        _ <- sync1.archive(omr3, recordTime = CantonTimestamp.ofEpochSecond(400).toInstant)(
           store.multiDomainAcsStore
         )
 
@@ -180,7 +180,7 @@ class DbScanRewardsReferenceStoreTest
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
-  protected val d1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
+  protected val sync1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
 
   private def mkStore(): DbScanRewardsReferenceStore = {
     val participantId = mkParticipantId("DbScanRewardsReferenceStoreTest")
@@ -192,13 +192,12 @@ class DbScanRewardsReferenceStoreTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     new DbScanRewardsReferenceStore(
-      key = ScanRewardsReferenceStore.Key(dsoParty),
+      key = ScanRewardsReferenceStore.Key(dsoParty, sync1),
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       DomainMigrationInfo(0L, None),
       participantId,
-      d1,
       IngestionConfig(),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )

@@ -22,7 +22,6 @@ async function main() {
   const auth0FetchOutput = getAuth0Config(Auth0ClientType.MAINSTACK);
 
   auth0FetchOutput.apply(async auth0Fetch => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     await auth0CacheAndInstallCluster(auth0Fetch);
   });
 }
