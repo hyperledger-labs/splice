@@ -428,7 +428,12 @@ object ConfigTransforms {
         conf
           .focus(_.synchronizerNodes.successor)
           .some
-          .modify(portTransform(bump, _))
+          .modify(
+            portTransform(bump, _)
+              .focus(_.bftSequencerConfig)
+              .some
+              .modify(_.focus(_.p2pUrl).modify(bumpUrl(bump, _)))
+          )
       )
     )
   }
@@ -696,16 +701,21 @@ object ConfigTransforms {
     )
   }
 
+  private def enableBftOnSvNode(node: SvSynchronizerNodeConfig): SvSynchronizerNodeConfig =
+    node.focus(_.sequencer).modify(_.copy(isBftSequencer = true))
+
   def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
-    config
-      .focus(_.localSynchronizerNodes.current)
-      .modify(
-        _.focus(_.sequencer).modify(
-          _.copy(
-            isBftSequencer = true
-          )
-        )
+    config.focus(_.localSynchronizerNodes.current).modify(enableBftOnSvNode)
+
+  def withBftSequencerSuccessor(config: SvAppBackendConfig): SvAppBackendConfig =
+    config.focus(_.localSynchronizerNodes.successor).modify(_.map(enableBftOnSvNode))
+
+  private def bftScanConfig(name: String, basePort: Int): Option[BftSequencerConfig] =
+    Some(
+      BftSequencerConfig(
+        s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}"
       )
+    )
 
   def withBftSequencer(
       name: String,
@@ -714,19 +724,30 @@ object ConfigTransforms {
   ): ScanAppBackendConfig =
     config
       .focus(_.synchronizerNodes.current.bftSequencerConfig)
-      .replace(
-        Some(
-          BftSequencerConfig(
-            s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}"
-          )
-        )
-      )
+      .replace(bftScanConfig(name, basePort))
 
-  def withBftSequencers(): ConfigTransform = {
-    updateAllSvAppConfigs_(withBftSequencer) compose {
-      updateAllScanAppConfigs((scan, config) => withBftSequencer(scan, config))
+  def withBftSequencerSuccessor(
+      name: String,
+      config: ScanAppBackendConfig,
+      basePort: Int = 5010,
+  ): ScanAppBackendConfig =
+    config
+      .focus(_.synchronizerNodes.successor)
+      .modify(_.map(_.focus(_.bftSequencerConfig).replace(bftScanConfig(name, basePort))))
+
+  private def withBftSequencersFor(
+      svTransform: SvAppBackendConfig => SvAppBackendConfig,
+      scanTransform: (String, ScanAppBackendConfig) => ScanAppBackendConfig,
+  ): ConfigTransform =
+    updateAllSvAppConfigs_(svTransform) compose {
+      updateAllScanAppConfigs(scanTransform)
     }
-  }
+
+  def withBftSequencers(): ConfigTransform =
+    withBftSequencersFor(withBftSequencer, withBftSequencer(_, _))
+
+  def withBftSequencersSuccessor(): ConfigTransform =
+    withBftSequencersFor(withBftSequencerSuccessor, withBftSequencerSuccessor(_, _))
 
   def withNoVoteCooldown: ConfigTransform = {
     updateAllSvAppFoundDsoConfigs_ { c =>

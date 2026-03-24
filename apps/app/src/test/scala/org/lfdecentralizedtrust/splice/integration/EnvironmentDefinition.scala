@@ -280,6 +280,9 @@ case class EnvironmentDefinition(
   def withBftSequencers: EnvironmentDefinition =
     addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
 
+  def withBftSequencersSuccessor: EnvironmentDefinition =
+    addConfigTransform((_, config) => ConfigTransforms.withBftSequencersSuccessor()(config))
+
   def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
     addConfigTransforms((_, conf) =>
       ConfigTransforms.updateAllSvAppConfigs_(config =>
