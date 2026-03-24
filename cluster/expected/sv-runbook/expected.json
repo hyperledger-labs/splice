@@ -761,7 +761,8 @@
           "fillInterval": "60s",
           "maxTokens": 10,
           "name": "acs",
-          "tokensPerFill": 5
+          "tokensPerFill": 5,
+          "type": "limited"
         },
         "/api/scan/v0/activities": {
           "name": "activities",
