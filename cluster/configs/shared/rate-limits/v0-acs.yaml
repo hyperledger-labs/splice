@@ -2,7 +2,6 @@ rateLimits:
   /api/scan/v0/acs:
     name: acs
     clientIp: true
-    limits:
-      maxTokens: 10
-      tokensPerFill: 5
-      fillInterval: 60s
+    maxTokens: 10
+    tokensPerFill: 5
+    fillInterval: 60s
