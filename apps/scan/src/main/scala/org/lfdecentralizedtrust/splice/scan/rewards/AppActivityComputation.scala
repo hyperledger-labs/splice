@@ -84,6 +84,9 @@ class AppActivityComputation(
                 // Skip activity record computation as we don't have the necessary round data ingested.
                 // This can happen for freshly onboarded SVs, but is not
                 // expected to happen once the first activity record has been computed.
+                logger.debug(
+                  s"No round data found for sequencingTime=${summary.sequencingTime}, skipping activity record computation"
+                )
                 Future.successful((summary, verdict, None))
             }
         }
@@ -145,6 +148,8 @@ class AppActivityComputation(
   ): SortedMap[String, Long] = {
     val perPartyNumerator = envelopesWithFeaturedAppConfirmers
       .foldLeft(SortedMap.empty[String, Long]) { case (acc, (envelope, featuredAppConfirmers)) =>
+        // The computations are performed using integer arithmetic for efficiency and determinism reasons.
+        // see CIP-104 for details.
         val perEnvelopeNumerator: Long =
           (envelope.trafficCost * totalConfirmationRequestTraffic) / featuredAppConfirmers.size.toLong
         featuredAppConfirmers.foldLeft(acc) { (innerAcc, party) =>

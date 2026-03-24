@@ -155,15 +155,12 @@ class DbTcsStore(
             sql"""SELECT MIN(archived_at) FROM #$archiveTableName
                   WHERE store_id = $storeId
                     AND migration_id = $migrationId
-               """.as[Option[Long]].head,
+               """.as[Option[CantonTimestamp]].head,
             "getEarliestArchivedAt",
           )
-          .map { minArchivedAtO =>
-            minArchivedAtO.map { micros =>
-              val ts = CantonTimestamp.assertFromLong(micros)
-              earliestArchivedAtCache.compareAndSet(None, Some(ts))
-              ts
-            }
+          .map { tsO =>
+            tsO.foreach(ts => earliestArchivedAtCache.compareAndSet(None, Some(ts)))
+            tsO
           }
     }
   }
