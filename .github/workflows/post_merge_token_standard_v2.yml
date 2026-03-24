@@ -1,0 +1,64 @@
+name: CI post-merge to main or release-line branches
+# TODO(#4625): remove this entire file
+on:
+  push:
+    branches:
+      - 'token-standard-v2-upcoming'
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+  pull-requests: read # Required for the static tests
+  issues: read # Required for the static tests
+  actions: write # Required for the cancel_if_not_opt_in job
+
+jobs:
+  publish_docs:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          submodules: "recursive"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup
+        id: setup
+        uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
+        with:
+          test_name: docs
+          save_nix_cache: true
+          save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          target: 'oss'
+          upload_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}
+          upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
+
+      - name: Build docs
+        uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          # We Test/compile here as the docs job is the one that pushes to the SBT cache
+          # as it finishes fastest and we want to ensure that it includes test sources.
+          cmd: "Test/compile docs/bundle"
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        if: github.event_name == 'push'
+        with:
+          path: docs/html/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@854d7aa1b99e4509c4d1b53d69b7ba4eaf39215a
