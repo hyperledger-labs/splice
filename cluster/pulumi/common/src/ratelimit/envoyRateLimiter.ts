@@ -11,6 +11,10 @@ interface Limits {
   fillInterval: string;
 }
 
+interface MatchedLimits extends Limits {
+  clientIp: boolean;
+}
+
 interface Banned {
   type: 'banned';
 }
@@ -19,7 +23,7 @@ interface Unlimited {
   type: 'unlimited';
 }
 
-type RateLimitConfig = Limits | Banned | Unlimited;
+type RateLimitConfig = MatchedLimits | Banned | Unlimited;
 
 export interface PathPrefixInfo {
   pathPrefix: string;
@@ -30,11 +34,9 @@ interface LocalLimits<L> {
   [pathPrefix: string]: LocalLimit<L>;
 }
 
-interface LocalLimit<L> {
+type LocalLimit<L> = {
   name: string;
-  clientIp: boolean;
-  limits: L;
-}
+} & L;
 
 // This is arbitrary, but must not match any limit `name` used for an EnvoyFilter
 // above. All existing manual YAML entries use 'client_ip' so this is the nicest
@@ -68,7 +70,7 @@ export function extractPathPrefixes(
 
   return Object.entries(rateLimits)
     .map(([pathPrefix, rl]) => {
-      const isBanned = 'type' in rl.limits && rl.limits.type === 'banned';
+      const isBanned = 'type' in rl && rl.type === 'banned';
       return { pathPrefix, isBanned };
     })
     .filter(info => info.pathPrefix.startsWith('/api/scan'));
@@ -93,7 +95,7 @@ function validateEndpointCoverage(
 
 function validateEffectiveRateLimits(
   args: RateLimitEnvoyFilterArgs
-): LocalLimits<Limits> | undefined {
+): LocalLimits<MatchedLimits> | undefined {
   const collidingPathNames = Object.entries(args.rateLimits || {})
     .filter(([, rl]) => rl.name === clientIpEntryKey)
     .map(([path]) => path);
@@ -129,13 +131,15 @@ function validateEffectiveRateLimits(
 
   // Filter out banned and unlimited entries
   return Object.fromEntries(
-    Object.entries(args.rateLimits || {}).filter((ent): ent is [string, LocalLimit<Limits>] => {
-      // TODO (#4201): in banned case, implement actual banning with special short-circuit for whitelisted IPs
-      // Currently skipping banned endpoints instead of setting 0/0 limits
-      // in unlimited case, we fall back to globalRateLimit so don't need a rule
-      const [, rl] = ent;
-      return !('type' in rl.limits);
-    })
+    Object.entries(args.rateLimits || {}).filter(
+      (ent): ent is [string, LocalLimit<MatchedLimits>] => {
+        // TODO (#4201): in banned case, implement actual banning with special short-circuit for whitelisted IPs
+        // Currently skipping banned endpoints instead of setting 0/0 limits
+        // in unlimited case, we fall back to globalRateLimit so don't need a rule
+        const [, rl] = ent;
+        return !('type' in rl);
+      }
+    )
   );
 }
 
@@ -300,9 +304,9 @@ proxyStatsMatcher:
                             ...(rateLimit.clientIp ? [{ key: clientIpEntryKey }] : []),
                           ],
                           token_bucket: {
-                            max_tokens: rateLimit.limits.maxTokens,
-                            tokens_per_fill: rateLimit.limits.tokensPerFill,
-                            fill_interval: rateLimit.limits.fillInterval,
+                            max_tokens: rateLimit.maxTokens,
+                            tokens_per_fill: rateLimit.tokensPerFill,
+                            fill_interval: rateLimit.fillInterval,
                           },
                         };
                       }),
