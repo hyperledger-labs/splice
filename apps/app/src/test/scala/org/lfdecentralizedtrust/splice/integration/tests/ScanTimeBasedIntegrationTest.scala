@@ -77,7 +77,7 @@ class ScanTimeBasedIntegrationTest
               updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
               s3 = Some(s3ConfigMock),
             ),
-            publicUrl = new Uri("http://foo.bar.com"),
+            publicUrl = Uri.create("http://foo.bar.com"),
           )
         )(config)
       )
