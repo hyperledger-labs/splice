@@ -48,6 +48,8 @@ class AppActivityComputation(
         if (verdict.verdict != v30.VerdictResult.VERDICT_RESULT_ACCEPTED) false
         else if (summary.totalTrafficCost <= AppActivityComputation.MaxTrafficCostBytes) true
         else {
+          // Note we skip the computation to avoid integer overflows. 
+          // This should never happen as Canton does not process 100MB transactions.
           logger.warn(
             s"Skipping app activity record at ${summary.sequencingTime}: " +
               s"totalTrafficCost ${summary.totalTrafficCost} exceeds maximum ${AppActivityComputation.MaxTrafficCostBytes}"
@@ -79,6 +81,8 @@ class AppActivityComputation(
                   )
                 }
               case None =>
+                // Skip activity record computation as we don't have the necessary round data ingested.
+                // This can happen for freshly onboarded SVs, but is not expected to happen once the first activity record has been computed.
                 Future.successful((summary, verdict, None))
             }
         }

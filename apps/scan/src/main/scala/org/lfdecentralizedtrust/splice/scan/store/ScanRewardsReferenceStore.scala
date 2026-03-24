@@ -26,7 +26,7 @@ trait ScanRewardsReferenceStore extends AppStore {
 
   /** For a batch of record times, resolve the oldest open mining round at each time.
     * Returns map from record_time to (roundNumber, roundOpensAt).
-    * This will block till the round info could be obtained for record_times
+    * This will wait till the round info could be obtained for record_times
     * which are yet to be ingested.
     *
     * On the other hand if round info could not be obtained for a particular record_time
