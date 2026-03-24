@@ -4,10 +4,13 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.config.S3Config
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
@@ -27,7 +30,8 @@ import scala.jdk.FutureConverters.*
 class S3BucketConnection(
     s3Config: S3Config,
     val loggerFactory: NamedLoggerFactory,
-) extends NamedLogging {
+) extends NamedLogging
+    with LimitHelpers {
 
   val s3Client = S3AsyncClient
     .builder()
@@ -65,8 +69,39 @@ class S3BucketConnection(
       .mapConcat(_.contents().asScala)
   }
 
-  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+  def listObjects(
+      prefix: String,
+      keyFilter: String => Boolean,
+      limit: Limit,
+  )(implicit tc: TraceContext, ec: ExecutionContext, as: ActorSystem): Future[Seq[ObjectKeyAndChecksum]] = {
+    val ord: Ordering[S3Object] = Ordering.by((a: S3Object) => a.key())
+    val listRequest = ListObjectsV2Request
+      .builder()
+      .bucket(bucketName)
+      .prefix(prefix)
+      .maxKeys(limit.maxPageSize)
+      .build();
+    Source
+      .fromPublisher(
+        s3Client.listObjectsV2Paginator(listRequest)
+      )
+      .fold(Seq.empty[S3Object])((acc, page) => {
+        val filteredPage = page.contents().asScala.filter(obj => keyFilter(obj.key()))
+        applyLimit(
+          "listObjectsSource",
+          limit,
+          (acc ++ filteredPage).sorted(ord),
+        )
+      })
+      .mapConcat(_.toList)
+      .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
+        readChecksum(obj.key)
+          .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
+      }
+      .runWith(Sink.seq[ObjectKeyAndChecksum])
+  }
 
+  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
     val headRequest = HeadObjectRequest
       .builder()
       .bucket(bucketName)
@@ -219,4 +254,10 @@ object S3BucketConnection {
       loggerFactory,
     )
   }
+
+  case class ObjectKeyAndChecksum(
+      key: String,
+      checksum: String,
+  )
+
 }

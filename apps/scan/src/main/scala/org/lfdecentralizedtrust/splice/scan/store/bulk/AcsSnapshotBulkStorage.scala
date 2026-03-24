@@ -17,17 +17,10 @@ import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
-  AcsSnapshotObjects,
-  ObjectKeyAndChecksum,
-}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryMetrics,
-  S3BucketConnection,
-  TimestampWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
+import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, Limit, S3BucketConnection, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -200,14 +193,19 @@ class AcsSnapshotBulkStorage(
         }
       prefix = storageConfig.findSegmentFolderPrefixByStartTimestamp(snapshotTs)
       objects <- s3Connection
-        .listObjectsSource(prefix)
-        .filter(_.key.matches(".*ACS_\\d+\\.zstd"))
-        .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
-          s3Connection
-            .readChecksum(obj.key)
-            .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
-        }
-        .runWith(Sink.seq[ObjectKeyAndChecksum])
+        // A single object currently holds ~700K contracts, we apply a Limit just for safety,
+        // but we don't expect to get anywhere near 1000 such objects in the foreseeable future
+        // (hence the HardLimit, just as a safety precaution).
+        .listObjects(
+          prefix,
+          _.matches(".*ACS_\\d+\\.zstd"),
+          HardLimit.tryCreate(Limit.DefaultMaxPageSize))
+//        .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
+//          s3Connection
+//            .readChecksum(obj.key)
+//            .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
+//        }
+//        .runWith(Sink.seq[ObjectKeyAndChecksum])
 
     } yield {
       if (objects.isEmpty) {
@@ -231,10 +229,10 @@ object AcsSnapshotBulkStorage {
   //  S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the
   //  size of the return). we'll do that in a coming PR, when we add support for querying the bulk storage
   //  for updates as well.
-  case class ObjectKeyAndChecksum(
-      key: String,
-      checksum: String,
-  )
+//  case class ObjectKeyAndChecksum(
+//      key: String,
+//      checksum: String,
+//  )
 
   case class AcsSnapshotObjects(
       timestamp: CantonTimestamp,
