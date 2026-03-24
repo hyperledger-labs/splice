@@ -127,14 +127,14 @@ class DbAppActivityRecordStoreTest
         verdict1 = mkVerdict(verdictStore, "update-combined-1", baseTs)
         verdict2 = mkVerdict(verdictStore, "update-combined-2", baseTs.plusSeconds(1L))
 
-        pendingAppActivity = Seq(
+        appActivityRecords = Seq(
           baseTs -> mkRecord(0L, 10L, Seq("app1::provider"), Seq(100L)),
           baseTs.plusSeconds(1L) -> mkRecord(0L, 11L, Seq("app2::provider"), Seq(200L)),
         )
 
         _ <- verdictStore.insertVerdictsWithAppActivityRecords(
           Seq(verdict1 -> noViews, verdict2 -> noViews),
-          pendingAppActivity,
+          appActivityRecords,
         )
 
         // Verify verdicts were inserted
@@ -158,7 +158,7 @@ class DbAppActivityRecordStoreTest
       }
     }
 
-    "insert verdicts without activity records when pendingAppActivity is empty" in {
+    "insert verdicts without activity records when appActivityRecords is empty" in {
       for {
         (_, verdictStore) <- newStores()
         baseTs = CantonTimestamp.now()
@@ -188,14 +188,14 @@ class DbAppActivityRecordStoreTest
         verdict2 = mkVerdict(verdictStore, "update-without", baseTs.plusSeconds(1L))
         verdict3 = mkVerdict(verdictStore, "update-with-2", baseTs.plusSeconds(2L))
 
-        pendingAppActivity = Seq(
+        appActivityRecords = Seq(
           baseTs -> mkRecord(0L, 10L, Seq("app1::provider"), Seq(100L)),
           baseTs.plusSeconds(2L) -> mkRecord(0L, 12L, Seq("app3::provider"), Seq(300L)),
         )
 
         _ <- verdictStore.insertVerdictsWithAppActivityRecords(
           Seq(verdict1 -> noViews, verdict2 -> noViews, verdict3 -> noViews),
-          pendingAppActivity,
+          appActivityRecords,
         )
 
         v1 <- verdictStore.getVerdictByUpdateId("update-with-1")
@@ -235,13 +235,13 @@ class DbAppActivityRecordStoreTest
 
         // Activity record has a timestamp that doesn't match any verdict
         unmatchedTs = baseTs.plusSeconds(999L)
-        pendingAppActivity = Seq(
+        appActivityRecords = Seq(
           unmatchedTs -> mkRecord(0L, 42L, Seq("orphan::provider"), Seq(300L))
         )
 
         _ <- verdictStore.insertVerdictsWithAppActivityRecords(
           Seq(verdict -> noViews),
-          pendingAppActivity,
+          appActivityRecords,
         )
 
         v <- verdictStore.getVerdictByUpdateId("update-mismatch")

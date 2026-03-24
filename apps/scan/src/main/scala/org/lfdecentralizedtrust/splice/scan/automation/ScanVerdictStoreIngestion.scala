@@ -192,7 +192,7 @@ class ScanVerdictStoreIngestion(
 
         // Compute app activity records (before DB transaction).
         // Records have verdictRowId = 0; the store resolves actual row_ids during insertion.
-        pendingAppActivity <- appActivityComputationO match {
+        appActivityRecords <- appActivityComputationO match {
           case Some(appActivityComputation) =>
             appActivityComputation.computeActivities(summariesWithVerdicts).map {
               _.flatMap { case (summary, _, recordO) =>
@@ -202,8 +202,8 @@ class ScanVerdictStoreIngestion(
           case None => Future.successful(Seq.empty)
         }
 
-        _ <- store.insertVerdictsWithAppActivityRecords(items, pendingAppActivity)
-      } yield (trafficSummaries.size, pendingAppActivity.size)
+        _ <- store.insertVerdictsWithAppActivityRecords(items, appActivityRecords)
+      } yield (trafficSummaries.size, appActivityRecords.size)
 
       result.transform {
         case Success((trafficSummaryCount, appActivityCount)) =>

@@ -507,22 +507,22 @@ class DbScanVerdictStore(
     * actual row_id (matched by sequencingTime) before insertion.
     *
     * @param items verdicts with their transaction view constructors
-    * @param pendingAppActivity pre-computed activity records paired with their sequencingTime;
-    *                           each record has verdictRowId = 0 as a placeholder
+    * @param appActivityRecords pre-computed activity records paired with their sequencingTime;
+    *                           each record has verdictRowId = DUMMY_VERDICT_ROW_ID as a placeholder
     */
   def insertVerdictsWithAppActivityRecords(
       items: Seq[(VerdictT, Long => Seq[TransactionViewT])],
-      pendingAppActivity: Seq[(CantonTimestamp, AppActivityRecordT)],
+      appActivityRecords: Seq[(CantonTimestamp, AppActivityRecordT)],
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
     val combinedAction = for {
       rowIdByTime <- insertVerdictAndTransactionViewsDBIO(items)
-      // Resolve placeholder verdictRowId (= 0) to actual row_ids from the inserted verdicts
-      appActivityRecords = pendingAppActivity.flatMap { case (sequencingTime, record) =>
+      // Resolve placeholder verdictRowId to actual row_ids from the inserted verdicts
+      resolvedAppActivityRecords = appActivityRecords.flatMap { case (sequencingTime, record) =>
         rowIdByTime.get(sequencingTime).map(rowId => record.copy(verdictRowId = rowId))
       }
-      _ <- insertAppActivityRecordsDBIO(appActivityRecords)
+      _ <- insertAppActivityRecordsDBIO(resolvedAppActivityRecords)
     } yield ()
 
     futureUnlessShutdownToFuture(
