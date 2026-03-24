@@ -2367,7 +2367,10 @@ class HttpScanHandler(
                   Codec.encode(ts),
                   objects.map { case ObjectKeyAndChecksum(key, digest) =>
                     definitions.BulkStorageObjectRef(
-                      URLEncoder.encode(s"$publicUrl/api/scan/v0/history/bulk/download/$key", StandardCharsets.UTF_8),
+                      URLEncoder.encode(
+                        s"$publicUrl/api/scan/v0/history/bulk/download/$key",
+                        StandardCharsets.UTF_8,
+                      ),
                       digest,
                     )
                   }.toVector,
