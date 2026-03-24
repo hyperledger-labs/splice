@@ -22,6 +22,7 @@ let
     circleci-cli
     curl
     docker
+    duckdb
     evans
     geckodriver
     getopt
