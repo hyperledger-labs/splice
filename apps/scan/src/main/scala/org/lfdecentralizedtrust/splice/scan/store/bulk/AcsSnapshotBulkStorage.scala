@@ -200,13 +200,6 @@ class AcsSnapshotBulkStorage(
           prefix,
           _.matches(".*ACS_\\d+\\.zstd"),
           HardLimit.tryCreate(Limit.DefaultMaxPageSize))
-//        .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
-//          s3Connection
-//            .readChecksum(obj.key)
-//            .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
-//        }
-//        .runWith(Sink.seq[ObjectKeyAndChecksum])
-
     } yield {
       if (objects.isEmpty) {
         throw Status.NOT_FOUND
@@ -225,18 +218,8 @@ class AcsSnapshotBulkStorage(
 }
 
 object AcsSnapshotBulkStorage {
-  // TODO(#3429): we probably want to move this case class and part of the pipeline in getAcsSnapshotAtOrBefore to
-  //  S3BucketConnection, to reuse with the updates workflow (but there we'll need to be careful with the
-  //  size of the return). we'll do that in a coming PR, when we add support for querying the bulk storage
-  //  for updates as well.
-//  case class ObjectKeyAndChecksum(
-//      key: String,
-//      checksum: String,
-//  )
-
   case class AcsSnapshotObjects(
       timestamp: CantonTimestamp,
       objects: Seq[ObjectKeyAndChecksum],
   )
-
 }
