@@ -6,7 +6,7 @@
 .. _splice-token-standard-test-v1-docs:
 
 splice-token-standard-test-v1 docs
-===============================
+==================================
 
 Copy the code of this package from https://github.com/hyperledger-labs/splice
 to gain access to test infrastructure for:
