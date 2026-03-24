@@ -507,7 +507,9 @@ object SpliceTests extends LazyLogging {
     protected def stopAllAsync(
         nodes: AppBackendReference*
     )(implicit ec: ExecutionContext): Future[Unit] = {
-      MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes.toSeq)(node => Future { node.stop() }).map(_ => ())
+      MonadUtil
+        .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes.toSeq)(node => Future { node.stop() })
+        .map(_ => ())
     }
 
     def registerHttpConnectionPoolsCleanup(implicit

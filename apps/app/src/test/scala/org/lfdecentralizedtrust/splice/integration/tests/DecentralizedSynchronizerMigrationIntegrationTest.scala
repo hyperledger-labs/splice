@@ -700,19 +700,22 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             val namespaceChangeResult =
               withClueAndLog("decentralized namespace can be modified on the new domain") {
-                MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(majorityUpgradeNodes) { upgradeNode =>
-                  val connection = upgradeNode.newParticipantConnection
-                  for {
-                    result <- connection
-                      .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                        "keep just sv1",
-                        decentralizedSynchronizerId,
-                        dsoPartyDecentralizedNamespace,
-                        _ => NonEmpty(Set, sv1Party.uid.namespace),
-                        RetryFor.WaitingOnInitDependency,
-                      )
-                  } yield result
-                }.futureValue
+                MonadUtil
+                  .parTraverseWithLimit(PositiveInt.tryCreate(4))(majorityUpgradeNodes) {
+                    upgradeNode =>
+                      val connection = upgradeNode.newParticipantConnection
+                      for {
+                        result <- connection
+                          .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                            "keep just sv1",
+                            decentralizedSynchronizerId,
+                            dsoPartyDecentralizedNamespace,
+                            _ => NonEmpty(Set, sv1Party.uid.namespace),
+                            RetryFor.WaitingOnInitDependency,
+                          )
+                      } yield result
+                  }
+                  .futureValue
               }
 
             withClueAndLog("migrate the late joining node") {

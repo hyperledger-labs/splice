@@ -57,7 +57,11 @@ class SvTimeBasedOnboardingIntegrationTest
         val sv2and3OnboardingRequestTriggers =
           Seq(sv2Backend, sv3Backend).map(_.dsoAutomation.trigger[SvOnboardingRequestTrigger])
 
-        MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(2))(sv2and3OnboardingRequestTriggers)(_.pause()).futureValue
+        MonadUtil
+          .parTraverseWithLimit_(PositiveInt.tryCreate(2))(sv2and3OnboardingRequestTriggers)(
+            _.pause()
+          )
+          .futureValue
         // We now need 2 confirmations to execute an action, but only sv1 will confirm to onboard sv4.
         clue("SV4 starts") {
           sv4ValidatorBackend.start()

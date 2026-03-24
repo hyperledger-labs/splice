@@ -87,12 +87,16 @@ class AnsIntegrationTest
 
       // Concurrently, request an entry as alice and bob
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(2))(Seq(
-          aliceRefs,
-          bobRefs,
-        )) { ref =>
-          Future { requestAndPayForEntry(ref, testEntryName) }
-        }.futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(40, "seconds"))),
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(2))(
+            Seq(
+              aliceRefs,
+              bobRefs,
+            )
+          ) { ref =>
+            Future { requestAndPayForEntry(ref, testEntryName) }
+          }
+          .futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(40, "seconds"))),
         lines => {
           forAll(lines) { line =>
             line.message should (include(s"entry already exists and owned by") or include(

@@ -806,7 +806,11 @@ class WalletIntegrationTest
       actAndCheck(
         "Create duplicate TransferPreapprovalProposals directly via the ledger API", {
           val proposalCids =
-            MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(5))((1 to 5).toList)(_ => Future(createTransferPreapprovalProposal)).futureValue
+            MonadUtil
+              .parTraverseWithLimit(PositiveInt.tryCreate(5))((1 to 5).toList)(_ =>
+                Future(createTransferPreapprovalProposal)
+              )
+              .futureValue
           proposalCids.toSet.size shouldBe proposalCids.size
         },
       )(

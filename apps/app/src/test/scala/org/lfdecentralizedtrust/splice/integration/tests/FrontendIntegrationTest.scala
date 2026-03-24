@@ -299,33 +299,38 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   protected def stopWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Stopping web drivers")
     // We process all browsers in parallel, for faster test termination.
-    MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) { webDriver =>
-      Future {
-        webDriver.quit()
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) { webDriver =>
+        Future {
+          webDriver.quit()
+        }
       }
-    }.futureValue
+      .futureValue
     logger.info("Stopped web drivers")
   }
 
   protected def clearWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Clearing web drivers")
     eventually(60.seconds) {
-      MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) { implicit webDriver =>
-        Future {
-          // Reset session storage so we see the login window again.
-          // You cannot reset session storage of about:blank so
-          // we exclude this.
-          if (currentUrl != "about:blank") {
-            webDriver.getSessionStorage().clear()
-            eventually() {
-              webDriver
-                .getSessionStorage()
-                .keySet
-                .asScala shouldBe empty withClue "webDriver sessionStorage"
+      MonadUtil
+        .parTraverseWithLimit(PositiveInt.tryCreate(4))(webDrivers.values.toList) {
+          implicit webDriver =>
+            Future {
+              // Reset session storage so we see the login window again.
+              // You cannot reset session storage of about:blank so
+              // we exclude this.
+              if (currentUrl != "about:blank") {
+                webDriver.getSessionStorage().clear()
+                eventually() {
+                  webDriver
+                    .getSessionStorage()
+                    .keySet
+                    .asScala shouldBe empty withClue "webDriver sessionStorage"
+                }
+              }
             }
-          }
         }
-      }.futureValue
+        .futureValue
     }
     logger.info("Cleared web drivers")
   }

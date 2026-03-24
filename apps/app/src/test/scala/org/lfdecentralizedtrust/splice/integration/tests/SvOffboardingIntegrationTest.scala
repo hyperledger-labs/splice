@@ -192,7 +192,11 @@ class SvOffboardingIntegrationTest
         }
       }
       withClue("pause offboarding triggers") {
-        MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(cantonMediatorSequencerTriggers)(_.pause()).futureValue
+        MonadUtil
+          .parTraverseWithLimit_(PositiveInt.tryCreate(4))(cantonMediatorSequencerTriggers)(
+            _.pause()
+          )
+          .futureValue
       }
 
       actAndCheck(

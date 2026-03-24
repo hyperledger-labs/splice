@@ -169,21 +169,29 @@ class DistributedDomainIntegrationTest
         clue(
           s"un-pause decentralized synchronizer to not crash other tests"
         ) {
-          MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            Future {
-              sv.unpauseDecentralizedSynchronizer()
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+              Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+            ) { sv =>
+              Future {
+                sv.unpauseDecentralizedSynchronizer()
+              }
             }
-          }.futureValue
+            .futureValue
         }
       },
     ) {
       actAndCheck(
         "SVs can pause the decentralizedSynchronizer",
-        MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-          Future {
-            sv.pauseDecentralizedSynchronizer()
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+          ) { sv =>
+            Future {
+              sv.pauseDecentralizedSynchronizer()
+            }
           }
-        }.futureValue,
+          .futureValue,
       )(
         "decentralizedSynchronizer is paused",
         _ =>
@@ -199,11 +207,15 @@ class DistributedDomainIntegrationTest
 
       actAndCheck(
         "SVs can unpause the decentralizedSynchronizer",
-        MonadUtil.parTraverseWithLimit(PositiveInt.tryCreate(4))(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-          Future {
-            sv.unpauseDecentralizedSynchronizer()
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+          ) { sv =>
+            Future {
+              sv.unpauseDecentralizedSynchronizer()
+            }
           }
-        }.futureValue,
+          .futureValue,
       )(
         "decentralizedSynchronizer is un-paused",
         _ =>
