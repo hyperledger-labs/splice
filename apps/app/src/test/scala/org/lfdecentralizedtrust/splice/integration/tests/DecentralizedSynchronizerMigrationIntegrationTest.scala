@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import better.files.File.apply
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.SynchronizerAlias

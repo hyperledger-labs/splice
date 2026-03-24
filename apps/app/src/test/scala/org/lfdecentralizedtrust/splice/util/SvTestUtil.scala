@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.daml.ledger.javaapi.data.Transaction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice

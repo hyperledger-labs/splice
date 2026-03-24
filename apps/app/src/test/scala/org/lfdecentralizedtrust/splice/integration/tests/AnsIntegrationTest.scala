@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.daml.ledger.javaapi.data.Identifier
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver

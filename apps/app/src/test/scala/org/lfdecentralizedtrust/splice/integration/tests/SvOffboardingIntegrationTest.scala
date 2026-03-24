@@ -34,6 +34,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
   pauseAllDsoDelegateTriggers,
   resumeAllDsoDelegateTriggers,
