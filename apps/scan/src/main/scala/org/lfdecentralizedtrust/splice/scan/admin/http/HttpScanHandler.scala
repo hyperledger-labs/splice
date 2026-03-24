@@ -2412,7 +2412,7 @@ class HttpScanHandler(
         case None =>
           ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
             ErrorResponse(
-              s"Activity totals not yet computed for round $roundNumber"
+              s"Activity totals not (yet) computed for round $roundNumber"
             )
           )
         case Some(roundTotal) =>
