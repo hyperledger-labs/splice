@@ -482,7 +482,7 @@ class DbScanAppRewardsStore(
     * TODO(#4384): Will be extended to run CC conversion (stage 2) and
     * Merkle tree hashing (stage 3) in a single transaction.
     */
-  def computeRewards(
+  def computeAndStoreRewards(
       roundNumber: Long
   )(implicit tc: TraceContext): Future[Unit] =
     aggregateActivityTotals(roundNumber)

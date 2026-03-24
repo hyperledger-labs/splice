@@ -24,7 +24,7 @@ trait ScanAppRewardsStore {
     * MUST only be called on rounds for which all app activity records have
     * been ingested and for which the reward information has not yet been computed.
     */
-  def computeRewards(roundNumber: Long)(implicit
+  def computeAndStoreRewards(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Unit]
 }
