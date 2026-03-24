@@ -300,26 +300,9 @@ async function installSvAndValidator(
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities: approvedSvIdentities(),
-    ...(!decentralizedSynchronizerMigrationConfig.lsuEnabled
-      ? {
-          domain: {
-            ...(valuesFromYamlFile.domain || {}),
-            ...(commonSvAppValues.domain || {}),
-          },
-          cometBFT: {
-            ...(valuesFromYamlFile.cometBFT || {}),
-            ...(commonSvAppValues.cometBFT || {}),
-          },
-        }
-      : {}),
     migration: {
       ...valuesFromYamlFile.migration,
-      migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
-        ? true
-        : valuesFromYamlFile.migration.migrating,
-      ...(decentralizedSynchronizerMigrationConfig.lsuEnabled
-        ? { id: decentralizedSynchronizerMigrationConfig.activeMigrationId }
-        : {}),
+      ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig().migration,
     },
     metrics: {
       enable: true,

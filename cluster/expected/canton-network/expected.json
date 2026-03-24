@@ -2978,7 +2978,7 @@
         "migration": {
           "id": 2
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -3124,14 +3124,12 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "cometBFT": {},
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
         "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
-        "domain": {
-          "skipInitialization": true
-        },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
           {
@@ -3192,7 +3190,7 @@
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "periodicTopologySnapshotConfig": {
           "backupInterval": "12h",
           "location": {
@@ -3254,6 +3252,7 @@
             },
             "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
           },
+          "skipInitialization": true,
           "successor": {
             "enableBftSequencer": true,
             "mediatorAddress": "global-domain-4-mediator",
@@ -3354,7 +3353,7 @@
           "id": 2
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -3945,7 +3944,7 @@
         "migration": {
           "id": 2
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "scan_sv_da_1",
           "port": 5432,
@@ -4095,15 +4094,13 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "cometBFT": {},
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
         "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
-        "domain": {
-          "skipInitialization": true
-        },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
         "failOnAppVersionMismatch": true,
@@ -4135,7 +4132,7 @@
         "nodeIdentifier": "Digital-Asset-1",
         "onboardingName": "Digital-Asset-1",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_da_1",
@@ -4186,6 +4183,7 @@
             },
             "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com"
           },
+          "skipInitialization": true,
           "successor": {
             "enableBftSequencer": true,
             "mediatorAddress": "global-domain-4-mediator",
@@ -4290,7 +4288,7 @@
           "id": 2
         },
         "nodeIdentifier": "Digital-Asset-1",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

@@ -90,6 +90,9 @@ export function valuesForSvApp(
   const synchronizerDomainValues: { domain?: object; synchronizers?: object } = lsuEnabled
     ? {
         synchronizers: {
+          ...(config.skipInitialization !== undefined
+            ? { skipInitialization: config.skipInitialization }
+            : {}),
           current: localSynchronizerNodeValues(
             synchronizerNodes.active,
             decentralizedSynchronizerMigrationConfig.active,
@@ -120,29 +123,22 @@ export function valuesForSvApp(
               }
             : {}),
         },
-        ...(config.skipInitialization !== undefined
-          ? { domain: { skipInitialization: config.skipInitialization } }
-          : {}),
       }
     : {
         domain: {
           ...(config.pruning?.sequencer
             ? { sequencerPruningConfig: config.pruning.sequencer }
             : {}),
-          ...(useCantonBft ? { enableBftSequencer: true } : {}),
           sequencerAddress: synchronizerNodes.active.namespaceInternalSequencerAddress,
           mediatorAddress: synchronizerNodes.active.namespaceInternalMediatorAddress,
           sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${ingressName}.${CLUSTER_HOSTNAME}`,
-          ...(config.skipInitialization !== undefined
-            ? { skipInitialization: config.skipInitialization }
-            : {}),
         },
       };
 
   // if you add a top level field here that is an object make sure to handle merging it in the caller
   return {
     ...(lsuEnabled || useCantonBft
-      ? {}
+      ? { cometBFT: {} }
       : {
           cometBFT: {
             enabled: true,

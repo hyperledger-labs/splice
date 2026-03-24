@@ -1,15 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.util.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.console.ValidatorAppClientReference
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
+import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebElement
 
@@ -457,13 +458,26 @@ abstract class ValidatorPreflightIntegrationTestBase
           case Seq(DomainSequencers(_, connections)) => connections
         }
         connections should not be empty withClue "sequencer connections"
-        val latestMigrationId = connections.map(_.migrationId).max
-        val availableConnections = connections.filter(connection =>
-          connection.migrationId == latestMigrationId &&
-            connection.url != "" &&
-            // added 60s grace period for the polling trigger interval 30s + other latency
-            env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
-        )
+
+        def isAvailable(connection: HttpScanAppClient.DsoSequencer) = {
+          // added 60s grace period for the polling trigger interval 30s + other latency
+          env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
+        }
+
+        val availableConnections = if (connections.exists(_.serial.nonEmpty)) {
+          val latestMigrationId = connections.map(_.migrationId).max
+          connections.filter(connection =>
+            connection.migrationId == latestMigrationId &&
+              connection.url != "" &&
+              isAvailable(connection)
+          )
+        } else {
+          val serial = connections.flatMap(_.serial).max
+          connections.filter(connection =>
+            connection.serial.contains(serial) &&
+              isAvailable(connection)
+          )
+        }
         val (expectedSequencerConnections, _) =
           Endpoint
             .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)

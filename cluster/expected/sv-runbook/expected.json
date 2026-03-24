@@ -578,7 +578,7 @@
         "migration": {
           "id": 2
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
@@ -1538,16 +1538,10 @@
           "audience": "https://sv.example.com/api",
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
-        "cometBFT": {
-          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-          "enabled": true
-        },
+        "cometBFT": {},
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
-        "domain": {
-          "skipInitialization": true
-        },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
@@ -1568,11 +1562,12 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 2,
+          "migrating": false
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "permissionedSynchronizer": false,
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
@@ -1619,6 +1614,7 @@
             },
             "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com"
           },
+          "skipInitialization": true,
           "successor": {
             "enableBftSequencer": true,
             "mediatorAddress": "global-domain-4-mediator",
@@ -1922,7 +1918,7 @@
           "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
