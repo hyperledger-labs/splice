@@ -41,11 +41,12 @@ jobs:
           # as it finishes fastest and we want to ensure that it includes test sources.
           cmd: "Test/compile docs/bundle"
 
-      - name: Upload documentation artifacts
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        with:
-          path: docs/html/html
+#      TODO(#4625): restore this
+#      - name: Upload documentation artifacts
+#        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+#        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+#        with:
+#          path: docs/html/html
 
       - name: Post-SBT job
         uses: ./splice-shared-gha/.github/actions/sbt/post_sbt
