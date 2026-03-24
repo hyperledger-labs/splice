@@ -19,7 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Trigger that drives the CIP-0104 reward computation pipeline via
   * ScanAppRewardsStore.computeRewards, which will eventually run three
-  * idempotent steps in one transaction:
+  * computation steps in one transaction:
   *   1. Aggregate activity totals from app activity records
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
