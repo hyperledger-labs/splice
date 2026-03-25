@@ -464,7 +464,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
         }
 
-        val availableConnections = if (connections.exists(_.serial.nonEmpty)) {
+        val availableConnections = if (connections.forall(_.serial.isEmpty)) {
           val latestMigrationId = connections.map(_.migrationId).max
           connections.filter(connection =>
             connection.migrationId == latestMigrationId &&
@@ -472,9 +472,8 @@ abstract class ValidatorPreflightIntegrationTestBase
               isAvailable(connection)
           )
         } else {
-          val serial = connections.flatMap(_.serial).max
           connections.filter(connection =>
-            connection.serial.contains(serial) &&
+            connection.serial.contains(migrationId) &&
               isAvailable(connection)
           )
         }
@@ -633,9 +632,14 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
         val nodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
         val synchronizerNodeConfig =
           nodeState.state.synchronizerNodes.asScala.values.headOption.value
+        val svSequencerUrl = synchronizerNodeConfig.physicalSynchronizers.toScala
+          .flatMap(_.asScala.get(migrationId).flatMap(_.sequencer.map(_.url).toScala))
+          .getOrElse(
+            synchronizerNodeConfig.sequencer.toScala.value.url
+          )
         val (svSequencerEndpoint, _) = Endpoint
           .fromUris(
-            NonEmpty.from(Seq(new URI(synchronizerNodeConfig.sequencer.toScala.value.url))).value
+            NonEmpty.from(Seq(new URI(svSequencerUrl))).value
           )
           .value
         val domainConnectionConfig =
