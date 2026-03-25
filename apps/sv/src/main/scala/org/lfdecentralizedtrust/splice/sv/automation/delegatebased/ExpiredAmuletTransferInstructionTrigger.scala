@@ -12,16 +12,14 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredAmuletTransferInstructionTrigger.*
 import com.digitalasset.canton.util.MonadUtil
-import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import com.digitalasset.canton.time.Clock
 
 import scala.jdk.CollectionConverters.*
 
 class ExpiredAmuletTransferInstructionTrigger(
     svConfig: SvAppBackendConfig,
-    clock: Clock,
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
@@ -59,45 +57,23 @@ class ExpiredAmuletTransferInstructionTrigger(
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
 
-      inputsWithPartiesOrNone <- MonadUtil.sequentialTraverse(task.work.expiredContracts) {
-        contract =>
-          val sender = PartyId.tryFromProtoPrimitive(contract.payload.transfer.sender)
-          val receiver = PartyId.tryFromProtoPrimitive(contract.payload.transfer.receiver)
-
-          svTaskContext.packageVersionSupport
-            .isPackageSupported(
-              Seq(
-                PackageIdResolver.Package.SpliceAmulet -> Seq(sender, receiver, store.key.dsoParty)
-              ),
-              clock.now,
-              DarResources.amulet_current.metadata,
-            )
-            .map(_.supported)
-            .flatMap { areVetted =>
-              if (!areVetted) {
-                logger.info(
-                  s"Skipping expiry of transfer instruction ${contract.contractId} because sender $sender or receiver $receiver have not vetted the required Amulet package."
-                )
-                Future.successful(None)
-              } else {
-                for {
-                  lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
-                    splice.amulet.LockedAmulet.COMPANION
-                  )(contract.payload.lockedAmulet)
-                } yield {
-                  val input = new splice.amuletrules.AmuletRules_ExpireTransferInstructionInput(
-                    new splice.api.token.transferinstructionv1.TransferInstruction.ContractId(
-                      contract.contractId.contractId
-                    ),
-                    java.lang.Boolean.valueOf(lockedAmuletExists.isDefined),
-                  )
-                  Some((input, Set(sender, receiver)))
-                }
-              }
-            }
+      inputsWithParties <- MonadUtil.sequentialTraverse(task.work.expiredContracts) { contract =>
+        val sender = PartyId.tryFromProtoPrimitive(contract.payload.transfer.sender)
+        val receiver = PartyId.tryFromProtoPrimitive(contract.payload.transfer.receiver)
+        for {
+          lockedAmuletExists <- store.multiDomainAcsStore.lookupContractById(
+            splice.amulet.LockedAmulet.COMPANION
+          )(contract.payload.lockedAmulet)
+        } yield {
+          val input = new splice.amuletrules.AmuletRules_ExpireTransferInstructionInput(
+            new splice.api.token.transferinstructionv1.TransferInstruction.ContractId(
+              contract.contractId.contractId
+            ),
+            java.lang.Boolean.valueOf(lockedAmuletExists.isDefined),
+          )
+          (input, Set(sender, receiver))
+        }
       }
-
-      inputsWithParties = inputsWithPartiesOrNone.flatten
 
       inputs = inputsWithParties.map(_._1)
 
