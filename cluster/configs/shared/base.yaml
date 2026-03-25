@@ -124,6 +124,8 @@ monitoring:
       sequencerRateLimits:
         rejectionRateThreshold: 0
         circuitBreakerStateThreshold: 0.5
+      gcpQuotas:
+        enabled: false
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')

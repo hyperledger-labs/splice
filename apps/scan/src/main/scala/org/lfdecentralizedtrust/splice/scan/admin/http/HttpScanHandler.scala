@@ -56,6 +56,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -110,6 +111,10 @@ import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
+  AcsSnapshotObjects,
+  ObjectKeyAndChecksum,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
@@ -127,10 +132,11 @@ class HttpScanHandler(
     updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
+    bulkStorage: BulkStorage,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
-    serveTrafficSummaries: Boolean,
+    serveAppActivityRecordsAndTraffic: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
@@ -764,6 +770,7 @@ class HttpScanHandler(
             _,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
             externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
@@ -856,27 +863,57 @@ class HttpScanHandler(
         updateId,
         updateHistory.domainMigrationInfo.currentMigrationId,
       )
-    } yield {
-      eventO match {
-        case None => Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
-        case Some((verdictWithViewsO, updateO)) =>
-          val encodedUpdateV2 = updateO
-            .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
-            .map(toUpdateV2)
-          val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
-            ScanHttpEncodings.encodeVerdict(v, views)
-          }
-          val trafficSummaryEncoded =
-            if (serveTrafficSummaries)
-              verdictWithViewsO.flatMap { case (v, _) =>
-                v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
-              }
-            else None
-          Right(
-            definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
+      result <- eventO match {
+        case None =>
+          Future.successful(
+            Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
           )
+        case Some((verdictWithViewsO, updateO)) =>
+          val verdictRowIdO = verdictWithViewsO.map { case (v, _) => v.rowId }
+          for {
+            appActivityRecordO <-
+              if (serveAppActivityRecordsAndTraffic)
+                verdictRowIdO match {
+                  case Some(rowId) =>
+                    eventStore.getAppActivityRecords(Seq(rowId)).map(_.get(rowId))
+                  case None => Future.successful(None)
+                }
+              else Future.successful(None)
+          } yield {
+            val encodedUpdateV2 = updateO
+              .map(
+                ScanHttpEncodings.encodeUpdate(
+                  _,
+                  encoding,
+                  ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+                )
+              )
+              .map(toUpdateV2)
+            val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+              ScanHttpEncodings.encodeVerdict(v, views)
+            }
+            val trafficSummaryEncoded =
+              if (serveAppActivityRecordsAndTraffic)
+                verdictWithViewsO.flatMap { case (v, _) =>
+                  v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
+                }
+              else None
+            val appActivityRecordEncoded = appActivityRecordO.map(
+              ScanHttpEncodings.encodeAppActivityRecord
+            )
+            Right(
+              definitions.EventHistoryItem(
+                encodedUpdateV2,
+                verdictEncoded,
+                trafficSummaryEncoded,
+                appActivityRecordEncoded,
+              )
+            )
+          }
       }
-    }
+    } yield result
   }
 
   override def getEventById(respond: ScanResource.GetEventByIdResponse.type)(
@@ -916,20 +953,42 @@ class HttpScanHandler(
           currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
           limit = PageLimit.tryCreate(pageSize, updateHistoryMaxPageSize),
         )
+        verdictRowIds = events.flatMap { case (verdictWithViewsO, _) =>
+          verdictWithViewsO.map { case (v, _) => v.rowId }
+        }
+        appActivityRecordMap <-
+          if (serveAppActivityRecordsAndTraffic) eventStore.getAppActivityRecords(verdictRowIds)
+          else Future.successful(Map.empty[Long, eventStore.AppActivityRecordT])
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
-          .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+          .map(
+            ScanHttpEncodings.encodeUpdate(
+              _,
+              encoding,
+              ScanHttpEncodings.V1,
+              hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+              externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+            )
+          )
           .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
         }
         val trafficSummaryEncoded =
-          if (serveTrafficSummaries)
+          if (serveAppActivityRecordsAndTraffic)
             verdictWithViewsO.flatMap { case (v, _) =>
               v.trafficSummaryO.map(ScanHttpEncodings.encodeTrafficSummary)
             }
           else None
-        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded, trafficSummaryEncoded)
+        val appActivityRecordEncoded = verdictWithViewsO.flatMap { case (v, _) =>
+          appActivityRecordMap.get(v.rowId).map(ScanHttpEncodings.encodeAppActivityRecord)
+        }
+        definitions.EventHistoryItem(
+          encodedUpdateV2,
+          verdictEncoded,
+          trafficSummaryEncoded,
+          appActivityRecordEncoded,
+        )
       }.toVector
     }
   }
@@ -1802,6 +1861,7 @@ class HttpScanHandler(
             txWithMigration,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
             externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
@@ -2186,6 +2246,8 @@ class HttpScanHandler(
                   _,
                   encoding = definitions.DamlValueEncoding.members.ProtobufJson,
                   version = ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
               .toVector
@@ -2213,6 +2275,8 @@ class HttpScanHandler(
                   _,
                   encoding = definitions.DamlValueEncoding.members.ProtobufJson,
                   version = ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
               .toVector
@@ -2398,6 +2462,40 @@ class HttpScanHandler(
           coupons.map(_.toHttp).toVector
         )
       }
+    }
+  }
+
+  override def listBulkAcsSnapshotObjects(
+      respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type
+  )(
+      atOrBeforeRecordTime: OffsetDateTime
+  )(extracted: TraceContext): Future[ScanResource.ListBulkAcsSnapshotObjectsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
+      bulkStorage.acsSnapshotBulkStorage.fold(
+        Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
+          Status.UNIMPLEMENTED
+            .withDescription("Bulk storage is not configured")
+            .asRuntimeException()
+        )
+      )(acsSnapshotBulkStorage =>
+        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
+          case AcsSnapshotObjects(ts, objects) =>
+            ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
+              definitions.ListBulkAcsSnapshotObjectsResponse(
+                Codec.encode(ts),
+                objects.map { case ObjectKeyAndChecksum(key, digest) =>
+                  definitions.BulkStorageObjectRef(
+                    // TODO(#3429): for now we return just the key, but this should be mapped to a full url in scan
+                    key,
+                    digest,
+                  )
+                }.toVector,
+              )
+            )
+        }
+      )
     }
   }
 }

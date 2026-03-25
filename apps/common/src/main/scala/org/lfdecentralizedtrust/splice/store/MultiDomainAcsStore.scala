@@ -279,7 +279,9 @@ object MultiDomainAcsStore extends StoreErrors {
     def ingestionFilter: IngestionFilter
 
     /** Whether the event is in scope. */
-    def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean
+    def contains(ev: CreatedEvent, synchronizerId: SynchronizerId)(implicit
+        elc: ErrorLoggingContext
+    ): Boolean
 
     /** Whether the contract referenced by the (archive)-ExercisedEvent should be archived.
       * Since the payload is not included in the event, this will be best-effort,
@@ -359,6 +361,7 @@ object MultiDomainAcsStore extends StoreErrors {
         Identifier, // interfaces are not (currently) upgradeable, so we match by package-id
         InterfaceFilter[?, ?, ?, IR],
       ],
+      synchronizerFilter: Option[SynchronizerId] = None,
   )(implicit
       hasAcsIndexColumns: AcsRowData.HasIndexColumns[R],
       hasInterfaceViewsIndexColumns: AcsRowData.HasIndexColumns[IR],
@@ -375,25 +378,29 @@ object MultiDomainAcsStore extends StoreErrors {
     def getInterfaceViewsIndexColumnNames: Seq[String] =
       hasInterfaceViewsIndexColumns.indexColumnNames
 
-    override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
-      val matchesTemplate = templateFilters
-        .get(PackageQualifiedName.fromEvent(ev))
-        .exists(_.evPredicate(ev))
-      lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
-        interfaceFilters.get(identifier).exists(_.evPredicate(ev))
+    override def contains(ev: CreatedEvent, synchronizerId: SynchronizerId)(implicit
+        elc: ErrorLoggingContext
+    ): Boolean = {
+      synchronizerFilter.forall(_ == synchronizerId) && {
+        val matchesTemplate = templateFilters
+          .get(PackageQualifiedName.fromEvent(ev))
+          .exists(_.evPredicate(ev))
+        lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
+          interfaceFilters.get(identifier).exists(_.evPredicate(ev))
+        }
+        lazy val interfaceToFailureMap = ev.getFailedInterfaceViews.asScala.filter {
+          case (identifier, _) =>
+            interfaceFilters.contains(identifier)
+        }
+        if (interfaceToFailureMap.nonEmpty) {
+          elc.error(
+            show"Found failed interface views that match an interface id in a filter: $interfaceToFailureMap. " +
+              show"This might be a bug in the daml definition of the interface's view. " +
+              show"Resolve the error, and if required, reingest the data."
+          )
+        }
+        matchesTemplate || interfaceViews.nonEmpty
       }
-      lazy val interfaceToFailureMap = ev.getFailedInterfaceViews.asScala.filter {
-        case (identifier, _) =>
-          interfaceFilters.contains(identifier)
-      }
-      if (interfaceToFailureMap.nonEmpty) {
-        elc.error(
-          show"Found failed interface views that match an interface id in a filter: $interfaceToFailureMap. " +
-            show"This might be a bug in the daml definition of the interface's view. " +
-            show"Resolve the error, and if required, reingest the data."
-        )
-      }
-      matchesTemplate || interfaceViews.nonEmpty
     }
 
     override def shouldArchive(

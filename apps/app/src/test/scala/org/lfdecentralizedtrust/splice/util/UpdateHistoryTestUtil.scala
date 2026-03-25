@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.mem
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
+  ExternalHashInclusionPolicy,
   ProtobufJsonScanHttpEncodings,
   ScanHttpEncodings,
 }
@@ -235,7 +236,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val historyFromStoreWithoutLostData =
       historyFromStore
         .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-        .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
+        .map(
+          ScanHttpEncodings
+            .makeConsistentAcrossSvs(_, ExternalHashInclusionPolicy.AlwaysInclude, None)
+        )
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
 
@@ -285,7 +289,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-      .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
+      .map(
+        ScanHttpEncodings
+          .makeConsistentAcrossSvs(_, ExternalHashInclusionPolicy.AlwaysInclude, None)
+      )
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(
@@ -354,6 +361,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
           .map(com.digitalasset.canton.util.HexString.toHexString)
       case _ => None
     }
+    extTxnHash should not be empty
     extractedHash shouldBe Some(
       extTxnHash
     ) withClue "external transaction hash from Scan API for updateId did not match expected hash"

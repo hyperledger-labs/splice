@@ -298,7 +298,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
     )
 
     val withoutLocalData = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original, None)
+      .makeConsistentAcrossSvs(original, ExternalHashInclusionPolicy.AlwaysInclude, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -344,7 +344,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
     // makeConsistentAcrossSvs() should be idempotent
     val withoutLocalData2 = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original, None)
+      .makeConsistentAcrossSvs(original, ExternalHashInclusionPolicy.AlwaysInclude, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -677,6 +677,22 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           mkTree,
           DamlValueEncoding.ProtobufJson,
           ScanHttpEncodings.V1,
+          hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
+      }
+    }
+
+    "return the hash when policy is AlwaysInclude irrespective of record time" in {
+      val thresholdDate = Instant.parse("2100-06-30T00:00:01Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
           externalTransactionHashThresholdTime = Some(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
