@@ -7,10 +7,7 @@ import better.files.File
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
-import com.digitalasset.canton.admin.api.client.data.{
-  SequencerConnectionValidation,
-  SynchronizerConnectionConfig,
-}
+import com.digitalasset.canton.admin.api.client.data.{SynchronizerConnectionConfig}
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, ExportAcsResponse}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
@@ -22,7 +19,6 @@ import com.digitalasset.canton.console.{
   Help,
   Helpful,
 }
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.grpc.OutputFileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
@@ -649,44 +645,6 @@ class ParticipantRepairAdministration(
         )
       }
     }
-
-  // TODO(#28972) Remove preview flag
-  @Help.Summary("Perform a logical synchronizer upgrade")
-  @Help.Description(
-    """This command allows to perform an offline logical synchronizer upgrade.
-       |It should only be used if the node was offline at the time of the upgrade and the
-       |synchronizer was decommissioned.
-       |
-       |Parameters:
-       |- currentPhysicalSynchronizerId: ID of the synchronizer that should be upgraded.
-       |- successorPhysicalSynchronizerId: ID of the new synchronizer.
-       |- announcedUpgradeTime: Time at which the upgrade happened.
-       |- successorConfig: configuration to connect to the new synchronizer.
-       |- validation: The validations which need to be done to the connection.
-      """
-  )
-  def perform_manual_lsu(
-      currentPhysicalSynchronizerId: PhysicalSynchronizerId,
-      successorPhysicalSynchronizerId: PhysicalSynchronizerId,
-      announcedUpgradeTime: CantonTimestamp,
-      successorConfig: SynchronizerConnectionConfig,
-      validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
-  ): Unit = check(FeatureFlag.Preview) {
-    check(FeatureFlag.Repair) {
-      consoleEnvironment.run {
-        runner.adminCommand(
-          ParticipantAdminCommands.ParticipantRepairManagement
-            .PerformManualLsu(
-              currentPSId = currentPhysicalSynchronizerId,
-              successorPSId = successorPhysicalSynchronizerId,
-              upgradeTime = announcedUpgradeTime,
-              successorConfig = successorConfig.toInternal,
-              sequencerConnectionValidation = validation.toInternal,
-            )
-        )
-      }
-    }
-  }
 }
 
 object ParticipantRepairAdministration {

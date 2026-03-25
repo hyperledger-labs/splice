@@ -64,7 +64,7 @@ class SequencerConnectionSuccessorListener(
       transactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     Monad[FutureUnlessShutdown].whenA(
-      transactions.exists(_.mapping.code == Code.SequencerConnectionSuccessor)
+      transactions.exists(_.mapping.code == Code.LsuSequencerConnectionSuccessor)
     )(checkAndCreateSynchronizerConfig(effectiveTimestamp.value.immediateSuccessor))
 
   private def checkAndCreateSynchronizerConfig(
