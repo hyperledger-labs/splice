@@ -539,6 +539,8 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationReader
         : ConfigReader[SvOnboardingConfig.DomainMigration] =
       deriveReader[SvOnboardingConfig.DomainMigration]
+    implicit val svOnboardingRollForwardLsuReader: ConfigReader[SvOnboardingConfig.RollForwardLsu] =
+      deriveReader[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
       deriveReader[SvOnboardingConfig]
     implicit val expectedValidatorOnboardingConfigReader
@@ -617,6 +619,7 @@ object SpliceConfig {
             case foundDso: SvOnboardingConfig.FoundDso => check(conf, foundDso)
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
+            case _: SvOnboardingConfig.RollForwardLsu => true
           }
         // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
         val sv1NodeHasNoSequencerUrl =
@@ -985,6 +988,8 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationWriter
         : ConfigWriter[SvOnboardingConfig.DomainMigration] =
       deriveWriter[SvOnboardingConfig.DomainMigration]
+    implicit val svOnboardingRollForwardLsuWriter: ConfigWriter[SvOnboardingConfig.RollForwardLsu] =
+      deriveWriter[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =
       confidentialWriter[SvOnboardingConfig](SvOnboardingConfig.hideConfidential)
 

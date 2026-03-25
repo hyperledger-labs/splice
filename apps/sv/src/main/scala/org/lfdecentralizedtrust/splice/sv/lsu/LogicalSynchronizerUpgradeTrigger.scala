@@ -3,17 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.sv.lsu
 
-import cats.implicits.{catsSyntaxOptionId, showInterpolator, toTraverseOps}
-import com.daml.nonempty.NonEmpty
+import cats.implicits.{showInterpolator, toTraverseOps}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.admin.api.client.data.SequencerHealthStatus.implicitPrettyString
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.networking
-import com.digitalasset.canton.topology.transaction.{GrpcConnection, LsuAnnouncement}
+import com.digitalasset.canton.topology.transaction.LsuAnnouncement
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
@@ -23,16 +19,13 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
   TriggerEnabledSynchronization,
 }
-import org.lfdecentralizedtrust.splice.environment.{RetryFor, StatusAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.StatusAdminConnection
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
-import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
-import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
-import java.net.URI
 import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -59,44 +52,17 @@ class LogicalSynchronizerUpgradeTrigger(
       loggerFactory,
     )
 
+  private val initializer =
+    new LsuNodeInitializer(
+      localSynchronizerNodes,
+      successorSynchronizerNode,
+      Some(reconciler),
+      loggerFactory,
+      context.retryProvider,
+    )
+
   override protected lazy val context: TriggerContext =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
-  private val newSequencerIntializer = new NodeInitializer(
-    successorSynchronizerNode.sequencerAdminConnection,
-    context.retryProvider,
-    loggerFactory,
-  )
-  private val newMediatorInitializer = new NodeInitializer(
-    successorSynchronizerNode.mediatorAdminConnection,
-    context.retryProvider,
-    loggerFactory,
-  )
-
-  private val successorConnection = {
-    networking.Endpoint
-      .fromUris(
-        NonEmpty(
-          Seq,
-          URI.create(
-            successorSynchronizerNode.sequencerExternalPublicUrl
-          ),
-        )
-      )
-      .map { case (validatedEndpoints, useTls) =>
-        GrpcConnection(
-          validatedEndpoints,
-          useTls,
-          None,
-        )
-      }
-      .getOrElse(
-        throw Status.INVALID_ARGUMENT
-          .withDescription(
-            s"Failed to create gRPC connection for ${successorSynchronizerNode.sequencerExternalPublicUrl}"
-          )
-          .asRuntimeException()
-      )
-  }
 
   protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
@@ -151,75 +117,11 @@ class LogicalSynchronizerUpgradeTrigger(
         _.reconcileNetworkConfig(owningNodeSvName, rulesAndState)
       )
       state <- exporter.exportLSUState(task.work.announcement.upgradeTime)
-      _ = logger.info("Initializing sequencer and mediators from the data of the old nodes")
-      _ <- newMediatorInitializer.initializeFromDump(state.nodeIdentities.mediator)
-      _ <- newSequencerIntializer.initializeFromDump(state.nodeIdentities.sequencer)
-      parameters = successorSynchronizerNode.staticSynchronizerParameters(
-        task.work.announcement.successorSynchronizerId.serial
-      )
-      _ <- context.retryProvider.ensureThat(
-        RetryFor.InitializingClientCalls,
-        "init_sequencer_lsu",
-        "Initialize sequencer from the state of the predecessor",
-        successorSynchronizerNode.sequencerAdminConnection.getStatus.map {
-          case NodeStatus.Failure(msg) => Left(msg)
-          case NodeStatus.NotInitialized(_, _) => Left("Not initialized")
-          case NodeStatus.Success(_) =>
-            logger.info("Sequencer is already initialized")
-            Right(())
-        },
-        (_: String) => {
-          logger.info(
-            show"Initializing sequencer from predecessor with $parameters"
-          )
-          successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
-            state.synchronizerStatePath,
-            parameters.copy(
-              protocolVersion = task.work.announcement.successorSynchronizerId.protocolVersion
-            ),
-          )
-        },
-        logger,
-      )
-      psid <- successorSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
-      sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
-      _ <-
-        if (task.work.announcement.upgradeTime.isAfter(task.readyAt))
-          currentSynchronizerNode.sequencerAdminConnection.ensureSequencerSuccessor(
-            psid,
-            sequencerId = sequencerId,
-            connection = successorConnection,
-          )
-        else {
-          logger.warn("Not publishing sequencer successor as we are past upgrade time")
-          Future.unit
-        }
-      _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
-        localSynchronizerNodes.some,
-        psid.logical,
-        OnboardedImmediately,
-      )
-      _ <- context.retryProvider.ensureThat(
-        RetryFor.InitializingClientCalls,
-        "init_mediator_lsu",
-        "Initialize mediator after the LSU",
-        successorSynchronizerNode.mediatorAdminConnection.getStatus.map {
-          case NodeStatus.Failure(msg) => Left(msg)
-          case NodeStatus.NotInitialized(_, _) => Left("Not initialized")
-          case NodeStatus.Success(_) =>
-            logger.info("Mediator is already initialized")
-            Right(())
-        },
-        (_: String) => {
-          logger.info(show"Initializing mediator")
-          successorSynchronizerNode.mediatorAdminConnection.initialize(
-            psid,
-            successorSynchronizerNode.internalSequencerConnection,
-            successorSynchronizerNode.mediatorSequencerAmplification.toInternal,
-            successorSynchronizerNode.mediatorSequencerConnectionPoolDelays.toInternal,
-          )
-        },
-        logger,
+      parameters <- initializer.initializeSynchronizer(
+        state,
+        task.work.announcement.successorSynchronizerId,
+        task.readyAt,
+        Some(task.work.announcement.upgradeTime),
       )
     } yield {
       TaskSuccess(

@@ -5,50 +5,41 @@ import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
-import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
-import com.digitalasset.canton.topology.store.TimeQuery
-import com.digitalasset.canton.topology.transaction.TopologyChangeOp
-import com.digitalasset.canton.util.HexString
+import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
+// import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.sv.config.{
+  SvOnboardingConfig,
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.{
-  LogicalSynchronizerUpgradeSequencingTestTrigger,
-  LogicalSynchronizerUpgradeTrigger,
-}
-import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeSequencingTestTrigger
 import org.lfdecentralizedtrust.splice.util.*
-import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
 import java.time.{Duration, Instant}
 import java.util.UUID
+import monocle.macros.syntax.lens.*
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
-class LogicalSynchronizerUpgradeIntegrationTest
+class RollForwardLsuIntegrationTest
     extends IntegrationTest
     with ExternallySignedPartyTestUtil
     with ProcessTestUtil
@@ -67,51 +58,78 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
-  // We manually force a snapshot on sv1 in the test. The other SVs
-  // won't have a snapshot at that time so the assertions in the
-  // update history sanity plugin wil fail.
-  override lazy val skipAcsSnapshotChecks = true
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransforms((_, config) => {
-        ConfigTransforms
-          .updateAllSvAppConfigs { (name, config) =>
-            config.copy(
-              localSynchronizerNodes = config.localSynchronizerNodes
-                .copy(successor = config.localSynchronizerNodes.current.some),
-              domainMigrationDumpPath = Some(
-                (DomainMigrationUtil.migrationTestDumpDir(name) / "domain_migration_dump.json").path
-              ),
-              parameters = config.parameters.copy(
-                spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
-                  physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
+      .addConfigTransforms(
+        (_, config) => {
+          ConfigTransforms
+            .updateAllSvAppConfigs { (name, config) =>
+              config.copy(
+                // TODO(#4682) Make it work with BFT connections.
+                bftSequencerConnection = false,
+                domainMigrationDumpPath = Some(
+                  (DomainMigrationUtil.migrationTestDumpDir(
+                    name
+                  ) / "domain_migration_dump.json").path
+                ),
+                parameters = config.parameters.copy(
+                  spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
+                    physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
+                  )
+                ),
+              )
+            }
+            .andThen(ConfigTransforms.updateAllScanAppConfigs { (_, config) =>
+              config.copy(
+                parameters = config.parameters.copy(
+                  spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
+                    physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
+                  )
                 )
+              )
+            })(config)
+        },
+        (_, config) =>
+          config.copy(
+            // The instance after the roll-forward with current = serial 2, legacy = serial 0
+            svApps = config.svApps ++
+              Seq(1, 2, 3, 4).map(sv =>
+                InstanceName.tryCreate(s"sv${sv}Local") ->
+                  config
+                    .svApps(InstanceName.tryCreate(s"sv$sv"))
+                    .focus(_.localSynchronizerNodes)
+                    .modify(c => c.copy(legacy = c.current.some))
+                    .focus(_.onboarding)
+                    .modify(c =>
+                      SvOnboardingConfig
+                        .RollForwardLsu(
+                          c.value.name,
+                          NonNegativeInt.tryCreate(2),
+                          ProtocolVersion.v34,
+                        )
+                        .some
+                    )
               ),
-            )
-          }
-          .andThen(ConfigTransforms.updateAllScanAppConfigs { (_, config) =>
-            config.copy(
-              synchronizerNodes = config.synchronizerNodes.copy(
-                successor = Some(config.synchronizerNodes.current)
-              ),
-              parameters = config.parameters.copy(
-                spliceCachingConfigs = config.parameters.spliceCachingConfigs.copy(
-                  physicalSynchronizerExpiration = NonNegativeFiniteDuration.ofSeconds(1)
-                )
-              ),
-            )
-          })(config)
-      })
+            scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
+              // The instance after the roll-forward with current = serial 2, legacy = serial 0
+              InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
+                config
+                  .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
+                  .focus(_.synchronizerNodes)
+                  .modify(c => c.copy(legacy = c.current.some))
+            ),
+          ),
+      )
       .withBftSequencersSuccessor
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
         ConfigTransforms
-          .bumpCantonSyncSuccessorPortsBy(22_000)
+          // This bumps current but not legacy
+          .bumpCantonSyncPortsBy(22_000, name => name.contains("Local"))
           .andThen(
             ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
               // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
@@ -120,58 +138,16 @@ class LogicalSynchronizerUpgradeIntegrationTest
           )(config)
       )
       .withAmuletPrice(walletAmuletPrice)
+      .withManualStart
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
-  "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
-    val topologyFreezeTime = CantonTimestamp.now()
-    val upgradeTime = CantonTimestamp.now().plusSeconds(120)
 
-    clue("Schedule logical synchronizer upgrade") {
-      scheduleLsu(topologyFreezeTime, upgradeTime, 1L)
-    }
-
-    clue("Wait for LSU announcement to be proposed") {
-      waitForLsuAnnouncement()
-    }
-
-    clue("Cancel LSU from all SVs") {
-      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).par.foreach { sv =>
-        sv.cancelLogicalSynchronizerUpgrade()
-      }
-    }
-
-    clue("LSU announcement has been removed from topology state") {
-      eventually() {
-        sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
-          .list(
-            store = Some(Synchronizer(decentralizedSynchronizerId)),
-            operation = Some(TopologyChangeOp.Replace),
-          ) shouldBe empty
-      }
-    }
-
-    clue("Removal transaction exists in topology history") {
-      val removals = sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
-        .list(
-          store = Some(Synchronizer(decentralizedSynchronizerId)),
-          timeQuery = TimeQuery.Range(None, None),
-          operation = Some(TopologyChangeOp.Remove),
-        )
-      removals should not be empty
-    }
-
-    clue("Trigger does not re-create the cancelled announcement") {
-      // Wait long enough for the trigger to have run multiple times
-      Threading.sleep(10_000)
-      sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
-        .list(
-          store = Some(Synchronizer(decentralizedSynchronizerId)),
-          operation = Some(TopologyChangeOp.Replace),
-        ) shouldBe empty
-    }
-  }
-
-  "upgrade synchronizer to new physical synchronizer without downtime" in { implicit env =>
+  // The scenario we test is the following:
+  // SVs schedule a migration from serial 0 to 1.
+  // This never goes through. In the test we simply never configure the successor synchronizer for the SVs so the announcement gets published but
+  // no synchronizer with serial 1 is initialized. Actually configuring the successor but ensuring nothing gets sequenced would both be tricky and slows the test down even more.
+  // The SVs reconfigure their SV app to manually do an LSU to serial 2.
+  "roll forward LSU" in { implicit env =>
     val allNodes = Seq[AppBackendReference](
       sv1ScanBackend,
       sv2ScanBackend,
@@ -181,22 +157,27 @@ class LogicalSynchronizerUpgradeIntegrationTest
       sv2Backend,
       sv3Backend,
       sv4Backend,
-      sv1ValidatorBackend,
-      sv2ValidatorBackend,
-      sv3ValidatorBackend,
-      sv4ValidatorBackend,
+      // TODO(#4682): Fix with BFT connections
+      // sv1ValidatorBackend,
+      // sv2ValidatorBackend,
+      // sv3ValidatorBackend,
+      // sv4ValidatorBackend,
     )
-    actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
-      "Scan transaction history is recorded and wallet balance is updated",
-      _ => {
-        // buffer to account for domain fee payments
-        assertInRange(
-          sv1WalletClient.balance().unlockedQty,
-          (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
-        )
-        countTapsFromScan(sv1ScanBackend, walletUsdToAmulet(1337)) shouldBe 1
-      },
-    )
+
+    startAllSync((allNodes ++ Seq(aliceValidatorBackend, bobValidatorBackend))*)
+
+    // TODO(#4682): Fix with BFT connections
+    // actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
+    //   "Scan transaction history is recorded and wallet balance is updated",
+    //   _ => {
+    //     // buffer to account for domain fee payments
+    //     assertInRange(
+    //       sv1WalletClient.balance().unlockedQty,
+    //       (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
+    //     )
+    //     countTapsFromScan(sv1ScanBackend, walletUsdToAmulet(1337)) shouldBe 1
+    //   },
+    // )
 
     clue("All sequencers are registered") {
       eventually() {
@@ -271,11 +252,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
     // synchronizers as upload_dar_unless_exists vets on all
     // connected synchronizers.
     aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-    val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
+    clue("Create external party and transfer 40 amulet to it") {
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
-    val lateJoiningNode = sv4Nodes
-    lateJoiningNode.par.foreach(_.stop())
     val topologyFreezeTime = CantonTimestamp.now()
     // We need to give enough time for the new Canton instance to startup
     // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
@@ -283,7 +262,21 @@ class LogicalSynchronizerUpgradeIntegrationTest
     clue("Schedule logical synchronizer upgrade") {
       scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
     }
-    val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+    clue("Topology state contains LSU announcement") {
+      eventually(3.minutes) {
+        sv1ScanBackend.participantClient.topology.lsu.announcement
+          .list(Some(decentralizedSynchronizerId)) should have size (1)
+        println("topology")
+      }
+    }
+    val allSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+    val allSvLocalBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
+    val allScanBackends = Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend)
+    val allScanLocalBackends =
+      Seq(sv1ScanLocalBackend, sv2ScanLocalBackend, sv3ScanLocalBackend, sv4ScanLocalBackend)
+    // Stop first
+    stopAllAsync(allSvBackends*).futureValue
+    stopAllAsync(allScanBackends*).futureValue
     withCantonSvNodes(
       (
         None,
@@ -295,10 +288,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
       enableBftSequencer = true,
       logSuffix = "global-synchronizer-upgrade",
     )() {
-
-      clue(s"wait for lsu announcement") {
-        waitForLsuAnnouncement()
+      // Wait first so that the participant has observed the timestamp and will happily migrate.
+      clue(s"wait for upgrade time $upgradeTime") {
+        Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
       }
+
+      // Restart SV app with roll-forward LSU config
+      startAllSync(allSvLocalBackends*)
+      startAllSync(allScanLocalBackends*)
 
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
         .list(store = Synchronizer(decentralizedSynchronizerId))
@@ -306,7 +303,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         .size
 
       clue("new nodes are initialized") {
-        Seq(sv1Backend, sv2Backend, sv3Backend).map { backend =>
+        allSvBackends.map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
@@ -329,52 +326,28 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      clue(s"wait for upgrade time $upgradeTime") {
-        Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
+      val newSequencerUrls = allSvBackends.map { backend =>
+        backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
+          .stripPrefix("http://")
       }
 
       def participantIsConnectedToNewSynchronizer(
-          clientWithAdminToken: ParticipantClientReference,
-          isSv4Connected: Boolean,
+          clientWithAdminToken: ParticipantClientReference
       ) = {
-        val newSequencerUrls =
-          (if (isSv4Connected) allBackends else allBackends.filter(_.name != sv4Backend.name)).map {
-            backend =>
-              backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
-                .stripPrefix("http://")
-          }
-
         clientWithAdminToken.synchronizers
           .list_connected()
           .loneElement
           .physicalSynchronizerId shouldBe successorPsid
-        val sequencerUrlSet = getSequencerUrlsConfiguredForTheSync(
+        val sequencerUrlSet = getSequencerUrlSet(
           clientWithAdminToken,
           decentralizedSynchronizerAlias,
         )
+        sequencerUrlSet should have size 4
         sequencerUrlSet should contain theSameElementsAs newSequencerUrls.toSet
         clientWithAdminToken.topology.transactions
           .list(store = Synchronizer(decentralizedSynchronizerId))
           .result
           .size should be >= topologyTransactionsOnTheSync
-      }
-
-      clue("Validator connects to the new sequencers and sync topology") {
-        eventually(60.seconds) {
-          val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-          participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = false)
-        }
-      }
-
-      clue("SVs connect to the new sequencers and sync topology") {
-        allBackends.par.map { backend =>
-          eventually() {
-            participantIsConnectedToNewSynchronizer(
-              backend.participantClientWithAdminToken,
-              isSv4Connected = false,
-            )
-          }
-        }
       }
 
       clue("physical synchronizers configs are set") {
@@ -404,13 +377,29 @@ class LogicalSynchronizerUpgradeIntegrationTest
             "http://localhost:27108",
             "http://localhost:27208",
             "http://localhost:27308",
+            "http://localhost:27408",
           )
+        }
+      }
+
+      clue("Validator connects to the new sequencers and sync topology") {
+        eventually(60.seconds) {
+          val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
+          participantIsConnectedToNewSynchronizer(clientWithAdminToken)
+        }
+      }
+
+      clue("SVs connect to the new sequencers and sync topology") {
+        allSvBackends.par.map { backend =>
+          eventually() {
+            participantIsConnectedToNewSynchronizer(backend.participantClientWithAdminToken)
+          }
         }
       }
 
       clue("Scan reports active physical synchronizer serial 1 after upgrade") {
         eventually() {
-          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend).foreach { scan =>
+          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
             scan.getActivePhysicalSynchronizerSerial() shouldBe newSynchronizerSerial
           }
         }
@@ -421,18 +410,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
           inside(sv1ScanBackend.listDsoSequencers()) {
             case Seq(DomainSequencers(synchronizerId, sequencers)) =>
               synchronizerId shouldBe decentralizedSynchronizerId
-              sequencers should have size 11
+              sequencers should have size 12
               sequencers.groupBy(_.svName).foreach { case (sv, sequencers) =>
                 clue(s"check sequencers for $sv") {
+                  sequencers.size shouldBe 3
                   forExactly(1, sequencers) { sequencer =>
                     sequencer.serial.value shouldBe 0
                     sequencer.migrationId shouldBe -1
                   }
-                  if (sv != sv4Backend.config.onboarding.value.name)
-                    forExactly(1, sequencers) { sequencer =>
-                      sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
-                      sequencer.migrationId shouldBe -1
-                    }
+                  forExactly(1, sequencers) { sequencer =>
+                    sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
+                    sequencer.migrationId shouldBe -1
+                  }
                   forExactly(1, sequencers) { sequencer =>
                     sequencer.serial should be(empty)
                     sequencer.migrationId shouldBe 0
@@ -443,143 +432,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      clue("External party's balance has been preserved and it can transfer") {
-        aliceValidatorBackend
-          .getExternalPartyBalance(externalPartyOnboarding.party)
-          .totalUnlockedCoin shouldBe "40.0000000000"
-        val prepareSend =
-          aliceValidatorBackend.prepareTransferPreapprovalSend(
-            externalPartyOnboarding.party,
-            aliceValidatorBackend.getValidatorPartyId(),
-            BigDecimal(10.0),
-            CantonTimestamp.now().plus(Duration.ofHours(24)),
-            0L,
-            Some("transfer-command-description"),
-          )
-        actAndCheck()(
-          "Submit signed TransferCommand creation",
-          aliceValidatorBackend.submitTransferPreapprovalSend(
-            externalPartyOnboarding.party,
-            prepareSend.transaction,
-            HexString.toHexString(
-              crypto
-                .signBytes(
-                  HexString.parseToByteString(prepareSend.txHash).value,
-                  externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
-                  usage = SigningKeyUsage.ProtocolOnly,
-                )
-                .value
-                .toProtoV30
-                .signature
-            ),
-            publicKeyAsHexString(externalPartyOnboarding.publicKey),
-          ),
-        )(
-          "validator automation completes transfer",
-          _ => {
-            BigDecimal(
-              aliceValidatorBackend
-                .getExternalPartyBalance(externalPartyOnboarding.party)
-                .totalUnlockedCoin
-            ) should be(BigDecimal(30))
-          },
-        )
-      }
-      // new sync nodes are started in process so to avoid log noise we stop everything before the test ends
-      clue("Alice can purchase traffic") {
-        val aliceParty = aliceValidatorBackend.getValidatorPartyId()
-        val aliceParticipant = aliceValidatorBackend.participantClient.id.toProtoPrimitive
-        val trackingId = java.util.UUID.randomUUID.toString
-        val trafficPurchaseAmount = 1000000L
-        val trafficStateBefore = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
-        clue("Alice creates traffic request") {
-          createBuyTrafficRequest(
-            aliceValidatorBackend,
-            aliceParty,
-            aliceParticipant,
-            trafficPurchaseAmount,
-            trackingId,
-          )
-        }
-        clue("Traffic request is ingested into wallet tx log") {
-          eventuallySucceeds() {
-            aliceValidatorWalletClient.getTrafficRequestStatus(trackingId)
-          }
-        }
-        clue("Wallet automation completes the request") {
-          eventually() {
-            inside(aliceValidatorWalletClient.getTrafficRequestStatus(trackingId)) {
-              case definitions.GetBuyTrafficRequestStatusResponse.members
-                    .BuyTrafficRequestCompletedResponse(
-                      definitions.BuyTrafficRequestCompletedResponse(status, _)
-                    ) =>
-                status shouldBe BuyTrafficRequestStatus.Completed
-            }
-          }
-        }
-        val expectedTrafficPurchased =
-          trafficStateBefore.extraTrafficPurchased + NonNegativeLong.tryCreate(
-            trafficPurchaseAmount
-          )
-        clue("Sequencer updates traffic state") {
-          eventually() {
-            val trafficStateAfter = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
-            trafficStateAfter.extraTrafficPurchased shouldBe expectedTrafficPurchased
-          }
-        }
-        clue("Scan updates traffic state") {
-          eventually() {
-            sv1ScanBackend
-              .getMemberTrafficStatus(
-                decentralizedSynchronizerId,
-                aliceValidatorBackend.participantClient.id,
-              )
-              .actual
-              .totalLimit shouldBe expectedTrafficPurchased.unwrap
-          }
-        }
-      }
-
-      clue("sv4 upgrades") {
-        loggerFactory.suppress(
-          SuppressionRule.forLogger[LogicalSynchronizerUpgradeTrigger] && SuppressionRule.Level(
-            org.slf4j.event.Level.WARN
-          )
-        ) {
-          lateJoiningNode.par.foreach(_.startSync())
-          clue("Validator also connects to the sv-4 sequencer") {
-            eventually(60.seconds) {
-              val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-              participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = true)
-            }
-          }
-        }
-      }
-
-      clue("sv and scan app can be restarted") {
-        sv1Backend.stop()
-        sv1ScanBackend.stop()
-        sv1Backend.startSync()
-        sv1ScanBackend.startSync()
-      }
-
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
         // manually stop stuff as we destroy the new synchronizer as it runs in process
         val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
         stopAllAsync(validators*).futureValue
         validators.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
         stopAllAsync(allNodes*).futureValue
-        allBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
+        allSvBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
       }
-    }
-  }
-
-  private def waitForLsuAnnouncement()(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    eventually(timeUntilSuccess = 5.minutes) {
-      sv1Backend.participantClientWithAdminToken.topology.lsu.announcement
-        .list(
-          Some(Synchronizer(decentralizedSynchronizerId))
-        ) should not be empty
     }
   }
 
@@ -607,17 +467,17 @@ class LogicalSynchronizerUpgradeIntegrationTest
       retryProvider,
     )
 
-  private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: BigDecimal) = {
-    listTransactionsFromScan(scan).count(
-      _.tap.map(a => BigDecimal(a.amuletAmount)).contains(tapAmount)
-    )
-  }
+  // private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: BigDecimal) = {
+  //   listTransactionsFromScan(scan).count(
+  //     _.tap.map(a => BigDecimal(a.amuletAmount)).contains(tapAmount)
+  //   )
+  // }
 
-  private def listTransactionsFromScan(scan: ScanAppBackendReference) = {
-    scan.listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
-  }
+  // private def listTransactionsFromScan(scan: ScanAppBackendReference) = {
+  //   scan.listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
+  // }
 
-  private def getSequencerUrlsConfiguredForTheSync(
+  private def getSequencerUrlSet(
       participantConnection: ParticipantClientReference,
       synchronizerAlias: SynchronizerAlias,
   ): Set[String] = {
