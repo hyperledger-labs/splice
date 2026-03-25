@@ -20,7 +20,14 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
-import org.lfdecentralizedtrust.splice.store.{HardLimit, HistoryMetrics, Limit, S3BucketConnection, TimestampWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  HistoryMetrics,
+  Limit,
+  S3BucketConnection,
+  TimestampWithMigrationId,
+  UpdateHistory,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -199,7 +206,8 @@ class AcsSnapshotBulkStorage(
         .listObjects(
           prefix,
           _.matches(".*ACS_\\d+\\.zstd"),
-          HardLimit.tryCreate(Limit.DefaultMaxPageSize))
+          HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+        )
       objectsWithChecksums <- s3Connection.getChecksums(objects)
     } yield {
       if (objects.isEmpty) {

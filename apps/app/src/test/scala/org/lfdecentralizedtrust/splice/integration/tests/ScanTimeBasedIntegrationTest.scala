@@ -644,6 +644,7 @@ class ScanTimeBasedIntegrationTest
         recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
       }
 
+      // FIXME: Finish the client&reference for listing updates via scan, and use it here
       val updateObjs = allS3Objs.filter(_.key().contains("/updates"))
       val updatesFromS3 = updateObjs
         .flatMap { obj =>

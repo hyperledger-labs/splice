@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
+import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.UpdateHistoryObjectsResponse
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
@@ -29,8 +30,7 @@ import org.lfdecentralizedtrust.splice.store.{
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
-import java.time.{Instant, YearMonth, ZoneOffset}
-import java.time.temporal.ChronoUnit
+import java.time.Instant
 
 class UpdateHistoryBulkStorage(
     val storageConfig: ScanStorageConfig,
@@ -206,24 +206,35 @@ class UpdateHistoryBulkStorage(
   def getUpdatesBetweenDates(
       afterRecordTime: CantonTimestamp,
       atOrBeforeRecordTime: CantonTimestamp,
-      limit: Limit,
+      limit: PageLimit,
       nextPageTokenO: Option[String],
-  )(implicit tc: TraceContext): Future[Seq[ObjectKeyAndChecksum]] = {
+  )(implicit tc: TraceContext): Future[UpdateHistoryObjectsResponse] = {
 
     def getStartAndEndTimestampsForFolder(
         folder: String
     ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
-      // Folder format is "{startTimestamp}-Migration-{migrationId}-{endTimestamp}/", e.g. "5-2024-01-01T00:00:00Z-5-2024-02-01T00:00:00Z/"
-      val parts = folder.stripSuffix("/").split("-")
-      if (parts.length != 4) {
-        Left("Cannot parse folder name: " + folder)
+      // Folder format is "{startTimestamp}-Migration-{migrationId}-{endTimestamp}/", e.g. "2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/"
+      val parts = folder.stripSuffix("/").split("-Migration-")
+      if (parts.length != 2) {
+        Left(
+          s"Cannot parse folder name: $folder (wrong number of parts after splitting by '-Migration-': ${parts.length})"
+        )
       } else {
         val folderStartStr = parts(0)
-        val folderEndStr = parts(3)
-        for {
-          folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
-          folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
-        } yield {(folderStart, folderEnd)}
+        val parts2 = parts(1).split("-", 2)
+        if (parts2.length != 2) {
+          Left(
+            s"Cannot parse folder name: $folder (wrong number of parts when splitting ${parts(1)}: ${parts2.length})"
+          )
+        } else {
+          val folderEndStr = parts2(1)
+          for {
+            folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
+            folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
+          } yield {
+            (folderStart, folderEnd)
+          }
+        }
       }
     }
 
@@ -249,7 +260,7 @@ class UpdateHistoryBulkStorage(
     def getUpdateObjectsInFolder(folder: String): Future[Seq[String]] = s3Connection.listObjects(
       prefix = folder,
       _.matches(".*updates_\\d+\\.zstd"),
-      limit,
+      HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
 
     def folderFilter(folder: String): Boolean =
@@ -258,7 +269,7 @@ class UpdateHistoryBulkStorage(
     // TODO(#3429): handle the case where the user asked for an end timestamp that is later than what we have in storage.
     // ATM, we still return the last folder as a "next page token" in that case, and in the next page, we return an empty result.
     // This might be fine if documented, and explained that the intention is "please try again later".
-    def getNextPageToken(folders: Seq[String], objKeys: Seq[String]): Option[String] = {
+    def getNextPageToken(objKeys: Seq[String]): Option[String] = {
       // We return a next page token when:
       //   - we found some objects to return (i.e. objKeys is non-empty), and
       //   - the end time in the last folder we listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
@@ -268,7 +279,9 @@ class UpdateHistoryBulkStorage(
           case Left(err) =>
             // This should not happen, since we should have successfully parsed the folder when listing its objects
             throw io.grpc.Status.INTERNAL
-              .withDescription(s"Cannot parse last folder name for next page token: $lastFolder, error: $err")
+              .withDescription(
+                s"Cannot parse last folder name for next page token: $lastFolder, error: $err"
+              )
               .asRuntimeException()
           case Right((_, folderEnd)) =>
             if (folderEnd < atOrBeforeRecordTime) {
@@ -282,55 +295,53 @@ class UpdateHistoryBulkStorage(
 
     def getFolderUpdateObjectsUpToLimit(folders: Seq[String]): Future[Seq[String]] = {
       folders
-        .foldLeft(Future.successful(Seq.empty[String], limit)) { case (futFolderState, folder) =>
-          futFolderState.flatMap { case (folderAcc, folderLimit) =>
-            if (folderLimit.limit <= 0) {
-              Future.successful((folderAcc, folderLimit))
-            } else {
-              getUpdateObjectsInFolder(folder).map { folderObjs =>
-                if (folderObjs.size > folderLimit.limit) {
-                  // Folder would exceed the limit; omit it entirely (and stop adding more by making the limit 0) if PageLimit, or fail if HardLimit
-                  folderLimit match {
-                    case PageLimit(limit, _) =>
-                      (folderAcc, PageLimit.tryCreate(0))
-                    case HardLimit(limit, _) =>
-                      throw io.grpc.Status.FAILED_PRECONDITION
-                        .withDescription(
-                          "Size of the result exceeded the limit in getUpdatesBetweenDates."
-                        )
-                        .asRuntimeException()
+        .foldLeft(Future.successful((Seq.empty[String], limit.limit))) {
+          case (futFolderState, folder) =>
+            futFolderState.flatMap { case (folderAcc, folderLimit) =>
+              if (folderLimit <= 0) {
+                Future.successful((folderAcc, folderLimit))
+              } else {
+                getUpdateObjectsInFolder(folder).map { folderObjs =>
+                  if (folderObjs.size > folderLimit) {
+                    // Folder would exceed the limit; omit it entirely (and stop adding more by making the limit 0)
+                    (folderAcc, 0)
+                  } else {
+                    (folderAcc ++ folderObjs, folderLimit - folderObjs.size)
                   }
-                } else {
-                  val newAcc = folderAcc ++ folderObjs
-                  val newLimit: Limit = folderLimit match {
-                    case PageLimit(limit, _) =>
-                      PageLimit.tryCreate(limit - folderObjs.size)
-                    case HardLimit(limit, _) =>
-                      HardLimit.tryCreate(limit - folderObjs.size)
-                  }
-                  (newAcc, newLimit)
                 }
               }
             }
-          }
         }
         .map(_._1)
     }
 
     for {
-      nextFolders <- s3Connection.listFolders(prefix = "", folderFilter, limit)
+      nextFolders <- s3Connection.listFolders(folderFilter, limit)
       objKeys <- getFolderUpdateObjectsUpToLimit(nextFolders)
+      _ = logger.debug(
+        s"Listed folders: ${nextFolders.mkString(", ")}, and objects: ${objKeys.mkString(", ")} for request with afterRecordTime=$afterRecordTime, atOrBeforeRecordTime=$atOrBeforeRecordTime, limit=${limit.limit}, nextPageTokenO=$nextPageTokenO"
+      )
+      _ = if (nextFolders.nonEmpty && objKeys.isEmpty) {
+        throw io.grpc.Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Limit of ${limit.limit} is too low to return any objects, even from a single folder of objects"
+          )
+          .asRuntimeException()
+      }
       objectsWithChecksums <- s3Connection.getChecksums(objKeys)
-      nextPageTokenO = getNextPageToken(nextFolders, objKeys)
+      nextPageTokenO = getNextPageToken(objKeys)
     } yield {
-      objectsWithChecksums
+      UpdateHistoryObjectsResponse(
+        objectsWithChecksums,
+        nextPageTokenO,
+      )
     }
   }
 
 }
 
 object UpdateHistoryBulkStorage {
-  case class UpdateHistoryObjectResponse(
+  case class UpdateHistoryObjectsResponse(
       objects: Seq[ObjectKeyAndChecksum],
       nextPageTokenO: Option[String],
   )

@@ -12,19 +12,61 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{ExternalPartyAmuletRules, TransferCommand}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, IssuingMiningRound, OpenMiningRound, SummarizingMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommand,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  ClosedMiningRound,
+  IssuingMiningRound,
+  OpenMiningRound,
+  SummarizingMiningRound,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, ParticipantAdminConnection, SequencerAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  ParticipantAdminConnection,
+  SequencerAdminConnection,
+}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsRequest, BatchListVotesByVoteRequestsRequest, DamlValueEncoding, ErrorResponse, EventHistoryRequest, HoldingsStateRequest, HoldingsSummaryRequest, ListBulkUpdateHistoryObjectsRequest, ListVoteResultsRequest, MaybeCachedContractWithState, UpdateHistoryItem, UpdateHistoryItemV2, UpdateHistoryRequestV2, UpdateHistoryTransactionV2}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  AcsRequest,
+  BatchListVotesByVoteRequestsRequest,
+  DamlValueEncoding,
+  ErrorResponse,
+  EventHistoryRequest,
+  HoldingsStateRequest,
+  HoldingsSummaryRequest,
+  ListBulkUpdateHistoryObjectsRequest,
+  ListVoteResultsRequest,
+  MaybeCachedContractWithState,
+  UpdateHistoryItem,
+  UpdateHistoryItemV2,
+  UpdateHistoryRequestV2,
+  UpdateHistoryTransactionV2,
+}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore, TxLogEntry}
-import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
-import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, PackageQualifiedName, QualifiedName}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanEventStore,
+  ScanStore,
+  TxLogEntry,
+}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{
+  AcsSnapshotBulkStorage,
+  BulkStorage,
+  UpdateHistoryBulkStorage,
+}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  PackageQualifiedName,
+  QualifiedName,
+}
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
@@ -46,10 +88,27 @@ import java.util.zip.GZIPOutputStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{AbortTransferInstruction, DevnetTap, Mint, Transfer}
-import org.lfdecentralizedtrust.splice.http.{HttpFeatureSupportHandler, HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  AbortTransferInstruction,
+  DevnetTap,
+  Mint,
+  Transfer,
+}
+import org.lfdecentralizedtrust.splice.http.{
+  HttpFeatureSupportHandler,
+  HttpValidatorLicensesHandler,
+  HttpVotesHandler,
+  UrlValidator,
+}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{AppStore, AppStoreWithIngestion, PageLimit, SortOrder, VotesStore}
+import org.lfdecentralizedtrust.splice.store.{
+  AppStore,
+  AppStoreWithIngestion,
+  PageLimit,
+  SortOrder,
+  UpdateHistory,
+  VotesStore,
+}
 import AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
@@ -60,11 +119,11 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
+import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.UpdateHistoryObjectsResponse
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 import scala.collection.immutable.SortedMap
 
@@ -100,6 +159,7 @@ class HttpScanHandler(
     with HttpFeatureSupportHandler {
 
   import HttpScanHandler.*
+
   private val store = storeWithIngestion.store
 
   override protected val workflowId: String = this.getClass.getSimpleName
@@ -409,6 +469,7 @@ class HttpScanHandler(
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
   }
+
   def getRoundOfLatestData(
       response: v0.ScanResource.GetRoundOfLatestDataResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.GetRoundOfLatestDataResponse] = {
@@ -477,6 +538,7 @@ class HttpScanHandler(
         )
     }
   }
+
   def getTopValidatorsByValidatorRewards(
       response: v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.type
   )(
@@ -778,11 +840,13 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetUpdateHistoryV2Response] = {
     implicit val tc: TraceContext = extracted
     val encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson)
+
     def afterMsg = request.after
       .map(a =>
         s": afterMigrationId = ${a.afterMigrationId}, afterRecordTime = ${a.afterRecordTime},"
       )
       .getOrElse(":")
+
     logger.debug(
       s"Requesting updateHistory${afterMsg} pageSize = ${request.pageSize}, encoding = $encoding"
     )
@@ -1922,6 +1986,7 @@ class HttpScanHandler(
       }
     }
   }
+
   override def listRoundPartyTotals(
       respond: ScanResource.ListRoundPartyTotalsResponse.type
   )(request: definitions.ListRoundPartyTotalsRequest)(
@@ -2162,6 +2227,7 @@ class HttpScanHandler(
         }
     }
   }
+
   override def getMemberTrafficStatus(
       respond: ScanResource.GetMemberTrafficStatusResponse.type
   )(synchronizerId: String, memberId: String)(
@@ -2385,49 +2451,90 @@ class HttpScanHandler(
     }
   }
 
+  private def getBulkStorage(): Option[(AcsSnapshotBulkStorage, UpdateHistoryBulkStorage, Uri)] = {
+    for {
+      acs <- bulkStorage.acsSnapshotBulkStorage
+      update <- bulkStorage.updateHistoryBulkStorage
+      url <- this.publicUrl
+    } yield {
+      (acs, update, url)
+    }
+  }
+
+  private def encodeBulkStorageObjects(objects: Seq[ObjectKeyAndChecksum]) =
+    objects.map { case ObjectKeyAndChecksum(key, digest) =>
+      val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
+      definitions.BulkStorageObjectRef(
+        s"$publicUrl/api/scan/v0/history/bulk/download/$encodedKey",
+        digest,
+      )
+    }.toVector
+
   override def listBulkAcsSnapshotObjects(
       respond: ScanResource.ListBulkAcsSnapshotObjectsResponse.type
   )(
       atOrBeforeRecordTime: OffsetDateTime
   )(extracted: TraceContext): Future[ScanResource.ListBulkAcsSnapshotObjectsResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getBulkAcsSnapshot") { _ => _ =>
-      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
-      bulkStorage.acsSnapshotBulkStorage.fold(
-        Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
-          Status.UNIMPLEMENTED
-            .withDescription("Bulk storage is not configured")
-            .asRuntimeException()
-        )
-      )(acsSnapshotBulkStorage =>
-        publicUrl.fold(
+    withSpan(s"$workflowId.listBulkAcsSnapshotObjects") { _ => _ =>
+      getBulkStorage() match {
+        case None =>
           Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
             Status.UNIMPLEMENTED
-              .withDescription("Public URL is not configured")
+              .withDescription("Bulk storage or public URL is not configured")
               .asRuntimeException()
           )
-        )(publicUrl =>
+        case Some((acsSnapshotBulkStorage, _, publicUrl)) =>
+          val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(atOrBeforeRecordTime)
           acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
             case AcsSnapshotObjects(ts, objects) =>
               ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
                 definitions.ListBulkAcsSnapshotObjectsResponse(
                   Codec.encode(ts),
-                  objects.map { case ObjectKeyAndChecksum(key, digest) =>
-                    val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
-                    definitions.BulkStorageObjectRef(
-                      s"$publicUrl/api/scan/v0/history/bulk/download/$encodedKey",
-                      digest,
-                    )
-                  }.toVector,
+                  encodeBulkStorageObjects(objects),
                 )
               )
           }
-        )
-      )
+
+      }
     }
   }
 
-  override def listBulkUpdateHistoryObjects(respond: ScanResource.ListBulkUpdateHistoryObjectsResponse.type)(body: ListBulkUpdateHistoryObjectsRequest)(extracted: TraceContext): Future[ScanResource.ListBulkUpdateHistoryObjectsResponse] = ???
+  override def listBulkUpdateHistoryObjects(
+      respond: ScanResource.ListBulkUpdateHistoryObjectsResponse.type
+  )(body: ListBulkUpdateHistoryObjectsRequest)(
+      extracted: TraceContext
+  ): Future[ScanResource.ListBulkUpdateHistoryObjectsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listBulkUpdateHistoryObjects") { _ => _ =>
+      getBulkStorage() match {
+        case None =>
+          Future.failed[ScanResource.ListBulkUpdateHistoryObjectsResponse](
+            Status.UNIMPLEMENTED
+              .withDescription("Bulk storage or public URL is not configured")
+              .asRuntimeException()
+          )
+        case Some((_, updateHistoryBulkStorage, publicUrl)) =>
+          val afterTs = Codec.tryDecode(Codec.OffsetDateTime)(body.afterRecordTime)
+          val upToTs = Codec.tryDecode(Codec.OffsetDateTime)(body.atOrBeforeRecordTime)
+          updateHistoryBulkStorage
+            .getUpdatesBetweenDates(
+              afterTs,
+              upToTs,
+              PageLimit.tryCreate(body.pageSize),
+              body.nextPageToken,
+            )
+            .map { case UpdateHistoryObjectsResponse(objects, nextPageToken) =>
+              ScanResource.ListBulkUpdateHistoryObjectsResponse.OK(
+                definitions.ListBulkUpdateHistoryObjectsResponse(
+                  encodeBulkStorageObjects(objects),
+                  nextPageToken,
+                )
+              )
+            }
+      }
+    }
+  }
 }
 
 object HttpScanHandler {

@@ -1703,6 +1703,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListBulkUpdateHistoryObjectsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "501":
@@ -4094,6 +4096,7 @@ components:
       required:
         - after_record_time
         - at_or_before_record_time
+        - page_size
       properties:
         after_record_time:
           description: |

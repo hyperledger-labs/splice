@@ -94,7 +94,6 @@ class S3BucketConnection(
     )
 
   def listFolders(
-      prefix: String,
       folderFilter: String => Boolean,
       limit: Limit,
   )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
@@ -102,7 +101,6 @@ class S3BucketConnection(
       ListObjectsV2Request
         .builder()
         .bucket(bucketName)
-        .prefix(prefix)
         .delimiter("/")
         .maxKeys(limit.limit)
         .build(),
