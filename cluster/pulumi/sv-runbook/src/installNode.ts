@@ -278,7 +278,6 @@ async function installSvAndValidator(
         svsConfig?.synchronizer?.skipInitialization &&
         !svsConfig?.synchronizer.forceSvRunbookInitialization,
     },
-    canton.active,
     canton,
     svRunbookConfig.ingressName
   );

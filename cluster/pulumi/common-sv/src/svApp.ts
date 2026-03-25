@@ -45,7 +45,6 @@ function localSynchronizerNodeValues(
 export function valuesForSvApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SingleSvConfiguration & { cometBftGovernanceKey?: unknown; skipInitialization?: boolean },
-  decentralizedSynchronizer: DecentralizedSynchronizerNode,
   synchronizerNodes: SynchronizerNodes,
   ingressName: string
 ): {
@@ -56,7 +55,6 @@ export function valuesForSvApp(
   pvc: object;
   permissionedSynchronizer?: boolean;
 } {
-  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const bftSequencerConnectionEnvVars =
     !config.participant || config.participant.bftSequencerConnection
       ? []
@@ -83,70 +81,46 @@ export function valuesForSvApp(
     .concat(bftSequencerConnectionEnvVars)
     .concat(mediatorPruningConfig);
 
-  const lsuEnabled = decentralizedSynchronizerMigrationConfig.lsuEnabled;
-
-  // When lsuEnabled, emit a synchronizers map
-  // (current = active, successor = upgrade, legacy = legacy) instead of the single domain field.
-  const synchronizerDomainValues: { domain?: object; synchronizers?: object } = lsuEnabled
-    ? {
-        synchronizers: {
-          ...(config.skipInitialization !== undefined
-            ? { skipInitialization: config.skipInitialization }
-            : {}),
-          current: localSynchronizerNodeValues(
-            synchronizerNodes.active,
-            decentralizedSynchronizerMigrationConfig.active,
-            ingressName,
-            config.cometBftGovernanceKey,
-            config.pruning?.sequencer
-          ),
-          ...(synchronizerNodes.upgrade
-            ? {
-                successor: localSynchronizerNodeValues(
-                  synchronizerNodes.upgrade,
-                  decentralizedSynchronizerMigrationConfig.upgrade!,
-                  ingressName,
-                  config.cometBftGovernanceKey,
-                  config.pruning?.sequencer
-                ),
-              }
-            : {}),
-          ...(synchronizerNodes.legacy
-            ? {
-                legacy: localSynchronizerNodeValues(
-                  synchronizerNodes.legacy,
-                  decentralizedSynchronizerMigrationConfig.legacy!,
-                  ingressName,
-                  config.cometBftGovernanceKey,
-                  config.pruning?.sequencer
-                ),
-              }
-            : {}),
-        },
-      }
-    : {
-        domain: {
-          ...(config.pruning?.sequencer
-            ? { sequencerPruningConfig: config.pruning.sequencer }
-            : {}),
-          sequencerAddress: synchronizerNodes.active.namespaceInternalSequencerAddress,
-          mediatorAddress: synchronizerNodes.active.namespaceInternalMediatorAddress,
-          sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${ingressName}.${CLUSTER_HOSTNAME}`,
-        },
-      };
+  const synchronizerValues: { synchronizers: object } = {
+    synchronizers: {
+      ...(config.skipInitialization !== undefined
+        ? { skipInitialization: config.skipInitialization }
+        : {}),
+      current: localSynchronizerNodeValues(
+        synchronizerNodes.active,
+        decentralizedSynchronizerMigrationConfig.active,
+        ingressName,
+        config.cometBftGovernanceKey,
+        config.pruning?.sequencer
+      ),
+      ...(synchronizerNodes.upgrade
+        ? {
+            successor: localSynchronizerNodeValues(
+              synchronizerNodes.upgrade,
+              decentralizedSynchronizerMigrationConfig.upgrade!,
+              ingressName,
+              config.cometBftGovernanceKey,
+              config.pruning?.sequencer
+            ),
+          }
+        : {}),
+      ...(synchronizerNodes.legacy
+        ? {
+            legacy: localSynchronizerNodeValues(
+              synchronizerNodes.legacy,
+              decentralizedSynchronizerMigrationConfig.legacy!,
+              ingressName,
+              config.cometBftGovernanceKey,
+              config.pruning?.sequencer
+            ),
+          }
+        : {}),
+    },
+  };
 
   // if you add a top level field here that is an object make sure to handle merging it in the caller
   return {
-    ...(lsuEnabled || useCantonBft
-      ? { cometBFT: {} }
-      : {
-          cometBFT: {
-            enabled: true,
-            connectionUri: pulumi.interpolate`http://${(decentralizedSynchronizer as unknown as CometbftSynchronizerNode).cometbftRpcServiceName}:26657`,
-            ...(config.cometBftGovernanceKey ? { externalGovernanceKey: true } : {}),
-          },
-        }),
-    ...synchronizerDomainValues,
+    ...synchronizerValues,
     pvc: {
       volumeStorageClass: standardStorageClassName,
       volumeName: `sv-app-global-domain-migration-${pvcSuffix}`,

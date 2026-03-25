@@ -1537,7 +1537,6 @@
           "audience": "https://sv.example.com/api",
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
-        "cometBFT": {},
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,

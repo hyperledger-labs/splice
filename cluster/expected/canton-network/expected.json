@@ -3124,7 +3124,6 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "cometBFT": {},
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
@@ -4094,7 +4093,6 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
-        "cometBFT": {},
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "delegatelessAutomationExpectedTaskDuration": 5000,
