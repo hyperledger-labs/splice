@@ -45,16 +45,19 @@ export interface ScanBigQueryConfig {
   prefix: string;
 }
 
-export interface StaticSvConfig {
+export interface StaticSvConfigBasic {
   nodeName: string;
   ingressName: string;
   onboardingName: string;
+  sweep?: SweepConfig;
+}
+
+export interface StaticSvConfig extends StaticSvConfigBasic {
   validatorWalletUser?: string;
   auth0ValidatorAppName: string;
   auth0SvAppName: string;
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
-  sweep?: SweepConfig;
   scanBigQuery?: ScanBigQueryConfig;
   svIdKeySecretName?: string;
   cometBftGovernanceKeySecretName?: string;

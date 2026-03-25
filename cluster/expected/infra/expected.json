@@ -3425,6 +3425,131 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionPrometheusQueryLanguage": {
+            "duration": "300s",
+            "query": "\n            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource=\"consumer_quota\"}\n            / ignoring(limit_name) group_right()\n            (serviceruntime_googleapis_com:quota_limit{monitored_resource=\"consumer_quota\"} > 0)\n            > 0.9\n          "
+          },
+          "displayName": "Allocation Quota approaching limit (>90%) in mock"
+        }
+      ],
+      "displayName": "Allocation Quota approaching limit (>90%) in mock",
+      "notificationChannels": [
+        null
+      ],
+      "userLabels": {
+        "cluster": "mock"
+      }
+    },
+    "name": "quotaAllocationAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionThreshold": {
+            "aggregations": [
+              {
+                "alignmentPeriod": "60s",
+                "crossSeriesReducer": "REDUCE_SUM",
+                "groupByFields": [
+                  "metric.label.quota_metric"
+                ],
+                "perSeriesAligner": "ALIGN_COUNT_TRUE"
+              }
+            ],
+            "comparison": "COMPARISON_GT",
+            "duration": "60s",
+            "filter": "resource.type=\"consumer_quota\" AND metric.type=\"serviceruntime.googleapis.com/quota/exceeded\"",
+            "trigger": {
+              "count": 1
+            }
+          },
+          "displayName": "Quota Exceeded in mock"
+        }
+      ],
+      "displayName": "Quota Exceeded in mock",
+      "notificationChannels": [
+        null
+      ],
+      "userLabels": {
+        "cluster": "mock"
+      }
+    },
+    "name": "quotaExceededAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionPrometheusQueryLanguage": {
+            "duration": "300s",
+            "query": "\n            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource=\"consumer_quota\"}\n            / ignoring(limit_name) group_right()\n            (serviceruntime_googleapis_com:quota_limit{monitored_resource=\"consumer_quota\"} > 0)\n            > 0.9\n          "
+          },
+          "displayName": "Rate Quota approaching limit (>90%) in mock"
+        }
+      ],
+      "displayName": "Rate Quota approaching limit (>90%) in mock",
+      "notificationChannels": [
+        null
+      ],
+      "userLabels": {
+        "cluster": "mock"
+      }
+    },
+    "name": "quotaRateAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "network": "projects/da-cn-devnet/global/networks/default"
     },
     "name": "router-test-stack",

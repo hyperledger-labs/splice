@@ -41,6 +41,10 @@ rateLimits:
     name: domains
     type: unlimited
 
+  /api/scan/v1/domains:
+    name: domains-v1
+    type: unlimited
+
   /api/scan/v0/closed-rounds:
     name: closed-rounds
     type: unlimited

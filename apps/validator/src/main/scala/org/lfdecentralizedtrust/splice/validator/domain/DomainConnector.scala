@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
@@ -90,7 +90,16 @@ class DomainConnector(
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
-            .single(GrpcSequencerConnection.tryCreate(url))
+            .tryMany(
+              connections = Seq(GrpcSequencerConnection.tryCreate(url)),
+              sequencerTrustThreshold = PositiveInt.one,
+              sequencerLivenessMargin = NonNegativeInt.zero,
+              submissionRequestAmplification = SubmissionRequestAmplification(
+                PositiveInt.one,
+                config.sequencerRequestAmplificationPatience,
+              ),
+              sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays,
+            )
         ).pure[Future]
     }
   }

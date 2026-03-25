@@ -39,7 +39,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.apache.pekko.stream.Materializer
@@ -128,6 +128,11 @@ trait ScanConnection
   def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]]
+
+  def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[ParticipantId]]
 
   def listDsoScans()(implicit tc: TraceContext): Future[Seq[HttpScanAppClient.DomainScans]]
 
