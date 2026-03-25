@@ -1622,6 +1622,7 @@ class UpdateHistory(
       )
     }
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
+
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         new Transaction(

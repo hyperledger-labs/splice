@@ -741,7 +741,7 @@ object ScanHttpEncodings {
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
 
-    // Only include the external transaction hash based on the hash inclusion policy.
+    // Include the external transaction hash based on the hash inclusion policy.
     val externalTransactionHash: ByteString =
       hashInclusionPolicy match {
         case ExternalHashInclusionPolicy.AlwaysInclude =>
