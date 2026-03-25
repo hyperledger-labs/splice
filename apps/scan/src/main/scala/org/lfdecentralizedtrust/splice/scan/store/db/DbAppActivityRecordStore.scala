@@ -58,6 +58,8 @@ class DbAppActivityRecordStore(
     val verdicts = "scan_verdict_store"
   }
 
+  private def historyId = updateHistory.historyId
+
   type AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
 
   private implicit val getResultAppActivityRecord: GetResult[AppActivityRecordT] = GetResult {
@@ -78,7 +80,7 @@ class DbAppActivityRecordStore(
   def earliestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
-    val historyId = updateHistory.historyId
+
     runQuerySingle(
       sql"""select min_round + 1
             from (
@@ -107,7 +109,7 @@ class DbAppActivityRecordStore(
   def latestRoundWithCompleteAppActivity()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
-    val historyId = updateHistory.historyId
+
     runQuerySingle(
       sql"""select max_round
             from (

@@ -104,6 +104,8 @@ class DbScanAppRewardsStore(
     val appRewardRootHashes = "app_reward_root_hashes"
   }
 
+  private def historyId = updateHistory.historyId
+
   // -- GetResult implicits --------------------------------------------------
 
   private implicit val getResultAppActivityPartyTotal
@@ -206,7 +208,7 @@ class DbScanAppRewardsStore(
   def getAppActivityPartyTotalsByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppActivityPartyTotalT]] = {
-    val historyId = updateHistory.historyId
+
     runQuery(
       sql"""select history_id, round_number, total_app_activity_weight,
                    app_provider_party_seq_num, app_provider_party
@@ -254,7 +256,7 @@ class DbScanAppRewardsStore(
   def getAppActivityRoundTotalByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppActivityRoundTotalT]] = {
-    val historyId = updateHistory.historyId
+
     runQuerySingle(
       sql"""select history_id, round_number, total_round_app_activity_weight,
                    active_app_provider_parties_count
@@ -302,7 +304,7 @@ class DbScanAppRewardsStore(
   def getAppRewardPartyTotalsByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppRewardPartyTotalT]] = {
-    val historyId = updateHistory.historyId
+
     runQuery(
       sql"""select history_id, round_number, app_provider_party_seq_num,
                    total_app_reward_amount
@@ -352,7 +354,7 @@ class DbScanAppRewardsStore(
   def getAppRewardRoundTotalByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppRewardRoundTotalT]] = {
-    val historyId = updateHistory.historyId
+
     runQuerySingle(
       sql"""select history_id, round_number,
                    total_app_reward_minting_allowance, total_app_reward_thresholded,
@@ -402,7 +404,7 @@ class DbScanAppRewardsStore(
   def getAppRewardBatchHashesByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppRewardBatchHashT]] = {
-    val historyId = updateHistory.historyId
+
     runQuery(
       sql"""select history_id, round_number, batch_level,
                    party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash
@@ -449,7 +451,7 @@ class DbScanAppRewardsStore(
   def getAppRewardRootHashByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppRewardRootHashT]] = {
-    val historyId = updateHistory.historyId
+
     runQuerySingle(
       sql"""select history_id, round_number, root_hash
             from #${Tables.appRewardRootHashes}
@@ -468,7 +470,7 @@ class DbScanAppRewardsStore(
   def lookupLatestRoundWithRewardComputation()(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
-    val historyId = updateHistory.historyId
+
     runQuerySingle(
       sql"""select max(round_number) from #${Tables.appRewardRootHashes}
             where history_id = $historyId
@@ -496,7 +498,7 @@ class DbScanAppRewardsStore(
   private[store] def aggregateActivityTotals(
       roundNumber: Long
   )(implicit tc: TraceContext): Future[Unit] = {
-    val historyId = updateHistory.historyId
+
     runUpdate(
       assertCompleteActivity(roundNumber).flatMap(_ =>
         (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
