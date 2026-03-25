@@ -27,10 +27,10 @@
     "start": "tsc --watch"
   },
   "dependencies": {
-    "dompurify": "3.3.3",
-    "jose": "4.15.9",
-    "jsondiffpatch": "0.7.3",
-    "msw": "2.12.14",
-    "zod": "3.25.76"
+    "dompurify": "^3.3.3",
+    "jose": "^4.15.9",
+    "jsondiffpatch": "^0.7.3",
+    "msw": "^2.12.14",
+    "zod": "^3.25.76"
   }
 }
