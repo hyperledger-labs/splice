@@ -1381,6 +1381,7 @@ abstract class StoreTestBase
       children: Seq[Event],
       synchronizerId: SynchronizerId,
       effectiveAt: Instant = defaultEffectiveAt,
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val updateId = nextUpdateId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
@@ -1406,7 +1407,7 @@ abstract class StoreTestBase
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
-      ByteString.EMPTY,
+      externalTransactionHash,
     )
   }
 

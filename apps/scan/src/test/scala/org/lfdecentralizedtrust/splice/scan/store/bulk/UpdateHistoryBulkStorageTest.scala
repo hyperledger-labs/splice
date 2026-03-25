@@ -50,6 +50,7 @@ class UpdateHistoryBulkStorageTest
     bulkDbReadChunkSize = 500,
     bulkZstdFrameSize = 10000L,
     maxFileSize,
+    zstdCompressionLevel = 3,
   )
   val appConfig = BulkStorageConfig(
     updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
