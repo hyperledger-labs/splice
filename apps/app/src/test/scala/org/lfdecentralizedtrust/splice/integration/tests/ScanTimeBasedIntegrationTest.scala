@@ -5,11 +5,18 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import org.apache.pekko.http.scaladsl.model.Uri
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon, ValidatorRewardCoupon}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  Amulet,
+  AppRewardCoupon,
+  ValidatorRewardCoupon,
+}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
@@ -616,7 +623,10 @@ class ScanTimeBasedIntegrationTest
         .createdEvents
       val acsObjUrl = getSnapshotResponse.objectRefs.head.url
       acsObjUrl should startWith("http://foo.bar.com/api/scan/v0/history/bulk/download/")
-      val acsObjKey = URLDecoder.decode(acsObjUrl.stripPrefix("http://foo.bar.com/api/scan/v0/history/bulk/download/"), StandardCharsets.UTF_8)
+      val acsObjKey = URLDecoder.decode(
+        acsObjUrl.stripPrefix("http://foo.bar.com/api/scan/v0/history/bulk/download/"),
+        StandardCharsets.UTF_8,
+      )
       val out = new ByteArrayOutputStream()
       sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
       val acsAtMidnightFromS3 = uncompressAndDecode(
