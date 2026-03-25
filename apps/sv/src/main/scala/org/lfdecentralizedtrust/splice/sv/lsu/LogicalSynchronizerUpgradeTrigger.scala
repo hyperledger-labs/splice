@@ -218,7 +218,7 @@ class LogicalSynchronizerUpgradeTrigger(
         sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
         _ <-
           currentSynchronizerNode.sequencerAdminConnection.ensureSequencerSuccessor(
-            psid.logical,
+            psid,
             sequencerId = sequencerId,
             connection = successorConnection,
           )

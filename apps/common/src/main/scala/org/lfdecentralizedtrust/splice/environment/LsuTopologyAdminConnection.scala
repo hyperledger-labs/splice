@@ -46,11 +46,12 @@ trait LsuTopologyAdminConnection {
         protocolVersion = None,
       ),
       sequencerId.filterString,
+      filterSuccessorPhysicalSynchronizerId = "",
     )
   ).map(_.headOption.map(r => TopologyResult(r.context, r.item)))
 
   def ensureSequencerSuccessor(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       sequencerId: SequencerId,
       connection: GrpcConnection,
   )(implicit
@@ -61,7 +62,7 @@ trait LsuTopologyAdminConnection {
       RetryFor.Automation,
       s"sequencer_successor_$sequencerId",
       s"sequencer successor for $sequencerId is published with connection $connection",
-      lookupSequencerSuccessors(synchronizerId, sequencerId).map { result =>
+      lookupSequencerSuccessors(synchronizerId.logical, sequencerId).map { result =>
         result.filter(_.mapping.connection == connection).toRight(result)
       },
       (previous: Option[TopologyResult[LsuSequencerConnectionSuccessor]]) => {
