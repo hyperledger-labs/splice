@@ -55,9 +55,9 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
     "return activity totals after aggregation trigger runs" in { implicit _env =>
       // TODO(#4381): Update the time management here
       //
-      // Advance enough ticks so that at least two rounds are fully closed and aggregated.
+      // Advance enough ticks so that at least three rounds are fully closed and aggregated.
       // (advanceRoundsToNextRoundOpening advances by 1 tick)
-      for (_ <- 1 to 6) {
+      for (_ <- 1 to 7) {
         advanceRoundsToNextRoundOpening
         sv1ScanBackend.automation
           .trigger[ScanAggregationTrigger]
@@ -65,11 +65,12 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
           .futureValue
       }
 
-      // Run the reward computation trigger
-      sv1ScanBackend.automation
-        .trigger[RewardComputationTrigger]
-        .runOnce()
-        .futureValue
+      clue("Run the reward computation trigger") {
+        sv1ScanBackend.automation
+          .trigger[RewardComputationTrigger]
+          .runOnce()
+          .futureValue
+      }
 
       val earliest = clue("Verify earliest available round is returned") {
         val e = sv1ScanBackend.getRewardAccountingEarliestAvailableRound()

@@ -404,8 +404,8 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        // 43 has prior round 42, so 43 is both earliest and latest complete
-        result.value shouldBe 43L
+        // max_round=43, 43-1=42 has records, so latest complete is 42
+        result.value shouldBe 42L
       }
     }
 
@@ -425,8 +425,8 @@ class DbAppActivityRecordStoreTest
         )
         result <- store.latestRoundWithCompleteAppActivity()
       } yield {
-        // 12 has prior round 11, so 12 is the latest complete
-        result.value shouldBe 12L
+        // max_round=12, 12-1=11 has records, so latest complete is 11
+        result.value shouldBe 11L
       }
     }
 

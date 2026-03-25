@@ -103,8 +103,9 @@ class DbAppActivityRecordStore(
   }
 
   /** Find the latest round with complete app activity.
-    * A round is complete if the prior round also has activity records,
-    * proving ingestion was running continuously through it.
+    * A round is complete when ingestion has moved past it, i.e., the next
+    * round also has records. We return max_round - 1 because max_round
+    * itself may still be receiving records.
     * Returns None if fewer than two consecutive rounds have been ingested.
     */
   def latestRoundWithCompleteAppActivity()(implicit
@@ -112,7 +113,7 @@ class DbAppActivityRecordStore(
   ): Future[Option[Long]] = {
 
     runQuerySingle(
-      sql"""select max_round
+      sql"""select max_round - 1
             from (
               select max(a.round_number) as max_round
               from #${Tables.appActivityRecords} a
@@ -131,8 +132,10 @@ class DbAppActivityRecordStore(
     )
   }
 
-  /** Assert that activity records exist for rounds surrounding the given round,
-    * proving ingestion completeness. Joins through scan_verdict_store to filter by history_id.
+  /** Assert that activity records exist for rounds roundNumber - 1 and
+    * roundNumber + 1, proving ingestion completeness for roundNumber.
+    * Round N-1 proves ingestion was running before N; round N+1 proves
+    * ingestion has moved past N, so all of N's records have been ingested.
     */
   def assertCompleteActivity(roundNumber: Long)(implicit
       tc: TraceContext
