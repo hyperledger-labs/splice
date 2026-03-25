@@ -2,10 +2,17 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
-import com.digitalasset.canton.topology.{SequencerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  PhysicalSynchronizerId,
+  SequencerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.{
   CometBftConfig,
@@ -24,13 +31,13 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.compat.java8.OptionConverters.RichOptionForJava8
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
 
 class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
-  private val migrationId = 123L
+  private val serialId = 123L
   private val selfSequencerId = SequencerId(
     UniqueIdentifier.tryFromProtoPrimitive("sequencer::self")
   )
@@ -44,11 +51,21 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
   private val scanConnection = mock[AggregatingScanConnection]
 
   when(sequencerAdminConnection.getSequencerId).thenReturn(Future.successful(selfSequencerId))
+  when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
+    .thenReturn(Future.successful(true))
+  when(sequencerAdminConnection.getPhysicalSynchronizerId()(any[TraceContext])).thenReturn(
+    Future.successful(
+      PhysicalSynchronizerId(
+        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::test")),
+        NonNegativeInt.tryCreate(serialId.toInt),
+        ProtocolVersion.latest,
+      )
+    )
+  )
 
   private val reconciler = new SequencerBftPeerReconciler(
     sequencerAdminConnection,
     scanConnection,
-    migrationId,
   ) {
     override protected def svDsoStore: SvDsoStore = svDsoStoreMock
 
@@ -72,17 +89,17 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer1Id,
         sequencer1Host.url,
       ),
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer2Id,
         sequencer2Host.url,
       ),
       BftSequencer(
-        migrationId,
+        serialId,
         selfSequencerId,
         "https://host3:7214",
       ),
@@ -105,12 +122,12 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer1Id,
         sequencer1Host.url,
       ),
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer2Id,
         sequencer2Host.url,
       ),
@@ -141,12 +158,12 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer1Id,
         sequencer1Host.url,
       ),
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer2Id,
         sequencer2Host.url,
       ),
@@ -176,7 +193,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer1Id,
         sequencer1Host.url,
       )
@@ -207,7 +224,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer1Id,
         newSequencer1Host.url,
       )
@@ -227,7 +244,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
     result.toRemove should contain only sequencer1Host
   }
 
-  it should "ignore sequencer urls from scan for other migration ids" in {
+  it should "ignore sequencer urls from scan for other serial ids" in {
     withConfiguredDsoSequencers(
       Seq(
         createSequencerConfig(sequencer1Id)
@@ -236,12 +253,12 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId + 1,
+        serialId + 1,
         sequencer2Id,
         sequencer2Host.url,
       ),
       BftSequencer(
-        migrationId + 1,
+        serialId + 1,
         sequencer1Id,
         sequencer1Host.url,
       ),
@@ -269,7 +286,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers(
       BftSequencer(
-        migrationId,
+        serialId,
         sequencer1Id,
         sequencer1Host.url,
       )
@@ -308,6 +325,26 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
     val result = reconciler.diffDsoRulesWithTopology().futureValue.loneElement
     result.toAdd should be(empty)
     result.toRemove should contain only sequencer1Host
+  }
+
+  it should "do nothing if the sequencer is not initialized" in {
+    withConfiguredDsoSequencers(
+      Seq(
+        createSequencerConfig(sequencer1Id),
+        createSequencerConfig(sequencer2Id),
+      )
+    )
+
+    when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
+      .thenReturn(Future.successful(false))
+
+    try {
+      val result = reconciler.diffDsoRulesWithTopology().futureValue
+      result should be(empty)
+    } finally {
+      when(sequencerAdminConnection.isNodeInitialized()(any[TraceContext]))
+        .thenReturn(Future.successful(true))
+    }
   }
 
   private def createSequencerConfig(id: SequencerId) = {

@@ -1900,11 +1900,8 @@ checkErrors := {
     import better.files.File
     val logSpecificIgnores =
       if (File(ignorePatternsFilename(logName)).exists()) Seq(logName) else Seq.empty
-    val bftIgnore = if (sys.env.contains("SPLICE_USE_BFT_SEQUENCER")) {
-      Seq("canton_log_bft")
-    } else {
-      Seq.empty
-    }
+    // ideally we would add them only if dabft is enabled but it's too much of a pain to wire it in the github actions
+    val bftIgnore = Seq("canton_log_bft")
 
     val simtimeIgnorePatterns = if (usesSimtime) Seq("canton_log_simtime_extra") else Seq.empty
     val beforeIgnorePatterns =

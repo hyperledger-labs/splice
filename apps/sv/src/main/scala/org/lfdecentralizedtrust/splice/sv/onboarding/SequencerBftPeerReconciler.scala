@@ -20,7 +20,6 @@ import scala.util.control.NonFatal
 abstract class SequencerBftPeerReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
-    migrationId: Long,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
 
@@ -95,23 +94,7 @@ abstract class SequencerBftPeerReconciler(
               )
             else Seq()
           }
-        }
-      peersToRemove = currentPeers
-        .filterNot {
-          case (Some(peerSequencerId), endpointId) =>
-            dsoSequencersWithScanInfo.exists { case (sequencerId, config) =>
-              sequencerId == peerSequencerId && config.forall(_.peerId.id == endpointId)
-            }
-          case (None, endpointId) =>
-            dsoSequencersWithScanInfo.exists { case (_, config) =>
-              config.exists(_.peerId.id == endpointId)
-            }
-        }
-    } yield {
-      if (peersToAdd.nonEmpty || peersToRemove.nonEmpty)
-        Seq(BftPeerDifference(peersToAdd.map(_._2.peerId), peersToRemove.map(_._2), currentPeers))
-      else Seq()
-    }
+    } yield result
   }
 
   private def getAllBftSequencers()(implicit ec: ExecutionContext, tc: TraceContext) = {

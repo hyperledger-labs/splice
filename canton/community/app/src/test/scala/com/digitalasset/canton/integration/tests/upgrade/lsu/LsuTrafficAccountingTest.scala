@@ -33,17 +33,13 @@ import com.digitalasset.canton.integration.tests.TrafficBalanceSupport
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality.Optional
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.TrafficControlParameters as InternalTrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
-import com.digitalasset.canton.synchronizer.sequencing.service.GrpcSequencerService
 import com.digitalasset.canton.topology.{Member, Party, SynchronizerId}
 import org.scalatest.Assertion
-import org.slf4j.event.Level
 
 import java.time.Duration
-import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
@@ -57,7 +53,7 @@ import scala.util.Random
  * Participants connect via different sequencers to simulate real-world usage.
  * representing old(sequencer1, sequencer3, mediator1) and new(sequencer2, sequencer4, mediator2) synchronizer nodes
  */
-abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSupport {
+abstract class LsuTrafficAccountingTest extends LsuBase with TrafficBalanceSupport {
 
   override protected def testName: String = "lsu-traffic-accounting"
 
@@ -258,10 +254,10 @@ abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSuppo
       // Before upgrade time has been reached on the old sequencer we expect an error
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         sequencer1.traffic_control.get_lsu_state(),
-        _.shouldBeCantonErrorCode(SequencerError.NoOngoingLSU),
+        _.shouldBeCantonErrorCode(SequencerError.NoOngoingLsu),
       )
 
-      performSynchronizerNodesLSU(fixture)
+      performSynchronizerNodesLsu(fixture)
 
       // Generate some non-trivial base traffic remainder state
       environment.simClock.value.advanceTo(upgradeTime.minusMillis(20L))
@@ -289,34 +285,10 @@ abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSuppo
         )
       }
 
-      eventually() {
-        participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
-      }
-
       environment.simClock.value.advance(Duration.ofSeconds(1))
 
-      // we start the ping before setting the traffic state to check that sequencer doesn't drop requests
-      // while traffic is still being initialized
-      val pingSucceeded = Promise[Unit]()
-      loggerFactory.assertEventuallyLogsSeq(
-        SuppressionRule.forLogger[GrpcSequencerService] && SuppressionRule.Level(Level.INFO)
-      )(
-        Future(participant1.health.ping(participant2))
-          .map(_ => pingSucceeded.success(()))
-          .discard // Note: we cannot return the Future via the suppression, it will put it on directExecutionContext
-        ,
-        logs =>
-          if (logs.exists(_.message.contains("sends request with id"))) {
-            logger.debug("Ping request is at the sequencer")
-            succeed
-          } else {
-            logger.debug("Ping request has not reached the sequencer yet...")
-            fail("Ping request not sent yet")
-          },
-      )
-
-      // Ping should not have completed
-      pingSucceeded.isCompleted shouldBe false
+      // Participants should not be able to connect to the new sequencers before the traffic state has been set
+      participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe false
 
       logger.debug("Setting traffic state on new sequencers")
       sequencer2.traffic_control.set_lsu_state(oldTrafficStateSeq1)
@@ -325,13 +297,11 @@ abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSuppo
       // Command is expected to return an error if called again
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         sequencer2.traffic_control.set_lsu_state(oldTrafficStateSeq1),
-        _.shouldBeCantonErrorCode(SequencerError.LSUTrafficAlreadyInitialized),
+        _.shouldBeCantonErrorCode(SequencerError.LsuTrafficAlreadyInitialized),
       )
 
-      // ping should succeed now
-      logger.debug("Waiting for ping to succeed")
-      clue("request blocked during LSU traffic state initialization should succeed") {
-        pingSucceeded.future.futureValue
+      eventually() {
+        participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
       }
 
       logger.debug("Comparing traffic states on old and new sequencers")
@@ -344,7 +314,7 @@ abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSuppo
       def getTraffic(sequencer: LocalSequencerReference) = members
         .map(m =>
           m -> sequencer.underlying.value.sequencer.sequencer
-            .getTrafficStateAt(m, upgradeTime)
+            .getTrafficStateAt(m, upgradeTime.immediateSuccessor)
             .futureValueUS
             .value
         )
@@ -368,12 +338,11 @@ abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSuppo
       oldSNTrafficStateSeq1 shouldEqual oldSNTrafficStateSeq3
       newSNTrafficStateSeq2 shouldEqual newSNTrafficStateSeq4
 
+      // make sure participant has initialized its traffic correctly when connecting to the new synchronizer
+      val newPNTrafficStateP1 = participant1.traffic_control.traffic_state(daId)
+      newPNTrafficStateP1 shouldBe newSNTrafficStateSeq2.get(participant1.id.member).value.value
+
       oldSynchronizerNodes.all.stop()
-
-      environment.simClock.value.advance(Duration.ofSeconds(1))
-
-      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
-      waitForTargetTimeOnSequencer(sequencer4, environment.clock.now)
 
       val aliceIou =
         participant1.ledger_api.javaapi.state.acs.await(IouSyntax.modelCompanion)(alice)
@@ -572,7 +541,7 @@ abstract class LSUTrafficAccountingTest extends LSUBase with TrafficBalanceSuppo
   }
 }
 
-final class LSUReferenceTrafficAccountingTest extends LSUTrafficAccountingTest {
+final class LsuReferenceTrafficAccountingTest extends LsuTrafficAccountingTest {
   registerPlugin(
     new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,

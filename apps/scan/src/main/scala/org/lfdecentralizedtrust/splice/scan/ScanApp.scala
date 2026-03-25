@@ -147,15 +147,22 @@ class ScanApp(
         this.getClass.getSimpleName,
         loggerFactory,
       )
-    val bftSequencersWithAdminConnections = config.bftSequencers.map(bftSequencer =>
-      new SequencerAdminConnection(
-        bftSequencer.sequencerAdminClient,
-        amuletAppParameters.loggingConfig.api,
-        loggerFactory,
-        nodeMetrics.grpcClientMetrics,
-        retryProvider,
-      ) -> bftSequencer
-    )
+    val bftSequencersWithAdminConnections = {
+      val all = Seq(config.synchronizerNodes.current) ++
+        config.synchronizerNodes.successor.toList ++
+        config.synchronizerNodes.legacy.toList
+      all.flatMap { syncConfig =>
+        syncConfig.bftSequencerConfig.map { bftConfig =>
+          new SequencerAdminConnection(
+            syncConfig.sequencer,
+            amuletAppParameters.loggingConfig.api,
+            loggerFactory,
+            nodeMetrics.grpcClientMetrics,
+            retryProvider,
+          ) -> bftConfig
+        }
+      }
+    }
     for {
       dsoParty <- appInitStep("Get DSO party from user metadata") {
         appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
