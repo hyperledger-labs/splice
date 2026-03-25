@@ -28,6 +28,16 @@
          walletPayments     0.1.14
          ================== =======
 
+    - Scan
+
+       - Added a new ``/v1/domains/{domain_id}/parties/{party_id}/participant-id`` endpoint that returns all participant IDs hosting a given party,
+         supporting parties hosted on multiple participants. The previous ``/v0`` endpoint only supported single-participant hosting.
+
+    - SV UI
+
+       - Fixed the SV UI to correctly handle parties hosted on multiple participants (e.g., the DSO party).
+         The SV app now proxies the party-to-participant mapping through Scan's new v1 endpoint.
+
     - LocalNet
 
        - LocalNet now supports running multiple synchronizers side by side for testing multi-synchronizer scenarios. By default, only the ``global``

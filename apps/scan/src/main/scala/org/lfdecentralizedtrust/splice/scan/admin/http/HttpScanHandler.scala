@@ -2297,6 +2297,48 @@ class HttpScanHandler(
     }
   }
 
+  override def getPartyToParticipantV1(
+      respond: ScanResource.GetPartyToParticipantV1Response.type
+  )(
+      synchronizerId: String,
+      partyId: String,
+  )(extracted: TraceContext): Future[ScanResource.GetPartyToParticipantV1Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getPartyToParticipantV1") { _ => _ =>
+      for {
+        domain <- SynchronizerId.fromString(synchronizerId) match {
+          case Right(domain) => Future.successful(domain)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode synchronizer ID: $error")
+            )
+        }
+        party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
+            )
+        }
+        response <- sequencerAdminConnection.getPartyToParticipant(
+          domain,
+          party,
+          topologyTransactionType = AuthorizedState,
+          topologySnapshot =
+            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+        )
+        _ <-
+          if (response.mapping.partyId == party) Future.unit
+          else
+            Future.failed(
+              HttpErrorHandler.notFound(s"Party not found: $party")
+            )
+      } yield definitions.GetPartyToParticipantResponseV1(
+        response.mapping.participantIds.map(_.toProtoPrimitive).toVector
+      )
+    }
+  }
+
   override def getValidatorFaucetsByValidator(
       respond: ScanResource.GetValidatorFaucetsByValidatorResponse.type
   )(validators: Vector[String])(
