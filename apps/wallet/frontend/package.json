@@ -14,21 +14,26 @@
     ]
   },
   "dependencies": {
-    "@daml.js/splice-api-token-metadata": "file:../../common/frontend/daml.js/splice-api-token-metadata-v1-1.0.0",
     "@daml.js/splice-api-token-allocation": "file:../../common/frontend/daml.js/splice-api-token-allocation-v1-1.0.0",
     "@daml.js/splice-api-token-allocation-request": "file:../../common/frontend/daml.js/splice-api-token-allocation-request-v1-1.0.0",
+    "@daml.js/splice-api-token-metadata": "file:../../common/frontend/daml.js/splice-api-token-metadata-v1-1.0.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@lfdecentralizedtrust/scan-proxy-openapi": "^0.0.1",
+    "@lfdecentralizedtrust/splice-common-frontend": "0.1.0",
+    "@lfdecentralizedtrust/splice-common-frontend-utils": "0.1.0",
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@tanstack/react-query": "5.90.20",
     "bignumber.js": "9.1.1",
-    "@lfdecentralizedtrust/splice-common-frontend": "0.1.0",
-    "@lfdecentralizedtrust/splice-common-frontend-utils": "0.1.0",
+    "dompurify": "3.3.3",
+    "jose": "4.15.9",
+    "jsondiffpatch": "0.7.3",
+    "msw": "2.12.14",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-helmet-async": "^2.0.5",
-    "@lfdecentralizedtrust/scan-proxy-openapi": "^0.0.1"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
@@ -46,7 +51,7 @@
     "@typescript-eslint/eslint-plugin": "8.29.1",
     "@typescript-eslint/parser": "8.29.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "eslint": "9.24.0",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "10.1.1",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
@@ -57,7 +62,7 @@
     "prettier": "3.5.3",
     "typescript": "5.8.3",
     "typescript-eslint": "^8.30.1",
-    "vite": "^5.4.19",
+    "vite": "^8.0.2",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.1.1"
   },
