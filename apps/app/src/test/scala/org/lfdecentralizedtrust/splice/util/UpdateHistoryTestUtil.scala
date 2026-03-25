@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.mem
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
+  ExternalHashInclusionPolicy,
   ProtobufJsonScanHttpEncodings,
   ScanHttpEncodings,
 }
@@ -49,6 +50,7 @@ import org.scalatest.Assertion
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import com.digitalasset.canton.util.HexString
 
 trait UpdateHistoryTestUtil extends TestCommon {
 
@@ -185,12 +187,8 @@ trait UpdateHistoryTestUtil extends TestCommon {
     // and that all expected hashes are present in the recorded updates
     val recordedExtTxnHashes = recordedUpdates.collect {
       case UpdateHistoryResponse(TransactionTreeUpdate(tx), _)
-          if Option(tx.getExternalTransactionHash).exists(!_.isEmpty) =>
-        Option(tx.getExternalTransactionHash)
-          .map(_.toByteArray)
-          .getOrElse(Array.emptyByteArray)
-          .map("%02x" format _)
-          .mkString
+          if !tx.getExternalTransactionHash.isEmpty =>
+        HexString.toHexString(tx.getExternalTransactionHash)
     }
 
     recordedExtTxnHashes should not be empty
@@ -238,7 +236,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val historyFromStoreWithoutLostData =
       historyFromStore
         .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-        .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
+        .map(
+          ScanHttpEncodings
+            .makeConsistentAcrossSvs(_, ExternalHashInclusionPolicy.AlwaysInclude, None)
+        )
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
 
@@ -253,6 +254,31 @@ trait UpdateHistoryTestUtil extends TestCommon {
     succeed
   }
 
+  def compareHistoryViaLosslessScanApiWithExtTxnHashes(
+      scanClient: ScanAppClientReference,
+      extTxnHashes: Seq[String] = Seq.empty,
+  ): Assertion = {
+    val historyThroughApi = scanClient
+      .getUpdateHistory(
+        1000,
+        None,
+        encoding = ProtobufJson,
+      )
+      .map(ProtobufJsonScanHttpEncodings.httpToLapiUpdate)
+
+    val recordedExtTxnHashes = historyThroughApi.flatMap { update =>
+      update.update.update match {
+        case TransactionTreeUpdate(tx) =>
+          val hash = tx.getExternalTransactionHash
+          if (hash.isEmpty) None else Some(HexString.toHexString(hash))
+        case _ => None
+      }
+    }
+    recordedExtTxnHashes should not be empty
+    recordedExtTxnHashes should contain allElementsOf extTxnHashes
+    succeed
+  }
+
   def compareHistoryViaScanApi(
       ledgerBegin: Long,
       svAppBackend: SvAppBackendReference,
@@ -263,7 +289,10 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
-      .map(ScanHttpEncodings.makeConsistentAcrossSvs(_, None))
+      .map(
+        ScanHttpEncodings
+          .makeConsistentAcrossSvs(_, ExternalHashInclusionPolicy.AlwaysInclude, None)
+      )
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(
@@ -310,6 +339,32 @@ trait UpdateHistoryTestUtil extends TestCommon {
     })
 
     succeed
+  }
+
+  def compareExtTxnHashViaScanAPIForUpdateId(
+      scanClient: ScanAppClientReference,
+      updateId: String,
+      extTxnHash: String,
+  ): Assertion = {
+
+    val treeUpdate =
+      CompactJsonScanHttpEncodings().httpToLapiUpdate(
+        scanClient.getUpdate(
+          updateId,
+          encoding = CompactJson,
+        )
+      )
+    val extractedHash = treeUpdate.update.update match {
+      case TransactionTreeUpdate(tx) =>
+        Option(tx.getExternalTransactionHash)
+          .filterNot(_.isEmpty)
+          .map(com.digitalasset.canton.util.HexString.toHexString)
+      case _ => None
+    }
+    extTxnHash should not be empty
+    extractedHash shouldBe Some(
+      extTxnHash
+    ) withClue "external transaction hash from Scan API for updateId did not match expected hash"
   }
 
   def checkUpdateHistoryMetrics(

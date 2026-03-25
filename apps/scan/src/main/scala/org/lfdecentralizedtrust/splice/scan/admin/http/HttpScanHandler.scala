@@ -768,6 +768,7 @@ class HttpScanHandler(
             _,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
             externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
@@ -878,7 +879,15 @@ class HttpScanHandler(
               else Future.successful(None)
           } yield {
             val encodedUpdateV2 = updateO
-              .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+              .map(
+                ScanHttpEncodings.encodeUpdate(
+                  _,
+                  encoding,
+                  ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+                )
+              )
               .map(toUpdateV2)
             val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
               ScanHttpEncodings.encodeVerdict(v, views)
@@ -950,7 +959,15 @@ class HttpScanHandler(
           else Future.successful(Map.empty[Long, eventStore.AppActivityRecordT])
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
-          .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+          .map(
+            ScanHttpEncodings.encodeUpdate(
+              _,
+              encoding,
+              ScanHttpEncodings.V1,
+              hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+              externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
+            )
+          )
           .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
@@ -1006,6 +1023,7 @@ class HttpScanHandler(
             effectiveAt = t.effectiveAt,
             rootEventIds = t.rootEventIds,
             eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash,
           )
         )
     }
@@ -1819,6 +1837,8 @@ class HttpScanHandler(
             txWithMigration,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+            externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
           )
         )
       )
@@ -2155,6 +2175,8 @@ class HttpScanHandler(
                   _,
                   encoding = definitions.DamlValueEncoding.members.ProtobufJson,
                   version = ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
               .toVector
@@ -2182,6 +2204,8 @@ class HttpScanHandler(
                   _,
                   encoding = definitions.DamlValueEncoding.members.ProtobufJson,
                   version = ScanHttpEncodings.V1,
+                  hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+                  externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
               .toVector
