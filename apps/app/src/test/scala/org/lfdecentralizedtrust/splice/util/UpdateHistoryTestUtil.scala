@@ -380,11 +380,22 @@ trait UpdateHistoryTestUtil extends TestCommon {
           encoding = CompactJson,
         )
       )
-    val extractedUpdateId = treeUpdate.update.update match {
+    val (extractedUpdateId, extractedExtTxnHash) = treeUpdate.update.update match {
       case TransactionTreeUpdate(tx) =>
-        Some(tx.getUpdateId)
-      case _ => None
+        (
+          Some(tx.getUpdateId),
+          Some(tx.getExternalTransactionHash)
+            .filterNot(_.isEmpty)
+            .map(HexString.toHexString),
+        )
+      case _ => (None, None)
     }
+
+    extractedUpdateId should not be empty
+    extractedExtTxnHash should not be empty
+    extractedExtTxnHash shouldBe Some(
+      extTxnHash
+    ) withClue s"extTxnHash $extractedExtTxnHash from Scan API did not match expected extTxnHash $extTxnHash"
     extractedUpdateId shouldBe Some(
       updateId
     ) withClue s"updateId $extractedUpdateId from Scan API for hash $extTxnHash did not match expected updateId $updateId"
