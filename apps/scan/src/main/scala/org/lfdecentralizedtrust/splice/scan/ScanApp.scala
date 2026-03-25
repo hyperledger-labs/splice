@@ -39,7 +39,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.rewards.NoOpAppActivityComputation
+import org.lfdecentralizedtrust.splice.scan.rewards.FakeAppActivityComputation
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -52,6 +52,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
+  DbScanAppRewardsStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -233,6 +234,19 @@ class ScanApp(
         nodeMetrics.grpcClientMetrics,
         retryProvider,
       )
+      appActivityRecordStoreO =
+        if (config.sequencerTrafficIngestion.enabled) {
+          Some(
+            new DbAppActivityRecordStore(
+              storage,
+              updateHistory,
+              loggerFactory,
+            )
+          )
+        } else None
+      appRewardsStoreO = appActivityRecordStoreO.map(appActivityRecordStore =>
+        new DbScanAppRewardsStore(storage, updateHistory, appActivityRecordStore, loggerFactory)
+      )
       automation = new ScanAutomationService(
         config,
         clock,
@@ -241,6 +255,8 @@ class ScanApp(
         loggerFactory,
         store,
         updateHistory,
+        appRewardsStoreO,
+        appActivityRecordStoreO,
         storage,
         acsSnapshotStore,
         serviceUserPrimaryParty,
@@ -271,15 +287,6 @@ class ScanApp(
               config.sequencerAdminClient,
               ScanApp.this,
               nodeMetrics.grpcClientMetrics,
-              loggerFactory,
-            )
-          )
-        } else None
-      appActivityRecordStoreO =
-        if (config.sequencerTrafficIngestion.enabled) {
-          Some(
-            new DbAppActivityRecordStore(
-              storage,
               loggerFactory,
             )
           )
@@ -337,7 +344,11 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
-      appActivityComputation = NoOpAppActivityComputation
+      // TODO(#4384): Remove once the PR adding the real AppActivityComputation is merged into this feature branch.
+      appActivityComputation =
+        FakeAppActivityComputation.withRoundFromStore(implicit tc =>
+          store.lookupRoundOfLatestData()
+        )
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
@@ -359,6 +370,8 @@ class ScanApp(
         sequencerAdminConnection,
         automation,
         updateHistory,
+        appRewardsStoreO,
+        appActivityRecordStoreO,
         acsSnapshotStore,
         scanEventStore,
         bulkStorage,

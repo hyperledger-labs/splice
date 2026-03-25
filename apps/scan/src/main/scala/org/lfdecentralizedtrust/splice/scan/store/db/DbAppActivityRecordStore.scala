@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import org.lfdecentralizedtrust.splice.scan.store.AppActivityStore
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -10,9 +12,10 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import io.grpc.Status
 import slick.jdbc.{GetResult, PostgresProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import slick.dbio.DBIO
+import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -36,10 +39,12 @@ object DbAppActivityRecordStore {
 
 class DbAppActivityRecordStore(
     storage: DbStorage,
+    updateHistory: UpdateHistory,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends NamedLogging
+) extends AppActivityStore
+    with NamedLogging
     with org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
     with FlagCloseable
     with HasCloseContext
@@ -51,7 +56,10 @@ class DbAppActivityRecordStore(
 
   object Tables {
     val appActivityRecords = "app_activity_record_store"
+    val verdicts = "scan_verdict_store"
   }
+
+  private def historyId = updateHistory.historyId
 
   type AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
 
@@ -65,21 +73,115 @@ class DbAppActivityRecordStore(
       )
   }
 
+  /** Find the earliest round with complete app activity.
+    *
+    * Assumes that ledger ingestion order for app activity is sequential,
+    * i.e.,
+    * - app activity for round N always precedes round N + 1, and
+    * - if activity for N + 1 is present now, N has all its activity.
+    *
+    * Returns None if fewer than two consecutive rounds have been ingested.
+    */
+  def earliestRoundWithCompleteAppActivity()(implicit
+      tc: TraceContext
+  ): Future[Option[Long]] = {
+
+    runQuerySingle(
+      sql"""select min_round + 1
+            from (
+              select min(a.round_number) as min_round
+              from #${Tables.appActivityRecords} a
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+              where v.history_id = $historyId
+            ) sub
+            where exists (
+              select 1
+              from #${Tables.appActivityRecords} a
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+              where a.round_number = sub.min_round + 1
+                and v.history_id = $historyId
+            )
+      """.as[Option[Long]].headOption.map(_.flatten),
+      "appActivity.earliestRoundWithCompleteAppActivity",
+    )
+  }
+
+  /** Find the latest round with complete app activity.
+    * A round is complete when ingestion has moved past it, i.e., the next
+    * round also has records. We return max_round - 1 because max_round
+    * itself may still be receiving records.
+    * Returns None if fewer than two consecutive rounds have been ingested.
+    */
+  def latestRoundWithCompleteAppActivity()(implicit
+      tc: TraceContext
+  ): Future[Option[Long]] = {
+
+    runQuerySingle(
+      sql"""select max_round - 1
+            from (
+              select max(a.round_number) as max_round
+              from #${Tables.appActivityRecords} a
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+              where v.history_id = $historyId
+            ) sub
+            where exists (
+              select 1
+              from #${Tables.appActivityRecords} a
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+              where a.round_number = sub.max_round - 1
+                and v.history_id = $historyId
+            )
+      """.as[Option[Long]].headOption.map(_.flatten),
+      "appActivity.latestRoundWithCompleteAppActivity",
+    )
+  }
+
+  /** Assert that activity records exist for rounds roundNumber - 1 and
+    * roundNumber + 1, proving ingestion completeness for roundNumber.
+    * Round N-1 proves ingestion was running before N; round N+1 proves
+    * ingestion has moved past N, so all of N's records have been ingested.
+    */
+  def assertCompleteActivity(roundNumber: Long)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.queryAndUpdate(
+        for {
+          hasPrev <- sql"""select exists(
+                             select 1 from #${Tables.appActivityRecords} a
+                             join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+                             where a.round_number = ${roundNumber - 1}
+                               and v.history_id = $historyId
+                           )""".as[Boolean].head
+          hasNext <- sql"""select exists(
+                             select 1 from #${Tables.appActivityRecords} a
+                             join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+                             where a.round_number = ${roundNumber + 1}
+                               and v.history_id = $historyId
+                           )""".as[Boolean].head
+          _ = if (!hasPrev || !hasNext)
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Incomplete app activity for round $roundNumber: " +
+                  s"round ${roundNumber - 1} exists=$hasPrev, round ${roundNumber + 1} exists=$hasNext"
+              )
+              .asRuntimeException()
+        } yield (),
+        "appActivity.assertCompleteActivity",
+      )
+    )
+
   def getRecordByVerdictRowId(verdictRowId: Long)(implicit
       tc: TraceContext
   ): Future[Option[AppActivityRecordT]] = {
-    futureUnlessShutdownToFuture(
-      storage
-        .querySingle(
-          sql"""
-            select verdict_row_id, round_number, app_provider_parties, app_activity_weights
-            from #${Tables.appActivityRecords}
-            where verdict_row_id = $verdictRowId
-            limit 1
-          """.as[AppActivityRecordT].headOption,
-          "appActivity.getRecordByVerdictRowId",
-        )
-        .value
+    runQuerySingle(
+      sql"""
+        select verdict_row_id, round_number, app_provider_parties, app_activity_weights
+        from #${Tables.appActivityRecords}
+        where verdict_row_id = $verdictRowId
+        limit 1
+      """.as[AppActivityRecordT].headOption,
+      "appActivity.getRecordByVerdictRowId",
     )
   }
 
@@ -136,4 +238,11 @@ class DbAppActivityRecordStore(
       )
     }
   }
+
+  private def runQuerySingle[T](
+      action: DBIOAction[Option[T], NoStream, Effect.Read],
+      operationName: String,
+  )(implicit tc: TraceContext): Future[Option[T]] =
+    futureUnlessShutdownToFuture(storage.querySingle(action, operationName).value)
+
 }

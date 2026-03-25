@@ -19,7 +19,8 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
   UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, AppActivityStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -39,6 +40,8 @@ class ScanAutomationService(
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
     val updateHistory: UpdateHistory,
+    appRewardsStoreO: Option[DbScanAppRewardsStore],
+    appActivityStoreO: Option[AppActivityStore],
     storage: DbStorage,
     snapshotStore: AcsSnapshotStore,
     svParty: PartyId,
@@ -69,6 +72,17 @@ class ScanAutomationService(
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
   registerTrigger(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
+  )
+  for {
+    appRewardsStore <- appRewardsStoreO
+    appActivityStore <- appActivityStoreO
+  } registerTrigger(
+    new RewardComputationTrigger(
+      appRewardsStore,
+      appActivityStore,
+      updateHistory,
+      triggerContext,
+    )
   )
 
   registerUpdateHistoryIngestion(updateHistory)

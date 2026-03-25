@@ -367,6 +367,11 @@ sv:
           limits:
             type: 'unlimited'
         - actions:
+            - name: 'reward-accounting-process'
+              pathPrefix: '/api/scan/v0/reward-accounting-process'
+          limits:
+            type: 'unlimited'
+        - actions:
             - name: 'v1-updates'
               pathPrefix: '/api/scan/v1/updates'
           limits:

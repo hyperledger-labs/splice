@@ -5,13 +5,18 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
+  DbScanAppRewardsStore,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.*
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.google.protobuf.ByteString
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.Future
 
@@ -40,7 +45,7 @@ class DbScanAppRewardsStoreTest
           appProviderParty = "alice::provider",
         )
         _ <- store.insertAppActivityPartyTotals(Seq(row))
-        loaded <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppActivityPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size 1
         loaded.head shouldBe row
@@ -57,7 +62,7 @@ class DbScanAppRewardsStoreTest
           activeAppProviderPartiesCount = 5L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
-        loaded <- store.getAppActivityRoundTotalByRound(historyId, roundNumber)
+        loaded <- store.getAppActivityRoundTotalByRound(roundNumber)
       } yield {
         loaded.value shouldBe row
       }
@@ -81,7 +86,7 @@ class DbScanAppRewardsStoreTest
           totalAppRewardAmount = BigDecimal("12345678901234567890.1234567891"),
         )
         _ <- store.insertAppRewardPartyTotals(Seq(rewardRow))
-        loaded <- store.getAppRewardPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size 1
         loaded.head shouldBe rewardRow
@@ -126,7 +131,7 @@ class DbScanAppRewardsStoreTest
           )
         }
         _ <- store.insertAppRewardPartyTotals(rewardRows)
-        loaded <- store.getAppRewardPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size testValues.size.toLong
         loaded.map(_.totalAppRewardAmount) shouldBe testValues
@@ -145,7 +150,7 @@ class DbScanAppRewardsStoreTest
           rewardedAppProviderPartiesCount = 3L,
         )
         _ <- store.insertAppRewardRoundTotals(Seq(row))
-        loaded <- store.getAppRewardRoundTotalByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardRoundTotalByRound(roundNumber)
       } yield {
         loaded.value shouldBe row
       }
@@ -166,7 +171,7 @@ class DbScanAppRewardsStoreTest
           batchHash = hash,
         )
         _ <- store.insertAppRewardBatchHashes(Seq(row))
-        loaded <- store.getAppRewardBatchHashesByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardBatchHashesByRound(roundNumber)
       } yield {
         loaded should have size 1
         loaded.head shouldBe row
@@ -183,7 +188,7 @@ class DbScanAppRewardsStoreTest
           rootHash = hash,
         )
         _ <- store.insertAppRewardRootHashes(Seq(row))
-        loaded <- store.getAppRewardRootHashByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardRootHashByRound(roundNumber)
       } yield {
         loaded.value shouldBe row
       }
@@ -204,7 +209,7 @@ class DbScanAppRewardsStoreTest
           )
         }
         _ <- store.insertAppActivityPartyTotals(rows)
-        loaded <- store.getAppActivityPartyTotalsByRound(historyId, roundNumber)
+        loaded <- store.getAppActivityPartyTotalsByRound(roundNumber)
       } yield {
         loaded should have size 10
         loaded.head shouldBe rows(0)
@@ -227,7 +232,7 @@ class DbScanAppRewardsStoreTest
           )
         }
         _ <- store.insertAppRewardBatchHashes(rows)
-        loaded <- store.getAppRewardBatchHashesByRound(historyId, roundNumber)
+        loaded <- store.getAppRewardBatchHashesByRound(roundNumber)
       } yield {
         loaded should have size 5
         loaded.head shouldBe rows(0)
@@ -292,14 +297,251 @@ class DbScanAppRewardsStoreTest
         result.getMessage should (include("unique constraint") or include("duplicate key"))
       }
     }
+
+    // -- Aggregation tests ---------------------------------------------------
+
+    "aggregateActivityTotals — single round, single party" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 1
+        partyTotals.head.appProviderParty shouldBe "alice::provider"
+        partyTotals.head.totalAppActivityWeight shouldBe 500L
+        partyTotals.head.appProviderPartySeqNum shouldBe 0
+
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 500L
+        roundTotal.value.activeAppProviderPartiesCount shouldBe 1L
+      }
+    }
+
+    "aggregateActivityTotals — multiple parties with correct GROUP BY and seq_nums" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        // Two records in the same round with overlapping parties
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          Seq("bob::provider", "alice::provider"),
+          Seq(300L, 200L),
+        )
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          Seq("alice::provider", "charlie::provider"),
+          Seq(100L, 400L),
+        )
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 3
+        // Sorted alphabetically: alice, bob, charlie → seq_nums 0, 1, 2
+        partyTotals(0).appProviderParty shouldBe "alice::provider"
+        partyTotals(0).totalAppActivityWeight shouldBe 300L // 200 + 100
+        partyTotals(0).appProviderPartySeqNum shouldBe 0
+
+        partyTotals(1).appProviderParty shouldBe "bob::provider"
+        partyTotals(1).totalAppActivityWeight shouldBe 300L
+        partyTotals(1).appProviderPartySeqNum shouldBe 1
+
+        partyTotals(2).appProviderParty shouldBe "charlie::provider"
+        partyTotals(2).totalAppActivityWeight shouldBe 400L
+        partyTotals(2).appProviderPartySeqNum shouldBe 2
+
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 1000L // 300+300+400
+        roundTotal.value.activeAppProviderPartiesCount shouldBe 3L
+      }
+    }
+
+    "aggregateActivityTotals — empty round produces zero totals" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        // No activity records for this round itself, but sentinels prove completeness
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals shouldBe empty
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 0L
+        roundTotal.value.activeAppProviderPartiesCount shouldBe 0L
+      }
+    }
+
+    "aggregateActivityTotals — only aggregates records from own history_id" in {
+      for {
+        (store1, historyId1) <- newStore()
+        (_, historyId2) <- newStore()
+        _ <- insertSentinelRecords(historyId1, roundNumber)
+        // Insert activity records for the same round under both historyIds
+        _ <- insertActivityRecord(historyId1, roundNumber, Seq("alice::provider"), Seq(100L))
+        _ <- insertActivityRecord(historyId2, roundNumber, Seq("alice::provider"), Seq(900L))
+        // Aggregate with store1 — should only see historyId1's data
+        _ <- store1.aggregateActivityTotals(roundNumber)
+        partyTotals <- store1.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store1.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 1
+        partyTotals.head.appProviderParty shouldBe "alice::provider"
+        partyTotals.head.totalAppActivityWeight shouldBe 100L
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 100L
+      }
+    }
+
+    "aggregateActivityTotals — re-run for same round raises error" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- insertSentinelRecords(historyId, roundNumber)
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
+        _ <- store.aggregateActivityTotals(roundNumber)
+        result <- store.aggregateActivityTotals(roundNumber).failed
+      } yield {
+        result.getMessage should (include("unique constraint") or include("duplicate key"))
+      }
+    }
+
+    "aggregateActivityTotals — rejects round with incomplete activity (missing previous)" in {
+      for {
+        (store, historyId) <- newStore()
+        // Only insert next-round sentinel, not previous
+        _ <- insertActivityRecord(historyId, roundNumber + 1, Seq("sentinel::provider"), Seq(1L))
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
+        result <- store.aggregateActivityTotals(roundNumber).failed
+      } yield {
+        result.getMessage should include("Incomplete app activity")
+        result.getMessage should include(s"round ${roundNumber - 1} exists=false")
+      }
+    }
+
+    "aggregateActivityTotals — rejects round with incomplete activity (missing next)" in {
+      for {
+        (store, historyId) <- newStore()
+        // Only insert previous-round sentinel, not next
+        _ <- insertActivityRecord(historyId, roundNumber - 1, Seq("sentinel::provider"), Seq(1L))
+        _ <- insertActivityRecord(historyId, roundNumber, Seq("alice::provider"), Seq(500L))
+        result <- store.aggregateActivityTotals(roundNumber).failed
+      } yield {
+        result.getMessage should include("Incomplete app activity")
+        result.getMessage should include(s"round ${roundNumber + 1} exists=false")
+      }
+    }
+
+    // -- lookupLatestRoundWithRewardComputation ------
+
+    "lookupLatestRoundWithRewardComputation returns None when no root hashes" in {
+      for {
+        (store, historyId) <- newStore()
+        result <- store.lookupLatestRoundWithRewardComputation()
+      } yield {
+        result shouldBe None
+      }
+    }
+
+    "lookupLatestRoundWithRewardComputation returns latest round with root hash" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppRewardRootHashes(
+          Seq(
+            AppRewardRootHashT(
+              historyId = historyId,
+              roundNumber = 10L,
+              rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
+            ),
+            AppRewardRootHashT(
+              historyId = historyId,
+              roundNumber = 20L,
+              rootHash = ByteString.copyFrom(Array[Byte](5, 6, 7, 8)),
+            ),
+          )
+        )
+        result <- store.lookupLatestRoundWithRewardComputation()
+      } yield {
+        result.value shouldBe 20L
+      }
+    }
+
+    "lookupLatestRoundWithRewardComputation returns single round" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppRewardRootHashes(
+          Seq(
+            AppRewardRootHashT(
+              historyId = historyId,
+              roundNumber = 5L,
+              rootHash = ByteString.copyFrom(Array[Byte](1, 2, 3, 4)),
+            )
+          )
+        )
+        result <- store.lookupLatestRoundWithRewardComputation()
+      } yield {
+        result.value shouldBe 5L
+      }
+    }
   }
 
+  private val verdictCounter = new java.util.concurrent.atomic.AtomicLong(1)
+
+  /** Insert a parent row into scan_verdict_store then a child row into
+    * app_activity_record_store. This satisfies the FK constraint.
+    */
+  private def insertActivityRecord(
+      historyId: Long,
+      round: Long,
+      parties: Seq[String],
+      weights: Seq[Long],
+  ): Future[Unit] = {
+    val verdictId = verdictCounter.getAndIncrement()
+    val partiesArray = parties.mkString("{", ",", "}")
+    val weightsArray = weights.mkString("{", ",", "}")
+    futureUnlessShutdownToFuture(
+      storage.underlying.queryAndUpdate(
+        sqlu"""insert into scan_verdict_store
+               (row_id, migration_id, domain_id, record_time, finalization_time,
+                submitting_participant_uid, verdict_result, mediator_group,
+                update_id, submitting_parties, transaction_root_views, history_id)
+               values ($verdictId, 0, 'domain::test', $verdictId, $verdictId,
+                       'participant::test', 0, 0,
+                       ${"update-" + verdictId}, '{}', '{}', $historyId)""",
+        "test.insertVerdictRow",
+      )
+    ).flatMap { _ =>
+      futureUnlessShutdownToFuture(
+        storage.underlying.queryAndUpdate(
+          sqlu"""insert into app_activity_record_store
+                 (verdict_row_id, round_number, app_provider_parties, app_activity_weights)
+                 values ($verdictId, $round,
+                         #${"'" + partiesArray + "'"},
+                         #${"'" + weightsArray + "'"})""",
+          "test.insertActivityRecord",
+        )
+      )
+    }.map(_ => ())
+  }
+
+  /** Insert sentinel activity records for rounds adjacent to `round`, satisfying
+    * the completeness precondition in aggregateActivityTotals.
+    */
+  private def insertSentinelRecords(historyId: Long, round: Long): Future[Unit] =
+    for {
+      _ <- insertActivityRecord(historyId, round - 1, Seq("sentinel::provider"), Seq(1L))
+      _ <- insertActivityRecord(historyId, round + 1, Seq("sentinel::provider"), Seq(1L))
+    } yield ()
+
+  private val storeCounter = new java.util.concurrent.atomic.AtomicLong(1)
+
   private def newStore(): Future[(DbScanAppRewardsStore, Long)] = {
-    val participantId = mkParticipantId("rewards-test")
+    val n = storeCounter.getAndIncrement()
+    val participantId = mkParticipantId(s"rewards-test-$n")
     val updateHistory = new UpdateHistory(
       storage.underlying,
       new DomainMigrationInfo(migrationId, None),
-      "app_rewards_test",
+      s"app_rewards_test_$n",
       participantId,
       dsoParty,
       BackfillingRequirement.BackfillingNotRequired,
@@ -309,8 +551,15 @@ class DbScanAppRewardsStoreTest
       HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
     updateHistory.ingestionSink.initialize().map { _ =>
+      val appActivityRecordStore = new DbAppActivityRecordStore(
+        storage.underlying,
+        updateHistory,
+        loggerFactory,
+      )
       val store = new DbScanAppRewardsStore(
         storage.underlying,
+        updateHistory,
+        appActivityRecordStore,
         loggerFactory,
       )
       (store, updateHistory.historyId)

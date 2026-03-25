@@ -50,10 +50,12 @@ import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
+  AppActivityStore,
   ScanEventStore,
   ScanStore,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
@@ -128,6 +130,8 @@ class HttpScanHandler(
     sequencerAdminConnection: SequencerAdminConnection,
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
+    appRewardsStoreO: Option[DbScanAppRewardsStore],
+    appActivityStoreO: Option[AppActivityStore],
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     bulkStorage: BulkStorage,
@@ -2365,6 +2369,70 @@ class HttpScanHandler(
             )
         }
       )
+    }
+  }
+
+  def getRewardAccountingEarliestAvailableRound(
+      respond: ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.type
+  )()(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingEarliestAvailableRoundResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingEarliestAvailableRound") { _ => _ =>
+      appActivityStoreO match {
+        case Some(appActivityStore) =>
+          appActivityStore.earliestRoundWithCompleteAppActivity().map {
+            case Some(round) =>
+              ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.OK(
+                definitions.GetRewardAccountingEarliestAvailableRoundResponse(round)
+              )
+            case None =>
+              ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+                ErrorResponse("No reward accounting data available yet")
+              )
+          }
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingEarliestAvailableRoundResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled")
+            )
+          )
+      }
+    }
+  }
+
+  def getRewardAccountingActivityTotals(
+      respond: ScanResource.GetRewardAccountingActivityTotalsResponse.type
+  )(roundNumber: Long)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingActivityTotalsResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingActivityTotals") { _ => _ =>
+      appRewardsStoreO match {
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
+            )
+          )
+        case Some(appRewardsStore) =>
+          appRewardsStore.getAppActivityRoundTotalByRound(roundNumber).map {
+            case None =>
+              ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+                ErrorResponse(
+                  s"Activity totals not (yet) computed for round $roundNumber"
+                )
+              )
+            case Some(roundTotal) =>
+              ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
+                definitions.GetRewardAccountingActivityTotalsResponse(
+                  roundNumber = roundTotal.roundNumber,
+                  totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
+                  activePartiesCount = roundTotal.activeAppProviderPartiesCount,
+                )
+              )
+          }
+      }
     }
   }
 }
