@@ -36,6 +36,8 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   validateNoAccountMeta,
 
 -- TODO(#4517): add unit tests for the non-trivial functions
+  -- ** Internal metadata functions
+  v2Namespace,
 
 ) where
 

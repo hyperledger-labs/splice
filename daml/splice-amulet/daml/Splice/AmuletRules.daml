@@ -22,8 +22,13 @@ import qualified DA.Text as T
 import DA.Time
 
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
+import Splice.Api.Token.EventsV2 as EventsV2
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
+
+import Splice.TokenStandard.Utils (basicAccount, upcast, eventFactory_workflowCompletedDefaultImpl, eventFactory_transferDefaultImpl)
+
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig, defaultTransferPreapprovalFee, getExternalPartyConfigStateTickDuration)
@@ -38,7 +43,6 @@ import Splice.Types
 import Splice.DecentralizedSynchronizer
 import Splice.ValidatorLicense
 import Splice.Util
-import Splice.Api.Token.TransferInstructionV1(TransferInstruction_Update(..), TransferInstructionResult, TransferInstruction)
 
 
 data AmuletRules_Amulet_ExpireTransferInstructionsResult = AmuletRules_Amulet_ExpireTransferInstructionsResult
@@ -136,6 +140,16 @@ template AmuletRules
 
     signatory dso
 
+    -- FIXME: check whether we even need this -- external party config state could be used
+    interface instance EventsV2.EventFactory for AmuletRules where
+      view = EventsV2.EventFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
+      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+
+
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
       with
@@ -163,7 +177,7 @@ template AmuletRules
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
-        executeTransfer rewardsConfig context dso transfer
+        executeTransfer (Some $ toInterfaceContractId self) rewardsConfig context dso transfer
 
     nonconsuming choice AmuletRules_CreateExternalPartySetupProposal : AmuletRules_CreateExternalPartySetupProposalResult
       -- ^ Propose to host an external party
@@ -186,7 +200,7 @@ template AmuletRules
         require "preapprovalExpiresAt is not in the past" (preapprovalExpiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (preapprovalExpiresAt `subTime` now) configUsd context.context dso
-        (transferResult, meta) <- splitAndBurn validator amuletPaid inputs context.context dso "create ExternalPartySetupProposal"
+        (transferResult, meta) <- splitAndBurn (toInterfaceContractId self) validator amuletPaid inputs context.context dso "create ExternalPartySetupProposal"
         proposalCid <- create ExternalPartySetupProposal with
           user
           validator
@@ -214,7 +228,7 @@ template AmuletRules
         require "expiresAt is not in the past" (expiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (expiresAt `subTime` now) configUsd context.context dso
-        (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "create TransferPreapproval"
+        (transferResult, meta) <- splitAndBurn (toInterfaceContractId self) provider amuletPaid inputs context.context dso "create TransferPreapproval"
         transferPreapprovalCid <- create TransferPreapproval with
           receiver
           provider
@@ -250,7 +264,7 @@ template AmuletRules
           Left err -> throw (InvalidTransfer err)
           Right _ -> pure ()
         (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
-        (transferResult, meta) <- splitAndBurn provider trafficCostAmulet inputs context dso "traffic purchase"
+        (transferResult, meta) <- splitAndBurn (toInterfaceContractId self) provider trafficCostAmulet inputs context dso "traffic purchase"
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
           dso
@@ -340,6 +354,7 @@ template AmuletRules
       controller receiver
       do
         require "isDevNet flag is true" isDevNet
+        logAmuletMint dso (toInterfaceContractId self) receiver amount (reasonMeta "tapped DevNet faucet")
         result <- exercise self AmuletRules_Mint with ..
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
@@ -892,10 +907,10 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
     issueValidatorRewards : Bool
 
 -- | Execute a transfer.
-executeTransfer : RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer config context dso t = do
+executeTransfer : Optional (ContractId EventsV2.EventFactory) -> RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer optEventFactoryCid config context dso t = do
   -- compute summaries
-  csum <- summarizeAndValidateContext context dso t
+  csum <- summarizeAndValidateContext optEventFactoryCid context dso t
   executeTransfer' config csum dso t
 
 -- | Execute a transfer for external parties so that the prepared tx remains valid for 24h
@@ -922,7 +937,7 @@ executeTransfer' config csum dso t = do
   issueRewards config csum t.provider t.beneficiaries
   -- record outputs
   (createdAmulets, senderChangeAmulet) <-
-    createTransferOutputs csum.openRoundNumber csum.config dso t.sender summary osum
+    createTransferOutputs csum.optEventFactoryCid csum.openRoundNumber csum.config dso t.sender summary osum
 
   let senderRetainsControl o =
         t.sender == o.receiver &&
@@ -938,9 +953,25 @@ executeTransfer' config csum dso t = do
           nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
+          -- FIXME: report validator faucet amount or assert that it is zero
           optionalNonZeroMetadata unclaimedActivityRecordAmountMetaKey summary.inputUnclaimedActivityRecordAmount $
           optionalNonZeroMetadata developmentFundAmountMetaKey summary.inputDevelopmentFundAmount $
           TextMap.empty
+
+  -- record reward minting
+  let mintAmount =
+        summary.inputAppRewardAmount +
+        summary.inputValidatorRewardAmount +
+        summary.inputSvRewardAmount +
+        fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount +
+        fromOptional 0.0 summary.inputValidatorFaucetAmount +
+        fromOptional 0.0 summary.inputDevelopmentFundAmount
+  when (mintAmount > 0.0) $
+    forA_ csum.optEventFactoryCid $ \eventFactoryCid -> do
+      logAmuletMint dso eventFactoryCid t.sender mintAmount $ Metadata with
+        values =
+          TextMap.insert reasonMetaKey "mint rewards" $
+          rewardInputMeta.values
 
   return TransferResult with
     round = csum.openRoundNumber
@@ -965,6 +996,7 @@ data TransferContextSummaryV2 = TransferContextSummaryV2 with
     amuletPrice : Decimal
     issuingMiningRounds : Map Round IssuingMiningRound
     validatorRights : Map Party (ContractId ValidatorRight)
+    optEventFactoryCid : Optional (ContractId EventsV2.EventFactory)
   deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with
@@ -994,8 +1026,8 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     lock : Optional TimeLock -- ^ Whether to lock the amulet or not
   deriving (Eq, Show)
 
-summarizeAndValidateContext : TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
-summarizeAndValidateContext context dso tf = do
+summarizeAndValidateContext : Optional (ContractId EventsV2.EventFactory) -> TransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
+summarizeAndValidateContext optEventFactoryCid context dso tf = do
   -- check that the current mining round is open
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
   assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
@@ -1024,6 +1056,8 @@ summarizeAndValidateContext context dso tf = do
     issuingMiningRounds = Map.fromList issuingMiningRounds
     validatorRights = Map.fromList validatorRights
     amuletPrice = openRound.amuletPrice
+    optEventFactoryCid
+
 
 summarizeAndValidateExternalPartyContext : ExternalPartyTransferContext -> Party -> Transfer -> Update TransferContextSummaryV2
 summarizeAndValidateExternalPartyContext context dso tf = do
@@ -1044,6 +1078,7 @@ summarizeAndValidateExternalPartyContext context dso tf = do
     -- no minting for long lived transfers
     issuingMiningRounds = Map.empty
     validatorRights = Map.empty
+    optEventFactoryCid = Some (toInterfaceContractId context.externalPartyConfigState)
 
 getValidatorRight : TransferContextSummaryV2 -> Party -> Update (ContractId ValidatorRight)
 getValidatorRight csum user =
@@ -1331,9 +1366,9 @@ issueRewards config csum provider beneficiaries = do
     featured = Some provider == csum.featuredAppProvider
 
 createTransferOutputs
-  : Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  : Optional (ContractId EventsV2.EventFactory) -> Round -> TransferConfigV2 Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
   -> Update ([CreatedAmulet], Optional (ContractId Amulet))
-createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
+createTransferOutputs optEventFactoryCid currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
     outputAmulets <- mapA createOutput preprocessedOutputs
     senderChangeAmulet <- createSenderChange
     return (outputAmulets, senderChangeAmulet)
@@ -1350,6 +1385,20 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
             dso
             owner = out.owner
             amount = expiringAmount transferConfigAmulet.holdingFee out.amount currentOpenRound
+
+      -- register transfer events for non-self transfers, if required
+      unless (sender == out.owner) $
+        forA_ optEventFactoryCid $ \eventFactoryCid ->
+          exercise eventFactoryCid EventsV2.EventFactory_Transfer with
+            -- FIXME: import name
+            scope = EventsV2.Scope with
+              reporter = dso
+              observers = [sender, out.owner]
+            instrumentId = upcast (amuletInstrumentId dso)
+            sender = basicAccount sender
+            receiver = basicAccount out.owner
+            amount = out.amount
+            meta = emptyMetadata -- FIXME: add reason
 
       case out.lock of
         None -> TransferResultAmulet <$> create amulet
@@ -1768,7 +1817,7 @@ template TransferPreapproval
       controller sender
       do
          assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
-         transferResult <- executeExternalPartyTransfer dso context Transfer with
+         transferResult <- executeExternalPartyTransfer  dso context Transfer with
            sender
            provider
            inputs
@@ -1804,7 +1853,7 @@ template TransferPreapproval
          amuletRules <- fetchPublicReferenceData (ForDso dso) context.amuletRules (AmuletRules_Fetch dso)
          let configUsd = getValueAsOf now amuletRules.configSchedule
          (amuletPaid, _) <- computeTransferPreapprovalFee extension configUsd context.context dso
-         (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "renew TransferPreapproval"
+         (transferResult, meta) <- splitAndBurn (toInterfaceContractId context.amuletRules) provider amuletPaid inputs context.context dso "renew TransferPreapproval"
          transferPreapprovalCid <- create this with
            lastRenewedAt = now
            expiresAt = newExpiresAt
@@ -1868,13 +1917,13 @@ computeTransferPreapprovalFee duration amuletConfig context dso = do
   let feeAmulet = feeUsd / contextMiningRound.amuletPrice
   pure (feeAmulet, feeUsd)
 
-splitAndBurn : Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update (TransferResult, Metadata)
-splitAndBurn sender amount inputs context dso usage = do
+splitAndBurn : ContractId EventsV2.EventFactory -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update (TransferResult, Metadata)
+splitAndBurn eventFactoryCid sender amount inputs context dso usage = do
 -- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  transferResult <- executeTransfer rewardsConfig context dso Transfer with
+  transferResult <- executeTransfer None rewardsConfig context dso Transfer with
     sender
     provider = sender
     inputs
@@ -1889,6 +1938,8 @@ splitAndBurn sender amount inputs context dso usage = do
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
+  -- record event
+  logAmuletBurn dso eventFactoryCid sender amount (reasonMeta usage)
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
     dso

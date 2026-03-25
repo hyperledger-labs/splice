@@ -3,6 +3,11 @@
 
 module Splice.ExternalPartyConfigState where
 
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.EventsV2 as EventsV2
+
+import Splice.TokenStandard.Utils
+
 import Splice.AmuletConfig
 import qualified Splice.AmuletConfig as Unit
 import Splice.Util
@@ -23,6 +28,15 @@ template ExternalPartyConfigState
     targetArchiveAfter : Time -- ^ Lower bound on the time the contract gets archived, not enforced as a strict upper bound.
   where
     signatory dso
+
+    interface instance EventsV2.EventFactory for ExternalPartyConfigState where
+      view = EventsV2.EventFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
+      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+
 
 instance HasCheckedFetch ExternalPartyConfigState ForDso where
   contractGroupId ExternalPartyConfigState {..} = ForDso with

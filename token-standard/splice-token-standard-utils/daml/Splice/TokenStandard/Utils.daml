@@ -66,6 +66,12 @@ module Splice.TokenStandard.Utils (
   BackwardCompatible(..),
   ForwardCompatible(..),
 
+  -- * Events
+  eventFactory_workflowCompletedDefaultImpl,
+  eventFactory_transferDefaultImpl,
+
+  logMint,
+  logBurn,
 
   -- * Allocation workflows
 
@@ -164,6 +170,6 @@ module Splice.TokenStandard.Utils (
 
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
+import Splice.TokenStandard.Utils.Internal.Events
 import Splice.TokenStandard.Utils.Internal.Transfers
 import Splice.TokenStandard.Utils.Internal.Allocations
-

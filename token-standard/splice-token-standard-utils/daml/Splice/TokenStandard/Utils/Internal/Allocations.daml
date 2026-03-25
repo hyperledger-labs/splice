@@ -82,6 +82,7 @@ import qualified DA.Set as Set
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.EventsV2 qualified as EventsV2
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
 import Splice.Api.Token.AllocationV1 qualified as AllocationV1
 import Splice.Api.Token.AllocationV2 qualified as AllocationV2
@@ -312,22 +313,24 @@ data PreparedAllocations = PreparedAllocations with
 -- have to reimplement the execution of the settlement choices.
 settlementFactoryV2_settleBatchDefaultImpl
   : HasToInterface t AllocationV2.SettlementFactory
-  => (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
+  => ContractId EventsV2.EventFactory
+     -- ^ Event log to use for registering the transfer events
+  -> (AllocationV2.AllocationSpecification -> Update (ContractId AllocationV2.Allocation, AllocationV2.AllocationView))
      -- ^ How to create the allocation of a missing receipt leg.
   -> t
   -> ContractId AllocationV2.SettlementFactory
   -> AllocationV2.SettlementFactory_SettleBatch
   -> Update AllocationV2.SettlementFactory_SettleBatchResult
-settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFactory0 _self arg= do
+settlementFactoryV2_settleBatchDefaultImpl eventFactoryCid createReceiptAllocation settlementFactory0 self arg= do
+  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
   -- check that executors are part of the actors
   -- additional actors are allowed, and are implicitly checked via authorization context in all steps that require authority
   require'
-    ("settlement.executors", arg.settlement.executors)
+    ("settlement.executors", settlement.executors)
     isSubsetOfR
-    ("SettlementFactory_SettleBatch.actors", arg.actors)
+    ("SettlementFactory_SettleBatch.actors", actors)
 
   -- validate call to factory and retrieve context
-  let AllocationV2.SettlementFactory_SettleBatch {..} = arg
   let settlementFactory = toInterface @AllocationV2.SettlementFactory settlementFactory0
   let admin = (view settlementFactory).admin
   prep <- validateAndPrepareAllocations admin arg
@@ -342,6 +345,19 @@ settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation settlementFac
       actors = AllocationV2.defaultAllocation_SettleControllers allocView
       extraArgs
     pure (allocView.allocation.authorizer, result.authorizerHoldingCids)
+
+  -- create transfer events for all transfer legs
+  forA_ transferLegs $ \leg ->
+    exercise eventFactoryCid EventsV2.EventFactory_Transfer with
+      scope = EventsV2.Scope with
+        reporter = admin
+        observers = accountParties leg.sender <> accountParties leg.receiver
+      sender = leg.sender
+      receiver = leg.receiver
+      amount = leg.amount
+      instrumentId = leg.instrumentId
+      meta = leg.meta
+      -- FIXME/QUESTION: should transfer events carry a 'Reference' so that we could store the `settlementRef` in there for easier correlation?
 
   -- return result
   pure AllocationV2.SettlementFactory_SettleBatchResult with

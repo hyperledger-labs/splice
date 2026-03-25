@@ -120,7 +120,6 @@ template AmuletAllocationV2
              lockedAmulet <- fetchAndArchive (ForOwner with dso = dso; owner = authorizer) cid
              requireMatchExpected ("lockedAmulet.amount", lockedAmulet.amulet.amount.initialAmount) (negate netAmount)
 
-          let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef
           pure V2.Allocation_SettleResult with
             authorizerHoldingCids = mempty
             meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None

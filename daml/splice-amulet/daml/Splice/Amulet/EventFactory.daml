@@ -1,0 +1,26 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Event log for Amulet.
+module Splice.Amulet.EventFactory where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.EventsV2 as EventsV2
+
+import Splice.TokenStandard.Utils
+
+-- FIXME: consider moving to the top level
+template AmuletEventFactory
+  with
+    dso : Party
+  where
+    signatory dso
+
+    interface instance EventsV2.EventFactory for AmuletEventFactory where
+      view = EventsV2.EventFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      eventFactory_workflowCompletedImpl = eventFactory_workflowCompletedDefaultImpl dso
+      eventFactory_transferImpl = eventFactory_transferDefaultImpl dso
+

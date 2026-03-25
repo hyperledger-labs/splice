@@ -1,0 +1,70 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Internal module containing utilities to implement or use V2 events.
+--
+-- Import 'Splice.TokenStandard.Utils' to get access to the public ones.
+module Splice.TokenStandard.Utils.Internal.Events (
+  eventFactory_workflowCompletedDefaultImpl,
+  eventFactory_transferDefaultImpl,
+
+  logMint,
+  logBurn,
+) where
+
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.EventsV2 qualified as V2
+
+import Splice.TokenStandard.Utils.Internal.Conversions
+import Splice.TokenStandard.Utils.Internal.Choices
+
+
+
+eventFactory_workflowCompletedDefaultImpl : Party -> ContractId V2.EventFactory -> V2.EventFactory_WorkflowCompleted -> Update V2.EventFactory_WorkflowCompletedResult
+eventFactory_workflowCompletedDefaultImpl admin _self arg = do
+  require' ("event.reporter", arg.scope.reporter) isEqualR ("admin", admin )
+  pure V2.EventFactory_WorkflowCompletedResult
+
+eventFactory_transferDefaultImpl : Party -> ContractId V2.EventFactory -> V2.EventFactory_Transfer -> Update V2.EventFactory_TransferResult
+eventFactory_transferDefaultImpl admin _self arg = do
+  require' ("event.reporter", arg.scope.reporter) isEqualR ("admin", admin )
+  pure V2.EventFactory_TransferResult
+
+
+mintAccountId : Text
+mintAccountId = v2Namespace <> "mint"
+
+burnAccountId : Text
+burnAccountId = v2Namespace <> "burn"
+
+logMint : ContractId V2.EventFactory -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logMint factoryCid admin receiver amount instrumentId meta = do
+  exercise factoryCid V2.EventFactory_Transfer with
+    scope = V2.Scope with
+      reporter = admin
+      observers = accountParties receiver
+    sender = V2.Account with
+      owner = admin
+      provider = None
+      id = Some mintAccountId
+    receiver
+    instrumentId
+    amount
+    meta
+
+logBurn : ContractId V2.EventFactory -> Party -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update V2.EventFactory_TransferResult
+logBurn factoryCid admin sender amount instrumentId meta = do
+  exercise factoryCid V2.EventFactory_Transfer with
+    scope = V2.Scope with
+      reporter = admin
+      observers = accountParties sender
+    sender
+    receiver = V2.Account with
+      owner = admin
+      provider = None
+      id = Some burnAccountId
+    instrumentId
+    amount
+    meta
