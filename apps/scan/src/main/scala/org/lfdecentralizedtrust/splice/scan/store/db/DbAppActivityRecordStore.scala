@@ -74,8 +74,12 @@ class DbAppActivityRecordStore(
   }
 
   /** Find the earliest round with complete app activity.
-    * A round is complete if the prior round also has activity records,
-    * proving ingestion was running continuously through it.
+    *
+    * Assumes that ledger ingestion order for app activity is sequential,
+    * i.e.,
+    * - app activity for round N always precedes round N + 1, and
+    * - if activity for N + 1 is present now, N has all its activity.
+    *
     * Returns None if fewer than two consecutive rounds have been ingested.
     */
   def earliestRoundWithCompleteAppActivity()(implicit
