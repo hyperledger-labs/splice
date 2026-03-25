@@ -376,6 +376,20 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons())
     }
 
+  @Help.Summary("Get the earliest round with CIP-0104 reward accounting data")
+  def getRewardAccountingEarliestAvailableRound(): Option[Long] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingEarliestAvailableRound())
+    }
+
+  @Help.Summary("Get CIP-0104 activity totals for a specific round")
+  def getRewardAccountingActivityTotals(
+      roundNumber: Long
+  ): Option[definitions.GetRewardAccountingActivityTotalsResponse] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingActivityTotals(roundNumber))
+    }
+
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
 

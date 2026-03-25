@@ -4,6 +4,8 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -78,10 +80,13 @@ object DbScanAppRewardsStore {
 
 class DbScanAppRewardsStore(
     storage: DbStorage,
+    updateHistory: UpdateHistory,
+    appActivityRecordStore: DbAppActivityRecordStore,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends NamedLogging
+) extends ScanAppRewardsStore
+    with NamedLogging
     with FlagCloseable
     with HasCloseContext
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries {
@@ -98,6 +103,8 @@ class DbScanAppRewardsStore(
     val appRewardBatchHashes = "app_reward_batch_hashes"
     val appRewardRootHashes = "app_reward_root_hashes"
   }
+
+  private def historyId = updateHistory.historyId
 
   // -- GetResult implicits --------------------------------------------------
 
@@ -198,9 +205,10 @@ class DbScanAppRewardsStore(
     }
   }
 
-  def getAppActivityPartyTotalsByRound(historyId: Long, roundNumber: Long)(implicit
+  def getAppActivityPartyTotalsByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppActivityPartyTotalT]] = {
+
     runQuery(
       sql"""select history_id, round_number, total_app_activity_weight,
                    app_provider_party_seq_num, app_provider_party
@@ -245,9 +253,10 @@ class DbScanAppRewardsStore(
     }
   }
 
-  def getAppActivityRoundTotalByRound(historyId: Long, roundNumber: Long)(implicit
+  def getAppActivityRoundTotalByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppActivityRoundTotalT]] = {
+
     runQuerySingle(
       sql"""select history_id, round_number, total_round_app_activity_weight,
                    active_app_provider_parties_count
@@ -292,9 +301,10 @@ class DbScanAppRewardsStore(
     }
   }
 
-  def getAppRewardPartyTotalsByRound(historyId: Long, roundNumber: Long)(implicit
+  def getAppRewardPartyTotalsByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppRewardPartyTotalT]] = {
+
     runQuery(
       sql"""select history_id, round_number, app_provider_party_seq_num,
                    total_app_reward_amount
@@ -341,9 +351,10 @@ class DbScanAppRewardsStore(
     }
   }
 
-  def getAppRewardRoundTotalByRound(historyId: Long, roundNumber: Long)(implicit
+  def getAppRewardRoundTotalByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppRewardRoundTotalT]] = {
+
     runQuerySingle(
       sql"""select history_id, round_number,
                    total_app_reward_minting_allowance, total_app_reward_thresholded,
@@ -390,9 +401,10 @@ class DbScanAppRewardsStore(
     }
   }
 
-  def getAppRewardBatchHashesByRound(historyId: Long, roundNumber: Long)(implicit
+  def getAppRewardBatchHashesByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Seq[DbScanAppRewardsStore.AppRewardBatchHashT]] = {
+
     runQuery(
       sql"""select history_id, round_number, batch_level,
                    party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash
@@ -436,9 +448,10 @@ class DbScanAppRewardsStore(
     }
   }
 
-  def getAppRewardRootHashByRound(historyId: Long, roundNumber: Long)(implicit
+  def getAppRewardRootHashByRound(roundNumber: Long)(implicit
       tc: TraceContext
   ): Future[Option[DbScanAppRewardsStore.AppRewardRootHashT]] = {
+
     runQuerySingle(
       sql"""select history_id, round_number, root_hash
             from #${Tables.appRewardRootHashes}
@@ -448,6 +461,106 @@ class DbScanAppRewardsStore(
       "appRewards.getAppRewardRootHashByRound",
     )
   }
+
+  // -- Aggregation ------------------------------------------------------------
+
+  /** Returns the latest round for which reward computation has completed
+    * (i.e. a root hash exists). None if no rounds have been computed.
+    */
+  def lookupLatestRoundWithRewardComputation()(implicit
+      tc: TraceContext
+  ): Future[Option[Long]] = {
+
+    runQuerySingle(
+      sql"""select max(round_number) from #${Tables.appRewardRootHashes}
+            where history_id = $historyId
+      """.as[Option[Long]].headOption.map(_.flatten),
+      "appRewards.lookupLatestRoundWithRewardComputation",
+    )
+  }
+
+  /** Runs the full reward computation pipeline for a single round.
+    *
+    * TODO(#4384): Will be extended to run CC conversion (stage 2) and
+    * Merkle tree hashing (stage 3) in a single transaction.
+    */
+  def computeAndStoreRewards(
+      roundNumber: Long
+  )(implicit tc: TraceContext): Future[Unit] =
+    aggregateActivityTotals(roundNumber)
+
+  /** Aggregate per-party and per-round activity totals for the given round from
+    * `app_activity_record_store`.
+    *
+    * Raises on duplicate key to detect unexpected re-runs; the trigger's
+    * range-based task selection avoids this.
+    */
+  private[store] def aggregateActivityTotals(
+      roundNumber: Long
+  )(implicit tc: TraceContext): Future[Unit] =
+    for {
+      _ <- appActivityRecordStore.assertCompleteActivity(roundNumber)
+      _ <- runUpdate(
+        (sql"with " ++ unnestAndAggregate(historyId, roundNumber) ++ sql", "
+          ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
+          ++ insertRoundTotals(historyId, roundNumber)).asUpdate
+          .map(_ =>
+            logger.debug(
+              s"Aggregated activity totals for round $roundNumber."
+            )
+          ),
+        "appRewards.aggregateActivityTotals",
+      )
+    } yield ()
+
+  /** Unnest per-verdict activity arrays and aggregate weights by party. */
+  private def unnestAndAggregate(historyId: Long, roundNumber: Long) =
+    sql"""unnested as (
+            select party, weight
+            from app_activity_record_store a
+            join scan_verdict_store v on a.verdict_row_id = v.row_id
+            cross join lateral unnest(a.app_provider_parties, a.app_activity_weights)
+                 as party_and_weight(party, weight)
+            where a.round_number = $roundNumber
+              and v.history_id = $historyId
+          ),
+          aggregated as (
+            select party, sum(weight) as total_weight
+            from unnested
+            group by party
+          ),
+          numbered as (
+            select party, total_weight,
+                   (row_number() over (order by party) - 1)::int as seq_num
+            from aggregated
+          )"""
+
+  /** Insert per-party totals and return the inserted weights via RETURNING. */
+  private def insertPartyTotals(historyId: Long, roundNumber: Long) =
+    sql"""inserted_parties as (
+            insert into #${Tables.appActivityPartyTotals}
+              (history_id,
+               round_number,
+               total_app_activity_weight,
+               app_provider_party_seq_num,
+               app_provider_party)
+            select $historyId, $roundNumber, total_weight, seq_num, party
+            from numbered
+            returning total_app_activity_weight
+          )"""
+
+  /** Insert the round-level totals from the RETURNING output of insertPartyTotals. */
+  private def insertRoundTotals(historyId: Long, roundNumber: Long) =
+    sql"""insert into #${Tables.appActivityRoundTotals}
+            (history_id,
+             round_number,
+             total_round_app_activity_weight,
+             active_app_provider_parties_count)
+          select $historyId,
+                 $roundNumber,
+                 coalesce(sum(total_app_activity_weight), 0),
+                 count(*)
+          from inserted_parties"""
 
   // -- Private helpers -------------------------------------------------------
 
