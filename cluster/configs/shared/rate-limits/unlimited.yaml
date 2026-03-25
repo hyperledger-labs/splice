@@ -1,286 +1,192 @@
-rateLimits: !append
+rateLimits:
   # Health/status endpoints (unlimited)
-  - actions:
-      - name: readyz
-        pathPrefix: /api/scan/readyz
-    limits:
-      type: unlimited
+  /api/scan/readyz:
+    name: readyz
+    type: unlimited
 
-  - actions:
-      - name: livez
-        pathPrefix: /api/scan/livez
-    limits:
-      type: unlimited
+  /api/scan/livez:
+    name: livez
+    type: unlimited
 
-  - actions:
-      - name: status
-        pathPrefix: /api/scan/status
-    limits:
-      type: unlimited
+  /api/scan/status:
+    name: status
+    type: unlimited
 
-  - actions:
-      - name: version
-        pathPrefix: /api/scan/version
-    limits:
-      type: unlimited
+  /api/scan/version:
+    name: version
+    type: unlimited
 
   # External API endpoints (unlimited)
-  - actions:
-      - name: dso-info
-        pathPrefix: /api/scan/v0/dso
-    limits:
-      type: unlimited
+  /api/scan/v0/dso:
+    name: dso-info
+    type: unlimited
 
-  - actions:
-      - name: validators
-        pathPrefix: /api/scan/v0/validators
-    limits:
-      type: unlimited
+  /api/scan/v0/validators:
+    name: validators
+    type: unlimited
 
-  - actions:
-      - name: scans
-        pathPrefix: /api/scan/v0/scans
-    limits:
-      type: unlimited
+  /api/scan/v0/scans:
+    name: scans
+    type: unlimited
 
-  - actions:
-      - name: dso-sequencers
-        pathPrefix: /api/scan/v0/dso-sequencers
-    limits:
-      type: unlimited
+  /api/scan/v0/dso-sequencers:
+    name: dso-sequencers
+    type: unlimited
 
-  - actions:
-      - name: bft-sequencers
-        pathPrefix: /api/scan/v0/sv-bft-sequencers
-    limits:
-      type: unlimited
+  /api/scan/v0/sv-bft-sequencers:
+    name: bft-sequencers
+    type: unlimited
 
-  - actions:
-      - name: domains
-        pathPrefix: /api/scan/v0/domains
-    limits:
-      type: unlimited
+  /api/scan/v0/domains:
+    name: domains
+    type: unlimited
 
-  - actions:
-      - name: domains-v1
-        pathPrefix: /api/scan/v1/domains
-    limits:
-      type: unlimited
+  /api/scan/v1/domains:
+    name: domains-v1
+    type: unlimited
 
-  - actions:
-      - name: closed-rounds
-        pathPrefix: /api/scan/v0/closed-rounds
-    limits:
-      type: unlimited
+  /api/scan/v0/closed-rounds:
+    name: closed-rounds
+    type: unlimited
 
-  - actions:
-      - name: open-and-issuing-mining-rounds
-        pathPrefix: /api/scan/v0/open-and-issuing-mining-rounds
-    limits:
-      type: unlimited
+  /api/scan/v0/open-and-issuing-mining-rounds:
+    name: open-and-issuing-mining-rounds
+    type: unlimited
 
-  - actions:
-      - name: v0-updates
-        pathPrefix: /api/scan/v0/updates
-    limits:
-      type: unlimited
+  /api/scan/v0/updates:
+    name: v0-updates
+    type: unlimited
 
-  - actions:
-      - name: v2-updates
-        pathPrefix: /api/scan/v2/updates
-    limits:
-      type: unlimited
+  /api/scan/v2/updates:
+    name: v2-updates
+    type: unlimited
 
-  - actions:
-      - name: state
-        pathPrefix: /api/scan/v0/state
-    limits:
-      type: unlimited
+  /api/scan/v0/state:
+    name: state
+    type: unlimited
 
-  - actions:
-      - name: holdings
-        pathPrefix: /api/scan/v0/holdings
-    limits:
-      type: unlimited
+  /api/scan/v0/holdings:
+    name: holdings
+    type: unlimited
 
-  - actions:
-      - name: ans-entries
-        pathPrefix: /api/scan/v0/ans-entries
-    limits:
-      type: unlimited
+  /api/scan/v0/ans-entries:
+    name: ans-entries
+    type: unlimited
 
-  - actions:
-      - name: dso-party-id
-        pathPrefix: /api/scan/v0/dso-party-id
-    limits:
-      type: unlimited
+  /api/scan/v0/dso-party-id:
+    name: dso-party-id
+    type: unlimited
 
-  - actions:
-      - name: transactions
-        pathPrefix: /api/scan/v0/transactions
-    limits:
-      type: unlimited
+  /api/scan/v0/transactions:
+    name: transactions
+    type: unlimited
 
-  - actions:
-      - name: backfilling
-        pathPrefix: /api/scan/v0/backfilling
-    limits:
-      type: unlimited
+  /api/scan/v0/backfilling:
+    name: backfilling
+    type: unlimited
 
-  - actions:
-      - name: validator-licenses
-        pathPrefix: /api/scan/v0/admin/validator
-    limits:
-      type: unlimited
+  /api/scan/v0/admin/validator:
+    name: validator-licenses
+    type: unlimited
 
-  - actions:
-      - name: sv-voterequests
-        pathPrefix: /api/scan/v0/admin/sv/voterequests
-    limits:
-      type: unlimited
+  /api/scan/v0/admin/sv/voterequests:
+    name: sv-voterequests
+    type: unlimited
 
-  - actions:
-      - name: sv-voteresults
-        pathPrefix: /api/scan/v0/admin/sv/voteresults
-    limits:
-      type: unlimited
+  /api/scan/v0/admin/sv/voteresults:
+    name: sv-voteresults
+    type: unlimited
 
-  - actions:
-      - name: activities
-        pathPrefix: /api/scan/v0/activities
-    limits:
-      type: unlimited
+  /api/scan/v0/activities:
+    name: activities
+    type: unlimited
 
-  - actions:
-      - name: amulet-price-votes
-        pathPrefix: /api/scan/v0/amulet-price
-    limits:
-      type: unlimited
+  /api/scan/v0/amulet-price:
+    name: amulet-price-votes
+    type: unlimited
 
-  - actions:
-      - name: amulet-rules
-        pathPrefix: /api/scan/v0/amulet-rules
-    limits:
-      type: unlimited
+  /api/scan/v0/amulet-rules:
+    name: amulet-rules
+    type: unlimited
 
-  - actions:
-      - name: ans-rules
-        pathPrefix: /api/scan/v0/ans-rules
-    limits:
-      type: unlimited
+  /api/scan/v0/ans-rules:
+    name: ans-rules
+    type: unlimited
 
-  - actions:
-      - name: events
-        pathPrefix: /api/scan/v0/events
-    limits:
-      type: unlimited
+  /api/scan/v0/events:
+    name: events
+    type: unlimited
 
-  - actions:
-      - name: external-party-amulet-rules
-        pathPrefix: /api/scan/v0/external-party-amulet-rules
-    limits:
-      type: unlimited
+  /api/scan/v0/external-party-amulet-rules:
+    name: external-party-amulet-rules
+    type: unlimited
 
-  - actions:
-      - name: feature-support
-        pathPrefix: /api/scan/v0/feature-support
-    limits:
-      type: unlimited
+  /api/scan/v0/feature-support:
+    name: feature-support
+    type: unlimited
 
-  - actions:
-      - name: featured-apps
-        pathPrefix: /api/scan/v0/featured-apps
-    limits:
-      type: unlimited
+  /api/scan/v0/featured-apps:
+    name: featured-apps
+    type: unlimited
 
-  - actions:
-      - name: migrations-schedule
-        pathPrefix: /api/scan/v0/migrations
-    limits:
-      type: unlimited
+  /api/scan/v0/migrations:
+    name: migrations-schedule
+    type: unlimited
 
-  - actions:
-      - name: splice-instance-names
-        pathPrefix: /api/scan/v0/splice-instance-names
-    limits:
-      type: unlimited
+  /api/scan/v0/splice-instance-names:
+    name: splice-instance-names
+    type: unlimited
 
-  - actions:
-      - name: synchronizer-bootstrapping-transactions
-        pathPrefix: /api/scan/v0/synchronizer-bootstrapping-transactions
-    limits:
-      type: unlimited
+  /api/scan/v0/synchronizer-bootstrapping-transactions:
+    name: synchronizer-bootstrapping-transactions
+    type: unlimited
 
-  - actions:
-      - name: synchronizer-identities
-        pathPrefix: /api/scan/v0/synchronizer-identities
-    limits:
-      type: unlimited
+  /api/scan/v0/synchronizer-identities:
+    name: synchronizer-identities
+    type: unlimited
 
-  - actions:
-      - name: top-validators-by-purchased-traffic
-        pathPrefix: /api/scan/v0/top-validators-by-purchased-traffic
-    limits:
-      type: unlimited
+  /api/scan/v0/top-validators-by-purchased-traffic:
+    name: top-validators-by-purchased-traffic
+    type: unlimited
 
-  - actions:
-      - name: top-validators-by-validator-faucets
-        pathPrefix: /api/scan/v0/top-validators-by-validator-faucets
-    limits:
-      type: unlimited
+  /api/scan/v0/top-validators-by-validator-faucets:
+    name: top-validators-by-validator-faucets
+    type: unlimited
 
-  - actions:
-      - name: top-validators-by-validator-rewards
-        pathPrefix: /api/scan/v0/top-validators-by-validator-rewards
-    limits:
-      type: unlimited
+  /api/scan/v0/top-validators-by-validator-rewards:
+    name: top-validators-by-validator-rewards
+    type: unlimited
 
-  - actions:
-      - name: transfer-command-counter
-        pathPrefix: /api/scan/v0/transfer-command-counter
-    limits:
-      type: unlimited
+  /api/scan/v0/transfer-command-counter:
+    name: transfer-command-counter
+    type: unlimited
 
-  - actions:
-      - name: transfer-command-status
-        pathPrefix: /api/scan/v0/transfer-command
-    limits:
-      type: unlimited
+  /api/scan/v0/transfer-command:
+    name: transfer-command-status
+    type: unlimited
 
-  - actions:
-      - name: transfer-preapprovals
-        pathPrefix: /api/scan/v0/transfer-preapprovals
-    limits:
-      type: unlimited
+  /api/scan/v0/transfer-preapprovals:
+    name: transfer-preapprovals
+    type: unlimited
 
-  - actions:
-      - name: unclaimed-development-fund-coupons
-        pathPrefix: /api/scan/v0/unclaimed-development-fund-coupons
-    limits:
-      type: unlimited
+  /api/scan/v0/unclaimed-development-fund-coupons:
+    name: unclaimed-development-fund-coupons
+    type: unlimited
 
-  - actions:
-      - name: voterequest
-        pathPrefix: /api/scan/v0/voterequest
-    limits:
-      type: unlimited
+  /api/scan/v0/voterequest:
+    name: voterequest
+    type: unlimited
 
-  - actions:
-      - name: voterequests
-        pathPrefix: /api/scan/v0/voterequests
-    limits:
-      type: unlimited
+  /api/scan/v0/voterequests:
+    name: voterequests
+    type: unlimited
 
-  - actions:
-      - name: getBulkAcsSnapshot
-        pathPrefix: /api/scan/v0/history/bulk/acs
-    limits:
-      type: unlimited
+  /api/scan/v0/history/bulk/acs:
+    name: getBulkAcsSnapshot
+    type: unlimited
 
   # TODO(#3429): This currently fails with "Orphaned rate limit prefixes not matching any scan.yaml endpoint",
   #              because the endpoint is in scan-stream-server.yaml, not in scan.yaml
-  # - actions:
-  #     - name: bulkStorageDownload
-  #       pathPrefix: /api/scan/v0/history/bulk/download
-  #   limits:
-  #     type: unlimited
+  # /api/scan/v0/history/bulk/download:
+  #   name: bulkStorageDownload
+  #   type: unlimited
