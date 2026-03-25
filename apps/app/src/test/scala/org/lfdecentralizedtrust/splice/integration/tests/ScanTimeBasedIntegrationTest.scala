@@ -620,8 +620,8 @@ class ScanTimeBasedIntegrationTest
         .value
         .createdEvents
       val acsObjUrl = getSnapshotResponse.objectRefs.head.url
-      acsObjUrl should startWith("http://foo.bar.com/api/scan/v0/bulk-storage/download/")
-      val acsObjKey = acsObjUrl.stripPrefix("http://foo.bar.com/api/scan/v0/bulk-storage/download/")
+      acsObjUrl should startWith("http://foo.bar.com/api/scan/v0/bulk/download/")
+      val acsObjKey = acsObjUrl.stripPrefix("http://foo.bar.com/api/scan/v0/bulkbuild/download/")
       val out = new ByteArrayOutputStream()
       sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
       val acsAtMidnightFromS3 = uncompressAndDecode(
