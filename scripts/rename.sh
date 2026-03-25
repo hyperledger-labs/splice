@@ -1182,7 +1182,7 @@ function subcmd_no_illegal_daml_references() {
     local illegal_patterns=(
       svc SVC Svc   # to avoid conflict with PerSvContracts
       '(?<![a-z])cc(?!(ept|essor|g[.]github))'
-      'global(?!(ly))' # TODO (DACH-NY/canton-network-node#17137): revisit
+      'global(?!(ly|[.]))'
       CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       # Allow only Dso as in DsoRules in comments
@@ -1194,8 +1194,8 @@ function subcmd_no_illegal_daml_references() {
       # No connection between DSO and issuance
       '(dso|Dso|DSO).*ssue'
       'ssue.*(dso|Dso|DSO)'
-      # No Github issue links
-      'github(?!.io/hashlink)'
+      # No Github issue links, but allow links to docs
+      '(?<!hyperledger-labs\.)github(?!.io/hashlink)'
 
       )
     for pattern in "${illegal_patterns[@]}"; do
