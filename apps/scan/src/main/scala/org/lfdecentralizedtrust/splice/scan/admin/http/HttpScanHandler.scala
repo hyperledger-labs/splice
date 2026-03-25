@@ -1960,6 +1960,8 @@ class HttpScanHandler(
             txWithMigration,
             encoding = encoding,
             version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
+            None,
           )
         )
       )
