@@ -2172,7 +2172,7 @@ class HttpScanHandler(
           case Right(domain) => Future.successful(domain)
           case Left(error) =>
             Future.failed(
-              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
+              HttpErrorHandler.badRequest(s"Could not decode synchronizer ID: $error")
             )
         }
         actual <- sequencerAdminConnection.getSequencerTrafficControlState(member)
@@ -2273,16 +2273,9 @@ class HttpScanHandler(
             Future.failed(
               HttpErrorHandler.notFound(s"Party not found: $party")
             )
-        participantIds <- response.mapping.participantIds match {
-          case Seq() =>
-            Future.failed(
-              HttpErrorHandler.notFound(
-                s"No participant id found hosting party: $party"
-              )
-            )
-          case ids => Future.successful(ids.map(_.toProtoPrimitive).toVector)
-        }
-      } yield definitions.GetPartyToParticipantResponseV1(participantIds)
+      } yield definitions.GetPartyToParticipantResponseV1(
+        response.mapping.participantIds.map(_.toProtoPrimitive).toVector
+      )
     }
   }
 

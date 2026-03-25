@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
@@ -617,6 +618,40 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         a[CommandFailure] should be thrownBy {
           sv1Backend.getPartyToParticipant(
             "wrong-party-id::123321321"
+          )
+        },
+        lines => forAll(lines)(_.errorMessage should include("HTTP 404")),
+      )
+    }
+  }
+
+  "scan getPartyToParticipant returns multiple participants for the DSO party" in { implicit env =>
+    initDso()
+    val activeSynchronizer = SynchronizerId.tryFromString(
+      sv1ScanBackend
+        .getAmuletConfigAsOf(env.environment.clock.now)
+        .decentralizedSynchronizer
+        .activeSynchronizer
+    )
+
+    clue("looking up the DSO party returns multiple participant ids") {
+      val participantIds = sv1ScanBackend.getPartyToParticipant(
+        activeSynchronizer,
+        dsoParty,
+      )
+      participantIds should have size 4 withClue "DSO party should be hosted on all 4 SV participants"
+    }
+
+    clue("looking up an unknown party fails with a 404") {
+      val unknownParty =
+        com.digitalasset.canton.topology.PartyId.tryFromProtoPrimitive(
+          "wrong-party-id::123321321"
+        )
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        a[CommandFailure] should be thrownBy {
+          sv1ScanBackend.getPartyToParticipant(
+            activeSynchronizer,
+            unknownParty,
           )
         },
         lines => forAll(lines)(_.errorMessage should include("HTTP 404")),
