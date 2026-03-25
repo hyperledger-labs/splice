@@ -376,7 +376,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val treeUpdate =
       CompactJsonScanHttpEncodings().httpToLapiUpdate(
         scanClient.getUpdateByHash(
-          hash = extTxnHash,
+          extTxnHash = extTxnHash,
           encoding = CompactJson,
         )
       )

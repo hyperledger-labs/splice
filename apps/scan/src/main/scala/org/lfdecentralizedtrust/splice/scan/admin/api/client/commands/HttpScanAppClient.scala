@@ -1397,7 +1397,7 @@ object HttpScanAppClient {
   }
 
   case class GetUpdateByHash(
-      hash: String,
+      extTxnHash: String,
       damlValueEncoding: definitions.DamlValueEncoding,
   ) extends InternalBaseCommand[http.GetUpdateByHashResponse, definitions.UpdateHistoryItemV3] {
     override def submitRequest(
@@ -1408,7 +1408,7 @@ object HttpScanAppClient {
       HttpResponse,
     ], http.GetUpdateByHashResponse] = {
       client.getUpdateByHash(
-        hash = hash,
+        hash = extTxnHash,
         damlValueEncoding = Some(damlValueEncoding),
         headers,
       )
@@ -1418,7 +1418,7 @@ object HttpScanAppClient {
       case http.GetUpdateByHashResponse.OK(response) =>
         Right(response)
       case http.GetUpdateByHashResponse.NotFound(_) =>
-        Left(s"Update with hash $hash not found")
+        Left(s"Update with extTxnHash $extTxnHash not found")
     }
   }
 

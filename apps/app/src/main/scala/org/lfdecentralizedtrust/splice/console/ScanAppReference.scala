@@ -549,10 +549,10 @@ abstract class ScanAppReference(
     }
   }
 
-  def getUpdateByHash(hash: String, encoding: definitions.DamlValueEncoding) = {
+  def getUpdateByHash(extTxnHash: String, encoding: definitions.DamlValueEncoding) = {
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.GetUpdateByHash(hash, encoding)
+        HttpScanAppClient.GetUpdateByHash(extTxnHash, encoding)
       )
     }
   }

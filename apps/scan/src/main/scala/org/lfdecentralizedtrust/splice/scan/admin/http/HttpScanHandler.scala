@@ -1973,7 +1973,7 @@ class HttpScanHandler(
       damlValueEncoding: Option[DamlValueEncoding],
   )(extracted: TraceContext): Future[ScanResource.GetUpdateByHashResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getUpdateByHashV2") { _ => _ =>
+    withSpan(s"$workflowId.getUpdateByHash") { _ => _ =>
       getUpdateByHash(
         hash = hash,
         encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
