@@ -70,14 +70,14 @@ trait LsuTopologyAdminConnection {
         (previous match {
           case Some(successor) =>
             proposeMapping(
-              synchronizerId,
+              synchronizerId.logical,
               successor.mapping.copy(connection = connection),
               successor.base.serial + PositiveInt.one,
               isProposal = false,
             )
           case None =>
             proposeMapping(
-              synchronizerId,
+              synchronizerId.logical,
               LsuSequencerConnectionSuccessor(sequencerId, synchronizerId, connection),
               PositiveInt.one,
               isProposal = false,
