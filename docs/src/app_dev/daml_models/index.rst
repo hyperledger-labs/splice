@@ -22,6 +22,7 @@ applications that are part of Splice.
    ../api/splice-wallet/index
    ../api/splice-wallet-payments/index
    ../api/splice-token-test-trading-app/index
+   ../api/splice-token-test-trading-app-v2/index
    ../api/splice-token-standard-test-v1/index
    ../api/splice-util-batched-markers/index
 
