@@ -1308,25 +1308,10 @@ private[sync] class SynchronizerConnectionsManager(
     * manually repairing the ACS to account for missed activity on both the old and new
     * synchronizer.
     */
+  // not used in splice
   def manuallyUpgradeSynchronizerTo(
       request: ManualLsuRequest
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
-    for {
-      _ <- validateSequencerConnection(
-        request.successorConfig,
-        request.successorConnectionValidation,
-      ).leftMap(_.toString)
-      _ <-
-        new ManualLogicalSynchronizerUpgrade(
-          synchronizerConnectionConfigStore,
-          connectQueue,
-          connectedSynchronizers,
-          disconnectSynchronizer = (alias: Traced[SynchronizerAlias]) =>
-            disconnectSynchronizer(alias.value)(alias.traceContext),
-          timeouts,
-          loggerFactory,
-        ).upgrade(request)
-    } yield ()
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = ???
 
   // Write health requires the ability to transact, i.e. connectivity to at least one synchronizer and HA-activeness.
   def currentWriteHealth(): HealthStatus = {

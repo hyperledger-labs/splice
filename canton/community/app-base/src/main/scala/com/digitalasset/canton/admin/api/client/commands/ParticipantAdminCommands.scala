@@ -4,7 +4,6 @@
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
-import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
@@ -64,12 +63,13 @@ import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.topology.transaction.{GrpcConnection, ParticipantPermission}
 import com.digitalasset.canton.topology.{
   ConfiguredPhysicalSynchronizerId,
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  SequencerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -80,6 +80,7 @@ import com.google.protobuf.timestamp.Timestamp
 import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, ManagedChannel}
+import io.scalaland.chimney.dsl.*
 
 import java.io.{File, IOException}
 import java.nio.file.{Files, Path, Paths}
@@ -1329,47 +1330,6 @@ object ParticipantAdminCommands {
       ): Either[String, Unit] = Either.unit
     }
 
-    final case class PerformManualLsu(
-        currentPSId: PhysicalSynchronizerId,
-        successorPSId: PhysicalSynchronizerId,
-        upgradeTime: CantonTimestamp,
-        successorConfig: SynchronizerConnectionConfig,
-        sequencerConnectionValidation: SequencerConnectionValidation,
-    ) extends GrpcAdminCommand[
-          v30.PerformManualLsuRequest,
-          v30.PerformManualLsuResponse,
-          Unit,
-        ] {
-      override type Svc = ParticipantRepairServiceStub
-
-      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
-        v30.ParticipantRepairServiceGrpc.stub(channel)
-
-      override protected def createRequest(): Either[String, v30.PerformManualLsuRequest] =
-        Right(
-          v30.PerformManualLsuRequest(
-            physicalSynchronizerId = currentPSId.toProtoPrimitive,
-            successor = v30.PerformManualLsuRequest
-              .Successor(
-                physicalSynchronizerId = successorPSId.toProtoPrimitive,
-                announcedUpgradeTime = upgradeTime.toProtoTimestamp.some,
-                config = successorConfig.toProtoV30.some,
-                sequencerConnectionValidation = sequencerConnectionValidation.toProtoV30,
-              )
-              .some,
-          )
-        )
-
-      override protected def submitRequest(
-          service: ParticipantRepairServiceStub,
-          request: v30.PerformManualLsuRequest,
-      ): Future[v30.PerformManualLsuResponse] =
-        service.performManualLsu(request)
-
-      override protected def handleResponse(
-          response: v30.PerformManualLsuResponse
-      ): Either[String, Unit] = Either.unit
-    }
   }
 
   object Ping {
@@ -1720,6 +1680,36 @@ object ParticipantAdminCommands {
 
       override protected def handleResponse(response: v30.LogoutResponse): Either[String, Unit] =
         Either.unit
+    }
+
+    final case class PerformManualLsu(
+        currentPsid: PhysicalSynchronizerId,
+        successorPsid: PhysicalSynchronizerId,
+        upgradeTime: Option[CantonTimestamp],
+        sequencerSuccessors: Map[SequencerId, GrpcConnection],
+    ) extends Base[v30.PerformManualLsuRequest, v30.PerformManualLsuResponse, Unit] {
+
+      override protected def createRequest(): Either[String, v30.PerformManualLsuRequest] =
+        v30
+          .PerformManualLsuRequest(
+            physicalSynchronizerId = currentPsid.toProtoPrimitive,
+            successorPhysicalSynchronizerId = successorPsid.toProtoPrimitive,
+            upgradeTime = upgradeTime.map(_.toProtoTimestamp),
+            sequencerSuccessors = sequencerSuccessors.map { case (sequencerId, connection) =>
+              sequencerId.toProtoPrimitive -> connection.toProtoV30
+                .transformInto[v30.PerformManualLsuRequest.SequencerConnection]
+            },
+          )
+          .asRight
+
+      override protected def submitRequest(
+          service: SynchronizerConnectivityServiceStub,
+          request: v30.PerformManualLsuRequest,
+      ): Future[v30.PerformManualLsuResponse] = service.performManualLsu(request)
+
+      override protected def handleResponse(
+          response: v30.PerformManualLsuResponse
+      ): Either[String, Unit] = Either.unit
     }
   }
 
