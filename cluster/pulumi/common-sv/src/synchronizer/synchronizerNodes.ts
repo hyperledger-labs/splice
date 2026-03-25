@@ -50,16 +50,16 @@ export class SynchronizerNodes {
     },
     ingressName: string
   ) {
-    const activeMigrationId =
-      decentralizedSynchronizerMigrationConfig.activeDatabaseId ||
-      decentralizedSynchronizerMigrationConfig.active.id;
+    const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;
 
     this.participant = {
       asDependencies: [],
       internalClusterAddress: decentralizedSynchronizerMigrationConfig.active
         .enableLogicalSynchronizerDeploymentMode
         ? pulumi.output('participant')
-        : pulumi.output(`participant-${activeMigrationId}`),
+        : pulumi.output(
+            `participant-${decentralizedSynchronizerMigrationConfig.lsuEnabled ? decentralizedSynchronizerMigrationConfig.frozenMigrationId : activeMigrationId}`
+          ),
     };
 
     this.active = buildDecentralizedSynchronizerNode(

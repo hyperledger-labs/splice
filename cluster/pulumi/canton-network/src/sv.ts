@@ -429,7 +429,6 @@ function installSvApp(
   const commonSvAppValues = valuesForSvApp(
     decentralizedSynchronizerMigrationConfig,
     { ...config, skipInitialization: svsConfig?.synchronizer?.skipInitialization },
-    decentralizedSynchronizer,
     synchronizerNodes,
     config.ingressName
   );
