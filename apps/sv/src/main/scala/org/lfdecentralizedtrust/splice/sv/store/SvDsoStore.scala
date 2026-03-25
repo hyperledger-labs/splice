@@ -201,6 +201,14 @@ trait SvDsoStore
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet]
 
+  /** List amulet transfer instructions that are expired */
+  def listExpiredAmuletTransferInstructions(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[
+    splice.amulettransferinstruction.AmuletTransferInstruction.ContractId,
+    splice.amulettransferinstruction.AmuletTransferInstruction,
+  ]
+
   /** List locked amulets that are expired and can never be used as transfer input. */
   def listLockedExpiredAmulets(
       ignoredParties: Set[PartyId]
@@ -1433,6 +1441,15 @@ object SvDsoStore {
         co.payload.dso == dso
       ) {
         DsoAcsStoreRowData(_)
+      },
+      mkFilter(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(co =>
+        co.payload.transfer.instrumentId.admin == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt =
+            Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
+        )
       },
     )
 
