@@ -55,6 +55,7 @@ class DbAppActivityRecordStore(
 
   object Tables {
     val appActivityRecords = "app_activity_record_store"
+    val verdicts = "scan_verdict_store"
   }
 
   type AppActivityRecordT = DbAppActivityRecordStore.AppActivityRecordT
@@ -68,8 +69,6 @@ class DbAppActivityRecordStore(
         appActivityWeights = longArrayGetResult(prs).toSeq,
       )
   }
-
-  private val verdictTable = "scan_verdict_store"
 
   /** Find the earliest round with complete app activity.
     * A round is complete if the prior round also has activity records,
@@ -85,13 +84,13 @@ class DbAppActivityRecordStore(
             from (
               select min(a.round_number) as min_round
               from #${Tables.appActivityRecords} a
-              join #$verdictTable v on a.verdict_row_id = v.row_id
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
               where v.history_id = $historyId
             ) sub
             where exists (
               select 1
               from #${Tables.appActivityRecords} a
-              join #$verdictTable v on a.verdict_row_id = v.row_id
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
               where a.round_number = sub.min_round + 1
                 and v.history_id = $historyId
             )
@@ -114,13 +113,13 @@ class DbAppActivityRecordStore(
             from (
               select max(a.round_number) as max_round
               from #${Tables.appActivityRecords} a
-              join #$verdictTable v on a.verdict_row_id = v.row_id
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
               where v.history_id = $historyId
             ) sub
             where exists (
               select 1
               from #${Tables.appActivityRecords} a
-              join #$verdictTable v on a.verdict_row_id = v.row_id
+              join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
               where a.round_number = sub.max_round - 1
                 and v.history_id = $historyId
             )
