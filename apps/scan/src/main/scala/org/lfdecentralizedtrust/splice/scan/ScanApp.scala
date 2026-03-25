@@ -244,8 +244,8 @@ class ScanApp(
             )
           )
         } else None
-      appRewardsStoreO = appActivityRecordStoreO.map(_ =>
-        new DbScanAppRewardsStore(storage, updateHistory, loggerFactory)
+      appRewardsStoreO = appActivityRecordStoreO.map(appActivityRecordStore =>
+        new DbScanAppRewardsStore(storage, updateHistory, appActivityRecordStore, loggerFactory)
       )
       automation = new ScanAutomationService(
         config,

@@ -12,6 +12,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import io.grpc.Status
 import slick.jdbc.{GetResult, PostgresProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -129,6 +130,39 @@ class DbAppActivityRecordStore(
       "appActivity.latestRoundWithCompleteAppActivity",
     )
   }
+
+  /** Assert that activity records exist for rounds surrounding the given round,
+    * proving ingestion completeness. Joins through scan_verdict_store to filter by history_id.
+    */
+  def assertCompleteActivity(roundNumber: Long)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.queryAndUpdate(
+        for {
+          hasPrev <- sql"""select exists(
+                             select 1 from #${Tables.appActivityRecords} a
+                             join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+                             where a.round_number = ${roundNumber - 1}
+                               and v.history_id = $historyId
+                           )""".as[Boolean].head
+          hasNext <- sql"""select exists(
+                             select 1 from #${Tables.appActivityRecords} a
+                             join #${Tables.verdicts} v on a.verdict_row_id = v.row_id
+                             where a.round_number = ${roundNumber + 1}
+                               and v.history_id = $historyId
+                           )""".as[Boolean].head
+          _ = if (!hasPrev || !hasNext)
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Incomplete app activity for round $roundNumber: " +
+                  s"round ${roundNumber - 1} exists=$hasPrev, round ${roundNumber + 1} exists=$hasNext"
+              )
+              .asRuntimeException()
+        } yield (),
+        "appActivity.assertCompleteActivity",
+      )
+    )
 
   def getRecordByVerdictRowId(verdictRowId: Long)(implicit
       tc: TraceContext
