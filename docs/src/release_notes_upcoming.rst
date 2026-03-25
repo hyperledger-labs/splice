@@ -34,3 +34,12 @@
          synchronizer is active. To enable the second synchronizer called ``app-synchronizer``, start LocalNet with the ``multi-sync`` Docker
          Compose profile (``--profile multi-sync``). The ``app-provider`` and ``app-user`` participant nodes are cross-connected to both
          synchronizers. See :ref:`multi-sync-localnet` for details.
+
+     - Scan
+
+       - **Experimental**: Add an optional ``app_activity_records`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
+         When enabled by SV configuration, traffic summaries and app activity records are included alongside verdicts in event history items.
+         This is part of the CIP-104 preview and is subject to change.
+
+         App activity record computation will be enabled step-by-step on Dev/Test/MainNet,
+         once the SVs have successfully concluded their performance testing.

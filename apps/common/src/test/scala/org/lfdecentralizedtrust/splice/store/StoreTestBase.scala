@@ -254,13 +254,18 @@ abstract class StoreTestBase
 
   protected val holdingFee = BigDecimal(1.0)
 
-  protected def openMiningRound(dso: PartyId, round: Long, amuletPrice: Double) = {
+  protected def openMiningRound(
+      dso: PartyId,
+      round: Long,
+      amuletPrice: Double,
+      opensAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
+  ) = {
     val template = new roundCodegen.OpenMiningRound(
       dso.toProtoPrimitive,
       new Round(round),
       numeric(amuletPrice),
-      Instant.now().truncatedTo(ChronoUnit.MICROS),
-      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
+      opensAt,
+      opensAt.plusSeconds(600),
       new RelTime(1_000_000),
       SpliceUtil.defaultTransferConfig(10, holdingFee),
       SpliceUtil.issuanceConfig(10.0, 10.0, 10.0),
