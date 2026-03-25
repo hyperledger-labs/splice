@@ -390,7 +390,7 @@ class SvAppBackendReference(
     }
 
   @Help.Summary("Get the party to participant mapping for a given party")
-  def getPartyToParticipant(partyId: String): definitions.GetPartyToParticipantResponse =
+  def getPartyToParticipant(partyId: String): definitions.GetPartyToParticipantResponseV1 =
     consoleEnvironment.run {
       httpCommand(HttpSvOperatorAppClient.GetPartyToParticipant(partyId))
     }

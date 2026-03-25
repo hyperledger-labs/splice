@@ -363,7 +363,7 @@ object HttpSvOperatorAppClient {
   case class GetPartyToParticipant(partyId: String)
       extends BaseCommand[
         http.GetPartyToParticipantResponse,
-        definitions.GetPartyToParticipantResponse,
+        definitions.GetPartyToParticipantResponseV1,
       ] {
 
     override def submitRequest(
@@ -379,7 +379,7 @@ object HttpSvOperatorAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[
       http.GetPartyToParticipantResponse,
-      Either[String, definitions.GetPartyToParticipantResponse],
+      Either[String, definitions.GetPartyToParticipantResponseV1],
     ] = { case http.GetPartyToParticipantResponse.OK(response) =>
       Right(response)
     }

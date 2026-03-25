@@ -4,9 +4,9 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
-  allSvsToDeploy,
-  coreSvsToDeploy,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigs';
+  allSvsToDeployBasic,
+  coreSvsToDeployBasic,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigsBasic';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
@@ -43,7 +43,7 @@ export const istioVersion = {
 };
 
 // dsoSize + number of extra SVs added via config.yaml
-const numCoreSvsToDeploy = coreSvsToDeploy.length;
+const numCoreSvsToDeploy = coreSvsToDeployBasic.length;
 
 function configureIstioBase(
   ns: k8s.core.v1.Namespace,
@@ -686,7 +686,7 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
                       hosts: [
                         // We could also have done `info.sv*.whatever` here but enumerating what we expect seems slightly more secure
                         ...new Set(
-                          allSvsToDeploy
+                          allSvsToDeployBasic
                             .map(sv => [
                               `info.${sv.ingressName}.${getDnsNames().cantonDnsName}`,
                               `info.${sv.ingressName}.${getDnsNames().daDnsName}`,
@@ -711,7 +711,7 @@ function configureSequencerHighPerformanceGrpcDestinationRules(
   return [
     ...(function* () {
       for (const migration of DecentralizedSynchronizerUpgradeConfig.runningMigrations()) {
-        for (const sv of allSvsToDeploy) {
+        for (const sv of allSvsToDeployBasic) {
           yield configureSequencerHighPerformanceGrpcDestinationRule(
             ingressNs,
             sv.nodeName,

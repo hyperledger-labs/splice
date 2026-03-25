@@ -12,7 +12,7 @@ import {
   CastVoteRequest,
   createConfiguration,
   CreateVoteRequest,
-  GetPartyToParticipantResponse,
+  GetPartyToParticipantResponseV1,
   ListAmuletPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
@@ -84,7 +84,7 @@ export interface SvAdminClient {
   getSequencerNodeStatus: () => Promise<openapi.NodeStatus>;
   getMediatorNodeStatus: () => Promise<openapi.NodeStatus>;
   featureSupport: () => Promise<openapi.FeatureSupportResponse>;
-  getPartyToParticipant: (partyId: string) => Promise<GetPartyToParticipantResponse>;
+  getPartyToParticipant: (partyId: string) => Promise<GetPartyToParticipantResponseV1>;
 }
 
 class ApiMiddleware
@@ -213,7 +213,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       featureSupport: async (): Promise<openapi.FeatureSupportResponse> => {
         return await svAdminClient.featureSupport();
       },
-      getPartyToParticipant: async (partyId: string): Promise<GetPartyToParticipantResponse> => {
+      getPartyToParticipant: async (partyId: string): Promise<GetPartyToParticipantResponseV1> => {
         return await svAdminClient.getPartyToParticipant(partyId);
       },
     };

@@ -177,10 +177,12 @@ class WalletBuyTrafficRequestIntegrationTest
                 activeSynchronizerId,
               ) shouldBe expectedTotalPurchasedTraffic
               // double-check that scan returns the same result
-              val participantId = sv1ScanBackend.getPartyToParticipant(
-                activeSynchronizerId,
-                aliceValidatorBackend.getValidatorPartyId(),
-              )
+              val participantId = sv1ScanBackend
+                .getPartyToParticipant(
+                  activeSynchronizerId,
+                  aliceValidatorBackend.getValidatorPartyId(),
+                )
+                .loneElement
               eventually()(
                 sv1ScanBackend
                   .getMemberTrafficStatus(
@@ -206,10 +208,12 @@ class WalletBuyTrafficRequestIntegrationTest
                 activeSynchronizerId,
               ).extraTrafficPurchased.value shouldBe expectedTrafficLimit
               // double-check that scan returns the same result
-              val participantId = sv1ScanBackend.getPartyToParticipant(
-                activeSynchronizerId,
-                aliceValidatorBackend.getValidatorPartyId(),
-              )
+              val participantId = sv1ScanBackend
+                .getPartyToParticipant(
+                  activeSynchronizerId,
+                  aliceValidatorBackend.getValidatorPartyId(),
+                )
+                .loneElement
               sv1ScanBackend
                 .getMemberTrafficStatus(
                   activeSynchronizerId,
@@ -318,10 +322,12 @@ class WalletBuyTrafficRequestIntegrationTest
         getTotalPurchasedTraffic(validatorApp.participantClient.id, activeSynchronizerId)
       // double-check that scan returns the same result
       val participantId =
-        sv1ScanBackend.getPartyToParticipant(
-          activeSynchronizerId,
-          validatorApp.getValidatorPartyId(),
-        )
+        sv1ScanBackend
+          .getPartyToParticipant(
+            activeSynchronizerId,
+            validatorApp.getValidatorPartyId(),
+          )
+          .loneElement
       eventually()(
         sv1ScanBackend
           .getMemberTrafficStatus(activeSynchronizerId, participantId)

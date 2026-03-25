@@ -75,7 +75,7 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.MonadUtil
@@ -246,6 +246,13 @@ class BftScanConnection(
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
     bftCall(_.listDsoSequencers())
+  }
+
+  override def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[ParticipantId]] = {
+    bftCall(_.getPartyToParticipant(synchronizerId, partyId))
   }
 
   override def listDsoScans()(implicit
