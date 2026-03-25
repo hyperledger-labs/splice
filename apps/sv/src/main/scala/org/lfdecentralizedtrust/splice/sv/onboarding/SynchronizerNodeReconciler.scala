@@ -65,7 +65,6 @@ class SynchronizerNodeReconciler(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Unit] = {
-    // TODO(#564) - add ability to sync all the synchronizers
     val currentNode = synchronizerNodes.map(_.current)
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(currentNode, migrationId)

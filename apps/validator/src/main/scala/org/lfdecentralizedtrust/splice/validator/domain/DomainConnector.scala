@@ -261,9 +261,15 @@ class DomainConnector(
               .mapValues { sequencersForId =>
                 val serialMatch =
                   sequencersForId.find(_.serial.contains(synchronizerSerial.unwrap.toLong))
-                serialMatch.orElse(
-                  sequencersForId.find(s => s.serial.isEmpty && s.migrationId == migrationId)
-                )
+                // it might be that some SV did not update the url for the latest serial
+                // in that case we don't want to fallback to the migration id one
+                // the migration id fallback is valid only if the SV did not sync the per serial urls yet for the first time
+                val sequencerHasAnyEntryWithSerial = sequencersForId.exists(_.serial.nonEmpty)
+                if (sequencerHasAnyEntryWithSerial) serialMatch
+                else
+                  serialMatch.orElse(
+                    sequencersForId.find(s => s.serial.isEmpty && s.migrationId == migrationId)
+                  )
               }
               .values
               .flatten

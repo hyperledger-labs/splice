@@ -113,14 +113,10 @@ class LogicalSynchronizerUpgradeTrigger(
         successorSynchronizerNode.mediatorAdminConnection,
         "mediator",
       )
-      sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
-      successorExists <- currentSynchronizerNode.sequencerAdminConnection
-        .lookupSequencerSuccessors(physicalSynchronizerId.logical, sequencerId)
-        .map(_.exists(_.mapping.connection == successorConnection))
     } yield {
       announcements
         .filter { _ =>
-          sequencerNotInitialized || mediatorNotInitialized || !successorExists
+          sequencerNotInitialized || mediatorNotInitialized
         }
         .map(result => LsuTransferTask(result.mapping))
     }
@@ -186,6 +182,23 @@ class LogicalSynchronizerUpgradeTrigger(
         logger,
       )
       psid <- successorSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
+      sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
+      _ <-
+        if (task.work.announcement.upgradeTime.isAfter(task.readyAt))
+          currentSynchronizerNode.sequencerAdminConnection.ensureSequencerSuccessor(
+            psid,
+            sequencerId = sequencerId,
+            connection = successorConnection,
+          )
+        else {
+          logger.warn("Not publishing sequencer successor as we are past upgrade time")
+          Future.unit
+        }
+      _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
+        localSynchronizerNodes.some,
+        psid.logical,
+        OnboardedImmediately,
+      )
       _ <- context.retryProvider.ensureThat(
         RetryFor.InitializingClientCalls,
         "init_mediator_lsu",
@@ -212,22 +225,6 @@ class LogicalSynchronizerUpgradeTrigger(
       TaskSuccess(
         show"Initialized new synchronizer with parameters $parameters"
       )
-    }).flatMap(result => {
-      for {
-        psid <- successorSynchronizerNode.sequencerAdminConnection.getPhysicalSynchronizerId()
-        sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
-        _ <-
-          currentSynchronizerNode.sequencerAdminConnection.ensureSequencerSuccessor(
-            psid,
-            sequencerId = sequencerId,
-            connection = successorConnection,
-          )
-        _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
-          localSynchronizerNodes.some,
-          psid.logical,
-          OnboardedImmediately,
-        )
-      } yield { result }
     })
   }
 

@@ -170,4 +170,7 @@ Submission timed out at
 # TODO(DACH-NY/canton-network-internal#4296) Remove once Canton fixes their metrics
 Instrument daml.mediator.response-latency.duration.seconds has recorded a negative value.
 
+# SV that joins late as part of the LSU test
+Missing successor information for the following sequencers.*sv4
+
 # Make sure to have a trailing newline
