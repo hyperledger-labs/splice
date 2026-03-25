@@ -34,7 +34,6 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   upcast_v1_v2_Allocation,
 
   -- ** Choice implementations
-  allocationV2_settleDefaultImplUsingV1,
   allocationV2_withdrawDefaultImplUsingV1,
   allocationV2_cancelDefaultImplUsingV1,
 
@@ -210,59 +209,6 @@ ensureIsReceiptAllocation executors receiver receiptAccount choiceArg = do
 -- Allocation choices
 ---------------------
 
--- TODO(#4517): re-review this implementation jointly to focus the increase in test coverage
-
--- | Default implementation for the `V2.Allocation_Settle` for a template that
--- implements the `V1.Allocation` interface.
---
--- It uses the `V1.Allocation_ExecuteTransfer` choice to ensure the sender's tx
--- parsing sees the expected choice.
-allocationV2_settleDefaultImplUsingV1
-  : AllocationV2.Allocation
-  -> ContractId AllocationV2.Allocation
-  -> AllocationV2.Allocation_Settle
-  -> Update AllocationV2.Allocation_SettleResult
-allocationV2_settleDefaultImplUsingV1 this self (AllocationV2.Allocation_Settle{..}) = do
-  -- no archive of self, as the V1 choice is consuming
-  -- prudent engineering:check actors explicitly to avoid leaking authority from
-  -- too many controllers to the later archivals of holdings.
-  let thisView = view this
-  checkActors actors [AllocationV2.defaultAllocation_SettleControllers thisView]
-  let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
-  result <- exercise v1Cid AllocationV1.Allocation_ExecuteTransfer with extraArgs
-  -- Archive the created receiver holdings, which is required, as the receiver
-  -- will get their credit as part of settling their allocation.
-  --
-  -- Note: we did not choose to implement passing the receiver holding to its matching
-  -- allocation's settle choice. That would make the V2.Allocation_Settle choice
-  -- unnecessarily difficult for the sake of a small optimization that is only relevant
-  -- for the limited period of mixed version settlements.
-  forA_ result.receiverHoldingCids $ \receiverHoldingCid ->
-    archive receiverHoldingCid
-
-  -- construct metadata to aid V1 tx history parsers
-  leg <- case thisView.allocation.transferLegs of
-    [leg] -> pure leg
-    legs -> abort $ "expected exactly one transfer leg for allocation settlement, but got: " <> show legs
-  let reason = "V2 allocation settlement for leg '" <> leg.transferLegId <> "' using V1.Allocation_ExecuteTransfer"
-  pure AllocationV2.Allocation_SettleResult with
-    authorizerHoldingCids = TextMap.fromList [ (leg.instrumentId.id, map upcast result.senderHoldingCids) ]
-    -- TODO(#4597): revisit this metadata as part of revisiting history parsing
-    meta = Metadata with
-      values = TextMap.fromList
-        [ (reasonMetaKey, reason)
-        , (txKindMetaKey, "mint")
-        ]
-      -- Note: this fallback metadata will be used by V1 tx history parsers for the receiver
-      -- when parsing the joint creation and archival of the receiver holding.
-      -- We tag it as a mint of 0.0 holding amount, as that is as good as any of
-      -- the other options.
-      --
-      -- Receivers using V2 wallets will parse the choice as a whole and ignore this metadata.
-
-      -- TODO(#4550): attempt to do better as part of switching to event based history parsing
-
-
 -- | Default implementation for the `V2.Allocation_Withdraw` for a template that
 -- implements the `V1.Allocation` interface.
 --
@@ -323,6 +269,9 @@ settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl arg =
 settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl
   : AllocationV2.SettlementFactory_SettleBatch -> [Party]
 settlementFactoryV2_privateAsset_settleBatchExtraObserversDefaultImpl _arg = []
+
+-- TODO(#4517): re-review this implementation jointly to focus the increase in test coverage
+
 
 -- TODO(#4517): re-review this implementation jointly to focus the increase in test coverage
 
@@ -473,13 +422,18 @@ instance BackwardCompatible AllocationV1.AllocationSpecification AllocationV2.Al
       settlement = upcast settlement
       transferLegs = [upcast_v1_v2_TransferLeg transferLegId transferLeg]
 
+-- | Use this instance only if your allocation does not evolve over time, as it
+-- always uses `None` for the `originalAllocationCid`.
 instance BackwardCompatible AllocationV1.AllocationView AllocationV2.AllocationView where
-  upcast thisView = upcast_v1_v2_Allocation (allocationV1_availableActionsDefault thisView) thisView
+  upcast thisView = upcast_v1_v2_Allocation None (allocationV1_availableActionsDefault thisView) thisView
 
--- | Generic method that allows to upcast a V1 allocation specification to a V2 one with custom available actions.
-upcast_v1_v2_Allocation : Map.Map [Party] [AllocationV2.AllocationAction] -> AllocationV1.AllocationView -> AllocationV2.AllocationView
-upcast_v1_v2_Allocation availableActions (AllocationV1.AllocationView with allocation, holdingCids, meta) =
+-- | Generic method that allows to upcast a V1 allocation specification to a V2 one with custom available actions,
+-- and a custom `originalAllocationCid`.
+upcast_v1_v2_Allocation
+  : Optional (ContractId AllocationV2.Allocation) -> Map.Map [Party] [AllocationV2.AllocationAction] -> AllocationV1.AllocationView -> AllocationV2.AllocationView
+upcast_v1_v2_Allocation originalAllocationCid availableActions (AllocationV1.AllocationView with allocation, holdingCids, meta) =
   AllocationV2.AllocationView with
+    originalAllocationCid
     allocation = upcast allocation
     holdingCids = map upcast holdingCids
     expiresAt = Some (allocation.settlement.settleBefore)

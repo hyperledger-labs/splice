@@ -32,6 +32,7 @@ testExpectedDsoParty_Transfer = do
                         lock = None
                     ]
           beneficiaries = None
+          meta = None
         context = context.context
         expectedDso = None
 

@@ -1,0 +1,131 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Internal module containing utilities to implement or use V2 events.
+--
+-- Import 'Splice.TokenStandard.Utils' to get access to the public ones.
+module Splice.TokenStandard.Utils.Internal.Events (
+
+  -- * Default implementation
+  eventLog_transferOutDefaultImpl,
+  eventLog_transferInDefaultImpl,
+
+  -- * Utilities to log events
+  logMint,
+  logBurn,
+  logTransfer,
+  logAllocationSettlement,
+) where
+
+import DA.Action (when, void)
+import DA.Foldable (forA_)
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
+import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
+
+import Splice.TokenStandard.Utils.Internal.Conversions
+import Splice.TokenStandard.Utils.Internal.Choices
+
+
+-- default implementations
+--------------------------
+
+eventLog_transferOutDefaultImpl
+  : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_TransferOut -> Update TransferEventsV2.EventLog_TransferOutResult
+eventLog_transferOutDefaultImpl admin _self arg = do
+  requireMatchExpected ("instrumentId.admin", arg.instrumentId.admin) admin
+  pure TransferEventsV2.EventLog_TransferOutResult
+
+eventLog_transferInDefaultImpl
+  : Party -> ContractId TransferEventsV2.EventLog -> TransferEventsV2.EventLog_TransferIn -> Update TransferEventsV2.EventLog_TransferInResult
+eventLog_transferInDefaultImpl admin _self arg = do
+  requireMatchExpected ("instrumentId.admin", arg.instrumentId.admin) admin
+  pure TransferEventsV2.EventLog_TransferInResult
+
+
+-- utilities to log mint and burn events
+----------------------------------------
+
+mintAccountId : Text
+mintAccountId = tokenStandardV2Namespace <> "mint"
+
+burnAccountId : Text
+burnAccountId = tokenStandardV2Namespace <> "burn"
+
+logMint : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update TransferEventsV2.EventLog_TransferInResult
+logMint factoryCid receiver amount instrumentId meta = do
+  exercise factoryCid TransferEventsV2.EventLog_TransferIn with
+    sender = V2.Account with
+      owner = instrumentId.admin
+      provider = None
+      id = mintAccountId
+    receiver
+    instrumentId
+    amount
+    observers = accountParties receiver
+    extraArgs = ExtraArgs with meta; context = emptyChoiceContext
+
+logBurn : ContractId TransferEventsV2.EventLog -> V2.Account -> Decimal -> V2.InstrumentId -> Metadata -> Update TransferEventsV2.EventLog_TransferOutResult
+logBurn factoryCid sender amount instrumentId meta = do
+  exercise factoryCid TransferEventsV2.EventLog_TransferOut with
+    receiver = V2.Account with
+      owner = instrumentId.admin
+      provider = None
+      id = burnAccountId
+    instrumentId
+    amount
+    sender
+    observers = accountParties sender
+    extraArgs = ExtraArgs with meta; context = emptyChoiceContext
+
+-- | Log transfer events for the settlement of an allocation.
+logAllocationSettlement : ContractId TransferEventsV2.EventLog -> AllocationV2.AllocationSpecification -> Update ()
+logAllocationSettlement eventLogCid allocation = do
+  forA_ allocation.transferLegs $ \AllocationV2.TransferLeg{..} -> do
+    let observers = accountParties allocation.authorizer
+    when (allocation.authorizer == sender) $
+      void $ exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
+        observers
+        sender
+        receiver
+        amount
+        instrumentId
+        extraArgs = ExtraArgs with
+          meta
+          context = emptyChoiceContext
+    when (allocation.authorizer == receiver) $
+      void $ exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
+        observers
+        sender
+        receiver
+        amount
+        instrumentId
+        extraArgs = ExtraArgs with
+          meta
+          context = emptyChoiceContext
+
+-- | Log events for the execution a transfer.
+logTransfer : ContractId TransferEventsV2.EventLog -> TransferInstructionV2.Transfer -> Update ()
+logTransfer eventLogCid transfer = do
+  exercise eventLogCid TransferEventsV2.EventLog_TransferOut with
+    sender = transfer.sender
+    receiver = transfer.receiver
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+    observers = accountParties transfer.sender
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = transfer.meta
+  exercise eventLogCid TransferEventsV2.EventLog_TransferIn with
+    sender = transfer.sender
+    receiver = transfer.receiver
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+    observers = accountParties transfer.receiver
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = transfer.meta
+  pure ()

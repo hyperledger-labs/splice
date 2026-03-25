@@ -17,6 +17,7 @@ import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils
 
 
@@ -51,6 +52,7 @@ template TokenAllocationV2 with
 
     interface instance V2.Allocation for TokenAllocationV2 where
       view = V2.AllocationView with
+        originalAllocationCid = None
         expiresAt = None
           -- Note: in a production implementation we would also want to add a choice
           -- for the `admin` to expire the allocation. We don't need it for testing though.
@@ -96,6 +98,10 @@ template TokenAllocationV2 with
           archive cid
           require' ("lockedToken", holding.account) isEqualR ("allocation.authorizer", allocation.authorizer)
           pure (holding.instrumentId, holding.amount)
+
+        -- log v2 transfer events
+        tokenRulesCid <- getEventLogFromContext extraArgs.context
+        logAllocationSettlement (toInterfaceContractId tokenRulesCid) allocation
 
         -- prudent engineering: compare debits with expected debits based on the transfer legs, and settle
         let creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
@@ -205,13 +211,28 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
+    -- TODO(#5001): test all calls to this event log using submitTree
+    interface instance TransferEventsV2.EventLog for TokenRules where
+      view = TransferEventsV2.EventLogView with
+        admin = admin
+        meta = emptyMetadata
+
+      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl admin
+      eventLog_transferInImpl = eventLog_transferInDefaultImpl admin
+
+
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
         admin
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl self arg =
-        settlementFactoryV2_settleBatchDefaultImpl admin self arg
+      settlementFactory_settleBatchImpl self arg0 =
+        let arg = arg0 with
+              extraArgs = arg0.extraArgs with
+                context = ChoiceContext with
+                  values = textMapSingleton tokenRulesContextKey (AV_ContractId (coerceContractId self))
+        in
+          settlementFactoryV2_settleBatchDefaultImpl admin self arg
 
       -- no extra observers to avoid leaking the settlement of different allocations to the other authorizers
       settlementFactory_settleBatchExtraObservers _arg = []
@@ -235,7 +256,7 @@ token_transferFactory_transferImpl
   -> ContractId V2.TransferFactory
   -> V2.TransferFactory_Transfer
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImpl tokenRules _self arg = do
+token_transferFactory_transferImpl tokenRules self arg = do
   -- TODO(#4542): allow either of the two authorizers to request the transfer
   let transfer = arg.transfer
   checkActors arg.actors [jointAuthorizers transfer.sender]
@@ -262,6 +283,9 @@ token_transferFactory_transferImpl tokenRules _self arg = do
           holding = (senderHoldingFromTransfer transfer) with
             amount = remainder
         pure [toInterfaceContractId cid]
+
+  -- report v2 event
+  logTransfer (coerceContractId self) transfer
 
   -- create holding for self-transfer, or transfer offer
   if transfer.receiver == transfer.sender
@@ -393,3 +417,20 @@ senderHoldingFromTransfer transfer = V2.HoldingView with
 
 jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties
+
+
+-- Event log retrieval
+----------------------
+
+tokenRulesContextKey : Text
+tokenRulesContextKey = "token-rules"
+
+getTokenRulesFromContext : ChoiceContext -> Update (ContractId TokenRules)
+getTokenRulesFromContext context = do
+  case TextMap.lookup tokenRulesContextKey context.values of
+    Some (AV_ContractId cid) -> pure (coerceContractId cid)
+    None -> fail $ "Context value for '" <> tokenRulesContextKey <> "' not found"
+    v -> fail $ "Failed to decode context value for '" <> tokenRulesContextKey <> "': " <> show v
+
+getEventLogFromContext : ChoiceContext -> Update (ContractId TransferEventsV2.EventLog)
+getEventLogFromContext context = toInterfaceContractId <$> getTokenRulesFromContext context

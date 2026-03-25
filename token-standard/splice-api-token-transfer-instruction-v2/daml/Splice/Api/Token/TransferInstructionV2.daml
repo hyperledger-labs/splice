@@ -9,6 +9,7 @@ import DA.Map qualified as Map
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
+-- TODO(#4598): when switching to batch transfers attempt to share the adjusted Transfer type between events, transfer instructions, and allocations
 
 -- | A specification of a transfer of holdings between two accounts.
 data Transfer = Transfer with
@@ -107,10 +108,11 @@ data TransferInstructionAction
 -- | View for `TransferInstruction`.
 data TransferInstructionView = TransferInstructionView with
     originalInstructionCid : Optional (ContractId TransferInstruction)
-      -- ^ The contract id of the original transfer instruction contract.
-      -- Used by the wallet to track the lineage of transfer instructions through multiple steps.
+      -- ^ The contract id of the original transfer instruction contract, which is `None`
+      -- for the original transfer instruction itself.
       --
-      -- Only set if the registry evolved the transfer instruction in multiple steps.
+      -- This SHOULD be used by wallets to correlate the same transfer instruction across
+      -- updates to its state.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
     availableActions : Map.Map [Party] [TransferInstructionAction]

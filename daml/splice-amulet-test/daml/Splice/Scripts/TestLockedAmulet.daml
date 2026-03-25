@@ -40,6 +40,7 @@ testLocking = do
         inputs = [InputAmulet amuletCid]
         outputs = [lockOutput, lockOutput]
         beneficiaries = None
+        meta = None
       context = context.context
       expectedDso = Some app.dso
 

@@ -42,6 +42,7 @@ template OTCTradeAllocationRequest with
 
     interface instance V2.AllocationRequest for OTCTradeAllocationRequest where
       view = V2.AllocationRequestView with
+        originalRequestCid = None
         settlement
         transferLegs
         authorizer

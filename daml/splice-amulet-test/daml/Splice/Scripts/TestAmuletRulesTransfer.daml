@@ -84,6 +84,7 @@ testUsageFees = do
 
                   ]
         beneficiaries = None
+        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -155,6 +156,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
                       lock = None
                       receiverFeeRatio = 0.4 ]
         beneficiaries = None -- test code, no beneficiaries
+        meta = None
       context = contextWithRound1.context
       expectedDso = Some app.dso
 
@@ -236,6 +238,7 @@ submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amou
                         lock = None
                         receiverFeeRatio = 1.0]
           beneficiaries = None -- test code, no beneficiaries
+          meta = None
         context = transferContext
         expectedDso = Some app.dso
 
@@ -282,6 +285,7 @@ testSenderChangeAndOutput = do
                     lock = None
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
+      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -336,6 +340,7 @@ testSenderSmallChange = do
                     lock = None
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
+      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -381,6 +386,7 @@ testSenderSmallChangeNoSenderOutput = do
 
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
+      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -423,6 +429,7 @@ testAppRewardBeneficiaries = do
                     lock = None
                 ]
       beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
+      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -441,6 +448,7 @@ testAppRewardBeneficiaries = do
                     lock = None
                 ]
       beneficiaries = Some (AppRewardBeneficiary alice.primaryParty 0.8 :: replicate 20 (AppRewardBeneficiary alice.primaryParty 0.01))
+      meta = None
     context = context.context
     expectedDso = Some app.dso
 
@@ -465,6 +473,7 @@ testAppRewardBeneficiaries = do
                       lock = None
                   ]
         beneficiaries = None
+        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -492,6 +501,7 @@ testAppRewardBeneficiaries = do
                             lock = None
                         ]
               beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
+              meta = None
             context = context.context
             expectedDso = Some app.dso
 
@@ -548,6 +558,7 @@ testUnclaimedActivityRecordTransferInput = do
         inputs = [InputUnclaimedActivityRecord expiredUnclaimedActivityRecordCid]
         outputs = []
         beneficiaries = None
+        meta = None
       context = context.context
       expectedDso = Some app.dso
 
@@ -564,6 +575,7 @@ testUnclaimedActivityRecordTransferInput = do
           inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
           outputs = []
           beneficiaries = None
+          meta = None
         context = context.context
         expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app
@@ -610,6 +622,7 @@ testInputDevelopmentFundCoupon = do
         inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
         outputs = []
         beneficiaries = None
+        meta = None
       context = context.context
       expectedDso = Some app.dso
   setTime now
@@ -626,6 +639,7 @@ testInputDevelopmentFundCoupon = do
             inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
             outputs = []
             beneficiaries = None
+            meta = None
           context = context.context
           expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app

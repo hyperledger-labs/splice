@@ -122,6 +122,13 @@ data AllocationRequestAction
 
 -- | View of an `AllocationRequest`.
 data AllocationRequestView = AllocationRequestView with
+    originalRequestCid : Optional (ContractId AllocationRequest)
+      -- ^ The contract id of the original allocation request contract, which is `None`
+      -- for the original allocation request itself.
+      --
+      -- This SHOULD be used by wallets to correlate the same allocation request across
+      -- updates to its state. It should not be used to correlate different allocation
+      -- requests for the same settlement. That can be done using the `settlement` field.
     authorizer : Account
       -- ^ Account that is asked to create allocations for this request.
       --
