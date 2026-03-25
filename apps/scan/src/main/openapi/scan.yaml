@@ -413,7 +413,7 @@ paths:
     get:
       tags: [external, scan]
       x-jvm-package: scan
-      operationId: "getUpdateByHashV2"
+      operationId: "getUpdateByHash"
       description: |
         Returns the update with the given hash.This endpoint is BFT safe only for the updates recorded after a threshold time.
         For record times of t0 and t1 where:

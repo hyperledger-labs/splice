@@ -1968,10 +1968,10 @@ class HttpScanHandler(
     }
   }
 
-  override def getUpdateByHashV2(respond: ScanResource.GetUpdateByHashV2Response.type)(
+  override def getUpdateByHash(respond: ScanResource.GetUpdateByHashResponse.type)(
       hash: String,
       damlValueEncoding: Option[DamlValueEncoding],
-  )(extracted: TraceContext): Future[ScanResource.GetUpdateByHashV2Response] = {
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateByHashResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getUpdateByHashV2") { _ => _ =>
       getUpdateByHash(
@@ -1982,9 +1982,9 @@ class HttpScanHandler(
       )
         .map {
           case Left(error) =>
-            ScanResource.GetUpdateByHashV2Response.NotFound(error)
+            ScanResource.GetUpdateByHashResponse.NotFound(error)
           case Right(update) =>
-            ScanResource.GetUpdateByHashV2Response.OK(toUpdateV3(update))
+            ScanResource.GetUpdateByHashResponse.OK(toUpdateV3(update))
         }
     }
   }
