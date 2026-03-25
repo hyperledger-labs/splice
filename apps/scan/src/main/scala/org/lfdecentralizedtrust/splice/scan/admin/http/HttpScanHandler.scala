@@ -2172,7 +2172,7 @@ class HttpScanHandler(
           case Right(domain) => Future.successful(domain)
           case Left(error) =>
             Future.failed(
-              HttpErrorHandler.badRequest(s"Could not decode synchronizer ID: $error")
+              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
             )
         }
         actual <- sequencerAdminConnection.getSequencerTrafficControlState(member)
@@ -2250,7 +2250,7 @@ class HttpScanHandler(
           case Right(domain) => Future.successful(domain)
           case Left(error) =>
             Future.failed(
-              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
+              HttpErrorHandler.badRequest(s"Could not decode synchronizer ID: $error")
             )
         }
         party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
