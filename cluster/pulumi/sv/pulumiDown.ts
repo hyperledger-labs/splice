@@ -13,6 +13,7 @@ export function startDownOperationsForSvStacks(
       return downStack(stack, abortController);
     },
     false,
+    true,
     true
   );
 }
