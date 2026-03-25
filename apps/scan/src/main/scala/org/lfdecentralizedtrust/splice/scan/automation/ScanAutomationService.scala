@@ -20,8 +20,11 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
   UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanRewardsReferenceStore
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanRewardsReferenceStore,
+  ScanStore,
+}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -77,7 +80,7 @@ class ScanAutomationService(
   registerUpdateHistoryIngestion(updateHistory)
 
   def registerRewardsReferenceStoreIngestion(
-      rewardsReferenceStore: DbScanRewardsReferenceStore
+      rewardsReferenceStore: ScanRewardsReferenceStore
   ): Unit =
     registerService(
       new UpdateIngestionService(

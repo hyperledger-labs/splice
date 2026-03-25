@@ -4,15 +4,22 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
-import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
+import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /** This is a temporal contract store (TcsStore) to provide efficient asOf round
   * lookups of FeaturedAppRight and OpenMiningRound contracts
@@ -53,6 +60,33 @@ trait ScanRewardsReferenceStore extends AppStore {
 }
 
 object ScanRewardsReferenceStore {
+
+  def apply(
+      key: ScanRewardsReferenceStore.Key,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      domainMigrationInfo: DomainMigrationInfo,
+      participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+  ): ScanRewardsReferenceStore = {
+    val dbStore = new db.DbScanRewardsReferenceStore(
+      key = key,
+      storage = storage,
+      loggerFactory = loggerFactory,
+      retryProvider = retryProvider,
+      domainMigrationInfo = domainMigrationInfo,
+      participantId = participantId,
+      ingestionConfig = ingestionConfig,
+      defaultLimit = defaultLimit,
+    )
+    new CachingScanRewardsReferenceStore(dbStore, loggerFactory)
+  }
 
   case class Key(
       dsoParty: PartyId,
