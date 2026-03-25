@@ -414,7 +414,7 @@ async function installValidator(
 }
 
 function publicScanUrl(config: SvConfig) {
-  return `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`
+  return `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`;
 }
 
 function internalScanUrl(config: SvConfig): string {
