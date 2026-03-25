@@ -1,5 +1,7 @@
 !include(base.yaml)
 infra:
+  istio:
+    enableIngressAccessLogging: true
   prometheus:
     retentionDuration: "30d"
     retentionSize: "200GB"
