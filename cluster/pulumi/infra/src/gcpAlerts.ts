@@ -379,3 +379,36 @@ export function installGcpQuotaAlerts(
     ],
   });
 }
+
+export function installCloudSqlTxIdUtilizationAlert(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
+  new gcp.monitoring.AlertPolicy('txIdUtilizationAlert', {
+    alertStrategy: getAlertStrategy(notificationChannel),
+    combiner: 'OR',
+    notificationChannels: [notificationChannel.name],
+    displayName: `High Transaction ID Utilization in ${CLUSTER_BASENAME}`,
+    conditions: [
+      {
+        displayName: `Cloud SQL Database - Transaction ID utilization ${CLUSTER_BASENAME}`,
+        conditionThreshold: {
+          filter:
+            'resource.type = "cloudsql_database" AND metric.type = "cloudsql.googleapis.com/database/postgresql/transaction_id_utilization"',
+          aggregations: [
+            {
+              alignmentPeriod: '3600s',
+              crossSeriesReducer: 'REDUCE_NONE',
+              perSeriesAligner: 'ALIGN_MIN',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          duration: '21600s',
+          trigger: {
+            count: 1,
+          },
+          thresholdValue: 0.8,
+        },
+      },
+    ],
+  });
+}

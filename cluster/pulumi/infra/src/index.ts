@@ -23,6 +23,7 @@ import {
   installClusterMaintenanceUpdateAlerts,
   installLoggedSecretsAlerts,
   installGcpQuotaAlerts,
+  installCloudSqlTxIdUtilizationAlert,
 } from './gcpAlerts';
 import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
@@ -86,6 +87,7 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     if (monitoringConfig.alerting.alerts.gcpQuotas.enabled) {
       installGcpQuotaAlerts(notificationChannel);
     }
+    installCloudSqlTxIdUtilizationAlert(notificationChannel);
   }
 }
 istioMonitoring(network.ingressNs, []);

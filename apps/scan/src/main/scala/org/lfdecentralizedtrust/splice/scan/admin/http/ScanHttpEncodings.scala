@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
   TrafficSummaryT,
   TransactionViewT,
@@ -537,6 +538,21 @@ object ScanHttpEncodings {
     definitions.EventHistoryTrafficSummary(
       totalTrafficCost = summary.totalTrafficCost,
       envelopeTrafficSummaries = envelopes,
+    )
+  }
+
+  def encodeAppActivityRecord(
+      record: AppActivityRecordT
+  ): definitions.EventHistoryAppActivityRecords = {
+    val records = record.appProviderParties
+      .zip(record.appActivityWeights)
+      .map { case (party, weight) =>
+        definitions.AppActivityRecord(party = party, weight = weight)
+      }
+      .toVector
+    definitions.EventHistoryAppActivityRecords(
+      roundNumber = record.roundNumber,
+      records = records,
     )
   }
 
