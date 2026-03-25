@@ -1562,6 +1562,7 @@ trait AmuletTransferUtil { self: StoreTestBase =>
       receiverFeeRatio.bigDecimal,
       amount.bigDecimal,
       Optional.empty(),
+      Optional.empty(),
     )
 
   def mkTransfer(receiver: PartyId, amount: Double) =
@@ -1799,6 +1800,7 @@ trait AmuletTransferUtil { self: StoreTestBase =>
           receiver.toProtoPrimitive,
           amuletContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
+          Optional.empty(),
         ).toValue,
         new AmuletRules_MintResult(
           new splice.amulet.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](

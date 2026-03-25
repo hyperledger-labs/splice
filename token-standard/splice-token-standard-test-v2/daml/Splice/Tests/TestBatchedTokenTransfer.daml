@@ -23,6 +23,7 @@ import Splice.TokenStandard.Utils
 import Splice.Testing.Utils
 import Splice.Testing.Registries.TestTokenV1_RegistryV1 qualified as TestTokenRegistryV1
 import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenRegistryV2
+import Splice.Testing.Registries.TestRegistries qualified as TestRegistries
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.TokenStandard.WalletClientV2 (SimpleTransfer(..))
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
@@ -45,7 +46,7 @@ data TestSetup = TestSetup with
 test_v1_transfers : Script ()
 test_v1_transfers = do
   -- setup
-  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  env <- TestRegistries.initialize TestRegistries.defaultConfig
   let instrX = V2.InstrumentId with
         id = "X1"
         admin = env.testTokenV1.admin
@@ -67,7 +68,7 @@ test_v1_transfers = do
 test_v2_transfer : Script ()
 test_v2_transfer = do
   -- setup
-  env <- MultiRegistry.initialize MultiRegistry.defaultConfig
+  env <- TestRegistries.initialize TestRegistries.defaultConfig
   let registries = env.registries
   let instrX = V2.InstrumentId with
         id = "X2"
@@ -126,7 +127,7 @@ genericTestTransfers TestSetup {..} = do
         instrumentId = instrX
         offerTime = days 1
         reason = "alice -> dora - test transfer 3"
-  WalletClientV2.executeTSABatch alice (at1 <> at2 <> at3)
+  WalletClientV2.executeTSABatch registries alice (at1 <> at2 <> at3)
 
   -- test accepting and forwarding a transfer using the holdings just received
   baccept <- acceptTransferOffers registries bob instrX
@@ -138,7 +139,7 @@ genericTestTransfers TestSetup {..} = do
         offerTime = days 1
         reason = "bob -> dora - test transfer 4"
 
-  WalletClientV2.executeTSABatch bob (baccept <> bt1)
+  WalletClientV2.executeTSABatch registries bob (baccept <> bt1)
 
   -- dora accepts all transfers in one go, and merges them
   daccept <- acceptTransferOffers registries dora instrX
@@ -150,18 +151,24 @@ genericTestTransfers TestSetup {..} = do
         offerTime = days 1
         reason = "dora -> dora - test self-merge"
   -- test that self-merge extracts the args correctly by executing it twice
-  WalletClientV2.executeTSABatch dora (daccept <> doraMerge <> doraMerge)
+  WalletClientV2.executeTSABatch registries dora (daccept <> doraMerge <> doraMerge)
 
   -- charlie accepts their offer
   -- TODO(#4813): actually reject as part of a batch, once we have the support for that in the batching utility
   caccept <- acceptTransferOffers registries charlie instrY
-  result <- WalletClientV2.executeTSABatch charlie caccept
+  (result, changes) <- WalletClientV2.executeTSABatch registries charlie caccept
 
-  -- check V1 metadata on V2 transfers
+  -- check tx history on V2 transfers
   when checkMetadata $ do
+    let testTransferReason = "alice -> charlie - test transfer 2"
+    WalletClientV2.expectTxHistoryReasons changes
+      [ (basicAccount alice, [testTransferReason], "")
+      , (basicAccount charlie, [testTransferReason], "")
+      ]
+    -- V1 history metadata
     let expectedMeta = Metadata with
           values = TextMap.fromList
-            [ ("splice.lfdecentralizedtrust.org/reason", "alice -> charlie - test transfer 2")
+            [ ("splice.lfdecentralizedtrust.org/reason", testTransferReason)
             , ("splice.lfdecentralizedtrust.org/sender", "alice")
             , ("splice.lfdecentralizedtrust.org/tx-kind", "transfer")
             ]

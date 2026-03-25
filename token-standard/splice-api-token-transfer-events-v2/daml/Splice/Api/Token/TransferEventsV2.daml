@@ -1,0 +1,113 @@
+-- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Interface to log events for token standard transfers.
+module Splice.Api.Token.TransferEventsV2 where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2
+
+-- Note: the TransferLeg type below is identical to Allocation.TransferLeg, but
+-- defined separately to avoid a tight coupling between how to specify
+-- allocations and how to report transfers. This allows evolving these two APIs
+-- independently.
+
+-- | A specification of a transfer of holdings between two parties.
+data TransferLeg = TransferLeg with
+    transferLegId : Text
+      -- ^ An identifier for the transfer leg.
+    sender : Account
+      -- ^ The sender of the transfer.
+    receiver : Account
+      -- ^ The receiver of the transfer.
+    amount : Decimal
+      -- ^ The amount to transfer.
+    instrumentId : InstrumentId
+      -- ^ The instrument identifier.
+    meta : Metadata
+      -- ^ Additional metadata about the transfer leg, used for extensibility.
+  deriving (Eq, Ord, Show)
+
+-- | An interface for templates that can be used to report token standard v2 events.
+--
+-- The non-consuming choice of this interface is used by the instrument admin to
+-- report token transfers. Make sure to only consider events from the instrument
+-- admin as token transfer events for a token.
+interface EventLog where
+  viewtype EventLogView
+
+  eventLog_holdingsChangeImpl : ContractId EventLog -> EventLog_HoldingsChange -> Update EventLog_HoldingsChangeResult
+
+  nonconsuming choice EventLog_HoldingsChange : EventLog_HoldingsChangeResult
+    -- ^ Signal a change in the holdings of an account to the observers.
+    --
+    -- Asset admins MUST ensure that these events explain:
+    --   1. all changes to the holdings of all accounts, including holdings that
+    --      were created and archived within a single transaction.
+    --   2. all incoming and outgoing transfers for all accounts
+    --      that are not owned by the instrument admin.
+    --
+    -- Note that even temporarily
+    --
+    -- Reporting holdings changes for accounts owned by the instrument admin is
+    -- not required, as the instrument admin has full visibility into all
+    -- holdings, and full knowledge of the actual workflows used to change these
+    -- holdings.
+    with
+      admin : Party
+        -- ^ Instrument admin reporting the change in holdings.
+      account : Account
+        -- ^ The account for which the change in holdings occurred.
+      inputHoldingCids : [ContractId Holding]
+        -- ^ The holdings of the account that were consumed.
+        --
+        -- They MUST be archived in the same transaction and they MUST be owned
+        -- by the `account` specified in this change.
+        --
+        -- Note that these MAY include holdings that were created and archived
+        -- within the same transaction. Such holding contracts-ids will occur
+        -- in both the input and output list of holdings.
+      transferLegs : [TransferLeg]
+        -- ^ The transfers that caused the change in holdings.
+        --
+        -- Their net balance changes MUST match the change in holdings of the account.
+        -- Transfers between accounts MUST be reported for both sender and receiver separately.
+        --
+        -- Note that the settlement of transfers whose net balance change is
+        -- zero MAY result in events that do have empty input and output
+        -- holdings.
+        --
+        -- Note also that merging and splitting of holdings MAY be reported with
+        -- an empty list of transfer legs, as the merge and split actions may not
+        -- related to a (self-)transfer of tokens.
+      outputHoldingCids : [ContractId Holding]
+        -- ^ The newly created holdings of the account.
+      observers : [Party]
+        -- ^ Parties that should be notified about the change in holdings.
+        --
+        -- MUST include at least the account parties.
+      extraArgs : ExtraArgs
+        -- ^ Arguments storing both metadata and additional context information about the event.
+        --
+        -- Use `splice.lfdecentralizedtrust.org/reason` to explain the reason for the overall change
+        -- in holdings.
+        --
+        -- The `ChoiceContext` is provided to allow storing extra links to contract-ids, which is
+        -- not possible using `Metadata` alone, as contract-ids cannot be stored as `Text`.
+    observer observers
+    controller admin
+    do eventLog_holdingsChangeImpl this self arg
+
+
+-- | View of an `EventLog` contract.
+--
+-- Note that `EventLog` contracts do not support public fetching, as they are intended to
+-- be used by the instrument admin or app provider only.
+data EventLogView = EventLogView with
+    admin : Party
+    meta : Metadata
+  deriving (Eq, Show)
+
+-- | Result of logging a change in holdings event. Provided for extensibility
+-- in a future where interfaces are upgradeable.
+data EventLog_HoldingsChangeResult = EventLog_HoldingsChangeResult {}

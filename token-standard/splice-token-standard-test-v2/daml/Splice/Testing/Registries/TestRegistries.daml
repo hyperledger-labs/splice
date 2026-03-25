@@ -1,0 +1,65 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Default setup of all test registries as a muti-registry environment.
+module Splice.Testing.Registries.TestRegistries
+  ( Config(..)
+  , defaultConfig
+  , initialize
+  ) where
+
+import DA.Map qualified as Map
+
+import Splice.TokenStandard.Utils (downcast)
+
+import Splice.Testing.TokenStandard.MultiRegistry
+
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistryV1
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.Registries.TestTokenV1_RegistryV1 qualified as TestTokenV1_RegistryV1
+import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenV2_RegistryV2
+
+import Daml.Script
+
+
+data Config = Config with
+    amulet : AmuletRegistryV2.AmuletRegistryConfig
+    testTokenV1 : TestTokenV1_RegistryV1.TestTokenV1RegistryConfig
+    testTokenV2 : TestTokenV2_RegistryV2.TestTokenV2RegistryConfig
+  deriving (Eq, Show)
+
+data Env = Env with
+  registries : MultiRegistry
+  amuletV1 : AmuletRegistryV1.AmuletRegistry
+  amuletV2 : AmuletRegistryV2.AmuletRegistry
+  testTokenV1 : TestTokenV1_RegistryV1.TestTokenV1Registry
+  testTokenV2 : TestTokenV2_RegistryV2.TestTokenV2Registry
+
+defaultConfig : Config
+defaultConfig = Config with
+  amulet = AmuletRegistryV2.defaultAmuletRegistryConfig
+  testTokenV1 = TestTokenV1_RegistryV1.defaultTestTokenV1RegistryConfig
+  testTokenV2 = TestTokenV2_RegistryV2.defaultTestTokenV2RegistryConfig
+
+initialize : Config -> Script Env
+initialize config = do
+  -- setup
+  amuletV2 <- AmuletRegistryV2.initialize config.amulet
+  let amuletId = amuletV2.instrumentId
+  let amuletV1 = AmuletRegistryV1.AmuletRegistry with
+        dso = amuletV2.dso
+        instrumentId = downcast amuletId
+
+  -- test token v1 registry setup
+  testTokenV1 <- TestTokenV1_RegistryV1.initialize config.testTokenV1
+
+  -- test token v2 registry setup
+  testTokenV2 <- TestTokenV2_RegistryV2.initialize config.testTokenV2
+
+  let registries = Map.fromList
+        [ (amuletV2.dso, mkRegistryApisV1V2 amuletV1 amuletV2)
+        , (testTokenV1.admin, mkRegistryApisV1 testTokenV1)
+        , (testTokenV2.admin, mkRegistryApisV2 testTokenV2 )
+        ]
+
+  pure Env with ..

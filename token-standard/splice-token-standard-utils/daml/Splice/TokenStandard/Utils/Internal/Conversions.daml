@@ -22,6 +22,14 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   dropMeta,
   validateNoMeta,
 
+  -- * Transfer metadata
+  reasonMetaKey,
+  txKindMetaKey,
+  senderMetaKey,
+  reasonFromMeta,
+  reasonToMeta,
+  mkMetaTransferFrom,
+
   -- * Account utils
   basicAccount,
   isBasicAccount,
@@ -36,6 +44,11 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   validateNoAccountMeta,
 
 -- TODO(#4517): add unit tests for the non-trivial functions
+  -- ** Internal metadata functions
+  tokenStandardV2Namespace,
+
+  -- * Pure allocation utilities
+  allocationAdmin,
 
 ) where
 
@@ -49,6 +62,7 @@ import DA.TextMap qualified as TextMap
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
 
 
 
@@ -68,6 +82,13 @@ decodeTime t = case T.parseInt t of
   Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
   None -> error ("Cannot parse time " <> t)
 
+-- Note: placed here to avoid a circular dependency
+allocationAdmin : AllocationV2.AllocationSpecification -> Party
+allocationAdmin AllocationV2.AllocationSpecification{..} =
+  case transferLegs of
+    [] -> error "No transfer legs in allocation"
+    (leg ::_) -> leg.instrumentId.admin
+
 
 -- AnyContractId conversion
 ------------------------------
@@ -83,8 +104,8 @@ toAnyContractId = coerceContractId
 -------------------------
 
 -- | Namespace for token standard V2 which is published as CIP-112.
-v2Namespace : Text
-v2Namespace = "cip-112/"
+tokenStandardV2Namespace : Text
+tokenStandardV2Namespace = "cip-112/"
 
 insertOptional : Text -> Optional a -> TextMap.TextMap a -> TextMap.TextMap a
 insertOptional k ov m = case ov of
@@ -94,11 +115,11 @@ insertOptional k ov m = case ov of
 
 timeToMeta : Text -> Time -> Metadata -> Metadata
 timeToMeta field t meta =
-  Metadata $ TextMap.insert (v2Namespace <> field) (encodeTime t) meta.values
+  Metadata $ TextMap.insert (tokenStandardV2Namespace <> field) (encodeTime t) meta.values
 
 timeFromMeta : Text -> Metadata -> Optional Time
 timeFromMeta field meta =
-  decodeTime <$> TextMap.lookup (v2Namespace <> field) meta.values
+  decodeTime <$> TextMap.lookup (tokenStandardV2Namespace <> field) meta.values
 
 
 -- Account metadata utils
@@ -118,10 +139,10 @@ accountParties account = case account.provider of
   _ -> [account.owner]
 
 providerKey : Text -> Text
-providerKey field = v2Namespace <> field <> ".provider"
+providerKey field = tokenStandardV2Namespace <> field <> ".provider"
 
 idKey : Text -> Text
-idKey field = v2Namespace <> field <> ".id"
+idKey field = tokenStandardV2Namespace <> field <> ".id"
 
 accountToMeta : Text -> HoldingV2.Account -> Metadata -> Metadata
 accountToMeta field account meta =
@@ -164,28 +185,63 @@ validateNoAccountMeta fieldName meta =
     validateNoMeta (idKey fieldName) meta
 
 validateNoMeta : Text -> Metadata -> Bool
-validateNoMeta fieldName meta = isNone $ TextMap.lookup (v2Namespace <> fieldName) meta.values
+validateNoMeta fieldName meta = isNone $ TextMap.lookup (tokenStandardV2Namespace <> fieldName) meta.values
 
 dropMeta : Text -> Metadata -> Metadata
-dropMeta field meta = Metadata $ TextMap.delete (v2Namespace <> field) meta.values
+dropMeta field meta = Metadata $ TextMap.delete (tokenStandardV2Namespace <> field) meta.values
 
 partiesToMeta : Text -> [Party] -> Metadata -> Metadata
 partiesToMeta field parties meta
   | null parties = meta
   | otherwise =
       Metadata $
-      TextMap.insert (v2Namespace <> field) (T.intercalate "," (map partyToText parties)) $
+      TextMap.insert (tokenStandardV2Namespace <> field) (T.intercalate "," (map partyToText parties)) $
       meta.values
 
 partiesFromMeta : Text -> Metadata -> [Party]
 partiesFromMeta field meta =
-    case TextMap.lookup (v2Namespace <> field) meta.values of
+    case TextMap.lookup (tokenStandardV2Namespace <> field) meta.values of
       None -> []
       Some txt -> map tryPartyFromText (T.splitOn "," txt)
   where
     tryPartyFromText p = case partyFromText p of
       None -> error $ "Invalid party in metadata field '" <> field <> "': " <> p
       Some party -> party
+
+
+-- Holding change metadata
+--------------------------
+
+cip56Prefix : Text
+cip56Prefix = "splice.lfdecentralizedtrust.org/"
+
+-- | Short, human-readable reason for the transaction.
+reasonMetaKey : Text
+reasonMetaKey = cip56Prefix <> "reason"
+
+-- | Kind of the transaction.
+txKindMetaKey : Text
+txKindMetaKey = cip56Prefix <> "tx-kind"
+
+-- | The sender of a transfer.
+senderMetaKey : Text
+senderMetaKey = cip56Prefix <> "sender"
+
+-- | Extra the transfer reason from the metadata. Returns an empty string if no reason is found.
+reasonFromMeta : Metadata -> Text
+reasonFromMeta (Metadata meta) = fromOptional "" $ TextMap.lookup reasonMetaKey meta
+
+-- |  Add the given reason to the metadata, if it's not empty.
+reasonToMeta : Text -> Metadata -> Metadata
+reasonToMeta reason (Metadata meta)
+  | T.isEmpty reason = Metadata meta
+  | otherwise = Metadata $ TextMap.insert reasonMetaKey reason meta
+
+-- | Metadata to tag a transfer for V1 transaction history parsing.
+mkMetaTransferFrom : Party -> Text -> Metadata
+mkMetaTransferFrom sender reason =
+  reasonToMeta reason $ Metadata with
+    values = TextMap.fromList [(txKindMetaKey, "transfer"), (senderMetaKey, partyToText sender)]
 
 
 -- Class based conversion

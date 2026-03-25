@@ -4,19 +4,21 @@
 -- | A mock implementation of a test token for the purpose of testing V2 token standard workflows.
 module Splice.Testing.Tokens.TestTokenV2 where
 
-import DA.Action (when)
+import DA.Action (when, unless)
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
+import DA.Time
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils
 
 
@@ -51,6 +53,7 @@ template TokenAllocationV2 with
 
     interface instance V2.Allocation for TokenAllocationV2 where
       view = V2.AllocationView with
+        originalAllocationCid = None
         expiresAt = None
           -- Note: in a production implementation we would also want to add a choice
           -- for the `admin` to expire the allocation. We don't need it for testing though.
@@ -69,7 +72,7 @@ template TokenAllocationV2 with
 
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
         archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
-        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockTokenAllocationV2 "allocation withdrawn" this extraArgs
         pure V2.Allocation_WithdrawResult
           with
             authorizerHoldingCids
@@ -77,7 +80,7 @@ template TokenAllocationV2 with
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
         archiveAndCheckActors self arg.actors [allocation.settlement.executors]
-        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockTokenAllocationV2 "allocation cancelled" this extraArgs
         pure V2.Allocation_CancelResult
           with
             authorizerHoldingCids
@@ -100,7 +103,7 @@ template TokenAllocationV2 with
         -- prudent engineering: compare debits with expected debits based on the transfer legs, and settle
         let creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
         let combinedAmounts = mergeAmountMaps debitAmounts creditAmounts
-        authorizerHoldingCids <- forA (Map.toList combinedAmounts) $ \(instrumentId, (debitAmount, creditAmount)) -> do
+        authorizerHoldingCids0 <- forA (Map.toList combinedAmounts) $ \(instrumentId, (debitAmount, creditAmount)) -> do
           require'
             ("archived lockedAmulet.amount for " <> show instrumentId, debitAmount)
             isEqualR
@@ -120,8 +123,16 @@ template TokenAllocationV2 with
               -- No credit of Token ==> no holding change
               pure (instrumentId.id, [])
 
+        -- log v2 transfer event for the whole settlement
+        let authorizerHoldingCids = TextMap.fromListWithR (++) $ authorizerHoldingCids0
+        tokenRulesCid <- getEventLogFromContext extraArgs.context
+        logAllocationSettlement (toInterfaceContractId tokenRulesCid)
+          (map toInterfaceContractId lockedTokens)
+          allocation
+          (concat $ textMapValues authorizerHoldingCids)
+
         pure V2.Allocation_SettleResult with
-          authorizerHoldingCids = TextMap.fromListWithR (++) $ authorizerHoldingCids
+          authorizerHoldingCids
           meta = emptyMetadata
             -- Note: for V1 tx history we would need create extra choices for
             -- the creation, as this choice here cannot express the creation and
@@ -156,34 +167,36 @@ template TokenTransferOffer with
 
       transferInstruction_withdrawImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.sender]
-        archiveLockedHoldingsForTransfer transfer
-        tokenCid <- create Token with
-          holding = senderHoldingFromTransfer transfer
+        tokenCid <- unlockTransferOffer "transfer offer withdrawn" transfer arg.extraArgs
         pure V2.TransferInstructionResult with
           output = V2.TransferInstructionResult_Failed
-          senderChangeCids = [toInterfaceContractId tokenCid]
+          senderChangeCids = [tokenCid]
           meta = emptyMetadata
 
       transferInstruction_rejectImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
-        archiveLockedHoldingsForTransfer transfer
-        tokenCid <- create Token with
-          holding = senderHoldingFromTransfer transfer
+        tokenCid <- unlockTransferOffer "transfer offer rejected" transfer arg.extraArgs
         pure V2.TransferInstructionResult with
           output = V2.TransferInstructionResult_Failed
-          senderChangeCids = [toInterfaceContractId tokenCid]
+          senderChangeCids = [tokenCid]
           meta = emptyMetadata
 
       transferInstruction_acceptImpl self arg = do
         archiveAndCheckActors self arg.actors [jointAuthorizers transfer.receiver]
         archiveLockedHoldingsForTransfer transfer
-        tokenCid <- create Token with
+        tokenCid <- toInterfaceContractId <$> create Token with
           holding = (senderHoldingFromTransfer transfer) with
             account = transfer.receiver
+        -- log v2 history event
+        tokenRulesCid <- getEventLogFromContext arg.extraArgs.context
+        logTransfer (toInterfaceContractId tokenRulesCid)
+          transfer
+          []
+          [tokenCid]
         pure V2.TransferInstructionResult with
           senderChangeCids = []
           output = V2.TransferInstructionResult_Completed with
-            receiverHoldingCids = [toInterfaceContractId tokenCid]
+            receiverHoldingCids = [tokenCid]
           meta = mkMetaTransferFrom transfer.sender.owner (reasonFromMeta transfer.meta)
 
 
@@ -205,19 +218,30 @@ template TokenRules with
 
       transferFactory_transferImpl self arg = token_transferFactory_transferImpl this self arg
 
+    interface instance TransferEventsV2.EventLog for TokenRules where
+      view = TransferEventsV2.EventLogView with
+        admin = admin
+        meta = emptyMetadata
+
+      eventLog_holdingsChangeImpl = eventLog_holdingsChangeDefaultImpl admin
+
     interface instance V2.SettlementFactory for TokenRules where
       view = V2.SettlementFactoryView with
         admin
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl self arg =
-        settlementFactoryV2_settleBatchDefaultImpl admin self arg
+      settlementFactory_settleBatchImpl self arg0 =
+        let arg = arg0 with
+              extraArgs = arg0.extraArgs with
+                context = ChoiceContext with
+                  values = textMapSingleton tokenRulesContextKey (AV_ContractId (coerceContractId self))
+        in
+          settlementFactoryV2_settleBatchDefaultImpl admin self arg
 
       -- no extra observers to avoid leaking the settlement of different allocations to the other authorizers
       settlementFactory_settleBatchExtraObservers _arg = []
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
-
 
     interface instance V2.AllocationFactory for TokenRules where
       view = V2.AllocationFactoryView with
@@ -229,13 +253,41 @@ template TokenRules with
       allocationFactory_allocateImpl self arg = token_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this
 
+    nonconsuming choice TokenRules_OfferMint : TokenRulesOfferMintResult with
+        receiver : V2.Account
+        amount : Decimal
+        instrumentId : V2.InstrumentId
+        offeredAt : Time
+      controller admin
+      do
+        requireMatchExpected ("instrumentId.admin", instrumentId.admin) admin
+        assertDeadlineExceeded "offeredAt" offeredAt
+        offerCid <- create TokenTransferOffer with
+          transfer = V2.Transfer with
+            sender = mintAccount admin
+            receiver
+            amount
+            instrumentId
+            inputHoldingCids = []
+            requestedAt = offeredAt
+            executeBefore = offeredAt `addRelTime` days 7
+            meta = reasonToMeta "mint offer" emptyMetadata
+        pure TokenRulesOfferMintResult with
+          offerCid
+          meta = emptyMetadata
+
+data TokenRulesOfferMintResult = TokenRulesOfferMintResult with
+    offerCid : ContractId TokenTransferOffer
+    meta : Metadata
+  deriving (Eq, Show)
+
 -- | Create a V2 transfer offer
 token_transferFactory_transferImpl
   : TokenRules
   -> ContractId V2.TransferFactory
   -> V2.TransferFactory_Transfer
   -> Update V2.TransferInstructionResult
-token_transferFactory_transferImpl tokenRules _self arg = do
+token_transferFactory_transferImpl tokenRules self arg = do
   -- TODO(#4542): allow either of the two authorizers to request the transfer
   let transfer = arg.transfer
   checkActors arg.actors [jointAuthorizers transfer.sender]
@@ -263,29 +315,52 @@ token_transferFactory_transferImpl tokenRules _self arg = do
             amount = remainder
         pure [toInterfaceContractId cid]
 
+
   -- create holding for self-transfer, or transfer offer
   if transfer.receiver == transfer.sender
     then do
-      outputCid <- create Token with
+      outputCid <- toInterfaceContractId <$> create Token with
         holding = senderHoldingFromTransfer transfer
+      -- report v2 event
+      logTransfer (coerceContractId self)
+        transfer
+        senderChangeCids
+        [outputCid]
+
       pure V2.TransferInstructionResult with
         output = V2.TransferInstructionResult_Completed with
-          receiverHoldingCids = [toInterfaceContractId outputCid]
+          receiverHoldingCids = [outputCid]
         senderChangeCids
         meta = emptyMetadata
     else do
+      let reason = reasonFromMeta transfer.meta
+      let contextDesc
+            | T.isEmpty reason = "transfer to " <> show transfer.receiver
+            | otherwise = reason
       -- lock the amount to be transferred
-      lockedCid <- create Token with
+      lockedCid <- toInterfaceContractId <$> create Token with
         holding = (senderHoldingFromTransfer transfer) with
           lock = Some $ V2.Lock with
             holders = iid.admin :: accountParties transfer.sender
             expiresAt = Some transfer.executeBefore
             expiresAfter = None
-            context = Some $ "transfer to " <> show transfer.receiver
+            context = Some contextDesc
       -- create transfer offer
       transferInstructionCid <- toInterfaceContractId <$> create TokenTransferOffer with
         transfer = transfer with
-          inputHoldingCids = [toInterfaceContractId lockedCid]
+          inputHoldingCids = [lockedCid]
+      -- log the tx history v2 event
+      logNonEmptyChange (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
+        admin = tokenRules.admin
+        account = transfer.sender
+        inputHoldingCids = transfer.inputHoldingCids
+        transferLegs = []
+        outputHoldingCids = lockedCid :: senderChangeCids
+        observers = accountParties transfer.sender
+        extraArgs = ExtraArgs with
+          context = emptyChoiceContext
+          meta = reasonToMeta ("lock for " <> contextDesc) emptyMetadata
+      -- return result
       pure V2.TransferInstructionResult with
         senderChangeCids
         -- Note: we skip over explaining the change in locked holdings to V1 history parsers,
@@ -300,7 +375,7 @@ token_allocationFactoryV2_allocateImpl
   -> ContractId V2.AllocationFactory
   -> V2.AllocationFactory_Allocate
   -> Update V2.AllocationInstructionResult
-token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
+token_allocationFactoryV2_allocateImpl tokenRules self arg = do
   let authorizer = arg.allocation.authorizer
   checkActors arg.actors [jointAuthorizers authorizer]
   -- debit all input amounts
@@ -314,6 +389,7 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
   -- create locked tokens and change for the sender
   let creditAmounts = netAllocationCreditAmounts authorizer arg.allocation.transferLegs
   let combinedAmounts = mergeAmountMaps inputAmounts creditAmounts
+  let contextDesc = "allocation for settlement of " <> arg.allocation.settlement.settlementRef.id
   locksAndChange <- forA (Map.toList combinedAmounts) $ \(instrumentId, (inputAmount, creditAmount)) -> do
     let netAmount = min 0.0 creditAmount + inputAmount
     when (netAmount < 0.0) $
@@ -333,7 +409,7 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
               holders = instrumentId.admin :: accountParties authorizer
               expiresAt = Some arg.allocation.settlement.settleAt
               expiresAfter = None
-              context = Some $ "allocation for settlement of " <> arg.allocation.settlement.settlementRef.id
+              context = Some contextDesc
             meta = emptyMetadata
         pure [cid]
     changeTokens <-
@@ -347,14 +423,25 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
             meta = emptyMetadata
         pure [(instrumentId.id, [toInterfaceContractId cid])]
     pure (lockedTokens, changeTokens)
-  -- create allocation
+  -- log v2 tx history event
   let lockedTokens = concatMap fst locksAndChange
+  let authorizerChangeCids = TextMap.fromListWithR (++) $ concatMap snd locksAndChange
+  logNonEmptyChange (coerceInterfaceContractId @TransferEventsV2.EventLog self) TransferEventsV2.EventLog_HoldingsChange with
+    admin = tokenRules.admin
+    account = authorizer
+    inputHoldingCids = arg.inputHoldingCids
+    transferLegs = []
+    outputHoldingCids = concat (textMapValues authorizerChangeCids) ++ (map toInterfaceContractId lockedTokens)
+    observers = accountParties authorizer
+    extraArgs = ExtraArgs with
+      context = emptyChoiceContext
+      meta = reasonToMeta ("lock for " <> contextDesc) emptyMetadata
+  -- create allocation
   allocationCid <- toInterfaceContractId <$> create TokenAllocationV2 with
     lockedTokens
     allocation = arg.allocation
     admin = tokenRules.admin
   -- return change
-  let authorizerChangeCids = TextMap.fromListWithR (++) $ concatMap snd locksAndChange
   pure V2.AllocationInstructionResult with
     authorizerChangeCids
     meta = emptyMetadata
@@ -364,8 +451,8 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
 -- Utilities
 ------------
 
-unlockTokenAllocationV2 : TokenAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
-unlockTokenAllocationV2 tokenAllocation _extraArgs = do
+unlockTokenAllocationV2 : Text -> TokenAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
+unlockTokenAllocationV2 reason tokenAllocation extraArgs = do
   holdingCids <- forA tokenAllocation.lockedTokens $ \lockedCid -> do
     token <- fetch lockedCid
     archive lockedCid
@@ -374,7 +461,31 @@ unlockTokenAllocationV2 tokenAllocation _extraArgs = do
     unlockedCid <- create Token with
       holding = holding with lock = None
     pure $ (holding.instrumentId.id, [toInterfaceContractId unlockedCid])
+  -- log the V2 event
+  eventLogCid <- getEventLogFromContext extraArgs.context
+  unless (null tokenAllocation.lockedTokens) $
+    logMergeSplit eventLogCid
+      tokenAllocation.admin
+      tokenAllocation.allocation.authorizer
+      (map toInterfaceContractId tokenAllocation.lockedTokens)
+      reason
+      (concatMap snd holdingCids)
+
   pure $ TextMap.fromListWithR (++) holdingCids
+
+unlockTransferOffer : Text -> V2.Transfer -> ExtraArgs -> Update (ContractId V2.Holding)
+unlockTransferOffer reason transfer extraArgs = do
+  archiveLockedHoldingsForTransfer transfer
+  tokenCid <- toInterfaceContractId <$> create Token with
+    holding = senderHoldingFromTransfer transfer
+  eventLogCid <- getEventLogFromContext extraArgs.context
+  logMergeSplit eventLogCid
+    transfer.instrumentId.admin
+    transfer.sender
+    transfer.inputHoldingCids
+    reason
+      [tokenCid]
+  pure tokenCid
 
 mergeAmountMaps : Ord k => Map.Map k Decimal -> Map.Map k Decimal -> Map.Map k (Decimal, Decimal)
 mergeAmountMaps = Map.merge (\_ x -> Some (x, 0.0)) (\_ y -> Some (0.0, y)) (\_ x y -> Some (x, y))
@@ -393,3 +504,22 @@ senderHoldingFromTransfer transfer = V2.HoldingView with
 
 jointAuthorizers : V2.Account -> [Party]
 jointAuthorizers = dedup . accountParties
+
+
+-- Event log factory retrieval
+------------------------------
+
+tokenRulesContextKey : Text
+tokenRulesContextKey = "token-rules"
+
+getTokenRulesFromContext : ChoiceContext -> Update (ContractId TokenRules)
+getTokenRulesFromContext context = do
+  case TextMap.lookup tokenRulesContextKey context.values of
+    Some (AV_ContractId cid) -> pure (coerceContractId cid)
+    None -> fail $ "Context value for '" <> tokenRulesContextKey <> "' not found"
+    v -> fail $ "Failed to decode context value for '" <> tokenRulesContextKey <> "': " <> show v
+
+-- | We ensure that all token standard actions always run in a context that references the
+-- token rules to use. Thereby we can always retrieve them to log events.
+getEventLogFromContext : ChoiceContext -> Update (ContractId TransferEventsV2.EventLog)
+getEventLogFromContext context = toInterfaceContractId <$> getTokenRulesFromContext context

@@ -52,11 +52,13 @@ template Escrow
                        expiresAt = lock.expiresAt `addRelTime` days 90
                        optContext = None
                      receiverFeeRatio = 0.0
+                     meta = None
                  , TransferOutput with
                      receiver = arbiter
                      amount = arbiterPaymentAmount
                      lock = None
                      receiverFeeRatio = 1.0
+                     meta = None
                  ]
                beneficiaries = None
          exerciseAppTransfer dso transferContext transfer

@@ -6,6 +6,7 @@
           "acsDelta" : true,
           "contractId" : "1",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "amulet" : {
               "amount" : {
@@ -32,6 +33,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
               "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
@@ -68,7 +70,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
+          "representativePackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -82,6 +84,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgIIdBIEfeSaRw==",
     "workflowId" : ""
   },
   {
@@ -91,6 +94,7 @@
           "acsDelta" : true,
           "contractId" : "2",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "amount" : {
               "createdAt" : {
@@ -108,6 +112,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
               "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
@@ -137,7 +142,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
+          "representativePackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -151,6 +156,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgMItAESBH3kmkc=",
     "workflowId" : ""
   },
   {
@@ -160,6 +166,7 @@
           "acsDelta" : true,
           "contractId" : "3",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "amount" : {
               "createdAt" : {
@@ -177,6 +184,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
               "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
@@ -206,7 +214,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
+          "representativePackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -220,6 +228,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgMItQESBH3kmkc=",
     "workflowId" : ""
   },
   {
@@ -229,6 +238,7 @@
           "acsDelta" : true,
           "contractId" : "4",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "amount" : {
               "createdAt" : {
@@ -246,6 +256,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
               "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
@@ -275,7 +286,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "387b41b7c40b6015f389e820cd65864caab34e94233df3475f735ec0f3a856d5",
+          "representativePackageId" : "4786bf810867c4cc56c2a81b7a6ac668bb3fbbea585626b4252993a515cddcda",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -289,6 +300,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgMI0AESBH3kmkc=",
     "workflowId" : ""
   },
   {
@@ -298,6 +310,7 @@
           "acsDelta" : true,
           "contractId" : "5",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "amount" : "30.0000000000",
             "issuer" : "alice::normalized",
@@ -307,6 +320,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "26c72abb5a4b485e58f201021de6f9e525c85863fa115536f768d6ee138ef13e",
               "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
@@ -335,7 +349,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-token-test-dummy-holding",
-          "representativePackageId" : "4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d",
+          "representativePackageId" : "26c72abb5a4b485e58f201021de6f9e525c85863fa115536f768d6ee138ef13e",
           "signatories" : [
             "alice::normalized"
           ],
@@ -348,6 +362,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgMI0wESBH3kmkc=",
     "workflowId" : ""
   },
   {
@@ -357,6 +372,7 @@
           "acsDelta" : true,
           "contractId" : "6",
           "contractKey" : null,
+          "contractKeyHash" : "",
           "createArgument" : {
             "amount" : "40.0000000000",
             "issuer" : "alice::normalized",
@@ -366,6 +382,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
+              "implementationPackageId" : "26c72abb5a4b485e58f201021de6f9e525c85863fa115536f768d6ee138ef13e",
               "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
@@ -394,7 +411,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-token-test-dummy-holding",
-          "representativePackageId" : "4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d",
+          "representativePackageId" : "26c72abb5a4b485e58f201021de6f9e525c85863fa115536f768d6ee138ef13e",
           "signatories" : [
             "alice::normalized"
           ],
@@ -407,6 +424,7 @@
         "synchronizerId" : "sync::normalized"
       }
     },
+    "streamContinuationToken" : "CgMI1AESBH3kmkc=",
     "workflowId" : ""
   }
 ]

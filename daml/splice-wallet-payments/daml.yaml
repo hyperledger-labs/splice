@@ -8,6 +8,8 @@ dependencies:
 data-dependencies:
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
+- ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
+- ../../token-standard/splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

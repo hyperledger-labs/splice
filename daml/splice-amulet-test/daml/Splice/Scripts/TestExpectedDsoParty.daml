@@ -30,6 +30,7 @@ testExpectedDsoParty_Transfer = do
                         receiverFeeRatio = 0.0
                         amount = outputAmount1
                         lock = None
+                        meta = None
                     ]
           beneficiaries = None
         context = context.context

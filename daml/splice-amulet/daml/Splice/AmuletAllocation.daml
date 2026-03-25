@@ -24,6 +24,7 @@ import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.TokenStandard.Utils as TSU hiding (require)
 
 import Splice.Amulet
+import Splice.AmuletRules (getExternalPartyConfigStateFromChoiceContext)
 import Splice.Amulet.TwoStepTransfer
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
@@ -96,6 +97,10 @@ template AmuletAllocation
         la <- fetchAndArchive (ForOwner with dso, owner = leg.sender) lockedAmulet
         requireMatchExpected ("lockedAmulet.amount", la.amulet.amount.initialAmount) leg.amount
 
+        -- report transfer events for V2 transaction history parsing
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
+        logAllocationSettlement (toInterfaceContractId configStateCid) [toInterfaceContractId lockedAmulet] (upcast allocation) []
+
          -- construct metadata to aid V1 tx history parsers
         let reason = "Debit for settlement " <> show allocation.settlement.settlementRef
         let v1HistoryMeta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
@@ -152,8 +157,9 @@ allocationToTwoStepTransfer allocation =
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update V1.Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
   let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
+  let transferMeta = amuletAllocation.allocation.transferLeg.meta
   (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet transferMeta extraArgs
   pure V1.Allocation_ExecuteTransferResult
     with
       senderHoldingCids

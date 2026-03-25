@@ -5,6 +5,9 @@ module Splice.Wallet.TransferOffer where
 
 import DA.Text
 
+import Splice.Api.Token.MetadataV1
+import Splice.TokenStandard.Utils qualified as TSU
+
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Round
@@ -138,6 +141,7 @@ template AcceptedTransferOffer
                   amount = amuletAmount
                   lock = None
                   receiverFeeRatio = 0.0
+                  meta = Some (TSU.reasonToMeta "transfer offer accepted" emptyMetadata)
               ]
             beneficiaries = None -- no beneficiaries for p2p transfers
         result <- exercisePaymentTransfer dso transferContext transfer
