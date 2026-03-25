@@ -152,7 +152,6 @@ multiValidator:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_JWT_TOKEN
       value: |
         canton.participants.participant_INDEX.ledger-api.max-token-lifetime = Inf
-    - !include(multi-participant_key_cache.yaml)
   resources:
     participant:
       requests:
