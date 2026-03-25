@@ -59,6 +59,7 @@ template Escrow
                      receiverFeeRatio = 1.0
                  ]
                beneficiaries = None
+               meta = None
          exerciseAppTransfer dso transferContext transfer
 
 test_designExample : Script ()

@@ -72,6 +72,7 @@ test_UnclaimedActivityRecord_FullFlow = do
         inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
         outputs = []
         beneficiaries = None
+        meta = None
       context = context.context
       expectedDso = Some app.dso
   Some openRound <- queryContractId @OpenMiningRound app.dso context.context.openMiningRound

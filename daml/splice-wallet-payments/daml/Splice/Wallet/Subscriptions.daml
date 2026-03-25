@@ -6,6 +6,9 @@ module Splice.Wallet.Subscriptions where
 import DA.Time
 import DA.List (dedupSort)
 
+import Splice.Api.Token.MetadataV1
+import Splice.TokenStandard.Utils qualified as TSU
+
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Expiry
@@ -393,6 +396,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
              receiverFeeRatio = 0.0
          ]
        beneficiaries = None -- no beneficiaries for locking step
+       meta = None -- empty metadata for self-transfer
 
   result <- exercisePaymentTransfer dso context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
@@ -412,6 +416,8 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
         inputs = [InputAmulet result.amuletCid]
         outputs = [mkTransferOutput receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
+        -- TODO(#5001): test that this reason metadata is reported as a TransferEventV2
+        meta = Some (TSU.reasonToMeta ("subscription for " <> subscriptionData.description) emptyMetadata)
   result <- exerciseAppTransfer subscriptionData.dso transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultAmulet amuletCid] = result.createdAmulets

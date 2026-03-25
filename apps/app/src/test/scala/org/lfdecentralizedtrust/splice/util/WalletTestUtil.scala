@@ -1347,6 +1347,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
                 )
               ).asJava,
               java.util.Optional.empty(),
+              java.util.Optional.empty(),
             ),
             new splice.amuletrules.TransferContext(
               transferContext.openMiningRound,
@@ -1473,6 +1474,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
               )
             ).asJava,
             outputs.asJava,
+            java.util.Optional.empty(),
             java.util.Optional.empty(),
           ),
           new splice.amuletrules.TransferContext(

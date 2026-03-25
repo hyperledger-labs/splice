@@ -454,6 +454,19 @@ This allows implementation of a `Portfolio View <https://github.com/global-synch
     Daml reference for V1 <../api/splice-api-token-holding-v1/index>
     Daml reference for V2 <../api/splice-api-token-holding-v2/index>
 
+Transfer Events
+---------------
+
+These are used by wallets to parse transfers from the Ledger API's transaction history and display them in the wallet's transaction history UI.
+They were newly added as part of the V2 token standard.
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference for V2 <../api/splice-api-token-transfer-events-v2/index>
+
+.. TODO(#4581): add open api docs for V2
+
 Transfer Instruction
 --------------------
 

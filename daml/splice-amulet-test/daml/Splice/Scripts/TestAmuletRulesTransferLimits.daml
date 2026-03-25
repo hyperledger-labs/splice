@@ -29,6 +29,7 @@ testTransferExceedsMaxInputs = do
             inputs = inputAmulets
             outputs = []
             beneficiaries = None
+            meta = None
           context = paymentContext.context
           expectedDso = Some app.dso
     return ()
@@ -50,6 +51,7 @@ testTransferExceedsMaxOutputs = do
             inputs = [InputAmulet amulet]
             outputs = outputAmulets
             beneficiaries = None
+            meta = None
           context = paymentContext.context
           expectedDso = Some app.dso
     return ()
@@ -85,6 +87,7 @@ testTransferExceedsMaxLockHolders = do
                   receiverFeeRatio = 0.0
               ]
             beneficiaries = None
+            meta = None
           context = paymentContext.context
           expectedDso = Some app.dso
     return ()

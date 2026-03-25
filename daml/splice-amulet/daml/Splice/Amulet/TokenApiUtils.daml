@@ -5,6 +5,7 @@
 
 module Splice.Amulet.TokenApiUtils where
 
+import DA.Action (void)
 import DA.Optional
 import DA.Monoid ()
 import DA.Time
@@ -16,6 +17,10 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
+import Splice.Api.Token.HoldingV2 qualified as V2
+
+import Splice.TokenStandard.Utils (logBurn, logMint, basicAccount)
 
 
 splicePrefix : Text
@@ -77,6 +82,9 @@ unclaimedActivityRecordAmountMetaKey = amuletPrefix <> "unclaimed-activity-recor
 
 validatorRewardAmountMetaKey : Text
 validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"
+
+validatorFaucetAmountMetaKey : Text
+validatorFaucetAmountMetaKey = amuletPrefix <> "validator-faucet"
 
 appRewardBeneficiariesMetaKey : Text
 appRewardBeneficiariesMetaKey = amuletPrefix <> "app-reward-beneficiaries"
@@ -251,6 +259,20 @@ lookupFromContextU context k = either fail pure $ lookupFromContext context k
 -- | Convenience version of `getFromContext` that raises the failure within the `Update`.
 getFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update a
 getFromContextU context k = either fail pure $ getFromContext context k
+
+
+-- V2 Events
+------------
+
+logAmuletMint : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletMint dso factoryCid receiver amount meta = do
+  let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta
+
+logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletBurn dso factoryCid sender amount meta = do
+  let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
 
 
 -- instances for ToAnyValue

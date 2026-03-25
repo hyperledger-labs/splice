@@ -17,6 +17,7 @@ data-dependencies:
   - ../dars/splice-api-token-allocation-v1-1.0.0.dar
   - ../dars/splice-api-token-allocation-instruction-v1-1.0.0.dar
   - ../../token-standard/splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
+  - ../../token-standard/splice-api-token-transfer-events-v2/.daml/dist/splice-api-token-transfer-events-v2-current.dar
   - ../../token-standard/splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
   - ../../token-standard/splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
   - ../../token-standard/splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
