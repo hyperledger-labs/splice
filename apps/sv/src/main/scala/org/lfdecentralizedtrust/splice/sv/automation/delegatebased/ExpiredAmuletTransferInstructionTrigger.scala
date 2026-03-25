@@ -44,7 +44,7 @@ class ExpiredAmuletTransferInstructionTrigger(
         Seq(
           instruction.transfer.sender,
           instruction.transfer.receiver,
-          svTaskContext.dsoStore.key.dsoParty,
+          svTaskContext.dsoStore.key.dsoParty.partyId.toProtoPrimitive,
         ).map(PartyId.tryFromProtoPrimitive),
     )
     with SvTaskBasedTrigger[Task] {
