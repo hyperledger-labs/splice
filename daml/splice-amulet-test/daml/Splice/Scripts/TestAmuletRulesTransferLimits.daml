@@ -49,6 +49,7 @@ testTransferExceedsMaxInputs = do
           inputs = inputAmulets
           outputs = []
           beneficiaries = None
+          meta = None
         context = context
         expectedError = "More than the maximum number of inputs"
     return ()
@@ -69,6 +70,7 @@ testTransferExceedsMaxOutputs = do
           inputs = [InputAmulet amulet]
           outputs = outputAmulets
           beneficiaries = None
+          meta = None
         context = context
         expectedError = "More than the maximum number of outputs"
     return ()
@@ -102,6 +104,7 @@ testTransferExceedsMaxLockHolders = do
               receiverFeeRatio = 0.0
           ]
         beneficiaries = None
+        meta = None
       context = context
       expectedError = "Fewer than the allowed number of lock holders"
     return ()

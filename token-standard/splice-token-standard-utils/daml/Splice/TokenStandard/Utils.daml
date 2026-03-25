@@ -66,6 +66,14 @@ module Splice.TokenStandard.Utils (
   BackwardCompatible(..),
   ForwardCompatible(..),
 
+  -- * Events
+  eventLog_transferOutDefaultImpl,
+  eventLog_transferInDefaultImpl,
+
+  logMint,
+  logBurn,
+  logTransfer,
+  logAllocationSettlement,
 
   -- * Allocation workflows
 
@@ -94,7 +102,6 @@ module Splice.TokenStandard.Utils (
   upcast_v1_v2_Allocation,
 
   -- *** Choices
-  allocationV2_settleDefaultImplUsingV1,
   allocationV2_withdrawDefaultImplUsingV1,
   allocationV2_cancelDefaultImplUsingV1,
 
@@ -164,6 +171,6 @@ module Splice.TokenStandard.Utils (
 
 import Splice.TokenStandard.Utils.Internal.Conversions
 import Splice.TokenStandard.Utils.Internal.Choices
+import Splice.TokenStandard.Utils.Internal.Events
 import Splice.TokenStandard.Utils.Internal.Transfers
 import Splice.TokenStandard.Utils.Internal.Allocations
-

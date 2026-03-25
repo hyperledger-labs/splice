@@ -332,6 +332,7 @@ payWithTransferFeeRatio app sender recipient amuletAmount transferFeeRatio = do
               lock = None
           ]
         beneficiaries = None -- test code only, don't set beneficiaries
+        meta = None -- test code only, don't set metadata
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, recipient] readAs
@@ -363,6 +364,7 @@ lockTo1 app sender lockHolder amuletAmount lockDuration = do
               receiverFeeRatio = 0.0
           ]
         beneficiaries = None -- no beneficiaries for self-transfer
+        meta = None -- test-code only, don't set metadata
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, lockHolder] readAs
@@ -434,6 +436,7 @@ runAmuletDepositBots app = do
               amulets
           outputs = []
           beneficiaries = None -- no beneficiaries for self-transfer
+          meta = None -- test code only, don't set metadata
     -- merge multiple amulets or rewards and claim rewards even if there are no amulets yet
     when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null amulets)) $ void $
       submitExerciseAmuletRulesByKey app [user] readAs AmuletRules_Transfer with
@@ -552,6 +555,13 @@ getTransferContext app user featuredAppRight = do
       [ (right.user, rightCid) | (rightCid, right) <- validatorRights, right.validator == user.primaryParty]
     openMiningRound
     featuredAppRight = featuredAppRight
+
+getExternalPartyTransferContext : AmuletApp -> Script ExternalPartyTransferContext
+getExternalPartyTransferContext app = do
+  (stateCid1, _) <- getExternalPartyConfigStates app
+  pure $ ExternalPartyTransferContext with
+    externalPartyConfigState = stateCid1
+    featuredAppRight = None
 
 tap : AmuletApp -> AmuletUser -> Decimal -> Script (ContractId Amulet)
 tap app user amount = do

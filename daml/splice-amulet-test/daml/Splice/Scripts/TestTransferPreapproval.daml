@@ -8,6 +8,9 @@ import DA.Assert
 import DA.Optional
 import DA.Time
 import qualified DA.TextMap as TextMap
+
+import Splice.Api.Token.MetadataV1
+
 import Splice.Scripts.Util
 import Splice.Amulet
 import Splice.AmuletRules
@@ -49,6 +52,21 @@ testTransferPreapprovalSend = script do
       description = Some "test-description"
 
   TextMap.lookup reasonMetaKey (fromSome result.meta).values === Some "test-description"
+
+  -- Test the support for generic metadata support in TransferPreapproval_SendV2
+  externalContext <- getExternalPartyTransferContext app
+  amuletCid <- tap app bob 50.0
+  result <- submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_SendV2
+    with
+      sender = bob.primaryParty
+      context = externalContext
+      inputs = [InputAmulet amuletCid]
+      amount = 15.0
+      description = Some "test-description V2 choice"
+      meta = Some (Metadata with values = TextMap.fromList [("acme.com/correlation-id", "<uuid>")])
+      -- TODO(#5001): use submitTree to test that the right TransferOut is present indeed
+
+  TextMap.lookup reasonMetaKey result.meta.values === Some "test-description V2 choice"
 
   -- Move forward in time to expire pre-approval
   passTime (days 1)

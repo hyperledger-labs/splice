@@ -72,6 +72,7 @@ template MintingDelegation
              inputs
              outputs = []
              beneficiaries = None
+             meta = None
            context = context.context with featuredAppRight = None
            expectedDso = Some dso
          pure MintingDelegation_MintResult with transferResult

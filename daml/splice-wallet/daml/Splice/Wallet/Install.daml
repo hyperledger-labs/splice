@@ -264,6 +264,7 @@ mkMergeAmuletAndRewardsTransfer endUserP inputs = do
         inputs = inputs
         outputs = []
         beneficiaries = None
+        meta = None
   transfer
 
 -- Enum of the possible ways amulets can be manipulated through the wallet.

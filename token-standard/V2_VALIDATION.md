@@ -88,3 +88,15 @@ Cleanup performed so far:
 - add default implementations for extra observers for `SettlementFactory_SettleBatch`  for public and private assets
 - use `Account.id : Text` instead of `Optional Text` to ensure that wallets do not have to deal with
   two different kinds of defalt accounts (empty string vs None). Use "" as the default account identifier.
+- Introduce and implement event based reporting of transfers:
+   - motivation:
+       - decouple the logic of executing a transfer from reporting it to external systems
+       - simplify parsing for wallets: just look for `TransferEventV2` events to understand all balance changes
+   - add new API package `splice-api-token-transfer-events-v2`
+   - add `Splice.Api.Token.TransferEventV2` module
+   - add `Splice.TokenStandard.Utils` convenience functions to log events for burns, mints, and transfers
+   - emit `TransferEventV2` events for all amulet choices, including properly tagging burns from ANS payments
+   - emit `TransferEventV2` events for `TestTokenV2` choices
+- Introduce `AllocationRequest.originalRequestId` and `Allocation.originalAllocationId` fields, which
+  are used to track the same request or allocation across state updates,
+  analogously to the `originalInstructionCid` of transfer and allocation instructions.
