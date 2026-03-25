@@ -53,7 +53,7 @@ class ScanAppRewardsComputationTimeBasedIntegrationTest
     }
 
     "return activity totals after aggregation trigger runs" in { implicit _env =>
-      // TODO(#4381): Update the time management here
+      // TODO(#4384): Update the time management here
       //
       // Advance enough ticks so that at least three rounds are fully closed and aggregated.
       // (advanceRoundsToNextRoundOpening advances by 1 tick)

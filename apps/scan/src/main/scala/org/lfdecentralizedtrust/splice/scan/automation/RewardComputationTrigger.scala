@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
   *   2. Compute reward totals (CC minting allowances with threshold filtering)
   *   3. Build the Merkle tree of batched reward hashes
   *
-  * TODO(#4381): use ScanRewardsReferenceStore for synchronization when computeAndStoreRewards requires it
+  * TODO(#4384): use ScanRewardsReferenceStore for synchronization when computeAndStoreRewards requires it
   */
 class RewardComputationTrigger(
     appRewardsStore: ScanAppRewardsStore,
