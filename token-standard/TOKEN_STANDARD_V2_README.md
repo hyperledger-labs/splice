@@ -26,6 +26,7 @@ This acts just like DevNet. This means:
         canton.participants.participant.parameters.alpha-version-support=true
         canton.participants.participant.parameters.initial-protocol-version=dev
       ```
+    
 - You can generate your own onboarding secret by calling: `curl -X POST https://sv.sv-2.token-std-v2-dev.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare`
 
 Do keep in mind:
