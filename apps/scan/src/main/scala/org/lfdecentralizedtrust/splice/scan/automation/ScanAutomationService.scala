@@ -40,7 +40,7 @@ class ScanAutomationService(
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
     val updateHistory: UpdateHistory,
-    appRewardsStore: DbScanAppRewardsStore,
+    appRewardsStoreO: Option[DbScanAppRewardsStore],
     appActivityStoreO: Option[AppActivityStore],
     storage: DbStorage,
     snapshotStore: AcsSnapshotStore,
@@ -73,16 +73,17 @@ class ScanAutomationService(
   registerTrigger(
     new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
   )
-  appActivityStoreO.foreach { appActivityStore =>
-    registerTrigger(
-      new RewardComputationTrigger(
-        appRewardsStore,
-        appActivityStore,
-        updateHistory,
-        triggerContext,
-      )
+  for {
+    appRewardsStore <- appRewardsStoreO
+    appActivityStore <- appActivityStoreO
+  } registerTrigger(
+    new RewardComputationTrigger(
+      appRewardsStore,
+      appActivityStore,
+      updateHistory,
+      triggerContext,
     )
-  }
+  )
 
   registerUpdateHistoryIngestion(updateHistory)
 

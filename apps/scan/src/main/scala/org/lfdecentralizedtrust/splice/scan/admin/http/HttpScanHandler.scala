@@ -130,7 +130,7 @@ class HttpScanHandler(
     sequencerAdminConnection: SequencerAdminConnection,
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
     updateHistory: UpdateHistory,
-    appRewardsStore: DbScanAppRewardsStore,
+    appRewardsStoreO: Option[DbScanAppRewardsStore],
     appActivityStoreO: Option[AppActivityStore],
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
@@ -2408,21 +2408,30 @@ class HttpScanHandler(
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getRewardAccountingActivityTotals") { _ => _ =>
-      appRewardsStore.getAppActivityRoundTotalByRound(roundNumber).map {
+      appRewardsStoreO match {
         case None =>
-          ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
-            ErrorResponse(
-              s"Activity totals not (yet) computed for round $roundNumber"
+          Future.successful(
+            ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
             )
           )
-        case Some(roundTotal) =>
-          ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
-            definitions.GetRewardAccountingActivityTotalsResponse(
-              roundNumber = roundTotal.roundNumber,
-              totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
-              activePartiesCount = roundTotal.activeAppProviderPartiesCount,
-            )
-          )
+        case Some(appRewardsStore) =>
+          appRewardsStore.getAppActivityRoundTotalByRound(roundNumber).map {
+            case None =>
+              ScanResource.GetRewardAccountingActivityTotalsResponse.NotFound(
+                ErrorResponse(
+                  s"Activity totals not (yet) computed for round $roundNumber"
+                )
+              )
+            case Some(roundTotal) =>
+              ScanResource.GetRewardAccountingActivityTotalsResponse.OK(
+                definitions.GetRewardAccountingActivityTotalsResponse(
+                  roundNumber = roundTotal.roundNumber,
+                  totalAppActivityWeight = roundTotal.totalRoundAppActivityWeight,
+                  activePartiesCount = roundTotal.activeAppProviderPartiesCount,
+                )
+              )
+          }
       }
     }
   }

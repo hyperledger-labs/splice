@@ -244,7 +244,9 @@ class ScanApp(
             )
           )
         } else None
-      appRewardsStore = new DbScanAppRewardsStore(storage, updateHistory, loggerFactory)
+      appRewardsStoreO = appActivityRecordStoreO.map(_ =>
+        new DbScanAppRewardsStore(storage, updateHistory, loggerFactory)
+      )
       automation = new ScanAutomationService(
         config,
         clock,
@@ -253,7 +255,7 @@ class ScanApp(
         loggerFactory,
         store,
         updateHistory,
-        appRewardsStore,
+        appRewardsStoreO,
         appActivityRecordStoreO,
         storage,
         acsSnapshotStore,
@@ -368,7 +370,7 @@ class ScanApp(
         sequencerAdminConnection,
         automation,
         updateHistory,
-        appRewardsStore,
+        appRewardsStoreO,
         appActivityRecordStoreO,
         acsSnapshotStore,
         scanEventStore,
