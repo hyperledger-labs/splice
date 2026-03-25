@@ -33,10 +33,12 @@ data AllocationInstructionAction
 -- | View for `AllocationInstruction`.
 data AllocationInstructionView = AllocationInstructionView with
     originalInstructionCid : Optional (ContractId AllocationInstruction)
-      -- ^ The contract id of the original allocation instruction contract.
-      -- Used by the wallet to track the lineage of allocation instructions through multiple steps.
+      -- ^ The contract id of the first allocation instruction contract of this
+      -- allocation instruction workflow, if this is not the first step of the workflow.
       --
-      -- Only set if the registry evolved the allocation instruction in multiple steps.
+      -- This SHOULD be used by wallets to correlate the same allocation instruction across
+      -- updates to its state. It should not be used to correlate different allocation
+      -- instructions for the same settlement. That can be done using the `allocation.settlement` field.
     allocation : AllocationSpecification
       -- ^ The allocation that this instruction should create.
     requestedAt : Time

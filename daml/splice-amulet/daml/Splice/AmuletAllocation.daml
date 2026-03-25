@@ -21,9 +21,11 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as V1
 import Splice.Api.Token.AllocationV1 qualified as V1
 import Splice.Api.Token.AllocationV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils as TSU hiding (require)
 
 import Splice.Amulet
+import Splice.AmuletRules (getExternalPartyConfigStateFromChoiceContext, lookupEventLogFromChoiceContext)
 import Splice.Amulet.TwoStepTransfer
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
@@ -61,15 +63,15 @@ template AmuletAllocation
       allocation_executeTransferImpl _self V1.Allocation_ExecuteTransfer{..} =
         transferAmuletAllocation this extraArgs
 
-      allocation_withdrawImpl _self V1.Allocation_Withdraw{..} = do
-        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+      allocation_withdrawImpl self V1.Allocation_Withdraw{..} = do
+        senderHoldingCids <- unlockAmuletAllocation this self extraArgs "withdrawn by sender"
         pure V1.Allocation_WithdrawResult
           with
             senderHoldingCids
             meta = emptyMetadata
 
-      allocation_cancelImpl _self V1.Allocation_Cancel{..} = do
-        senderHoldingCids <- unlockAmuletAllocation this extraArgs
+      allocation_cancelImpl self V1.Allocation_Cancel{..} = do
+        senderHoldingCids <- unlockAmuletAllocation this self extraArgs "cancelled by executor"
         pure V1.Allocation_CancelResult
           with
             senderHoldingCids
@@ -87,12 +89,34 @@ template AmuletAllocation
 
       allocation_withdrawImpl = allocationV2_withdrawDefaultImplUsingV1 (toInterface this)
       allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
-      allocation_settleImpl = allocationV2_settleDefaultImplUsingV1 (toInterface this)
+      allocation_settleImpl self arg = do
+        -- V2 settlement of a V1 allocation
+        let leg = allocation.transferLeg
+        let dso = leg.instrumentId.admin
+        archiveAndCheckActors self arg.actors [[dso, allocation.settlement.executor, leg.sender, leg.receiver]]
+        -- Archive locked amulet to execute the debit (extra checks part of defensive programming)
+        la <- fetchAndArchive (ForOwner with dso, owner = leg.sender) lockedAmulet
+        requireMatchExpected ("lockedAmulet.amount", la.amulet.amount.initialAmount) leg.amount
+
+        -- report transfer events for V2 transaction history parsing
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
+        logAllocationSettlement (toInterfaceContractId configStateCid) (upcast allocation)
+
+         -- construct metadata to aid V1 tx history parsers
+        let reason = "Debit for settlement " <> show allocation.settlement.settlementRef
+        let v1HistoryMeta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
+        -- NOTE: we report this as a burn in the V1 history metadata, as representing the full
+        -- set of transfer legs is very difficult to do using the V1 metadata.
+        pure V2.Allocation_SettleResult with
+          authorizerHoldingCids = mempty
+          meta = v1HistoryMeta
+
 
     -- Implemented on the concrete template as you cannot upgrade interfaces so we cannot add a choice to the Allocation interface.
     choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult
       with
         expireLock : Bool
+        eventLogCid : Optional (ContractId TransferEventsV2.EventLog)
       controller allocationInstrumentAdmin allocation
       do
         assertDeadlineExceeded "allocation.settlement.settleBefore" allocation.settlement.settleBefore
@@ -102,8 +126,7 @@ template AmuletAllocation
                 values = TextMap.fromList [(expireLockKey, toAnyValue expireLock)]
               meta = emptyMetadata
 
-        senderHoldingCids <- unlockAmuletAllocation this extraArgs
-
+        senderHoldingCids <- unlockAmuletAllocation this self extraArgs "expired"
         pure AmuletAllocation_DsoExpireResult with
           senderHoldingCids
           meta = TSU.reasonToMeta "expired as settleBefore has passed" emptyMetadata
@@ -135,16 +158,20 @@ allocationToTwoStepTransfer allocation =
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update V1.Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
   let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
+  let transferMeta = amuletAllocation.allocation.transferLeg.meta
   (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet transferMeta extraArgs
   pure V1.Allocation_ExecuteTransferResult
     with
       senderHoldingCids
       receiverHoldingCids
       meta
 
-unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId V1.Holding]
-unlockAmuletAllocation amuletAllocation extraArgs = do
+unlockAmuletAllocation : AmuletAllocation -> ContractId t -> ExtraArgs -> Text -> Update [ContractId V1.Holding]
+unlockAmuletAllocation amuletAllocation self extraArgs reason = do
+  let dso = allocationInstrumentAdmin amuletAllocation.allocation
+  eventLogCid <- lookupEventLogFromChoiceContext extraArgs.context
+  logWorkflowTerminated eventLogCid dso self amuletAllocation reason
   let lockExpiresAt = amuletAllocation.allocation.settlement.settleBefore
   abortTwoStepTransfer lockExpiresAt amuletAllocation.lockedAmulet extraArgs
 

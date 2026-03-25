@@ -80,7 +80,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
         inputs = transferInputs
         beneficiaries = None
 
-  result <- executeExternalPartyTransfer dso context transfer
+  result <- executeExternalPartyTransfer dso context emptyMetadata transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   pure
     ( lockedAmulet
@@ -89,9 +89,9 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids context 
     )
 
 executeTwoStepTransfer
-  : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
+  : TwoStepTransfer -> ContractId LockedAmulet -> Metadata -> ExtraArgs
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
-executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
+executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid transferMeta extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
   (context, beneficiaries) <-
     if allowFeaturing
@@ -118,7 +118,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
         beneficiaries
-  result <- executeExternalPartyTransfer dso context amuletRulesTransfer
+  result <- executeExternalPartyTransfer dso context transferMeta amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
     , createdAmuletToHolding <$> result.createdAmulets

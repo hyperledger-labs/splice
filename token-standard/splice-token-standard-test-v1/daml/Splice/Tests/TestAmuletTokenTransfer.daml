@@ -112,7 +112,10 @@ setupTest = do
       executeBefore = now `addRelTime` days 1
       inputHoldingCids = bobHoldingCids
       meta = Metadata with
-        values = TextMap.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
+        values = TextMap.fromList
+          [ ("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")
+          , ("splice.lfdecentralizedtrust.org/reason", "test reason")
+          ]
 
   return TestSetup with ..
 

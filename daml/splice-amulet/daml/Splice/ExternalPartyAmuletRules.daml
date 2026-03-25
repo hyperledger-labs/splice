@@ -16,8 +16,9 @@ import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferIns
 import Splice.Api.Token.HoldingV1 qualified as V1
 import Splice.Api.Token.AllocationInstructionV1 qualified as V1
 import Splice.Api.Token.AllocationV2 qualified as V2
-import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
 import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
 
 import Splice.Amulet
@@ -61,12 +62,14 @@ template ExternalPartyAmuletRules
       do
         require ("expectedDso " <> show expectedDso <> " matches the dsoParty " <> show dso) (expectedDso == dso)
 
+        let eventLogCid = Some (toInterfaceContractId self)
         individualResults <- forA inputs $ \input -> do
           alloc <- fetchButArchiveLater (ForDso with dso) input.allocationCid
           require "The dsoParty must be the admin of the allocation's instrument" (alloc.allocation.transferLeg.instrumentId.admin == dso)
 
           exercise input.allocationCid AmuletAllocation_DsoExpire with
             expireLock = input.expireLock
+            eventLogCid
 
         pure ExternalPartyAmuletRules_ExpireAmuletAllocationsResult with
           results = individualResults
@@ -143,19 +146,29 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      settlementFactory_settleBatchImpl self arg =
+      settlementFactory_settleBatchImpl self arg = do
         let createReceiptAllocation =
               settlementFactoryV2_defaultCreateReceiptAllocation
                 (coerceContractId self)
                 (\account -> [account.owner])
                 arg
-        in
-          settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
+
+        settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
       settlementFactory_settleBatchExtraObservers =
         settlementFactoryV2_publicAsset_settleBatchExtraObserversDefaultImpl
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
+
+    interface instance TransferEventsV2.EventLog for ExternalPartyAmuletRules where
+      view = TransferEventsV2.EventLogView with
+        admin = dso
+        meta = emptyMetadata
+
+      eventLog_workflowCompletedImpl = eventLog_workflowCompletedDefaultImpl dso
+      eventLog_transferOutImpl = eventLog_transferOutDefaultImpl dso
+      eventLog_transferInImpl = eventLog_transferInDefaultImpl dso
+
 
 
 -- Legacy transfer commands
@@ -363,7 +376,7 @@ amulet_transferFactory_transferImpl this _self arg = do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
           inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
-          result <- executeExternalPartyTransfer dso paymentContext Transfer with
+          result <- executeExternalPartyTransfer dso paymentContext transfer.meta Transfer with
             sender = transfer.sender
             provider = transfer.sender
             inputs

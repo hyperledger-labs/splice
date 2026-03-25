@@ -553,6 +553,13 @@ getTransferContext app user featuredAppRight = do
     openMiningRound
     featuredAppRight = featuredAppRight
 
+getExternalPartyTransferContext : AmuletApp -> Script ExternalPartyTransferContext
+getExternalPartyTransferContext app = do
+  (stateCid1, _) <- getExternalPartyConfigStates app
+  pure $ ExternalPartyTransferContext with
+    externalPartyConfigState = stateCid1
+    featuredAppRight = None
+
 tap : AmuletApp -> AmuletUser -> Decimal -> Script (ContractId Amulet)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app

@@ -50,6 +50,19 @@ testTransferPreapprovalSend = script do
 
   TextMap.lookup reasonMetaKey (fromSome result.meta).values === Some "test-description"
 
+  -- Externally signed transaction (or not if bob is not also externally hosted, like for a sweep) to send amulets
+  externalContext <- getExternalPartyTransferContext app
+  amuletCid <- tap app bob 50.0
+  result <- submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_SendV2
+    with
+      sender = bob.primaryParty
+      context = externalContext
+      inputs = [InputAmulet amuletCid]
+      amount = 15.0
+      description = Some "test-description V2 choice"
+
+  TextMap.lookup reasonMetaKey result.meta.values === Some "test-description V2 choice"
+
   -- Move forward in time to expire pre-approval
   passTime (days 1)
 

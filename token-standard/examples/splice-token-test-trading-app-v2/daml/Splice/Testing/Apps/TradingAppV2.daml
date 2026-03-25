@@ -41,6 +41,7 @@ template OTCTradeAllocationRequest with
 
     interface instance V2.AllocationRequest for OTCTradeAllocationRequest where
       view = V2.AllocationRequestView with
+        originalRequestCid = None
         settlement
         transferLegs
         authorizer
@@ -52,6 +53,7 @@ template OTCTradeAllocationRequest with
       allocationRequest_rejectExtraObservers = allocationRequestV2_rejectDefaultExtraObservers this
       allocationRequest_withdrawExtraObservers = allocationRequestV2_withdrawDefaultExtraObservers this
 
+      -- FIXME: report abortions of workflow
       allocationRequest_acceptImpl = allocationRequestV2_acceptDefaultImpl [[p] | p <- accountParties authorizer]
       allocationRequest_rejectImpl = allocationRequestV2_rejectDefaultImplUsingV1 [[p] | p <- accountParties authorizer]
       allocationRequest_withdrawImpl = allocationRequestV2_withdrawDefaultImplUsingV1 (toInterface this)

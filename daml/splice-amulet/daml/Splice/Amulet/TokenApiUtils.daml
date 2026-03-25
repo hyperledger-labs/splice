@@ -5,6 +5,7 @@
 
 module Splice.Amulet.TokenApiUtils where
 
+import DA.Action (void)
 import DA.Optional
 import DA.Monoid ()
 import DA.Time
@@ -16,6 +17,11 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
+import Splice.Api.Token.TransferEventsV2 qualified as TransferEventsV2
+import Splice.Api.Token.HoldingV2 qualified as V2
+
+import Splice.AmuletEventLog
+import Splice.TokenStandard.Utils (logBurn, logMint, basicAccount)
 
 
 splicePrefix : Text
@@ -78,6 +84,9 @@ unclaimedActivityRecordAmountMetaKey = amuletPrefix <> "unclaimed-activity-recor
 validatorRewardAmountMetaKey : Text
 validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"
 
+validatorFaucetAmountMetaKey : Text
+validatorFaucetAmountMetaKey = amuletPrefix <> "validator-faucet"
+
 appRewardBeneficiariesMetaKey : Text
 appRewardBeneficiariesMetaKey = amuletPrefix <> "app-reward-beneficiaries"
 
@@ -126,6 +135,9 @@ txKindToText kind = case kind of
   TxKind_Burn -> "burn"
   TxKind_Mint -> "mint"
   TxKind_ExpireDust -> "expire-dust"
+
+reasonMeta : Text -> Metadata
+reasonMeta reason = Metadata with values = TextMap.singleton reasonMetaKey reason
 
 -- | Simplified version for a few of the common cases.
 simpleHoldingTxMeta : TxKind -> Optional Text -> Optional Decimal -> Metadata
@@ -251,6 +263,41 @@ lookupFromContextU context k = either fail pure $ lookupFromContext context k
 -- | Convenience version of `getFromContext` that raises the failure within the `Update`.
 getFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update a
 getFromContextU context k = either fail pure $ getFromContext context k
+
+
+-- V2 Events
+------------
+
+logAmuletMint : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletMint dso factoryCid receiver amount meta = do
+  let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logMint factoryCid (basicAccount receiver) amount instrumentId meta
+
+logAmuletBurn : Party -> ContractId TransferEventsV2.EventLog -> Party -> Decimal -> Metadata -> Update ()
+logAmuletBurn dso factoryCid sender amount meta = do
+  let instrumentId = V2.InstrumentId with admin = dso; id = amuletInstrumentIdName
+  void $ logBurn factoryCid (basicAccount sender) amount instrumentId meta
+
+logWorkflowTerminated : (HasSignatory t, HasObserver t) => Optional (ContractId TransferEventsV2.EventLog) -> Party -> ContractId i -> t -> Text -> Update ()
+logWorkflowTerminated optEventLogCid dso workflowCid co reason =
+  logWorkflowCompleted optEventLogCid dso (stakeholder co) workflowCid False (reasonMeta reason)
+
+logWorkflowCompleted : Optional (ContractId TransferEventsV2.EventLog) -> Party -> [Party] -> ContractId t -> Bool -> Metadata -> Update ()
+logWorkflowCompleted optEvenLogCid dso observers workflowCid success meta = do
+  -- TODO(#4992): use contract key lookup to find the `AmuletEventLog`; instead of creating a new one for each event.
+  let logEvent cid =
+        void $ exercise cid TransferEventsV2.EventLog_WorkflowCompleted with
+          admin = dso
+          workflowCid = coerceContractId workflowCid
+          success
+          observers
+          extraArgs = ExtraArgs with meta; context = emptyChoiceContext
+  case optEvenLogCid of
+    Some cid -> logEvent cid
+    None -> do
+      factoryCid <- create AmuletEventLog with dso
+      logEvent (toInterfaceContractId @TransferEventsV2.EventLog factoryCid)
+      archive factoryCid
 
 
 -- instances for ToAnyValue

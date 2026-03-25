@@ -47,8 +47,11 @@ template AmuletAllocationV2
         (\instrumentId -> instrumentId == amuletInstrumentIdV2 dso)
         allocation
 
+    -- TODO(#4525): add expiry choice for the DSO and hook it up to AmuletRules, so that AmuletAllocationV2 is also auto-expired
+
     interface instance V2.Allocation for AmuletAllocationV2 where
       view = V2.AllocationView with
+        originalAllocationCid = None
         expiresAt = Some expiresAt
         allocation
         holdingCids = case lockedAmulet of
@@ -68,7 +71,7 @@ template AmuletAllocationV2
 
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
         archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
-        authorizerHoldingCids <- unlockAmuletAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockAmuletAllocationV2 this self extraArgs "withdrawn by sender"
         pure V2.Allocation_WithdrawResult
           with
             authorizerHoldingCids
@@ -76,7 +79,7 @@ template AmuletAllocationV2
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
         archiveAndCheckActors self arg.actors [allocation.settlement.executors]
-        authorizerHoldingCids <- unlockAmuletAllocationV2 this extraArgs
+        authorizerHoldingCids <- unlockAmuletAllocationV2 this self extraArgs "cancelled by executor"
         pure V2.Allocation_CancelResult
           with
             authorizerHoldingCids
@@ -87,6 +90,11 @@ template AmuletAllocationV2
         archiveAndCheckActors self arg.actors [dso :: allocation.settlement.executors]
         forA_ allocation.settlement.settlementDeadline $ \deadline ->
           assertWithinDeadline "allocation.settlement.settlementDeadline" deadline
+
+        -- report transfer events for V2 transaction history parsing
+        (configStateCid, _) <- getExternalPartyConfigStateFromChoiceContext dso extraArgs.context
+        logAllocationSettlement (toInterfaceContractId configStateCid) allocation
+
         -- compute total funds to move
         let authorizer = allocation.authorizer.owner
         let netAmount = netAmuletCreditAmount dso (basicAccount authorizer) allocation.transferLegs
@@ -107,7 +115,8 @@ template AmuletAllocationV2
               pure V2.Allocation_SettleResult with
                 authorizerHoldingCids = TextMap.fromList [(amuletInstrumentIdName, [toInterfaceContractId newHoldingCid])]
                 meta = simpleHoldingTxMeta TxKind_Mint (Some reason) None
-                -- TODO(#4550): revisit whether this mint is the right choice once we know how to do tx history parsing v2
+                -- Note: for V1 tx history parsing, it is difficult to do better
+                -- than reporting this as a mint, as explained below for TxKind_Burn.
           else do
             -- No holding change ==> no tx history metadata
             pure V2.Allocation_SettleResult with
@@ -120,15 +129,21 @@ template AmuletAllocationV2
              lockedAmulet <- fetchAndArchive (ForOwner with dso = dso; owner = authorizer) cid
              requireMatchExpected ("lockedAmulet.amount", lockedAmulet.amulet.amount.initialAmount) (negate netAmount)
 
-          let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef
+          let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef.id
           pure V2.Allocation_SettleResult with
             authorizerHoldingCids = mempty
             meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
-            -- TODO(#4550): revisit whether this burn is the right choice once we know how to do tx history parsing v2
+            -- Note: for V1 tx history parsing, we can't really do better reporting this as a burn, as we don't
+            -- have the option of reporting all the actual transfers independently, as we do for V2 tx history parsing.
+            -- We accept this short-coming, as wallets can easily start parsing V2 events independently fo doing the work
+            -- to fully support all V2 flows.
 
 
-unlockAmuletAllocationV2 : AmuletAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
-unlockAmuletAllocationV2 amuletAllocation extraArgs = do
+unlockAmuletAllocationV2 : AmuletAllocationV2 -> ContractId t -> ExtraArgs -> Text -> Update (TextMap.TextMap [ContractId V2.Holding])
+unlockAmuletAllocationV2 amuletAllocation self extraArgs reason = do
+  -- report workflow termination to V2 transaction history parsers
+  eventLogCid <- lookupEventLogFromChoiceContext extraArgs.context
+  logWorkflowTerminated eventLogCid amuletAllocation.dso self amuletAllocation reason
   case amuletAllocation.lockedAmulet of
     None -> return TextMap.empty
     Some la -> do

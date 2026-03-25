@@ -16,6 +16,8 @@ import Splice.Api.Token.TransferInstructionV2 qualified as Api.TransferInstructi
 import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet
+import Splice.AmuletRules (lookupEventLogFromChoiceContext)
+import Splice.Amulet.TokenApiUtils
 import Splice.Amulet.TwoStepTransfer
 import Splice.Util (require)
 
@@ -40,14 +42,14 @@ template AmuletTransferInstruction
       transferInstruction_acceptImpl _self arg =
         executeTransferInstr this arg.extraArgs
 
-      transferInstruction_rejectImpl _self arg =
-        abortAmuletTransferInstruction this arg.extraArgs
+      transferInstruction_rejectImpl self arg =
+        abortAmuletTransferInstruction this self arg.extraArgs "rejected by receiver"
 
-      transferInstruction_updateImpl _self arg =
-        updateAmuletTransferInstruction this arg.extraActors arg.extraArgs
+      transferInstruction_updateImpl self arg =
+        updateAmuletTransferInstruction this self arg.extraActors arg.extraArgs
 
-      transferInstruction_withdrawImpl _self arg = do
-        abortAmuletTransferInstruction this arg.extraArgs
+      transferInstruction_withdrawImpl self arg = do
+        abortAmuletTransferInstruction this self arg.extraArgs "withdrawn by sender"
 
     interface instance Api.TransferInstructionV2.TransferInstruction for AmuletTransferInstruction where
       view = Api.TransferInstructionV2.TransferInstructionView with
@@ -89,15 +91,18 @@ executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update Transfer
 executeTransferInstr instr extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+    executeTwoStepTransfer twoStepTransfer instr.lockedAmulet instr.transfer.meta extraArgs
   pure TransferInstructionResult with
     senderChangeCids = senderHoldingCids
     output = TransferInstructionResult_Completed with
       receiverHoldingCids
     meta
 
-abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
-abortAmuletTransferInstruction instr extraArgs = do
+abortAmuletTransferInstruction : AmuletTransferInstruction -> ContractId TransferInstruction -> ExtraArgs -> Text -> Update TransferInstructionResult
+abortAmuletTransferInstruction instr self extraArgs reason = do
+  let dso = instr.transfer.instrumentId.admin
+  eventLogCid <- lookupEventLogFromChoiceContext extraArgs.context
+  logWorkflowTerminated eventLogCid dso self instr reason
   let lockExpiresAt = instr.transfer.executeBefore
   senderHoldingCids <- abortTwoStepTransfer lockExpiresAt instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
@@ -105,10 +110,13 @@ abortAmuletTransferInstruction instr extraArgs = do
     output = TransferInstructionResult_Failed
     meta = emptyMetadata
 
-updateAmuletTransferInstruction : AmuletTransferInstruction -> [Party] -> ExtraArgs -> Update TransferInstructionResult
-updateAmuletTransferInstruction instr extraActors extraArgs = do
+updateAmuletTransferInstruction : AmuletTransferInstruction -> ContractId TransferInstruction -> [Party] -> ExtraArgs -> Update TransferInstructionResult
+updateAmuletTransferInstruction instr self extraActors extraArgs = do
   require "No extra actors on transfer expiry" (null extraActors)
   assertDeadlineExceeded "Transfer.executeBefore" instr.transfer.executeBefore
+  let dso = instr.transfer.instrumentId.admin
+  eventLogCid <- lookupEventLogFromChoiceContext extraArgs.context
+  logWorkflowTerminated eventLogCid dso self instr "expired"
   let lockExpiresAt = instr.transfer.executeBefore
   senderHoldingCids <- abortTwoStepTransfer lockExpiresAt instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
