@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
