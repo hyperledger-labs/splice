@@ -10,15 +10,18 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.pattern.after
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
-import org.apache.pekko.stream.scaladsl.{Source, Sink}
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.PekkoRetryingService
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.{
-  PageLimit,
+  HardLimit,
   HistoryMetrics,
+  Limit,
+  PageLimit,
   S3BucketConnection,
   TimestampWithMigrationId,
   UpdateHistory,
@@ -26,6 +29,8 @@ import org.lfdecentralizedtrust.splice.store.{
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
+import java.time.{Instant, YearMonth, ZoneOffset}
+import java.time.temporal.ChronoUnit
 
 class UpdateHistoryBulkStorage(
     val storageConfig: ScanStorageConfig,
@@ -197,4 +202,136 @@ class UpdateHistoryBulkStorage(
       )
     }
   }
+
+  def getUpdatesBetweenDates(
+      afterRecordTime: CantonTimestamp,
+      atOrBeforeRecordTime: CantonTimestamp,
+      limit: Limit,
+      nextPageTokenO: Option[String],
+  )(implicit tc: TraceContext): Future[Seq[ObjectKeyAndChecksum]] = {
+
+    def getStartAndEndTimestampsForFolder(
+        folder: String
+    ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
+      // Folder format is "{startTimestamp}-Migration-{migrationId}-{endTimestamp}/", e.g. "5-2024-01-01T00:00:00Z-5-2024-02-01T00:00:00Z/"
+      val parts = folder.stripSuffix("/").split("-")
+      if (parts.length != 4) {
+        Left("Cannot parse folder name: " + folder)
+      } else {
+        val folderStartStr = parts(0)
+        val folderEndStr = parts(3)
+        for {
+          folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
+          folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
+        } yield {(folderStart, folderEnd)}
+      }
+    }
+
+    def isFolderInRange(folder: String): Boolean = {
+      // Overlap check: folder range (folderStart, folderEnd] overlaps with query range (afterRecordTime, atOrBeforeRecordTime]
+      getStartAndEndTimestampsForFolder(folder) match {
+        case Left(err) =>
+          // TODO: throw an exception? For now, just log and skip the folder, since this should not happen and we don't want to fail the whole request because of a single malformed folder.
+          logger.warn(s"Skipping folder $folder due to parsing error: $err")
+          false
+        case Right((folderStart, folderEnd)) =>
+          folderStart < atOrBeforeRecordTime && folderEnd > afterRecordTime
+      }
+    }
+
+    def paginationFilter(folder: String): Boolean = {
+      nextPageTokenO match {
+        case None => true
+        case Some(token) => folder > token
+      }
+    }
+
+    def getUpdateObjectsInFolder(folder: String): Future[Seq[String]] = s3Connection.listObjects(
+      prefix = folder,
+      _.matches(".*updates_\\d+\\.zstd"),
+      limit,
+    )
+
+    def folderFilter(folder: String): Boolean =
+      isFolderInRange(folder) && paginationFilter(folder)
+
+    // TODO(#3429): handle the case where the user asked for an end timestamp that is later than what we have in storage.
+    // ATM, we still return the last folder as a "next page token" in that case, and in the next page, we return an empty result.
+    // This might be fine if documented, and explained that the intention is "please try again later".
+    def getNextPageToken(folders: Seq[String], objKeys: Seq[String]): Option[String] = {
+      // We return a next page token when:
+      //   - we found some objects to return (i.e. objKeys is non-empty), and
+      //   - the end time in the last folder we listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
+      objKeys.lastOption.flatMap(lastObjKey => {
+        val lastFolder = lastObjKey.substring(0, lastObjKey.lastIndexOf('/') + 1)
+        getStartAndEndTimestampsForFolder(lastFolder) match {
+          case Left(err) =>
+            // This should not happen, since we should have successfully parsed the folder when listing its objects
+            throw io.grpc.Status.INTERNAL
+              .withDescription(s"Cannot parse last folder name for next page token: $lastFolder, error: $err")
+              .asRuntimeException()
+          case Right((_, folderEnd)) =>
+            if (folderEnd < atOrBeforeRecordTime) {
+              Some(lastFolder)
+            } else {
+              None
+            }
+        }
+      })
+    }
+
+    def getFolderUpdateObjectsUpToLimit(folders: Seq[String]): Future[Seq[String]] = {
+      folders
+        .foldLeft(Future.successful(Seq.empty[String], limit)) { case (futFolderState, folder) =>
+          futFolderState.flatMap { case (folderAcc, folderLimit) =>
+            if (folderLimit.limit <= 0) {
+              Future.successful((folderAcc, folderLimit))
+            } else {
+              getUpdateObjectsInFolder(folder).map { folderObjs =>
+                if (folderObjs.size > folderLimit.limit) {
+                  // Folder would exceed the limit; omit it entirely (and stop adding more by making the limit 0) if PageLimit, or fail if HardLimit
+                  folderLimit match {
+                    case PageLimit(limit, _) =>
+                      (folderAcc, PageLimit.tryCreate(0))
+                    case HardLimit(limit, _) =>
+                      throw io.grpc.Status.FAILED_PRECONDITION
+                        .withDescription(
+                          "Size of the result exceeded the limit in getUpdatesBetweenDates."
+                        )
+                        .asRuntimeException()
+                  }
+                } else {
+                  val newAcc = folderAcc ++ folderObjs
+                  val newLimit: Limit = folderLimit match {
+                    case PageLimit(limit, _) =>
+                      PageLimit.tryCreate(limit - folderObjs.size)
+                    case HardLimit(limit, _) =>
+                      HardLimit.tryCreate(limit - folderObjs.size)
+                  }
+                  (newAcc, newLimit)
+                }
+              }
+            }
+          }
+        }
+        .map(_._1)
+    }
+
+    for {
+      nextFolders <- s3Connection.listFolders(prefix = "", folderFilter, limit)
+      objKeys <- getFolderUpdateObjectsUpToLimit(nextFolders)
+      objectsWithChecksums <- s3Connection.getChecksums(objKeys)
+      nextPageTokenO = getNextPageToken(nextFolders, objKeys)
+    } yield {
+      objectsWithChecksums
+    }
+  }
+
+}
+
+object UpdateHistoryBulkStorage {
+  case class UpdateHistoryObjectResponse(
+      objects: Seq[ObjectKeyAndChecksum],
+      nextPageTokenO: Option[String],
+  )
 }

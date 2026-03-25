@@ -56,52 +56,72 @@ class S3BucketConnection(
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
 
-  def listObjectsSource(prefix: String): Source[S3Object, NotUsed] = {
-    val listRequest = ListObjectsV2Request
-      .builder()
-      .bucket(bucketName)
-      .prefix(prefix)
-      .build();
+  private def s3List(
+      listRequest: ListObjectsV2Request,
+      pageToContent: ListObjectsV2Response => Iterable[String],
+      limit: Limit,
+  )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] = {
     Source
       .fromPublisher(
         s3Client.listObjectsV2Paginator(listRequest)
       )
-      .mapConcat(_.contents().asScala)
+      .fold(Seq.empty[String])((acc, page) => {
+        val content = pageToContent(page)
+        applyLimit(
+          "listObjects",
+          limit,
+          (acc ++ content).sorted,
+        )
+      })
+      .mapConcat(_.toList)
+      .runWith(Sink.seq[String])
   }
 
   def listObjects(
       prefix: String,
       keyFilter: String => Boolean,
       limit: Limit,
-  )(implicit tc: TraceContext, ec: ExecutionContext, as: ActorSystem): Future[Seq[ObjectKeyAndChecksum]] = {
-    val ord: Ordering[S3Object] = Ordering.by((a: S3Object) => a.key())
-    val listRequest = ListObjectsV2Request
-      .builder()
-      .bucket(bucketName)
-      .prefix(prefix)
-      .maxKeys(limit.maxPageSize)
-      .build();
-    Source
-      .fromPublisher(
-        s3Client.listObjectsV2Paginator(listRequest)
-      )
-      .fold(Seq.empty[S3Object])((acc, page) => {
-        val filteredPage = page.contents().asScala.filter(obj => keyFilter(obj.key()))
-        applyLimit(
-          "listObjectsSource",
-          limit,
-          (acc ++ filteredPage).sorted(ord),
-        )
-      })
-      .mapConcat(_.toList)
-      .mapAsync(4) { obj => // TODO(#3429): make this parallelism configurable
-        readChecksum(obj.key)
-          .map(checksum => ObjectKeyAndChecksum(obj.key, checksum))
+  )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
+    s3List(
+      ListObjectsV2Request
+        .builder()
+        .bucket(bucketName)
+        .prefix(prefix)
+        .maxKeys(limit.limit)
+        .build(),
+      _.contents().asScala.map(_.key()).filter(keyFilter),
+      limit,
+    )
+
+  def listFolders(
+      prefix: String,
+      folderFilter: String => Boolean,
+      limit: Limit,
+  )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
+    s3List(
+      ListObjectsV2Request
+        .builder()
+        .bucket(bucketName)
+        .prefix(prefix)
+        .delimiter("/")
+        .maxKeys(limit.limit)
+        .build(),
+      _.commonPrefixes().asScala.map(_.prefix()).filter(folderFilter),
+      limit,
+    )
+
+  def getChecksums(
+      objectKeys: Seq[String]
+  )(implicit ec: ExecutionContext, as: ActorSystem): Future[Seq[ObjectKeyAndChecksum]] = {
+    Source(objectKeys.toList)
+      .mapAsync(4) { key => // TODO(#3429): make this parallelism configurable
+        readChecksum(key)
+          .map(checksum => ObjectKeyAndChecksum(key, checksum))
       }
       .runWith(Sink.seq[ObjectKeyAndChecksum])
   }
 
-  def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
+  private def readChecksum(key: String)(implicit ec: ExecutionContext): Future[String] = {
     val headRequest = HeadObjectRequest
       .builder()
       .bucket(bucketName)

@@ -200,6 +200,7 @@ class AcsSnapshotBulkStorage(
           prefix,
           _.matches(".*ACS_\\d+\\.zstd"),
           HardLimit.tryCreate(Limit.DefaultMaxPageSize))
+      objectsWithChecksums <- s3Connection.getChecksums(objects)
     } yield {
       if (objects.isEmpty) {
         throw Status.NOT_FOUND
@@ -209,9 +210,9 @@ class AcsSnapshotBulkStorage(
           .asRuntimeException()
       }
       logger.trace(
-        s"Found snapshot in bulk storage at timestamp $snapshotTs, with objects: ${objects.map(_.key).mkString(", ")}"
+        s"Found snapshot in bulk storage at timestamp $snapshotTs, with objects: ${objects.mkString(", ")}"
       )
-      AcsSnapshotObjects(snapshotTs, objects)
+      AcsSnapshotObjects(snapshotTs, objectsWithChecksums)
     }
   }
 

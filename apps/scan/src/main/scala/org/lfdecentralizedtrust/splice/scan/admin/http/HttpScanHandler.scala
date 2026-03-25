@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, ParticipantAdminConnection, SequencerAdminConnection}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsRequest, BatchListVotesByVoteRequestsRequest, DamlValueEncoding, ErrorResponse, EventHistoryRequest, HoldingsStateRequest, HoldingsSummaryRequest, ListVoteResultsRequest, MaybeCachedContractWithState, UpdateHistoryItem, UpdateHistoryItemV2, UpdateHistoryRequestV2, UpdateHistoryTransactionV2}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsRequest, BatchListVotesByVoteRequestsRequest, DamlValueEncoding, ErrorResponse, EventHistoryRequest, HoldingsStateRequest, HoldingsSummaryRequest, ListBulkUpdateHistoryObjectsRequest, ListVoteResultsRequest, MaybeCachedContractWithState, UpdateHistoryItem, UpdateHistoryItemV2, UpdateHistoryRequestV2, UpdateHistoryTransactionV2}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore, TxLogEntry}
@@ -2426,6 +2426,8 @@ class HttpScanHandler(
       )
     }
   }
+
+  override def listBulkUpdateHistoryObjects(respond: ScanResource.ListBulkUpdateHistoryObjectsResponse.type)(body: ListBulkUpdateHistoryObjectsRequest)(extracted: TraceContext): Future[ScanResource.ListBulkUpdateHistoryObjectsResponse] = ???
 }
 
 object HttpScanHandler {
