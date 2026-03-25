@@ -49,15 +49,11 @@ class RewardComputationTrigger(
         earliestCompleteO <- appActivityStore.earliestRoundWithCompleteAppActivity()
         latestCompleteO <- appActivityStore.latestRoundWithCompleteAppActivity()
         latestComputedO <- appRewardsStore.lookupLatestRoundWithRewardComputation()
-      } yield {
-        (earliestCompleteO, latestCompleteO) match {
-          case (Some(earliestComplete), Some(latestComplete)) =>
-            val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
-            // TODO(#4570): Support parallel execution
-            Seq(start).filter(_ <= latestComplete).map(RewardComputationTrigger.Task(_))
-          case _ => Seq.empty
-        }
-      }
+      } yield RewardComputationTrigger.nextTask(
+        earliestCompleteO,
+        latestCompleteO,
+        latestComputedO,
+      )
   }
 
   override protected def completeTask(
@@ -80,4 +76,22 @@ object RewardComputationTrigger {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("roundNumber", _.roundNumber))
   }
+
+  /** Compute the next round to process, given the bounds of complete activity data
+    * and the latest round for which rewards have already been computed.
+    * Returns at most one task.
+    *
+    * TODO(#4570): Support parallel execution
+    */
+  def nextTask(
+      earliestCompleteO: Option[Long],
+      latestCompleteO: Option[Long],
+      latestComputedO: Option[Long],
+  ): Seq[Task] =
+    (earliestCompleteO, latestCompleteO) match {
+      case (Some(earliestComplete), Some(latestComplete)) =>
+        val start = math.max(earliestComplete, latestComputedO.fold(0L)(_ + 1))
+        if (start <= latestComplete) Seq(Task(start)) else Seq.empty
+      case _ => Seq.empty
+    }
 }
