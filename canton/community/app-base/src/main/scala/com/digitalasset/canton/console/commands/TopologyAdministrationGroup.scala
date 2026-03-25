@@ -3700,7 +3700,7 @@ class TopologyAdministrationGroup(
       def propose_successor(
           sequencerId: SequencerId,
           endpoints: NonEmpty[Seq[URI]],
-          synchronizerId: SynchronizerId,
+          synchronizerId: PhysicalSynchronizerId,
           customTrustCertificates: Option[ByteString] = None,
           store: Option[TopologyStoreId] = None,
           mustFullyAuthorize: Boolean = false,
@@ -3747,6 +3747,7 @@ class TopologyAdministrationGroup(
           operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
           filterSequencerId: String = "",
           filterSigningKey: String = "",
+          filterSuccessorPhysicalSynchronizerId: String = "",
       ): Seq[ListLsuSequencerConnectionSuccessorResult] = consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListLsuSequencerConnectionSuccessor(
@@ -3758,7 +3759,8 @@ class TopologyAdministrationGroup(
               filterSigningKey,
               None,
             ),
-            filterSequencerId,
+            filterSequencerId = filterSequencerId,
+            filterSuccessorPhysicalSynchronizerId = filterSuccessorPhysicalSynchronizerId,
           )
         )
       }

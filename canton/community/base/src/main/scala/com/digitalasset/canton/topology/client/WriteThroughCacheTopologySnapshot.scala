@@ -227,7 +227,7 @@ class WriteThroughCacheTopologySnapshot(
         FutureUnlessShutdown.pure(StoredTopologyTransactions.empty[TopologyChangeOp.Replace])
       )(sequencersNE =>
         findTransactionsByUids(
-          types = Seq(TopologyMapping.Code.SequencerConnectionSuccessor),
+          types = Seq(TopologyMapping.Code.LsuSequencerConnectionSuccessor),
           filterUid = sequencersNE,
         )
       )
