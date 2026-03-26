@@ -11,6 +11,9 @@ module Splice.TokenStandard.Utils (
   isBasicAccount,
   accountParties,
 
+  ensureBasicAccount,
+  ensureNoAccountMeta,
+
   -- ** Requirements checking
   require',
   isMemberR,
@@ -24,6 +27,8 @@ module Splice.TokenStandard.Utils (
   requireUnique,
 
   -- ** Actors pattern
+  checkActor,
+  checkActors,
   archiveAndCheckActors,
 
   -- ** Public fetch implementation

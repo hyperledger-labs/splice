@@ -22,6 +22,7 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   basicAccount,
   isBasicAccount,
   accountParties,
+  ensureBasicAccount,
 
   -- ** Account metadata conversion
   accountToMeta,
@@ -34,6 +35,7 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
 
 ) where
 
+import DA.Action
 import DA.Date
 import DA.Optional
 import DA.Text qualified as T
@@ -131,6 +133,11 @@ ensureNoAccountMeta path fieldName meta = do
     check k = case TextMap.lookup k meta.values of
       None -> pure ()
       Some v -> fail $ "Unexpected account information in metadata on v2 choice for '" <> path <> fieldName <> "': " <> show v
+
+ensureBasicAccount : Text -> HoldingV2.Account -> Update ()
+ensureBasicAccount fieldName account = do
+  unless (isBasicAccount account) $
+    abort $ "Expected a basic account for field '" <> fieldName <> "', but got: " <> show account
 
 validateNoAccountMeta : Text -> Metadata -> Bool
 validateNoAccountMeta fieldName meta =

@@ -66,7 +66,7 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
 ) where
 
 import DA.Foldable (forA_)
-import DA.List (dedupSort)
+import DA.List (dedupSort, unique)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional)
 import qualified DA.Set as Set
@@ -134,6 +134,7 @@ isValidAllocationSpecificationV2
 isValidAllocationSpecificationV2 validInstrumentId AllocationV2.AllocationSpecification{..} =
     isValidSettlementInfoV2 settlement &&
     not (null transferLegs) &&
+    unique transferLegs &&
     all isValidLeg transferLegs
   where
     isValidLeg leg =
@@ -354,15 +355,19 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
       requireMatchExpected ("transferLeg.instrumentId.admin", leg.instrumentId.admin) admin
     pure (allocationCid, allocationView)
 
-  -- determine missing allocations for receipt legs
-  let requiredAuthorizations = Set.fromList $ concatMap toAuthorizedLegs transferLegs
-  let allocatedAuthorizations = Set.fromList $ do
+  -- ensure there are no duplicate authorizations
+  let allocatedAuthorizations = do
         (_, allocationView) <- allocations
         leg <- allocationView.allocation.transferLegs
         pure (allocationView.allocation.authorizer, leg)
+  requireUnique "allocated authorizations" allocatedAuthorizations
+
+  -- determine missing allocations for receipt legs
+  let requiredAuthorizations = Set.fromList $ concatMap toAuthorizedLegs transferLegs
+  let allocatedAuthorizationsSet = Set.fromList allocatedAuthorizations
   let missingReceiptAllocations =
         Set.filter (\(authorizer, leg) -> leg.sender /= authorizer) $
-        Set.difference requiredAuthorizations allocatedAuthorizations
+        Set.difference requiredAuthorizations allocatedAuthorizationsSet
   let missingAllocationsByAuthorizer = Map.fromListWithR (++) $ do
         (authorizer, leg) <- Set.toList missingReceiptAllocations
         pure (authorizer, [leg])

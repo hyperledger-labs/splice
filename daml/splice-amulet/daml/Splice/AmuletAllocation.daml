@@ -40,6 +40,7 @@ template AmuletAllocation
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
     allocation : V1.AllocationSpecification
+    -- FIXME: add early expiry to V1 allocation
   where
     signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
     observer allocation.settlement.executor
