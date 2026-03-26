@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.rewards.RewardIssuanceParams
 import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
@@ -571,16 +572,20 @@ class DbScanAppRewardsStore(
     */
   private[store] def computeRewardTotals(
       roundNumber: Long,
-      issuancePerFeaturedAppTraffic_CCperMB: BigDecimal,
-      threshold_CC: BigDecimal,
+      params: RewardIssuanceParams,
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
+
+    val issuance = params.issuancePerFeaturedAppTraffic_CCperMB
+    val threshold = params.threshold_CC
+    val totalIssuance = params.totalIssuanceForFeaturedAppRewards
+    val unclaimed = params.unclaimedAppRewardAmount
 
     val insertRewardTotals =
       (sql"""with computed as (
                select history_id, round_number, app_provider_party_seq_num,
                       (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
-                        * $issuancePerFeaturedAppTraffic_CCperMB as reward_amount
+                        * $issuance as reward_amount
                from #${Tables.appActivityPartyTotals}
                where history_id = $historyId and round_number = $roundNumber
              ),
@@ -589,7 +594,7 @@ class DbScanAppRewardsStore(
                  (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
                select history_id, round_number, app_provider_party_seq_num, reward_amount
                from computed
-               where reward_amount >= $threshold_CC
+               where reward_amount >= $threshold
                returning total_app_reward_amount
              )
              insert into #${Tables.appRewardRoundTotals}
@@ -598,9 +603,8 @@ class DbScanAppRewardsStore(
                 rewarded_app_provider_parties_count)
              select $historyId, $roundNumber,
                coalesce(sum(total_app_reward_amount), 0),
-               coalesce((select sum(reward_amount) from computed
-                         where reward_amount < $threshold_CC), 0),
-               0,
+               $totalIssuance - $unclaimed - coalesce(sum(total_app_reward_amount), 0),
+               $unclaimed,
                count(*)
              from inserted_parties""").asUpdate
 
