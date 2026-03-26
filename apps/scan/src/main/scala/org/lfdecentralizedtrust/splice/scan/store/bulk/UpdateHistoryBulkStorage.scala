@@ -263,6 +263,7 @@ class UpdateHistoryBulkStorage(
       HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
 
+    // FIXME: also only before the record time stored in the DB
     def folderFilter(folder: String): Boolean =
       isFolderInRange(folder) && paginationFilter(folder)
 
