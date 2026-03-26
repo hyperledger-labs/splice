@@ -45,15 +45,18 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   allocationRequestV1_rejectDefaultImpl,
   allocationRequestV1_withdrawDefaultImpl,
 
-  -- ** V2 choice observers
+  -- ** V2 defaults
+  allocationRequestV2_acceptDefaultExtraObservers,
   allocationRequestV2_rejectDefaultExtraObservers,
   allocationRequestV2_withdrawDefaultExtraObservers,
+
+  allocationRequestV2_acceptDefaultImpl,
 
   -- ** V2 for dual version templates
   allocationRequestV2_rejectDefaultImplUsingV1,
   allocationRequestV2_withdrawDefaultImplUsingV1,
 
-  -- ** V2 only
+  -- ** V2 for V2-only templates
   allocationRequestV2_rejectDefaultImplV2Only,
   allocationRequestV2_withdrawDefaultImplV2Only,
 
@@ -604,6 +607,15 @@ allocationRequestV1_withdrawDefaultImpl _this _self _arg = do
   -- V1 is consuming with the controller set to the executor ==> nothing to do in the body
   pure ChoiceExecutionMetadata with meta = emptyMetadata
 
+-- | Default observers for the `V2.AllocationRequest_Accept` choice, which are
+-- the observers of the request contract.
+allocationRequestV2_acceptDefaultExtraObservers
+  : HasObserver t
+  => t
+  -> AllocationRequestV2.AllocationRequest_Accept
+  -> [Party]
+allocationRequestV2_acceptDefaultExtraObservers this _arg = observer this
+
 -- | Default observers for the `V2.AllocationRequest_Reject` choice, which are
 -- the observers of the request contract.
 allocationRequestV2_rejectDefaultExtraObservers
@@ -621,6 +633,18 @@ allocationRequestV2_withdrawDefaultExtraObservers
   -> AllocationRequestV2.AllocationRequest_Withdraw
   -> [Party]
 allocationRequestV2_withdrawDefaultExtraObservers this _arg = observer this
+
+-- | Default implementation for the `V2.AllocationRequest_Accept` choice that
+-- checks the actors are in the `allowedActors` and archives the request.
+allocationRequestV2_acceptDefaultImpl
+  : [[Party]]
+    -- ^ Groups of parties allowed to call the accept choice.
+  -> ContractId AllocationRequestV2.AllocationRequest
+  -> AllocationRequestV2.AllocationRequest_Accept
+  -> Update AllocationRequestV2.AllocationRequest_AcceptResult
+allocationRequestV2_acceptDefaultImpl allowedActors self arg = do
+  archiveAndCheckActors self arg.actors allowedActors
+  pure AllocationRequestV2.AllocationRequest_AcceptResult with meta = emptyMetadata
 
 -- | Default implementation for the `V2.AllocationRequest_Reject` choice that
 -- checks the actors are in the `allowedActors` and archives the request.

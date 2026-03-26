@@ -22,15 +22,40 @@ import Splice.Api.Token.AllocationV2
 interface AllocationRequest where
   viewtype AllocationRequestView
 
+  allocationRequest_acceptImpl
+    : ContractId AllocationRequest -> AllocationRequest_Accept -> Update AllocationRequest_AcceptResult
   allocationRequest_rejectImpl
     : ContractId AllocationRequest -> AllocationRequest_Reject -> Update AllocationRequest_RejectResult
   allocationRequest_withdrawImpl
     : ContractId AllocationRequest -> AllocationRequest_Withdraw -> Update AllocationRequest_WithdrawResult
 
   allocationRequest_rejectExtraObservers : AllocationRequest_Reject -> [Party]
+  allocationRequest_acceptExtraObservers : AllocationRequest_Accept -> [Party]
   allocationRequest_withdrawExtraObservers : AllocationRequest_Withdraw -> [Party]
 
-  -- TODO(#4659): add `AllocationRequest_Accept` choice to enable UTXO-based dedup when creating net positivie allocations
+  nonconsuming choice AllocationRequest_Accept : AllocationRequest_AcceptResult
+    -- ^ Signal to settlement.executors that the requested allocations will be
+    -- created before `settlement.settleAt`.
+    --
+    -- Wallets SHOULD call this choice in the same transaction as the creation
+    -- of the requested allocations to protect from creating the same
+    -- allocations multiple times.
+    --
+    -- IMPORTANT: implementations MUST ensure that the allocation request is
+    -- consumed by the body of this choice.
+    with
+      actors : [Party]
+        -- ^ The parties accepting the allocation request.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized acceptance.
+        --
+        -- Implementations SHOULD allow calling this choice for all parties that
+        -- need to create an allocation for this request.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    observer allocationRequest_acceptExtraObservers this arg
+    controller actors
+    do allocationRequest_acceptImpl this self arg
 
   nonconsuming choice AllocationRequest_Reject : AllocationRequest_RejectResult
     -- ^ Reject an allocation request to signal that no allocation will be created for it.
@@ -83,6 +108,9 @@ interface AllocationRequest where
 data AllocationRequestView = AllocationRequestView with
     authorizer : Account
       -- ^ Account that is asked to create allocations for this request.
+      --
+      -- Wallets SHOULD use this field to determine whether a request requires
+      -- user action or is informational only.
     settlement : SettlementInfo
       -- ^ Settlement for which allocations are requested to be created.
     transferLegs : [TransferLeg]
@@ -93,6 +121,11 @@ data AllocationRequestView = AllocationRequestView with
       -- depending on the confidentiality requirements of the app.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation request, used for extensibility.
+  deriving (Show, Eq)
+
+data AllocationRequest_AcceptResult = AllocationRequest_AcceptResult with
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of accepting the allocation request, used for extensibility.
   deriving (Show, Eq)
 
 data AllocationRequest_RejectResult = AllocationRequest_RejectResult with
