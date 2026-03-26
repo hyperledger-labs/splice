@@ -212,9 +212,11 @@ class UpdateHistoryBulkStorage(
     def isFolderInRange(folder: String): Boolean = {
       storageConfig.getStartAndEndTimestampsForFolder(folder) match {
         case Left(err) =>
-          // TODO: throw an exception? For now, just log and skip the folder, since this should not happen and we don't want to fail the whole request because of a single malformed folder.
-          logger.warn(s"Skipping folder $folder due to parsing error: $err")
-          false
+          throw io.grpc.Status.INTERNAL
+            .withDescription(
+              s"Cannot parse folder name $folder, error: $err"
+            )
+            .asRuntimeException()
         case Right((folderStart, folderEnd)) =>
           folderStart < atOrBeforeRecordTime && folderEnd > afterRecordTime
       }
@@ -223,7 +225,6 @@ class UpdateHistoryBulkStorage(
     def isFolderFullyDumped(folder: String, lastSegmentEnd: CantonTimestamp): Boolean = {
       storageConfig.getStartAndEndTimestampsForFolder(folder) match {
         case Left(err) =>
-          // This should not happen, since it should have failed in isFolderInRange already.
           throw io.grpc.Status.INTERNAL
             .withDescription(
               s"Cannot parse folder name $folder, error: $err"
@@ -269,7 +270,6 @@ class UpdateHistoryBulkStorage(
         val lastFolder = lastObjKey.substring(0, lastObjKey.lastIndexOf('/') + 1)
         storageConfig.getStartAndEndTimestampsForFolder(lastFolder) match {
           case Left(err) =>
-            // This should not happen, since we should have successfully parsed the folder when listing its objects
             throw io.grpc.Status.INTERNAL
               .withDescription(
                 s"Cannot parse last folder name for next page token: $lastFolder, error: $err"
