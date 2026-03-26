@@ -73,3 +73,6 @@ Cleanup performed so far:
   - Extend `TradingAppV2` to support mixed version settlement of trades involving V1-only tokens, and V1/V2 tokens
     whose allocations are created through either a V1 wallet or a V2 wallet
 - Remove redundant `Splice.Testing.UtilsV2` module: use `Splice.Testing.Utils` instead
+- Improve commentary on `V2.AllocationRequest` choices
+- Add missing choice observers to `V2.TransferFactory_Transfer`
+- Renamed `_extraObserverDefaultImpl` to `_extraObserversDefaultImpl` to reflect that it can return multiple observers

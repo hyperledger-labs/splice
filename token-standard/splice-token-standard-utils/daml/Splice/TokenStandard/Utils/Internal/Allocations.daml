@@ -67,8 +67,8 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   -- * Allocation factory implementations
 
   -- ** V2 Choice observers
-  allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl,
-  allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl,
+  allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl,
+  allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl,
 
 ) where
 
@@ -411,7 +411,7 @@ validateAndPrepareAllocations admin AllocationV2.SettlementFactory_SettleBatch{.
 
   -- check that all missing authorizations are covered by the extra receipt authorizers
   forA_ (Set.toList missingReceiptAllocations) $ \(authorizer, leg) -> do
-    require' (leg.transferLegId <> ".authorizer", authorizer) isMemberR ("extraReceiptAuthorizers", extraReceiptAuthorizers)
+    require' ("missing authorizer of " <> leg.transferLegId, authorizer) isMemberR ("extraReceiptAuthorizers", extraReceiptAuthorizers)
 
   pure PreparedAllocations with
     receiptAllocationsToCreate = missingAllocations
@@ -710,16 +710,16 @@ instance ForwardCompatible AllocationRequestV1.AllocationRequestView AllocationR
 -- | For public assets the settlement executors should be observers of the
 -- allocation choice itself so there's no extra view for communicating the
 -- created allocation.
-allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
-allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl arg =
-  arg.allocation.settlement.executors
+allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
+allocationFactoryV2_publicAsset_allocateExtraObserversDefaultImpl arg =
+  arg.allocation.settlement.executors <> accountParties arg.allocation.authorizer
 
 -- | Default for private assets, where the settlement executors are only be
 -- observers of the allocation choice itself if no funding is required.
-allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
-allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl arg
-  | all (>= 0.0) (Map.values creditAmounts) = allocation.settlement.executors
-  | otherwise = []
+allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
+allocationFactoryV2_privateAsset_allocateExtraObserversDefaultImpl arg =
+    accountParties allocation.authorizer <>
+    (if all (>= 0.0) (Map.values creditAmounts) then arg.allocation.settlement.executors else [])
   where
     allocation = arg.allocation
     creditAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs

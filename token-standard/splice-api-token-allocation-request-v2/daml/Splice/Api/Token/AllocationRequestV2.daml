@@ -52,7 +52,7 @@ interface AllocationRequest where
         -- Implementations MUST check these parties to avoid unauthorized acceptance.
         --
         -- Implementations SHOULD allow calling this choice for all parties that
-        -- need to create an allocation for this request.
+        -- can create an allocation matching this request.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationRequest_acceptExtraObservers this arg
@@ -75,7 +75,7 @@ interface AllocationRequest where
         -- Implementations MUST check these parties to avoid unauthorized rejection.
         --
         -- Implementations SHOULD allow calling this choice for all parties that
-        -- need to create an allocation for this request.
+        -- can create an allocation matching this request.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationRequest_rejectExtraObservers this arg
@@ -97,8 +97,8 @@ interface AllocationRequest where
         --
         -- Implementations MUST check these parties to avoid unauthorized withdrawal.
         --
-        -- Implementations SHOULD allow the `settlement.executors` to call this
-        -- choice.
+        -- Implementations SHOULD allow the `settlement.executors` to jointly
+        -- call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocationRequest_withdrawExtraObservers this arg
