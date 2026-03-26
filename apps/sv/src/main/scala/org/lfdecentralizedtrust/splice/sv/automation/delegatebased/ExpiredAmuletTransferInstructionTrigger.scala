@@ -62,8 +62,7 @@ class ExpiredAmuletTransferInstructionTrigger(
     }.toSet + store.key.dsoParty
 
     for {
-      packageSupport <- svTaskContext.packageVersionSupport.supports24hSubmissionDelay(
-        // amulet transfer instruction expiry was added in the same release as 24h submission delay
+      packageSupport <- svTaskContext.packageVersionSupport.supportsExpireTransferInstructions(
         allParties.toSeq,
         clock.now,
       )
