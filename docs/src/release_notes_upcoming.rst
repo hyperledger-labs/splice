@@ -9,6 +9,13 @@
 
 .. release-notes:: Upcoming
 
+    - SVs
+
+      .. important::
+
+        - BFT sequencer connections are recommended again with this upgrade. To enable them, remove the config flags to disable them from the SV and validator configuration
+          used to :ref:`disable them <helm-sv-bft-sequencer-connections>`.
+
     - SV and Validator app
 
     - Going forward unusable splice DARs will be automatically unvetted by the super validators.
