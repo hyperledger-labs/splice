@@ -258,7 +258,7 @@ test_happy_path_direct = script do
 -----------------------------
 
 
--- TODO(#4550): test that transfer instructions get archived
+-- TODO(#4517): test that transfer instructions get archived
 
 test_two_step_success : Script ()
 test_two_step_success = do

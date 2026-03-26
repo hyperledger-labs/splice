@@ -90,7 +90,7 @@ template AmuletAllocationV2
             then do
               -- Net credit of Amulet ==> create the holding
 
-              -- TODO(#4550): share context fetching code
+              -- TODO(#4552): share context fetching code
               externalPartyConfigStateCid <- getFromContextU @(ContractId ExternalPartyConfigState) extraArgs.context externalPartyConfigStateContextKey
               externalPartyConfigState <- fetchChecked (ForDso with dso = dso) externalPartyConfigStateCid
               let config = scaleFees2 (1.0 / externalPartyConfigState.amuletPrice) $ externalPartyConfigState.transferConfig

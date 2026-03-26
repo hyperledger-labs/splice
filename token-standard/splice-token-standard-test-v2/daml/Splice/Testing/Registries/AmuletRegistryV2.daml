@@ -320,7 +320,7 @@ registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
       optLockedAmulet <- queryContractId @LockedAmulet registry.dso la
       let lockedAmuletActive = isSome optLockedAmulet
       -- this can only happen if the locked amulet already expired
-      -- TODO(#4550): review condition
+      -- TODO(#4552): review condition
       -- now <- getTime
       -- unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleAt <= now) $
         -- fail "Invariant violation: the locked amulet is archived, but the settlement is not yet expired"
@@ -419,7 +419,7 @@ getFeaturedAppRightContext registry provider = do
 
 lookupLockedAmuletOfAllocation : AmuletRegistry -> ContractId Allocation -> Script (Optional (ContractId LockedAmulet))
 lookupLockedAmuletOfAllocation registry allocCid = do
-  -- TODO(#4550): find a better way to determine whether a contract-id points to a specific template instance
+  -- TODO(#4552): find a better way to determine whether a contract-id points to a specific template instance
   v2s <- query @AmuletAllocationV2 registry.dso
   if (coerceContractId allocCid `notElem` map fst v2s)
     then do
@@ -433,7 +433,7 @@ lookupLockedAmuletOfAllocation registry allocCid = do
 getLockedAmuleForAllocationsD : AmuletRegistry -> ContractId Allocation -> Script Disclosures'
 getLockedAmuleForAllocationsD registry allocCid = do
   optLockedAmuletCid <- lookupLockedAmuletOfAllocation registry allocCid
-  -- TODO(#4550): find a better way to determine whether a contract-id points to a specific template instance
+  -- TODO(#4552): find a better way to determine whether a contract-id points to a specific template instance
   case optLockedAmuletCid of
     None -> return mempty
     Some la -> queryDisclosure' @LockedAmulet registry.dso la

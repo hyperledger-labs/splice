@@ -353,7 +353,7 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- inputHoldingCids: note that their detailed validation is done in the transfer itself
   require "At least one holding must be provided" (not $ null transfer.inputHoldingCids)
 
-  -- TODO(#4552): limit time between requestedAt and executeBefore (and add to release notes)
+  -- TODO(#4665): limit time between requestedAt and executeBefore, i.e., max lock duration (and add to release notes)
 
   let reason = TextMap.lookup reasonMetaKey transfer.meta.values
 
