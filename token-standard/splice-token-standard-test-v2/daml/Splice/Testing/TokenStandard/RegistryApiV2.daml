@@ -44,9 +44,6 @@ class RegistryApi app where
     : app -> V2.SettlementFactory_SettleBatch
     -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
 
-  getAllocation_TransferContext
-    : app -> ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
-
   getAllocation_WithdrawContext
     : app -> ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
 
@@ -75,7 +72,6 @@ mkGenericRegistry app =
     ggetTransferFactory = getTransferFactory app
     ggetAllocationFactory = getAllocationFactory app
     ggetSettlementFactory = getSettlementFactory app
-    ggetAllocation_TransferContext = getAllocation_TransferContext app
     ggetAllocation_WithdrawContext = getAllocation_WithdrawContext app
     ggetAllocation_CancelContext = getAllocation_CancelContext app
     ggetTransferInstruction_AcceptContext = getTransferInstruction_AcceptContext app
@@ -113,9 +109,6 @@ data GenericRegistry = GenericRegistry with
     : V2.SettlementFactory_SettleBatch
     -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
 
-  ggetAllocation_TransferContext
-    : ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
-
   ggetAllocation_WithdrawContext
     : ContractId V2.Allocation -> Metadata -> Script OpenApiChoiceContext
 
@@ -136,7 +129,6 @@ instance RegistryApi GenericRegistry where
   getTransferFactory registry = registry.ggetTransferFactory
   getAllocationFactory registry = registry.ggetAllocationFactory
   getSettlementFactory registry = registry.ggetSettlementFactory
-  getAllocation_TransferContext registry = registry.ggetAllocation_TransferContext
   getAllocation_WithdrawContext registry = registry.ggetAllocation_WithdrawContext
   getAllocation_CancelContext registry = registry.ggetAllocation_CancelContext
   getTransferInstruction_AcceptContext registry = registry.ggetTransferInstruction_AcceptContext
