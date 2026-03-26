@@ -328,7 +328,7 @@ class UpdateHistoryBulkStorageTest
         bulkStorageTestConfig,
         appConfig,
         mock[UpdateHistory],
-        mkProvider.futureValue,
+        mockKvProvider,
         0L,
         bucketConnection,
         new HistoryMetrics(new InMemoryMetricsFactory)(MetricsContext.Empty),
