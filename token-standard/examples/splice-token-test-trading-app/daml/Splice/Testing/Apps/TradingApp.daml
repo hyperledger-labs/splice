@@ -182,7 +182,7 @@ require msg invariant =
 
 makeTradeRef : ContractId OTCTradeProposal -> Api.Token.AllocationV1.Reference
 makeTradeRef tradeCid = Api.Token.AllocationV1.Reference with
-  id = "OTCTradeProposal" -- set to the name of the template to simplify debugging
+  id = "OTCTradeProposal" -- set to the name of the template to simplify debugging, should be a unique id in a real app
   cid = Some (coerceContractId tradeCid)
 
 

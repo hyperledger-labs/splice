@@ -41,6 +41,8 @@ data AllocationInstructionView = AllocationInstructionView with
     inputHoldingCids : [ContractId Holding]
       -- ^ The holdings to be used to fund the allocation.
       --
+      -- Empty for allocations that do not require funding.
+      --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
     availableActions : Map.Map [Party] [AllocationInstructionAction]
       -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
@@ -121,12 +123,12 @@ interface AllocationFactory where
       inputHoldingCids : [ContractId Holding]
         -- ^ The holdings matching the instrument of the legs that SHOULD be used to fund the allocation.
         --
-        -- MUST be non-empty for allocations that require funding. For such allocations,
-        -- implementations MUST consume all holdings as part of creating the allocation.
-        -- Thereby enabling the authorizer wallet to use contention on these holdings
-        -- to prevent duplicate allocations with attached funding.
+        -- MUST be empty for allocations that do not require funding.
         --
-        -- MUST be empty for allocations that are net positive.
+        -- For allocations that require funding,, implementations MUST consume
+        -- all provided holdings as part of creating the allocation. Thereby
+        -- enabling the authorizer's wallet to use contention on these holdings to
+        -- prevent creating duplicate allocations.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
       actors : [Party]

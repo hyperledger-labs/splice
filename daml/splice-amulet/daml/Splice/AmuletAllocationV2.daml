@@ -128,6 +128,7 @@ template AmuletAllocationV2
 -- Allocation usage
 -------------------
 
+-- FIXME: trim this now that the code for creating the allocations is shared
 debitAllocationToTwoStepTransfer : Party -> [V2.TransferLeg] -> Party -> Time -> V2.SettlementInfo -> TwoStepTransfer
 debitAllocationToTwoStepTransfer sender transferLegs dso expiresAt settlement
   | creditAmount >= 0.0 = error $
@@ -147,7 +148,8 @@ debitAllocationToTwoStepTransfer sender transferLegs dso expiresAt settlement
       allowFeaturing = True
       lockContext = Text.implode
         -- We don't show more context to avoid bloating the response here.
-        ["allocation for settlement ", settlement.settlementRef.id]
+        ["allocation for settlement of ", settlement.settlementRef.id]
+        -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
   where
     creditAmount = netAllocationCreditAmount (basicAccount sender) transferLegs
 

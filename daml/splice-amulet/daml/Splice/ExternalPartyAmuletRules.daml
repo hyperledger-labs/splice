@@ -7,8 +7,10 @@ module Splice.ExternalPartyAmuletRules where
 import DA.Assert
 import DA.Exception
 import DA.Foldable (forA_)
+import qualified DA.List
 import DA.Optional
 import qualified DA.TextMap as TextMap
+import qualified DA.Text as T
 import DA.Time
 
 import Splice.Api.Token.MetadataV1
@@ -428,8 +430,10 @@ amulet_allocationFactoryV2_allocateImpl
   -> V2.AllocationFactory_Allocate
   -> Update V2.AllocationInstructionResult
 amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
+  let debitAmount = negate $
+        netAllocationCreditAmount arg.allocation.authorizer arg.allocation.transferLegs
   (lockedAmulet, senderChangeCids, expiresAt, meta) <-
-    amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg
+    amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg debitAmount
   allocationCid <- toInterfaceContractId <$> create AmuletAllocationV2 with
     allocation = arg.allocation
     lockedAmulet
@@ -444,8 +448,9 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
 amulet_allocationFactoryV2_allocateImplCore
   : ExternalPartyAmuletRules
   -> V2.AllocationFactory_Allocate
+  -> Decimal
   -> Update (Optional (ContractId LockedAmulet), [ContractId V1.Holding], Time, Metadata)
-amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg = do
+amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg fundingAmount = do
   let dso = externalAmuletRules.dso
   let (V2.AllocationFactory_Allocate with allocation, requestedAt, inputHoldingCids, extraArgs, actors) = arg
 
@@ -496,15 +501,30 @@ amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg = do
   assertDeadlineExceeded "requestedAt" requestedAt
 
   -- create locked amulet if required
-  let amount = netAllocationCreditAmount (basicAccount authorizer) arg.allocation.transferLegs
-  if amount >= 0.0
+  if fundingAmount <= 0.0
   then do
-    require "No holding cids are expected for net positive credit amount" (null inputHoldingCids)
+    require "Must not provide holding cids for allocations that do not require funding" (null inputHoldingCids)
     return (None, [], expiresAt, emptyMetadata)
   else do
-    require "At least one input holding must be provided when net amount is negative" (not (null inputHoldingCids))
+    require "At least one input holding must be provided for allocations that require funding" (not (null inputHoldingCids))
     -- lock the funds
-    let twoStepTransfer = AmuletAllocationV2.debitAllocationToTwoStepTransfer authorizer arg.allocation.transferLegs dso expiresAt arg.allocation.settlement
+    let twoStepTransfer = TwoStepTransfer with
+          dso
+          sender = authorizer
+          -- Note: we use a single leg to the authorizer to get the right locking behavior as part of preparing the two-step transfer
+          -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
+          receiver = authorizer
+          amount = fundingAmount
+          provider = DA.List.head settlement.executors
+          -- We accept the limitation that only a single executor will receiver featured app markers,
+          -- as featured app markers will be removed anyways with CIP-104.
+          transferBefore = expiresAt
+          transferBeforeDeadline = "allocation.expiresAt"
+          allowFeaturing = True
+          lockContext = T.implode
+            -- We don't show more context to avoid bloating the response here.
+            ["allocation for settlement of ", settlement.settlementRef.id]
+            -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
     (la, cids, meta) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map downcast inputHoldingCids) paymentContext
     return (Some la, cids, expiresAt, meta)
 
@@ -519,7 +539,9 @@ amulet_allocationFactoryV1_allocateImpl externalAmuletRules _self arg = do
   let dso = externalAmuletRules.dso
   requireExpectedAdminMatch arg.expectedAdmin dso
 
-  -- call V2 body
+  -- call V2 body with explicitly computed funding amount, which matters
+  -- as V2 uses net amounts and V1 uses gross amounts, which are different for self-transfers
+  let fundingAmount = arg.allocation.transferLeg.amount
   let argV2 = V2.AllocationFactory_Allocate with
         allocation = upcast arg.allocation
         requestedAt = arg.requestedAt
@@ -528,7 +550,7 @@ amulet_allocationFactoryV1_allocateImpl externalAmuletRules _self arg = do
         extraArgs = arg.extraArgs
   -- TODO(#4665): use `expiresAt` below and enforce max lock duration and add early expiry to V1 allocation
   (optLockedAmulet, senderChangeCids, _expiresAt, meta) <-
-    amulet_allocationFactoryV2_allocateImplCore externalAmuletRules argV2
+    amulet_allocationFactoryV2_allocateImplCore externalAmuletRules argV2 fundingAmount
 
   -- create the amulet allocation
   let lockedAmulet = fromSomeNote "unexpected: no locked amulet created" optLockedAmulet
