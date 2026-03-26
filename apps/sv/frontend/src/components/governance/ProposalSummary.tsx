@@ -137,11 +137,7 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
         {formType === 'revoke-validator-license' && (
           <>
             <ProposalField id="revokeValidator" title="Validator" value={props.validator} />
-            <ProposalField
-              id="revokeValidatorReason"
-              title="Reason"
-              value={props.reason}
-            />
+            <ProposalField id="revokeValidatorReason" title="Reason" value={props.reason} />
           </>
         )}
 

@@ -187,10 +187,8 @@ export const RevokeValidatorLicenseForm: React.FC = _ => {
             <form.AppField
               name="validator"
               validators={{
-                onBlur: ({ value }) =>
-                  !value ? 'Please select a validator' : false,
-                onChange: ({ value }) =>
-                  !value ? 'Please select a validator' : false,
+                onBlur: ({ value }) => (!value ? 'Please select a validator' : false),
+                onChange: ({ value }) => (!value ? 'Please select a validator' : false),
               }}
             >
               {field => (
@@ -205,18 +203,11 @@ export const RevokeValidatorLicenseForm: React.FC = _ => {
             <form.AppField
               name="reason"
               validators={{
-                onBlur: ({ value }) =>
-                  !value ? 'Please provide a reason' : false,
-                onChange: ({ value }) =>
-                  !value ? 'Please provide a reason' : false,
+                onBlur: ({ value }) => (!value ? 'Please provide a reason' : false),
+                onChange: ({ value }) => (!value ? 'Please provide a reason' : false),
               }}
             >
-              {field => (
-                <field.TextField
-                  title="Reason"
-                  id="revoke-validator-license-reason"
-                />
-              )}
+              {field => <field.TextField title="Reason" id="revoke-validator-license-reason" />}
             </form.AppField>
           </>
         )}
