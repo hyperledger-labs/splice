@@ -121,13 +121,12 @@ interface AllocationFactory where
       inputHoldingCids : [ContractId Holding]
         -- ^ The holdings matching the instrument of the legs that SHOULD be used to fund the allocation.
         --
-        -- MAY be empty for registries that do not represent their holdings on-ledger; or
-        -- for registries that support automatic selection of holdings for allocations.
+        -- MUST be non-empty for allocations that require funding. For such allocations,
+        -- implementations MUST consume all holdings as part of creating the allocation.
+        -- Thereby enabling the authorizer wallet to use contention on these holdings
+        -- to prevent duplicate allocations with attached funding.
         --
-        -- If specified, then the successful allocation MUST archive all of these holdings, so
-        -- that the execution of the allocation conflicts with any other allocations
-        -- using these holdings. Thereby allowing that the sender can use
-        -- deliberate contention on holdings to prevent duplicate allocations.
+        -- MUST be empty for allocations that are net positive.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
       actors : [Party]

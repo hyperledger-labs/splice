@@ -42,6 +42,7 @@ import Splice.Api.Token.AllocationRequestV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
+import Splice.TokenStandard.Utils (netAllocationCreditAmount)
 
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
 import Splice.Testing.UtilsV2 qualified as V2
@@ -170,7 +171,10 @@ acceptAllocationRequestV2 registries tradingAccount actor req = do
           settlement = req.settlement
           transferLegs = legs
     registry <- V2.getRegistryFor' registries instrumentId
-    inputHoldingCids <- listUnlockedHoldingCidsFor tradingAccount actor instrumentId
+    inputHoldingCids <-
+      if netAllocationCreditAmount tradingAccount legs > 0.0
+        then pure []
+        else listUnlockedHoldingCidsFor tradingAccount actor instrumentId
     now <- getTime
     V2.getAllocationFactory registry V2.AllocationFactory_Allocate with
       allocation
