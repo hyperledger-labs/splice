@@ -30,7 +30,6 @@ import org.lfdecentralizedtrust.splice.store.{
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
-import java.time.Instant
 
 class UpdateHistoryBulkStorage(
     val storageConfig: ScanStorageConfig,
@@ -210,43 +209,28 @@ class UpdateHistoryBulkStorage(
       nextPageTokenO: Option[String],
   )(implicit tc: TraceContext): Future[UpdateHistoryObjectsResponse] = {
 
-    def getStartAndEndTimestampsForFolder(
-        folder: String
-    ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
-      // Folder format is "{startTimestamp}-Migration-{migrationId}-{endTimestamp}/", e.g. "2015-10-20T00:00:00Z-Migration-1-2015-10-21T00:00:00Z/"
-      val parts = folder.stripSuffix("/").split("-Migration-")
-      if (parts.length != 2) {
-        Left(
-          s"Cannot parse folder name: $folder (wrong number of parts after splitting by '-Migration-': ${parts.length})"
-        )
-      } else {
-        val folderStartStr = parts(0)
-        val parts2 = parts(1).split("-", 2)
-        if (parts2.length != 2) {
-          Left(
-            s"Cannot parse folder name: $folder (wrong number of parts when splitting ${parts(1)}: ${parts2.length})"
-          )
-        } else {
-          val folderEndStr = parts2(1)
-          for {
-            folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
-            folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
-          } yield {
-            (folderStart, folderEnd)
-          }
-        }
-      }
-    }
-
     def isFolderInRange(folder: String): Boolean = {
-      // Overlap check: folder range (folderStart, folderEnd] overlaps with query range (afterRecordTime, atOrBeforeRecordTime]
-      getStartAndEndTimestampsForFolder(folder) match {
+      storageConfig.getStartAndEndTimestampsForFolder(folder) match {
         case Left(err) =>
           // TODO: throw an exception? For now, just log and skip the folder, since this should not happen and we don't want to fail the whole request because of a single malformed folder.
           logger.warn(s"Skipping folder $folder due to parsing error: $err")
           false
         case Right((folderStart, folderEnd)) =>
           folderStart < atOrBeforeRecordTime && folderEnd > afterRecordTime
+      }
+    }
+
+    def isFolderFullyDumped(folder: String, lastSegmentEnd: CantonTimestamp): Boolean = {
+      storageConfig.getStartAndEndTimestampsForFolder(folder) match {
+        case Left(err) =>
+          // This should not happen, since it should have failed in isFolderInRange already.
+          throw io.grpc.Status.INTERNAL
+            .withDescription(
+              s"Cannot parse folder name $folder, error: $err"
+            )
+            .asRuntimeException()
+        case Right((folderStart, folderEnd)) =>
+            folderEnd <= lastSegmentEnd
       }
     }
 
@@ -263,9 +247,16 @@ class UpdateHistoryBulkStorage(
       HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
 
-    // FIXME: also only before the record time stored in the DB
-    def folderFilter(folder: String): Boolean =
-      isFolderInRange(folder) && paginationFilter(folder)
+    def getFolderFilter: Future[String => Boolean] = {
+      kvProvider.getLatestUpdatesSegmentInBulkStorage().value.map {
+        case None =>
+          _ => false
+        case Some(segment) =>
+          folder =>  {
+            isFolderInRange(folder) && paginationFilter(folder) && isFolderFullyDumped(folder, segment.toTimestamp.timestamp)
+          }
+      }
+    }
 
     // TODO(#3429): handle the case where the user asked for an end timestamp that is later than what we have in storage.
     // ATM, we still return the last folder as a "next page token" in that case, and in the next page, we return an empty result.
@@ -276,7 +267,7 @@ class UpdateHistoryBulkStorage(
       //   - the end time in the last folder we listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
       objKeys.lastOption.flatMap(lastObjKey => {
         val lastFolder = lastObjKey.substring(0, lastObjKey.lastIndexOf('/') + 1)
-        getStartAndEndTimestampsForFolder(lastFolder) match {
+        storageConfig.getStartAndEndTimestampsForFolder(lastFolder) match {
           case Left(err) =>
             // This should not happen, since we should have successfully parsed the folder when listing its objects
             throw io.grpc.Status.INTERNAL
@@ -317,6 +308,7 @@ class UpdateHistoryBulkStorage(
     }
 
     for {
+      folderFilter <- getFolderFilter
       nextFolders <- s3Connection.listFolders(folderFilter, limit)
       objKeys <- getFolderUpdateObjectsUpToLimit(nextFolders)
       _ = logger.debug(

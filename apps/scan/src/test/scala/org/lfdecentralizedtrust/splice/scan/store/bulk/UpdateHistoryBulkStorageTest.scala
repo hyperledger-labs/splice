@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import cats.data.OptionT
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
@@ -302,6 +303,27 @@ class UpdateHistoryBulkStorageTest
 
     "list objects correctly" in {
       val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
+      val mockKvProvider = mock[ScanKeyValueProvider]
+      when(
+        mockKvProvider.getLatestUpdatesSegmentInBulkStorage()
+      ).thenReturn(
+        OptionT(
+          Future.successful(
+            Some(
+              UpdatesSegment(
+                TimestampWithMigrationId(
+                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
+                  1L,
+                ),
+                TimestampWithMigrationId(
+                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-24T00:00:00Z")),
+                  1L,
+                ),
+              )
+            )
+          )
+        )
+      )
       val svc = new UpdateHistoryBulkStorage(
         bulkStorageTestConfig,
         appConfig,
@@ -322,6 +344,8 @@ class UpdateHistoryBulkStorageTest
         "2015-10-22T00:00:00Z-Migration-1-2015-10-23T00:00:00Z/updates_1.zstd",
         "2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/updates_0.zstd",
         "2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/updates_1.zstd",
+        "2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/updates_0.zstd",
+        "2015-10-24T00:00:00Z-Migration-1-2015-10-25T00:00:00Z/updates_1.zstd",
       )
       Future
         .sequence(allObjs.map {
@@ -338,7 +362,7 @@ class UpdateHistoryBulkStorageTest
           None,
         )
         .futureValue
-      res1.objects.map(_.key) should contain theSameElementsInOrderAs allObjs
+      res1.objects.map(_.key) should contain theSameElementsInOrderAs allObjs.slice(0, 9)
       res1.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/")
 
       // A smaller range within the data
