@@ -266,7 +266,6 @@ class RollForwardLsuIntegrationTest
       eventually(3.minutes) {
         sv1ScanBackend.participantClient.topology.lsu.announcement
           .list(Some(decentralizedSynchronizerId)) should have size (1)
-        println("topology")
       }
     }
     val allSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
