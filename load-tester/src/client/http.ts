@@ -3,6 +3,7 @@
 import { sleep } from 'k6';
 import http, { RefinedParams, RefinedResponse, ResponseType } from 'k6/http';
 
+
 type ResponseHandler = {
   then: <T>(handleResponse: (n: RefinedResponse<'text'>) => T) => T;
 };
@@ -42,7 +43,7 @@ export class HttpClient {
 
   private _raw_request<R extends ResponseType>(
     url: string,
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     body: http.RequestBody | null,
     params: RequestParams<R>,
   ): RefinedResponse<'text'> {
@@ -67,7 +68,7 @@ export class HttpClient {
   // base HTTP request with simple error handling
   private _request<R extends ResponseType>(
     url: string,
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     body: http.RequestBody | null,
     expectedStatus: 200 | 201 | 302,
     params: RequestParams<R>,
@@ -192,6 +193,16 @@ export class HttpClient {
       params: RequestParams<R>,
     ): ResponseHandler => {
       return this._request(url, 'POST', body, 201, params);
+    },
+  };
+
+  public delete = {
+    success: <R extends ResponseType>(
+      url: string,
+      body: http.RequestBody | null,
+      params: RequestParams<R>,
+    ): ResponseHandler => {
+      return this._request(url, 'DELETE', body, 200, params);
     },
   };
 }

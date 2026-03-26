@@ -3,9 +3,12 @@
 import BigNumber from 'bignumber.js';
 import { Counter, Trend } from 'k6/metrics';
 
+
+
 import { syncRetryUndefined } from '../../utils';
 import { GetBalanceResponse } from './models';
 import { ValidatorClient } from './validator';
+
 
 const createOfferLatency = new Trend('create_offer_latency', true);
 const offerSyncLatency = new Trend('offer_sync_latency', true);
@@ -16,8 +19,16 @@ const transfersFailed = new Counter('transfers_failed');
 
 export function doIfOnboarded(validatorClient: ValidatorClient, action: () => void): void {
   const userStatus = validatorClient.v0.wallet.userStatus();
-  if (userStatus?.user_onboarded && userStatus?.user_wallet_installed) {
-    action();
+  if (userStatus === undefined) {
+    return;
+  } else if (userStatus.user_onboarded && userStatus.user_wallet_installed) {
+    if (!userStatus.has_featured_app_right && validatorClient.featured === true) {
+      validatorClient.v0.wallet.selfGrantFeatureAppRight();
+    } else if (userStatus.has_featured_app_right && validatorClient.featured === false) {
+      validatorClient.v0.wallet.cancelFeaturedAppRights();
+    } else {
+      action();
+    }
   } else {
     validatorClient.v0.register();
   }
