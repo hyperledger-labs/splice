@@ -30,6 +30,8 @@ interface AllocationRequest where
   allocationRequest_rejectExtraObservers : AllocationRequest_Reject -> [Party]
   allocationRequest_withdrawExtraObservers : AllocationRequest_Withdraw -> [Party]
 
+  -- TODO(#4659): add `AllocationRequest_Accept` choice to enable UTXO-based dedup when creating net positivie allocations
+
   nonconsuming choice AllocationRequest_Reject : AllocationRequest_RejectResult
     -- ^ Reject an allocation request to signal that no allocation will be created for it.
     --
@@ -79,6 +81,7 @@ interface AllocationRequest where
 
 -- | View of an `AllocationRequest`.
 data AllocationRequestView = AllocationRequestView with
+    -- TODO(#4659): switch to single authorizer to enable using `AllocationRequest_Accept` for UTXO-based dedup when creating net positivie allocations
     authorizers : [Account]
       -- ^ Accounts that are asked to create allocations for this request.
       --
