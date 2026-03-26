@@ -51,6 +51,7 @@ import CreateUnallocatedUnclaimedActivityRecord from './actions/CreateUnallocate
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
+import RevokeValidatorLicense from './actions/RevokeValidatorLicense';
 import SetAmuletRulesConfig from './actions/SetAmuletRulesConfig';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
 import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
@@ -128,6 +129,7 @@ export const CreateVoteRequest: React.FC = () => {
       name: 'Create Unclaimed Activity Record',
       value: 'SRARC_CreateUnallocatedUnclaimedActivityRecord',
     },
+    { name: 'Revoke Validator License', value: 'VLRARC_WithdrawValidatorLicense' },
   ];
 
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
@@ -396,6 +398,9 @@ export const CreateVoteRequest: React.FC = () => {
               setIsValidAmount={setIsValidAmount}
               summary={summary}
             />
+          )}
+          {actionName === 'VLRARC_WithdrawValidatorLicense' && (
+            <RevokeValidatorLicense chooseAction={chooseAction} />
           )}
           <Typography variant="h5">Proposal</Typography>
 

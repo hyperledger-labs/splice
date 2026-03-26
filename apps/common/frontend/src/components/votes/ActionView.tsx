@@ -345,6 +345,34 @@ export const ActionView: React.FC<{
         );
       }
     }
+  } else if (action.tag === 'ARC_ValidatorLicense') {
+    const vlAction = action.value.validatorLicenseAction;
+    switch (vlAction.tag) {
+      case 'VLRARC_WithdrawValidatorLicense': {
+        return (
+          <>
+            <ActionValueTable
+              actionType={actionType}
+              actionName={vlAction.tag}
+              valuesMap={{
+                'Validator License': (
+                  <PartyId
+                    id="vlrarc_withdrawvalidatorlicense-cid"
+                    partyId={action.value.validatorLicenseCid}
+                  />
+                ),
+                Reason: (
+                  <Typography id="vlrarc_withdrawvalidatorlicense-reason">
+                    {vlAction.value.reason}
+                  </Typography>
+                ),
+              }}
+            />
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
+          </>
+        );
+      }
+    }
   }
   return <p>Not yet implemented for this action</p>;
 };
