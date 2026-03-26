@@ -400,7 +400,8 @@ class LocalSynchronizerNode(
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
   def onboardLocalSequencerIfRequired(
-      svConnection: => Future[SvConnection]
+      svConnection: => Future[SvConnection],
+      preInit: () => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PhysicalSynchronizerId] =
     retryProvider
       .getValueWithRetries(
@@ -413,7 +414,8 @@ class LocalSynchronizerNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_, _)) =>
           logger.info("Onboarding sequencer")
-          svConnection.flatMap(onboardLocalSequencer(_))
+          svConnection
+            .flatMap(svConnection => preInit().flatMap(_ => onboardLocalSequencer(svConnection)))
         case Right(NodeStatus.Success(s)) =>
           logger.info("Sequencer is already onboarded")
           Future.successful(s.synchronizerId)
