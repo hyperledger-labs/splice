@@ -64,7 +64,11 @@ object DarResourcesUtil {
       .flatMap(pkg => pkgIdToDarResource.get(pkg))
   }
 
-  private val supportedPackageVersions: Seq[DarResource] =
+  def getMinimalSupportedPackageVersions: Seq[DarResource] = packageResources.flatMap(pkg =>
+    pkg.all.filter(p => p.metadata.version == pkg.minimumInitialization.metadata.version)
+  )
+
+  val supportedPackageVersions: Seq[DarResource] =
     packageResources.flatMap(pkg =>
       pkg.all.filter(p => p.metadata.version >= pkg.minimumInitialization.metadata.version)
     )
