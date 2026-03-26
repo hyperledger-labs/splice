@@ -1,3 +1,4 @@
+org.lfdecentralizedtrust.splice.integration.tests.CopyVotesTimeBasedIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.DisabledWalletTimeBasedIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ExternallySignedTxsTimeBasedIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.FollowAmuletConversionRateFeedTimeBasedIntegrationTest
