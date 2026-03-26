@@ -571,7 +571,7 @@ class DbScanAppRewardsStore(
     */
   private[store] def computeRewardTotals(
       roundNumber: Long,
-      issuancePerFeaturedAppTrafficMB: BigDecimal,
+      issuancePerFeaturedAppTraffic_CCperMB: BigDecimal,
       threshold_CC: BigDecimal,
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
