@@ -28,7 +28,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "bignumber.js": "^9.1.1",
+    "bignumber.js": "^10.0.1",
     "zod": "^4.3.6"
   }
 }
