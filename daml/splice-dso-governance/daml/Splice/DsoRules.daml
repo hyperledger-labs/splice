@@ -72,6 +72,9 @@ data ActionRequiringConfirmation
   | ARC_AnsEntryContext with
       ansEntryContextCid : ContractId AnsEntryContext
       ansEntryContextAction : AnsEntryContext_ActionRequiringConfirmation
+  | ARC_ValidatorLicense with
+      validatorLicenseCid : ContractId ValidatorLicense
+      validatorLicenseAction : ValidatorLicense_ActionRequiringConfirmation
   | ExtActionRequiringConformation with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
@@ -123,6 +126,11 @@ data AnsEntryContext_ActionRequiringConfirmation
     -- ^ Automated action to collect initial payment of an ans entry.
   | ANSRARC_RejectEntryInitialPayment AnsEntryContext_RejectEntryInitialPayment
     -- ^ Automated action to reject initial payment of an ans entry.
+  deriving (Eq, Show)
+
+data ValidatorLicense_ActionRequiringConfirmation
+  = VLRARC_WithdrawValidatorLicense ValidatorLicense_Withdraw
+    -- ^ Voted action to revoke a validator's license.
   deriving (Eq, Show)
 
 -- | Information about SVs relevant to DSO governance.
@@ -1711,6 +1719,10 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
       ANSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
+  ARC_ValidatorLicense with .. -> do
+    void $ fetchChecked (ForDso with dso) validatorLicenseCid
+    case validatorLicenseAction of
+      VLRARC_WithdrawValidatorLicense choiceArg -> void $ exercise validatorLicenseCid choiceArg
   ExtActionRequiringConformation _dummyUnitField -> pure ()
 
 -- | __Deprecated__ in favor of delegateless automation.
@@ -1761,6 +1773,7 @@ actionRequiringConfirmationEffectiveAt action =
         CRARC_MiningRound_StartIssuing _ -> None
     ARC_DsoRules with .. -> None
     ARC_AnsEntryContext with .. -> None
+    ARC_ValidatorLicense with .. -> None
     ExtActionRequiringConformation _dummyUnitField ->
       error "Encountered unexpected ExtActionRequiringConformation at runtime"
 
