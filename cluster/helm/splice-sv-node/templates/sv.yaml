@@ -204,7 +204,7 @@ spec:
               value: |
                 canton.sv-apps.sv.local-synchronizer-nodes.{{ $syncName }} {
                   sequencer {
-                    {{- if $sync.enableBftSequencer }}
+                    {{- if (index $sync "enableBftSequencer") }}
                     is-bft-sequencer = true
                     {{- end }}
                     admin-api {
