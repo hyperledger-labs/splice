@@ -265,15 +265,14 @@ class UpdateHistoryBulkStorage(
     def getNextPageToken(
         objKeys: Seq[String],
         storageCaughtUpTo: Option[UpdatesSegment],
-    ): Future[Option[String]] = {
+    ): Option[String] = {
       /* We return a next page token when:
          - we found some objects to return (i.e. objKeys is non-empty), and the end time in the last folder we
            listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
          - or -
-         - we found no objects to return, but the requested end time is past the dumped data, so we want to signal the user to try again later
+         - we found no objects to return, but the requested end time is later than the latest dumped data, so we want to signal the user to try again later
        */
       objKeys.lastOption.fold(
-        // FIXME: there's actually a race here because we're reading this value multiple times, and it might move in between. We should read it only once!
         storageCaughtUpTo match {
           case None => nextPageTokenO
           case Some(segment) =>
@@ -296,9 +295,9 @@ class UpdateHistoryBulkStorage(
               .asRuntimeException()
           case Right((_, folderEnd)) =>
             if (folderEnd < atOrBeforeRecordTime) {
-              Future.successful(Some(lastFolder))
+              Some(lastFolder)
             } else {
-              Future.successful(None)
+              None
             }
         }
       })
@@ -339,7 +338,7 @@ class UpdateHistoryBulkStorage(
       nextFolders <- s3Connection.listFolders(folderFilter(storageCaughtUpTo), limit)
       objKeys <- getFolderUpdateObjectsUpToLimit(nextFolders)
       objectsWithChecksums <- s3Connection.getChecksums(objKeys)
-      nextPageTokenO <- getNextPageToken(objKeys, storageCaughtUpTo)
+      nextPageTokenO = getNextPageToken(objKeys, storageCaughtUpTo)
     } yield {
       UpdateHistoryObjectsResponse(
         objectsWithChecksums,
