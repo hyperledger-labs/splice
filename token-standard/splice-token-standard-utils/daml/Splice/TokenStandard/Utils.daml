@@ -79,15 +79,18 @@ module Splice.TokenStandard.Utils (
   allocationRequestV1_rejectDefaultImpl,
   allocationRequestV1_withdrawDefaultImpl,
 
-  -- ** V2 choice observers
+  -- ** V2 defaults
+  allocationRequestV2_acceptDefaultExtraObservers,
   allocationRequestV2_rejectDefaultExtraObservers,
   allocationRequestV2_withdrawDefaultExtraObservers,
+
+  allocationRequestV2_acceptDefaultImpl,
 
   -- ** V2 for dual version templates
   allocationRequestV2_rejectDefaultImplUsingV1,
   allocationRequestV2_withdrawDefaultImplUsingV1,
 
-  -- ** V2 only templates
+  -- ** V2 for V2-only templates
   allocationRequestV2_rejectDefaultImplV2Only,
   allocationRequestV2_withdrawDefaultImplV2Only,
   -- TODO(#4517): ensure these functions are tested

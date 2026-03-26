@@ -147,19 +147,19 @@ listRequestedAllocationsForAdmin admin tradingAccount actor = do
           transferLegs
   pure amuletAllocs
 
-listAllocationRequestsV2 : V2.Account -> Party -> Script [V2.AllocationRequestView]
+listAllocationRequestsV2 : V2.Account -> Party -> Script [(ContractId V2.AllocationRequest, V2.AllocationRequestView)]
 listAllocationRequestsV2 tradingAccount actor = do
   reqs <- queryInterface @V2.AllocationRequest actor
-  return [ reqView | (_, Some reqView) <- reqs, tradingAccount `elem` reqView.authorizers ]
+  return [ (reqCid, reqView) | (reqCid, Some reqView) <- reqs, tradingAccount == reqView.authorizer ]
 
 splitLegsByInstrumentId : [V2.TransferLeg] -> Map.Map V2.InstrumentId [V2.TransferLeg]
 splitLegsByInstrumentId legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentId, [leg])) legs
 
 -- | Accept the allocation request by authorizing the transfer of all its requested legs.
 acceptAllocationRequestV2
-  :  V2.MultiRegistry -> V2.Account -> Party -> V2.AllocationRequestView -> Script ()
-acceptAllocationRequestV2 registries tradingAccount actor req = do
-  unless (tradingAccount `elem` req.authorizers) $
+  :  V2.MultiRegistry -> V2.Account -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script ()
+acceptAllocationRequestV2 registries tradingAccount actor (reqCid, req) = do
+  unless (tradingAccount == req.authorizer) $
     fail $ "Trading account " <> show tradingAccount <> " is not an authorizer for this allocation request."
   let relevantLegs = filterLegsForAccount tradingAccount req.transferLegs
   -- TODO(#4542): move away from splitting by instrument id, as we want to allocate across instrumens from the same admin
@@ -183,10 +183,16 @@ acceptAllocationRequestV2 registries tradingAccount actor req = do
       extraArgs = V2.emptyExtraArgs
       actors = [actor]
 
-  -- Create all the allocations in a single transaction.
-  V2.submitWithDisclosures' actor (foldMap (.disclosures) choices) $ do
-    forA_ choices $ \ch -> do
-      exerciseCmd ch.factoryCid ch.arg
+  -- Create all the allocations in a single transaction together with accepting the allocation request
+  -- to ensure deduplication via the requests' consumption.
+  V2.submitWithDisclosures' actor (foldMap (.disclosures) choices) $
+    ( exerciseCmd reqCid V2.AllocationRequest_Accept with
+        actors = [actor]
+        extraArgs = V2.emptyExtraArgs
+    ) *>
+    forA_ choices (\ch -> do exerciseCmd ch.factoryCid ch.arg)
+
+  pure ()
 
 
 filterLegsForAccount : V2.Account -> [V2.TransferLeg] -> [V2.TransferLeg]
