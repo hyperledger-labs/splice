@@ -34,6 +34,11 @@ export interface UnclaimedActivityRecordProposal {
   mintBefore: string;
 }
 
+export interface RevokeValidatorLicenseProposal {
+  validatorLicenseCid: string;
+  reason: string;
+}
+
 /**
  * A config change represents a field that has been changed in a config.
  * This could be DSO or Amulet Configs.
@@ -83,6 +88,7 @@ export type Proposal =
   | UnfeatureAppProposal
   | UpdateSvRewardWeightProposal
   | UnclaimedActivityRecordProposal
+  | RevokeValidatorLicenseProposal
   | AmuletRulesConfigProposal
   | DsoRulesConfigProposal
   | undefined;
@@ -93,6 +99,7 @@ export type ProposalActionMap = {
   SRARC_RevokeFeaturedAppRight: UnfeatureAppProposal;
   SRARC_UpdateSvRewardWeight: UpdateSvRewardWeightProposal;
   SRARC_CreateUnallocatedUnclaimedActivityRecord: UnclaimedActivityRecordProposal;
+  VLRARC_WithdrawValidatorLicense: RevokeValidatorLicenseProposal;
   CRARC_SetConfig: AmuletRulesConfigProposal;
   SRARC_SetConfig: DsoRulesConfigProposal;
   // If no proposal type is defined, can use unknown or a specific type:
@@ -133,7 +140,8 @@ export type SupportedActionTag =
   | 'SRARC_RevokeFeaturedAppRight'
   | 'SRARC_SetConfig'
   | 'SRARC_UpdateSvRewardWeight'
-  | 'SRARC_CreateUnallocatedUnclaimedActivityRecord';
+  | 'SRARC_CreateUnallocatedUnclaimedActivityRecord'
+  | 'VLRARC_WithdrawValidatorLicense';
 
 export type ProposalListingStatus =
   | 'Accepted'

@@ -8,6 +8,7 @@ import type {
   DsoRules_SetConfig,
   DsoRulesConfig,
   SvInfo,
+  ValidatorLicense_ActionRequiringConfirmation,
   Vote,
   VoteRequest,
   VoteRequestOutcome,
@@ -28,6 +29,7 @@ import type {
   PendingConfigFieldInfo,
   Proposal,
   ProposalListingStatus,
+  RevokeValidatorLicenseProposal,
   SupportedActionTag,
   UnclaimedActivityRecordProposal,
   UnfeatureAppProposal,
@@ -49,6 +51,7 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_CreateUnallocatedUnclaimedActivityRecord: 'Create Unclaimed Activity Record',
   SRARC_SetConfig: 'Set Dso Rules Configuration',
   SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
+  VLRARC_WithdrawValidatorLicense: 'Revoke Validator License',
 });
 
 export const createProposalActions: {
@@ -65,6 +68,7 @@ export const createProposalActions: {
   },
   { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
   { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
+  { name: 'Revoke Validator License', value: 'VLRARC_WithdrawValidatorLicense' },
 ];
 
 export const getVoteResultStatus = (
@@ -149,6 +153,15 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
           amuletAction.value.newConfig
         );
     }
+  } else if (action.tag === 'ARC_ValidatorLicense') {
+    const vlAction = action.value.validatorLicenseAction;
+    switch (vlAction.tag) {
+      case 'VLRARC_WithdrawValidatorLicense':
+        return createRevokeValidatorLicenseProposal(
+          action.value.validatorLicenseCid,
+          vlAction.value.reason
+        );
+    }
   }
 }
 
@@ -192,6 +205,16 @@ function createUnallocatedUnclaimedActivityRecordProposal(
   };
 }
 
+function createRevokeValidatorLicenseProposal(
+  validatorLicenseCid: string,
+  reason: string
+): RevokeValidatorLicenseProposal {
+  return {
+    validatorLicenseCid,
+    reason,
+  };
+}
+
 function createAmuletRulesConfigProposal(
   baseConfig: AmuletConfig<'USD'>,
   newConfig: AmuletConfig<'USD'>
@@ -216,7 +239,11 @@ function createDsoRulesConfigProposal(
 
 export function getActionValue(
   a: ActionRequiringConfirmation
-): DsoRules_ActionRequiringConfirmation | AmuletRules_ActionRequiringConfirmation | undefined {
+):
+  | DsoRules_ActionRequiringConfirmation
+  | AmuletRules_ActionRequiringConfirmation
+  | ValidatorLicense_ActionRequiringConfirmation
+  | undefined {
   if (!a) return undefined;
 
   switch (a.tag) {
@@ -224,6 +251,8 @@ export function getActionValue(
       return a.value.amuletRulesAction;
     case 'ARC_DsoRules':
       return a.value.dsoAction;
+    case 'ARC_ValidatorLicense':
+      return a.value.validatorLicenseAction;
     default:
       return undefined;
   }
