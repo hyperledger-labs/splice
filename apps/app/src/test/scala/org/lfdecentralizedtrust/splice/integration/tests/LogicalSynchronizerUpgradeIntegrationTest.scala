@@ -32,7 +32,11 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeSequencingTestTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSynchronizerUpgradeSequencingTestTrigger,
+  LogicalSynchronizerUpgradeTrigger,
+}
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
@@ -537,7 +541,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
 
       clue("sv4 upgrades") {
-        lateJoiningNode.par.foreach(_.startSync())
+        loggerFactory.suppress(
+          SuppressionRule.forLogger[LogicalSynchronizerUpgradeTrigger] && SuppressionRule.Level(
+            org.slf4j.event.Level.WARN
+          )
+        ) {
+          lateJoiningNode.par.foreach(_.startSync())
+        }
         clue("Validator also connects to the sv-4 sequencer") {
           eventually(60.seconds) {
             val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
