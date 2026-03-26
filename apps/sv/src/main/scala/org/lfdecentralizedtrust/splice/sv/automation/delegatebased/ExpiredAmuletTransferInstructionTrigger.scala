@@ -13,7 +13,7 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredAmuletTransferInstructionTrigger.*
 import com.digitalasset.canton.util.MonadUtil
-import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 
@@ -62,10 +62,10 @@ class ExpiredAmuletTransferInstructionTrigger(
     }.toSet + store.key.dsoParty
 
     for {
-      packageSupport <- svTaskContext.packageVersionSupport.isPackageSupported(
-        Seq(PackageIdResolver.Package.SpliceAmulet -> allParties.toSeq),
-        clock.now,
-        DarResources.amulet_current.metadata,
+      packageSupport <- svTaskContext.packageVersionSupport.supports24hSubmissionDelay(
+        // amulet transfer instruction expiry was added in the same release as 24h submission delay
+        allParties.toSeq,
+        clock.now
       )
       res <-
         if (!packageSupport.supported) {
