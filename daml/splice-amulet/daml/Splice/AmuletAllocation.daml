@@ -32,7 +32,7 @@ data AmuletAllocation_DsoExpireResult = AmuletAllocation_DsoExpireResult
     meta : Metadata
   deriving (Show, Eq)
 
--- | V1 amulet allocation, which was crated using an V1 allocation factory and
+-- | V1 amulet allocation, which was created using a V1 allocation factory and
 -- can be settled on its own using `V1.Allocation_ExecuteTransfer` or by
 -- providing it as an input to a batch settlement executed using
 -- `V2.SettlementFactory_SettleBatch`.
@@ -40,7 +40,7 @@ template AmuletAllocation
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
     allocation : V1.AllocationSpecification
-    -- FIXME: add early expiry to V1 allocation
+    -- TODO(#4665): enforce max lock duration and add early expiry to V1 allocation
   where
     signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
     observer allocation.settlement.executor

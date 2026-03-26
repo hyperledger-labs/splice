@@ -470,8 +470,8 @@ amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg = do
       assertWithinDeadline "Allocation.settlement.settlementDeadline" d
 
   let
-    -- FIXME: configurable with 90 days default
-    latestExpiresAt = requestedAt `addRelTime` days 30
+    -- TODO(#4665): make max duration configurable; and also implement for transfer instructions
+    latestExpiresAt = requestedAt `addRelTime` days 90
     expiresAt = optional latestExpiresAt (min latestExpiresAt) allocation.settlement.settlementDeadline
   require "Allocation.settlement.settleAt <= Allocation.expiresAt"
     (settlement.settleAt <= expiresAt)
@@ -526,7 +526,8 @@ amulet_allocationFactoryV1_allocateImpl externalAmuletRules _self arg = do
         inputHoldingCids = map upcast arg.inputHoldingCids
         actors = [arg.allocation.transferLeg.sender]
         extraArgs = arg.extraArgs
-  (optLockedAmulet, senderChangeCids, expiresAt, meta) <-
+  -- TODO(#4665): use `expiresAt` below and enforce max lock duration and add early expiry to V1 allocation
+  (optLockedAmulet, senderChangeCids, _expiresAt, meta) <-
     amulet_allocationFactoryV2_allocateImplCore externalAmuletRules argV2
 
   -- create the amulet allocation
@@ -540,7 +541,8 @@ amulet_allocationFactoryV1_allocateImpl externalAmuletRules _self arg = do
     meta
 
 
--- FIXME: move to TokenApiUtils
+-- Utilities
+------------
+
 requireExpectedAdminMatch : Party -> Party -> Update ()
 requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
-
