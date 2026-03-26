@@ -580,7 +580,7 @@ class DbScanAppRewardsStore(
       (sql"""with computed as (
                select history_id, round_number, app_provider_party_seq_num,
                       (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
-                        * $issuancePerFeaturedAppTrafficMB as reward_amount
+                        * $issuancePerFeaturedAppTraffic_CCperMB as reward_amount
                from #${Tables.appActivityPartyTotals}
                where history_id = $historyId and round_number = $roundNumber
              ),
@@ -589,7 +589,7 @@ class DbScanAppRewardsStore(
                  (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
                select history_id, round_number, app_provider_party_seq_num, reward_amount
                from computed
-               where reward_amount >= $threshold
+               where reward_amount >= $threshold_CC
                returning total_app_reward_amount
              )
              insert into #${Tables.appRewardRoundTotals}
@@ -599,7 +599,7 @@ class DbScanAppRewardsStore(
              select $historyId, $roundNumber,
                coalesce(sum(total_app_reward_amount), 0),
                coalesce((select sum(reward_amount) from computed
-                         where reward_amount < $threshold), 0),
+                         where reward_amount < $threshold_CC), 0),
                0,
                count(*)
              from inserted_parties""").asUpdate
