@@ -104,31 +104,37 @@ accountParties account = case account.provider of
   Some provider | provider /= account.owner -> [account.owner, provider]
   _ -> [account.owner]
 
+providerKey : Text -> Text
+providerKey field = v2Namespace <> field <> ".provider"
+
+idKey : Text -> Text
+idKey field = v2Namespace <> field <> ".id"
+
 accountToMeta : Text -> HoldingV2.Account -> Metadata -> Metadata
 accountToMeta field account meta =
   Metadata $
-  insertOptional (v2Namespace <> field <> ".provider") (partyToText <$> account.provider) $
-  insertOptional (v2Namespace <> field <> ".id") account.id $
+  insertOptional (providerKey field) (partyToText <$> account.provider) $
+  insertOptional (idKey field) account.id $
   meta.values
 
 accountFromMeta : Party -> Text -> Metadata -> HoldingV2.Account
 accountFromMeta owner field meta =
   HoldingV2.Account with
-    provider = (TextMap.lookup (v2Namespace <> field <> ".provider") meta.values) >>= partyFromText
-    id = TextMap.lookup (v2Namespace <> field <> ".id") meta.values
+    provider = (TextMap.lookup (providerKey field) meta.values) >>= partyFromText
+    id = TextMap.lookup (idKey field) meta.values
     owner
 
 dropAccountMeta : Text -> Metadata -> Metadata
 dropAccountMeta fieldName meta =
   Metadata $
-  TextMap.delete (v2Namespace <> fieldName <> ".provider") $
-  TextMap.delete (v2Namespace <> fieldName <> ".id") $
+  TextMap.delete (providerKey fieldName) $
+  TextMap.delete (idKey fieldName) $
   meta.values
 
 ensureNoAccountMeta : Text -> Text -> Metadata -> Update ()
 ensureNoAccountMeta path fieldName meta = do
-    check (v2Namespace <> fieldName <> ".provider")
-    check (v2Namespace <> fieldName <> ".id")
+    check (providerKey fieldName)
+    check (idKey fieldName)
   where
     check k = case TextMap.lookup k meta.values of
       None -> pure ()
@@ -141,8 +147,8 @@ ensureBasicAccount fieldName account = do
 
 validateNoAccountMeta : Text -> Metadata -> Bool
 validateNoAccountMeta fieldName meta =
-    validateNoMeta (fieldName <> ".provider") meta &&
-    validateNoMeta (fieldName <> ".id") meta
+    validateNoMeta (providerKey fieldName) meta &&
+    validateNoMeta (idKey fieldName) meta
 
 validateNoMeta : Text -> Metadata -> Bool
 validateNoMeta fieldName meta = isNone $ TextMap.lookup (v2Namespace <> fieldName) meta.values
