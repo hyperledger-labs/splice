@@ -194,6 +194,41 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v1/domains/{domain_id}/parties/{party_id}/participant-id:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getPartyToParticipantV1"
+      description: |
+        Get the IDs of the participants hosting a given party.
+        Unlike /v0, this endpoint supports parties hosted on multiple participants.
+      parameters:
+        - name: "domain_id"
+          description: |
+            The synchronizer ID to look up a mapping for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "party_id"
+          description: |
+            The party ID to lookup a participant ID for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetPartyToParticipantResponseV1"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/domains/{domain_id}/members/{member_id}/traffic-status:
     get:
       tags: [external, scan]
@@ -3771,6 +3806,17 @@ components:
             ID of the participant hosting the provided party, in the form
             `PAR::id::fingerprint`
           type: string
+    GetPartyToParticipantResponseV1:
+      type: object
+      required: [ "participant_ids" ]
+      properties:
+        participant_ids:
+          description: |
+            IDs of the participants hosting the provided party, each in the form
+            `PAR::id::fingerprint`
+          type: array
+          items:
+            type: string
     GetValidatorFaucetsByValidatorResponse:
       type: object
       required: [ "validatorsReceivedFaucets" ]

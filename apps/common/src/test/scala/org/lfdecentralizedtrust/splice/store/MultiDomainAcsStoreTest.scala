@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.store
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time
@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, Contrac
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv1,
@@ -149,12 +149,12 @@ abstract class MultiDomainAcsStoreTest[
         limit = HardLimit.tryCreate(expected.size.max(1)),
       )
       _ = actualList shouldBe expected_
-      _ <- expected_.parTraverse_ { c =>
+      _ <- MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(expected_) { c =>
         store
           .lookupContractById(AppRewardCoupon.COMPANION)(c.contract.contractId)
           .map(_ shouldBe Some(c))
       }
-      _ <- expected_.parTraverse_ { c =>
+      _ <- MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(expected_) { c =>
         store
           .lookupContractStateById(c.contract.contractId)
           .map(_ shouldBe Some(c.state))

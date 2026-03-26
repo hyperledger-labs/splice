@@ -69,6 +69,7 @@ class AcsSnapshotBulkStorageTest
     bulkDbReadChunkSize = 1000,
     bulkZstdFrameSize = 10000L,
     bulkMaxFileSize = 50000L,
+    zstdCompressionLevel = 3,
   )
   val appConfig = BulkStorageConfig(
     snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)

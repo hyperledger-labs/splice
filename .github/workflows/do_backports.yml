@@ -1,0 +1,19 @@
+
+# On merging a PR, automatically backport it to other branches as requested in a comment on that PR
+
+name: Auto-backport PRs to release branches
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        required: true
+        type: number
+  # pull_request:
+  #   types: [closed]
+
+jobs:
+  dummy:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dummy step
+        run: echo 'Hello, world!'

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.*
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
   HttpClientConfig,
@@ -41,9 +42,6 @@ final case class BulkStorageConfig(
     updatesPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     // The maximum parallelization for uploading multiple parts of the same object
     maxParallelPartUploads: Int = 4,
-    // zstd compression level
-    // TODO(#3429): remove from here, and move to ScanStorageConfig, this must not be configured per-SV. We put it here for now to experiment with the impact of different compression levels.
-    zstdCompressionLevel: Int = 3,
     s3: Option[S3Config] = None,
 )
 
@@ -79,6 +77,7 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    publicUrl: Option[Uri] = None,
     // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
     // TODO(#4249): use on-ledger synchronization for switching record times
     externalTransactionHashThresholdTime: Option[Instant] =

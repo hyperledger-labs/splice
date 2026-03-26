@@ -8,6 +8,11 @@ export const BucketRateLimitSchema = z.object({
   fillInterval: z.string(),
 });
 
+const BucketMatchedRateLimitSchema = BucketRateLimitSchema.extend({
+  type: z.literal('limited'),
+  clientIp: z.boolean(),
+});
+
 export const BannedSchema = z.object({
   type: z.literal('banned'),
 });
@@ -16,8 +21,8 @@ export const UnlimitedSchema = z.object({
   type: z.literal('unlimited'),
 });
 
-export const RateLimitConfigSchema = z.union([
-  BucketRateLimitSchema,
+export const RateLimitConfigSchema = z.discriminatedUnion('type', [
+  BucketMatchedRateLimitSchema,
   BannedSchema,
   UnlimitedSchema,
 ]);
@@ -26,21 +31,12 @@ export type ExternalRateLimit = z.infer<typeof RateLimitSchema>;
 
 export const RateLimitSchema = z.object({
   globalLimits: BucketRateLimitSchema,
-  rateLimits: z.array(
-    z.object({
-      actions: z.array(
-        z.union([
-          z.object({
-            name: z.string(),
-            pathPrefix: z.string(),
-          }),
-          z.object({
-            name: z.string(),
-            clientIp: z.boolean(),
-          }),
-        ])
-      ),
-      limits: RateLimitConfigSchema,
-    })
+  rateLimits: z.object({}).catchall(
+    z.intersection(
+      z.object({
+        name: z.string(),
+      }),
+      RateLimitConfigSchema
+    )
   ),
 });

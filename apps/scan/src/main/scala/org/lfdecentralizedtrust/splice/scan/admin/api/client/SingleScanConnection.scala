@@ -57,7 +57,7 @@ import org.lfdecentralizedtrust.tokenstandard.{
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -324,6 +324,16 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListDsoSequencers(),
+    )
+  }
+
+  override def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[ParticipantId]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId),
     )
   }
 

@@ -82,6 +82,8 @@ import scala.util.{Try, Using}
 import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   AbortTransferInstruction,
@@ -108,6 +110,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
@@ -145,6 +148,7 @@ class HttpScanHandler(
     initialRound: String,
     externalTransactionHashThresholdTime: Option[Instant] = None,
     updateHistoryMaxPageSize: Int,
+    publicUrl: Option[Uri],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -2373,6 +2377,48 @@ class HttpScanHandler(
     }
   }
 
+  override def getPartyToParticipantV1(
+      respond: ScanResource.GetPartyToParticipantV1Response.type
+  )(
+      synchronizerId: String,
+      partyId: String,
+  )(extracted: TraceContext): Future[ScanResource.GetPartyToParticipantV1Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getPartyToParticipantV1") { _ => _ =>
+      for {
+        domain <- SynchronizerId.fromString(synchronizerId) match {
+          case Right(domain) => Future.successful(domain)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode synchronizer ID: $error")
+            )
+        }
+        party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
+            )
+        }
+        response <- sequencerAdminConnection.getPartyToParticipant(
+          domain,
+          party,
+          topologyTransactionType = AuthorizedState,
+          topologySnapshot =
+            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+        )
+        _ <-
+          if (response.mapping.partyId == party) Future.unit
+          else
+            Future.failed(
+              HttpErrorHandler.notFound(s"Party not found: $party")
+            )
+      } yield definitions.GetPartyToParticipantResponseV1(
+        response.mapping.participantIds.map(_.toProtoPrimitive).toVector
+      )
+    }
+  }
+
   override def getValidatorFaucetsByValidator(
       respond: ScanResource.GetValidatorFaucetsByValidatorResponse.type
   )(validators: Vector[String])(
@@ -2485,21 +2531,29 @@ class HttpScanHandler(
             .asRuntimeException()
         )
       )(acsSnapshotBulkStorage =>
-        acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
-          case AcsSnapshotObjects(ts, objects) =>
-            ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
-              definitions.ListBulkAcsSnapshotObjectsResponse(
-                Codec.encode(ts),
-                objects.map { case ObjectKeyAndChecksum(key, digest) =>
-                  definitions.BulkStorageObjectRef(
-                    // TODO(#3429): for now we return just the key, but this should be mapped to a full url in scan
-                    key,
-                    digest,
-                  )
-                }.toVector,
+        publicUrl.fold(
+          Future.failed[ScanResource.ListBulkAcsSnapshotObjectsResponse](
+            Status.UNIMPLEMENTED
+              .withDescription("Public URL is not configured")
+              .asRuntimeException()
+          )
+        )(publicUrl =>
+          acsSnapshotBulkStorage.getAcsSnapshotAtOrBefore(recordTimeTs).map {
+            case AcsSnapshotObjects(ts, objects) =>
+              ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
+                definitions.ListBulkAcsSnapshotObjectsResponse(
+                  Codec.encode(ts),
+                  objects.map { case ObjectKeyAndChecksum(key, digest) =>
+                    val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
+                    definitions.BulkStorageObjectRef(
+                      s"$publicUrl/api/scan/v0/history/bulk/download/$encodedKey",
+                      digest,
+                    )
+                  }.toVector,
+                )
               )
-            )
-        }
+          }
+        )
       )
     }
   }

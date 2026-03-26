@@ -3,7 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -109,8 +110,8 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
         if (tasks.nonEmpty) {
           logger.info(s"Reconciling tasks: $tasks")
         }
-        tasks
-          .parTraverse(task =>
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(10))(tasks)(task =>
             withSpan("reconcile_task") { implicit tc => _ =>
               reconciler.reconcileTask(task)
             }
