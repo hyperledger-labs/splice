@@ -448,7 +448,6 @@ class UpdateHistoryBulkStorageTest
 
       // Test handling an empty segment: Simulate no updates in 2015-10-25 to 2015-10-26
       val moreObjs = Seq(
-
         "2015-10-25T00:00:00Z-Migration-1-2015-10-26T00:00:00Z/ACS_0.zstd",
         "2015-10-26T00:00:00Z-Migration-1-2015-10-27T00:00:00Z/updates_0.zstd",
         "2015-10-26T00:00:00Z-Migration-1-2015-10-27T00:00:00Z/updates_1.zstd",
