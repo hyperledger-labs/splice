@@ -52,7 +52,6 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
-  DbScanRewardsReferenceStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -340,7 +339,7 @@ class ScanApp(
       )
       rewardsReferenceStoreO =
         if (config.enableAppActivityRecordAndTrafficIngestion) {
-          val rewardsStore = new DbScanRewardsReferenceStore(
+          val rewardsStore = ScanRewardsReferenceStore(
             key = ScanRewardsReferenceStore.Key(
               dsoParty = dsoParty,
               synchronizerId = synchronizerId,
