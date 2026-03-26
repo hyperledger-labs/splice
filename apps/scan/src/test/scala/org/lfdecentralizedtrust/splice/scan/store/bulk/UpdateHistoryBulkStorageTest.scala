@@ -307,7 +307,7 @@ class UpdateHistoryBulkStorageTest
       when(
         mockKvProvider.getLatestUpdatesSegmentInBulkStorage()
       ).thenReturn(
-        OptionT(
+        OptionT[Future, UpdatesSegment](
           Future.successful(
             Some(
               UpdatesSegment(
