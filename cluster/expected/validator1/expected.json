@@ -480,7 +480,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "3"
+            "activeMigrationId": "2"
           },
           "splitwell": true
         },
