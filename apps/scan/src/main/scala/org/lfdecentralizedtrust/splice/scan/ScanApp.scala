@@ -41,7 +41,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
 }
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanSynchronizerConfig}
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,

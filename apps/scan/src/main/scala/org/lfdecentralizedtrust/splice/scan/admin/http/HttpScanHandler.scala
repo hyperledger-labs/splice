@@ -29,6 +29,7 @@ import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet, ans as ansCodegen}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -93,6 +94,10 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 }
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.{
+  AcsSnapshotObjects,
+  ObjectKeyAndChecksum,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
@@ -115,6 +120,8 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 import java.io.ByteArrayInputStream
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
@@ -2424,13 +2431,17 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
         }
-        response <- sequencerAdminConnection.getPartyToParticipant(
-          domain,
-          party,
-          topologyTransactionType = AuthorizedState,
-          topologySnapshot =
-            TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
-        )
+        response <- synchronizerNodeService
+          .sequencerAdminConnection()
+          .flatMap(
+            _.getPartyToParticipant(
+              domain,
+              party,
+              topologyTransactionType = AuthorizedState,
+              topologySnapshot =
+                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+            )
+          )
         _ <-
           if (response.mapping.partyId == party) Future.unit
           else

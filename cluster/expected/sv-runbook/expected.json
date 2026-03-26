@@ -229,7 +229,7 @@
           "synchronizer": {
             "active": {
               "chainIdSuffix": "4",
-              "migrationId": 3
+              "migrationId": 2
             }
           }
         },
@@ -571,14 +571,14 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": 2,
+          "migrating": false
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -592,7 +592,6 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -600,6 +599,19 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
+        },
+        "synchronizers": {
+          "current": {
+            "mediator": "global-domain-3-mediator",
+            "sequencer": "global-domain-3-sequencer"
+          },
+          "successor": {
+            "bftSequencerConfig": {
+              "p2pUrl": "https://sequencer-p2p-4.sv.mock.global.canton.network.digitalasset.com"
+            },
+            "mediator": "global-domain-4-mediator",
+            "sequencer": "global-domain-4-sequencer"
+          }
         },
         "tolerations": [
           {
@@ -763,6 +775,10 @@
           "name": "acs",
           "tokensPerFill": 5,
           "type": "limited"
+        },
+        "/api/scan/v0/active-synchronizer-serial": {
+          "name": "activeSynchronizerSerial",
+          "type": "unlimited"
         },
         "/api/scan/v0/activities": {
           "name": "activities",
@@ -1066,7 +1082,7 @@
           },
           {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
-            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+            "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -1135,26 +1151,9 @@
           "audience": "https://sv.example.com/api",
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
-        "cometBFT": {
-          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-          "enabled": true
-        },
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
-        "domain": {
-          "enableBftSequencer": false,
-          "mediatorAddress": "global-domain-3-mediator",
-          "sequencerAddress": "global-domain-3-sequencer",
-          "sequencerAvailabilityDelay": "60 seconds",
-          "sequencerPruningConfig": {
-            "enabled": true,
-            "pruningInterval": "1 hour",
-            "retentionPeriod": "30 days"
-          },
-          "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com",
-          "skipInitialization": true
-        },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
@@ -1175,11 +1174,12 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": 2,
+          "migrating": false
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "permissionedSynchronizer": false,
         "persistence": {
           "postgresName": "apps-pg",
@@ -1209,6 +1209,34 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
+        },
+        "synchronizers": {
+          "current": {
+            "cometBftConfig": {
+              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+              "enabled": true
+            },
+            "mediatorAddress": "global-domain-3-mediator",
+            "sequencerAddress": "global-domain-3-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com"
+          },
+          "skipInitialization": true,
+          "successor": {
+            "enableBftSequencer": true,
+            "mediatorAddress": "global-domain-4-mediator",
+            "sequencerAddress": "global-domain-4-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-4.sv.mock.global.canton.network.digitalasset.com"
+          }
         },
         "tolerations": [
           {
@@ -1522,10 +1550,10 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

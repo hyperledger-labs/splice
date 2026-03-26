@@ -20,7 +20,6 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanCacheConfig,
   ScanSynchronizerConfig,
   ScanSynchronizerNodesConfig,
-  SequencerTrafficIngestionConfig,
   CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{

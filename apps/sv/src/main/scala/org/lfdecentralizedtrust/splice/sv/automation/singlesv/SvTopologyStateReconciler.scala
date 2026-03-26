@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
+import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
@@ -104,7 +105,7 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
     for {
       noDsoRules <- store.lookupDsoRules().map(_.isEmpty)
       // required to prevent bogus topology transactions from being created during LSUs
-      connectedSyncs <- participantAdminConnection.parTraverse(_.listConnectedDomains())
+      connectedSyncs <- participantAdminConnection.traverse(_.listConnectedDomains())
     } yield noDsoRules || connectedSyncs.exists(_.isEmpty)
 
   }
