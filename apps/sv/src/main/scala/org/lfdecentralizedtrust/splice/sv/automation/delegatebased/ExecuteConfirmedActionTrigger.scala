@@ -24,7 +24,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AmuletRules,
   ARC_AnsEntryContext,
   ARC_DsoRules,
+  ARC_ValidatorLicense,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicense_actionrequiringconfirmation.VLRARC_WithdrawValidatorLicense
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
@@ -282,6 +285,19 @@ class ExecuteConfirmedActionTrigger(
           case action =>
             throw new UnsupportedOperationException(
               show"ANS entry context $action is not yet supported"
+            )
+        }
+      case arcValidatorLicense: ARC_ValidatorLicense =>
+        arcValidatorLicense.validatorLicenseAction match {
+          case _: VLRARC_WithdrawValidatorLicense =>
+            store.multiDomainAcsStore
+              .lookupContractById(ValidatorLicense.COMPANION)(
+                arcValidatorLicense.validatorLicenseCid
+              )
+              .map(_.isEmpty)
+          case action =>
+            throw new UnsupportedOperationException(
+              show"ValidatorLicense $action is not yet supported"
             )
         }
       case _ =>
