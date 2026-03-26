@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AmuletRules,
   ARC_AnsEntryContext,
   ARC_DsoRules,
+  ARC_ValidatorLicense,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -296,6 +297,8 @@ object ScanTables extends AcsTables {
           arcAmuletRules.amuletRulesAction.getClass.getSimpleName
         case arcAnsEntryContext: ARC_AnsEntryContext =>
           arcAnsEntryContext.ansEntryContextAction.getClass.getSimpleName
+        case arcValidatorLicense: ARC_ValidatorLicense =>
+          arcValidatorLicense.validatorLicenseAction.getClass.getSimpleName
         case _ => ""
       }
     }

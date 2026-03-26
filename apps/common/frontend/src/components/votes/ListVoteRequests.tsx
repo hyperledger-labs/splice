@@ -56,6 +56,9 @@ export function getAction(action: ActionRequiringConfirmation): string {
   } else if (action.tag === 'ARC_AmuletRules') {
     const amuletRulesAction = action.value.amuletRulesAction;
     return `${amuletRulesAction.tag}`;
+  } else if (action.tag === 'ARC_ValidatorLicense') {
+    const vlAction = action.value.validatorLicenseAction;
+    return `${vlAction.tag}`;
   } else {
     return 'Action tag not defined.';
   }

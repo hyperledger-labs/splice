@@ -34,6 +34,8 @@ function getAction(action: ActionRequiringConfirmation): string {
       return action.value.amuletRulesAction.tag;
     case 'ARC_DsoRules':
       return action.value.dsoAction.tag;
+    case 'ARC_ValidatorLicense':
+      return action.value.validatorLicenseAction.tag;
     default:
       return 'Action tag not defined.';
   }

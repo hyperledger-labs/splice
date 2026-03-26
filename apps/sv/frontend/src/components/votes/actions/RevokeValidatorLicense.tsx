@@ -33,7 +33,7 @@ const RevokeValidatorLicense: React.FC<{
 
   function updateAction(validatorParty: string, withdrawReason: string) {
     const license = licenses.find(l => l.payload.validator === validatorParty);
-    if (!license) return;
+    if (!license || !withdrawReason) return;
 
     chooseAction({
       tag: 'ARC_ValidatorLicense',
