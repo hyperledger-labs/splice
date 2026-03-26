@@ -249,7 +249,9 @@ class UpdateHistoryBulkStorage(
     )
 
     def getFolderFilter: Future[String => Boolean] = {
-      kvProvider.getLatestUpdatesSegmentInBulkStorage().value.map {
+      val k = kvProvider.getLatestUpdatesSegmentInBulkStorage()
+      println(k)
+      k.value.map {
         case None =>
           _ => false
         case Some(segment) =>

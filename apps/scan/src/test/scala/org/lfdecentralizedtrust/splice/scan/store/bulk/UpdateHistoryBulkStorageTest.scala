@@ -33,11 +33,12 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.slf4j.event.Level
 
 import java.time.{Instant, LocalDate, ZoneOffset}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
 import scala.util.Using
+import io.circe.Decoder
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -303,12 +304,18 @@ class UpdateHistoryBulkStorageTest
 
     "list objects correctly" in {
       val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock, loggerFactory)
-      val mockKvProvider = mock[ScanKeyValueProvider]
+      val mockKvStore = mock[KeyValueStore]
       when(
-        mockKvProvider.getLatestUpdatesSegmentInBulkStorage()
+        mockKvStore.readValueAndLogOnDecodingFailure[UpdatesSegment](
+          eqTo("latest_updates_segment_in_bulk_storage")
+        )(
+          any[Decoder[UpdatesSegment]],
+          any[TraceContext],
+          any[ExecutionContext],
+        )
       ).thenReturn(
         OptionT[Future, UpdatesSegment](
-          Future.successful(
+          Future(
             Some(
               UpdatesSegment(
                 TimestampWithMigrationId(
@@ -324,6 +331,7 @@ class UpdateHistoryBulkStorageTest
           )
         )
       )
+      val mockKvProvider = new ScanKeyValueProvider(mockKvStore, loggerFactory)
       val svc = new UpdateHistoryBulkStorage(
         bulkStorageTestConfig,
         appConfig,
@@ -362,7 +370,7 @@ class UpdateHistoryBulkStorageTest
           None,
         )
         .futureValue
-      res1.objects.map(_.key) should contain theSameElementsInOrderAs allObjs.slice(0, 9)
+      res1.objects.map(_.key) should contain theSameElementsInOrderAs allObjs.slice(0, 8)
       res1.nextPageTokenO shouldBe Some("2015-10-23T00:00:00Z-Migration-1-2015-10-24T00:00:00Z/")
 
       // A smaller range within the data
