@@ -762,18 +762,9 @@ object BftScanConnection {
           BftScanConnection.TextFailureResponse(unexpected.statusCode, unexpected.content)
         )
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpJsonResponse) =>
-        Unmarshal(unexpected.entity)
-          .to[ByteString]
-          .flatMap(s =>
-            io.circe.jawn.parseByteBuffer(s.asByteBuffer) match {
-              case Right(value) =>
-                Future.successful(
-                  BftScanConnection.HttpFailureResponse(unexpected.statusCode, value)
-                )
-              case Left(failure) =>
-                Future.successful(BftScanConnection.ExceptionFailureResponse(failure))
-            }
-          )
+        Future.successful(
+          BftScanConnection.HttpFailureResponse(unexpected.statusCode, unexpected.content)
+        )
       case Failure(unexpected: HttpCommandException) =>
         Future.successful(
           BftScanConnection.HttpFailureResponse(
