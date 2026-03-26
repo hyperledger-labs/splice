@@ -109,16 +109,25 @@ class DomainConnector(
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
-            .single(
-              GrpcSequencerConnection
-                .create(url)
-                .fold(
-                  error =>
-                    throw Status.INVALID_ARGUMENT
-                      .withDescription(s"Invalid synchronizer url $url: $error")
-                      .asRuntimeException(),
-                  identity,
-                )
+            .tryMany(
+              connections = Seq(
+                GrpcSequencerConnection
+                  .create(url)
+                  .fold(
+                    error =>
+                      throw Status.INVALID_ARGUMENT
+                        .withDescription(s"Invalid synchronizer url $url: $error")
+                        .asRuntimeException(),
+                    identity,
+                  )
+              ),
+              sequencerTrustThreshold = PositiveInt.one,
+              sequencerLivenessMargin = NonNegativeInt.zero,
+              submissionRequestAmplification = SubmissionRequestAmplification(
+                PositiveInt.one,
+                config.sequencerRequestAmplificationPatience.toInternal,
+              ),
+              sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays.toInternal,
             )
         ).pure[Future]
     }

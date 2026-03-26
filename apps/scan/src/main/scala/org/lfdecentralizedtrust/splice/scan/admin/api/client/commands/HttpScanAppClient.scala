@@ -41,6 +41,7 @@ import org.lfdecentralizedtrust.tokenstandard.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
+  ListBulkAcsSnapshotObjectsResponse,
   GetDateOfFirstSnapshotAfterResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
 }
@@ -810,6 +811,31 @@ object HttpScanAppClient {
         for {
           participantId <- Codec.decode(Codec.Participant)(response.participantId)
         } yield participantId
+    }
+  }
+
+  case class GetPartyToParticipantV1(synchronizerId: SynchronizerId, partyId: PartyId)
+      extends ExternalBaseCommand[
+        http.GetPartyToParticipantV1Response,
+        Seq[ParticipantId],
+      ] {
+
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetPartyToParticipantV1Response] =
+      client.getPartyToParticipantV1(
+        synchronizerId.toProtoPrimitive,
+        partyId.toProtoPrimitive,
+        headers,
+      )
+
+    override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetPartyToParticipantV1Response.OK(response) =>
+        response.participantIds.traverse(Codec.decode(Codec.Participant)(_))
     }
   }
 
@@ -2485,6 +2511,37 @@ object HttpScanAppClient {
           ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
         )
         .leftMap(_.toString)
+    }
+  }
+
+  case class GetBulkAcsSnapshot(
+      atOrBeforeTimestamp: CantonTimestamp
+  ) extends InternalBaseCommand[
+        http.ListBulkAcsSnapshotObjectsResponse,
+        definitions.ListBulkAcsSnapshotObjectsResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkAcsSnapshotObjectsResponse] =
+      client.listBulkAcsSnapshotObjects(
+        atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[ListBulkAcsSnapshotObjectsResponse, Either[
+      String,
+      definitions.ListBulkAcsSnapshotObjectsResponse,
+    ]] = {
+      case http.ListBulkAcsSnapshotObjectsResponse.OK(response) =>
+        Right(response)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotFound(err) =>
+        Left(err.error)
+      case http.ListBulkAcsSnapshotObjectsResponse.NotImplemented(err) =>
+        Left(err.error)
+
     }
   }
 

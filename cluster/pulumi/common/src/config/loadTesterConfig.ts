@@ -24,7 +24,7 @@ export const LoadTesterConfigSchema = z.object({
       minRate: z.number().default(0.9),
       iterationsPerMinute: z.number().default(60),
       maxVUs: z.number().optional(),
-      adaptiveScenario: LoadTesterAdaptiveScenarioConfigSchema.default({}),
+      adaptiveScenario: LoadTesterAdaptiveScenarioConfigSchema.prefault({}),
       resources: K8sResourceSchema.optional(),
     })
     .optional(),

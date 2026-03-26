@@ -222,7 +222,7 @@ function addDefaultDenyRule(
 
 // Extract un-banned path prefixes and build optimized regex
 function allowedPathsCondition(scanExternalRateLimits: PerEndpointLimits, pathPrefix: string) {
-  if (scanExternalRateLimits.rateLimits && scanExternalRateLimits.rateLimits.length > 0) {
+  if (scanExternalRateLimits.rateLimits && !_.isEmpty(scanExternalRateLimits.rateLimits)) {
     const pathPrefixes = extractPathPrefixes(scanExternalRateLimits.rateLimits)
       .filter(p => !p.isBanned)
       .map(p => p.pathPrefix);

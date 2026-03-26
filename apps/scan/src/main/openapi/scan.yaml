@@ -15,6 +15,9 @@ tags:
   - name: scan
     description: |
       The internal and external endpoints.
+  - name: pre-alpha
+    description: |
+      Still under active development, highly unstable. Do not use in production.
 servers:
   - url: https://example.com/api/scan
 paths:
@@ -205,6 +208,41 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetPartyToParticipantResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v1/domains/{domain_id}/parties/{party_id}/participant-id:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getPartyToParticipantV1"
+      description: |
+        Get the IDs of the participants hosting a given party.
+        Unlike /v0, this endpoint supports parties hosted on multiple participants.
+      parameters:
+        - name: "domain_id"
+          description: |
+            The synchronizer ID to look up a mapping for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "party_id"
+          description: |
+            The party ID to lookup a participant ID for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetPartyToParticipantResponseV1"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -1636,6 +1674,32 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/history/bulk/acs:
+    get:
+      tags: [ pre-alpha, scan ]
+      x-jvm-package: scan
+      operationId: "listBulkAcsSnapshotObjects"
+      description: |
+        **Under Development, do not use in production yet** Get download URLs and metadata for an ACS snapshot available for bulk download, at or before a certain record time.
+      parameters:
+        - name: "at_or_before_record_time"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListBulkAcsSnapshotObjectsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -2417,6 +2481,11 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
+        external_transaction_hash:
+          description: |
+            For transaction externally signed, contains the external transaction hash
+            signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          type: string
     UpdateHistoryTransactionV2:
       type: object
       required:
@@ -2475,6 +2544,11 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
+        external_transaction_hash:
+          description: |
+            For transaction externally signed, contains the external transaction hash
+            signed by the external party. Can be used to correlate an external submission with a committed transaction.
+          type: string
     TreeEvent:
       type: object
       description: |
@@ -3659,6 +3733,17 @@ components:
             ID of the participant hosting the provided party, in the form
             `PAR::id::fingerprint`
           type: string
+    GetPartyToParticipantResponseV1:
+      type: object
+      required: [ "participant_ids" ]
+      properties:
+        participant_ids:
+          description: |
+            IDs of the participants hosting the provided party, each in the form
+            `PAR::id::fingerprint`
+          type: array
+          items:
+            type: string
     GetValidatorFaucetsByValidatorResponse:
       type: object
       required: [ "validatorsReceivedFaucets" ]
@@ -3762,8 +3847,9 @@ components:
         If an event pertains to a transaction that is partially private, it may also bear verdict information for the private portions.
         When both fields are present, the transaction and verdict have the same `update_id` and `record_time`.
 
-        **Experimental**: for networks where the SVs enable it
-        a traffic summary is present when a verdict is present.
+        **Experimental**: for networks where the SVs enable activity record
+        computation, a traffic summary and app activity record are present when
+        a verdict is present.
 
         This support is experimental while the preview phase of CIP-104 is running.
       properties:
@@ -3779,6 +3865,11 @@ components:
 
             This is our current best guess for how the summaries are served, but there remains a chance that the API needs to be adjusted.
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
+          nullable: true
+        app_activity_records:
+          description: |
+            **EXPERIMENTAL**: This property is experimental and subject to change. Data may be incomplete or missing.
+          $ref: "#/components/schemas/EventHistoryAppActivityRecords"
           nullable: true
     EventHistoryVerdict:
       type: object
@@ -3938,6 +4029,43 @@ components:
           items:
             type: integer
             format: int32
+    EventHistoryAppActivityRecords:
+      type: object
+      description: |
+        App activity record computed from verdicts and traffic summaries
+        as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
+      required:
+        - round_number
+        - records
+      properties:
+        round_number:
+          description: |
+            The round number assigned to the activity records.
+          type: integer
+          format: int64
+        records:
+          description: |
+            App activity records, one per app provider.
+          type: array
+          items:
+            $ref: "#/components/schemas/AppActivityRecord"
+    AppActivityRecord:
+      type: object
+      description: |
+        ActivityRecord for an app.
+      required:
+        - party
+        - weight
+      properties:
+        party:
+          description: |
+            The app provider party identifier.
+          type: string
+        weight:
+          description: |
+            Activity weight in bytes of traffic.
+          type: integer
+          format: int64
 
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
@@ -3949,3 +4077,37 @@ components:
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    ListBulkAcsSnapshotObjectsResponse:
+      type: object
+      required:
+        - record_time
+        - object_refs
+      properties:
+        record_time:
+          description: |
+            The record time for which the ACS snapshot was taken.
+          type: string
+          format: date-time
+        object_refs:
+          description: |
+            The list of references to the bulk storage objects containing the ACS snapshot data.
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkStorageObjectRef"
+
+    BulkStorageObjectRef:
+      type: object
+      required:
+        - url
+        - digest
+      properties:
+        url:
+          description: |
+            The URL from which the bulk storage object can be downloaded.
+          type: string
+        digest:
+          description: |
+            The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
+          type: string
+

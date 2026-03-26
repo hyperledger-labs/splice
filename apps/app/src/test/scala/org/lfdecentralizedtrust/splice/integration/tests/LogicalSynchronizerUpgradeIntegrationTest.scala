@@ -547,11 +547,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
           )
         ) {
           lateJoiningNode.par.foreach(_.startSync())
-        }
-        clue("Validator also connects to the sv-4 sequencer") {
-          eventually(60.seconds) {
-            val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-            participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = true)
+          clue("Validator also connects to the sv-4 sequencer") {
+            eventually(60.seconds) {
+              val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
+              participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = true)
+            }
           }
         }
       }

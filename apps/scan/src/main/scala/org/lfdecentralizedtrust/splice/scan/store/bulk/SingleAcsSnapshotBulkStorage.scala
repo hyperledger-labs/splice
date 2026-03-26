@@ -85,7 +85,7 @@ class SingleAcsSnapshotBulkStorage(
           storageConfig,
           appConfig,
           s3Connection,
-          { objIdx => s"${storageConfig.getSegmentKeyPrefix(timestamp, None)}/ACS_$objIdx.zstd" },
+          { objIdx => s"${storageConfig.getSegmentFolder(timestamp, None)}/ACS_$objIdx.zstd" },
           loggerFactory,
         )
       )

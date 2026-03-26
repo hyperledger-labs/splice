@@ -10,12 +10,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
   TransferFactory,
   TransferInstruction,
 }
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.CompactJson
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.util.TokenStandardMetadata
+import org.lfdecentralizedtrust.splice.util.{TokenStandardMetadata, UpdateHistoryTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.io.FileOutputStream
@@ -30,12 +33,27 @@ class TokenStandardCliIntegrationTest
     with TokenStandardTest
     with HasExecutionContext
     with ExternallySignedPartyTestUtil
-    with HasTempDirectory {
+    with HasTempDirectory
+    with UpdateHistoryTestUtil {
+
+  override def environmentDefinition: EnvironmentDefinition = {
+    EnvironmentDefinition
+      .simpleTopology1Sv(this.getClass.getSimpleName)
+      // Set externalTransactionHashThresholdDate to a past date so that updates include external transaction hashes
+      .addConfigTransforms((_, config) =>
+        updateAllScanAppConfigs_(
+          _.copy(externalTransactionHashThresholdTime =
+            Some(java.time.Instant.parse("2020-01-01T00:00:00Z"))
+          )
+        )(config)
+      )
+  }
 
   "Token Standard CLI" should {
 
     "execute transfers between external parties" in { implicit env =>
-      val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
+      val sv1LedgerBeginOffset = sv1Backend.participantClient.ledger_api.state.end()
+      val onboardingAlice @ OnboardingResult(alicePartyId, alicePublicKey, alicePrivateKey) =
         onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
       val (alicePublicKeyPath, alicePrivateKeyPath) =
         writeKeysToTempFile("alice", alicePublicKey, alicePrivateKey)
@@ -46,14 +64,13 @@ class TokenStandardCliIntegrationTest
         writeKeysToTempFile("bob", bobPublicKey, bobPrivateKey)
 
       aliceValidatorWalletClient.tap(5000.0)
-
       // only alice will have a transfer preapproval
       aliceValidatorBackend.participantClient.parties
         .hosted(filterParty =
           onboardingAlice.party.filterString
         ) should not be empty withClue "alice hosted"
 
-      createAndAcceptExternalPartySetupProposal(
+      val onboardingAliceExtPartySetupResult = createAndAcceptExternalPartySetupProposal(
         aliceValidatorBackend,
         onboardingAlice,
         verboseHashing = true,
@@ -74,7 +91,7 @@ class TokenStandardCliIntegrationTest
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
             RichPartyId.local(aliceValidatorBackend.getValidatorPartyId()),
-            aliceParty,
+            alicePartyId,
             BigDecimal(2000.0),
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
           )
@@ -83,7 +100,7 @@ class TokenStandardCliIntegrationTest
         "Alice (external party) has received the 2000.0 Amulet",
         _ => {
           aliceValidatorBackend
-            .getExternalPartyBalance(aliceParty)
+            .getExternalPartyBalance(alicePartyId)
             .totalUnlockedCoin shouldBe "2000.0000000000"
         },
       )
@@ -99,7 +116,7 @@ class TokenStandardCliIntegrationTest
               "--",
               "transfer",
               "-s",
-              aliceParty.toProtoPrimitive,
+              alicePartyId.toProtoPrimitive,
               "-r",
               bobParty.toProtoPrimitive,
               "--amount",
@@ -123,7 +140,7 @@ class TokenStandardCliIntegrationTest
               "--reason",
               reason,
             ),
-            aliceParty,
+            alicePartyId,
             TransferFactory.CHOICE_TransferFactory_Transfer,
           )
         },
@@ -181,11 +198,13 @@ class TokenStandardCliIntegrationTest
       )
 
       // necessary to call the balance endpoint after
-      createAndAcceptExternalPartySetupProposal(
-        aliceValidatorBackend,
-        onboardingBob,
-        verboseHashing = true,
-      )
+      val onboardingBobExtPartySetupResult =
+        createAndAcceptExternalPartySetupProposal(
+          aliceValidatorBackend,
+          onboardingBob,
+          verboseHashing = true,
+        )
+
       clue("Bob's balance has been updated") {
         eventually() {
           aliceValidatorBackend
@@ -193,8 +212,55 @@ class TokenStandardCliIntegrationTest
             .totalUnlockedCoin shouldBe "10.0000000000"
         }
       }
-    }
 
+      // We run external transaction hash tests for history updates here
+      // to minimize the impact on overall runtime of integration tests
+      clue("SV1 Scan backend has been updated") {
+        eventuallySucceeds() {
+          sv1ScanBackend.getUpdateHistory(10, None, encoding = CompactJson)
+        }
+      }
+
+      clue("SV1 scan backend should see the updates with external txn hashes") {
+        eventually() {
+          compareHistoryIncludingHashes(
+            sv1Backend.participantClient,
+            sv1ScanBackend.appState.automation.updateHistory,
+            sv1LedgerBeginOffset,
+            extTxnHashes = Seq(
+              onboardingAliceExtPartySetupResult.txHash,
+              onboardingBobExtPartySetupResult.txHash,
+            ),
+          )
+        }
+      }
+
+      clue("SV1 scan API (/vX/updates) should return the updates with external txn hashes") {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareHistoryViaLosslessScanApiWithExtTxnHashes(
+            scanClient,
+            extTxnHashes = Seq(
+              onboardingAliceExtPartySetupResult.txHash,
+              onboardingBobExtPartySetupResult.txHash,
+            ),
+          )
+        }
+      }
+
+      clue(
+        "SV1 scan API (/vX/updates/{update_id})  should return the update with external txn hash"
+      ) {
+        eventually() {
+          val scanClient = scancl("sv1ScanClient")
+          compareExtTxnHashViaScanAPIForUpdateId(
+            scanClient,
+            onboardingBobExtPartySetupResult.updateId,
+            onboardingBobExtPartySetupResult.txHash,
+          )
+        }
+      }
+    }
   }
 
   private def runCommand(

@@ -219,7 +219,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
     if (partyId === 'a-party-id::1014912492' || partyId === svPartyId) {
       return res(
         ctx.json({
-          participant_id: svPartyId,
+          participant_ids: [svPartyId],
         })
       );
     } else {

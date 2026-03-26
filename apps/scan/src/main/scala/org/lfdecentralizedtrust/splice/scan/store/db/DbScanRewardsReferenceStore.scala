@@ -33,7 +33,6 @@ class DbScanRewardsReferenceStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    synchronizerId: SynchronizerId,
     ingestionConfig: IngestionConfig,
     override val defaultLimit: Limit,
 )(implicit
@@ -50,7 +49,8 @@ class DbScanRewardsReferenceStore(
         party = key.dsoParty,
         participant = participantId,
         key = Map(
-          "dsoParty" -> key.dsoParty.toProtoPrimitive
+          "dsoParty" -> key.dsoParty.toProtoPrimitive,
+          "synchronizerId" -> key.synchronizerId.toProtoPrimitive,
         ),
       ),
       domainMigrationInfo = domainMigrationInfo,
@@ -65,8 +65,48 @@ class DbScanRewardsReferenceStore(
     with ScanRewardsReferenceStore {
 
   private val tcsStore = new DbTcsStore(
-    multiDomainAcsStore
+    multiDomainAcsStore,
+    descriptor => SynchronizerId.tryFromString(descriptor.key("synchronizerId")),
   )
+
+  override def lookupActiveOpenMiningRounds(
+      recordTimes: Seq[CantonTimestamp]
+  )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]] = {
+    tcsStore.getEarliestArchivedAt().flatMap {
+      case None =>
+        Future.successful(Map.empty)
+      case Some(ingestionStart) =>
+        val afterIngestionStartTimes = recordTimes.filter(_ >= ingestionStart)
+        if (afterIngestionStartTimes.isEmpty) Future.successful(Map.empty)
+        else {
+          val (minTime, maxTime) = afterIngestionStartTimes.foldLeft(
+            (CantonTimestamp.MaxValue, CantonTimestamp.MinValue)
+          ) { case ((lo, hi), t) => (lo.min(t), hi.max(t)) }
+          lookupOpenMiningRoundsActiveWithin(minTime, maxTime).map { activeWithinResult =>
+            afterIngestionStartTimes.flatMap { recordTime =>
+              val roundsAtTime = TcsStore.contractsActiveAsOf(activeWithinResult, recordTime)
+              val openRounds = roundsAtTime.filter { r =>
+                CantonTimestamp.assertFromInstant(r.contract.payload.opensAt) <= recordTime
+              }
+              openRounds
+                .minByOption(_.contract.payload.round.number)
+                .map { r =>
+                  recordTime -> (
+                    r.contract.payload.round.number.toLong,
+                    CantonTimestamp.assertFromInstant(r.contract.payload.opensAt)
+                  )
+                }
+            }.toMap
+          }
+        }
+    }
+  }
+
+  override def lookupFeaturedAppPartiesAsOf(
+      asOf: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Set[String]] =
+    lookupFeaturedAppRightsAsOf(asOf)
+      .map(_.map(_.contract.payload.provider).toSet)
 
   def lookupOpenMiningRoundsActiveWithin(
       lowerBoundIncl: CantonTimestamp,
@@ -80,7 +120,6 @@ class DbScanRewardsReferenceStore(
       OpenMiningRound.COMPANION,
       lowerBoundIncl,
       upperBoundIncl,
-      synchronizerId,
     )
 
   def lookupFeaturedAppRightsAsOf(
@@ -88,12 +127,12 @@ class DbScanRewardsReferenceStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    tcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf, synchronizerId)
+    tcsStore.listAllContractsAsOf(FeaturedAppRight.COMPANION, asOf)
 
   def lookupOpenMiningRoundsAsOf(
       asOf: CantonTimestamp
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    tcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf, synchronizerId)
+    tcsStore.listAllContractsAsOf(OpenMiningRound.COMPANION, asOf)
 }

@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
@@ -15,8 +16,6 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, Positi
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.util.FutureInstances.*
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
@@ -165,21 +164,29 @@ class DistributedDomainIntegrationTest
         clue(
           s"un-pause decentralized synchronizer to not crash other tests"
         ) {
-          Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
-            Future {
-              sv.unpauseDecentralizedSynchronizer()
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+              Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+            ) { sv =>
+              Future {
+                sv.unpauseDecentralizedSynchronizer()
+              }
             }
-          }.futureValue
+            .futureValue
         }
       },
     ) {
       actAndCheck(
         "SVs can pause the decentralizedSynchronizer",
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
-          Future {
-            sv.pauseDecentralizedSynchronizer()
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+          ) { sv =>
+            Future {
+              sv.pauseDecentralizedSynchronizer()
+            }
           }
-        }.futureValue,
+          .futureValue,
       )(
         "decentralizedSynchronizer is paused",
         _ =>
@@ -195,11 +202,15 @@ class DistributedDomainIntegrationTest
 
       actAndCheck(
         "SVs can unpause the decentralizedSynchronizer",
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { sv =>
-          Future {
-            sv.unpauseDecentralizedSynchronizer()
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+            Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+          ) { sv =>
+            Future {
+              sv.unpauseDecentralizedSynchronizer()
+            }
           }
-        }.futureValue,
+          .futureValue,
       )(
         "decentralizedSynchronizer is un-paused",
         _ =>

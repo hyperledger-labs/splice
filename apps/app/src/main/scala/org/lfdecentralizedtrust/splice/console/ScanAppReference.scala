@@ -327,15 +327,27 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetMemberTrafficStatus(synchronizerId, memberId))
     }
 
+  @deprecated(message = "Use getPartyToParticipant instead", since = "0.5.17")
   @Help.Summary(
-    "Get the id of the participant hosting a given party"
+    "Get the id of the participant hosting a given party (fails if multiple)"
   )
-  def getPartyToParticipant(
+  def getPartyToParticipantV0(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
   ): ParticipantId =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
+    }
+
+  @Help.Summary(
+    "Get the ids of the participants hosting a given party"
+  )
+  def getPartyToParticipant(
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+  ): Seq[ParticipantId] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetPartyToParticipantV1(synchronizerId, partyId))
     }
 
   @Help.Summary(
@@ -753,6 +765,16 @@ abstract class ScanAppReference(
       )
     }
   }
+
+  @Help.Summary("List all objects in bulk storage for an ACS snapshot")
+  def getBulkAcsSnapshot(
+      timestamp: CantonTimestamp
+  ): definitions.ListBulkAcsSnapshotObjectsResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetBulkAcsSnapshot(timestamp)
+      )
+    }
 
   @Help.Summary("Download a bulk storage object")
   def bulkStorageDownload(objectKey: String, output: OutputStream)(implicit
