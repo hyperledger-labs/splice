@@ -246,6 +246,7 @@ object BuildCommon {
             "splice-api-token-allocation-request-v2-daml/clean",
             "splice-api-token-allocation-instruction-v2-daml/clean",
             "splice-token-standard-test-v2-daml/clean",
+            "splice-token-standard-utils-daml/clean",
             "apps-frontends/clean",
             "cleanCnDars",
             "docs/clean",

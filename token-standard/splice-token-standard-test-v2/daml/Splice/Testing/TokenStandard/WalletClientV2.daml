@@ -162,7 +162,7 @@ acceptAllocationRequestV2 registries tradingAccount actor (reqCid, req) = do
   unless (tradingAccount == req.authorizer) $
     fail $ "Trading account " <> show tradingAccount <> " is not an authorizer for this allocation request."
   let relevantLegs = filterLegsForAccount tradingAccount req.transferLegs
-  -- TODO(#4542): move away from splitting by instrument id, as we want to allocate across instrumens from the same admin
+  -- TODO(#4515): move away from splitting by instrument id, as we want to allocate across instrumens from the same admin
   let legsByInstrument = splitLegsByInstrumentId relevantLegs
   -- Allocate the legs grouped by instrument.
   choices <- forA (Map.toList legsByInstrument) $ \(instrumentId, legs) -> do

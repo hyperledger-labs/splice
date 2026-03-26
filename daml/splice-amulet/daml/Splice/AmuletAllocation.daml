@@ -111,7 +111,7 @@ template AmuletAllocation
 -- Allocation usage
 -------------------
 
--- | Minimal lock context to avoid bloating the lock context.
+-- | Brief description of lock context.
 mkAllocationLockContext : V1.Reference -> Text
 mkAllocationLockContext ref = "allocation for settlement of " <> ref.id
 

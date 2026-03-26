@@ -158,7 +158,8 @@ template ExternalPartyAmuletRules
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
 
-
+-- Legacy transfer commands
+---------------------------
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with

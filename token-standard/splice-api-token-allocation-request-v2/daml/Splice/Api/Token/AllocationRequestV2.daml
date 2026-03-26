@@ -38,8 +38,8 @@ interface AllocationRequest where
     -- created before `settlement.settleAt`.
     --
     -- Wallets SHOULD call this choice in the same transaction as the creation
-    -- of the requested allocations to protect from creating the same
-    -- allocations multiple times.
+    -- of the requested allocation to protect from creating the same
+    -- allocation multiple times.
     --
     -- IMPORTANT: implementations MUST ensure that the allocation request is
     -- consumed by the body of this choice.

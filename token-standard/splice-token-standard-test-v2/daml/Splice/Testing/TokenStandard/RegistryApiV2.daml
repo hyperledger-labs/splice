@@ -62,6 +62,9 @@ class RegistryApi app where
 
 -- Multi-registry support
 -------------------------
+
+-- TODO(#4515): make use of this as part of testing settlement flows involving the registry of the private asset
+
 -- | Type alias for a map of registries, keyed by the party that administers them.
 type MultiRegistry = Map.Map Party GenericRegistry
 

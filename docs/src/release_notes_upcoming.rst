@@ -64,5 +64,3 @@
     - Token Standard V2 (CIP-112)
 
       - Add preview of the V2 token standard APIs and implement them for Amulet
-
-
