@@ -248,23 +248,24 @@ class UpdateHistoryBulkStorage(
       HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
 
-    def getFolderFilter: Future[String => Boolean] = {
-      kvProvider.getLatestUpdatesSegmentInBulkStorage().value.map {
+    def folderFilter(storageCaughtUpTo: Option[UpdatesSegment])(folder: String): Boolean = {
+      storageCaughtUpTo match {
         case None =>
-          _ => false
+          false
         case Some(segment) =>
-          folder => {
-            isFolderInRange(folder) && paginationFilter(folder) && isFolderFullyDumped(
-              folder,
-              segment.toTimestamp.timestamp,
-            )
-          }
+          isFolderInRange(folder) && paginationFilter(folder) && isFolderFullyDumped(
+            folder,
+            segment.toTimestamp.timestamp,
+          )
       }
     }
 
     // TODO(#3429): Make sure to properly document the case where the user asked for an end timestamp that is later than what we have in storage.
     // Specifically: we still return the last folder as a "next page token" in that case, and in the next page, we return an empty result.
-    def getNextPageToken(objKeys: Seq[String]): Future[Option[String]] = {
+    def getNextPageToken(
+        objKeys: Seq[String],
+        storageCaughtUpTo: Option[UpdatesSegment],
+    ): Future[Option[String]] = {
       /* We return a next page token when:
          - we found some objects to return (i.e. objKeys is non-empty), and the end time in the last folder we
            listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
@@ -273,7 +274,7 @@ class UpdateHistoryBulkStorage(
        */
       objKeys.lastOption.fold(
         // FIXME: there's actually a race here because we're reading this value multiple times, and it might move in between. We should read it only once!
-        kvProvider.getLatestUpdatesSegmentInBulkStorage().value.map {
+        storageCaughtUpTo match {
           case None => nextPageTokenO
           case Some(segment) =>
             if (segment.toTimestamp.timestamp < atOrBeforeRecordTime) {
@@ -333,11 +334,12 @@ class UpdateHistoryBulkStorage(
     }
 
     for {
-      folderFilter <- getFolderFilter
-      nextFolders <- s3Connection.listFolders(folderFilter, limit)
+      // We first read the storageCaughtUpTo value once here, and then use it for filtering folders and computing the next page token, to avoid races where the value moves in between those operations.
+      storageCaughtUpTo <- kvProvider.getLatestUpdatesSegmentInBulkStorage().value
+      nextFolders <- s3Connection.listFolders(folderFilter(storageCaughtUpTo), limit)
       objKeys <- getFolderUpdateObjectsUpToLimit(nextFolders)
       objectsWithChecksums <- s3Connection.getChecksums(objKeys)
-      nextPageTokenO <- getNextPageToken(objKeys)
+      nextPageTokenO <- getNextPageToken(objKeys, storageCaughtUpTo)
     } yield {
       UpdateHistoryObjectsResponse(
         objectsWithChecksums,
