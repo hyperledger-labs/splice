@@ -249,9 +249,7 @@ class UpdateHistoryBulkStorage(
     )
 
     def getFolderFilter: Future[String => Boolean] = {
-      val k = kvProvider.getLatestUpdatesSegmentInBulkStorage()
-      println(k)
-      k.value.map {
+      kvProvider.getLatestUpdatesSegmentInBulkStorage().value.map {
         case None =>
           _ => false
         case Some(segment) =>
@@ -264,11 +262,26 @@ class UpdateHistoryBulkStorage(
     // TODO(#3429): handle the case where the user asked for an end timestamp that is later than what we have in storage.
     // ATM, we still return the last folder as a "next page token" in that case, and in the next page, we return an empty result.
     // This might be fine if documented, and explained that the intention is "please try again later".
-    def getNextPageToken(objKeys: Seq[String]): Option[String] = {
-      // We return a next page token when:
-      //   - we found some objects to return (i.e. objKeys is non-empty), and
-      //   - the end time in the last folder we listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
-      objKeys.lastOption.flatMap(lastObjKey => {
+    def getNextPageToken(objKeys: Seq[String]): Future[Option[String]] = {
+      /* We return a next page token when:
+         - we found some objects to return (i.e. objKeys is non-empty), and the end time in the last folder we
+           listed is before the atOrBeforeRecordTime (i.e. there are more folders to list that are in range, but we stopped listing due to the limit. We then use the last folder as the next page token)
+         - or -
+         - we found no objects to return, but the requested end time is past the dumped data, so we want to signal the user to try again later
+      */
+      objKeys.lastOption.fold(
+        // FIXME: there's actually a race here because we're reading this value multiple times, and it might move in between. We should read it only once!
+        kvProvider.getLatestUpdatesSegmentInBulkStorage().value.map {
+          case None => nextPageTokenO
+          case Some(segment) => if (segment.toTimestamp.timestamp < atOrBeforeRecordTime) {
+            // We have dumped data up to a segment that ends before the requested end time, so return the current nextPageToken again, to be retried later
+            nextPageTokenO
+          } else {
+            // We have dumped data up to a segment that ends after the requested end time, so we do not return a next page token, as there is no more data to list for this request
+            None
+          }
+        }
+      )(lastObjKey => {
         val lastFolder = lastObjKey.substring(0, lastObjKey.lastIndexOf('/') + 1)
         storageConfig.getStartAndEndTimestampsForFolder(lastFolder) match {
           case Left(err) =>
@@ -279,9 +292,9 @@ class UpdateHistoryBulkStorage(
               .asRuntimeException()
           case Right((_, folderEnd)) =>
             if (folderEnd < atOrBeforeRecordTime) {
-              Some(lastFolder)
+              Future.successful(Some(lastFolder))
             } else {
-              None
+              Future.successful(None)
             }
         }
       })
@@ -298,6 +311,13 @@ class UpdateHistoryBulkStorage(
                 getUpdateObjectsInFolder(folder).map { folderObjs =>
                   if (folderObjs.size > folderLimit) {
                     // Folder would exceed the limit; omit it entirely (and stop adding more by making the limit 0)
+                    if (folderAcc.isEmpty) {
+                      throw io.grpc.Status.INVALID_ARGUMENT
+                        .withDescription(
+                          s"Limit of ${limit.limit} is too low to return any objects, even from a single folder of objects"
+                        )
+                        .asRuntimeException()
+                    }
                     (folderAcc, 0)
                   } else {
                     (folderAcc ++ folderObjs, folderLimit - folderObjs.size)
@@ -313,18 +333,8 @@ class UpdateHistoryBulkStorage(
       folderFilter <- getFolderFilter
       nextFolders <- s3Connection.listFolders(folderFilter, limit)
       objKeys <- getFolderUpdateObjectsUpToLimit(nextFolders)
-      _ = logger.debug(
-        s"Listed folders: ${nextFolders.mkString(", ")}, and objects: ${objKeys.mkString(", ")} for request with afterRecordTime=$afterRecordTime, atOrBeforeRecordTime=$atOrBeforeRecordTime, limit=${limit.limit}, nextPageTokenO=$nextPageTokenO"
-      )
-      _ = if (nextFolders.nonEmpty && objKeys.isEmpty) {
-        throw io.grpc.Status.INVALID_ARGUMENT
-          .withDescription(
-            s"Limit of ${limit.limit} is too low to return any objects, even from a single folder of objects"
-          )
-          .asRuntimeException()
-      }
       objectsWithChecksums <- s3Connection.getChecksums(objKeys)
-      nextPageTokenO = getNextPageToken(objKeys)
+      nextPageTokenO <- getNextPageToken(objKeys)
     } yield {
       UpdateHistoryObjectsResponse(
         objectsWithChecksums,
