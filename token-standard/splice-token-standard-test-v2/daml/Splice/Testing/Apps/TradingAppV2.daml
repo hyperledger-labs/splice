@@ -42,7 +42,7 @@ template OTCTradeAllocationRequest with
       view = V2.AllocationRequestView with
         settlement
         transferLegs
-        authorizers = [authorizer]
+        authorizer
         meta = emptyMetadata
 
       allocationRequest_rejectExtraObservers = allocationRequestV2_rejectDefaultExtraObservers this

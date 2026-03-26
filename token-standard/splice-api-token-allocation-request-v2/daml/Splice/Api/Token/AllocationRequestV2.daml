@@ -81,13 +81,8 @@ interface AllocationRequest where
 
 -- | View of an `AllocationRequest`.
 data AllocationRequestView = AllocationRequestView with
-    -- TODO(#4659): switch to single authorizer to enable using `AllocationRequest_Accept` for UTXO-based dedup when creating net positivie allocations
-    authorizers : [Account]
-      -- ^ Accounts that are asked to create allocations for this request.
-      --
-      -- This is used by wallets to distinguish between requests that are merely
-      -- visible to their user's parties and requests that need action by their
-      -- users.
+    authorizer : Account
+      -- ^ Account that is asked to create allocations for this request.
     settlement : SettlementInfo
       -- ^ Settlement for which allocations are requested to be created.
     transferLegs : [TransferLeg]

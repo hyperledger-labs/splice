@@ -150,7 +150,7 @@ listRequestedAllocationsForAdmin admin tradingAccount actor = do
 listAllocationRequestsV2 : V2.Account -> Party -> Script [V2.AllocationRequestView]
 listAllocationRequestsV2 tradingAccount actor = do
   reqs <- queryInterface @V2.AllocationRequest actor
-  return [ reqView | (_, Some reqView) <- reqs, tradingAccount `elem` reqView.authorizers ]
+  return [ reqView | (_, Some reqView) <- reqs, tradingAccount == reqView.authorizer ]
 
 splitLegsByInstrumentId : [V2.TransferLeg] -> Map.Map V2.InstrumentId [V2.TransferLeg]
 splitLegsByInstrumentId legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentId, [leg])) legs
@@ -159,7 +159,7 @@ splitLegsByInstrumentId legs = Map.fromListWithR (++) $ map (\leg -> (leg.instru
 acceptAllocationRequestV2
   :  V2.MultiRegistry -> V2.Account -> Party -> V2.AllocationRequestView -> Script ()
 acceptAllocationRequestV2 registries tradingAccount actor req = do
-  unless (tradingAccount `elem` req.authorizers) $
+  unless (tradingAccount == req.authorizer) $
     fail $ "Trading account " <> show tradingAccount <> " is not an authorizer for this allocation request."
   let relevantLegs = filterLegsForAccount tradingAccount req.transferLegs
   -- TODO(#4542): move away from splitting by instrument id, as we want to allocate across instrumens from the same admin
