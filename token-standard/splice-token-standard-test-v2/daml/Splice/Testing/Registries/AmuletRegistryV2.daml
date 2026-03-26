@@ -52,7 +52,6 @@ import Splice.TokenStandard.Utils (upcast)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletAllocation
 import Splice.AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
@@ -419,21 +418,15 @@ getFeaturedAppRightContext registry provider = do
 
 lookupLockedAmuletOfAllocation : AmuletRegistry -> ContractId Allocation -> Script (Optional (ContractId LockedAmulet))
 lookupLockedAmuletOfAllocation registry allocCid = do
-  -- TODO(#4552): find a better way to determine whether a contract-id points to a specific template instance
-  v2s <- query @AmuletAllocationV2 registry.dso
-  if (coerceContractId allocCid `notElem` map fst v2s)
-    then do
-      Some v1 <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
-      pure (Some v1.lockedAmulet)
-    else do
-      -- need to disclose the amulet contract, as the executors has no visibility into it
-      Some v2 <- queryContractId @AmuletAllocationV2 registry.dso (coerceContractId allocCid)
-      pure v2.lockedAmulet
+  Some allocView <- queryInterfaceContractId @Allocation registry.dso allocCid
+  case allocView.holdingCids of
+    [] -> pure None
+    [holdingCid] -> pure (Some (coerceContractId holdingCid))
+    _ -> fail $ T.unlines ["unexpected: multiple holding cids for allocation:", show allocView]
 
 getLockedAmuleForAllocationsD : AmuletRegistry -> ContractId Allocation -> Script Disclosures'
 getLockedAmuleForAllocationsD registry allocCid = do
   optLockedAmuletCid <- lookupLockedAmuletOfAllocation registry allocCid
-  -- TODO(#4552): find a better way to determine whether a contract-id points to a specific template instance
   case optLockedAmuletCid of
     None -> return mempty
     Some la -> queryDisclosure' @LockedAmulet registry.dso la
