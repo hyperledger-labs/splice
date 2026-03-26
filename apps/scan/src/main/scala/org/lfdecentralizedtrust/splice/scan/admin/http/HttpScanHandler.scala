@@ -120,6 +120,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillin
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
+import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
 
 class HttpScanHandler(
@@ -1047,7 +1048,9 @@ class HttpScanHandler(
             effectiveAt = t.effectiveAt,
             rootEventIds = t.rootEventIds,
             eventsById = SortedMap.from(t.eventsById),
-            externalTransactionHash = t.externalTransactionHash.getOrElse(""),
+            externalTransactionHash = t.externalTransactionHash.getOrElse(
+              throw new IllegalStateException("externalTransactionHash must not be empty")
+            ),
           )
         )
     }

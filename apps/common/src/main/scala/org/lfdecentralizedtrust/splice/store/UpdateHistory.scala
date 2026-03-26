@@ -1409,11 +1409,11 @@ class UpdateHistory(
   def getUpdateByHash(
       hash: String
   )(implicit tc: TraceContext): Future[Option[TreeUpdateWithMigrationId]] = {
-    val parsedHash = HexString.parseToByteString(hash).getOrElse(ByteString.EMPTY)
-    if (parsedHash.isEmpty) {
+    val parsedExtTxnHash = HexString.parseToByteString(hash).getOrElse(ByteString.EMPTY)
+    if (parsedExtTxnHash.isEmpty) {
       Future.successful(None)
     } else {
-      val safeHash = sanitizedExtTxnHash(parsedHash)
+      val safeExtTxnHash = sanitizedExtTxnHash(parsedExtTxnHash)
 
       import storage.DbStorageConverters.setParameterOptionalByteArray
       val query =
@@ -1431,7 +1431,7 @@ class UpdateHistory(
         command_id,
         external_transaction_hash
       from  update_history_transactions
-      where external_transaction_hash = $safeHash
+      where external_transaction_hash = $safeExtTxnHash
       and history_id = $historyId
         """
 
@@ -1675,6 +1675,7 @@ class UpdateHistory(
       )
     }
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
+
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         new Transaction(
@@ -2483,7 +2484,6 @@ object UpdateHistory {
   }
 
   sealed trait BackfillingRequirement
-
   object BackfillingRequirement {
 
     /** This history is guaranteed to have started ingestion early enough

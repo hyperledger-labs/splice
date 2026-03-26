@@ -420,8 +420,8 @@ paths:
           - For transactions recorded before t0, 404 will be returned
           - For transactions recorded between t0 and t1, either 404 or the update will be returned
           - For transactions recorded after t1, the update will be returned
-          - The difference between t0 and t1 is expected to be in the order of a few days
-          - t1 is expected to be weeks after the transaction hash inclusion threshold time in the v2/updates endpoint
+          - TBD; The difference between t0 and t1 is expected to be in the order of a few days
+          - TBD: t1 is expected to be weeks after the transaction hash inclusion threshold time in the v2/updates endpoint
       parameters:
         - name: "hash"
           in: "path"
