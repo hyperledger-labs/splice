@@ -11,7 +11,7 @@ node, which is operated by DA and allows connections from the same IPs as
 the ones that connect to the normal DevNet. The network is reset and upgraded on a weekly
 basis on Monday to consume changes to the token standard APIs.
 
-If you have any questions or bug reports, please post them in the [Digital Asset Slack channel](https://app.slack.com/client/T03T53E10/C0ANWRU9R9S).
+If you have any questions or bug reports, please post them in the [Digital Asset Slack channel `temp-token-standard-v2-devnet-external`](https://app.slack.com/client/T03T53E10/C0ANWRU9R9S).
 Request access to it from your Digital Asset contact if you don't have it already.
 
 ## Connecting to Token Standard V2 DevNet
@@ -31,7 +31,7 @@ using the [guide for DevNet](https://hyperledger-labs.github.io/splice/validator
      - to get an onboarding secret: `curl -X POST https://sv.sv-2.token-std-v2-dev.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare`
      - as the URL of your onboarding SV
    - Scan URL: https://scan.sv-2.token-std-v2-dev.global.canton.network.digitalasset.com/
-4. Configure the protocol version to DEV in your participant by [adding the following environment variable](https://hyperledger-labs.github.io/splice/deployment/configuration.html#adding-ad-hoc-configuration):
+4. Configure the protocol version to DEV in your participant by using the following environment variable (see [docs for ad-hoc configuration](https://hyperledger-labs.github.io/splice/deployment/configuration.html#adding-ad-hoc-configuration)):
    ```
    - name: ADDITIONAL_CONFIG_PV_DEV
      value: |
@@ -40,6 +40,3 @@ using the [guide for DevNet](https://hyperledger-labs.github.io/splice/validator
        canton.participants.participant.parameters.alpha-version-support=true
        canton.participants.participant.parameters.initial-protocol-version=dev
      ```
-
-If you have any questions, bug reports or such, please post them in the [Digital Asset Slack channel](https://app.slack.com/client/T03T53E10/C0ANWRU9R9S).
-Request access to it from your Digital Asset contact if you don't have it already.
