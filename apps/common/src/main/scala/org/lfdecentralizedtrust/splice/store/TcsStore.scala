@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.util.ContractWithState
@@ -16,7 +15,7 @@ trait TcsStore {
 
   def lookupContractByIdAsOf[C, TCid <: ContractId[?], T](
       companion: C
-  )(id: ContractId[?], asOf: CantonTimestamp, synchronizerId: SynchronizerId)(implicit
+  )(id: ContractId[?], asOf: CantonTimestamp)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
@@ -27,7 +26,6 @@ trait TcsStore {
   def listAllContractsAsOf[C, TCid <: ContractId[?], T](
       companion: C,
       asOf: CantonTimestamp,
-      synchronizerId: SynchronizerId,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -41,7 +39,6 @@ trait TcsStore {
       companion: C,
       lowerBoundIncl: CantonTimestamp,
       upperBoundIncl: CantonTimestamp,
-      synchronizerId: SynchronizerId,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,

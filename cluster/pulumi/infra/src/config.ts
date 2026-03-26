@@ -76,6 +76,8 @@ const MonitoringConfigSchema = z
           rejectionRateThreshold: z.number(),
           circuitBreakerStateThreshold: z.number(),
         }),
+        // so existing overrides don't break
+        gcpQuotas: z.object({ enabled: z.literal(true) }).optional(),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),

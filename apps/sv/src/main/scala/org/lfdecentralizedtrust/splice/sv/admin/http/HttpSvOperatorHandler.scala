@@ -16,8 +16,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.{ErrorUtil, Mutex}
-import io.grpc.{Status, StatusRuntimeException}
+import com.digitalasset.canton.util.ErrorUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -27,7 +26,6 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_operator as v0}
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource as r0
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
-import TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.{
   HttpClient,
   HttpFeatureSupportHandler,
@@ -418,55 +416,26 @@ class HttpSvOperatorHandler(
   ): Future[r0.GetPartyToParticipantResponse] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
     withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
-      withSequencerConnection { sequencerConnection =>
-        for {
-          party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
-            case Right(party) => Future.successful(party)
-            case Left(error) =>
-              Future.failed(
-                HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
-              )
-          }
-          dsoRules <- dsoStore.getDsoRules()
-          partyToParticipant <- sequencerConnection
-            .getPartyToParticipant(
-              dsoRules.domain,
-              party,
-              topologySnapshot =
-                TopologySnapshot.Effective, // Follow the usual Canton APIs to return effective and not sequenced state.
+      for {
+        party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
-          _ <- {
-            if (partyToParticipant.mapping.partyId == party) {
-              Future.unit
-            } else {
-              Future.failed(
-                HttpErrorHandler.notFound(s"Party not found: $partyId")
-              )
-            }
-          }
-          participantId <- partyToParticipant.mapping.participants match {
-            case Seq(participant) => Future.successful(participant.participantId.toProtoPrimitive)
-            case Seq() =>
-              Future.failed(
-                HttpErrorHandler.notFound(s"No participant id found hosting party: $partyId")
-              )
-            case _ =>
-              Future.failed(
-                HttpErrorHandler.internalServerError(
-                  s"Party $partyId is hosted on multiple participants, which is not currently supported"
-                )
-              )
-          }
-        } yield {
-          r0.GetPartyToParticipantResponse.OK(
-            definitions.GetPartyToParticipantResponse(participantId)
-          )
         }
-      }.recoverWith {
-        case e: StatusRuntimeException if e.getStatus.getCode == Status.NOT_FOUND.getCode =>
-          Future.successful(
-            respond.NotFound(definitions.ErrorResponse(s"Party not found: $partyId"))
+        dsoRules <- dsoStore.getDsoRules()
+        scanConnection <- scanConnectionF
+        participantIds <- scanConnection.getPartyToParticipant(
+          dsoRules.domain,
+          party,
+        )
+      } yield {
+        r0.GetPartyToParticipantResponse.OK(
+          definitions.GetPartyToParticipantResponseV1(
+            participantIds.map(_.toProtoPrimitive).toVector
           )
+        )
       }
     }
   }

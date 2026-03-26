@@ -51,7 +51,7 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "json-credentials": "eyJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZ2NwLXRvcG9sb2d5LXNuYXBzaG90LWJ1Y2tldC1zYS1rZXktc2VjcmV0IiwianNvbkNyZWRlbnRpYWxzIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQtY3JlZHMiLCJidWNrZXRTYUtleVNlY3JldCI6ImdjcC10b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LWV4YW1wbGUiLCJidWNrZXRTYUlhbUFjY291bnQiOiJkYS1jbi1leGFtcGxldEBkYS1jbi1zaGFyZWQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ=="
+          "json-credentials": "eyJwcm9qZWN0SWQiOiJkYS1jbi1zaGFyZWQiLCJidWNrZXROYW1lIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZ2NwLXRvcG9sb2d5LXNuYXBzaG90LWJ1Y2tldC1zYS1rZXktc2VjcmV0IiwianNvbkNyZWRlbnRpYWxzIjoidG9wb2xvZ3ktc25hcHNob3QtYnVja2V0LXNhLWtleS1zZWNyZXQtY3JlZHMiLCJidWNrZXRTYUtleVNlY3JldCI6ImdjcC10b3BvbG9neS1zbmFwc2hvdC1idWNrZXQtc2Eta2V5LWV4YW1wbGUiLCJidWNrZXRTYUlhbUFjY291bnQiOiJkYS1jbi1leGFtcGxldEBkYS1jbi1zaGFyZWQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ=="
         }
       },
       "kind": "Secret",
@@ -313,10 +313,8 @@
             }
           }
         ],
-        "frozenMigrationId": 2,
-        "lsuEnabled": true,
         "upgrade": {
-          "enableLogicalSynchronizerDeploymentMode": true,
+          "enableLogicalSynchronizerDeploymentMode": false,
           "id": 4,
           "releaseReference": {
             "deploymentDir": "cluster/deployment",
@@ -329,7 +327,7 @@
             "spliceRoot": "splice"
           },
           "sequencer": {
-            "enableBftSequencer": true
+            "enableBftSequencer": false
           },
           "version": {
             "type": "remote",
@@ -1252,608 +1250,232 @@
       },
       "inboundPort": 5012,
       "namespace": "sv-1",
-      "rateLimits": [
-        {
-          "actions": [
-            {
-              "name": "acs",
-              "pathPrefix": "/api/scan/v0/acs"
-            },
-            {
-              "clientIp": true,
-              "name": "client_ip"
-            }
-          ],
-          "limits": {
-            "fillInterval": "60s",
-            "maxTokens": 10,
-            "tokensPerFill": 5
-          }
+      "rateLimits": {
+        "/api/scan/livez": {
+          "name": "livez",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "readyz",
-              "pathPrefix": "/api/scan/readyz"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/readyz": {
+          "name": "readyz",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "livez",
-              "pathPrefix": "/api/scan/livez"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/status": {
+          "name": "status",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "status",
-              "pathPrefix": "/api/scan/status"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/acs": {
+          "clientIp": true,
+          "fillInterval": "60s",
+          "maxTokens": 10,
+          "name": "acs",
+          "tokensPerFill": 5,
+          "type": "limited"
         },
-        {
-          "actions": [
-            {
-              "name": "version",
-              "pathPrefix": "/api/scan/version"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/activities": {
+          "name": "activities",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "dso-info",
-              "pathPrefix": "/api/scan/v0/dso"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/admin/sv/voterequests": {
+          "name": "sv-voterequests",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "validators",
-              "pathPrefix": "/api/scan/v0/validators"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/admin/sv/voteresults": {
+          "name": "sv-voteresults",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "scans",
-              "pathPrefix": "/api/scan/v0/scans"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/admin/validator": {
+          "name": "validator-licenses",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "dso-sequencers",
-              "pathPrefix": "/api/scan/v0/dso-sequencers"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/aggregated-rounds": {
+          "name": "aggregated-rounds",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "bft-sequencers",
-              "pathPrefix": "/api/scan/v0/sv-bft-sequencers"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/amulet-config-for-round": {
+          "name": "amulet-config-for-round",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "domains",
-              "pathPrefix": "/api/scan/v0/domains"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/amulet-price": {
+          "name": "amulet-price-votes",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "closed-rounds",
-              "pathPrefix": "/api/scan/v0/closed-rounds"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/amulet-rules": {
+          "name": "amulet-rules",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "open-and-issuing-mining-rounds",
-              "pathPrefix": "/api/scan/v0/open-and-issuing-mining-rounds"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/ans-entries": {
+          "name": "ans-entries",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "v0-updates",
-              "pathPrefix": "/api/scan/v0/updates"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/ans-rules": {
+          "name": "ans-rules",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "v2-updates",
-              "pathPrefix": "/api/scan/v2/updates"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/backfilling": {
+          "name": "backfilling",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "state",
-              "pathPrefix": "/api/scan/v0/state"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/closed-rounds": {
+          "name": "closed-rounds",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "holdings",
-              "pathPrefix": "/api/scan/v0/holdings"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/domains": {
+          "name": "domains",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "ans-entries",
-              "pathPrefix": "/api/scan/v0/ans-entries"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/dso": {
+          "name": "dso-info",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "dso-party-id",
-              "pathPrefix": "/api/scan/v0/dso-party-id"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/dso-party-id": {
+          "name": "dso-party-id",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "transactions",
-              "pathPrefix": "/api/scan/v0/transactions"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/dso-sequencers": {
+          "name": "dso-sequencers",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "backfilling",
-              "pathPrefix": "/api/scan/v0/backfilling"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/events": {
+          "name": "events",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "validator-licenses",
-              "pathPrefix": "/api/scan/v0/admin/validator"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/external-party-amulet-rules": {
+          "name": "external-party-amulet-rules",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "sv-voterequests",
-              "pathPrefix": "/api/scan/v0/admin/sv/voterequests"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/feature-support": {
+          "name": "feature-support",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "sv-voteresults",
-              "pathPrefix": "/api/scan/v0/admin/sv/voteresults"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/featured-apps": {
+          "name": "featured-apps",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "activities",
-              "pathPrefix": "/api/scan/v0/activities"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/history/bulk/acs": {
+          "name": "getBulkAcsSnapshot",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "amulet-price-votes",
-              "pathPrefix": "/api/scan/v0/amulet-price"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/holdings": {
+          "name": "holdings",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "amulet-rules",
-              "pathPrefix": "/api/scan/v0/amulet-rules"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/migrations": {
+          "name": "migrations-schedule",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "ans-rules",
-              "pathPrefix": "/api/scan/v0/ans-rules"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/open-and-issuing-mining-rounds": {
+          "name": "open-and-issuing-mining-rounds",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "events",
-              "pathPrefix": "/api/scan/v0/events"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/rewards-collected": {
+          "name": "rewards-collected",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "external-party-amulet-rules",
-              "pathPrefix": "/api/scan/v0/external-party-amulet-rules"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/round-of-latest-data": {
+          "name": "round-of-latest-data",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "feature-support",
-              "pathPrefix": "/api/scan/v0/feature-support"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/round-party-totals": {
+          "name": "round-party-totals",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "featured-apps",
-              "pathPrefix": "/api/scan/v0/featured-apps"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/round-totals": {
+          "name": "round-totals",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "migrations-schedule",
-              "pathPrefix": "/api/scan/v0/migrations"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/scans": {
+          "name": "scans",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "splice-instance-names",
-              "pathPrefix": "/api/scan/v0/splice-instance-names"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/splice-instance-names": {
+          "name": "splice-instance-names",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "synchronizer-bootstrapping-transactions",
-              "pathPrefix": "/api/scan/v0/synchronizer-bootstrapping-transactions"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/state": {
+          "name": "state",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "synchronizer-identities",
-              "pathPrefix": "/api/scan/v0/synchronizer-identities"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/sv-bft-sequencers": {
+          "name": "bft-sequencers",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "top-validators-by-purchased-traffic",
-              "pathPrefix": "/api/scan/v0/top-validators-by-purchased-traffic"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/synchronizer-bootstrapping-transactions": {
+          "name": "synchronizer-bootstrapping-transactions",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "top-validators-by-validator-faucets",
-              "pathPrefix": "/api/scan/v0/top-validators-by-validator-faucets"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/synchronizer-identities": {
+          "name": "synchronizer-identities",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "top-validators-by-validator-rewards",
-              "pathPrefix": "/api/scan/v0/top-validators-by-validator-rewards"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-providers-by-app-rewards": {
+          "name": "top-providers",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "transfer-command-counter",
-              "pathPrefix": "/api/scan/v0/transfer-command-counter"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-validators-by-purchased-traffic": {
+          "name": "top-validators-by-purchased-traffic",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "transfer-command-status",
-              "pathPrefix": "/api/scan/v0/transfer-command"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-validators-by-validator-faucets": {
+          "name": "top-validators-by-validator-faucets",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "transfer-preapprovals",
-              "pathPrefix": "/api/scan/v0/transfer-preapprovals"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-validators-by-validator-rewards": {
+          "name": "top-validators-by-validator-rewards",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "unclaimed-development-fund-coupons",
-              "pathPrefix": "/api/scan/v0/unclaimed-development-fund-coupons"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transactions": {
+          "name": "transactions",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "voterequest",
-              "pathPrefix": "/api/scan/v0/voterequest"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transfer-command": {
+          "name": "transfer-command-status",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "voterequests",
-              "pathPrefix": "/api/scan/v0/voterequests"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transfer-command-counter": {
+          "name": "transfer-command-counter",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "activeSynchronizerSerial",
-              "pathPrefix": "/api/scan/v0/active-synchronizer-serial"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transfer-preapprovals": {
+          "name": "transfer-preapprovals",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "v1-updates",
-              "pathPrefix": "/api/scan/v1/updates"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/unclaimed-development-fund-coupons": {
+          "name": "unclaimed-development-fund-coupons",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "aggregated-rounds",
-              "pathPrefix": "/api/scan/v0/aggregated-rounds"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/updates": {
+          "name": "v0-updates",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "round-totals",
-              "pathPrefix": "/api/scan/v0/round-totals"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/validators": {
+          "name": "validators",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "round-party-totals",
-              "pathPrefix": "/api/scan/v0/round-party-totals"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/voterequest": {
+          "name": "voterequest",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "amulet-config-for-round",
-              "pathPrefix": "/api/scan/v0/amulet-config-for-round"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/voterequests": {
+          "name": "voterequests",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "round-of-latest-data",
-              "pathPrefix": "/api/scan/v0/round-of-latest-data"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v1/domains": {
+          "name": "domains-v1",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "rewards-collected",
-              "pathPrefix": "/api/scan/v0/rewards-collected"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v1/updates": {
+          "name": "v1-updates",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "top-providers",
-              "pathPrefix": "/api/scan/v0/top-providers-by-app-rewards"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v2/updates": {
+          "name": "v2-updates",
+          "type": "unlimited"
+        },
+        "/api/scan/version": {
+          "name": "version",
+          "type": "unlimited"
         }
-      ]
+      }
     },
     "name": "splice-sv-1-scan-app-rate-limit",
     "provider": "",
@@ -1871,608 +1493,232 @@
       },
       "inboundPort": 5012,
       "namespace": "sv-da-1",
-      "rateLimits": [
-        {
-          "actions": [
-            {
-              "name": "acs",
-              "pathPrefix": "/api/scan/v0/acs"
-            },
-            {
-              "clientIp": true,
-              "name": "client_ip"
-            }
-          ],
-          "limits": {
-            "fillInterval": "60s",
-            "maxTokens": 10,
-            "tokensPerFill": 5
-          }
+      "rateLimits": {
+        "/api/scan/livez": {
+          "name": "livez",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "readyz",
-              "pathPrefix": "/api/scan/readyz"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/readyz": {
+          "name": "readyz",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "livez",
-              "pathPrefix": "/api/scan/livez"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/status": {
+          "name": "status",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "status",
-              "pathPrefix": "/api/scan/status"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/acs": {
+          "clientIp": true,
+          "fillInterval": "60s",
+          "maxTokens": 10,
+          "name": "acs",
+          "tokensPerFill": 5,
+          "type": "limited"
         },
-        {
-          "actions": [
-            {
-              "name": "version",
-              "pathPrefix": "/api/scan/version"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/activities": {
+          "name": "activities",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "dso-info",
-              "pathPrefix": "/api/scan/v0/dso"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/admin/sv/voterequests": {
+          "name": "sv-voterequests",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "validators",
-              "pathPrefix": "/api/scan/v0/validators"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/admin/sv/voteresults": {
+          "name": "sv-voteresults",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "scans",
-              "pathPrefix": "/api/scan/v0/scans"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/admin/validator": {
+          "name": "validator-licenses",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "dso-sequencers",
-              "pathPrefix": "/api/scan/v0/dso-sequencers"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/aggregated-rounds": {
+          "name": "aggregated-rounds",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "bft-sequencers",
-              "pathPrefix": "/api/scan/v0/sv-bft-sequencers"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/amulet-config-for-round": {
+          "name": "amulet-config-for-round",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "domains",
-              "pathPrefix": "/api/scan/v0/domains"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/amulet-price": {
+          "name": "amulet-price-votes",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "closed-rounds",
-              "pathPrefix": "/api/scan/v0/closed-rounds"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/amulet-rules": {
+          "name": "amulet-rules",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "open-and-issuing-mining-rounds",
-              "pathPrefix": "/api/scan/v0/open-and-issuing-mining-rounds"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/ans-entries": {
+          "name": "ans-entries",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "v0-updates",
-              "pathPrefix": "/api/scan/v0/updates"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/ans-rules": {
+          "name": "ans-rules",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "v2-updates",
-              "pathPrefix": "/api/scan/v2/updates"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/backfilling": {
+          "name": "backfilling",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "state",
-              "pathPrefix": "/api/scan/v0/state"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/closed-rounds": {
+          "name": "closed-rounds",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "holdings",
-              "pathPrefix": "/api/scan/v0/holdings"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/domains": {
+          "name": "domains",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "ans-entries",
-              "pathPrefix": "/api/scan/v0/ans-entries"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/dso": {
+          "name": "dso-info",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "dso-party-id",
-              "pathPrefix": "/api/scan/v0/dso-party-id"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/dso-party-id": {
+          "name": "dso-party-id",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "transactions",
-              "pathPrefix": "/api/scan/v0/transactions"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/dso-sequencers": {
+          "name": "dso-sequencers",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "backfilling",
-              "pathPrefix": "/api/scan/v0/backfilling"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/events": {
+          "name": "events",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "validator-licenses",
-              "pathPrefix": "/api/scan/v0/admin/validator"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/external-party-amulet-rules": {
+          "name": "external-party-amulet-rules",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "sv-voterequests",
-              "pathPrefix": "/api/scan/v0/admin/sv/voterequests"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/feature-support": {
+          "name": "feature-support",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "sv-voteresults",
-              "pathPrefix": "/api/scan/v0/admin/sv/voteresults"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/featured-apps": {
+          "name": "featured-apps",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "activities",
-              "pathPrefix": "/api/scan/v0/activities"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/history/bulk/acs": {
+          "name": "getBulkAcsSnapshot",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "amulet-price-votes",
-              "pathPrefix": "/api/scan/v0/amulet-price"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/holdings": {
+          "name": "holdings",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "amulet-rules",
-              "pathPrefix": "/api/scan/v0/amulet-rules"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/migrations": {
+          "name": "migrations-schedule",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "ans-rules",
-              "pathPrefix": "/api/scan/v0/ans-rules"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/open-and-issuing-mining-rounds": {
+          "name": "open-and-issuing-mining-rounds",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "events",
-              "pathPrefix": "/api/scan/v0/events"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/rewards-collected": {
+          "name": "rewards-collected",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "external-party-amulet-rules",
-              "pathPrefix": "/api/scan/v0/external-party-amulet-rules"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/round-of-latest-data": {
+          "name": "round-of-latest-data",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "feature-support",
-              "pathPrefix": "/api/scan/v0/feature-support"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/round-party-totals": {
+          "name": "round-party-totals",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "featured-apps",
-              "pathPrefix": "/api/scan/v0/featured-apps"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/round-totals": {
+          "name": "round-totals",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "migrations-schedule",
-              "pathPrefix": "/api/scan/v0/migrations"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/scans": {
+          "name": "scans",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "splice-instance-names",
-              "pathPrefix": "/api/scan/v0/splice-instance-names"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/splice-instance-names": {
+          "name": "splice-instance-names",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "synchronizer-bootstrapping-transactions",
-              "pathPrefix": "/api/scan/v0/synchronizer-bootstrapping-transactions"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/state": {
+          "name": "state",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "synchronizer-identities",
-              "pathPrefix": "/api/scan/v0/synchronizer-identities"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/sv-bft-sequencers": {
+          "name": "bft-sequencers",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "top-validators-by-purchased-traffic",
-              "pathPrefix": "/api/scan/v0/top-validators-by-purchased-traffic"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/synchronizer-bootstrapping-transactions": {
+          "name": "synchronizer-bootstrapping-transactions",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "top-validators-by-validator-faucets",
-              "pathPrefix": "/api/scan/v0/top-validators-by-validator-faucets"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/synchronizer-identities": {
+          "name": "synchronizer-identities",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "top-validators-by-validator-rewards",
-              "pathPrefix": "/api/scan/v0/top-validators-by-validator-rewards"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-providers-by-app-rewards": {
+          "name": "top-providers",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "transfer-command-counter",
-              "pathPrefix": "/api/scan/v0/transfer-command-counter"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-validators-by-purchased-traffic": {
+          "name": "top-validators-by-purchased-traffic",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "transfer-command-status",
-              "pathPrefix": "/api/scan/v0/transfer-command"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-validators-by-validator-faucets": {
+          "name": "top-validators-by-validator-faucets",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "transfer-preapprovals",
-              "pathPrefix": "/api/scan/v0/transfer-preapprovals"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/top-validators-by-validator-rewards": {
+          "name": "top-validators-by-validator-rewards",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "unclaimed-development-fund-coupons",
-              "pathPrefix": "/api/scan/v0/unclaimed-development-fund-coupons"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transactions": {
+          "name": "transactions",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "voterequest",
-              "pathPrefix": "/api/scan/v0/voterequest"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transfer-command": {
+          "name": "transfer-command-status",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "voterequests",
-              "pathPrefix": "/api/scan/v0/voterequests"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transfer-command-counter": {
+          "name": "transfer-command-counter",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "activeSynchronizerSerial",
-              "pathPrefix": "/api/scan/v0/active-synchronizer-serial"
-            }
-          ],
-          "limits": {
-            "type": "unlimited"
-          }
+        "/api/scan/v0/transfer-preapprovals": {
+          "name": "transfer-preapprovals",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "v1-updates",
-              "pathPrefix": "/api/scan/v1/updates"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/unclaimed-development-fund-coupons": {
+          "name": "unclaimed-development-fund-coupons",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "aggregated-rounds",
-              "pathPrefix": "/api/scan/v0/aggregated-rounds"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/updates": {
+          "name": "v0-updates",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "round-totals",
-              "pathPrefix": "/api/scan/v0/round-totals"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/validators": {
+          "name": "validators",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "round-party-totals",
-              "pathPrefix": "/api/scan/v0/round-party-totals"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/voterequest": {
+          "name": "voterequest",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "amulet-config-for-round",
-              "pathPrefix": "/api/scan/v0/amulet-config-for-round"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v0/voterequests": {
+          "name": "voterequests",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "round-of-latest-data",
-              "pathPrefix": "/api/scan/v0/round-of-latest-data"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v1/domains": {
+          "name": "domains-v1",
+          "type": "unlimited"
         },
-        {
-          "actions": [
-            {
-              "name": "rewards-collected",
-              "pathPrefix": "/api/scan/v0/rewards-collected"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v1/updates": {
+          "name": "v1-updates",
+          "type": "banned"
         },
-        {
-          "actions": [
-            {
-              "name": "top-providers",
-              "pathPrefix": "/api/scan/v0/top-providers-by-app-rewards"
-            }
-          ],
-          "limits": {
-            "type": "banned"
-          }
+        "/api/scan/v2/updates": {
+          "name": "v2-updates",
+          "type": "unlimited"
+        },
+        "/api/scan/version": {
+          "name": "version",
+          "type": "unlimited"
         }
-      ]
+      }
     },
     "name": "splice-sv-da-1-scan-app-rate-limit",
     "provider": "",
@@ -2538,7 +1784,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "apps-pg-override-tier-sv-1",
         "userLabels": {
           "cluster": "mock"
         }
@@ -2972,13 +2218,14 @@
         "isFirstSv": true,
         "logAsyncFlush": false,
         "logLevel": "WARN",
+        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -2987,6 +2234,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "publicUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
         "resources": {
           "limits": {
             "memory": "2048Mi"
@@ -2996,6 +2244,7 @@
             "memory": "1536Mi"
           }
         },
+        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -3003,19 +2252,6 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
-        },
-        "synchronizers": {
-          "current": {
-            "mediator": "global-domain-3-mediator",
-            "sequencer": "global-domain-3-sequencer"
-          },
-          "successor": {
-            "bftSequencerConfig": {
-              "p2pUrl": "https://sequencer-p2p-4.sv-2.mock.global.canton.network.digitalasset.com"
-            },
-            "mediator": "global-domain-4-mediator",
-            "sequencer": "global-domain-4-sequencer"
-          }
         },
         "tolerations": [
           {
@@ -3049,7 +2285,7 @@
           },
           {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
-            "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -3124,11 +2360,26 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "cometBFT": {
+          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+          "enabled": true
+        },
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
         "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
+        "domain": {
+          "mediatorAddress": "global-domain-3-mediator",
+          "sequencerAddress": "global-domain-3-sequencer",
+          "sequencerPruningConfig": {
+            "enabled": true,
+            "pruningInterval": "1 hour",
+            "retentionPeriod": "30 days"
+          },
+          "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
+          "skipInitialization": true
+        },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
           {
@@ -3181,7 +2432,7 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 3,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -3189,13 +2440,13 @@
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "periodicTopologySnapshotConfig": {
           "backupInterval": "12h",
           "location": {
             "bucket": {
               "bucketName": "cn-topology-snapshots",
-              "jsonCredentials": "{\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
+              "jsonCredentials": "{\"projectId\":\"da-cn-shared\",\"bucketName\":\"topology-snapshot-bucket-name\",\"secretName\":\"gcp-topology-snapshot-bucket-sa-key-secret\",\"jsonCredentials\":\"topology-snapshot-bucket-sa-key-secret-creds\",\"bucketSaKeySecret\":\"gcp-topology-snapshot-bucket-sa-key-example\",\"bucketSaIamAccount\":\"da-cn-examplet@da-cn-shared.iam.gserviceaccount.com\"}",
               "projectId": "da-cn-shared",
               "secretName": "cn-gcp-bucket-da-cn-shared-cn-topology-snapshots"
             },
@@ -3235,34 +2486,6 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
-        },
-        "synchronizers": {
-          "current": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-              "enabled": true
-            },
-            "mediatorAddress": "global-domain-3-mediator",
-            "sequencerAddress": "global-domain-3-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
-            },
-            "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
-          },
-          "skipInitialization": true,
-          "successor": {
-            "enableBftSequencer": true,
-            "mediatorAddress": "global-domain-4-mediator",
-            "sequencerAddress": "global-domain-4-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
-            },
-            "sequencerPublicUrl": "https://sequencer-4.sv-2.mock.global.canton.network.digitalasset.com"
-          }
         },
         "tolerations": [
           {
@@ -3349,10 +2572,10 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -3503,7 +2726,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "apps-pg-override-tier",
         "userLabels": {
           "cluster": "mock"
         }
@@ -3937,13 +3160,14 @@
         "isFirstSv": false,
         "logAsyncFlush": false,
         "logLevel": "INFO",
+        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "scan_sv_da_1",
           "port": 5432,
@@ -3952,6 +3176,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com",
         "resources": {
           "limits": {
             "memory": "2048Mi"
@@ -3961,6 +3186,7 @@
             "memory": "1536Mi"
           }
         },
+        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -3968,19 +3194,6 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
-        },
-        "synchronizers": {
-          "current": {
-            "mediator": "global-domain-3-mediator",
-            "sequencer": "global-domain-3-sequencer"
-          },
-          "successor": {
-            "bftSequencerConfig": {
-              "p2pUrl": "https://sequencer-p2p-4.sv-1.mock.global.canton.network.digitalasset.com"
-            },
-            "mediator": "global-domain-4-mediator",
-            "sequencer": "global-domain-4-sequencer"
-          }
         },
         "tolerations": [
           {
@@ -4018,7 +3231,7 @@
           },
           {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
-            "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -4093,12 +3306,28 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "cometBFT": {
+          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+          "enabled": true,
+          "externalGovernanceKey": true
+        },
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "delegatelessAutomationExpectedTaskDuration": 5000,
         "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
         "delegatelessAutomationExpiredRewardCouponNumBatches": 100,
         "disableOnboardingParticipantPromotionDelay": false,
+        "domain": {
+          "mediatorAddress": "global-domain-3-mediator",
+          "sequencerAddress": "global-domain-3-sequencer",
+          "sequencerPruningConfig": {
+            "enabled": true,
+            "pruningInterval": "1 hour",
+            "retentionPeriod": "30 days"
+          },
+          "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com",
+          "skipInitialization": true
+        },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
         "failOnAppVersionMismatch": true,
@@ -4124,13 +3353,13 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 3,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-1",
         "onboardingName": "Digital-Asset-1",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_da_1",
@@ -4164,35 +3393,6 @@
           "nameServiceNameAcronym": "ANS",
           "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
           "networkName": "Splice"
-        },
-        "synchronizers": {
-          "current": {
-            "cometBftConfig": {
-              "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
-              "enabled": true,
-              "externalGovernanceKey": true
-            },
-            "mediatorAddress": "global-domain-3-mediator",
-            "sequencerAddress": "global-domain-3-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
-            },
-            "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com"
-          },
-          "skipInitialization": true,
-          "successor": {
-            "enableBftSequencer": true,
-            "mediatorAddress": "global-domain-4-mediator",
-            "sequencerAddress": "global-domain-4-sequencer",
-            "sequencerPruningConfig": {
-              "enabled": true,
-              "pruningInterval": "1 hour",
-              "retentionPeriod": "30 days"
-            },
-            "sequencerPublicUrl": "https://sequencer-4.sv-1.mock.global.canton.network.digitalasset.com"
-          }
         },
         "tolerations": [
           {
@@ -4283,10 +3483,10 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
         "nodeIdentifier": "Digital-Asset-1",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

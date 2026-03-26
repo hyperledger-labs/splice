@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.validator.domain
 
 import cats.implicits.catsSyntaxApplicativeId
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
@@ -109,7 +110,8 @@ class DomainConnector(
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
-            .single(
+            .tryMany(
+              connections = Seq(
               GrpcSequencerConnection
                 .create(url)
                 .fold(
@@ -119,6 +121,14 @@ class DomainConnector(
                       .asRuntimeException(),
                   identity,
                 )
+            ),
+              sequencerTrustThreshold = PositiveInt.one,
+              sequencerLivenessMargin = NonNegativeInt.zero,
+              submissionRequestAmplification = SubmissionRequestAmplification(
+                PositiveInt.one,
+                config.sequencerRequestAmplificationPatience,
+              ),
+              sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays,
             )
         ).pure[Future]
     }

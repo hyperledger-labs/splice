@@ -1,10 +1,8 @@
-rateLimits: !append
-  - actions:
-      - name: acs
-        pathPrefix: /api/scan/v0/acs
-      - name: client_ip
-        clientIp: true
-    limits:
-      maxTokens: 10
-      tokensPerFill: 5
-      fillInterval: 60s
+rateLimits:
+  /api/scan/v0/acs:
+    name: acs
+    type: limited
+    clientIp: true
+    maxTokens: 10
+    tokensPerFill: 5
+    fillInterval: 60s

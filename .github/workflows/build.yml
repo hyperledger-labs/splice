@@ -83,6 +83,7 @@ jobs:
     with:
       commit_sha: ${{ inputs.commit_sha }}
       self_hosted: true
+      oss_only: ${{ inputs.oss_only }}
 
   deployment_test:
     uses: ./.github/workflows/build.deployment_test.yml
