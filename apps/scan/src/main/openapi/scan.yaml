@@ -444,19 +444,20 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v2/updates/hashes/{hash}:
+  /v2/updates/hash/{hash}:
     get:
       tags: [external, scan]
       x-jvm-package: scan
       operationId: "getUpdateByHash"
       description: |
-        Returns the update associated with the given hash.This endpoint is BFT safe only for the updates recorded after a threshold time (t1).
-        For record times of t0 and t1 where:
-          - t0: The time when the Scan backend begin indexing external transaction hashes
-          - t1: The time at which transaction hashes are included in the /v1/updates and /v2/updates streams
-          - For transactions recorded before t0, 404 will be returned
-          - For transactions recorded between t0 and t1, either 404 or the update will be returned
-          - For transactions recorded after t1, the update will be returned
+        Returns the update associated with the given hash of the prepared transaction.
+
+        This endpoint is not always BFT safe.
+        For transactions committed before a scan instance started indexing hashes, the instance will return a 404 error.
+        For transactions committed around the time different scans started indexing hashes,
+        some scan instances might return a 404 error while others return the matching update.
+
+        This is in contrast to the `v2/updates` and `v2/updates/{update_id}` endpoints, which are guaranteed to be always BFT safe.
       parameters:
         - name: "hash"
           in: "path"
