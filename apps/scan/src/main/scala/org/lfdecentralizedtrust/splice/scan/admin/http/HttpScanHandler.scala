@@ -149,7 +149,7 @@ class HttpScanHandler(
     initialRound: String,
     externalTransactionHashThresholdTime: Option[Instant] = None,
     updateHistoryMaxPageSize: Int,
-    publicUrl: Option[Uri],
+    publicUrlO: Option[Uri],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -2455,13 +2455,13 @@ class HttpScanHandler(
     for {
       acs <- bulkStorage.acsSnapshotBulkStorage
       update <- bulkStorage.updateHistoryBulkStorage
-      url <- this.publicUrl
+      publicUrl <- publicUrlO
     } yield {
-      (acs, update, url)
+      (acs, update, publicUrl)
     }
   }
 
-  private def encodeBulkStorageObjects(objects: Seq[ObjectKeyAndChecksum]) =
+  private def encodeBulkStorageObjects(objects: Seq[ObjectKeyAndChecksum], publicUrl: Uri) =
     objects.map { case ObjectKeyAndChecksum(key, digest) =>
       val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8)
       definitions.BulkStorageObjectRef(
@@ -2491,7 +2491,7 @@ class HttpScanHandler(
               ScanResource.ListBulkAcsSnapshotObjectsResponse.OK(
                 definitions.ListBulkAcsSnapshotObjectsResponse(
                   Codec.encode(ts),
-                  encodeBulkStorageObjects(objects),
+                  encodeBulkStorageObjects(objects, publicUrl),
                 )
               )
           }
@@ -2527,7 +2527,7 @@ class HttpScanHandler(
             .map { case UpdateHistoryObjectsResponse(objects, nextPageToken) =>
               ScanResource.ListBulkUpdateHistoryObjectsResponse.OK(
                 definitions.ListBulkUpdateHistoryObjectsResponse(
-                  encodeBulkStorageObjects(objects),
+                  encodeBulkStorageObjects(objects, publicUrl),
                   nextPageToken,
                 )
               )
