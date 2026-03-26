@@ -138,8 +138,8 @@ transferAmuletAllocation amuletAllocation extraArgs = do
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId V1.Holding]
 unlockAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
-  abortTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
+  let lockExpiresAt = amuletAllocation.allocation.settlement.settleBefore
+  abortTwoStepTransfer lockExpiresAt amuletAllocation.lockedAmulet extraArgs
 
 
 instance HasCheckedFetch AmuletAllocation ForDso where

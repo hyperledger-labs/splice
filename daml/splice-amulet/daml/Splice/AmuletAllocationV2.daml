@@ -4,13 +4,10 @@
 -- | V2 amulet allocation, which can and should be settled using `V2.SettlementFactory_SettleBatch`.
 module Splice.AmuletAllocationV2 (
   AmuletAllocationV2(..),
-  debitAllocationToTwoStepTransfer,
 ) where
 
 import DA.Foldable (forA_)
-import qualified DA.List
 import DA.Optional (isNone, isSome)
-import DA.Text as Text
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -125,42 +122,13 @@ template AmuletAllocationV2
             meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
 
 
--- Allocation usage
--------------------
-
--- FIXME: trim this now that the code for creating the allocations is shared
-debitAllocationToTwoStepTransfer : Party -> [V2.TransferLeg] -> Party -> Time -> V2.SettlementInfo -> TwoStepTransfer
-debitAllocationToTwoStepTransfer sender transferLegs dso expiresAt settlement
-  | creditAmount >= 0.0 = error $
-      "debitAllocationToTwoStepTransfer: unexpect positive credit amount" <> show creditAmount
-  | otherwise = TwoStepTransfer with
-      dso
-      sender
-      -- Note: we use a single leg to the sender to get the right locking behavior as part of preparing the two-step transfer
-      -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
-      receiver = sender
-      amount = negate creditAmount
-      provider = DA.List.head settlement.executors
-      -- We accept the limitation that only a single executor will receiver featured app markers,
-      -- as featured app markers will be removed anyways with CIP-104.
-      transferBefore = expiresAt
-      transferBeforeDeadline = "allocation.expiresAt"
-      allowFeaturing = True
-      lockContext = Text.implode
-        -- We don't show more context to avoid bloating the response here.
-        ["allocation for settlement of ", settlement.settlementRef.id]
-        -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
-  where
-    creditAmount = netAllocationCreditAmount (basicAccount sender) transferLegs
-
 unlockAmuletAllocationV2 : AmuletAllocationV2 -> ExtraArgs -> Update [ContractId V2.Holding]
 unlockAmuletAllocationV2 amuletAllocation extraArgs = do
   case amuletAllocation.lockedAmulet of
     None -> return []
     Some la -> do
-      let twoStepTransfer = debitAllocationToTwoStepTransfer amuletAllocation.allocation.authorizer.owner amuletAllocation.allocation.transferLegs amuletAllocation.dso amuletAllocation.expiresAt amuletAllocation.allocation.settlement
-      map upcast <$> abortTwoStepTransfer twoStepTransfer la extraArgs
-
+      let lockExpiresAt = amuletAllocation.expiresAt
+      map upcast <$> abortTwoStepTransfer lockExpiresAt la extraArgs
 
 
 -- instances

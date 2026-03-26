@@ -125,8 +125,8 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
     , fromOptional emptyMetadata result.meta
     )
 
-abortTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update [ContractId Holding]
-abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
+abortTwoStepTransfer : Time -> ContractId LockedAmulet -> ExtraArgs -> Update [ContractId Holding]
+abortTwoStepTransfer lockExpiresAt lockedAmuletCid extraArgs = do
   optExpireLockedAmulet <- lookupFromContextU @Bool extraArgs.context expireLockKey
   -- if the key is not set, then we are likely chaining within a Daml transaction, which means
   -- the amulet is still locked and should be unlocked.
@@ -137,6 +137,6 @@ abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
       result <- exercise lockedAmuletCid LockedAmulet_UnlockV2
       pure [toInterfaceContractId result.amuletCid]
     else do
-      -- scan is telling us to not expire the lock, this is OK if the transfer expired
-      assertDeadlineExceeded transferBeforeDeadline transferBefore
+      -- the choice context is telling us to not expire the lock, this is OK if the lock expired
+      assertDeadlineExceeded "lockedAmulet.lockExpiresAt" lockExpiresAt
       pure []
