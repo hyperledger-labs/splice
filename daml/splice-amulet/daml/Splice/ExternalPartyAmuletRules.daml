@@ -7,10 +7,8 @@ module Splice.ExternalPartyAmuletRules where
 import DA.Assert
 import DA.Exception
 import DA.Foldable (forA_)
-import qualified DA.List
 import DA.Optional
 import qualified DA.TextMap as TextMap
-import qualified DA.Text as T
 import DA.Time
 
 import Splice.Api.Token.MetadataV1
@@ -511,20 +509,16 @@ amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg fundingAmoun
     let twoStepTransfer = TwoStepTransfer with
           dso
           sender = authorizer
-          -- Note: we use a single leg to the authorizer to get the right locking behavior as part of preparing the two-step transfer
-          -- We never execute the two-step transfer though, as that happens directly in a netted fashion.
-          receiver = authorizer
           amount = fundingAmount
-          provider = DA.List.head settlement.executors
-          -- We accept the limitation that only a single executor will receiver featured app markers,
-          -- as featured app markers will be removed anyways with CIP-104.
+          -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
+          lockContext = AmuletAllocationV1.mkAllocationLockContext (downcast settlement.settlementRef)
           transferBefore = expiresAt
           transferBeforeDeadline = "allocation.expiresAt"
-          allowFeaturing = True
-          lockContext = T.implode
-            -- We don't show more context to avoid bloating the response here.
-            ["allocation for settlement of ", settlement.settlementRef.id]
-            -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
+          -- Minor hack: we use the authorizer for receiver and provider as these fields are irrlevant
+          -- for preparing the two-step transfer .
+          receiver = authorizer
+          provider = authorizer
+          allowFeaturing = False
     (la, cids, meta) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map downcast inputHoldingCids) paymentContext
     return (Some la, cids, expiresAt, meta)
 

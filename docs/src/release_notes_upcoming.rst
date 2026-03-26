@@ -67,13 +67,4 @@
 
       - Add V2 of the the token standard APIs and implement them for Amulet
 
-      - Bugfixes:
-        - Disallow creating self-transfer allocations using the V1 API,
-          as these do not make sense to create in V1. They are allowed for creation
-          using the V2 API,
-
-        - Disallow creation of self-transfers
-
-      - Includes disallowing the creation of a V1 allocation for a self-transfer
-
 

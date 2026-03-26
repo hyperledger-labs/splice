@@ -4,13 +4,17 @@
 -- | V1 amulet allocation.
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
-  AmuletAllocation_DsoExpireResult,
+
+  -- * Construction
   allocationToTwoStepTransfer,
+  mkAllocationLockContext,
+
+  -- * Expiry
   AmuletAllocation_DsoExpire(..),
+  AmuletAllocation_DsoExpireResult,
 ) where
 
 import DA.Assert (assertDeadlineExceeded)
-import DA.Text as Text
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
@@ -71,6 +75,18 @@ template AmuletAllocation
             senderHoldingCids
             meta = emptyMetadata
 
+    interface instance V2.Allocation for AmuletAllocation where
+      view = upcast (view (toInterface @V1.Allocation this))
+
+      allocation_settleExtraObservers _arg = []
+      -- add the executor as an extra observer, as they otherwise only see the V1 choice by default
+      allocation_cancelExtraObservers _arg = [allocation.settlement.executor]
+      allocation_withdrawExtraObservers _arg = [allocation.settlement.executor]
+
+      allocation_withdrawImpl = allocationV2_withdrawDefaultImplUsingV1 (toInterface this)
+      allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
+      allocation_settleImpl = allocationV2_settleDefaultImplUsingV1 (toInterface this)
+
     -- Implemented on the concrete template as you cannot upgrade interfaces so we cannot add a choice to the Allocation interface.
     choice AmuletAllocation_DsoExpire : AmuletAllocation_DsoExpireResult
       with
@@ -91,21 +107,13 @@ template AmuletAllocation
           meta = Metadata with
             values = TextMap.fromList [(reasonMetaKey, "expired as settleBefore has passed")]
 
-    interface instance V2.Allocation for AmuletAllocation where
-      view = upcast (view (toInterface @V1.Allocation this))
-
-      allocation_settleExtraObservers _arg = []
-      -- add the executor as an extra observer, as they otherwise only see the V1 choice by default
-      allocation_cancelExtraObservers _arg = [allocation.settlement.executor]
-      allocation_withdrawExtraObservers _arg = [allocation.settlement.executor]
-
-      allocation_withdrawImpl = allocationV2_withdrawDefaultImplUsingV1 (toInterface this)
-      allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
-      allocation_settleImpl = allocationV2_settleDefaultImplUsingV1 (toInterface this)
-
 
 -- Allocation usage
 -------------------
+
+-- | Minimal lock context to avoid bloating the lock context.
+mkAllocationLockContext : V1.Reference -> Text
+mkAllocationLockContext ref = "allocation for settlement of " <> ref.id
 
 allocationInstrumentAdmin : V1.AllocationSpecification -> Party
 allocationInstrumentAdmin V1.AllocationSpecification{..} = transferLeg.instrumentId.admin
@@ -121,9 +129,7 @@ allocationToTwoStepTransfer allocation =
     transferBefore = allocation.settlement.settleBefore
     transferBeforeDeadline = "allocation.settlement.settleBefore"
     allowFeaturing = True
-    lockContext = Text.implode
-      -- We don't show more context to avoid bloating the response here.
-      ["allocation for transfer leg ", show allocation.transferLegId, " to ", show allocation.transferLeg.receiver]
+    lockContext = mkAllocationLockContext allocation.settlement.settlementRef
 
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update V1.Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
