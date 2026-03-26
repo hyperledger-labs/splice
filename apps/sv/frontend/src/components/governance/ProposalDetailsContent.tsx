@@ -232,6 +232,13 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             />
           )}
 
+          {proposalDetails.action === 'VLRARC_WithdrawValidatorLicense' && (
+            <RevokeValidatorLicenseSection
+              validatorLicenseCid={proposalDetails.proposal.validatorLicenseCid}
+              reason={proposalDetails.proposal.reason}
+            />
+          )}
+
           {proposalDetails.action === 'CRARC_SetConfig' && (
             <>
               <DetailItem
@@ -655,5 +662,41 @@ const UpdateSvRewardWeightSection = ({
         }
       />
     </>
+  );
+};
+
+interface RevokeValidatorLicenseSectionProps {
+  validatorLicenseCid: string;
+  reason: string;
+}
+
+const RevokeValidatorLicenseSection = ({
+  validatorLicenseCid,
+  reason,
+}: RevokeValidatorLicenseSectionProps) => {
+  return (
+    <Box
+      id="proposal-details-revoke-validator-license-section"
+      data-testid="proposal-details-revoke-validator-license-section"
+      sx={{ display: 'contents' }}
+    >
+      <DetailItem
+        label="Validator License"
+        value={
+          <CopyableIdentifier
+            value={validatorLicenseCid}
+            size="large"
+            data-testid="proposal-details-validator-license-cid"
+          />
+        }
+        labelId="proposal-details-validator-license-label"
+      />
+      <DetailItem
+        label="Reason"
+        value={reason}
+        labelId="proposal-details-revoke-reason-label"
+        valueId="proposal-details-revoke-reason-value"
+      />
+    </Box>
   );
 };

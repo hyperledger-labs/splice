@@ -46,6 +46,11 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         amount: string;
         expiresAt: string;
       }
+    | {
+        formType: 'revoke-validator-license';
+        validator: string;
+        reason: string;
+      }
   );
 
 export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
@@ -126,6 +131,17 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
             <ProposalField id="amount" title="Amount" value={props.amount} />
 
             <ProposalField id="expiresAt" title="Must Mint Before" value={props.expiresAt} />
+          </>
+        )}
+
+        {formType === 'revoke-validator-license' && (
+          <>
+            <ProposalField id="revokeValidator" title="Validator" value={props.validator} />
+            <ProposalField
+              id="revokeValidatorReason"
+              title="Reason"
+              value={props.reason}
+            />
           </>
         )}
 

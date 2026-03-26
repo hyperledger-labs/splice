@@ -14,6 +14,7 @@ import type { GrantRevokeFeaturedAppFormData } from '../components/forms/GrantRe
 import type { OffboardSvFormData } from '../components/forms/OffboardSvForm';
 import type { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
 import type { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
+import type { RevokeValidatorLicenseFormData } from '../components/forms/RevokeValidatorLicenseForm';
 import type { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
 
 export interface OffBoardMemberProposal {
@@ -210,7 +211,8 @@ export type NonConfigProposalFormData =
   | UpdateSvRewardWeightFormData
   | OffboardSvFormData
   | GrantRevokeFeaturedAppFormData
-  | CreateUnallocatedUnclaimedActivityRecordFormData;
+  | CreateUnallocatedUnclaimedActivityRecordFormData
+  | RevokeValidatorLicenseFormData;
 
 export type ConfigProposalFormData = SetDsoConfigCompleteFormData | SetAmuletConfigCompleteFormData;
 
