@@ -43,10 +43,10 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   MaybeCachedContractWithState,
   UpdateHistoryItem,
   UpdateHistoryItemV2,
-  UpdateHistoryItemV3,
+  UpdateHistoryItemV2WithHash,
   UpdateHistoryRequestV2,
   UpdateHistoryTransactionV2,
-  UpdateHistoryTransactionV3,
+  UpdateHistoryTransactionV2WithHash,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -1035,15 +1035,15 @@ class HttpScanHandler(
         )
     }
 
-  private def toUpdateV3(update: UpdateHistoryItem): UpdateHistoryItemV3 =
+  private def toUpdateV3(update: UpdateHistoryItem): UpdateHistoryItemV2WithHash =
     update match {
       case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
-        UpdateHistoryItemV3(
-          UpdateHistoryItemV3.members.UpdateHistoryReassignment(r)
+        UpdateHistoryItemV2WithHash(
+          UpdateHistoryItemV2WithHash.members.UpdateHistoryReassignment(r)
         )
       case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
-        UpdateHistoryItemV3(
-          UpdateHistoryTransactionV3(
+        UpdateHistoryItemV2WithHash(
+          UpdateHistoryTransactionV2WithHash(
             updateId = t.updateId,
             migrationId = t.migrationId,
             workflowId = t.workflowId,

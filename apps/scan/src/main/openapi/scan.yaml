@@ -474,7 +474,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UpdateHistoryItemV3"
+                $ref: "#/components/schemas/UpdateHistoryItemV2WithHash"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -2295,12 +2295,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
-    UpdateHistoryItemV3:
+    UpdateHistoryItemV2WithHash:
       type: object
       description: |
         An individual item in the update history. May be a transaction or a contract reassignment.
       oneOf:
-        - $ref: "#/components/schemas/UpdateHistoryTransactionV3"
+        - $ref: "#/components/schemas/UpdateHistoryTransactionV2WithHash"
         - $ref: "#/components/schemas/UpdateHistoryReassignment"
     UpdateHistoryItemV2:
       type: object
@@ -2564,7 +2564,7 @@ components:
                 For transaction externally signed, contains the external transaction hash
                 signed by the external party. Can be used to correlate an external submission with a committed transaction.
               type: string
-    UpdateHistoryTransactionV3:
+    UpdateHistoryTransactionV2WithHash:
       allOf:
         - $ref: "#/components/schemas/BaseUpdateHistoryTransaction"
         - type: object
