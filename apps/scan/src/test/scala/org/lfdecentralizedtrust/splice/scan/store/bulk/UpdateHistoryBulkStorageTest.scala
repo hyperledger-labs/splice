@@ -50,6 +50,7 @@ class UpdateHistoryBulkStorageTest
     bulkDbReadChunkSize = 500,
     bulkZstdFrameSize = 10000L,
     maxFileSize,
+    zstdCompressionLevel = 3,
   )
   val appConfig = BulkStorageConfig(
     updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5)
@@ -129,7 +130,7 @@ class UpdateHistoryBulkStorageTest
               update.update.update.recordTime <= toTimestamp
           )
         } yield {
-          val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+          val objectKeys = s3Objects.contents.asScala.map(_.key()).sorted
           objectKeys should have length 2
           s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
           val allUpdatesFromS3 = objectKeys.flatMap(

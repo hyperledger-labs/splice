@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
   AppRewardCoupon,
@@ -32,6 +33,8 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 
 import java.io.ByteArrayOutputStream
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
@@ -75,7 +78,8 @@ class ScanTimeBasedIntegrationTest
               snapshotPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
               updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
               s3 = Some(s3ConfigMock),
-            )
+            ),
+            publicUrl = Some(Uri("http://foo.bar.com")),
           )
         )(config)
       )
@@ -594,15 +598,21 @@ class ScanTimeBasedIntegrationTest
         .value
         .toInstant shouldBe >=(lastMidnight)
 
-      val s3Objs = bucketConnection.listObjects.futureValue.contents().asScala
+      val getSnapshotResponse = eventuallySucceeds() {
+        val getSnapshotResponse = sv1ScanBackend
+          .getBulkAcsSnapshot(CantonTimestamp.assertFromInstant(lastMidnight))
+        getSnapshotResponse.recordTime should be(lastMidnight.atOffset(java.time.ZoneOffset.UTC))
+        getSnapshotResponse
+      }
+      val allS3Objs = bucketConnection.listObjects.futureValue.contents().asScala
 
       // Wait for bulk storage objects to be created
-      s3Objs.map(_.key()) should contain(expectedAcsSnapshotKey)
+      allS3Objs.map(_.key()) should contain(expectedAcsSnapshotKey)
 
       // Depending on how the days are split exactly (based on the exact simtime when the test was started),
       // the updates may be in one or two segments, so we only assert that there exists a segment that ends
       // at last midnight
-      s3Objs
+      allS3Objs
         .map(_.key())
         .filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
 
@@ -611,11 +621,18 @@ class ScanTimeBasedIntegrationTest
         .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
         .createdEvents
-      val acsObjKey = s3Objs.filter(_.key() == expectedAcsSnapshotKey).head
-      val acsAtMidnightFromS3 = readUncompressAndDecode(
-        bucketConnection,
+      val acsObjUrl = getSnapshotResponse.objectRefs.head.url
+      acsObjUrl should startWith("http://foo.bar.com/api/scan/v0/history/bulk/download/")
+      val acsObjKey = URLDecoder.decode(
+        acsObjUrl.stripPrefix("http://foo.bar.com/api/scan/v0/history/bulk/download/"),
+        StandardCharsets.UTF_8,
+      )
+      val out = new ByteArrayOutputStream()
+      sv1ScanBackend.bulkStorageDownload(acsObjKey, out).futureValue
+      val acsAtMidnightFromS3 = uncompressAndDecode(
+        ByteString(out.toByteArray),
         io.circe.parser.decode[definitions.CreatedEvent],
-      )(acsObjKey)
+      )
       acsAtMidnightFromScan should contain theSameElementsInOrderAs acsAtMidnightFromS3
 
       def isInTimeRange(u: definitions.UpdateHistoryItemV2) = {
@@ -627,7 +644,7 @@ class ScanTimeBasedIntegrationTest
         recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
       }
 
-      val updateObjs = s3Objs.filter(_.key().contains("/updates"))
+      val updateObjs = allS3Objs.filter(_.key().contains("/updates"))
       val updatesFromS3 = updateObjs
         .flatMap { obj =>
           val out = new ByteArrayOutputStream()

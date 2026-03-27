@@ -3,7 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.MonadUtil
 import cats.syntax.option.*
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
@@ -169,8 +170,8 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       .asScala
       .map(PartyId.tryFromProtoPrimitive)
       .toSeq
-    svs
-      .parTraverse { svParty =>
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(16))(svs) { svParty =>
         participantAdminConnection
           .getPartyToParticipant(
             dsoRules.domain,

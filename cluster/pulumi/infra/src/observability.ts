@@ -24,11 +24,11 @@ import {
   ObservabilityReleaseName,
   SPLICE_ROOT,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { allSvsConfiguration } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/singleSvConfig';
 import {
-  allSvsConfiguration,
-  extraSvConfigs,
-  standardSvConfigs,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+  extraSvConfigsBasic,
+  standardSvConfigsBasic,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigsBasic';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { local } from '@pulumi/command';
@@ -172,7 +172,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
               routes: [
                 {
                   receiver: 'null',
-                  matchers: ['alertname="Watchdog|InfoInhibitor"'],
+                  matchers: ['alertname=~"Watchdog|InfoInhibitor"'],
                   continue: false,
                 },
               ],
@@ -762,8 +762,8 @@ function partyIdTransform(partyId: string) {
 }
 
 function createGrafanaAlerting(namespace: Input<string>) {
-  const sweepConfigs: SweepConfig[] = extraSvConfigs
-    .concat(standardSvConfigs)
+  const sweepConfigs: SweepConfig[] = extraSvConfigsBasic
+    .concat(standardSvConfigsBasic)
     .map(sv => sv.sweep!)
     .filter(e => e != undefined);
   const cometbftPruningHighestBlockRetain = allSvsConfiguration

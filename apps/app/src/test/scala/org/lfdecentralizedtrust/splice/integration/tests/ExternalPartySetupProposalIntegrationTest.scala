@@ -190,7 +190,7 @@ class ExternalPartySetupProposalIntegrationTest
           bobParty.filterString
         ) should not be empty withClue "bob hosted on bobValidator participant"
       bobValidatorWalletClient.tap(50.0)
-      val (cidBob, _) =
+      val onboardingBobExtPartySetupResult =
         createAndAcceptExternalPartySetupProposal(
           bobValidatorBackend,
           onboardingBob,
@@ -206,7 +206,9 @@ class ExternalPartySetupProposalIntegrationTest
       }
       bobValidatorBackend
         .listTransferPreapprovals()
-        .map(tp => tp.contract.contractId) contains cidBob
+        .map(tp =>
+          tp.contract.contractId
+        ) contains onboardingBobExtPartySetupResult.transferPreapprovalCid
 
       // Lookup transfer command counter before any transfer command
       aliceValidatorBackend.scanProxy.lookupTransferCommandCounterByParty(aliceParty) shouldBe None

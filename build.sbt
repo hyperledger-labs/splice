@@ -2253,6 +2253,8 @@ updateTestConfigForParallelRuns := {
     name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
   def isLSUTest(name: String): Boolean =
     name contains "LogicalSynchronizerUpgradeIntegrationTest"
+  def isLSURollForwardTest(name: String): Boolean =
+    name contains "RollForwardLsu"
 
   val allTestNames =
     definedTests
@@ -2382,6 +2384,11 @@ updateTestConfigForParallelRuns := {
       "tests to check logical sync upgrade",
       "test-full-class-names-lsu.log",
       (t: String) => isLSUTest(t),
+    ),
+    (
+      "tests to check logical sync roll-forward upgrade",
+      "test-full-class-names-roll-forward-lsu.log",
+      (t: String) => isLSURollForwardTest(t),
     ),
     (
       "tests with wall clock time",

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as _ from 'lodash';
 import {
+  CloudSqlConfig,
   clusterSmallDisk,
   ExactNamespace,
   loadYamlFromFile,
@@ -19,20 +20,14 @@ export function installPostgres(
   name: string,
   secretName: string,
   selfHostedValuesFile: string,
-  isActive: boolean = true
+  isActive: boolean = true,
+  cloudSqlConfigOverride?: CloudSqlConfig
 ): SplicePostgres | CloudPostgres {
-  if (spliceConfig.pulumiProjectConfig.cloudSql.enabled) {
-    return new CloudPostgres(
-      xns,
-      name,
-      name,
-      secretName,
-      spliceConfig.pulumiProjectConfig.cloudSql,
-      isActive,
-      {
-        disableProtection: supportsSvRunbookReset,
-      }
-    );
+  const cloudSqlConfig = cloudSqlConfigOverride ?? spliceConfig.pulumiProjectConfig.cloudSql;
+  if (cloudSqlConfig.enabled) {
+    return new CloudPostgres(xns, name, name, secretName, cloudSqlConfig, isActive, {
+      disableProtection: supportsSvRunbookReset,
+    });
   } else {
     const valuesFromFile = loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`

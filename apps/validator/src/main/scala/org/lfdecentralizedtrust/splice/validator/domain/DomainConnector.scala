@@ -109,16 +109,25 @@ class DomainConnector(
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
-            .single(
-              GrpcSequencerConnection
-                .create(url)
-                .fold(
-                  error =>
-                    throw Status.INVALID_ARGUMENT
-                      .withDescription(s"Invalid synchronizer url $url: $error")
-                      .asRuntimeException(),
-                  identity,
-                )
+            .tryMany(
+              connections = Seq(
+                GrpcSequencerConnection
+                  .create(url)
+                  .fold(
+                    error =>
+                      throw Status.INVALID_ARGUMENT
+                        .withDescription(s"Invalid synchronizer url $url: $error")
+                        .asRuntimeException(),
+                    identity,
+                  )
+              ),
+              sequencerTrustThreshold = PositiveInt.one,
+              sequencerLivenessMargin = NonNegativeInt.zero,
+              submissionRequestAmplification = SubmissionRequestAmplification(
+                PositiveInt.one,
+                config.sequencerRequestAmplificationPatience.toInternal,
+              ),
+              sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays.toInternal,
             )
         ).pure[Future]
     }
@@ -261,9 +270,15 @@ class DomainConnector(
               .mapValues { sequencersForId =>
                 val serialMatch =
                   sequencersForId.find(_.serial.contains(synchronizerSerial.unwrap.toLong))
-                serialMatch.orElse(
-                  sequencersForId.find(s => s.serial.isEmpty && s.migrationId == migrationId)
-                )
+                // it might be that some SV did not update the url for the latest serial
+                // in that case we don't want to fallback to the migration id one
+                // the migration id fallback is valid only if the SV did not sync the per serial urls yet for the first time
+                val sequencerHasAnyEntryWithSerial = sequencersForId.exists(_.serial.nonEmpty)
+                if (sequencerHasAnyEntryWithSerial) serialMatch
+                else
+                  serialMatch.orElse(
+                    sequencersForId.find(s => s.serial.isEmpty && s.migrationId == migrationId)
+                  )
               }
               .values
               .flatten

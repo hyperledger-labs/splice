@@ -25,7 +25,7 @@ import org.lfdecentralizedtrust.splice.util.{FactoryChoiceWithDisclosures, Token
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant}
+import java.time.Duration
 import java.util.UUID
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -360,7 +360,9 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       )
 
     // Venue initiates settlement
-    val prepareUntil = Instant.now().plus(10, ChronoUnit.MINUTES)
+    // Use the Canton clock (not wall clock) so this works correctly in simtime too.
+    val now = env.environment.clock.now.toInstant
+    val prepareUntil = now.plus(10, ChronoUnit.MINUTES)
     val settleUntil = prepareUntil.plus(10, ChronoUnit.MINUTES)
 
     val (_, (trade, aliceRequest, bobRequest)) =

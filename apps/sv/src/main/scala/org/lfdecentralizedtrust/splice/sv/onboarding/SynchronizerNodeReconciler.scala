@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import cats.implicits.{catsSyntaxApplicativeError, toTraverseOps}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -49,10 +49,10 @@ class SynchronizerNodeReconciler(
     versionSupport: PackageVersionSupport,
     clock: Clock,
     retryProvider: RetryProvider,
-    logger: TracedLogger,
+    val loggerFactory: NamedLoggerFactory,
     migrationId: Long,
     scanConfig: SvScanConfig,
-) {
+) extends NamedLogging {
 
   private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
@@ -65,7 +65,6 @@ class SynchronizerNodeReconciler(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Unit] = {
-    // TODO(#564) - add ability to sync all the synchronizers
     val currentNode = synchronizerNodes.map(_.current)
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(currentNode, migrationId)

@@ -204,7 +204,7 @@ spec:
               value: |
                 canton.sv-apps.sv.local-synchronizer-nodes.{{ $syncName }} {
                   sequencer {
-                    {{- if $sync.enableBftSequencer }}
+                    {{- if (index $sync "enableBftSequencer") }}
                     is-bft-sequencer = true
                     {{- end }}
                     admin-api {
@@ -415,7 +415,7 @@ spec:
             - name: SPLICE_APP_EXPIRED_REWARD_COUPON_NUM_BATCHES
               value: {{ .Values.delegatelessAutomationExpiredRewardCouponNumBatches | quote }}
             {{- end }}
-            {{- if and .Values.domain .Values.domain.skipInitialization }}
+            {{- if and .Values.synchronizers .Values.synchronizers.skipInitialization }}
             - name: ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION
               value: canton.sv-apps.sv.skip-synchronizer-initialization = true
             {{- end }}

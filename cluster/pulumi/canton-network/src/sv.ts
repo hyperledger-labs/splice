@@ -242,7 +242,7 @@ export async function installSvNode(
       `cn-apps-pg`,
       `cn-apps-pg`,
       config.version,
-      spliceConfig.pulumiProjectConfig.cloudSql,
+      svConfig.appsPg?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       {
         logicalDecoding: !!baseConfig.scanBigQuery,
@@ -404,8 +404,12 @@ async function installValidator(
   });
 }
 
-function internalScanUrl(config: SvConfig): pulumi.Output<string> {
-  return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
+function publicScanUrl(config: SvConfig) {
+  return `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`;
+}
+
+function internalScanUrl(config: SvConfig): string {
+  return `http://scan-app.${config.nodeName}:5012`;
 }
 
 function installSvApp(
@@ -429,7 +433,6 @@ function installSvApp(
   const commonSvAppValues = valuesForSvApp(
     decentralizedSynchronizerMigrationConfig,
     { ...config, skipInitialization: svsConfig?.synchronizer?.skipInitialization },
-    decentralizedSynchronizer,
     synchronizerNodes,
     config.ingressName
   );
@@ -457,7 +460,7 @@ function installSvApp(
         ? undefined
         : decentralizedSynchronizer.sv1InternalSequencerAddress,
     scan: {
-      publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+      publicUrl: publicScanUrl(config),
       internalUrl: internalScanUrl(config),
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
@@ -618,6 +621,7 @@ function installScan(
           },
         }
       : {}),
+    publicUrl: publicScanUrl(config),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

@@ -97,6 +97,7 @@ object ConfigTransforms {
               )
             case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
             case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
+            case Some(rollForwardLsu: SvOnboardingConfig.RollForwardLsu) => Some(rollForwardLsu)
             case None => None
           },
         )
@@ -338,6 +339,7 @@ object ConfigTransforms {
             Some(update(foundDso))
           case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
           case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
+          case Some(rollForwardLsu: SvOnboardingConfig.RollForwardLsu) => Some(rollForwardLsu)
           case None => None
         }
     )

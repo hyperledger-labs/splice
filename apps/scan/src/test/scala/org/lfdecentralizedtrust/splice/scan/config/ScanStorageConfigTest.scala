@@ -19,6 +19,7 @@ class ScanStorageConfigTest
           bulkDbReadChunkSize = 1,
           bulkZstdFrameSize = 0L,
           bulkMaxFileSize = 0L,
+          zstdCompressionLevel = 0,
         )
         val prev = cantonTimestamp("2007-12-03T11:30:00.00Z")
         val next = cantonTimestamp("2007-12-03T12:00:00.00Z")
@@ -31,6 +32,7 @@ class ScanStorageConfigTest
           bulkDbReadChunkSize = 1,
           bulkZstdFrameSize = 0L,
           bulkMaxFileSize = 0L,
+          zstdCompressionLevel = 0,
         )
         val prev = cantonTimestamp("2007-12-03T12:00:00.00Z")
         val next = cantonTimestamp("2007-12-03T14:00:00.00Z")
@@ -43,6 +45,7 @@ class ScanStorageConfigTest
           bulkDbReadChunkSize = 1,
           bulkZstdFrameSize = 0L,
           bulkMaxFileSize = 0L,
+          zstdCompressionLevel = 0,
         )
         val prev = cantonTimestamp("2007-12-03T21:00:00.00Z")
         val next = cantonTimestamp("2007-12-04T00:00:00.00Z")
