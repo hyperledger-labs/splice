@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useGetRoundOfLatestData } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
-import React, { useMemo } from 'react';
+import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { Tab, Tabs, Typography, Box, Grid } from '@mui/material';
@@ -9,7 +8,6 @@ import { Tab, Tabs, Typography, Box, Grid } from '@mui/material';
 import Layout from '../components/Layout';
 import NetworkInfo from '../components/NetworkInfo';
 import TotalAmuletBalance from '../components/TotalAmuletBalance';
-import TotalRewards from '../components/TotalRewards';
 
 const Root: React.FC = () => {
   const navLinks = [
@@ -24,25 +22,6 @@ const Root: React.FC = () => {
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
 
-  const { data: latestRound, error } = useGetRoundOfLatestData();
-
-  const round = useMemo(() => {
-    if (error) {
-      if (
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (error as any).code === 404 &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (error as any).body.error === 'No data has been made available yet'
-      ) {
-        // Backend is working, but no round data is available
-        return '??';
-      } else {
-        return '--';
-      }
-    }
-    return latestRound?.round !== undefined ? latestRound.round : '--';
-  }, [latestRound, error]);
-
   return (
     <Layout>
       <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>
@@ -54,10 +33,6 @@ const Root: React.FC = () => {
 
         <Grid size={{ xs: 12, lg: 6 }} data-testid="circulating-supply-container">
           <TotalAmuletBalance />
-        </Grid>
-
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <TotalRewards />
         </Grid>
 
         <Grid size={{ xs: 12, lg: 6 }}>
