@@ -7,11 +7,10 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.functorFilter.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{CantonConfig, DefaultProcessingTimeouts, ProcessingTimeout}
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.integration.{
   ConfigTransform,
@@ -446,11 +445,11 @@ class ProgrammableSequencer(
   ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp] =
     baseSequencer.awaitContainingBlockLastTimestamp(timestamp)
 
-  override private[sequencer] def updateLsuSuccessor(
+  override private[sequencer] def updateSynchronizerSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit =
-    baseSequencer.updateLsuSuccessor(successorO, announcementEffectiveTime)
+    baseSequencer.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
 
   override private[canton] def orderer: Option[BlockOrderer] = baseSequencer.orderer
 
@@ -524,7 +523,7 @@ object ProgrammableSequencer {
   /** Extract the list of confirmation responses.
     */
   def confirmationResponsesKind(messages: Map[Member, Seq[SubmissionRequest]])(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Map[Member, Seq[String]] =
     messages.view
       .mapValues(_.mapFilter { submissionRequest =>

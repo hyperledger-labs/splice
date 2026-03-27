@@ -7,7 +7,10 @@ import better.files.File
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
-import com.digitalasset.canton.admin.api.client.data.{SynchronizerConnectionConfig}
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionValidation,
+  SynchronizerConnectionConfig,
+}
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, ExportAcsResponse}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
@@ -19,7 +22,8 @@ import com.digitalasset.canton.console.{
   Help,
   Helpful,
 }
-import com.digitalasset.canton.grpc.OutputFileStreamObserver
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ActiveContractOld,
@@ -214,7 +218,7 @@ class ParticipantRepairAdministration(
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
         val file = File(outputFile)
-        val responseObserver = new OutputFileStreamObserver[ExportAcsOldResponse](file, _.chunk)
+        val responseObserver = new FileStreamObserver[ExportAcsOldResponse](file, _.chunk)
 
         def call: ConsoleCommandResult[Context.CancellableContext] =
           runner.adminCommand(
@@ -267,7 +271,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcsOld(
-            Seq(ByteString.copyFrom(File(inputFile).loadBytes)),
+            ByteString.copyFrom(File(inputFile).loadBytes),
             if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
           )
         )
@@ -303,7 +307,7 @@ class ParticipantRepairAdministration(
   ): Unit =
     consoleEnvironment.run {
       val file = File(exportFilePath)
-      val responseObserver = new OutputFileStreamObserver[ExportAcsResponse](file, _.chunk)
+      val responseObserver = new FileStreamObserver[ExportAcsResponse](file, _.chunk)
 
       def call: ConsoleCommandResult[Context.CancellableContext] =
         runner.adminCommand(
@@ -401,7 +405,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
-            Seq(ByteString.copyFrom(File(importFilePath).loadBytes)),
+            ByteString.copyFrom(File(importFilePath).loadBytes),
             if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
             contractImportMode,
             representativePackageIdOverride,
@@ -524,7 +528,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcsOld(
-            Seq(bytes),
+            bytes,
             workflowIdPrefix = s"import-${UUID.randomUUID}",
           )
         )
@@ -645,6 +649,44 @@ class ParticipantRepairAdministration(
         )
       }
     }
+
+  // TODO(#28972) Remove preview flag
+  @Help.Summary("Perform a logical synchronizer upgrade")
+  @Help.Description(
+    """This command allows to perform an offline logical synchronizer upgrade.
+       |It should only be used if the node was offline at the time of the upgrade and the
+       |synchronizer was decommissioned.
+       |
+       |Parameters:
+       |- currentPhysicalSynchronizerId: ID of the synchronizer that should be upgraded.
+       |- successorPhysicalSynchronizerId: ID of the new synchronizer.
+       |- announcedUpgradeTime: Time at which the upgrade happened.
+       |- successorConfig: configuration to connect to the new synchronizer.
+       |- validation: The validations which need to be done to the connection.
+      """
+  )
+  def perform_manual_lsu(
+      currentPhysicalSynchronizerId: PhysicalSynchronizerId,
+      successorPhysicalSynchronizerId: PhysicalSynchronizerId,
+      announcedUpgradeTime: CantonTimestamp,
+      successorConfig: SynchronizerConnectionConfig,
+      validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
+  ): Unit = check(FeatureFlag.Preview) {
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement
+            .PerformManualLsu(
+              currentPSId = currentPhysicalSynchronizerId,
+              successorPSId = successorPhysicalSynchronizerId,
+              upgradeTime = announcedUpgradeTime,
+              successorConfig = successorConfig.toInternal,
+              sequencerConnectionValidation = validation.toInternal,
+            )
+        )
+      }
+    }
+  }
 }
 
 object ParticipantRepairAdministration {

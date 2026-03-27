@@ -687,34 +687,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
     )(implicit
         override val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = "The topology snapshot was rejected because it was inconsistent."
-        )
-        with TopologyManagerError
-
-    final case class MissingSynchronizerSequencerState()(implicit
-        override val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause =
-            "The topology snapshot was rejected because it is missing the synchronizer sequencer state."
-        )
-        with TopologyManagerError
-
-    final case class MultipleLogicalSynchronizerIds(synchronizerIds: Set[SynchronizerId])(implicit
-        override val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause =
-            s"The topology snapshot was rejected because it contains synchronizer sequencer states with multiple differing syncrhonizer ids: $synchronizerIds."
-        )
-        with TopologyManagerError
-
-    final case class UnexpectedPhysicalSynchronizerId(
-        fromParameters: PhysicalSynchronizerId,
-        fromAnnouncement: PhysicalSynchronizerId,
-    )(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause =
-            s"Sequencer is being initialized with physical synchronizer id $fromParameters, " +
-              s"not matching the announced upgrade successor id $fromAnnouncement in the provided topology snapshot."
+          cause = s"The topology snapshot was rejected because it was inconsistent."
         )
         with TopologyManagerError
   }
@@ -930,14 +903,14 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   }
 
   @Explanation(
-    "This error indicates that an LSU is scheduled and only mappings related to synchronizer upgrade are permitted."
+    "This error indicates that a synchronizer upgrade is ongoing and only mappings related to synchronizer upgrade are permitted."
   )
   @Resolution(
     "Contact the owners of the synchronizer about the ongoing synchronizer upgrade."
   )
-  object AnnouncedLsuTopologyFreeze
+  object OngoingSynchronizerUpgrade
       extends ErrorCode(
-        id = "TOPOLOGY_LSU_TOPOLOGY_FREEZE",
+        id = "TOPOLOGY_ONGOING_SYNCHRONIZER_UPGRADE",
         InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(synchronizerId: SynchronizerId)(implicit
@@ -950,18 +923,20 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   }
 
   @Explanation(
-    "This error indicates that an LSU is not scheduled, which prevents some upgrade operations from being performed."
+    "This error indicates that a synchronizer upgrade is not ongoing, which prevents some upgrade operations from being performed."
   )
-  @Resolution("Contact the owners of the synchronizer about the LSU.")
-  object NoLsuScheduled
+  @Resolution(
+    "Contact the owners of the synchronizer about the ongoing synchronizer upgrade."
+  )
+  object NoOngoingSynchronizerUpgrade
       extends ErrorCode(
-        id = "TOPOLOGY_NO_LSU_SCHEDULED",
+        id = "TOPOLOGY_NO_ONGOING_SYNCHRONIZER_UPGRADE",
         InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Failure()(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = "The operation cannot be performed because no LSU is scheduled"
+          cause = s"The operation cannot be performed because no upgrade is ongoing"
         )
         with TopologyManagerError
   }
@@ -1000,9 +975,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         Reject(
           successorSynchronizerId = successorSynchronizerId,
           details =
-            s"conflicts with previous announcement with successor $previouslyAnnouncedSuccessor. " +
-              s"Changing the announcement (including the upgrade time) requires a new announcement " +
-              s"with an increasing synchronizer id",
+            s"conflicts with previous announcement with successor $previouslyAnnouncedSuccessor",
         )
     }
   }

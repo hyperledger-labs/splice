@@ -4,23 +4,24 @@
 package com.digitalasset.canton.participant.admin.data
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.sequencing.SequencerConnectionValidation
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.transaction.GrpcConnection
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 
 // See invariants in `checkInvariants` below
 final case class ManualLsuRequest private (
-    currentPsid: PhysicalSynchronizerId,
-    successorPsid: PhysicalSynchronizerId,
-    upgradeTime: Option[CantonTimestamp],
-    sequencerSuccessors: Map[SequencerId, GrpcConnection],
-) {
-  def lsid: SynchronizerId = currentPsid.logical
-}
+    currentPSId: PhysicalSynchronizerId,
+    successorPSId: PhysicalSynchronizerId,
+    upgradeTime: CantonTimestamp,
+    successorConfig: SynchronizerConnectionConfig,
+    successorConnectionValidation: SequencerConnectionValidation,
+)
 
 object ManualLsuRequest {
   import scala.math.Ordered.orderingToOrdered
@@ -29,60 +30,67 @@ object ManualLsuRequest {
       request: v30.PerformManualLsuRequest
   ): ParsingResult[ManualLsuRequest] =
     for {
-      currentPsid <-
+      currentPSId <-
         PhysicalSynchronizerId
           .fromProtoPrimitive(
             request.physicalSynchronizerId,
             "physical_synchronizer_id",
           )
 
-      successorPsid <- PhysicalSynchronizerId
+      successor <- request.successor
+        .toRight(ProtoDeserializationError.FieldNotSet("successor"))
+
+      successorPSId <- PhysicalSynchronizerId
         .fromProtoPrimitive(
-          request.successorPhysicalSynchronizerId,
-          "successor_physical_synchronizer_id",
+          successor.physicalSynchronizerId,
+          "successor.physical_synchronizer_id",
         )
 
-      upgradeTimeO <- request.upgradeTime.traverse(CantonTimestamp.fromProtoTimestamp)
+      upgradeTime <- ProtoConverter
+        .parseRequired(
+          CantonTimestamp.fromProtoTimestamp,
+          "successor.announced_upgrade_time",
+          successor.announcedUpgradeTime,
+        )
 
-      successors <- request.sequencerSuccessors.toSeq.traverse { case (sequencerIdP, connectionP) =>
-        for {
-          sequencerId <- SequencerId.fromProtoPrimitive(
-            sequencerIdP,
-            "successor.sequencer_successors.id",
-          )
-          connection <- GrpcConnection.fromProtoPrimitives(
-            connectionP.endpoints,
-            connectionP.customTrustCertificates,
-          )
-        } yield (sequencerId, connection)
-      }
+      successorConfig <- ProtoConverter
+        .parseRequired(
+          SynchronizerConnectionConfig.fromProtoV30,
+          "successor.config",
+          successor.config,
+        )
+
+      validation <- SequencerConnectionValidation.fromProtoV30(
+        successor.sequencerConnectionValidation
+      )
 
       _ <- checkInvariants(
-        currentPsid = currentPsid,
-        successorPsid = successorPsid,
+        currentPSId = currentPSId,
+        successorPSId = successorPSId,
       ).leftMap(InvariantViolation(None, _))
 
     } yield ManualLsuRequest(
-      currentPsid = currentPsid,
-      successorPsid = successorPsid,
-      upgradeTime = upgradeTimeO,
-      sequencerSuccessors = successors.toMap,
+      currentPSId = currentPSId,
+      successorPSId = successorPSId,
+      upgradeTime = upgradeTime,
+      successorConfig = successorConfig,
+      successorConnectionValidation = validation,
     )
 
   private def checkInvariants(
-      currentPsid: PhysicalSynchronizerId,
-      successorPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
+      successorPSId: PhysicalSynchronizerId,
   ): Either[String, Unit] = for {
     _ <- Either.cond(
-      currentPsid.logical == successorPsid.logical,
+      currentPSId.logical == successorPSId.logical,
       (),
-      s"Current and successor physical synchronizer ids must have same logical ids. Found: $currentPsid and $successorPsid",
+      s"Current and successor physical synchronizer ids must have same logical ids. Found: $currentPSId and $successorPSId",
     )
 
     _ <- Either.cond(
-      currentPsid < successorPsid,
+      currentPSId < successorPSId,
       (),
-      s"Current physical synchronizer id must be smaller than the successor. Found: $currentPsid and $successorPsid",
+      s"Current physical synchronizer id must be smaller than the successor. Found: $currentPSId and $successorPSId",
     )
   } yield ()
 }

@@ -46,15 +46,6 @@ object GrpcStreamingUtils {
   private final val defaultChunkSize: Int =
     1024 * 1024 * 2 // 2MB - This is half of the default max message size of gRPC
 
-  /** A blocking method that waits for a chunk of bytes from the input stream, or the end of the
-    * stream.
-    * @return
-    *   an array of bytes read from the input stream (with at most `chunkSize` bytes), or an empty
-    *   array if the end of the stream has been reached.
-    */
-  def readChunkBytes(inputStream: InputStream, chunkSize: Int = defaultChunkSize): Array[Byte] =
-    inputStream.readNBytes(chunkSize)
-
   def streamFromClient[Req, Resp, C](
       extractChunkBytes: Req => ByteString,
       extractContext: Req => C,
@@ -273,43 +264,6 @@ object GrpcStreamingUtils {
       }
 
     read()
-    requestComplete.future
-  }
-
-  def streamToServerChunked[Req, Resp](
-      load: StreamObserver[Resp] => StreamObserver[Req],
-      requests: Seq[Req],
-  ): Future[Resp] = {
-    val requestComplete = Promise[Resp]()
-    val ref = new AtomicReference[Option[Resp]](None)
-
-    val responseObserver = new StreamObserver[Resp] {
-      override def onNext(value: Resp): Unit =
-        ref.set(Some(value))
-
-      override def onError(t: Throwable): Unit = requestComplete.failure(t)
-
-      override def onCompleted(): Unit =
-        ref.get() match {
-          case Some(response) => requestComplete.success(response)
-          case None =>
-            requestComplete.failure(
-              io.grpc.Status.CANCELLED
-                .withDescription("Server completed the request before providing a response")
-                .asRuntimeException()
-            )
-        }
-
-    }
-    val requestObserver = load(responseObserver)
-
-    requests
-      .foreach { request =>
-        blocking {
-          requestObserver.onNext(request)
-        }
-      }
-    requestObserver.onCompleted()
     requestComplete.future
   }
 

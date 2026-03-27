@@ -333,9 +333,6 @@ object ParticipantId {
   def apply(identifier: String, namespace: Namespace): ParticipantId =
     ParticipantId(UniqueIdentifier.tryCreate(identifier, namespace))
 
-  def apply(uid: UniqueIdentifier): ParticipantId =
-    new ParticipantId(uid)
-
   /** create a participant from a string
     *
     * used in testing

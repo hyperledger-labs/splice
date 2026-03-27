@@ -18,6 +18,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.LifeCycleContainer
 import com.digitalasset.canton.participant.admin.data.ManualLsuRequest
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
+import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.UnknownPSId
 import com.digitalasset.canton.participant.store.{
   StoredSynchronizerConnectionConfig,
   SyncPersistentState,
@@ -131,7 +132,7 @@ abstract class LogicalSynchronizerUpgrade[Param](
     */
   protected def performUpgradeInternal(
       alias: SynchronizerAlias,
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
       params: Param,
   )(implicit
@@ -173,7 +174,7 @@ abstract class LogicalSynchronizerUpgrade[Param](
   /** Runs `f` if the upgrade was not done yet.
     */
   protected def performIfNotUpgradedYet[E](
-      successorPsid: PhysicalSynchronizerId
+      successorPSId: PhysicalSynchronizerId
   )(
       f: => EitherT[FutureUnlessShutdown, E, Unit],
       operation: String,
@@ -181,7 +182,7 @@ abstract class LogicalSynchronizerUpgrade[Param](
       traceContext: TraceContext,
       logger: Lsu.Logger,
   ): EitherT[FutureUnlessShutdown, E, Unit] =
-    synchronizerConnectionConfigStore.get(successorPsid) match {
+    synchronizerConnectionConfigStore.get(successorPSId) match {
       case Right(
             StoredSynchronizerConnectionConfig(_, SynchronizerConnectionConfigStore.Active, _, _)
           ) =>
@@ -197,17 +198,17 @@ abstract class LogicalSynchronizerUpgrade[Param](
     */
   protected def performUpgrade(
       alias: SynchronizerAlias,
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
       param: Param,
   )(implicit
       traceContext: TraceContext,
       logger: Lsu.Logger,
   ): EitherT[FutureUnlessShutdown, NegativeResult, Unit] = {
-    val successorPsid = synchronizerSuccessor.psid
-    val lsid = currentPsid.logical
+    val successorPSId = synchronizerSuccessor.psid
+    val lsid = currentPSId.logical
 
-    performIfNotUpgradedYet(successorPsid)(
+    performIfNotUpgradedYet(successorPSId)(
       for {
         _disconnect <- disconnectSynchronizer(Traced(alias)).leftMap(err =>
           NegativeResult(err.toString, isRetryable = true)
@@ -218,7 +219,7 @@ abstract class LogicalSynchronizerUpgrade[Param](
             lsid,
             operation = performUpgradeInternal(
               alias,
-              currentPsid,
+              currentPSId,
               synchronizerSuccessor,
               param,
             ).leftMap { error =>
@@ -227,7 +228,7 @@ abstract class LogicalSynchronizerUpgrade[Param](
                 recovered from (except DB exceptions).
                */
               NegativeResult(
-                s"Unable to upgrade $currentPsid to $successorPsid. Not retrying. Cause: $error",
+                s"Unable to upgrade $currentPSId to $successorPSId. Not retrying. Cause: $error",
                 isRetryable = false,
               )
             }.value,
@@ -236,7 +237,7 @@ abstract class LogicalSynchronizerUpgrade[Param](
           )
         )
       } yield (),
-      operation = s"$kind upgrade from $currentPsid to $successorPsid",
+      operation = s"$kind upgrade from $currentPSId to $successorPSId",
     )
   }
 }
@@ -277,10 +278,10 @@ class AutomaticLogicalSynchronizerUpgrade(
 
   override def kind: String = "automatic"
 
-  /** Attempt to perform the upgrade from `currentPsid` to `synchronizerSuccessor`.
+  /** Attempt to perform the upgrade from `currentPSId` to `synchronizerSuccessor`.
     *
     * Prerequisites:
-    *   - Time on `currentPsid` has reached `synchronizerSuccessor.upgradeTime`
+    *   - Time on `currentPSId` has reached `synchronizerSuccessor.upgradeTime`
     *   - Successor synchronizer is registered
     *
     * Strategy:
@@ -292,18 +293,18 @@ class AutomaticLogicalSynchronizerUpgrade(
     */
   def upgrade(
       alias: SynchronizerAlias,
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
-    val successorPsid = synchronizerSuccessor.psid
+    val successorPSId = synchronizerSuccessor.psid
     implicit val logger = Lsu.Logger(loggerFactory, getClass, synchronizerSuccessor)
 
-    logger.info(s"Upgrade from $currentPsid to $successorPsid")
+    logger.info(s"Upgrade from $currentPSId to $successorPSId")
 
     // Ensure upgraded is not attempted if announcement was revoked
     def ensureUpgradeOngoing(): EitherT[FutureUnlessShutdown, String, Unit] = for {
       topologyStore <- EitherT.fromOption[FutureUnlessShutdown](
-        syncPersistentStateManager.get(currentPsid).map(_.topologyManager.store),
+        syncPersistentStateManager.get(currentPSId).map(_.topologyManager.store),
         "Unable to find topology store",
       )
 
@@ -313,7 +314,7 @@ class AutomaticLogicalSynchronizerUpgrade(
             asOf = synchronizerSuccessor.upgradeTime,
             asOfInclusive = false,
             isProposal = false,
-            types = Seq(TopologyMapping.Code.LsuAnnouncement),
+            types = Seq(TopologyMapping.Code.SynchronizerUpgradeAnnouncement),
             filterUid = None,
             filterNamespace = None,
           )
@@ -338,37 +339,37 @@ class AutomaticLogicalSynchronizerUpgrade(
       }
     } yield ()
 
-    performIfNotUpgradedYet(successorPsid)(
+    performIfNotUpgradedYet(successorPSId)(
       for {
         _ <- ensureUpgradeOngoing()
 
         upgradabilityCheckResult <- EitherT(
-          runWithRetries(upgradabilityCheck(alias, currentPsid, synchronizerSuccessor))
+          runWithRetries(upgradabilityCheck(alias, currentPSId, synchronizerSuccessor))
         )
 
         _ <- upgradabilityCheckResult match {
           case UpgradabilityCheckResult.ReadyToUpgrade =>
             logger.info(
-              s"Upgrade from $currentPsid to $successorPsid is possible, starting internal upgrade"
+              s"Upgrade from $currentPSId to $successorPSId is possible, starting internal upgrade"
             )
 
             EitherT.liftF[FutureUnlessShutdown, String, Unit](
               retryPolicy
                 .unlessShutdown(
-                  performUpgrade(alias, currentPsid, synchronizerSuccessor, ()).value,
+                  performUpgrade(alias, currentPSId, synchronizerSuccessor, ()).value,
                   DbExceptionRetryPolicy,
                 )
                 .map(_ => ())
             )
 
           case UpgradabilityCheckResult.UpgradeDone =>
-            logger.info(s"Upgrade from $currentPsid to $successorPsid already done.")
+            logger.info(s"Upgrade from $currentPSId to $successorPSId already done.")
             EitherTUtil.unitUS
         }
 
         _ <- connectSynchronizer(Traced(alias)).leftMap(_.toString)
       } yield (),
-      operation = s"automatic upgrade from $currentPsid to $successorPsid",
+      operation = s"automatic upgrade from $currentPSId to $successorPSId",
     )
   }
 
@@ -381,7 +382,7 @@ class AutomaticLogicalSynchronizerUpgrade(
     */
   override protected def performUpgradeInternal(
       alias: SynchronizerAlias,
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
       params: Unit,
   )(implicit
@@ -390,17 +391,17 @@ class AutomaticLogicalSynchronizerUpgrade(
   ): EitherT[FutureUnlessShutdown, String, Unit] =
     for {
       // Should have been checked before but this is cheap
-      _ <- canBeUpgradedTo(currentPsid, synchronizerSuccessor).leftMap(_.details)
+      _ <- canBeUpgradedTo(currentPSId, synchronizerSuccessor).leftMap(_.details)
 
       // Prevent reconnect to the current/old synchronizer
-      _ = logger.info(s"Marking synchronizer connection $currentPsid as inactive")
+      _ = logger.info(s"Marking synchronizer connection $currentPSId as inactive")
       _ <- synchronizerConnectionConfigStore
         .setStatus(
           alias,
-          KnownPhysicalSynchronizerId(currentPsid),
+          KnownPhysicalSynchronizerId(currentPSId),
           SynchronizerConnectionConfigStore.Inactive,
         )
-        .leftMap(err => s"Unable to mark current synchronizer $currentPsid as inactive: $err")
+        .leftMap(err => s"Unable to mark current synchronizer $currentPSId as inactive: $err")
 
       // Comes last to indicate that the node is ready to connect to the successor
       _ = logger.info(s"Marking synchronizer connection ${synchronizerSuccessor.psid} as active")
@@ -422,14 +423,14 @@ class AutomaticLogicalSynchronizerUpgrade(
     */
   private def upgradabilityCheck(
       alias: SynchronizerAlias,
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
   )(implicit
       traceContext: TraceContext,
       logger: Lsu.Logger,
   ): FutureUnlessShutdown[Either[NegativeResult, UpgradabilityCheckResult]] = {
-    val successorPsid = synchronizerSuccessor.psid
-    val lsid = currentPsid.logical
+    val successorPSId = synchronizerSuccessor.psid
+    val lsid = currentPSId.logical
 
     logger.info("Attempting upgradability check")
 
@@ -440,13 +441,13 @@ class AutomaticLogicalSynchronizerUpgrade(
           NegativeResult(s"Unable to connect to $alias: $error", isRetryable = true).asLeft
         )
 
-      case Right(Some(`successorPsid`)) =>
+      case Right(Some(`successorPSId`)) =>
         FutureUnlessShutdown.pure(UpgradabilityCheckResult.UpgradeDone.asRight)
 
       case Right(_) =>
         enqueueOperation(
           lsid,
-          canBeUpgradedTo(currentPsid, synchronizerSuccessor).value,
+          canBeUpgradedTo(currentPSId, synchronizerSuccessor).value,
           description = "lsu-upgradability-check",
           shouldBeConnected = true,
         )
@@ -457,7 +458,7 @@ class AutomaticLogicalSynchronizerUpgrade(
     * right indicates that the upgrade can be attempted or was already done.
     */
   private def canBeUpgradedTo(
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
   )(implicit
       traceContext: TraceContext
@@ -468,9 +469,9 @@ class AutomaticLogicalSynchronizerUpgrade(
       EitherT
         .fromOptionF(
           ledgerApiIndexer.asEval.value.ledgerApiStore.value
-            .cleanSynchronizerIndex(currentPsid.logical),
+            .cleanSynchronizerIndex(currentPSId.logical),
           NegativeResult(
-            s"Unable to get synchronizer index for ${currentPsid.logical}",
+            s"Unable to get synchronizer index for ${currentPSId.logical}",
             isRetryable = true,
           ),
         )
@@ -499,9 +500,9 @@ class AutomaticLogicalSynchronizerUpgrade(
     def upgradeCheck(): EitherT[FutureUnlessShutdown, NegativeResult, Unit] = for {
       synchronizerIndex <- EitherT.fromOptionF(
         ledgerApiIndexer.asEval.value.ledgerApiStore.value
-          .cleanSynchronizerIndex(currentPsid.logical),
+          .cleanSynchronizerIndex(currentPSId.logical),
         NegativeResult(
-          s"Unable to get synchronizer index for ${currentPsid.logical}",
+          s"Unable to get synchronizer index for ${currentPSId.logical}",
           isRetryable = true,
         ),
       )
@@ -517,10 +518,10 @@ class AutomaticLogicalSynchronizerUpgrade(
 
       currentSyncPersistentState <- EitherT.fromEither[FutureUnlessShutdown](
         syncPersistentStateManager
-          .get(currentPsid)
+          .get(currentPSId)
           .toRight(
             NegativeResult(
-              s"Unable to find persistent state for $currentPsid",
+              s"Unable to find persistent state for $currentPSId",
               isRetryable = false,
             )
           )
@@ -712,21 +713,79 @@ class ManualLogicalSynchronizerUpgrade(
 
   override def kind: String = "manual"
 
-  // Not used in splice
   def upgrade(
       request: ManualLsuRequest
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = ???
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
+    val currentPSId = request.currentPSId
+    val successorPSId = request.successorPSId
+    val upgradeTime = request.upgradeTime
+    val alias = request.successorConfig.synchronizerAlias
+    val synchronizerSuccessor = SynchronizerSuccessor(successorPSId, upgradeTime)
+    implicit val logger = Lsu.Logger(loggerFactory, getClass, synchronizerSuccessor)
 
-  // not used in splice
+    EitherT(
+      runWithRetries(
+        performUpgrade(
+          alias,
+          currentPSId,
+          synchronizerSuccessor,
+          request.successorConfig,
+        ).value
+      )
+    )
+  }
+
   override protected def performUpgradeInternal(
       alias: SynchronizerAlias,
-      currentPsid: PhysicalSynchronizerId,
+      currentPSId: PhysicalSynchronizerId,
       synchronizerSuccessor: SynchronizerSuccessor,
       successorConfig: SynchronizerConnectionConfig,
   )(implicit
       traceContext: TraceContext,
       logger: Lsu.Logger,
-  ): EitherT[FutureUnlessShutdown, String, Unit] = ???
+  ): EitherT[FutureUnlessShutdown, String, Unit] = {
+    logger.info(s"Marking synchronizer connection $currentPSId as inactive")
+    val successorPSId = synchronizerSuccessor.psid
+
+    for {
+      _ <- synchronizerConnectionConfigStore
+        .setStatus(
+          successorConfig.synchronizerAlias,
+          KnownPhysicalSynchronizerId(currentPSId),
+          SynchronizerConnectionConfigStore.Inactive,
+        )
+        .leftMap(_.message)
+
+      _ <- synchronizerConnectionConfigStore.get(successorPSId) match {
+        case Left(_: UnknownPSId) =>
+          logger.info(s"Storing synchronizer connection config for $successorPSId")
+          synchronizerConnectionConfigStore
+            .put(
+              successorConfig,
+              SynchronizerConnectionConfigStore.Active,
+              KnownPhysicalSynchronizerId(successorPSId),
+              Some(
+                SynchronizerPredecessor(
+                  currentPSId,
+                  synchronizerSuccessor.upgradeTime,
+                  isLateUpgrade = true,
+                )
+              ),
+            )
+            .leftMap(err => s"Unable to store connection config for $successorPSId: $err")
+
+        case Right(foundConfig) =>
+          logger.info(s"Marking synchronizer connection $successorPSId as active")
+          synchronizerConnectionConfigStore
+            .setStatus(
+              successorConfig.synchronizerAlias,
+              foundConfig.configuredPSId,
+              SynchronizerConnectionConfigStore.Active,
+            )
+            .leftMap(err => s"Unable to mark successor synchronizer $successorPSId as active: $err")
+      }
+    } yield logger.info("Manual upgrade was successful")
+  }
 }
 
 protected object LogicalSynchronizerUpgrade {

@@ -25,13 +25,13 @@ trait AdminCommand[Req, Res, Result] {
     */
   protected def createRequest(): Either[String, Req]
 
-  @inline final def createRequestInternal(): Either[String, Req] = createRequest()
+  @inline private[client] final def createRequestInternal(): Either[String, Req] = createRequest()
 
   /** Handle the response the service has provided
     */
   protected def handleResponse(response: Res): Either[String, Result]
 
-  @inline final def handleResponseInternal(response: Res): Either[String, Result] =
+  @inline private[client] final def handleResponseInternal(response: Res): Either[String, Result] =
     handleResponse(response)
 
   /** Determines within which time frame the request should complete
@@ -59,7 +59,7 @@ trait GrpcAdminCommand[Req, Res, Result] extends AdminCommand[Req, Res, Result] 
     */
   protected def createService(channel: ManagedChannel): Svc
 
-  @inline def createServiceInternal(channel: ManagedChannel): Svc =
+  @inline private[client] def createServiceInternal(channel: ManagedChannel): Svc =
     createService(channel)
 
   /** Submit the created request to our service
@@ -69,7 +69,7 @@ trait GrpcAdminCommand[Req, Res, Result] extends AdminCommand[Req, Res, Result] 
   @GrpcServiceInvocationMethod
   protected def submitRequest(service: Svc, request: Req): Future[Res]
 
-  @inline final def submitRequestInternal(service: Svc, request: Req): Future[Res] =
+  @inline private[client] final def submitRequestInternal(service: Svc, request: Req): Future[Res] =
     submitRequest(service, request)
 
 }

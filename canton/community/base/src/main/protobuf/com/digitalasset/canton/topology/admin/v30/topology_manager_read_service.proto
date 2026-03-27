@@ -44,7 +44,7 @@ service TopologyManagerReadService {
 
   // Fetch the topology state
   // The returned bytestring can be used directly to initialize a successor sequencer
-  rpc SequencerLsuState(SequencerLsuStateRequest) returns (stream SequencerLsuStateResponse);
+  rpc LogicalUpgradeState(LogicalUpgradeStateRequest) returns (stream LogicalUpgradeStateResponse);
 }
 
 message BaseQuery {
@@ -256,7 +256,6 @@ message ListLsuAnnouncementResponse {
 message ListLsuSequencerConnectionSuccessorRequest {
   BaseQuery base_query = 1;
   string filter_sequencer_id = 2;
-  string filter_successor_physical_synchronizer_id = 3;
 }
 
 message ListLsuSequencerConnectionSuccessorResponse {
@@ -328,12 +327,12 @@ message GenesisStateV2Response {
   bytes chunk = 1;
 }
 
-message SequencerLsuStateRequest {
+message LogicalUpgradeStateRequest {
   // Must be specified if the node is configured with more than one active synchronizer.
   optional StoreId synchronizer_store = 1;
 }
 
-message SequencerLsuStateResponse {
+message LogicalUpgradeStateResponse {
   // versioned stored topology transactions
   bytes chunk = 1;
 }

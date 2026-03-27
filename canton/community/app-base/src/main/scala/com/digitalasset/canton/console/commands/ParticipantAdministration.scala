@@ -77,15 +77,12 @@ import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
-  SequencerId,
   Synchronizer,
   SynchronizerId,
 }
-import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.*
-import com.digitalasset.canton.{config, SequencerAlias, SynchronizerAlias}
-import com.google.protobuf.ByteString
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
 import io.grpc.Context
 
 import java.time.Instant
@@ -113,7 +110,6 @@ private[console] object ParticipantCommands {
         expectedMainPackageId: String,
         requestHeaders: Map[String, String],
         logger: TracedLogger,
-        darDataO: Option[ByteString] = None,
     ): ConsoleCommandResult[String] =
       runner
         .adminCommand(
@@ -127,7 +123,6 @@ private[console] object ParticipantCommands {
               expectedMainPackageId,
               requestHeaders,
               logger,
-              darDataO,
             )
         )
         .flatMap {
@@ -1717,7 +1712,6 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
         requestHeaders: Map[String, String] = Map(),
-        darDataO: Option[ByteString] = None,
     ): String = {
       val res = consoleEnvironment.runE {
         for {
@@ -2654,36 +2648,6 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def logout(synchronizerAlias: SynchronizerAlias): Unit = consoleEnvironment.run {
       adminCommand(
         ParticipantAdminCommands.SynchronizerConnectivity.Logout(synchronizerAlias)
-      )
-    }
-
-    @Help.Summary("Perform a manual LSU")
-    @Help.Description("""
-        |Perform a local manual logical synchronizer upgrade to
-        |switch to the designated successor.
-        |
-        |Parameters:
-        |- currentPsid: current physical synchronizer id
-        |- successorPsid: physical synchronizer id of the successor
-        |- upgradeTime:
-        |     If defined:
-        |       - MUST be higher than any message received by the node on the synchronizer id
-        |       - Upgrade will not start until all events until upgrade_time have been processed
-        |     If empty:
-        |       - Clean synchronizer index from ledger api server will be used.
-        |- sequencerSuccessors:
-        |     The sequencer connection definitions to connect to the new sequencers.
-        |     SHOULD contain one entry for each sequencer currently registered by the participant
-        |""")
-    def perform_manual_lsu(
-        currentPsid: PhysicalSynchronizerId,
-        successorPsid: PhysicalSynchronizerId,
-        upgradeTime: Option[CantonTimestamp],
-        sequencerSuccessors: Map[SequencerId, GrpcConnection],
-    ): Unit = consoleEnvironment.run {
-      adminCommand(
-        ParticipantAdminCommands.SynchronizerConnectivity
-          .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
       )
     }
   }

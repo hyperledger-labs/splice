@@ -742,7 +742,8 @@ class DbActiveContractStore(
             val query = {
               sql"""select ts, repair_counter, contract_id, operation, reassignment_counter, remote_synchronizer_idx
                   from par_active_contracts where synchronizer_idx = $indexedSynchronizer
-                  and (ts, repair_counter) = ($sequenceTs, $sequenceRc)""" ++ withCidLowerBound ++ sql"""
+                  and (ts, repair_counter) = ($sequenceTs, $sequenceRc)"""
+                ++ withCidLowerBound ++ sql"""
                   -- grouped by contract_id, so that activations and deactivations are as close as they can be and it's more likely to find the reassignment counter for deactivations in the same batch
                   order by contract_id asc,
                   -- in the order first activation, then deactivation

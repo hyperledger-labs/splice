@@ -13,7 +13,6 @@ import com.digitalasset.canton.admin.participant.v30.RegisterSynchronizerRequest
 import com.digitalasset.canton.admin.participant.v30.{
   DisconnectAllSynchronizersRequest,
   DisconnectAllSynchronizersResponse,
-  PerformManualLsuRequest,
 }
 import com.digitalasset.canton.admin.sequencer.v30 as sequencerV30
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
@@ -402,8 +401,5 @@ class GrpcSynchronizerConnectivityService(
     )
     _mapErrNewEUS(ret)
   }
-
-  // Unused in splice
-  override def performManualLsu(request: PerformManualLsuRequest) = ???
 
 }

@@ -17,7 +17,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.integration.tests.sequencer.reference.ReferenceSequencerWithTrafficControlApiTestBase.RateLimitManagerImplTest
@@ -297,6 +297,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         dontWarnOnDeprecatedPV = false,
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
+      sequencingTimeLowerBoundExclusive = None,
       asyncWriter = AsyncWriterParameters(),
       timeAdvancingTopology = TimeAdvancingTopologyConfig(),
     )
@@ -422,7 +423,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ),
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
-        sequencingTimeLowerBoundExclusive = None,
+        SequencingTimeBound(None),
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS

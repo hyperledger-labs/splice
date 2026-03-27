@@ -6,9 +6,9 @@ package com.digitalasset.canton.console.commands
 import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.{
   InitializeFromGenesisState,
   InitializeFromGenesisStateV2,
-  InitializeFromLsuPredecessor,
   InitializeFromOnboardingState,
   InitializeFromOnboardingStateV2,
+  InitializeFromSynchronizerPredecessor,
 }
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, SequencerAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.{
@@ -36,7 +36,6 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSeque
 import com.digitalasset.canton.topology.SequencerId
 import com.google.protobuf.ByteString
 
-import java.io.BufferedInputStream
 import scala.concurrent.ExecutionContext
 
 class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGroup.Impl(node) {
@@ -165,7 +164,7 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     consoleEnvironment.run {
       runner.adminCommand(
         InitializeFromGenesisStateV2(
-          Seq(genesisState),
+          genesisState,
           synchronizerParameters.toInternal,
         )
       )
@@ -173,10 +172,10 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   }
 
   @Help.Summary(
-    "Initialize a sequencer for the logical upgrade from the state of its predecessor, streaming the state from a file"
+    "Initialize a sequencer for the logical upgrade from the state of its predecessor"
   )
-  def initialize_from_lsu_predecessor(
-      inputFile: String,
+  def initialize_from_synchronizer_predecessor(
+      predecessorState: ByteString,
       synchronizerParameters: StaticSynchronizerParameters,
       waitForReady: Boolean = true,
   ): Unit = {
@@ -184,10 +183,8 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
     consoleEnvironment.run {
       runner.adminCommand(
-        InitializeFromLsuPredecessor(
-          new BufferedInputStream(
-            new java.io.FileInputStream(inputFile)
-          ),
+        InitializeFromSynchronizerPredecessor(
+          predecessorState,
           synchronizerParameters.toInternal,
         )
       )

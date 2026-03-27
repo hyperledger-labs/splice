@@ -9,20 +9,22 @@ import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.RpcError
-import com.digitalasset.canton.{config, networking}
-import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
-import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
-import com.digitalasset.canton.admin.api.client.data.{
-  TopologyQueueStatus,
-  DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
-}
+import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
-import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
+import com.digitalasset.canton.admin.api.client.data.{
+  DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
+  TopologyQueueStatus,
+}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
+import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
+import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
+import com.digitalasset.canton.console.FeatureFlag.Preview
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CommandErrors,
+  CommandSuccessful,
   ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
@@ -32,24 +34,21 @@ import com.digitalasset.canton.console.{
   Helpful,
   InstanceReference,
 }
-import com.digitalasset.canton.console.CommandErrors.GenericCommandError
-import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
-import com.digitalasset.canton.console.FeatureFlag.Preview
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonError
-import com.digitalasset.canton.grpc.{ByteStringStreamObserver, OutputFileStreamObserver}
+import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.{
   ExportTopologySnapshotResponse,
   ExportTopologySnapshotV2Response,
   GenesisStateResponse,
   GenesisStateV2Response,
-  SequencerLsuStateResponse,
+  LogicalUpgradeStateResponse,
 }
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
@@ -65,9 +64,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
+import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
-import io.grpc.{Context, Status}
+import io.grpc.Context
 
 import java.net.URI
 import java.time.Duration
@@ -189,7 +189,7 @@ class TopologyAdministrationGroup(
       waitForReady,
     )
 
-  private def getIdCommand(): ConsoleCommandResult[GetIdResult] =
+  private def getIdCommand(): ConsoleCommandResult[UniqueIdentifier] =
     adminCommand(TopologyAdminCommands.Init.GetId())
 
   // small cache to avoid repetitive calls to fetchId (as the id is immutable once set)
@@ -202,13 +202,15 @@ class TopologyAdministrationGroup(
   private[console] def idHelper[T](
       apply: UniqueIdentifier => T
   ): T =
-    maybeIdHelper(apply).getOrElse(
-      throw Status.UNAVAILABLE
-        .withDescription(
-          s"Node does not have an Id assigned yet."
-        )
-        .asRuntimeException()
-    )
+    apply(idCache.get() match {
+      case Some(v) => v
+      case None =>
+        val r = consoleEnvironment.run {
+          getIdCommand()
+        }
+        idCache.set(Some(r))
+        r
+    })
 
   private[console] def maybeIdHelper[T](
       apply: UniqueIdentifier => T
@@ -216,11 +218,14 @@ class TopologyAdministrationGroup(
     (idCache.get() match {
       case Some(v) => Some(v)
       case None =>
-        val r = consoleEnvironment.run {
-          getIdCommand()
+        consoleEnvironment.run {
+          CommandSuccessful(getIdCommand() match {
+            case CommandSuccessful(v) =>
+              idCache.set(Some(v))
+              Some(v)
+            case _: CommandError => None
+          })
         }
-        r.uniqueIdentifier.foreach(id => idCache.set(Some(id)))
-        r.uniqueIdentifier
     }).map(apply)
 
   @Help.Summary("Topology synchronisation helpers", FeatureFlag.Preview)
@@ -767,7 +772,7 @@ class TopologyAdministrationGroup(
       }
 
     @Help.Summary(
-      "Stream the topology upgrade state for a sequencer (intended for logical synchronizer upgrade) to a file"
+      "Download the topology upgrade state for a sequencer (intended for logical synchronizer upgrade)"
     )
     @Help.Description(
       """Download the topology snapshot which includes the entire history of topology transactions
@@ -781,27 +786,23 @@ class TopologyAdministrationGroup(
         |                 topology store must be set explicitly.
         """
     )
-    def sequencer_lsu_state(
-        outputFile: String,
+    def logical_upgrade_state(
         topologyStore: Option[TopologyStoreId.Synchronizer] = None,
         timeout: NonNegativeDuration = timeouts.unbounded,
-    ): Unit =
+    ): ByteString =
       consoleEnvironment.run {
-        val fileStreamObserver = new OutputFileStreamObserver[SequencerLsuStateResponse](
-          better.files.File(outputFile),
-          _.chunk,
-        )
+        val responseObserver = new ByteStringStreamObserver[LogicalUpgradeStateResponse](_.chunk)
 
         def call: ConsoleCommandResult[Context.CancellableContext] =
           adminCommand(
-            TopologyAdminCommands.Read.SequencerLsuState(topologyStore, fileStreamObserver)
+            TopologyAdminCommands.Read.LogicalUpgradeState(topologyStore, responseObserver)
           )
 
         processResult(
           call,
-          fileStreamObserver.result,
+          responseObserver.resultBytes,
           timeout,
-          "Downloading the genesis state for logical upgrade to a file",
+          "Downloading the genesis state for logical upgrade",
         )
       }
 
@@ -2661,9 +2662,9 @@ class TopologyAdministrationGroup(
               (
                 serial.increment,
                 // first filter out all existing packages that either get re-added (i.e. modified) or removed
-                item.packages.filter(vp =>
-                  !allChangedPackageIds.contains(vp.packageId)
-                ) /* now we can add all the adds the also haven't been in the remove set */ ++ adds,
+                item.packages.filter(vp => !allChangedPackageIds.contains(vp.packageId))
+                // now we can add all the adds the also haven't been in the remove set
+                  ++ adds,
               )
             case Some(
                   ListVettedPackagesResult(
@@ -3700,7 +3701,7 @@ class TopologyAdministrationGroup(
       def propose_successor(
           sequencerId: SequencerId,
           endpoints: NonEmpty[Seq[URI]],
-          synchronizerId: PhysicalSynchronizerId,
+          synchronizerId: SynchronizerId,
           customTrustCertificates: Option[ByteString] = None,
           store: Option[TopologyStoreId] = None,
           mustFullyAuthorize: Boolean = false,
@@ -3747,7 +3748,6 @@ class TopologyAdministrationGroup(
           operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
           filterSequencerId: String = "",
           filterSigningKey: String = "",
-          filterSuccessorPhysicalSynchronizerId: String = "",
       ): Seq[ListLsuSequencerConnectionSuccessorResult] = consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListLsuSequencerConnectionSuccessor(
@@ -3759,8 +3759,7 @@ class TopologyAdministrationGroup(
               filterSigningKey,
               None,
             ),
-            filterSequencerId = filterSequencerId,
-            filterSuccessorPhysicalSynchronizerId = filterSuccessorPhysicalSynchronizerId,
+            filterSequencerId,
           )
         )
       }

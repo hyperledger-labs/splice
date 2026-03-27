@@ -4,7 +4,6 @@
 package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.sequencer.v30.SequencerStatusServiceGrpc
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -13,7 +12,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{Crypto, SynchronizerCrypto, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.health.*
@@ -101,14 +100,12 @@ import com.digitalasset.canton.topology.store.{
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.{
-  LsuAnnouncement,
   MediatorSynchronizerState,
   SequencerSynchronizerState,
   SynchronizerTrustCertificate,
-  TopologyMapping,
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, SingleUseCell}
+import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseVersion}
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.ServerServiceDefinition
@@ -586,41 +583,6 @@ class SequencerNodeBootstrap(
             }
           }
 
-          sequencingTimeLowerBoundExclusive <-
-            EitherT.right[String] {
-              // We use the store since at this point the topology client has not been initialized yet
-              synchronizerTopologyStore
-                .findPositiveTransactions(
-                  CantonTimestamp.MaxValue,
-                  asOfInclusive = false,
-                  isProposal = false,
-                  types = Seq(
-                    TopologyMapping.Code.LsuAnnouncement
-                  ),
-                  filterUid = Some(NonEmpty(Seq, psid.uid)),
-                  filterNamespace = None,
-                )
-                .map(
-                  _.collectOfMapping[LsuAnnouncement].result
-                    .filter(_.mapping.successorSynchronizerId == psid)
-                    .toList match {
-                    case Nil =>
-                      logger.info(s"Sequencer will not use any sequencing lower bound")
-                      None
-                    case one :: Nil =>
-                      val priorUpgradeTime = one.mapping.upgradeTime
-                      logger.info(
-                        s"Sequencer will use prior upgrade time $priorUpgradeTime as sequencing lower bound"
-                      )
-
-                      Some(priorUpgradeTime)
-                    case _moreThanOne =>
-                      ErrorUtil
-                        .invalidState("Found more than one LsuAnnouncement mapping")
-                  }
-                )
-            }
-
           sequencerSnapshotTimestamp = topologyAndSequencerSnapshot
             .flatMap(_._2)
             .map(sequencerSnapshot => EffectiveTime(sequencerSnapshot.lastTs))
@@ -629,7 +591,7 @@ class SequencerNodeBootstrap(
               TopologyTransactionProcessor
                 .createProcessorAndClientForSynchronizer(
                   synchronizerTopologyStore,
-                  synchronizerUpgradeTime = sequencingTimeLowerBoundExclusive,
+                  synchronizerUpgradeTime = parameters.sequencingTimeLowerBoundExclusive,
                   crypto.pureCrypto,
                   parameters,
                   arguments.config.topology,
@@ -739,6 +701,10 @@ class SequencerNodeBootstrap(
               topologyClient,
               loggerFactory,
             )
+
+          sequencingTimeLowerBoundExclusive = SequencingTimeBound(
+            parameters.sequencingTimeLowerBoundExclusive
+          )
 
           topologyStateForInitializationService =
             new StoreBasedTopologyStateForInitializationService(

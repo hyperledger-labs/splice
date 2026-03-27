@@ -124,12 +124,12 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
     }
     def mockParticipant: ParticipantNodeBootstrap = mockParticipantAndNode._1
 
-    val environment = new CantonEnvironment(
+    val environment = new Environment(
       config,
       TestingConfigInternal(initializeGlobalOpenTelemetry = false),
       new ParticipantNodeBootstrapFactory {
         override protected def createLedgerApiBootstrapUtils(
-            arguments: Arguments,
+            arguments: this.Arguments,
             engine: Engine,
             testingTimeService: TestingTimeService,
         )(implicit

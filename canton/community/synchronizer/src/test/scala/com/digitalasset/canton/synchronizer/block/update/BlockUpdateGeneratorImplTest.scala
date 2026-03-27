@@ -4,7 +4,7 @@
 package com.digitalasset.canton.synchronizer.block.update
 
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.sequencing.protocol.{
   AllMembersOfSynchronizer,
@@ -23,6 +23,7 @@ import com.digitalasset.canton.synchronizer.block.update.BlockUpdateGenerator.{
 import com.digitalasset.canton.synchronizer.block.{BlockEvents, LedgerBlockEvent, RawLedgerBlock}
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.DefaultTestIdentities.{physicalSynchronizerId, sequencerId}
@@ -68,7 +69,7 @@ class BlockUpdateGeneratorImplTest
             sequencerId,
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
-            sequencingTimeLowerBoundExclusive = Some(sequencingTimeLowerBoundExclusive),
+            SequencingTimeBound(Some(sequencingTimeLowerBoundExclusive)),
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
             BatchingConfig(),
@@ -180,7 +181,9 @@ class BlockUpdateGeneratorImplTest
             sequencerId,
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
-            sequencingTimeLowerBoundExclusive = None,
+            SequencingTimeBound(
+              SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
+            ),
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
             BatchingConfig(),
@@ -233,7 +236,9 @@ class BlockUpdateGeneratorImplTest
             sequencerId,
             mock[SequencerRateLimitManager],
             OrderingTimeFixMode.ValidateOnly,
-            sequencingTimeLowerBoundExclusive = None,
+            SequencingTimeBound(
+              SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
+            ),
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
             BatchingConfig(),
@@ -320,7 +325,9 @@ class BlockUpdateGeneratorImplTest
               sequencerId,
               mock[SequencerRateLimitManager],
               OrderingTimeFixMode.ValidateOnly,
-              sequencingTimeLowerBoundExclusive = None,
+              SequencingTimeBound(
+                SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
+              ),
               producePostOrderingTopologyTicks = true,
               SequencerTestMetrics,
               BatchingConfig(),
@@ -391,7 +398,9 @@ class BlockUpdateGeneratorImplTest
               sequencerId,
               mock[SequencerRateLimitManager],
               OrderingTimeFixMode.ValidateOnly,
-              sequencingTimeLowerBoundExclusive = None,
+              SequencingTimeBound(
+                SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
+              ),
               producePostOrderingTopologyTicks = true,
               SequencerTestMetrics,
               BatchingConfig(),

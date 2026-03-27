@@ -4,6 +4,7 @@
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
@@ -63,13 +64,12 @@ import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.transaction.{GrpcConnection, ParticipantPermission}
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{
   ConfiguredPhysicalSynchronizerId,
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
-  SequencerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -80,7 +80,6 @@ import com.google.protobuf.timestamp.Timestamp
 import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, ManagedChannel}
-import io.scalaland.chimney.dsl.*
 
 import java.io.{File, IOException}
 import java.nio.file.{Files, Path, Paths}
@@ -188,13 +187,7 @@ object ParticipantAdminCommands {
       }
     }
 
-    final case class DarData(
-        darPath: String,
-        description: String,
-        expectedMainPackageId: String,
-        // We sometimes want to upload DARs that are inside JARs, which is hard with just a path.
-        darDataO: Option[ByteString] = None,
-    )
+    final case class DarData(darPath: String, description: String, expectedMainPackageId: String)
     final case class UploadDar(
         dars: Seq[DarData],
         synchronizerId: Option[SynchronizerId],
@@ -208,17 +201,12 @@ object ParticipantAdminCommands {
           .traverse(dar =>
             for {
               _ <- Either.cond(dar.darPath.nonEmpty, (), "Provided DAR path is empty")
-              filenameAndDarData <- dar.darDataO.fold(loadDarData(dar.darPath))(darData =>
-                Right(Paths.get(dar.darPath).getFileName.toString -> darData)
-              )
+              filenameAndDarData <- loadDarData(dar.darPath)
               (filename, darData) = filenameAndDarData
               descriptionOrFilename =
                 if (dar.description.isEmpty)
                   PathUtils.getFilenameWithoutExtension(Path.of(filename))
                 else dar.description
-              _ = logger.info(s"Sending upload dar for ${descriptionOrFilename}")(
-                TraceContext.empty
-              )
             } yield v30.UploadDarRequest.UploadDarData(
               darData,
               Some(descriptionOrFilename),
@@ -282,9 +270,8 @@ object ParticipantAdminCommands {
           expectedMainPackageId: String,
           requestHeaders: Map[String, String],
           logger: TracedLogger,
-          darDataO: Option[ByteString],
       ): UploadDar = UploadDar(
-        Seq(DarData(darPath, description, expectedMainPackageId, darDataO)),
+        Seq(DarData(darPath, description, expectedMainPackageId)),
         synchronizerId,
         vetAllPackages = vetAllPackages,
         synchronizeVetting = synchronizeVetting,
@@ -905,10 +892,10 @@ object ParticipantAdminCommands {
     // TODO(#24610) - Remove, replaced by ImportAcs
     @nowarn("cat=deprecation")
     final case class ImportAcsOld(
-        acsChunk: Seq[ByteString],
+        acsChunk: ByteString,
         workflowIdPrefix: String,
     ) extends GrpcAdminCommand[
-          Seq[v30.ImportAcsOldRequest],
+          v30.ImportAcsOldRequest,
           v30.ImportAcsOldResponse,
           Unit,
         ] {
@@ -918,23 +905,26 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         v30.ParticipantRepairServiceGrpc.stub(channel)
 
-      override protected def createRequest(): Either[String, Seq[v30.ImportAcsOldRequest]] =
+      override protected def createRequest(): Either[String, v30.ImportAcsOldRequest] =
         Right(
-          acsChunk.map(bytes =>
-            v30.ImportAcsOldRequest(
-              bytes,
-              workflowIdPrefix,
-            )
+          v30.ImportAcsOldRequest(
+            acsChunk,
+            workflowIdPrefix,
           )
         )
 
       override protected def submitRequest(
           service: ParticipantRepairServiceStub,
-          request: Seq[v30.ImportAcsOldRequest],
+          request: v30.ImportAcsOldRequest,
       ): Future[v30.ImportAcsOldResponse] =
-        GrpcStreamingUtils.streamToServerChunked(
+        GrpcStreamingUtils.streamToServer(
           service.importAcsOld,
-          request,
+          (bytes: Array[Byte]) =>
+            v30.ImportAcsOldRequest(
+              ByteString.copyFrom(bytes),
+              workflowIdPrefix,
+            ),
+          request.acsSnapshot,
         )
 
       override protected def handleResponse(
@@ -995,13 +985,13 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportAcs(
-        acsChunk: Seq[ByteString],
+        acsChunk: ByteString,
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,
         representativePackageIdOverride: RepresentativePackageIdOverride,
         excludedStakeholders: Set[PartyId],
     ) extends GrpcAdminCommand[
-          Seq[v30.ImportAcsRequest],
+          v30.ImportAcsRequest,
           v30.ImportAcsResponse,
           Unit,
         ] {
@@ -1011,26 +1001,32 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         v30.ParticipantRepairServiceGrpc.stub(channel)
 
-      override protected def createRequest(): Either[String, Seq[v30.ImportAcsRequest]] =
+      override protected def createRequest(): Either[String, v30.ImportAcsRequest] =
         Right(
-          acsChunk.map(bytes =>
-            v30.ImportAcsRequest(
-              bytes,
-              workflowIdPrefix,
-              contractImportMode.toProtoV30,
-              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
-              Some(representativePackageIdOverride.toProtoV30),
-            )
+          v30.ImportAcsRequest(
+            acsChunk,
+            workflowIdPrefix,
+            contractImportMode.toProtoV30,
+            excludedStakeholders.map(_.toProtoPrimitive).toSeq,
+            Some(representativePackageIdOverride.toProtoV30),
           )
         )
 
       override protected def submitRequest(
           service: ParticipantRepairServiceStub,
-          request: Seq[v30.ImportAcsRequest],
+          request: v30.ImportAcsRequest,
       ): Future[v30.ImportAcsResponse] =
-        GrpcStreamingUtils.streamToServerChunked(
+        GrpcStreamingUtils.streamToServer(
           service.importAcs,
-          request,
+          (bytes: Array[Byte]) =>
+            v30.ImportAcsRequest(
+              ByteString.copyFrom(bytes),
+              workflowIdPrefix,
+              contractImportMode.toProtoV30,
+              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
+              Some(representativePackageIdOverride.toProtoV30),
+            ),
+          request.acsSnapshot,
         )
 
       override protected def handleResponse(
@@ -1330,6 +1326,47 @@ object ParticipantAdminCommands {
       ): Either[String, Unit] = Either.unit
     }
 
+    final case class PerformManualLsu(
+        currentPSId: PhysicalSynchronizerId,
+        successorPSId: PhysicalSynchronizerId,
+        upgradeTime: CantonTimestamp,
+        successorConfig: SynchronizerConnectionConfig,
+        sequencerConnectionValidation: SequencerConnectionValidation,
+    ) extends GrpcAdminCommand[
+          v30.PerformManualLsuRequest,
+          v30.PerformManualLsuResponse,
+          Unit,
+        ] {
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        v30.ParticipantRepairServiceGrpc.stub(channel)
+
+      override protected def createRequest(): Either[String, v30.PerformManualLsuRequest] =
+        Right(
+          v30.PerformManualLsuRequest(
+            physicalSynchronizerId = currentPSId.toProtoPrimitive,
+            successor = v30.PerformManualLsuRequest
+              .Successor(
+                physicalSynchronizerId = successorPSId.toProtoPrimitive,
+                announcedUpgradeTime = upgradeTime.toProtoTimestamp.some,
+                config = successorConfig.toProtoV30.some,
+                sequencerConnectionValidation = sequencerConnectionValidation.toProtoV30,
+              )
+              .some,
+          )
+        )
+
+      override protected def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: v30.PerformManualLsuRequest,
+      ): Future[v30.PerformManualLsuResponse] =
+        service.performManualLsu(request)
+
+      override protected def handleResponse(
+          response: v30.PerformManualLsuResponse
+      ): Either[String, Unit] = Either.unit
+    }
   }
 
   object Ping {
@@ -1680,36 +1717,6 @@ object ParticipantAdminCommands {
 
       override protected def handleResponse(response: v30.LogoutResponse): Either[String, Unit] =
         Either.unit
-    }
-
-    final case class PerformManualLsu(
-        currentPsid: PhysicalSynchronizerId,
-        successorPsid: PhysicalSynchronizerId,
-        upgradeTime: Option[CantonTimestamp],
-        sequencerSuccessors: Map[SequencerId, GrpcConnection],
-    ) extends Base[v30.PerformManualLsuRequest, v30.PerformManualLsuResponse, Unit] {
-
-      override protected def createRequest(): Either[String, v30.PerformManualLsuRequest] =
-        v30
-          .PerformManualLsuRequest(
-            physicalSynchronizerId = currentPsid.toProtoPrimitive,
-            successorPhysicalSynchronizerId = successorPsid.toProtoPrimitive,
-            upgradeTime = upgradeTime.map(_.toProtoTimestamp),
-            sequencerSuccessors = sequencerSuccessors.map { case (sequencerId, connection) =>
-              sequencerId.toProtoPrimitive -> connection.toProtoV30
-                .transformInto[v30.PerformManualLsuRequest.SequencerConnection]
-            },
-          )
-          .asRight
-
-      override protected def submitRequest(
-          service: SynchronizerConnectivityServiceStub,
-          request: v30.PerformManualLsuRequest,
-      ): Future[v30.PerformManualLsuResponse] = service.performManualLsu(request)
-
-      override protected def handleResponse(
-          response: v30.PerformManualLsuResponse
-      ): Either[String, Unit] = Either.unit
     }
   }
 

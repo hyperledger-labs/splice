@@ -9,7 +9,7 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -26,6 +26,7 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
   PayloadToEventTimeBoundExceeded,
   SequencedBeforeOrAtLowerBound,
@@ -192,7 +193,7 @@ class SequencerWriterSourceTest
         testedProtocolVersion,
         SequencerMetrics.noop(suiteName),
         blockSequencerMode = blockSequencerMode,
-        sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+        SequencingTimeBound(sequencingTimeLowerBoundExclusive),
       )(executorService, implicitly[TraceContext], implicitly[ErrorLoggingContext])
         .toMat(Sink.ignore)(Keep.both),
       errorLogMessagePrefix = "Writer flow failed",
@@ -220,7 +221,8 @@ class SequencerWriterSourceTest
 
   private def withEnv(
       keepAliveInterval: Option[NonNegativeFiniteDuration] = None,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp] = None,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp] =
+        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
       blockSequencerMode: Boolean = true,
   )(testCode: Env => Future[Assertion]): Future[Assertion] = {
     val env = new Env(keepAliveInterval, sequencingTimeLowerBoundExclusive, blockSequencerMode)
