@@ -256,9 +256,7 @@ class RollForwardLsuIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
     val topologyFreezeTime = CantonTimestamp.now()
-    // We need to give enough time for the new Canton instance to startup
-    // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
-    val upgradeTime = CantonTimestamp.now().plusSeconds(120)
+    val upgradeTime = CantonTimestamp.now().plusSeconds(60)
     clue("Schedule logical synchronizer upgrade") {
       scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
     }
