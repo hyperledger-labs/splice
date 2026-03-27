@@ -213,13 +213,13 @@ allocationV2_settleDefaultImplUsingV1 this self (AllocationV2.Allocation_Settle{
 -- It uses the `V1.Allocation_Withdraw` choice to ensure the sender's tx parsing
 -- sees the expected choice.
 allocationV2_withdrawDefaultImplUsingV1
-  : AllocationV2.Allocation
+  : AllocationV1.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Withdraw
   -> Update AllocationV2.Allocation_WithdrawResult
-allocationV2_withdrawDefaultImplUsingV1 _this self (AllocationV2.Allocation_Withdraw{..}) = do
+allocationV2_withdrawDefaultImplUsingV1 this self (AllocationV2.Allocation_Withdraw{..}) = do
   -- no archive of self, as the V1 choice is consuming
-  -- no check of actors, as they will be checked implicitly by the V1 choice
+  checkActors actors [[(view this).allocation.transferLeg.sender]]
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Withdraw with
     extraArgs
@@ -233,13 +233,13 @@ allocationV2_withdrawDefaultImplUsingV1 _this self (AllocationV2.Allocation_With
 -- It uses the `V1.Allocation_Cancel` choice to ensure the sender's tx parsing
 -- sees the expected choice.
 allocationV2_cancelDefaultImplUsingV1
-  : AllocationV2.Allocation
+  : AllocationV1.Allocation
   -> ContractId AllocationV2.Allocation
   -> AllocationV2.Allocation_Cancel
   -> Update AllocationV2.Allocation_CancelResult
-allocationV2_cancelDefaultImplUsingV1 _this self (AllocationV2.Allocation_Cancel{..}) = do
+allocationV2_cancelDefaultImplUsingV1 this self (AllocationV2.Allocation_Cancel{..}) = do
   -- no archive of self, as the V1 choice is consuming
-  -- no check of actors, as they will be checked implicitly by the V1 choice
+  checkActors actors [AllocationV1.allocationControllers (view this)]
   let v1Cid = coerceInterfaceContractId self : ContractId AllocationV1.Allocation
   result <- exercise v1Cid AllocationV1.Allocation_Cancel with
     extraArgs
