@@ -1,0 +1,9 @@
+diff a/canton/community/app-base/src/main/scala/com/digitalasset/canton/config/ConfigValidations.scala b/canton/community/app-base/src/main/scala/com/digitalasset/canton/config/ConfigValidations.scala	(rejected hunks)
+@@ -596,6 +597,7 @@
+       config: CantonConfig
+   ): Validated[NonEmpty[Seq[String]], Unit] = {
+     val CantonConfig(
++      _,
+       sequencers,
+       mediators,
+       participants,

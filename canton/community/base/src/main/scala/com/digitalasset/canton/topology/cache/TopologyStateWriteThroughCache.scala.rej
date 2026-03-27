@@ -1,0 +1,11 @@
+diff a/canton/community/base/src/main/scala/com/digitalasset/canton/topology/cache/TopologyStateWriteThroughCache.scala b/canton/community/base/src/main/scala/com/digitalasset/canton/topology/cache/TopologyStateWriteThroughCache.scala	(rejected hunks)
+@@ -1276,8 +1276,7 @@
+         tail.iterator.takeWhile(_.validUntil.exists(_.value >= asOf.value))
+       headAndTail.filter { tx =>
+         tx.isActiveAsOf(asOf = asOf, asOfInclusive = asOfInclusive) &&
+-        !tx.transaction.isProposal && op == tx.transaction.operation
+-        && tx.rejectionReason.isEmpty
++        !tx.transaction.isProposal && op == tx.transaction.operation && tx.rejectionReason.isEmpty
+       }.toSeq
+     }
+ 

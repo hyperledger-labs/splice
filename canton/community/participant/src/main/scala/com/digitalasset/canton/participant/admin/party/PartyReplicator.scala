@@ -1026,17 +1026,15 @@ final class PartyReplicator(
             ): Seq[PartyReplicationStateManager.Modification] =
               if (condition) Seq(update) else Seq.empty
 
-            statusUpdate(isAgreementArchived, _.setAgreementO(None))
-              ++ statusUpdate(
-                isOnboardingFlagVerifiedCleared,
-                _.setAuthorization(
-                  PartyReplicationAuthorization(onboardingAt, isOnboardingFlagCleared = true)
-                ),
-              )
-              ++ statusUpdate(
-                (isAgreementArchived || agreementO.isEmpty) && (isOnboardingFlagVerifiedCleared || isOnboardingFlagCleared),
-                _.setCompleted(),
-              )
+            statusUpdate(isAgreementArchived, _.setAgreementO(None)) ++ statusUpdate(
+              isOnboardingFlagVerifiedCleared,
+              _.setAuthorization(
+                PartyReplicationAuthorization(onboardingAt, isOnboardingFlagCleared = true)
+              ),
+            ) ++ statusUpdate(
+              (isAgreementArchived || agreementO.isEmpty) && (isOnboardingFlagVerifiedCleared || isOnboardingFlagCleared),
+              _.setCompleted(),
+            )
           }
 
           status <-

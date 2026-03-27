@@ -189,7 +189,7 @@ lazy val `build-tools-dar-lock-checker` = project
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.better_files,
-      Dependencies.daml_lf_archive_reader,
+      CantonDependencies.daml_lf_archive_reader,
     ),
     Headers.ApacheDAHeaderSettings,
   )
@@ -1979,7 +1979,7 @@ lazy val `apps-dar-resources-generator` =
       Headers.ApacheDAHeaderSettings,
       libraryDependencies ++= Seq(
         Dependencies.better_files,
-        Dependencies.daml_lf_archive_reader,
+        CantonDependencies.daml_lf_archive_reader,
         CantonDependencies.cats,
       ),
     )

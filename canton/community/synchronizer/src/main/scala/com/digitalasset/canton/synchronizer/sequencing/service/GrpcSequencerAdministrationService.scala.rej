@@ -1,0 +1,12 @@
+diff a/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencing/service/GrpcSequencerAdministrationService.scala b/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencing/service/GrpcSequencerAdministrationService.scala	(rejected hunks)
+@@ -28,6 +28,10 @@
+   SetLsuTrafficControlStateResponse,
+   SetTrafficPurchasedRequest,
+   SetTrafficPurchasedResponse,
++  SetThroughputCapRequest,
++  GetThroughputCapRequest,
++  GenerateAuthenticationTokenRequest,
++  PerformLsuSequencingTestRequest,
+ }
+ import com.digitalasset.canton.sequencing.client.SequencerClientSend
+ import com.digitalasset.canton.serialization.ProtoConverter

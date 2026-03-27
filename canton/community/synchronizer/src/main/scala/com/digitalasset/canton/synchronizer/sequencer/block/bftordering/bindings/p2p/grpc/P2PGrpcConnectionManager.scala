@@ -1530,8 +1530,7 @@ private[bftordering] object P2PGrpcConnectionManager {
 
                 case oldState @ P2POutgoingConnectionStatus.Connecting =>
                   // Let the gRPC channel setup logic orderly abort the connection attempt
-                  State(UnlessShutdown.Outcome(p2pConnectionsStatus.removed(p2pEndpointId)))
-                    -> ResultWithLogs(
+                  State(UnlessShutdown.Outcome(p2pConnectionsStatus.removed(p2pEndpointId))) -> ResultWithLogs(
                       Left(FutureUnlessShutdown.unit),
                       Level.DEBUG -> (() => s"$oldState -> Disconnected (not in state)"),
                     )
@@ -1552,8 +1551,7 @@ private[bftordering] object P2PGrpcConnectionManager {
 
                 case oldState @ P2POutgoingConnectionStatus.ConnectingOnChannel(ch, acO, None) =>
                   // Let the connect worker orderly abort the connection attempt
-                  State(UnlessShutdown.Outcome(p2pConnectionsStatus.removed(p2pEndpointId)))
-                    -> ResultWithLogs(
+                  State(UnlessShutdown.Outcome(p2pConnectionsStatus.removed(p2pEndpointId))) -> ResultWithLogs(
                       Right(ch -> acO),
                       Level.DEBUG -> (() => s"$oldState -> Disconnected (not in state)"),
                     )

@@ -18,7 +18,7 @@ import Wartremover.spliceWarts
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
-import CantonDependencies.{daml_ledger_api_value_proto, excludeTranscodeConflictingDependencies}
+import CantonDependencies.excludeTranscodeConflictingDependencies
 import org.latestbit.sbt.gcs.GcsPlugin.autoImport.googleCredentialsDisable
 
 import java.util.concurrent.atomic.AtomicInteger
@@ -404,7 +404,7 @@ object BuildCommon {
       .dependsOn(
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-observability`,
-        `canton-util-external` % "test",
+        `canton-util-external`,
       )
       .settings(
         sharedCantonSettings,
@@ -452,7 +452,6 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           auth0_java,
           auth0_jwks,
-          daml_http_test_utils % Test,
           daml_test_evidence_generator_scalatest % Test,
           scalatest % Test,
           scalaz_core,
@@ -699,7 +698,6 @@ object BuildCommon {
           better_files,
           cats,
           cats_law,
-          daml_metrics_test_lib,
           jul_to_slf4j,
           mockito_scala,
           opentelemetry_api,
@@ -738,7 +736,7 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           toxiproxy_java,
           opentelemetry_proto,
-          daml_http_test_utils,
+          daml_testing_utils,
         ),
 
         // This library contains a lot of testing helpers that previously existing in testing scope
@@ -1017,6 +1015,7 @@ object BuildCommon {
       .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
       .dependsOn(`canton-wartremover-annotations`, `canton-slick-fork`)
       .settings(
+        Test / scalacOptions ++= Seq("-Wconf:msg=synchronized not selected from this instance:silent"),
         disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
@@ -1151,11 +1150,7 @@ object BuildCommon {
           scalatestScalacheck % Test,
           daml_lf_data,
           daml_lf_transaction,
-          daml_http_test_utils % Test,
-          daml_testing_utils % Test,
           daml_ports % Test,
-          daml_tracing_test_lib % Test,
-          daml_rs_grpc_testing_utils % Test,
         ),
         Test / fork := true,
         Test / testForkedParallel := true,
@@ -1193,7 +1188,6 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
-          daml_libs_scala_grpc_test_utils,
           daml_ports,
           hikaricp,
           guava,
@@ -1290,7 +1284,6 @@ object BuildCommon {
       // compile proto files that we've extracted here
       Compile / PB.protoSources ++= Seq(target.value / "protobuf_external"),
       libraryDependencies ++= Seq(
-        daml_ledger_api_value_proto % "protobuf"
       ),
     )
 

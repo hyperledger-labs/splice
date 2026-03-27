@@ -1,0 +1,17 @@
+diff a/canton/community/participant/src/main/scala/com/digitalasset/canton/participant/admin/grpc/GrpcSynchronizerConnectivityService.scala b/canton/community/participant/src/main/scala/com/digitalasset/canton/participant/admin/grpc/GrpcSynchronizerConnectivityService.scala	(rejected hunks)
+@@ -13,6 +13,7 @@
+ import com.digitalasset.canton.admin.participant.v30.{
+   DisconnectAllSynchronizersRequest,
+   DisconnectAllSynchronizersResponse,
++  PerformManualLsuRequest,
+ }
+ import com.digitalasset.canton.admin.sequencer.v30 as sequencerV30
+ import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
+@@ -402,4 +403,7 @@
+     _mapErrNewEUS(ret)
+   }
+ 
++  // Unused in splice
++  override def performManualLsu(request: PerformManualLsuRequest) = ???
++
+ }

@@ -1,0 +1,10 @@
+diff a/canton/community/app-base/src/main/scala/com/digitalasset/canton/admin/api/client/data/SequencerConnections.scala b/canton/community/app-base/src/main/scala/com/digitalasset/canton/admin/api/client/data/SequencerConnections.scala	(rejected hunks)
+@@ -251,7 +251,7 @@
+     param("patience", _.patience),
+   )
+ 
+-  private[canton] def toInternal: SubmissionRequestAmplificationInternal =
++  def toInternal: SubmissionRequestAmplificationInternal =
+     this.transformInto[SubmissionRequestAmplificationInternal]
+ }
+ 

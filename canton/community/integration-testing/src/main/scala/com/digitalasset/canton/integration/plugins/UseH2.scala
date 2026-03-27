@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.plugins
 
 import com.digitalasset.canton.config.{CantonConfig, DbConfig}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{
   ConfigTransforms,
   EnvironmentSetupPlugin,
@@ -17,7 +18,8 @@ import org.h2.tools.Server
   * use H2.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
-class UseH2(protected val loggerFactory: NamedLoggerFactory) extends EnvironmentSetupPlugin {
+class UseH2(protected val loggerFactory: NamedLoggerFactory)
+    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
 
   var server: Server = _
 

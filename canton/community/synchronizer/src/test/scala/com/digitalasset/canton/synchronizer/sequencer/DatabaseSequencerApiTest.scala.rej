@@ -1,0 +1,23 @@
+diff a/canton/community/synchronizer/src/test/scala/com/digitalasset/canton/synchronizer/sequencer/DatabaseSequencerApiTest.scala b/canton/community/synchronizer/src/test/scala/com/digitalasset/canton/synchronizer/sequencer/DatabaseSequencerApiTest.scala	(rejected hunks)
+@@ -5,12 +5,10 @@
+ 
+ import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, DefaultProcessingTimeouts}
+ import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+-import com.digitalasset.canton.data.SequencingTimeBound
+ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+ import com.digitalasset.canton.resource.MemoryStorage
+ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+ import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
+-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
+ import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
+ import com.digitalasset.canton.time.SimClock
+ import com.digitalasset.canton.topology.*
+@@ -56,7 +54,7 @@
+       DefaultProcessingTimeouts.testing,
+       storage,
+       sequencerStore,
+-      SequencingTimeBound(SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive),
++      sequencingTimeLowerBoundExclusive = None,
+       clock,
+       sequencerId,
+       crypto,

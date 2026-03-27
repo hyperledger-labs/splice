@@ -1,0 +1,10 @@
+diff a/canton/community/participant/src/main/scala/com/digitalasset/canton/participant/topology/SequencerConnectionSuccessorListener.scala b/canton/community/participant/src/main/scala/com/digitalasset/canton/participant/topology/SequencerConnectionSuccessorListener.scala	(rejected hunks)
+@@ -64,7 +64,7 @@
+       transactions: Seq[GenericSignedTopologyTransaction],
+   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+     Monad[FutureUnlessShutdown].whenA(
+-      transactions.exists(_.mapping.code == Code.SequencerConnectionSuccessor)
++      transactions.exists(_.mapping.code == Code.LsuSequencerConnectionSuccessor)
+     )(checkAndCreateSynchronizerConfig(effectiveTimestamp.value.immediateSuccessor))
+ 
+   private def checkAndCreateSynchronizerConfig(

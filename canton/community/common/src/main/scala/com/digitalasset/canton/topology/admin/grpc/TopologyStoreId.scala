@@ -110,7 +110,7 @@ object TopologyStoreId {
         physical => Right(store.TopologyStoreId.SynchronizerStore(physical)),
       )
 
-    private[canton] def logicalSynchronizerId: SynchronizerId = id.fold(identity, _.logical)
+    def logicalSynchronizerId: SynchronizerId = id.fold(identity, _.logical)
   }
 
   object Synchronizer {

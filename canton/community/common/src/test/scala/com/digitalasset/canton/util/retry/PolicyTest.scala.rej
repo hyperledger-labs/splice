@@ -1,0 +1,9 @@
+diff a/canton/community/common/src/test/scala/com/digitalasset/canton/util/retry/PolicyTest.scala b/canton/community/common/src/test/scala/com/digitalasset/canton/util/retry/PolicyTest.scala	(rejected hunks)
+@@ -1106,6 +1106,7 @@
+       val closeableEc = Threading.newExecutionContext(
+         executionContextName,
+         noTracingLogger,
++        None,
+         Threading.detectNumberOfThreads(noTracingLogger),
+         exitOnFatal = exitOnFatal,
+       )

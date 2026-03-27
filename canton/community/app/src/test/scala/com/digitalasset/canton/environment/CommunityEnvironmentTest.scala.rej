@@ -1,0 +1,16 @@
+diff a/canton/community/app/src/test/scala/com/digitalasset/canton/environment/CommunityEnvironmentTest.scala b/canton/community/app/src/test/scala/com/digitalasset/canton/environment/CommunityEnvironmentTest.scala	(rejected hunks)
+@@ -124,12 +124,12 @@
+     }
+     def mockParticipant: ParticipantNodeBootstrap = mockParticipantAndNode._1
+ 
+-    val environment = new Environment(
++    val environment = new CantonEnvironment(
+       config,
+       TestingConfigInternal(initializeGlobalOpenTelemetry = false),
+       new ParticipantNodeBootstrapFactory {
+         override protected def createLedgerApiBootstrapUtils(
+-            arguments: this.Arguments,
++            arguments: Arguments,
+             engine: Engine,
+             testingTimeService: TestingTimeService,
+         )(implicit

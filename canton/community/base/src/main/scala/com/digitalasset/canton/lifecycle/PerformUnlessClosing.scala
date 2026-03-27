@@ -51,6 +51,11 @@ trait PerformUnlessClosing extends OnShutdownRunner with HasSynchronizeWithReade
   )(implicit ec: ExecutionContext, traceContext: TraceContext): FutureUnlessShutdown[A] =
     synchronizeWithClosing(name)(FutureUnlessShutdown.outcomeF(f))
 
+// def performUnlessClosingEitherT[E, R](name: String, onClosing: => E)(
+//       etf: => EitherT[Future, E, R]
+//   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, E, R] =
+//     EitherT(performUnlessClosingF(name)(etf.value).unwrap.map(_.onShutdown(Left(onClosing))))
+
   protected def onClosed(): Unit = ()
 
   protected def onCloseFailure(e: Throwable): Unit = throw e

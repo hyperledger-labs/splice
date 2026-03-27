@@ -299,7 +299,7 @@ final case class SequencerConnectionPoolDelays(
     param("subscriptionRequestDelay", _.subscriptionRequestDelay),
   )
 
-  private[canton] def toInternal: SequencerConnectionPoolDelaysInternal =
+  def toInternal: SequencerConnectionPoolDelaysInternal =
     this.transformInto[SequencerConnectionPoolDelaysInternal]
 }
 

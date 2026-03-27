@@ -1,0 +1,47 @@
+diff a/canton/community/app-base/src/main/scala/com/digitalasset/canton/console/commands/SequencerAdministration.scala b/canton/community/app-base/src/main/scala/com/digitalasset/canton/console/commands/SequencerAdministration.scala	(rejected hunks)
+@@ -6,9 +6,9 @@
+ import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.{
+   InitializeFromGenesisState,
+   InitializeFromGenesisStateV2,
++  InitializeFromLsuPredecessor,
+   InitializeFromOnboardingState,
+   InitializeFromOnboardingStateV2,
+-  InitializeFromSynchronizerPredecessor,
+ }
+ import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, SequencerAdminCommands}
+ import com.digitalasset.canton.admin.api.client.data.{
+@@ -36,6 +36,7 @@
+ import com.digitalasset.canton.topology.SequencerId
+ import com.google.protobuf.ByteString
+ 
++import java.io.BufferedInputStream
+ import scala.concurrent.ExecutionContext
+ 
+ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGroup.Impl(node) {
+@@ -172,10 +173,10 @@
+   }
+ 
+   @Help.Summary(
+-    "Initialize a sequencer for the logical upgrade from the state of its predecessor"
++    "Initialize a sequencer for the logical upgrade from the state of its predecessor, streaming the state from a file"
+   )
+-  def initialize_from_synchronizer_predecessor(
+-      predecessorState: ByteString,
++  def initialize_from_lsu_predecessor(
++      inputFile: String,
+       synchronizerParameters: StaticSynchronizerParameters,
+       waitForReady: Boolean = true,
+   ): Unit = {
+@@ -183,8 +184,10 @@
+ 
+     consoleEnvironment.run {
+       runner.adminCommand(
+-        InitializeFromSynchronizerPredecessor(
+-          predecessorState,
++        InitializeFromLsuPredecessor(
++          new BufferedInputStream(
++            new java.io.FileInputStream(inputFile)
++          ),
+           synchronizerParameters.toInternal,
+         )
+       )

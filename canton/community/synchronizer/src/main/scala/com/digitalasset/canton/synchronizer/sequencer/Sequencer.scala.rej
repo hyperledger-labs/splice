@@ -1,0 +1,10 @@
+diff a/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/Sequencer.scala b/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/Sequencer.scala	(rejected hunks)
+@@ -200,7 +200,7 @@
+ 
+   /** To be called by the topology processing to set/update/remove a synchronizer upgrade
+     */
+-  private[sequencer] def updateSynchronizerSuccessor(
++  private[sequencer] def updateLsuSuccessor(
+       successorO: Option[SynchronizerSuccessor],
+       announcementEffectiveTime: EffectiveTime,
+   )(implicit traceContext: TraceContext): Unit

@@ -1,0 +1,38 @@
+diff a/canton/community/app-base/src/main/scala/com/digitalasset/canton/config/CantonConfig.scala b/canton/community/app-base/src/main/scala/com/digitalasset/canton/config/CantonConfig.scala	(rejected hunks)
+@@ -477,8 +453,6 @@
+         protocol = CantonNodeParameterConverter.protocol(this, sequencerNodeConfig.parameters),
+         maxConfirmationRequestsBurstFactor =
+           sequencerNodeConfig.parameters.maxConfirmationRequestsBurstFactor,
+-        sequencingTimeLowerBoundExclusive =
+-          sequencerNodeConfig.parameters.sequencingTimeLowerBoundExclusive,
+         asyncWriter = sequencerNodeConfig.parameters.asyncWriter.toParameters,
+         timeAdvancingTopology = sequencerNodeConfig.parameters.timeAdvancingTopology,
+         unsafeEnableOnlinePartyReplication =
+@@ -595,26 +617,11 @@
+       .focus(_.mediators)
+       .modify(mapWithDefaults)
+   }
+-
+-  def mergeDynamicChanges(newConfig: CantonConfig): CantonConfig =
+-    copy(participants =
+-      participants
+-        .map { case (name, config) =>
+-          (name, config, newConfig.participants.get(name))
+-        }
+-        .map {
+-          case (name, old, Some(newConfig)) =>
+-            (name, old.copy(alphaDynamic = newConfig.alphaDynamic))
+-          case (name, old, None) => (name, old)
+-        }
+-        .toMap
+-    )
+-
+ }
+ 
+ private[canton] object CantonNodeParameterConverter {
+ 
+-  def general(parent: CantonConfig, node: LocalNodeConfig): CantonNodeParameters.General =
++  def general(parent: SharedCantonConfig[?], node: LocalNodeConfig): CantonNodeParameters.General =
+     CantonNodeParameters.General.Impl(
+       tracing = parent.monitoring.tracing,
+       delayLoggingThreshold = parent.monitoring.logging.delayLoggingThreshold.toInternal,

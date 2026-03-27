@@ -1,0 +1,48 @@
+diff a/canton/community/app-base/src/main/scala/com/digitalasset/canton/admin/api/client/commands/TopologyAdminCommands.scala b/canton/community/app-base/src/main/scala/com/digitalasset/canton/admin/api/client/commands/TopologyAdminCommands.scala	(rejected hunks)
+@@ -470,6 +470,7 @@
+     final case class ListLsuSequencerConnectionSuccessor(
+         query: BaseQuery,
+         filterSequencerId: String,
++        filterSuccessorPhysicalSynchronizerId: String,
+     ) extends BaseCommand[
+           v30.ListLsuSequencerConnectionSuccessorRequest,
+           v30.ListLsuSequencerConnectionSuccessorResponse,
+@@ -482,6 +483,7 @@
+           new ListLsuSequencerConnectionSuccessorRequest(
+             baseQuery = Some(query.toProtoV1),
+             filterSequencerId = filterSequencerId,
++            filterSuccessorPhysicalSynchronizerId = filterSuccessorPhysicalSynchronizerId,
+           )
+         )
+ 
+@@ -658,23 +660,23 @@
+       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+     }
+ 
+-    final case class LogicalUpgradeState(
++    final case class SequencerLsuState(
+         store: Option[TopologyStoreId],
+-        observer: StreamObserver[LogicalUpgradeStateResponse],
++        observer: StreamObserver[SequencerLsuStateResponse],
+     ) extends BaseCommand[
+-          v30.LogicalUpgradeStateRequest,
++          v30.SequencerLsuStateRequest,
+           CancellableContext,
+           CancellableContext,
+         ] {
+-      override protected def createRequest(): Either[String, v30.LogicalUpgradeStateRequest] =
+-        Right(v30.LogicalUpgradeStateRequest(store.map(_.toProtoV30)))
++      override protected def createRequest(): Either[String, v30.SequencerLsuStateRequest] =
++        Right(v30.SequencerLsuStateRequest(store.map(_.toProtoV30)))
+ 
+       override protected def submitRequest(
+           service: TopologyManagerReadServiceStub,
+-          request: v30.LogicalUpgradeStateRequest,
++          request: v30.SequencerLsuStateRequest,
+       ): Future[CancellableContext] = {
+         val context = Context.current().withCancellation()
+-        context.run(() => service.logicalUpgradeState(request, observer))
++        context.run(() => service.sequencerLsuState(request, observer))
+         Future.successful(context)
+       }
+ 

@@ -145,6 +145,8 @@ trait RefinedNonNegativeDurationCompanion[D <: RefinedNonNegativeDuration[D]] {
   def tryFromJavaDuration(duration: java.time.Duration): D =
     tryFromDuration(Duration.fromNanos(duration.toNanos))
 
+  def ofMicros(millis: Long): D = apply(Duration(millis, TimeUnit.MICROSECONDS))
+
   def ofMillis(millis: Long): D = apply(Duration(millis, TimeUnit.MILLISECONDS))
 
   def ofSeconds(secs: Long): D = apply(Duration(secs, TimeUnit.SECONDS))
@@ -387,8 +389,7 @@ object NonNegativeFiniteDuration
       s"Cannot convert `$input` to a non-negative finite duration: $reason"
   }
 
-  private[canton] implicit val nonNegativeFiniteDurationReader
-      : ConfigReader[NonNegativeFiniteDuration] =
+  implicit val nonNegativeFiniteDurationReader: ConfigReader[NonNegativeFiniteDuration] =
     ConfigReader.fromString[NonNegativeFiniteDuration] { str =>
       (for {
         duration <- strToFiniteDuration(str)
@@ -396,8 +397,7 @@ object NonNegativeFiniteDuration
       } yield nonNegativeFiniteDuration).leftMap(NonNegativeFiniteDurationError(str, _))
     }
 
-  private[canton] implicit val nonNegativeFiniteDurationWriter
-      : ConfigWriter[NonNegativeFiniteDuration] =
+  implicit val nonNegativeFiniteDurationWriter: ConfigWriter[NonNegativeFiniteDuration] =
     // avoid pretty printing by converting the underlying value to string
     ConfigWriter.toString(_.underlying.toString)
 }
@@ -444,7 +444,7 @@ object PositiveFiniteDuration extends RefinedNonNegativeDurationCompanion[Positi
       s"Cannot convert `$input` to a positive finite duration: $reason"
   }
 
-  private[canton] implicit val positiveFiniteDurationReader: ConfigReader[PositiveFiniteDuration] =
+  implicit val positiveFiniteDurationReader: ConfigReader[PositiveFiniteDuration] =
     ConfigReader.fromString[PositiveFiniteDuration] { str =>
       (for {
         duration <- strToFiniteDuration(str)
@@ -452,7 +452,7 @@ object PositiveFiniteDuration extends RefinedNonNegativeDurationCompanion[Positi
       } yield positiveFiniteDuration).leftMap(PositiveFiniteDurationError(str, _))
     }
 
-  private[canton] implicit val positiveFiniteDurationWriter: ConfigWriter[PositiveFiniteDuration] =
+  implicit val positiveFiniteDurationWriter: ConfigWriter[PositiveFiniteDuration] =
     // avoid pretty printing by converting the underlying value to string
     ConfigWriter.toString(_.underlying.toString)
 

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.console.commands
 
 import better.files.File
-import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.data.{
@@ -26,7 +25,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.grpc.OutputFileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
-  ActiveContract,
   ContractImportMode,
   RepairContract,
   RepresentativePackageIdOverride,
@@ -34,12 +32,10 @@ import com.digitalasset.canton.participant.admin.data.{
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ReassignmentCounter, SequencerCounter, SynchronizerAlias}
 import io.grpc.Context
 
-import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class ParticipantRepairAdministration(
@@ -302,21 +298,7 @@ class ParticipantRepairAdministration(
       representativePackageIdOverride: RepresentativePackageIdOverride =
         RepresentativePackageIdOverride.NoOverride,
       excludedStakeholders: Set[PartyId] = Set.empty,
-  ): Unit =
-    check(FeatureFlag.Repair) {
-      consoleEnvironment.run {
-        runner.adminCommand(
-          ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
-            new java.io.File(importFilePath),
-            if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
-            contractImportMode,
-            representativePackageIdOverride,
-            excludedStakeholders,
-            synchronizerId,
-          )
-        )
-      }
-    }
+  ): Unit = ???
 
   @Help.Summary("Add specified contracts to a specific synchronizer on the participant")
   @Help.Description(
@@ -364,44 +346,7 @@ class ParticipantRepairAdministration(
       representativePackageIdOverride: RepresentativePackageIdOverride =
         RepresentativePackageIdOverride.NoOverride,
       excludedStakeholders: Set[PartyId] = Set.empty,
-  ): Unit = {
-
-    val temporaryFile = File.newTemporaryFile(suffix = ".gz")
-    val outputStream = temporaryFile.newGzipOutputStream()
-    val resolvedWorkflowIdPrefix =
-      if (workflowIdPrefix.isEmpty) s"import-${UUID.randomUUID}" else workflowIdPrefix
-
-    ResourceUtil.withResource(outputStream) { outputStream =>
-      contracts
-        .traverse_ { repairContract =>
-          for {
-            lapiContract <- RepairContract.toLapiActiveContract(repairContract, synchronizerId)
-            activeContract = ActiveContract.create(lapiContract)(protocolVersion)
-            _ = activeContract.writeDelimitedTo(outputStream)
-          } yield outputStream.flush()
-        }
-        .valueOr(err =>
-          consoleEnvironment.raiseError(s"Unable to add contract data to stream: $err")
-        )
-    }
-
-    check(FeatureFlag.Repair) {
-      consoleEnvironment.run {
-        runner.adminCommand(
-          ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
-            temporaryFile.toJava,
-            resolvedWorkflowIdPrefix,
-            contractImportMode,
-            representativePackageIdOverride,
-            excludedStakeholders,
-            synchronizerId,
-          )
-        )
-      }
-    }
-
-    temporaryFile.delete(swallowIOExceptions = true)
-  }
+  ): Unit = ???
 
   @Help.Summary("Purge the data of a deactivated synchronizer")
   @Help.Description(

@@ -1,0 +1,15 @@
+diff a/canton/community/base/src/main/scala/com/digitalasset/canton/protocol/messages/ProtocolMessage.scala b/canton/community/base/src/main/scala/com/digitalasset/canton/protocol/messages/ProtocolMessage.scala	(rejected hunks)
+@@ -227,12 +227,7 @@
+   )(implicit
+       traceContext: TraceContext,
+       ec: ExecutionContext,
+-  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = {
+-    val typedMessage = TypedSignedProtocolMessageContent(message)
+-    for {
+-      signature <- mkSignature(typedMessage, cryptoApi, approximateTimestampOverride)
+-    } yield SignedProtocolMessage(typedMessage, NonEmpty(Seq, signature))
+-  }
++  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = ???
+ 
+   /** @param approximateTimestampOverride
+     *   optional timestamp to use for signing. Should only be set when signing submission requests,

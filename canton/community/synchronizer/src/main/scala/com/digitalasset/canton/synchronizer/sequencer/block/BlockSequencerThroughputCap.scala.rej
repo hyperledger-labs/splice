@@ -1,0 +1,10 @@
+diff a/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/block/BlockSequencerThroughputCap.scala b/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/sequencer/block/BlockSequencerThroughputCap.scala	(rejected hunks)
+@@ -137,7 +137,7 @@
+   @VisibleForTesting
+   private[block] def addBlockUpdateInternal(
+       submissions: Seq[SubmissionRequestEntry]
+-  ): Unit = if (enabled.get())(lock.exclusive {
++  ): Unit = if (enabled.get()) (lock.exclusive {
+     cancellable.foreach(_.cancel().discard)
+ 
+     submissions.foreach { submission =>

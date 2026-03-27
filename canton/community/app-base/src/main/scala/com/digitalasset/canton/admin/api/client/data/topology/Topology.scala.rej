@@ -1,0 +1,10 @@
+diff a/canton/community/app-base/src/main/scala/com/digitalasset/canton/admin/api/client/data/topology/Topology.scala b/canton/community/app-base/src/main/scala/com/digitalasset/canton/admin/api/client/data/topology/Topology.scala	(rejected hunks)
+@@ -356,7 +356,7 @@
+ final case class ListLsuAnnouncementResult(
+     context: BaseResult,
+     item: LsuAnnouncement,
+-)
++) extends TopologyResult[LsuAnnouncement]
+ 
+ object ListLsuAnnouncementResult {
+   def fromProtoV30(

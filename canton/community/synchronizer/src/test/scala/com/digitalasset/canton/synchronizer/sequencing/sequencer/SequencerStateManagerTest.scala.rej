@@ -1,0 +1,27 @@
+diff a/canton/community/synchronizer/src/test/scala/com/digitalasset/canton/synchronizer/sequencing/sequencer/SequencerStateManagerTest.scala b/canton/community/synchronizer/src/test/scala/com/digitalasset/canton/synchronizer/sequencing/sequencer/SequencerStateManagerTest.scala	(rejected hunks)
+@@ -13,7 +13,7 @@
+   TopologyConfig,
+ }
+ import com.digitalasset.canton.crypto.*
+-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
++import com.digitalasset.canton.data.CantonTimestamp
+ import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
+ import com.digitalasset.canton.logging.LogEntry
+ import com.digitalasset.canton.protocol.TestSynchronizerParameters
+@@ -26,7 +26,6 @@
+ import com.digitalasset.canton.synchronizer.metrics.{SequencerMetrics, SequencerTestMetrics}
+ import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
+ import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
+ import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
+   InvalidAcknowledgementSignature,
+   InvalidAcknowledgementTimestamp,
+@@ -369,7 +368,7 @@
+       sequencer1,
+       defaultRateLimiter,
+       orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
+-      SequencingTimeBound(SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive),
++      sequencingTimeLowerBoundExclusive = None,
+       producePostOrderingTopologyTicks = false,
+       SequencerTestMetrics,
+       BatchingConfig(),
