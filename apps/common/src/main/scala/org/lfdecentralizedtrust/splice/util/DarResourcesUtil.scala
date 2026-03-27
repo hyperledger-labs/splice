@@ -55,7 +55,7 @@ object DarResourcesUtil extends NamedLogging {
         if (minimumInitializationVersion < v && v <= upToRequiredVersion) {
           true
         } else {
-          logger.warn(
+          logger.info(
             s"Version $v of package $name configured in `additionalPackagesToUnvet` is smaller or equal to the minimum initialization version $minimumInitializationVersion or larger than $upToRequiredVersion."
           )
           false

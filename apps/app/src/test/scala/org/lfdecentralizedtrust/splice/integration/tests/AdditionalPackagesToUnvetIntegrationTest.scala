@@ -246,10 +246,10 @@ class MinimumRequiredAdditionalPackagesToUnvetIntegrationTest
         sv1LocalBackend,
         sv1ValidatorLocalBackend,
       )
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         within = {},
         lines =>
-          forAll(lines) { line =>
+          forAtLeast(1, lines) { line =>
             line.message should include regex s"Version .* of .* is smaller or equal to the minimum initialization version .* or larger than .*"
           },
       )
