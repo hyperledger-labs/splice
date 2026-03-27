@@ -73,6 +73,7 @@ type ActionName =
   | 'CRARC_SetConfig'
   | 'SRARC_UpdateSvRewardWeight'
   | 'SRARC_CreateUnallocatedUnclaimedActivityRecord'
+  | 'VLRARC_WithdrawValidatorLicense'
   | (string & {});
 
 export async function changeAction(actionName: ActionName = 'SRARC_SetConfig'): Promise<void> {

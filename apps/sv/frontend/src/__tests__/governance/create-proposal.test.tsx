@@ -74,6 +74,7 @@ describe('Create Proposal', () => {
       expect(screen.getByText('Set Amulet Rules Configuration')).toBeInTheDocument();
       expect(screen.getByText('Update SV Reward Weight')).toBeInTheDocument();
       expect(screen.getByText('Create Unclaimed Activity Record')).toBeInTheDocument();
+      expect(screen.getByText('Revoke Validator License')).toBeInTheDocument();
     });
   });
 
@@ -126,6 +127,14 @@ describe('Create Proposal', () => {
       'Create Unclaimed Activity Record',
       'SRARC_CreateUnallocatedUnclaimedActivityRecord',
       'create-unallocated-unclaimed-activity-record-action'
+    );
+  });
+
+  test('Revoke Validator License Form is rendered after action selection', async () => {
+    await checkActionSelection(
+      'Revoke Validator License',
+      'VLRARC_WithdrawValidatorLicense',
+      'revoke-validator-license-action'
     );
   });
 

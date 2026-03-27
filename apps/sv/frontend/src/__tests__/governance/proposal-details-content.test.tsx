@@ -12,6 +12,7 @@ import {
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
+  RevokeValidatorLicenseProposal,
   UnclaimedActivityRecordProposal,
   UpdateSvRewardWeightProposal,
 } from '../../utils/types';
@@ -354,6 +355,52 @@ describe('Proposal Details Content', () => {
 
     const mustMintBefore = screen.getByTestId('proposal-details-must-mint-before-value');
     expect(mustMintBefore.textContent).toMatch(/2025-01-01 13:00/);
+  });
+
+  test('should render revoke validator license proposal details', () => {
+    const revokeValidatorLicenseDetails = {
+      actionName: 'Revoke Validator License',
+      action: 'VLRARC_WithdrawValidatorLicense',
+      createdAt: '2025-01-01 13:00',
+      url: 'https://example.com',
+      summary: 'Validator not meeting requirements',
+      proposal: {
+        validatorLicenseCid: 'some-license-contract-id',
+        reason: 'Not meeting requirements',
+      } as RevokeValidatorLicenseProposal,
+    } as ProposalDetails;
+
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
+          contractId={voteRequest.contractId}
+          proposalDetails={revokeValidatorLicenseDetails}
+          votingInformation={voteRequest.votingInformation}
+          votes={voteRequest.votes}
+        />
+      </Wrapper>
+    );
+
+    const action = screen.getByTestId('proposal-details-action-value');
+    expect(action.textContent).toMatch(/Revoke Validator License/);
+
+    const revokeSection = screen.getByTestId(
+      'proposal-details-revoke-validator-license-section'
+    );
+    expect(revokeSection).toBeInTheDocument();
+
+    const licenseLabel = screen.getByTestId('proposal-details-validator-license-label');
+    expect(licenseLabel.textContent).toMatch(/Validator License/);
+
+    const licenseCid = screen.getByTestId('proposal-details-validator-license-cid-value');
+    expect(licenseCid.textContent).toMatch(/some-license-contract-id/);
+
+    const reasonLabel = screen.getByTestId('proposal-details-revoke-reason-label');
+    expect(reasonLabel.textContent).toMatch(/Reason/);
+
+    const reasonValue = screen.getByTestId('proposal-details-revoke-reason-value');
+    expect(reasonValue.textContent).toMatch(/Not meeting requirements/);
   });
 
   test('should render amulet rules config proposal details', () => {

@@ -25,6 +25,7 @@ import Splice.DSO.AmuletPrice
 import Splice.AmuletConfig
 import Splice.CometBft
 import Splice.DecentralizedSynchronizer
+import Splice.ValidatorLicense
 
 import Splice.Scripts.DsoTestUtils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
@@ -984,6 +985,31 @@ testVoteRequestExpireWithEffectivity = do
 
   return ()
 
+
+
+-- | Tests that SVs can vote to revoke a ValidatorLicense via ARC_ValidatorLicense.
+testRevokeValidatorLicense : Script ()
+testRevokeValidatorLicense = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+
+  -- onboard a validator
+  validator <- allocateParty "validator1"
+  onboardValidator app sv1 "validator1" validator
+
+  -- verify the license exists
+  [(licenseCid, license)] <- queryFilter @ValidatorLicense dso (\l -> l.validator == validator)
+  license.validator === validator
+
+  -- SVs vote to revoke the license
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_ValidatorLicense with
+      validatorLicenseCid = licenseCid
+      validatorLicenseAction = VLRARC_WithdrawValidatorLicense ValidatorLicense_Withdraw with
+        reason = "Validator not meeting requirements"
+
+  -- verify the license has been archived
+  [] <- queryFilter @ValidatorLicense dso (\l -> l.validator == validator)
+  pure ()
 
 
 -- Amulet Prices
