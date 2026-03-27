@@ -24,10 +24,10 @@ export class ValidatorClient {
 
   private token: string;
   /** Expected featured app status
-  * true: this party should be featured
-  * false: this party should not be featured
-  * undefined: do not attempt to modify the featured app status of this party
-  */
+   * true: this party should be featured
+   * false: this party should not be featured
+   * undefined: do not attempt to modify the featured app status of this party
+   */
   public featured: boolean | undefined;
   private _partyId: string | undefined;
 
