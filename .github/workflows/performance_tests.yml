@@ -60,6 +60,11 @@ jobs:
             ls -lah /tmp/mainnetupdates.json
           cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
 
+      - name: Push metrics to Prometheus Pushgateway
+        if: ${{ always() }} #TBD
+        run: |
+          python3 apps/app/src/test/resources/performance/push_store_ingestion_perf_metrics.py
+
       # sanity check
       - name: Check logs for errors
         uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
