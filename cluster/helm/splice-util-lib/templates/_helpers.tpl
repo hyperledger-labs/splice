@@ -240,7 +240,9 @@ app: {{ .app }}
 {{- end -}}
 {{- end -}}
 {{- define "splice-util-lib.default-annotations" -}}
+{{- if (.enableReloader | default false) -}}
 reloader.stakater.com/auto: "true"
+{{- end -}}
 {{- end -}}
 {{- define "splice-util-lib.affinity" -}}
 {{- if or .enableAntiAffinity .affinity }}
