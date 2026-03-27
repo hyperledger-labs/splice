@@ -703,7 +703,7 @@ object BftScanConnection {
       nTargetSuccess: Int,
       logger: TracedLogger,
       shortenResponsesForLog: T => Any = identity[T],
-  )(implicit ec: ExecutionContext, tc: TraceContext, mat: Materializer): Future[T] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     require(requestFrom.nonEmpty, "At least one request must be made.")
 
     val responses =
@@ -779,7 +779,7 @@ object BftScanConnection {
       logger: TracedLogger,
       consensusResponse: Try[T],
       responses: ConcurrentHashMap[BftScanConnection.ScanResponse[T], List[Uri]],
-  )(implicit ec: ExecutionContext, mat: Materializer, tc: TraceContext): Unit = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Unit = {
     keyToGroupResponses(consensusResponse).foreach { consensusResponseKey =>
       responses.remove(consensusResponseKey)
       responses.forEach { (disagreeingResponse, scanUrls) =>
