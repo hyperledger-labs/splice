@@ -5,10 +5,12 @@ import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
@@ -31,7 +33,10 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSynchronizerUpgradeSequencingTestTrigger,
+  LogicalSynchronizerUpgradeTrigger,
+}
 import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
@@ -109,10 +114,33 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000)(config)
       )
+      // use the standalone participant
+      .addConfigTransforms((_, config) => {
+        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(22_100, Seq("bobValidatorLocal"))(
+          config.copy(
+            validatorApps = config.validatorApps + (
+              InstanceName.tryCreate("bobValidatorLocal") -> {
+                val bobValidatorConfig = config
+                  .validatorApps(InstanceName.tryCreate("bobValidator"))
+                bobValidatorConfig
+              }
+            ),
+            walletAppClients = config.walletAppClients + (
+              InstanceName.tryCreate("bobValidatorWalletLocal") -> {
+                config.walletAppClients(InstanceName.tryCreate("bobValidatorWallet"))
+              }
+            ),
+          )
+        )
+      })
       .withAmuletPrice(walletAmuletPrice)
+      .withManualStart
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
+
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
+    initDso()
+    startAllSync(aliceValidatorBackend, splitwellValidatorBackend)
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(120)
 
@@ -264,6 +292,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
     val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
+
+    clue("Start bob validator local, onboard and tap before upgrade") {
+      runBobValidatorWithStandaloneParticipant("before-upgrade")(
+        onboardUserAndTapAmulet(
+          v("bobValidatorLocal"),
+          wc(
+            "bobValidatorWalletLocal"
+          ),
+        )
+      )
+    }
+
     val lateJoiningNode = sv4Nodes
     lateJoiningNode.par.foreach(_.stop())
     val topologyFreezeTime = CantonTimestamp.now()
@@ -553,6 +593,19 @@ class LogicalSynchronizerUpgradeIntegrationTest
         sv1ScanBackend.startSync()
       }
 
+      clue("bob validator local upgrades after restart and can tap") {
+        runBobValidatorWithStandaloneParticipant("after-upgrade")(
+          onboardUserAndTapAmulet(
+            v("bobValidatorLocal"),
+            wc(
+              "bobValidatorWalletLocal"
+            ),
+            20,
+            70 to 70,
+          )
+        )
+      }
+
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
         // manually stop stuff as we destroy the new synchronizer as it runs in process
         val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
@@ -561,6 +614,25 @@ class LogicalSynchronizerUpgradeIntegrationTest
         stopAllAsync(allNodes*).futureValue
         allBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
       }
+    }
+  }
+
+  private def runBobValidatorWithStandaloneParticipant(hint: String)(
+      run: => Unit
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    withCanton(
+      Seq(
+        testResourcesPath / "standalone-participant-extra.conf",
+        testResourcesPath / "standalone-participant-extra-no-auth.conf",
+      ),
+      Seq(),
+      s"lsu-bob-validator-$hint",
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> bobValidatorBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_DB" -> s"participant_extra_$dbsSuffix",
+    ) {
+      bobValidatorBackend.startSync()
+      run
+      bobValidatorBackend.stop()
     }
   }
 
