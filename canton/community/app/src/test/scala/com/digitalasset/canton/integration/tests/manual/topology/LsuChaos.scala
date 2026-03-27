@@ -3,8 +3,9 @@
 
 package com.digitalasset.canton.integration.tests.manual.topology
 
+import com.daml.metrics.api.MetricQualification
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
@@ -24,17 +25,21 @@ import com.digitalasset.canton.integration.tests.manual.topology.TopologyOperati
   TransactionProgress,
   topologyChangeTimeout,
 }
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
 import com.digitalasset.canton.integration.{
   ConfigTransform,
   ConfigTransforms,
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
-import com.digitalasset.canton.topology.PhysicalSynchronizerId
+import com.digitalasset.canton.metrics.{MetricValue, MetricsConfig, MetricsReporterConfig}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{BaseTest, config}
+import com.digitalasset.canton.{BaseTest, UniquePortGenerator, config}
+import monocle.macros.syntax.lens.*
+import org.apache.pekko.actor.Scheduler
+import org.scalatest.EitherValues
 import org.scalatest.OptionValues.*
 import org.scalatest.matchers.should.Matchers
 
@@ -44,12 +49,13 @@ import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{Future, blocking}
+import scala.jdk.DurationConverters.JavaDurationOps
 import scala.math.Ordering.Implicits.*
 
 /** This class performs repeated LSUs. It assumes the synchronizer has only one sequencer
   * (sequencer1) and one mediator (mediator1).
   *
-  * The PSId of the successor is constructed as follows:
+  * The psid of the successor is constructed as follows:
   *   - pv = dev
   *   - serial=previous serial + 1
   *
@@ -63,9 +69,11 @@ import scala.math.Ordering.Implicits.*
 private[topology] class LsuChaos(
     maxLsu: PositiveInt,
     val logger: TracedLogger,
+    scheduler: Scheduler,
 ) extends TopologyOperations
     with LogicalUpgradeUtils
-    with Matchers {
+    with Matchers
+    with EitherValues {
   override val name: String = LsuChaos.name
 
   override protected def testName: String = name
@@ -113,11 +121,25 @@ private[topology] class LsuChaos(
     lastKnownSynchronizer.set(Some(synchronizerData))
   }
 
+  private val enableMetrics: ConfigTransform = _.focus(_.monitoring.metrics)
+    .replace(
+      MetricsConfig(
+        qualifiers = Seq[MetricQualification](MetricQualification.Debug),
+        reporters = Seq(
+          MetricsReporterConfig.Prometheus(port = UniquePortGenerator.next)
+        ),
+      )
+    )
+
   override def additionalConfigTransforms: Seq[ConfigTransform] =
-    // Synchronizer nodes used for LSU should not have auto init
-    ConfigTransforms.disableAutoInit(
-      (2 to maxLsu.unwrap + 1).flatMap(i => Seq(s"sequencer$i", s"mediator$i")).toSet
-    ) +:
+    Seq(
+      // Synchronizer nodes used for LSU should not have auto init
+      ConfigTransforms
+        .disableAutoInit(
+          (2 to maxLsu.unwrap + 1).flatMap(i => Seq(s"sequencer$i", s"mediator$i")).toSet
+        ),
+      enableMetrics,
+    ) ++
       // pv=dev is used
       ConfigTransforms.enableAlphaVersionSupport
 
@@ -133,7 +155,7 @@ private[topology] class LsuChaos(
           && currentSynchronizer.index.decrement < maxLsu.toNonNegative // number of LSUs is capped
 
       if (scheduleNextLsu) {
-        val nextPSId = PhysicalSynchronizerId(
+        val nextPsid = PhysicalSynchronizerId(
           currentSynchronizer.psid.logical,
           currentSynchronizer.psid.serial.increment.toNonNegative,
           ProtocolVersion.dev,
@@ -142,10 +164,10 @@ private[topology] class LsuChaos(
         val upgradeTime = now.plus(topologyFreezeDuration)
 
         PerformLsu(
-          currentPSId = currentSynchronizer.psid,
+          currentPsid = currentSynchronizer.psid,
           nextSynchronizer = SynchronizerData(
             usedSince = upgradeTime,
-            psid = nextPSId,
+            psid = nextPsid,
             index = currentSynchronizer.index.increment,
           ),
           upgradeTime = upgradeTime,
@@ -155,9 +177,10 @@ private[topology] class LsuChaos(
   }
 
   private def performLsu(
-      currentPSId: PhysicalSynchronizerId,
+      currentPsid: PhysicalSynchronizerId,
       newSynchronizer: SynchronizerData,
       upgradeTime: CantonTimestamp,
+      scheduler: Scheduler,
   )(implicit
       env: TestConsoleEnvironment,
       errorLoggingContext: ErrorLoggingContext,
@@ -214,36 +237,22 @@ private[topology] class LsuChaos(
 
     val exportDirectory = exportNodesData(
       SynchronizerNodes(Seq(currentSequencer), Seq(currentMediator)),
-      successorPSId = newSynchronizer.psid,
+      successorPsid = newSynchronizer.psid,
     )
 
     logOperationStep(lsuId)("Migrate synchronizer nodes")
 
-    /*
-    The order is important:
-    - start the sequencer
-    - set the lower bound
-    - start the mediator; download of the correct topology state from the mediator depends on the lower bound.
-     */
     Seq[InstanceReference](newSequencer, newMediator).foreach { newNode =>
       logger.info(s"[$lsuId]: Migrate node $newNode")
       migrateNode(
         migratedNode = newNode,
         newStaticSynchronizerParameters = newSynchronizer.staticSynchronizerParameters,
-        synchronizerId = currentPSId,
+        synchronizerId = currentPsid,
         newSequencers = Seq(newSequencer),
         exportDirectory = exportDirectory,
         newNodeToOldNodeName =
           Map(newSequencer.name -> currentSequencer.name, newMediator.name -> currentMediator.name),
       )
-
-      newNode match {
-        case localSeq: LocalSequencerReference =>
-          localSeq.underlying.value.sequencer
-            .setSequencingTimeLowerBoundExclusive(Some(upgradeTime))
-
-        case _ => ()
-      }
     }
 
     logOperationStep(lsuId)(s"Announcing sequencer successor of $currentSequencer")
@@ -251,11 +260,68 @@ private[topology] class LsuChaos(
       .propose_successor(
         sequencerId = currentSequencer.id,
         endpoints = newSequencer.sequencerConnection.endpoints.map(_.toURI(useTls = false)),
-        synchronizerId = currentPSId,
+        successorSynchronizerId = newSynchronizer.psid,
       )
       .discard
 
+    newSequencer.setup.test_lsu_sequencing(NonNegativeInt.zero)
+
+    logger.info(s"[$lsuId] Scheduling operations to run at upgrade time ($upgradeTime)")
+    scheduler.scheduleOnce((upgradeTime - CantonTimestamp.now()).toScala) {
+      transferTraffic(lsuId, upgradeTime, currentSequencer, newSequencer)
+
+      // assert on the outcome of test_lsu_sequencing above: it should bump metrics
+      getLsuSequencingTestMetricValues(newMediator) shouldBe Map(newSequencer.id -> 1)
+    }
+
     logger.info(s"[$lsuId] All operations scheduled")
+  }
+
+  // Returns the number of received messages per sender
+  private def getLsuSequencingTestMetricValues(node: LocalInstanceReference): Map[Member, Long] = {
+    val metricName = "daml.received-lsu-sequencing-test-messages"
+    node.metrics
+      .list(metricName)
+      .get(metricName)
+      .value
+      .collect { case metric: MetricValue.LongPoint =>
+        Member.fromProtoPrimitive_(metric.attributes.get("sender").value).value -> metric.value
+      }
+      .toMap
+  }
+
+  private def transferTraffic(
+      lsuId: String,
+      upgradeTime: CantonTimestamp,
+      currentSequencer: LocalSequencerReference,
+      newSequencer: LocalSequencerReference,
+  )(implicit env: TestConsoleEnvironment, errorLoggingContext: ErrorLoggingContext): Unit = {
+    logOperationStep(lsuId)("Transferring LSU traffic state")
+    logger.info(s"[$lsuId] Downloading LSU traffic state $currentSequencer")
+    val trafficState = BaseTest.eventually(retryOnTestFailuresOnly = false)(
+      currentSequencer.traffic_control.get_lsu_state()
+    )
+
+    // Note: this command returns approximate traffic state, so we only use it to list the members
+    val members =
+      currentSequencer.traffic_control.traffic_state_of_all_members().trafficStates.keySet
+
+    def getTraffic(sequencer: LocalSequencerReference) =
+      members.map { m =>
+        logger.info(s"[$lsuId] Getting traffic state for $m from $sequencer")
+        m -> sequencer.underlying.value.sequencer.sequencer
+          .getTrafficStateAt(m, upgradeTime.immediateSuccessor)
+          .futureValueUS
+          .value
+      }.toMap
+
+    val trafficStateBeforeLsu = getTraffic(currentSequencer)
+    logger.info(s"[$lsuId] Uploading LSU traffic state $newSequencer")
+    newSequencer.traffic_control.set_lsu_state(trafficState)
+    val trafficStateAfterLsu = getTraffic(newSequencer)
+    trafficStateAfterLsu shouldEqual trafficStateBeforeLsu
+
+    logOperationStep(lsuId)(s"Upgrade to $lsuId is finished")
   }
 
   override def runTopologyChanges()(implicit
@@ -271,8 +337,8 @@ private[topology] class LsuChaos(
 
     nextAction() match {
       case LsuChaos.NoAction => Future.unit
-      case PerformLsu(currentPSId, nextSynchronizer, upgradeTime) =>
-        Future(performLsu(currentPSId, nextSynchronizer, upgradeTime))
+      case PerformLsu(currentPsid, nextSynchronizer, upgradeTime) =>
+        Future(performLsu(currentPsid, nextSynchronizer, upgradeTime, scheduler))
     }
   }
 
@@ -330,7 +396,7 @@ private[topology] object LsuChaos extends TopologyOperationsCompanion {
   private sealed trait Action extends Product with Serializable
   private case object NoAction extends Action
   private final case class PerformLsu(
-      currentPSId: PhysicalSynchronizerId,
+      currentPsid: PhysicalSynchronizerId,
       nextSynchronizer: SynchronizerData,
       upgradeTime: CantonTimestamp,
   ) extends Action
@@ -350,7 +416,11 @@ private[topology] object LsuChaos extends TopologyOperationsCompanion {
 
   override def acceptableLogEntries: Seq[String] = Seq(
     // If submission is done during the LSU
-    "SUBMISSION_SYNCHRONIZER_NOT_READY"
+    "SUBMISSION_SYNCHRONIZER_NOT_READY",
+    // Handshakes and sequencer connections while the traffic is still being initialized on the sequencer
+    "FAILED_TO_CONNECT_TO_SEQUENCERS_TRANSIENT",
+    // Traffic transfer is scheduled on the wall clock, leaving sequencer a bit behind, it will retry with this error
+    "SEQUENCER_LSU_NOT_AT_UPGRADE_TIME_OR_BEYOND",
   )
 
   override def acceptableNonRetryableLogEntries: Seq[String] = Seq(

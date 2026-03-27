@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.synchronizer.metrics
 
-import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.*
 import com.daml.metrics.api.HistogramInventory.Item
 import com.daml.metrics.api.MetricHandle.*
+import com.daml.metrics.{CacheMetrics, HealthMetrics}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.logging.pretty.PrettyNameOnlyCase
@@ -416,13 +416,14 @@ class BftOrderingMetrics private[metrics] (
 
     private val prefix = histograms.global.prefix
 
-    val blocksOrdered: Meter = openTelemetryMetricsFactory.meter(
+    val blockNumber: Gauge[Long] = openTelemetryMetricsFactory.gauge(
       MetricInfo(
-        prefix :+ "ordered-blocks",
-        summary = "Blocks ordered",
-        description = "Measures the total blocks ordered.",
+        prefix :+ "block-number",
+        summary = "Block number",
+        description = "Latest block number ordered by the node.",
         qualification = MetricQualification.Traffic,
-      )
+      ),
+      0,
     )
 
     val batchesOrdered: Meter = openTelemetryMetricsFactory.meter(
@@ -599,6 +600,9 @@ class BftOrderingMetrics private[metrics] (
         ),
         0,
       )
+
+      val batchCache: CacheMetrics =
+        new CacheMetrics("batch-cache", openTelemetryMetricsFactory)
     }
 
     object regression {

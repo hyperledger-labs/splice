@@ -5,6 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
+import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
@@ -24,6 +25,7 @@ import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.block.update.BlockChunkProcessor
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
@@ -103,8 +105,9 @@ abstract class SequencerApiTest
           cryptoSnapshot.pureCrypto,
           cryptoSnapshot,
           request,
-          Some(cryptoSnapshot.ipsSnapshot.timestamp),
-          Some(clock.now),
+          timestampOfSigningKey = Some(cryptoSnapshot.ipsSnapshot.timestamp),
+          signingTimestampOverrides =
+            None, // not needed for unit tests; session signing keys disabled
           HashPurpose.SubmissionRequestSignature,
           testedProtocolVersion,
         )
@@ -497,14 +500,14 @@ abstract class SequencerApiTest
         val content1 = "message1-to-sign"
         val content2 = "message2-to-sign"
         val recipients1 = Recipients.cc(p11, p13)
-        val envelope1 = ClosedEnvelope.create(
+        val envelope1 = ClosedUncompressedEnvelope.create(
           ByteString.copyFromUtf8(content1),
           recipients1,
           Seq.empty,
           testedProtocolVersion,
         )
         val recipients2 = Recipients.cc(p12, p13)
-        val envelope2 = ClosedEnvelope.create(
+        val envelope2 = ClosedUncompressedEnvelope.create(
           ByteString.copyFromUtf8(content2),
           recipients2,
           Seq.empty,
@@ -521,7 +524,7 @@ abstract class SequencerApiTest
         def mkRequest(
             sender: Member,
             messageId: MessageId,
-            envelopes: List[ClosedEnvelope],
+            envelopes: List[ClosedUncompressedEnvelope],
         ): SubmissionRequest =
           SubmissionRequest.tryCreate(
             sender,
@@ -535,9 +538,9 @@ abstract class SequencerApiTest
           )
 
         for {
-          envs1 <- envelopes.parTraverse(signEnvelope(p11Crypto, _, clock))
+          envs1 <- envelopes.parTraverse(signEnvelope(p11Crypto, _))
           request1 = mkRequest(p11, messageId1, envs1)
-          envs2 <- envelopes.parTraverse(signEnvelope(p12Crypto, _, clock))
+          envs2 <- envelopes.parTraverse(signEnvelope(p12Crypto, _))
           request2 = mkRequest(p12, messageId2, envs2)
           _ <- sequencer
             .sendAsyncSigned(sign(request1))
@@ -554,7 +557,7 @@ abstract class SequencerApiTest
           )
 
           // participant13 is late to the party and its request is refused
-          envs3 <- envelopes.parTraverse(signEnvelope(p13Crypto, _, clock))
+          envs3 <- envelopes.parTraverse(signEnvelope(p13Crypto, _))
           request3 = mkRequest(p13, messageId3, envs3)
           _ <- sequencer
             .sendAsyncSigned(sign(request3))
@@ -627,7 +630,7 @@ abstract class SequencerApiTest
         val aggregationRule =
           AggregationRule(NonEmpty(Seq, p14, p15), PositiveInt.tryCreate(2), testedProtocolVersion)
         val recipients = Recipients.cc(p14, p15)
-        val envelope = ClosedEnvelope.create(
+        val envelope = ClosedUncompressedEnvelope.create(
           ByteString.copyFromUtf8(messageContent),
           recipients,
           Seq.empty,
@@ -642,7 +645,7 @@ abstract class SequencerApiTest
         def mkRequest(
             sender: Member,
             messageId: MessageId,
-            envelope: ClosedEnvelope,
+            envelope: ClosedUncompressedEnvelope,
         ): SubmissionRequest =
           SubmissionRequest.tryCreate(
             sender,
@@ -656,11 +659,11 @@ abstract class SequencerApiTest
           )
 
         for {
-          env1 <- signEnvelope(p14Crypto, envelope, clock)
+          env1 <- signEnvelope(p14Crypto, envelope)
           request1 = mkRequest(p14, messageId1, env1)
-          env2 <- signEnvelope(p14Crypto, envelope, clock)
+          env2 <- signEnvelope(p14Crypto, envelope)
           request2 = mkRequest(p14, messageId2, env2)
-          env3 <- signEnvelope(p15Crypto, envelope, clock)
+          env3 <- signEnvelope(p15Crypto, envelope)
           request3 = mkRequest(p15, messageId3, env3)
           _ <- sequencer
             .sendAsyncSigned(sign(request1))
@@ -1059,11 +1062,12 @@ trait SequencerApiTestUtils
       maxSequencingTime: CantonTimestamp = CantonTimestamp.MaxValue,
       aggregationRule: Option[AggregationRule] = None,
       topologyTimestamp: Option[CantonTimestamp] = None,
-      sequencingSubmissionCost: Batch[ClosedEnvelope] => Option[SequencingSubmissionCost] = _ =>
-        None,
+      sequencingSubmissionCost: Batch[ClosedUncompressedEnvelope] => Option[
+        SequencingSubmissionCost
+      ] = _ => None,
   ): SubmissionRequest = {
     val envelope1 = TestingEnvelope(messageContent, recipients)
-    val batch = Batch(List(envelope1.closeEnvelope), testedProtocolVersion)
+    val batch = Batch(List(envelope1.toClosedUncompressedEnvelope), testedProtocolVersion)
     val messageId = MessageId.tryCreate(s"thisisamessage: $messageContent")
     SubmissionRequest.tryCreate(
       sender,
@@ -1080,6 +1084,7 @@ trait SequencerApiTestUtils
   protected def checkMessages(
       expectedMessages: Seq[EventDetails],
       receivedMessages: Seq[(Member, SequencedSerializedEvent)],
+      expectEnvelopes: Boolean = true,
   ): Assertion = {
 
     receivedMessages.length shouldBe expectedMessages.length
@@ -1104,8 +1109,10 @@ trait SequencerApiTestUtils
 
       event match {
         case Deliver(_, _, _, messageIdO, batch, _, trafficReceipt) =>
-          withClue(s"Received the wrong number of envelopes for recipient $member") {
-            batch.envelopes.length shouldBe expectedMessage.envs.length
+          if (expectEnvelopes) {
+            withClue(s"Received the wrong number of envelopes for recipient $member") {
+              batch.envelopes.length shouldBe expectedMessage.envs.length
+            }
           }
 
           if (messageIdO.isDefined) {
@@ -1119,9 +1126,11 @@ trait SequencerApiTestUtils
           }
 
           forAll(batch.envelopes.zip(expectedMessage.envs)) { case (got, wanted) =>
-            got.recipients shouldBe wanted.recipients
-            got.bytes shouldBe ByteString.copyFromUtf8(wanted.content)
-            got.signatures shouldBe wanted.signatures
+            val gotUncompressed = got.toClosedUncompressedEnvelopeUnsafe
+
+            gotUncompressed.recipients shouldBe wanted.recipients
+            gotUncompressed.bytes shouldBe ByteString.copyFromUtf8(wanted.content)
+            gotUncompressed.signatures shouldBe wanted.signatures
           }
 
         case _ => fail(s"Event $event is not a deliver")
@@ -1157,12 +1166,15 @@ trait SequencerApiTestUtils
 
   def signEnvelope(
       crypto: SynchronizerCryptoClient,
-      envelope: ClosedEnvelope,
-      clock: Clock,
-  ): FutureUnlessShutdown[ClosedEnvelope] = {
+      envelope: ClosedUncompressedEnvelope,
+  ): FutureUnlessShutdown[ClosedUncompressedEnvelope] = {
     val hash = crypto.pureCrypto.digest(HashPurpose.SignedProtocolMessageSignature, envelope.bytes)
     crypto.currentSnapshotApproximation.futureValueUS
-      .sign(hash, SigningKeyUsage.ProtocolOnly, Some(clock.now))
+      .sign(
+        hash,
+        SigningKeyUsage.ProtocolOnly,
+        None,
+      )
       .map(sig => envelope.copy(signatures = Seq(sig)))
       .valueOrFail(s"Failed to sign $envelope")
   }
@@ -1171,13 +1183,19 @@ trait SequencerApiTestUtils
       extends Envelope[String] {
 
     /** Closes the envelope by serializing the contents */
-    def closeEnvelope: ClosedEnvelope =
-      ClosedEnvelope.create(
+    def toClosedUncompressedEnvelope: ClosedUncompressedEnvelope =
+      ClosedUncompressedEnvelope.create(
         ByteString.copyFromUtf8(content),
         recipients,
         Seq.empty,
         testedProtocolVersion,
       )
+
+    override def toClosedUncompressedEnvelopeResult: ParsingResult[ClosedUncompressedEnvelope] =
+      toClosedUncompressedEnvelope.asRight
+
+    override def toClosedCompressedEnvelope: ClosedCompressedEnvelope =
+      toClosedUncompressedEnvelope.toClosedCompressedEnvelope
 
     override def forRecipient(
         member: Member,
@@ -1198,7 +1216,7 @@ trait SequencerApiTestUtils
   def registerAllTopologyMembers(headSnapshot: TopologySnapshot, sequencer: Sequencer): Unit =
     (for {
       allMembers <- EitherT
-        .right[Sequencer.RegisterError](headSnapshot.allMembers())
+        .right[Sequencer.RegisterError](headSnapshot.knownMembers())
       _ <- allMembers.toSeq
         .parTraverse_ { member =>
           for {

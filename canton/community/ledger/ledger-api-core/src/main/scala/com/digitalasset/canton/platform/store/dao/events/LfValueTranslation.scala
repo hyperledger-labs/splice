@@ -8,12 +8,7 @@ import com.daml.ledger.api.v2.value
 import com.daml.ledger.api.v2.value.{Record as ApiRecord, Value as ApiValue}
 import com.daml.metrics.Timed
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  LoggingContextWithTrace,
-  NamedLoggerFactory,
-  NamedLogging,
-}
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.{ErrorCause, RejectionGenerators}
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
@@ -29,14 +24,15 @@ import com.digitalasset.canton.platform.{
   PackageId as LfPackageId,
   Value as LfValue,
 }
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{FullIdentifier, Identifier}
-import com.digitalasset.daml.lf.engine as LfEngine
 import com.digitalasset.daml.lf.engine.Engine
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.VersionedValue
+import com.digitalasset.daml.lf.{crypto, engine as LfEngine}
 import com.google.protobuf.ByteString
 import com.google.rpc.Status
 import com.google.rpc.status.Status as ProtoStatus
@@ -75,11 +71,12 @@ final class LfValueTranslation(
     engineO: Option[Engine],
     loadPackage: (
         LfPackageId,
-        LoggingContextWithTrace,
+        TraceContext,
     ) => Future[Option[com.digitalasset.daml.lf.archive.DamlLf.Archive]],
     val loggerFactory: NamedLoggerFactory,
 ) extends LfValueSerialization
     with NamedLogging {
+  import LoggingContextWithTrace.implicitExtractTraceContext
 
   private[this] val packageLoader = new DeduplicatingPackageLoader()
 
@@ -300,7 +297,7 @@ final class LfValueTranslation(
       loggingContext: LoggingContextWithTrace,
   ): Future[CreatedEvent] = {
     val createArgument = fatContractInstance.createArg
-    val createKey = fatContractInstance.contractKeyWithMaintainers.map(_.globalKey.key)
+    val createKey = fatContractInstance.contractKeyWithMaintainers.map(_.globalKey)
 
     val representativeTemplateId =
       fatContractInstance.templateId
@@ -323,7 +320,8 @@ final class LfValueTranslation(
       templateId = Some(
         LfEngineToApi.toApiIdentifier(fatContractInstance.templateId)
       ),
-      contractKey = apiContractData.contractKey,
+      contractKey = apiContractData.contractKey.map(_._1),
+      contractKeyHash = apiContractData.contractKey.fold(ByteString.EMPTY)(_._2.bytes.toByteString),
       createArguments = Some(apiContractData.createArguments),
       createdEventBlob = apiContractData.createdEventBlob.getOrElse(ByteString.EMPTY),
       interfaceViews = apiContractData.interfaceViews,
@@ -342,7 +340,7 @@ final class LfValueTranslation(
 
   private def toApiContractData(
       value: Value,
-      keyO: Option[Value],
+      keyO: Option[GlobalKey],
       representativeTemplateId: FullIdentifier,
       witnesses: Set[String],
       eventProjectionProperties: EventProjectionProperties,
@@ -363,14 +361,14 @@ final class LfValueTranslation(
         .map(toContractArgumentApi(verbose))
     def asyncContractKey = keyO match {
       case None => Future.successful(None)
-      case Some(key) =>
+      case Some(gkey) =>
         enrichAsync(
           verbose = verbose,
-          value = key,
+          value = gkey.key,
           enrich = enricher.enrichContractKey(representativeTemplateId.toIdentifier, _),
         )
           .map(toContractKeyApi(verbose))
-          .map(Some(_))
+          .map(value => Some((value, gkey.hash)))
     }
 
     def asyncInterfaceViews =
@@ -510,9 +508,6 @@ final class LfValueTranslation(
       executionContext: ExecutionContext,
   ): Future[Either[Status, Versioned[Value]]] = Timed.future(
     metrics.index.lfValue.computeInterfaceView, {
-      implicit val errorLogger: ErrorLoggingContext =
-        ErrorLoggingContext(logger, loggingContext)
-
       def goAsync(
           res: LfEngine.Result[Versioned[Value]]
       ): Future[Either[Status, Versioned[Value]]] =
@@ -533,14 +528,14 @@ final class LfValueTranslation(
           case LfEngine.ResultNeedContract(_, _) =>
             Future.failed(new IllegalStateException("View computation must be a pure function"))
 
-          case LfEngine.ResultNeedKey(_, _) =>
+          case LfEngine.ResultNeedKey(_, _, _, _) =>
             Future.failed(new IllegalStateException("View computation must be a pure function"))
 
           case LfEngine.ResultNeedPackage(packageId, resume) =>
             packageLoader
               .loadPackage(
                 packageId = packageId,
-                delegate = packageId => loadPackage(packageId, loggingContext),
+                delegate = packageId => loadPackage(packageId, loggingContext.traceContext),
                 metric = metrics.index.db.translation.getLfPackage,
               )
               .map(resume)
@@ -564,7 +559,7 @@ object LfValueTranslation {
   final case class ApiContractData(
       createArguments: ApiRecord,
       createdEventBlob: Option[ByteString],
-      contractKey: Option[ApiValue],
+      contractKey: Option[(ApiValue, crypto.Hash)],
       interfaceViews: Seq[InterfaceView],
   )
 }

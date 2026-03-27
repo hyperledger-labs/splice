@@ -13,15 +13,19 @@ import com.digitalasset.canton.admin.participant.v30.RegisterSynchronizerRequest
 import com.digitalasset.canton.admin.participant.v30.{
   DisconnectAllSynchronizersRequest,
   DisconnectAllSynchronizersResponse,
+  PerformManualLsuRequest,
+  PerformManualLsuResponse,
 }
 import com.digitalasset.canton.admin.sequencer.v30 as sequencerV30
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonBaseError
+import com.digitalasset.canton.error.LsuError.FailedLsu
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
+import com.digitalasset.canton.participant.admin.data.ManualLsuRequest
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceInternalError.{
   PhysicalSynchronizerIdNotConfigured,
   SynchronizerIsMissingInternally,
@@ -80,7 +84,7 @@ class GrpcSynchronizerConnectivityService(
           )
       )
       client <- EitherT.fromEither[FutureUnlessShutdown](
-        synchronizerConnectionConfig.configuredPSId.toOption
+        synchronizerConnectionConfig.configuredPsid.toOption
           .toRight(PhysicalSynchronizerIdNotConfigured(synchronizerAlias, "connectivity service"))
           .flatMap(
             sync.syncCrypto.ips
@@ -119,9 +123,19 @@ class GrpcSynchronizerConnectivityService(
       proto: Option[v30.SynchronizerConnectionConfig],
       name: String,
   ): Either[CantonBaseError, SynchronizerConnectionConfig] =
-    ProtoConverter
-      .parseRequired(SynchronizerConnectionConfig.fromProtoV30, name, proto)
-      .leftMap(ProtoDeserializationFailure.WrapNoLogging.apply)
+    for {
+      config <- ProtoConverter
+        .parseRequired(SynchronizerConnectionConfig.fromProtoV30, name, proto)
+        .leftMap(ProtoDeserializationFailure.WrapNoLogging.apply)
+      _ <- config.sequencerConnections.submissionRequestAmplification.validate.leftMap(message =>
+        ProtoDeserializationFailure.WrapNoLogging(
+          ProtoDeserializationError.ValueConversionError(
+            "SequencerConnections.SubmissionRequestAmplification",
+            message,
+          )
+        )
+      )
+    } yield config
 
   private def parseSequencerConnectionValidation(
       proto: sequencerV30.SequencerConnectionValidation
@@ -233,7 +247,7 @@ class GrpcSynchronizerConnectivityService(
             new v30.ListRegisteredSynchronizersResponse.Result(
               config = Some(cnf.config.toProtoV30),
               connected = connected.contains(cnf.config.synchronizerAlias),
-              physicalSynchronizerId = cnf.configuredPSId.toOption.map(_.toProtoPrimitive),
+              physicalSynchronizerId = cnf.configuredPsid.toOption.map(_.toProtoPrimitive),
             )
           )
       )
@@ -399,7 +413,27 @@ class GrpcSynchronizerConnectivityService(
       physicalSynchronizerId = result.psid.toProtoPrimitive,
       synchronizerId = result.psid.logical.toProtoPrimitive,
     )
+
     _mapErrNewEUS(ret)
   }
 
+  override def performManualLsu(
+      request: PerformManualLsuRequest
+  ): Future[PerformManualLsuResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val res = for {
+      request <- EitherT.fromEither[FutureUnlessShutdown](
+        ManualLsuRequest
+          .fromProtoV30(request)
+          .leftMap[CantonBaseError](ProtoDeserializationFailure.WrapNoLogging(_))
+      )
+
+      _ <- sync
+        .performManualLsu(request)
+        .leftMap[CantonBaseError](FailedLsu.Error(_))
+    } yield PerformManualLsuResponse()
+
+    _mapErrNewEUS(res)
+  }
 }

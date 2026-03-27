@@ -9,14 +9,14 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.Gauge.CloseableGauge
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricName
+import com.daml.metrics.{CacheMetrics, ExecutorServiceMetrics, HealthMetrics}
 import com.daml.nonempty.NonEmpty
 import com.daml.tracing.DefaultOpenTelemetry
 import com.digitalasset.canton.admin.health.v30.StatusServiceGrpc
-import com.digitalasset.canton.auth.CantonAdminTokenDispenser
+import com.digitalasset.canton.auth.{CantonAdminTokenDispenser, GrpcAuthInterceptorFactory}
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -64,7 +64,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
-import com.digitalasset.canton.metrics.{CacheMetrics, DbStorageMetrics, DeclarativeApiMetrics}
+import com.digitalasset.canton.metrics.{DbStorageMetrics, DeclarativeApiMetrics}
 import com.digitalasset.canton.networking.grpc.{
   CantonGrpcUtil,
   CantonMutableHandlerRegistry,
@@ -74,14 +74,14 @@ import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.{Storage, StorageFactory}
 import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.{
   GrpcIdentityInitializationService,
   GrpcTopologyAggregationService,
   GrpcTopologyManagerReadService,
   GrpcTopologyManagerWriteService,
-  PSIdLookup,
+  PsidLookup,
 }
 import com.digitalasset.canton.topology.admin.v30 as adminV30
 import com.digitalasset.canton.topology.client.{
@@ -136,7 +136,7 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.io.IOException
 import java.util.concurrent.{Executors, ScheduledExecutorService}
-import scala.annotation.unused
+import scala.annotation.{tailrec, unused}
 import scala.concurrent.{ExecutionContext, Future}
 
 /** When a canton node is created it first has to obtain an identity before most of its services can
@@ -197,6 +197,7 @@ final case class CantonNodeBootstrapCommonArguments[
     testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: M,
+    executorServiceMetrics: ExecutorServiceMetrics,
     storageFactory: StorageFactory,
     replicaManager: Option[ReplicaManager],
     futureSupervisor: FutureSupervisor,
@@ -255,8 +256,9 @@ abstract class CantonNodeBootstrapImpl[
 
   protected val cryptoConfig: CryptoConfig = config.crypto
   protected val tracerProvider: TracerProvider = arguments.tracerProvider
+  protected val executorServiceMetrics: ExecutorServiceMetrics = arguments.executorServiceMetrics
   protected implicit val tracer: Tracer = tracerProvider.tracer
-  protected val initQueue: SimpleExecutionQueue = new SimpleExecutionQueue(
+  private val initQueue: SimpleExecutionQueue = new SimpleExecutionQueue(
     s"init-queue-${arguments.name}",
     arguments.futureSupervisor,
     timeouts,
@@ -287,6 +289,7 @@ abstract class CantonNodeBootstrapImpl[
       .getOrElse(NodeStatus.NotInitialized(isActive, waitingFor))
 
   private def waitingFor: Option[WaitingForExternalInput] = {
+    @tailrec
     def nextStage(stage: BootstrapStage[?, ?]): Option[BootstrapStage[?, ?]] =
       stage.next match {
         case Some(s: BootstrapStage[?, ?]) => nextStage(s)
@@ -313,7 +316,7 @@ abstract class CantonNodeBootstrapImpl[
   // Node specific status service need to be bound early
   protected def bindNodeStatusService(): ServerServiceDefinition
 
-  protected def mkHealthComponents(
+  private def mkHealthComponents(
       nodeHealthService: DependenciesHealthService,
       livenessService: LivenessHealthService,
   ): (GrpcHealthReporter, Option[GrpcHealthServer], Option[HttpHealthServer]) = {
@@ -387,7 +390,7 @@ abstract class CantonNodeBootstrapImpl[
 
   protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager]
 
-  protected val bootstrapStageCallback = new BootstrapStage.Callback {
+  protected val bootstrapStageCallback: BootstrapStage.Callback = new BootstrapStage.Callback {
     override def loggerFactory: NamedLoggerFactory = CantonNodeBootstrapImpl.this.loggerFactory
     override def timeouts: ProcessingTimeout = CantonNodeBootstrapImpl.this.timeouts
     override def abortThisNodeOnStartupFailure(): Unit =
@@ -401,8 +404,13 @@ abstract class CantonNodeBootstrapImpl[
     override def ec: ExecutionContext = CantonNodeBootstrapImpl.this.executionContext
   }
 
-  protected def lookupTopologyClient(storeId: TopologyStoreId): Option[SynchronizerTopologyClient]
-  protected def lookupActivePSId: PSIdLookup
+  protected def lookupTopologyClient(
+      psid: PhysicalSynchronizerId
+  ): Option[SynchronizerTopologyClient]
+  protected def lookupSynchronizerTimeTracker(
+      psid: PhysicalSynchronizerId
+  ): Option[SynchronizerTimeTracker]
+  protected def lookupActivePsid: PsidLookup
 
   private val startupStage =
     new BootstrapStage[T, SetupCrypto](
@@ -490,6 +498,7 @@ abstract class CantonNodeBootstrapImpl[
             arguments.config.parameters.batching,
             bootstrapStageCallback.loggerFactory,
             tracerProvider,
+            executorServiceMetrics,
           )
           .map { crypto =>
             addCloseable(crypto)
@@ -525,14 +534,24 @@ abstract class CantonNodeBootstrapImpl[
       val openTelemetry = new DefaultOpenTelemetry(tracerProvider.openTelemetry)
       val builder = CantonServerBuilder
         .forConfig(
-          adminApiConfig,
-          Some(adminTokenDispenser),
-          executionContext,
-          bootstrapStageCallback.loggerFactory,
-          arguments.parameterConfig.loggingConfig.api,
-          arguments.parameterConfig.tracing,
-          arguments.metrics.grpcMetrics,
-          openTelemetry,
+          config = adminApiConfig,
+          executor = executionContext,
+          loggerFactory = bootstrapStageCallback.loggerFactory,
+          apiLoggingConfig = arguments.parameterConfig.loggingConfig.api,
+          tracing = arguments.parameterConfig.tracing,
+          grpcMetrics = arguments.metrics.grpcMetrics,
+          additionalInterceptors = Seq(
+            GrpcAuthInterceptorFactory.createInterceptor(
+              bootstrapStageCallback.loggerFactory,
+              arguments.parameterConfig.loggingConfig.api,
+              openTelemetry,
+              adminTokenDispenser,
+              adminApiConfig.authServices,
+              adminApiConfig.jwtTimestampLeeway,
+              adminApiConfig.adminTokenConfig,
+              adminApiConfig.jwksCacheConfig,
+            )
+          ),
         )
 
       val registry = builder.mutableHandlerRegistry()
@@ -709,7 +728,7 @@ abstract class CantonNodeBootstrapImpl[
     override protected def autoCompleteStage(): EitherT[FutureUnlessShutdown, String, Option[
       SetupNodeIdResult
     ]] =
-      (config.init.identity match {
+      config.init.identity match {
         case IdentityConfig.External(identifier, namespace, certificates) =>
           initWithExternal(identifier, namespace, certificates).map(Some(_))
         case IdentityConfig.Auto(identifier) =>
@@ -719,7 +738,7 @@ abstract class CantonNodeBootstrapImpl[
         case IdentityConfig.Manual =>
           // This should never be called, as the stage is not auto-completable
           EitherT.leftT("Manual initialization should never run auto-complete")
-      })
+      }
 
     /** validate the certificates and the uid provided externally
       *
@@ -999,8 +1018,9 @@ abstract class CantonNodeBootstrapImpl[
                     member(nodeId),
                     temporaryStoreRegistry.stores() ++ sequencedTopologyStores :+ authorizedStore,
                     crypto,
-                    lookupTopologyClient,
-                    lookupActivePSId,
+                    topologyClientLookup = lookupTopologyClient,
+                    lookupSynchronizerTimeTracker,
+                    lookupActivePsid,
                     processingTimeout = parameters.processingTimeouts,
                     bootstrapStageCallback.loggerFactory,
                   ),
@@ -1014,7 +1034,7 @@ abstract class CantonNodeBootstrapImpl[
                   new GrpcTopologyManagerWriteService(
                     temporaryStoreRegistry
                       .managers() ++ sequencedTopologyManagers :+ topologyManager,
-                    lookupActivePSId,
+                    lookupActivePsid,
                     temporaryStoreRegistry,
                     parameters,
                     bootstrapStageCallback.loggerFactory,

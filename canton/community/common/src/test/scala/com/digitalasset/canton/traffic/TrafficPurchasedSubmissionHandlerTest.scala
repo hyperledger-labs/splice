@@ -18,6 +18,7 @@ import com.digitalasset.canton.protocol.messages.{
 }
 import com.digitalasset.canton.protocol.{DynamicSynchronizerParameters, SynchronizerParameters}
 import com.digitalasset.canton.sequencing.TrafficControlParameters
+import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
 import com.digitalasset.canton.sequencing.client.{
   SendAsyncClientError,
   SendCallback,
@@ -82,8 +83,7 @@ class TrafficPurchasedSubmissionHandlerTest
   }
 
   "send a well formed top up message" in {
-    val maxSequencingTimeCapture: ArgumentCaptor[CantonTimestamp] =
-      ArgumentCaptor.forClass(classOf[CantonTimestamp])
+    val timestampsCapture = ArgumentCaptor.forClass(classOf[SendRequestTimestamps])
     val batchCapture: ArgumentCaptor[Batch[DefaultOpenEnvelope]] =
       ArgumentCaptor.forClass(classOf[Batch[DefaultOpenEnvelope]])
     val aggregationRuleCapture = ArgumentCaptor.forClass(classOf[Option[AggregationRule]])
@@ -92,12 +92,12 @@ class TrafficPurchasedSubmissionHandlerTest
     when(
       sequencerClient.send(
         batchCapture.capture(),
-        any[Option[CantonTimestamp]],
-        maxSequencingTimeCapture.capture(),
+        timestampsCapture.capture(),
         any[MessageId],
         aggregationRuleCapture.capture(),
         callbackCapture.capture(),
-        any[Boolean],
+        amplify = any[Boolean],
+        useConfirmationResponseAmplificationParameters = eqTo(false),
       )(any[TraceContext], any[MetricsContext])
     ).thenReturn(EitherT.pure(()))
 
@@ -118,7 +118,7 @@ class TrafficPurchasedSubmissionHandlerTest
     callbackCapture.getValue.asInstanceOf[SendCallback.CallbackFuture](
       UnlessShutdown.Outcome(SendResult.Success(mock[Deliver[Envelope[?]]]))
     )
-    maxSequencingTimeCapture.getValue shouldBe clock.now.plusSeconds(
+    timestampsCapture.getValue.maxSequencingTime shouldBe clock.now.plusSeconds(
       trafficParams.setBalanceRequestSubmissionWindowSize.duration.toSeconds
     )
 
@@ -156,8 +156,7 @@ class TrafficPurchasedSubmissionHandlerTest
   "send 2 messages if close to the end of the max sequencing time window" in {
     val callbackCapture: ArgumentCaptor[SendCallback] =
       ArgumentCaptor.forClass(classOf[SendCallback])
-    val maxSequencingTimeCapture: ArgumentCaptor[CantonTimestamp] =
-      ArgumentCaptor.forClass(classOf[CantonTimestamp])
+    val timestampsCapture = ArgumentCaptor.forClass(classOf[SendRequestTimestamps])
 
     val minutesBucketEnd =
       (8 * trafficParams.setBalanceRequestSubmissionWindowSize.duration.toMinutes).toInt
@@ -172,12 +171,12 @@ class TrafficPurchasedSubmissionHandlerTest
     when(
       sequencerClient.send(
         any[Batch[DefaultOpenEnvelope]],
-        any[Option[CantonTimestamp]],
-        maxSequencingTimeCapture.capture(),
+        timestampsCapture.capture(),
         any[MessageId],
         any[Option[AggregationRule]],
         callbackCapture.capture(),
-        any[Boolean],
+        amplify = any[Boolean],
+        useConfirmationResponseAmplificationParameters = eqTo(false),
       )(any[TraceContext], any[MetricsContext])
     ).thenReturn(EitherT.pure(()))
 
@@ -194,9 +193,9 @@ class TrafficPurchasedSubmissionHandlerTest
 
     eventually() {
       Try(callbackCapture.getAllValues).isSuccess shouldBe true
-      Try(maxSequencingTimeCapture.getAllValues).isSuccess shouldBe true
+      Try(timestampsCapture.getAllValues).isSuccess shouldBe true
       callbackCapture.getAllValues.size() shouldBe 2
-      maxSequencingTimeCapture.getAllValues.size() shouldBe 2
+      timestampsCapture.getAllValues.size() shouldBe 2
     }
     callbackCapture.getAllValues.asScala.foreach {
       _.asInstanceOf[SendCallback.CallbackFuture](
@@ -211,7 +210,9 @@ class TrafficPurchasedSubmissionHandlerTest
         .toEpochMilli
     )
 
-    maxSequencingTimeCapture.getAllValues.asScala should contain theSameElementsAs List(
+    timestampsCapture.getAllValues.asScala.map(
+      _.maxSequencingTime
+    ) should contain theSameElementsAs List(
       mkTimeBucketUpperBound(minutesBucketEnd),
       mkTimeBucketUpperBound(
         minutesBucketEnd + trafficParams.setBalanceRequestSubmissionWindowSize.duration.toMinutes.toInt
@@ -225,12 +226,12 @@ class TrafficPurchasedSubmissionHandlerTest
     when(
       sequencerClient.send(
         any[Batch[DefaultOpenEnvelope]],
-        any[Option[CantonTimestamp]],
-        any[CantonTimestamp],
+        any[SendRequestTimestamps],
         any[MessageId],
         any[Option[AggregationRule]],
         any[SendCallback],
-        any[Boolean],
+        amplify = any[Boolean],
+        useConfirmationResponseAmplificationParameters = eqTo(false),
       )(any[TraceContext], any[MetricsContext])
     )
       .thenReturn(EitherT.leftT(SendAsyncClientError.RequestFailed("failed")))
@@ -259,12 +260,12 @@ class TrafficPurchasedSubmissionHandlerTest
     when(
       sequencerClient.send(
         any[Batch[DefaultOpenEnvelope]],
-        any[Option[CantonTimestamp]],
-        any[CantonTimestamp],
+        any[SendRequestTimestamps],
         any[MessageId],
         any[Option[AggregationRule]],
         callbackCapture.capture(),
-        any[Boolean],
+        amplify = any[Boolean],
+        useConfirmationResponseAmplificationParameters = eqTo(false),
       )(any[TraceContext], any[MetricsContext])
     )
       .thenReturn(EitherT.pure(()))
@@ -319,12 +320,12 @@ class TrafficPurchasedSubmissionHandlerTest
     when(
       sequencerClient.send(
         any[Batch[DefaultOpenEnvelope]],
-        any[Option[CantonTimestamp]],
-        any[CantonTimestamp],
+        any[SendRequestTimestamps],
         any[MessageId],
         any[Option[AggregationRule]],
         callbackCapture.capture(),
-        any[Boolean],
+        amplify = any[Boolean],
+        useConfirmationResponseAmplificationParameters = eqTo(false),
       )(any[TraceContext], any[MetricsContext])
     )
       .thenReturn(EitherT.pure(()))

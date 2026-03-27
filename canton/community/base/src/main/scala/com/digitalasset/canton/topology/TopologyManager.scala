@@ -51,7 +51,6 @@ import com.digitalasset.canton.topology.store.TopologyStoreId.{
 }
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction.GenericValidatedTopologyTransaction
 import com.digitalasset.canton.topology.store.{
-  TimeQuery,
   TopologyStore,
   TopologyStoreId,
   ValidatedTopologyTransaction,
@@ -184,6 +183,11 @@ class SynchronizerTopologyManager(
   } yield {
     val (txs, asyncResult) = validationResult
     (Seq(txs -> ts), asyncResult)
+  }
+
+  override protected def onClosed(): Unit = {
+    super.onClosed()
+    LifeCycle.close(outboxQueue)(logger)
   }
 }
 
@@ -354,7 +358,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
 
   // sequential queue to run all the processing that does operate on the state
   protected val sequentialQueue = new SimpleExecutionQueue(
-    "topology-manager-x-queue",
+    "topology-manager-queue",
     futureSupervisor,
     timeouts,
     loggerFactory,
@@ -409,9 +413,9 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
     EitherTUtil.condUnitET[FutureUnlessShutdown][TopologyManagerError](
-      (numberOfHostingNodes == 0 || threshold.value <= numberOfHostingNodes || forceFlags.permits(
+      numberOfHostingNodes == 0 || threshold.value <= numberOfHostingNodes || forceFlags.permits(
         ForceFlag.AllowConfirmingThresholdCanBeMet
-      )),
+      ),
       TopologyManagerError.ConfirmingThresholdCannotBeReached
         .Reject(threshold, numberOfHostingNodes),
     )
@@ -925,19 +929,19 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
         keys,
       )
 
-    case PartyToParticipant(partyId, threshold, participants, signingKeysWithThreholdO) =>
+    case PartyToParticipant(partyId, threshold, participants, signingKeysWithThresholdO) =>
       checkPartyToParticipantIsNotDangerous(
         partyId,
         threshold,
         participants,
-        signingKeysWithThreholdO,
+        signingKeysWithThresholdO,
         forceChanges,
         transaction.transaction.operation,
       )
 
     case upgradeAnnouncement: LsuAnnouncement =>
       if (transaction.operation == TopologyChangeOp.Replace)
-        checkSynchronizerUpgradeAnnouncementIsNotDangerous(upgradeAnnouncement, transaction.serial)
+        checkLsuAnnouncementIsNotDangerous(upgradeAnnouncement)
       else EitherT.pure(())
 
     case _ => EitherT.rightT(())
@@ -1046,52 +1050,23 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
       _ <- validatePackageVetting(currentlyVettedPackages, newPackageIds, None, forceChanges)
     } yield ()
 
-  private def checkSynchronizerUpgradeAnnouncementIsNotDangerous(
-      upgradeAnnouncement: LsuAnnouncement,
-      serial: PositiveInt,
+  private def checkLsuAnnouncementIsNotDangerous(
+      upgradeAnnouncement: LsuAnnouncement
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] = {
-
-    val resF = store
-      .inspect(
-        proposals = false,
-        timeQuery = TimeQuery.Range(None, None),
-        asOfExclusiveO = None,
-        op = None,
-        types = Seq(TopologyMapping.Code.SynchronizerUpgradeAnnouncement),
-        idFilter = None,
-        namespaceFilter = None,
-      )
-      .map { result =>
-        result
-          .collectOfMapping[LsuAnnouncement]
-          .result
-          .maxByOption(_.serial) match {
-          case None => ().asRight
-
-          case Some(latestUpgradeAnnouncement) =>
-            // If the latest is another upgrade, we want the PSId to be strictly greater
-            if (serial == latestUpgradeAnnouncement.serial)
-              ().asRight
-            else {
-              val previouslyAnnouncedSuccessorPSId =
-                latestUpgradeAnnouncement.mapping.successorSynchronizerId
-
-              Either.cond(
-                previouslyAnnouncedSuccessorPSId < upgradeAnnouncement.successorSynchronizerId,
-                (),
-                InvalidSynchronizerSuccessor.Reject.conflictWithPreviousAnnouncement(
-                  successorSynchronizerId = upgradeAnnouncement.successorSynchronizerId,
-                  previouslyAnnouncedSuccessor = previouslyAnnouncedSuccessorPSId,
-                ),
-              )
-            }
-        }
-      }
-
-    EitherT(resF)
-  }
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
+    EitherT.fromEither(store.storeId.forSynchronizer match {
+      case Some(psid) =>
+        Either.cond(
+          upgradeAnnouncement.successorSynchronizerId >= psid,
+          (),
+          InvalidSynchronizerSuccessor.Reject.conflictWithCurrentPsid(
+            successorSynchronizerId = upgradeAnnouncement.successorSynchronizerId,
+            currentSynchronizerId = psid,
+          ),
+        )
+      case None => Right(())
+    })
 
   private def checkSigningThresholdCanBeReached(
       threshold: PositiveInt,
@@ -1289,7 +1264,7 @@ object TopologyManager {
     }
   }
 
-  def checkBounds(
+  private def checkBounds(
       parameters: DynamicSynchronizerParameters
   )(implicit errorLoggingContext: ErrorLoggingContext): Either[TopologyManagerError, Unit] = {
     def check(

@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound, SynchronizerSuccessor}
+import com.digitalasset.canton.data.SynchronizerSuccessor
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
@@ -21,6 +21,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencer.admin.v30.{
   SequencerAdministrationServiceGrpc,
   SequencerPruningAdministrationServiceGrpc,
+  SequencerTrafficInspectionServiceGrpc,
 }
 import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencing.client.SequencerClient
@@ -39,6 +40,7 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
 import com.digitalasset.canton.synchronizer.sequencer.time.{
   BroadcastTimeTrackerImpl,
+  LsuSequencingBounds,
   TimeAdvancingTopologySubscriberV1,
   TimeAdvancingTopologySubscriberV2,
 }
@@ -99,12 +101,12 @@ object SequencerAuthenticationConfig {
   *   authentication.
   */
 class SequencerRuntime(
-    sequencerId: SequencerId,
+    val sequencerId: SequencerId,
     val sequencer: Sequencer,
     @VisibleForTesting val client: SequencerClient,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     localNodeParameters: SequencerNodeParameters,
-    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
+    lsuSequencingBounds: Option[LsuSequencingBounds],
     val timeTracker: SynchronizerTimeTracker,
     val metrics: SequencerMetrics,
     physicalIndexedSynchronizer: IndexedPhysicalSynchronizer,
@@ -123,7 +125,7 @@ class SequencerRuntime(
     authenticationServices: AuthenticationServices,
     sequencerService: GrpcSequencerService,
     sequencerChannelServiceO: Option[GrpcSequencerChannelService],
-    maybeSynchronizerOutboxFactory: Option[SynchronizerOutboxFactorySingleCreate],
+    synchronizerOutbox: SynchronizerOutboxHandle,
     protected val loggerFactory: NamedLoggerFactory,
     runtimeReadyPromise: PromiseUnlessShutdown[Unit],
 )(implicit
@@ -148,7 +150,7 @@ class SequencerRuntime(
           .flatMap { snapshot =>
             val ipsSnapshot = snapshot.ipsSnapshot
             ipsSnapshot
-              .signingKeys(sequencerId, SigningKeyUsage.SequencerAuthenticationOnly)
+              .signingKeys(sequencerId, SigningKeyUsage.ProtocolOnly)
               .map { keys =>
                 Either.cond(
                   keys.nonEmpty,
@@ -219,7 +221,7 @@ class SequencerRuntime(
 
   def topologyQueue: TopologyQueueStatus = TopologyQueueStatus(
     manager = topologyManagerStatusO.map(_.queueSize).getOrElse(0),
-    dispatcher = synchronizerOutboxO.map(_.queueSize).getOrElse(0),
+    dispatcher = synchronizerOutbox.queueSize,
     clients = topologyClient.numPendingChanges,
   )
 
@@ -235,6 +237,12 @@ class SequencerRuntime(
     register(
       SequencerAdministrationServiceGrpc.bindService(
         sequencerAdministrationService,
+        executionContext,
+      )
+    )
+    register(
+      SequencerTrafficInspectionServiceGrpc.bindService(
+        SequencerTrafficInspectionService,
         executionContext,
       )
     )
@@ -260,8 +268,7 @@ class SequencerRuntime(
         svcDef: ServerServiceDefinition
     ) = {
       import scala.jdk.CollectionConverters.*
-
-      // use the auth service interceptor together with the rate interceptor
+      // use the auth service interceptor
       val interceptors =
         (List(
           authenticationServices.authenticationServerInterceptor
@@ -280,7 +287,7 @@ class SequencerRuntime(
             synchronizerTopologyManager,
             syncCrypto,
             clock,
-            sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+            lsuSequencingBounds,
             loggerFactory,
           )(ec),
           executionContext,
@@ -358,19 +365,19 @@ class SequencerRuntime(
     )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
       val removeO = transactions
         .find(tx =>
-          tx.operation == TopologyChangeOp.Remove && tx.mapping.code == Code.SynchronizerUpgradeAnnouncement
+          tx.operation == TopologyChangeOp.Remove && tx.mapping.code == Code.LsuAnnouncement
         )
         .map(_ => Option.empty[SynchronizerSuccessor])
       val replaceO = transactions.collectFirst {
         case tx
-            if tx.operation == TopologyChangeOp.Replace && tx.mapping.code == Code.SynchronizerUpgradeAnnouncement =>
+            if tx.operation == TopologyChangeOp.Replace && tx.mapping.code == Code.LsuAnnouncement =>
           tx.mapping.select[LsuAnnouncement].map(_.successor)
       }
       // Some(Some(successor)) - replacement, otherwise Some(None) - removal, otherwise None - noop
       // Replace op takes precedence over Remove op
       replaceO
         .orElse(removeO)
-        .foreach(sequencer.updateSynchronizerSuccessor(_, effectiveTimestamp))
+        .foreach(sequencer.updateLsuSuccessor(_, effectiveTimestamp))
       FutureUnlessShutdown.unit
     }
   })
@@ -405,18 +412,6 @@ class SequencerRuntime(
     topologyProcessor.subscribe(timeAdvancingTopologySubscriber)
   }
 
-  private lazy val synchronizerOutboxO: Option[SynchronizerOutboxHandle] =
-    maybeSynchronizerOutboxFactory
-      .map(
-        _.createOnlyOnce(
-          topologyClient,
-          client,
-          timeTracker,
-          clock,
-          loggerFactory,
-        )
-      )
-
   private val topologyHandler = topologyProcessor.createHandler(psid)
   private val trafficProcessor =
     new TrafficControlProcessor(
@@ -440,12 +435,16 @@ class SequencerRuntime(
       topologyClient,
       timeTracker,
       staticSynchronizerParameters,
+      authenticationServices.memberAuthenticationService,
+      localNodeParameters,
       loggerFactory,
     )
 
-  @VisibleForTesting
-  def setSequencingTimeLowerBoundExclusive(lowerBound: Option[CantonTimestamp]): Unit =
-    sequencingTimeLowerBoundExclusive.set(lowerBound)
+  private val SequencerTrafficInspectionService =
+    new GrpcSequencerTrafficInspectionService(
+      sequencer,
+      loggerFactory,
+    )
 
   def initializeAll()(implicit
       traceContext: TraceContext
@@ -465,16 +464,14 @@ class SequencerRuntime(
             timeTracker,
           )
         )
-      _ <- synchronizerOutboxO
-        .map(_.startup())
-        .getOrElse(EitherT.rightT[FutureUnlessShutdown, String](()))
+      _ <- synchronizerOutbox.startup()
       // Note: we use head snapshot as we want the latest announced upgrade anyway, an overlapping update is idempotent
       synchronizerUpgradeO <- EitherT.right(
-        topologyClient.headSnapshot.synchronizerUpgradeOngoing()
+        topologyClient.headSnapshot.announcedLsu()
       )
     } yield {
       synchronizerUpgradeO.foreach { case (successor, effectiveTime) =>
-        sequencer.updateSynchronizerSuccessor(Some(successor), effectiveTime)
+        sequencer.updateLsuSuccessor(Some(successor), effectiveTime)
       }
       logger.info("Sequencer runtime initialized")
       runtimeReadyPromise.outcome_(())

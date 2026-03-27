@@ -9,6 +9,7 @@ import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
 import com.daml.ledger.resources.ResourceContext
 import com.daml.ports.Port
 import com.digitalasset.canton.TestPredicateFiltersFixtureAnyWordSpec
+import com.digitalasset.canton.annotations.{NuckTest, RollbackTest}
 import com.digitalasset.canton.config.AuthServiceConfig.Wildcard
 import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.integration.ConfigTransforms.{
@@ -100,7 +101,6 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
           partyDetails <- client.partyManagementClient.allocateParty(Some(party))
           // Uploading the package is not enough.
           // We have to submit a request that forces the engine to load the package.
-          _ = println(s"diff head: ${(pkgsAfter diff pkgsBefore).head}")
           request = buildRequest(
             (pkgsAfter diff pkgsBefore).head.packageId,
             partyDetails.party,
@@ -201,4 +201,6 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
 
 class StableEngineModeIT extends BaseEngineModeIT(supportDevLanguageVersions = false)
 
+@NuckTest
+@RollbackTest
 class DevEngineModeIT extends BaseEngineModeIT(supportDevLanguageVersions = true)

@@ -3,52 +3,79 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.RichGeneratedMessage
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
-import com.digitalasset.canton.crypto.{Signature, SyncCryptoClient, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound, SynchronizerSuccessor}
+import com.digitalasset.canton.crypto.{
+  HashPurpose,
+  Signature,
+  SyncCryptoClient,
+  SynchronizerCryptoClient,
+  SynchronizerSnapshotSyncCryptoApi,
+}
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.messages.{
+  EncryptedViewMessage,
+  LsuSequencingTestMessage,
+  LsuSequencingTestMessageContent,
+}
 import com.digitalasset.canton.resource.{DbExceptionRetryPolicy, Storage}
-import com.digitalasset.canton.sequencing.client.SequencerClientSend
+import com.digitalasset.canton.sequencer.admin.v30.{EnvelopeTrafficSummary, TrafficSummary}
+import com.digitalasset.canton.sequencing.GroupAddressResolver
+import com.digitalasset.canton.sequencing.client.SendAsyncClientError.ErrorCode
+import com.digitalasset.canton.sequencing.client.{
+  RequestSigner,
+  SendAsyncClientError,
+  SequencerClientSend,
+}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors.{
   Overloaded,
   SubmissionRequestRefused,
 }
-import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.{
+  TrafficControlDisabled,
+  TrafficControlError,
+  TrafficStateNotFound,
+}
 import com.digitalasset.canton.sequencing.traffic.{
+  EventCostCalculator,
+  TrafficConsumed,
   TrafficControlErrors,
   TrafficPurchasedSubmissionHandler,
 }
-import com.digitalasset.canton.synchronizer.block.BlockSequencerStateManagerBase
+import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.synchronizer.block.data.SequencerBlockStore
 import com.digitalasset.canton.synchronizer.block.update.BlockUpdateGeneratorImpl
+import com.digitalasset.canton.synchronizer.block.{BlockSequencerStateManagerBase, RawLedgerBlock}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.PruningError.UnsafePruningPoint
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
-import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.OngoingSynchronizerUpgrade
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
   BlockNotFound,
   ExceededMaxSequencingTime,
+  InvalidTrafficState,
   LsuSequencerError,
   LsuTrafficAlreadyInitialized,
   MissingSynchronizerPredecessor,
   SequencerPastUpgradeTime,
 }
-import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
+import com.digitalasset.canton.synchronizer.sequencer.store.{PayloadId, SequencerStore}
+import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.*
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   LsuTrafficState,
@@ -60,7 +87,7 @@ import com.digitalasset.canton.synchronizer.sequencing.traffic.store.TrafficPurc
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.EffectiveTime
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown
 import com.digitalasset.canton.util.retry.Pause
@@ -68,12 +95,13 @@ import com.digitalasset.canton.util.{EitherTUtil, MonadUtil, PekkoUtil, SimpleEx
 import io.grpc.ServerServiceDefinition
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.*
-import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
+import scala.collection.immutable.SortedSet
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
@@ -97,7 +125,7 @@ class BlockSequencer(
     clock: Clock,
     blockRateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
-    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
+    lsuSequencingBounds: Option[LsuSequencingBounds],
     processingTimeouts: ProcessingTimeout,
     logEventDetails: Boolean,
     prettyPrinter: CantonPrettyPrinter,
@@ -129,7 +157,7 @@ class BlockSequencer(
       metrics,
       loggerFactory,
       blockSequencerMode = true,
-      sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+      lsuSequencingBounds,
       rateLimitManagerO = Some(blockRateLimitManager),
     )
     with DatabaseSequencerIntegration
@@ -157,20 +185,19 @@ class BlockSequencer(
     }
   // If the lower bound is not set (this sequencer is not an LSU successor),
   // we don't need to wait for traffic initialization.
-  // TODO(#26983): Rather use the topology state with the older synchronizer LSU announcement
-  sequencingTimeLowerBoundExclusive.get match {
+  lsuSequencingBounds match {
     case None =>
       logger.info(
         s"Sequencer $sequencerId is not an LSU successor; traffic data initialization is not required."
       )(TraceContext.empty)
       lsuTrafficInitialized.success(UnlessShutdown.unit)
-    case Some(upgradeTime) =>
+    case Some(lsuSequencingBounds) =>
       // check that traffic control is enabled in the current topology
       implicit val traceContext: TraceContext = TraceContext.createNew(
         "block-sequencer-lsu-traffic-control-check"
       )
       val checkLsuTrafficInitializedFUS = for {
-        snapshot <- cryptoApi.ipsSnapshot(upgradeTime)
+        snapshot <- cryptoApi.ipsSnapshot(lsuSequencingBounds.upgradeTime)
         trafficControlParametersO <- snapshot.trafficControlParameters(protocolVersion)
         trafficPurchasedInitialized <- trafficPurchasedStore.getInitialTimestamp
       } yield {
@@ -208,10 +235,11 @@ class BlockSequencer(
     new TrafficPurchasedSubmissionHandler(clock, loggerFactory)
 
   override protected def resetWatermarkTo: SequencerWriter.ResetWatermark =
-    sequencingTimeLowerBoundExclusive.get match {
-      case Some(boundExclusive) =>
+    lsuSequencingBounds match {
+      case Some(lsuSequencingBounds) =>
         SequencerWriter.ResetWatermarkToTimestamp(
-          stateManager.getHeadState.block.lastTs.max(boundExclusive)
+          stateManager.getHeadState.block.lastTs
+            .max(lsuSequencingBounds.lowerBoundSequencingTimeExclusive)
         )
 
       case None =>
@@ -237,17 +265,20 @@ class BlockSequencer(
       loggerFactory,
     )
 
+  private[sequencer] val announcedLsu: AtomicReference[Option[AnnouncedLsu]] =
+    new AtomicReference(None)
+
   private val (killSwitchF, done) = {
     val headState = stateManager.getHeadState
     noTracingLogger.info(s"Subscribing to block source from ${headState.block.height + 1}")
 
     val updateGenerator = new BlockUpdateGeneratorImpl(
-      protocolVersion,
       cryptoApi,
       sequencerId,
       blockRateLimitManager,
       orderingTimeFixMode,
-      sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+      lsuSequencingBounds = lsuSequencingBounds,
+      getAnnouncedLsu = announcedLsu.get(),
       producePostOrderingTopologyTicks,
       metrics,
       batchingConfig,
@@ -257,13 +288,19 @@ class BlockSequencer(
 
     implicit val traceContext: TraceContext =
       TraceContext.createNew("block-sequencer-driver-source")
-    val runtimeAndLsuTrafficReady = for {
-      _ <- runtimeReady
-      _ <- lsuTrafficInitialized.futureUS
-    } yield ()
 
+    val pauseAtUpgradeTimeUntilLsuTrafficInitialized =
+      lsuSequencingBounds.fold(Flow[Traced[RawLedgerBlock]]) {
+        case LsuSequencingBounds(upgradeTime, _) =>
+          PekkoUtil.mapAsyncAndDrainUS(Flow[Traced[RawLedgerBlock]], 1) {
+            case block if block.value.baseSequencingTimeMicrosFromEpoch > upgradeTime.toMicros =>
+              lsuTrafficInitialized.futureUS.map(_ => block)
+            case block =>
+              FutureUnlessShutdown.pure(block)
+          }
+      }
     val driverSource = Source
-      .futureSource(runtimeAndLsuTrafficReady.unwrap.map {
+      .futureSource(runtimeReady.unwrap.map {
         case UnlessShutdown.AbortedDueToShutdown =>
           noTracingLogger.debug("Not initiating subscription to block source due to shutdown")
           Source.empty.viaMat(KillSwitches.single)(Keep.right)
@@ -271,6 +308,7 @@ class BlockSequencer(
           noTracingLogger.debug("Subscribing to block source")
           blockOrderer.subscribe()
       })
+      .via(pauseAtUpgradeTimeUntilLsuTrafficInitialized)
       // Explicit async to make sure that the block processing runs in parallel with the block retrieval
       .async
       .map(updateGenerator.extractBlockEvents)
@@ -366,17 +404,13 @@ class BlockSequencer(
         // current block can be reflected in the traffic state used to validate the request
         {
           val headChunkLastTs = stateManager.getHeadState.chunk.lastTs
-          // For LSU successor sequencer, bound from below by the sequencing time lower bound
-          // TODO(#26983): Use the topology state with the older synchronizer LSU announcement
-          sequencingTimeLowerBoundExclusive.get
+          lsuSequencingBounds
+            .map(_.upgradeTime)
             .getOrElse(headChunkLastTs)
             .max(headChunkLastTs)
         },
-        stateManager.getHeadState.chunk.latestSequencerEventTimestamp.orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
-        ),
+        stateManager.getHeadState.chunk.latestSequencerEventTimestamp
+          .orElse(lsuSequencingBounds.map(_.upgradeTime)),
       )
       .leftMap {
         // If the cost is outdated, we bounce the request with a specific SendAsyncError so the
@@ -429,7 +463,7 @@ class BlockSequencer(
       : EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] = {
     val currentTime = clock.now
 
-    sequencingTimeLowerBoundExclusive.get match {
+    lsuSequencingBounds.map(_.upgradeTime) match {
       case Some(boundExclusive) =>
         EitherTUtil.condUnitET[FutureUnlessShutdown](
           currentTime > boundExclusive,
@@ -449,7 +483,7 @@ class BlockSequencer(
       EitherT.leftT(
         Overloaded("Sequencer can't take requests because it is behind on processing events")
       )
-    else EitherT.rightT(())
+    else EitherTUtil.unitUS
 
   private def rejectAcknowledgementIfOverloaded()
       : EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
@@ -457,10 +491,11 @@ class BlockSequencer(
       EitherT.leftT(
         Overloaded("Sequencer can't take requests because it is behind on processing events")
       )
-    else EitherT.rightT(())
+    else EitherTUtil.unitUS
 
   override protected def sendAsyncSignedInternal(
-      signedSubmission: SignedContent[SubmissionRequest]
+      signedSubmission: SignedContent[SubmissionRequest],
+      skipLsuChecks: Boolean = false,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = {
@@ -474,13 +509,23 @@ class BlockSequencer(
       _,
       _,
     ) = submission
+
+    val maybeDelayedProcessingMessage =
+      if (lsuTrafficInitialized.isCompleted || skipLsuChecks)
+        ""
+      else " Traffic is not yet initialized. Handling of submission request might be delayed."
+
     logger.debug(
-      s"Request to send submission with id ${submission.messageId} with max sequencing time $maxSequencingTime from $sender to ${batch.allRecipients}"
+      s"Request to send submission with id ${submission.messageId} with max sequencing time $maxSequencingTime from $sender to ${batch.allRecipients}. $maybeDelayedProcessingMessage"
     )
 
     for {
-      _ <- EitherT.right(lsuTrafficInitialized.futureUS)
-      _ <- rejectSubmissionsBeforeOrAtSequencingTimeLowerBound()
+      _ <-
+        if (!skipLsuChecks) EitherT.right(lsuTrafficInitialized.futureUS)
+        else EitherTUtil.unitUS
+      _ <-
+        if (!skipLsuChecks) rejectSubmissionsBeforeOrAtSequencingTimeLowerBound()
+        else EitherTUtil.unitUS
       _ <- enforceThroughputCap(submission)
       _ <- rejectSubmissionsIfOverloaded(submission)
       // TODO(i17584): revisit the consequences of no longer enforcing that
@@ -523,9 +568,18 @@ class BlockSequencer(
       _ <- EitherTUtil.toFutureUnlessShutdown(
         rejectAcknowledgementIfOverloaded().leftMap(_.asGrpcError)
       )
-      _ <- EitherTUtil.toFutureUnlessShutdown(
-        rejectSubmissionsBeforeOrAtSequencingTimeLowerBound().leftMap(_.asGrpcError)
-      )
+
+      _ = signedAcknowledgeRequest.content.member match {
+        case _: ParticipantId =>
+          // Participants should not ack before upgrade time because the events are on the old synchronizer.
+          EitherTUtil.toFutureUnlessShutdown(
+            rejectSubmissionsBeforeOrAtSequencingTimeLowerBound().leftMap(_.asGrpcError)
+          )
+
+        case _: SequencerId | _: MediatorId =>
+          // Synchronizer nodes can receive messages on the new synchronizer before upgrade time so they can ack
+          FutureUnlessShutdown.unit
+      }
       waitForAcknowledgementF = stateManager.waitForAcknowledgementToComplete(
         req.member,
         req.timestamp,
@@ -563,6 +617,134 @@ class BlockSequencer(
           BlockNotFound.InvalidTimestamp(timestamp): SequencerError
         )
     }
+  }
+
+  override protected def readPayloadsFromTimestampsInternal(timestamps: Seq[CantonTimestamp])(
+      implicit traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] =
+    // In the block sequencer, payload Ids are sequencing timestamps so we can use that to look up payloads directly
+    // We don't load them in the cache though to avoid interfering with optimizations on event delivery to members
+    reader.readPayloadsByIdWithoutCacheLoading(timestamps.map(PayloadId(_)))
+
+  private val eventCostCalculator = new EventCostCalculator(loggerFactory)
+
+  override def getTrafficSummaries(timestamps: Seq[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[TrafficSummary]] = {
+
+    val timestampsSet = SortedSet.from(timestamps)
+    val headBlock = stateManager.getHeadState.block
+    val latestSequencedTimestamp = headBlock.lastTs
+    val latestSequencerEventTimestamp = headBlock.latestSequencerEventTimestamp
+
+    // Get the latest snapshot available by making use of the latestSequencerEventTimestamp in the head state
+    // This ensures we can immediately get topology snapshots for events that have been sequenced without
+    // waiting for the head topolog snapshot to get updated
+    def getSnapshot(timestamp: CantonTimestamp) = SyncCryptoClient
+      .getSnapshotForTimestamp(
+        cryptoApi,
+        timestamp,
+        latestSequencerEventTimestamp,
+      )
+      .map(_.ipsSnapshot)
+
+    // Computes the detailed event cost for a batch at the sequencing timestamp
+    def computeDetailedEventCostForBatch(
+        batch: Batch[ClosedEnvelope],
+        sequencingTime: CantonTimestamp,
+    ): EitherT[FutureUnlessShutdown, TrafficControlError, EventCostCalculator.EventCostDetails] = {
+
+      // TODO(i29505): remove once flat fees for broadcasts is implemented
+      val groups =
+        batch.envelopes.flatMap(_.recipients.allRecipients).collect { case g: GroupRecipient => g }
+
+      for {
+        topologySnapshot <- OptionT.liftF(getSnapshot(sequencingTime))
+        trafficParams <- OptionT(
+          topologySnapshot.trafficControlParameters(protocolVersion)
+        )
+        groupToMembers <- OptionT.liftF(
+          GroupAddressResolver.resolveGroupsToMembers(groups.toSet, topologySnapshot)
+        )
+        eventCost = eventCostCalculator.computeEventCost(
+          batch,
+          trafficParams.readVsWriteScalingFactor,
+          groupToMembers,
+          protocolVersion,
+          trafficParams.baseEventCost,
+        )
+      } yield eventCost
+    }
+      .toRight(TrafficControlErrors.TrafficControlDisabled.Error())
+      .leftWiden[TrafficControlError]
+
+    def buildEnvelopeTrafficSummary(
+        eventCostDetails: EventCostCalculator.EventCostDetails
+    ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[EnvelopeTrafficSummary]] =
+      EitherT
+        .fromEither[FutureUnlessShutdown](
+          eventCostDetails.envelopes.toSeq.traverse { case (closedEnvelope, costDetails) =>
+            closedEnvelope
+              .toOpenEnvelope(cryptoApi.pureCrypto, protocolVersion)
+              .leftMap(err => TrafficControlErrors.EnvelopeTrafficSummaryError.Error(err))
+              .map { openEnvelope =>
+                val viewHashes = openEnvelope.protocolMessage match {
+                  // For encrypted view messages, extract the view hash
+                  case message: EncryptedViewMessage[?] =>
+                    List(message.viewHash.unwrap.getCryptographicEvidence)
+                  case _ => List.empty
+                }
+                EnvelopeTrafficSummary(
+                  envelopeTrafficCost = costDetails.finalCost,
+                  viewHashes = viewHashes,
+                )
+              }
+          }
+        )
+        .leftWiden[TrafficControlError]
+
+    def computeSummary(
+        batch: Batch[ClosedEnvelope],
+        sequencingTimestamp: CantonTimestamp,
+    ): EitherT[FutureUnlessShutdown, TrafficControlError, TrafficSummary] = for {
+      eventCostDetails <- computeDetailedEventCostForBatch(batch, sequencingTimestamp)
+      envelopeSummaries <- buildEnvelopeTrafficSummary(eventCostDetails)
+    } yield TrafficSummary(
+      sequencingTime = Some(sequencingTimestamp.toProtoTimestamp),
+      totalTrafficCost = eventCostDetails.eventCost.value,
+      envelopes = envelopeSummaries,
+    )
+
+    for {
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+        lsuTrafficInitialized.futureUS.isCompleted,
+        TrafficStateNotFound.Error(),
+      )
+
+      // Check that the latest timestamp is not above the latest sequenced timestamp
+      _ <- timestampsSet.lastOption
+        .find(_ > latestSequencedTimestamp)
+        .fold(EitherTUtil.unitUS[TrafficControlError])(inTheFuture =>
+          EitherT.leftT[FutureUnlessShutdown, Unit](
+            TrafficControlErrors.RequestedTimestampInTheFuture.Error(inTheFuture)
+          )
+        )
+        .leftWiden[TrafficControlError]
+      eventsMap <- EitherT.liftF(readPayloadsFromTimestampsInternal(timestamps))
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+        eventsMap.sizeIs == timestampsSet.size,
+        TrafficControlErrors.NoEventAtTimestamps.Error(
+          timestampsSet.diff(eventsMap.keySet.map(_.unwrap))
+        ),
+      )
+      trafficSummaries <- MonadUtil
+        .parTraverseWithLimit(batchingConfig.parallelism)(
+          eventsMap.toSeq
+        ) { case (payloadId, batch) =>
+          val sequencingTime = payloadId.unwrap
+          computeSummary(batch, sequencingTime)
+        }
+    } yield trafficSummaries
   }
 
   override def awaitContainingBlockLastTimestamp(timestamp: CantonTimestamp)(implicit
@@ -754,6 +936,7 @@ class BlockSequencer(
     import TraceContext.Implicits.Empty.*
     logger.debug(s"$name sequencer shutting down")
     Seq[AsyncOrSyncCloseable](
+      SyncCloseable("lsu-traffic-initialized", lsuTrafficInitialized.shutdown_()),
       SyncCloseable("pruningQueue", pruningQueue.close()),
       SyncCloseable("stateManager.close()", stateManager.close()),
       // The kill switch ensures that we don't process the remaining contents of the queue buffer
@@ -809,9 +992,7 @@ class BlockSequencer(
         requestedMembers,
         timestamp,
         stateManager.getHeadState.block.latestSequencerEventTimestamp.orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
+          lsuSequencingBounds.map(_.upgradeTime)
         ),
         // TODO(#18401) set warnIfApproximate to true and check that we don't get warnings
         // Warn on approximate topology or traffic purchased when getting exact traffic states only (so when selector is not LatestApproximate)
@@ -857,23 +1038,30 @@ class BlockSequencer(
   @nowarn("cat=deprecation")
   override def trafficStatus(requestedMembers: Seq[Member], selector: TimestampSelector)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SequencerTrafficStatus] =
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, SequencerTrafficStatus] =
     for {
-      topologySnapshot <- cryptoApi.currentSnapshotApproximation
-      members <-
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+        lsuTrafficInitialized.futureUS.isCompleted,
+        TrafficControlErrors.LsuTrafficNotInitialized.Error(),
+      )
+      topologySnapshot <- EitherT.right(cryptoApi.currentSnapshotApproximation)
+      members <- EitherT.right(
         if (requestedMembers.isEmpty) {
           // If requestedMembers is not set get the traffic states of all known members
-          topologySnapshot.ipsSnapshot.allMembers()
+          topologySnapshot.ipsSnapshot.knownMembers()
         } else {
           topologySnapshot.ipsSnapshot
-            .allMembers()
+            .knownMembers()
             .map { registered =>
               requestedMembers.toSet.intersect(registered)
             }
         }
-      trafficState <- trafficStatesForMembers(
-        members,
-        selector,
+      )
+      trafficState <- EitherT.right(
+        trafficStatesForMembers(
+          members,
+          selector,
+        )
       )
     } yield SequencerTrafficStatus(trafficState)
 
@@ -881,20 +1069,23 @@ class BlockSequencer(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerRateLimitError.TrafficNotFound, Option[
     TrafficState
-  ]] =
-    EitherT.right(lsuTrafficInitialized.futureUS).flatMap { _ =>
-      val latestSequencerEventTimestamp =
-        stateManager.getHeadState.block.latestSequencerEventTimestamp.orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
-        )
-      blockRateLimitManager.getTrafficStateForMemberAt(
-        member,
-        timestamp,
-        latestSequencerEventTimestamp,
+  ]] = for {
+    _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+      lsuTrafficInitialized.futureUS.isCompleted,
+      SequencerRateLimitError.TrafficNotFound(
+        member
+      ),
+    )
+    latestSequencerEventTimestamp =
+      stateManager.getHeadState.block.latestSequencerEventTimestamp.orElse(
+        lsuSequencingBounds.map(_.upgradeTime)
       )
-    }
+    result <- blockRateLimitManager.getTrafficStateForMemberAt(
+      member,
+      timestamp,
+      latestSequencerEventTimestamp,
+    )
+  } yield result
 
   override def sequencingTime(implicit
       traceContext: TraceContext
@@ -903,32 +1094,38 @@ class BlockSequencer(
 
   override private[canton] def orderer: Some[BlockOrderer] = Some(blockOrderer)
 
-  private val ongoingSynchronizerUpgrade: AtomicReference[Option[OngoingSynchronizerUpgrade]] =
-    new AtomicReference(None)
-
-  override private[sequencer] def updateSynchronizerSuccessor(
+  override private[sequencer] def updateLsuSuccessor(
       successorO: Option[SynchronizerSuccessor],
       announcementEffectiveTime: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit = {
     successorO match {
       case Some(successor) =>
-        ongoingSynchronizerUpgrade.set(
-          Some(OngoingSynchronizerUpgrade(successor, announcementEffectiveTime, loggerFactory))
+        announcedLsu.set(
+          Some(AnnouncedLsu(successor, announcementEffectiveTime, loggerFactory))
         )
-      case None => ongoingSynchronizerUpgrade.set(None)
+      case None => announcedLsu.set(None)
     }
-    super.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
+    super.updateLsuSuccessor(successorO, announcementEffectiveTime)
   }
 
-  @nowarn("cat=deprecation")
   override def getLsuTrafficControlState(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, LsuSequencerError, LsuTrafficState] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] =
     for {
       // - Check that LSU is ongoing
-      upgrade <- EitherT.fromOption[FutureUnlessShutdown](
-        ongoingSynchronizerUpgrade.get(),
-        SequencerError.NoOngoingLsu.Error(cryptoApi.psid, cryptoApi.topologyKnownUntilTimestamp),
+      upgrade <- EitherT
+        .fromOption[FutureUnlessShutdown](
+          announcedLsu.get(),
+          SequencerError.NoLsuAnnounced.Error(cryptoApi.psid, cryptoApi.topologyKnownUntilTimestamp),
+        )
+        .leftWiden[CantonBaseError]
+      // - Traffic control is enabled
+      _ <- EitherT(
+        cryptoApi.ips.currentSnapshotApproximation
+          .flatMap(
+            _.trafficControlParameters(protocolVersion)
+          )
+          .map(_.toRight[CantonBaseError](TrafficControlDisabled.Error()))
       )
 
       // - Basic time check against the wall clock
@@ -948,13 +1145,11 @@ class BlockSequencer(
         // - Traffic states have been persisted (the block completion is written last, after traffic)
         // TODO(##29986): When traffic accounting is made async, we need a different way to determine that
         //  it has become consistent (accounting reached the upgrade time)
-        store.readHead.map(_.map(_.latestBlock.lastTs))
+        store.readHeadBlockInfo().map(_.map(_.lastTs))
       )
       latestSequencerEventTimestamp = stateManager.getHeadState.block.latestSequencerEventTimestamp
         .orElse(
-          // TODO(#26983): Rather fall back to the topology state for older synchronizer LSU announcement
-          // predecessor.map(_.upgradeTime)
-          sequencingTimeLowerBoundExclusive.get
+          lsuSequencingBounds.map(_.upgradeTime)
         )
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
         latestPersistedBlockTimeO.exists(_ >= upgrade.successor.upgradeTime),
@@ -963,32 +1158,62 @@ class BlockSequencer(
           latestPersistedBlockTimeO,
         ),
       )
-      // - All checks passed
-      topologySnapshot <- EitherT.right[LsuSequencerError](
+      // We use the topology snapshot at upgrade time to await the processing of member registrations,
+      // so that traffic state doesn't miss any members.
+      // Technically this should not be necessary due to the topology freeze around LSU.
+      _ <- EitherT.right[LsuSequencerError](
         SyncCryptoClient.getSnapshotForTimestamp(
           cryptoApi,
           upgrade.successor.upgradeTime,
           latestSequencerEventTimestamp,
         )
       )
+      // - All checks passed
       // - Get all members known at the upgrade time
       allMembers <- EitherT.right[LsuSequencerError](
-        topologySnapshot.ipsSnapshot.allMembers()
+        dbSequencerStore.allRegisteredMembers(registeredAtBeforeInclusive =
+          upgrade.successor.upgradeTime
+        )
       )
       // - Get traffic states at the upgrade time for all members
+      consumedRecordsPerMember <- EitherT.right[LsuSequencerError](
+        blockRateLimitManager.trafficConsumedStore
+          .lookupLatestBeforeInclusive(upgrade.successor.upgradeTime.immediatePredecessor)
+          .map(_.map(tc => tc.member -> tc).toMap)
+      )
       // TODO(#29997): This doesn't scale to millions of traffic accounts, need a batch method or a different approach
       trafficStates <-
         MonadUtil
-          .parTraverseWithLimit(batchingConfig.parallelism)(allMembers.toSeq)(member =>
-            getTrafficStateAt(member, upgrade.successor.upgradeTime).map { stateO =>
-              logger.debug(s"Traffic state at LSU time for member $member: $stateO")
-              stateO.map(member -> _)
+          .parTraverseWithLimit(batchingConfig.parallelism)(allMembers.toList) { member =>
+            val trafficConsumedO = consumedRecordsPerMember.get(member)
+            val trafficPurchasedET =
+              blockRateLimitManager.trafficPurchasedManager.getTrafficPurchasedAt(
+                member,
+                upgrade.successor.upgradeTime,
+                latestSequencerEventTimestamp.orElse(lsuSequencingBounds.map(_.upgradeTime)),
+              )
+            trafficPurchasedET.map { trafficPurchasedO =>
+              member -> trafficConsumedO
+                .getOrElse(TrafficConsumed.init(member))
+                .toTrafficState(trafficPurchasedO)
             }
+          }
+          .leftMap(error =>
+            SequencerError.LsuTrafficNotFound.Error(
+              s"Failed to get traffic states for all members at upgrade time: $error"
+            ): CantonBaseError
           )
-          .map(_.flatten.toMap)
-          .leftMap[LsuSequencerError](error =>
-            SequencerError.LsuTrafficNotFound.Error(error.toString)
+          .map(_.toMap)
+      _ = {
+        if (logger.underlying.isDebugEnabled) {
+          logger.debug(
+            "Traffic states at LSU time for all members:"
           )
+          trafficStates.foreach { case (member, trafficState) =>
+            logger.debug(s"\t- $member: $trafficState")
+          }
+        }
+      }
 
     } yield {
       LsuTrafficState(trafficStates)(
@@ -996,68 +1221,209 @@ class BlockSequencer(
       )
     }
 
+  private val runningSetLsuTraffic =
+    new AtomicReference[
+      Option[(LsuTrafficState, PromiseUnlessShutdown[Either[CantonBaseError, Unit]])]
+    ](None)
   override def setLsuTrafficControlState(
       state: LsuTrafficState
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, LsuSequencerError, Unit] =
-    for {
-      // - Check that there's an LSU predecessor
-      upgradeTime <- EitherT.fromOption[FutureUnlessShutdown](
-        // TODO(#26983): Rather use the topology state for older synchronizer LSU announcement
-        sequencingTimeLowerBoundExclusive.get,
-        MissingSynchronizerPredecessor.Error(cryptoApi.psid, sequencerId),
-      )
-      // - Check that the node has not progressed beyond the upgrade time
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        stateManager.getHeadState.block.lastTs <= upgradeTime,
-        SequencerPastUpgradeTime.Error(
-          cryptoApi.psid,
-          stateManager.getHeadState.block.lastTs,
-          upgradeTime,
-        ),
-      )
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        !lsuTrafficInitialized.futureUS.isCompleted,
-        LsuTrafficAlreadyInitialized.Error(
-          cryptoApi.psid
-        ),
-      )
-      // - Clean up the stores
-      _ = logger.debug(s"Clearing existing LSU traffic control state")
-      _ <- EitherT.right(blockRateLimitManager.trafficConsumedStore.truncate())
-      _ <- EitherT.right(trafficPurchasedStore.truncate())
-
-      // - Set the traffic states for all members provided in 'state'
-      _ = logger.debug(s"Setting LSU traffic consumed")
-      membersTraffic = state.membersTraffic.toList
-      _ <- EitherT.right(
-        blockRateLimitManager.trafficConsumedStore.store(
-          membersTraffic.map { case (member, trafficState) =>
-            trafficState.toTrafficConsumed(member)
-          }
-        )
-      )
-      _ <- EitherT.right(
-        MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(
-          membersTraffic.flatMap { case (member, trafficState) =>
-            trafficState.toTrafficPurchased(member).toList
-          }
-        ) { trafficPurchasedRecord =>
-          logger.debug(
-            s"Setting LSU traffic purchased for member ${trafficPurchasedRecord.member} to $trafficPurchasedRecord"
-          )
-          val updateTrafficPurchasedRecord =
-            trafficPurchasedRecord.copy(sequencingTimestamp =
-              trafficPurchasedRecord.sequencingTimestamp.immediatePredecessor
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = {
+    val promise = PromiseUnlessShutdown.unsupervised[Either[CantonBaseError, Unit]]()
+    val currentPromiseO = runningSetLsuTraffic.compareAndExchange(None, Some(state -> promise))
+    currentPromiseO match {
+      case Some((otherState, otherPromise)) =>
+        if (otherState == state) {
+          EitherT(otherPromise.futureUS)
+        } else {
+          EitherT.leftT[FutureUnlessShutdown, Unit](
+            InvalidTrafficState.Error(
+              "A concurrent call to setLsuTrafficControlState with a different state is not supported."
             )
-          blockRateLimitManager.trafficPurchasedManager.addTrafficPurchased(
-            updateTrafficPurchasedRecord
           )
         }
-      )
-      _ <- EitherT.right(trafficPurchasedStore.setInitialTimestamp(upgradeTime))
-    } yield {
-      blockRateLimitManager.trafficPurchasedManager.tick(upgradeTime)
-      logger.info(s"LSU traffic control state has been initialized")
-      lsuTrafficInitialized.success(UnlessShutdown.unit)
+      case None =>
+        val resultET: EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = for {
+          // - Check that there's an LSU predecessor
+          upgradeTime <- EitherT
+            .fromOption[FutureUnlessShutdown](
+              lsuSequencingBounds.map(_.upgradeTime),
+              MissingSynchronizerPredecessor.Error(cryptoApi.psid, sequencerId),
+            )
+            .leftWiden[CantonBaseError]
+          _ <- EitherT(
+            cryptoApi.ips.currentSnapshotApproximation
+              .flatMap(
+                _.trafficControlParameters(protocolVersion)
+              )
+              .map(_.toRight(TrafficControlDisabled.Error()))
+          )
+          // Check if the initialization has already been completed
+          _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+            !lsuTrafficInitialized.futureUS.isCompleted,
+            LsuTrafficAlreadyInitialized.Error(cryptoApi.psid),
+          )
+          // - Check that the node has not progressed beyond the upgrade time
+          _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+            stateManager.getHeadState.block.lastTs <= upgradeTime,
+            SequencerPastUpgradeTime.Error(
+              cryptoApi.psid,
+              stateManager.getHeadState.block.lastTs,
+              upgradeTime,
+            ),
+          )
+
+          // Check that all members registered via topology are present in the provided traffic state
+          allMembers <- EitherT.right[LsuSequencerError](
+            dbSequencerStore.allRegisteredMembers(registeredAtBeforeInclusive = upgradeTime)
+          )
+          missingMembers = allMembers.diff(state.membersTraffic.keySet)
+          _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+            // We expect all members mentioned in topology to have a traffic record.
+            // Some may have been offboarded or disabled, so the provided state may contain more members.
+            missingMembers.isEmpty,
+            InvalidTrafficState.Error(
+              s"The provided traffic states must contain traffic state for all members known in topology at the upgrade time $upgradeTime, missing members: $missingMembers"
+            ),
+          )
+
+          // - Clean up the stores
+          _ = logger.debug(s"Clearing existing LSU traffic control state")
+          _ <- EitherT.right(blockRateLimitManager.trafficConsumedStore.truncate())
+          _ <- EitherT.right(trafficPurchasedStore.truncate())
+
+          // - Set the traffic states for all members provided in 'state'
+          _ = logger.debug(s"Setting LSU traffic consumed")
+          membersTraffic = state.membersTraffic.toList.sortBy { case (_, state) => state.timestamp }
+          _ <- EitherT.right(
+            blockRateLimitManager.trafficConsumedStore.store(
+              membersTraffic.map { case (member, trafficState) =>
+                val trafficConsumed = trafficState.toTrafficConsumed(member)
+                logger.debug(
+                  s"Setting LSU traffic consumed for member $member to $trafficConsumed"
+                )
+                trafficConsumed
+              }
+            )
+          )
+          _ <- EitherT.right(
+            MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(
+              membersTraffic.flatMap { case (member, trafficState) =>
+                trafficState.toTrafficPurchased(member).toList
+              }
+            ) { trafficPurchasedRecord =>
+              logger.debug(
+                s"Setting LSU traffic purchased for member ${trafficPurchasedRecord.member} to $trafficPurchasedRecord"
+              )
+              val updateTrafficPurchasedRecord =
+                trafficPurchasedRecord.copy(sequencingTimestamp = upgradeTime.immediatePredecessor)
+              blockRateLimitManager.trafficPurchasedManager.addTrafficPurchased(
+                updateTrafficPurchasedRecord
+              )
+            }
+          )
+          // The method below normally deletes the data > the passed argument for crash recovery purposes.
+          // With CantonTimestamp.MaxValue this will only reset the TrafficConsumedManager's cache.
+          _ <- EitherT.right(blockRateLimitManager.resetStateTo(CantonTimestamp.MaxValue))
+          _ <- EitherT.right(trafficPurchasedStore.setInitialTimestamp(upgradeTime))
+        } yield {
+          blockRateLimitManager.trafficPurchasedManager.tick(upgradeTime)
+          logger.info(s"LSU traffic control state has been initialized")
+          lsuTrafficInitialized.success(UnlessShutdown.unit)
+          ()
+        }
+        resultET.value.onComplete { result =>
+          runningSetLsuTraffic.set(None)
+          promise.complete(result)
+        }
+        resultET
     }
+  }
+
+  override def getThroughputCap(
+      requestType: SubmissionRequestType
+  ): Option[BlockSequencerConfig.IndividualThroughputCapConfig] =
+    throughputCap.getCap(requestType)
+
+  override def setThroughputCap(
+      requestType: SubmissionRequestType,
+      config: Option[BlockSequencerConfig.IndividualThroughputCapConfig],
+  )(implicit traceContext: TraceContext): Unit = throughputCap.replaceCap(requestType, config)
+
+  override def performLsuSequencingTest(mediatorGroupRecipient: MediatorGroupRecipient)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = {
+
+    def sign[A <: HasCryptographicEvidence](
+        syncCryptoApi: SynchronizerSnapshotSyncCryptoApi,
+        hashPurpose: HashPurpose,
+        request: A,
+    ): EitherT[FutureUnlessShutdown, ErrorCode.Wrap, SignedContent[A]] =
+      RequestSigner(cryptoApi, loggerFactory)
+        .signRequest(
+          request = request,
+          hashPurpose = hashPurpose,
+          snapshot = syncCryptoApi,
+          signingTimestampOverrides = None,
+        )
+        .leftMap { err =>
+          val message = s"Error signing submission request $err"
+          logger.error(message)
+          SendAsyncClientError.ErrorCode
+            .Wrap(SendAsyncClientError.RequestFailed(message))
+        }
+
+    for {
+      syncCryptoApi <- EitherT.liftF(cryptoApi.currentSnapshotApproximation)
+
+      _ <- OptionT(syncCryptoApi.ipsSnapshot.mediatorGroup(mediatorGroupRecipient.group)).toRight(
+        SendAsyncClientError.ErrorCode
+          .Wrap(
+            SendAsyncClientError.RequestInvalid(
+              s"Mediator group ${mediatorGroupRecipient.group} does not exist at timestamp ${syncCryptoApi.ipsSnapshot.timestamp}"
+            )
+          )
+      )
+
+      content = LsuSequencingTestMessageContent.create(psid = cryptoApi.psid, sender = sequencerId)
+      signedContent <- sign(syncCryptoApi, HashPurpose.LsuSequencingTestMessageContent, content)
+
+      batch = Batch.of(
+        protocolVersion,
+        (
+          LsuSequencingTestMessage(signedContent.content, signedContent.signature),
+          Recipients.cc(mediatorGroupRecipient),
+        ),
+      )
+      messageId = MessageId.randomMessageId()
+
+      submissionRequest <- SubmissionRequest
+        .create(
+          sequencerId,
+          messageId,
+          Batch.closeEnvelopes(batch),
+          maxSequencingTime = CantonTimestamp.MaxValue,
+          topologyTimestamp = None,
+          aggregationRule = None,
+          submissionCost = None, // sequencer is the sender
+          SubmissionRequest.protocolVersionRepresentativeFor(protocolVersion),
+        )
+        .leftMap(err =>
+          SendAsyncClientError.ErrorCode
+            .Wrap(SendAsyncClientError.RequestInvalid(s"Unable to get submission request: $err"))
+        )
+        .toEitherT[FutureUnlessShutdown]
+
+      signedSubmissionRequest <- sign(
+        syncCryptoApi,
+        HashPurpose.SubmissionRequestSignature,
+        submissionRequest,
+      )
+
+      _ = logger.info(
+        s"Creation of LsuSequencingTestMessage with mediator group $mediatorGroupRecipient and message id $messageId succeeded"
+      )
+
+      _ <- sendAsyncSignedInternal(signedSubmissionRequest, skipLsuChecks = true)
+    } yield ()
+  }
 }

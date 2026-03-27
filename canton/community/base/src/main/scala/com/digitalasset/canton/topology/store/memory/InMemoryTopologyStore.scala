@@ -209,17 +209,19 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
         .view
         .mapValues(_.min1)
         .toMap
-    val found = topologyTransactionStore
-      .filter { entry =>
-        itemsMap.get(entry.indexKey).exists { validUntil =>
-          entry.rejected.isEmpty
-          && entry.until.forall(ts => ts >= validUntil)
+    val found = lock.exclusive {
+      topologyTransactionStore
+        .filter { entry =>
+          itemsMap.get(entry.indexKey).exists { validUntil =>
+            entry.rejected.isEmpty
+            && entry.until.forall(ts => ts >= validUntil)
+          }
         }
-      }
-      .sortBy(c => (c.until.map(_.value).getOrElse(CantonTimestamp.MaxValue), c.batchIdx))
-      .reverse
-      .map(_.toStoredTransaction)
-      .toSeq
+        .sortBy(c => (c.until.map(_.value).getOrElse(CantonTimestamp.MaxValue), c.batchIdx))
+        .reverse
+        .map(_.toStoredTransaction)
+        .toSeq
+    }
     FutureUnlessShutdown.pure(StoredTopologyTransactions(found))
   }
 
@@ -426,6 +428,27 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       pagination,
     ).map(
       _.collectOfType[TopologyChangeOp.Remove]
+    )
+
+  override def findAllTransactions(
+      asOf: CantonTimestamp,
+      asOfInclusive: Boolean,
+      isProposal: Boolean,
+      types: Seq[TopologyMapping.Code],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      pagination: Option[(Option[UniqueIdentifier], Int)] = None,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[StoredTopologyTransactions[TopologyChangeOp, TopologyMapping]] =
+    findTransactionsInStore(
+      asOf,
+      asOfInclusive,
+      isProposal,
+      types,
+      filterUid,
+      filterNamespace,
+      pagination,
     )
 
   private def findTransactionsInStore(
@@ -760,17 +783,17 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       errorLoggingContext: ErrorLoggingContext,
   ): FutureUnlessShutdown[Unit] = {
     implicit val tc = errorLoggingContext.traceContext
-    val targetPSId = ev(storeId).psid
-    val sourcePSId = sourceStore.storeId.psid
+    val targetPsid = ev(storeId).psid
+    val sourcePsid = sourceStore.storeId.psid
 
     for {
       _ <- ErrorUtil.requireArgumentAsyncShutdown(
-        targetPSId.logical == sourcePSId.logical,
-        s"unexpected logical synchronizer id: expected=${targetPSId.logical}, actual=${sourcePSId.logical}",
+        targetPsid.logical == sourcePsid.logical,
+        s"unexpected logical synchronizer id: expected=${targetPsid.logical}, actual=${sourcePsid.logical}",
       )
       _ <- ErrorUtil.requireArgumentAsyncShutdown(
-        sourcePSId < targetPSId,
-        s"source synchronizer [$sourcePSId] is not a predecessor of the target synchronizer [$targetPSId]",
+        sourcePsid < targetPsid,
+        s"source synchronizer [$sourcePsid] is not a predecessor of the target synchronizer [$targetPsid]",
       )
       sourceInMemoryStore <- sourceStore match {
         case store: InMemoryTopologyStore[SynchronizerStore] => FutureUnlessShutdown.pure(store)
@@ -802,7 +825,7 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       _ <- bulkInsert(StoredTopologyTransactions(toCopy))
     } yield {
       logger.info(
-        s"Transferred ${topologyTransactionStore.size} topology transactions from $sourcePSId to $targetPSId"
+        s"Transferred ${topologyTransactionStore.size} topology transactions from $sourcePsid to $targetPsid"
       )
     }
 

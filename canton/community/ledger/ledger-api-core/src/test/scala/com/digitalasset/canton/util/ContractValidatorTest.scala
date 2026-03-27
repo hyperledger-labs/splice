@@ -4,7 +4,6 @@
 package com.digitalasset.canton.util
 
 import cats.syntax.either.*
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.crypto.TestSalt
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.examples.java.cycle.Cycle
@@ -16,6 +15,7 @@ import com.digitalasset.canton.{
   LfPackageName,
   LfPartyId,
 }
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.transaction.CreationTime.CreatedAt
 import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
@@ -33,8 +33,6 @@ class ContractValidatorTest
     with HasExecutionContext
     with FailOnShutdown {
 
-  implicit private val loggingContext: LoggingContext = LoggingContext.empty
-
   private val alice = LfPartyId.assertFromString("Alice")
 
   private val pureCrypto = new SymbolicPureCrypto()
@@ -46,6 +44,7 @@ class ContractValidatorTest
         packagePaths = Seq(CantonExamplesPath),
         iterationsBetweenInterruptions = 10,
         cantonContractIdVersion = authContractIdVersion,
+        loggerFactory = loggerFactory,
       )
 
     val underTest =
@@ -256,8 +255,9 @@ class ContractValidatorTest
             val changeKey = keyWithMaintainers.copy(globalKey =
               LfGlobalKey.assertBuild(
                 contractInstanceWithKey.templateId,
-                ValueText("changed"),
                 contractInstanceWithKey.inst.packageName,
+                ValueText("changed"),
+                crypto.Hash.hashPrivateKey("dummy-key-hash"),
               )
             )
             val invalid: FatContractInstance = ExampleContractFactory

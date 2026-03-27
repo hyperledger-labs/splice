@@ -4,8 +4,12 @@
 package com.digitalasset.canton.synchronizer.block.update
 
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
+import com.digitalasset.canton.sequencing.protocol.ProtocolObjectTestUtils.{
+  assertEnvelopeType,
+  normalizeSubmissionRequest,
+}
 import com.digitalasset.canton.sequencing.protocol.{
   AllMembersOfSynchronizer,
   Recipients,
@@ -23,14 +27,15 @@ import com.digitalasset.canton.synchronizer.block.update.BlockUpdateGenerator.{
 import com.digitalasset.canton.synchronizer.block.{BlockEvents, LedgerBlockEvent, RawLedgerBlock}
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
+import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.DefaultTestIdentities.{physicalSynchronizerId, sequencerId}
 import com.digitalasset.canton.topology.TestingIdentityFactory
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, HasExecutorService}
+import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -49,6 +54,41 @@ class BlockUpdateGeneratorImplTest
   private val aTimestamp =
     CantonTimestamp.assertFromInstant(Instant.parse("2024-03-08T12:00:00.000Z"))
 
+  private def assertBlockEventsEqual(
+      actual: BlockEvents,
+      expected: BlockEvents,
+  ): Assertion = {
+    actual.events
+      .map(_.value)
+      .collectFirst { case send: Send =>
+        send.signedSubmissionRequest.content.batch.envelopes.headOption
+      }
+      .flatten
+      .foreach { envelope =>
+        assertEnvelopeType(
+          envelope,
+          testedProtocolVersion,
+        )
+      }
+
+    normalizeBlockEvents(actual) shouldBe normalizeBlockEvents(expected)
+  }
+
+  private def normalizeBlockEvents(blockEvents: BlockEvents) =
+    blockEvents.copy(
+      events = blockEvents.events.map { traced =>
+        traced.map {
+          case send: Send =>
+            send.copy(
+              signedSubmissionRequest = send.signedSubmissionRequest.copy(
+                content = normalizeSubmissionRequest(send.signedSubmissionRequest.content)
+              )
+            )
+          case other => other
+        }
+      }
+    )
+
   "BlockUpdateGeneratorImpl.extractBlockEvents" should {
     "filter out events" when {
       "the sequencing time is before or at the minimum sequencing time" in {
@@ -64,12 +104,17 @@ class BlockUpdateGeneratorImplTest
 
         val blockUpdateGenerator =
           new BlockUpdateGeneratorImpl(
-            testedProtocolVersion,
             syncCryptoApiFake,
             sequencerId,
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
-            SequencingTimeBound(Some(sequencingTimeLowerBoundExclusive)),
+            lsuSequencingBounds = Some(
+              LsuSequencingBounds(
+                sequencingTimeLowerBoundExclusive,
+                sequencingTimeLowerBoundExclusive,
+              )
+            ),
+            getAnnouncedLsu = None,
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
             BatchingConfig(),
@@ -112,52 +157,55 @@ class BlockUpdateGeneratorImplTest
 
         val blockBaseSequencingTime2 = sequencingTimeLowerBoundExclusive.immediatePredecessor
         val blockBaseSequencingTime2MicrosFromEpoch = blockBaseSequencingTime2.toMicros
-        blockUpdateGenerator
-          .extractBlockEvents(
-            Traced(
-              RawLedgerBlock(
-                1L,
-                blockBaseSequencingTime2MicrosFromEpoch,
-                Seq(
-                  RawBlockEvent
-                    .Acknowledgment(
-                      acknowledgeRequest.toByteString,
-                      blockBaseSequencingTime2MicrosFromEpoch,
-                    ),
-                  RawBlockEvent
-                    .Send(
-                      signedSubmissionRequest.toByteString,
-                      sequencingTimeLowerBoundExclusive.immediateSuccessor.toMicros,
-                      sequencerId.toProtoPrimitive,
-                    ),
-                  RawBlockEvent
-                    .Acknowledgment(
-                      acknowledgeRequest.toByteString,
-                      sequencingTimeLowerBoundExclusive.immediateSuccessor.immediateSuccessor.toMicros,
-                    ),
-                ).map(Traced(_)(TraceContext.empty)),
-                None,
+        assertBlockEventsEqual(
+          blockUpdateGenerator
+            .extractBlockEvents(
+              Traced(
+                RawLedgerBlock(
+                  1L,
+                  blockBaseSequencingTime2MicrosFromEpoch,
+                  Seq(
+                    RawBlockEvent
+                      .Acknowledgment(
+                        acknowledgeRequest.toByteString,
+                        blockBaseSequencingTime2MicrosFromEpoch,
+                      ),
+                    RawBlockEvent
+                      .Send(
+                        signedSubmissionRequest.toByteString,
+                        sequencingTimeLowerBoundExclusive.immediateSuccessor.toMicros,
+                        sequencerId.toProtoPrimitive,
+                      ),
+                    RawBlockEvent
+                      .Acknowledgment(
+                        acknowledgeRequest.toByteString,
+                        sequencingTimeLowerBoundExclusive.immediateSuccessor.immediateSuccessor.toMicros,
+                      ),
+                  ).map(Traced(_)(TraceContext.empty)),
+                  None,
+                )
               )
             )
-          )
-          .value shouldBe BlockEvents(
-          1L,
-          blockBaseSequencingTime2,
-          Seq(
-            Send(
-              sequencingTimeLowerBoundExclusive.immediateSuccessor,
-              signedSubmissionRequest,
-              sequencerId,
-              signedSubmissionRequest.toByteString.size(),
+            .value,
+          BlockEvents(
+            1L,
+            blockBaseSequencingTime2,
+            Seq(
+              Send(
+                sequencingTimeLowerBoundExclusive.immediateSuccessor,
+                signedSubmissionRequest,
+                sequencerId,
+                signedSubmissionRequest.toByteString.size(),
+              ),
+              Acknowledgment(
+                sequencingTimeLowerBoundExclusive.immediateSuccessor.immediateSuccessor,
+                acknowledgeRequest,
+              ),
+            ).map(
+              Traced(_)(TraceContext.empty)
             ),
-            Acknowledgment(
-              sequencingTimeLowerBoundExclusive.immediateSuccessor.immediateSuccessor,
-              acknowledgeRequest,
-            ),
-          ).map(
-            Traced(_)(TraceContext.empty)
+            None,
           ),
-          None,
         )
 
       }
@@ -176,14 +224,12 @@ class BlockUpdateGeneratorImplTest
 
         val blockUpdateGenerator =
           new BlockUpdateGeneratorImpl(
-            testedProtocolVersion,
             syncCryptoApiFake,
             sequencerId,
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
-            SequencingTimeBound(
-              SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
-            ),
+            lsuSequencingBounds = None,
+            getAnnouncedLsu = None,
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
             BatchingConfig(),
@@ -226,7 +272,6 @@ class BlockUpdateGeneratorImplTest
 
         val blockUpdateGenerator =
           new BlockUpdateGeneratorImpl(
-            testedProtocolVersion,
             synchronizerSyncCryptoApi =
               TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
                 sequencerId,
@@ -236,9 +281,8 @@ class BlockUpdateGeneratorImplTest
             sequencerId,
             mock[SequencerRateLimitManager],
             OrderingTimeFixMode.ValidateOnly,
-            SequencingTimeBound(
-              SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
-            ),
+            lsuSequencingBounds = None,
+            getAnnouncedLsu = None,
             producePostOrderingTopologyTicks = false,
             SequencerTestMetrics,
             BatchingConfig(),
@@ -315,7 +359,6 @@ class BlockUpdateGeneratorImplTest
 
           val blockUpdateGenerator =
             new BlockUpdateGeneratorImpl(
-              testedProtocolVersion,
               synchronizerSyncCryptoApi =
                 TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
                   sequencerId,
@@ -325,9 +368,8 @@ class BlockUpdateGeneratorImplTest
               sequencerId,
               mock[SequencerRateLimitManager],
               OrderingTimeFixMode.ValidateOnly,
-              SequencingTimeBound(
-                SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
-              ),
+              lsuSequencingBounds = None,
+              getAnnouncedLsu = None,
               producePostOrderingTopologyTicks = true,
               SequencerTestMetrics,
               BatchingConfig(),
@@ -388,7 +430,6 @@ class BlockUpdateGeneratorImplTest
           val epsilon = defaultStaticSynchronizerParameters.topologyChangeDelay.duration
           val blockUpdateGenerator =
             new BlockUpdateGeneratorImpl(
-              testedProtocolVersion,
               synchronizerSyncCryptoApi =
                 TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
                   sequencerId,
@@ -398,9 +439,8 @@ class BlockUpdateGeneratorImplTest
               sequencerId,
               mock[SequencerRateLimitManager],
               OrderingTimeFixMode.ValidateOnly,
-              SequencingTimeBound(
-                SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive
-              ),
+              lsuSequencingBounds = None,
+              getAnnouncedLsu = None,
               producePostOrderingTopologyTicks = true,
               SequencerTestMetrics,
               BatchingConfig(),
@@ -440,6 +480,20 @@ class BlockUpdateGeneratorImplTest
               state.copy(latestPendingTopologyTransactionTimestamp = Some(t2)),
               MaybeTopologyTickChunk(1L, t3, None),
             )
+
+            result5 <- blockUpdateGenerator.processBlockChunk(
+              state.copy(latestPendingTopologyTransactionTimestamp = Some(t1)),
+              MaybeTopologyTickChunk(
+                1L,
+                aTimestamp,
+                Some(
+                  TickTopology(
+                    aTimestamp.immediateSuccessor.immediateSuccessor,
+                    Right(SequencersOfSynchronizer),
+                  )
+                ),
+              ),
+            )
           } yield {
             // no pending topology transaction timestamps, so nothing to do
             noOpResult shouldBe (state, ChunkUpdate.noop)
@@ -473,6 +527,19 @@ class BlockUpdateGeneratorImplTest
               // the tick is created
               case c: ChunkUpdate if c.submissionsOutcomes.sizeIs == 1 =>
             }
+
+            // in this case, DABFT is requesting a later tick and this later timestamp wins over t1
+            result5._1 shouldBe state.copy(
+              lastChunkTs = aTimestamp.immediateSuccessor.immediateSuccessor,
+              latestSequencerEventTimestamp =
+                Some(aTimestamp.immediateSuccessor.immediateSuccessor),
+              latestPendingTopologyTransactionTimestamp = None,
+            )
+            result5._2 should matchPattern {
+              // the tick is created
+              case c: ChunkUpdate if c.submissionsOutcomes.sizeIs == 1 =>
+            }
+
           }
         }.failOnShutdown
       }

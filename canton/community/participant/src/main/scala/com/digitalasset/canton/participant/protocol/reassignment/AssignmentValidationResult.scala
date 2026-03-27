@@ -15,7 +15,7 @@ import com.digitalasset.canton.ledger.participant.state.{
   CompletionInfo,
   Reassignment,
   ReassignmentInfo,
-  SequencedUpdate,
+  SequencedEventUpdate,
   Update,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -37,7 +37,7 @@ final case class AssignmentValidationResult private[reassignment] (
     contracts: ContractsReassignmentBatch,
     submitterMetadata: ReassignmentSubmitterMetadata,
     reassignmentId: ReassignmentId,
-    sourcePSId: Source[PhysicalSynchronizerId],
+    sourcePsid: Source[PhysicalSynchronizerId],
     hostedConfirmingReassigningParties: Set[LfPartyId],
     isReassigningParticipant: Boolean,
     commonValidationResult: CommonValidationResult,
@@ -65,7 +65,7 @@ final case class AssignmentValidationResult private[reassignment] (
   private[reassignment] def commitSet = CommitSet.createForAssignment(
     reassignmentId,
     contracts.contracts,
-    sourcePSId.map(_.logical),
+    sourcePsid.map(_.logical),
   )
 
   // Assigning the internal contract ids to the contracts requires that all the contracts are
@@ -76,7 +76,7 @@ final case class AssignmentValidationResult private[reassignment] (
       recordTime: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): AcsChangeFactory => InternalContractIds => SequencedUpdate = {
+  ): AcsChangeFactory => InternalContractIds => SequencedEventUpdate = {
     val updateId = rootHash
     val completionInfo =
       Option.when(participantId == submitterMetadata.submittingParticipant)(
@@ -125,7 +125,7 @@ final case class AssignmentValidationResult private[reassignment] (
           workflowId = submitterMetadata.workflowId,
           updateId = UpdateId.fromRootHash(updateId),
           reassignmentInfo = ReassignmentInfo(
-            sourceSynchronizer = sourcePSId.map(_.logical),
+            sourceSynchronizer = sourcePsid.map(_.logical),
             targetSynchronizer = targetSynchronizer,
             submitter = Option(submitterMetadata.submitter),
             reassignmentId = reassignmentId,

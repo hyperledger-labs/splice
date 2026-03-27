@@ -184,6 +184,7 @@ class OutputModule[E <: Env[E]](
     new SequencerSnapshotAdditionalInfoProvider[E](
       store,
       epochStoreReader,
+      orderingTopologyProvider,
       loggerFactory,
     )
 
@@ -751,7 +752,7 @@ class OutputModule[E <: Env[E]](
       //  (and successfully processed and applied by the topology processor).
       pipeToSelf(
         orderingTopologyProvider.getOrderingTopologyAt(
-          TopologyActivationTime(epochEndBftTime.immediateSuccessor),
+          Some(TopologyActivationTime(epochEndBftTime.immediateSuccessor)),
           checkPendingChanges = true,
         ),
         metrics.topology.queryLatency,
@@ -849,7 +850,7 @@ class OutputModule[E <: Env[E]](
       metrics.topology.validators.updateValue(currentEpochOrderingTopology.nodes.size)
       logger.debug(
         s"Sending topology $currentEpochOrderingTopology of a new epoch $newEpochNumber " +
-          "to a consensus behavior"
+          s"to a consensus behavior (epochLength= ${newEpochTopologyMessage.membership.orderingTopology.epochLength})"
       )
 
       consensus.asyncSend(newEpochTopologyMessage)

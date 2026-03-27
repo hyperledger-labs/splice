@@ -7,6 +7,8 @@ import cats.Functor
 import cats.data.{EitherT, OptionT}
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import com.daml.ledger.api.v2.interactive.interactive_submission_service.HashingSchemeVersion as ApiHashingSchemeVersion
+import com.daml.metrics.OpenTelemetryOnDemandMetricsReader
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor, Threading}
@@ -15,7 +17,6 @@ import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTime
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
-import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
   StaticSynchronizerParameters,
@@ -28,6 +29,7 @@ import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{CheckedT, MaxBytesToDecompress}
 import com.digitalasset.canton.version.{
+  HashingSchemeVersion,
   ProtocolVersion,
   ProtocolVersionValidation,
   ReleaseProtocolVersion,
@@ -80,7 +82,6 @@ trait TestEssentials
 
   protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
-  protected implicit lazy val partiesKind: PartyKind = BaseTest.testedPartiesKind
   protected lazy val testedProtocolVersion: ProtocolVersion = BaseTest.testedProtocolVersion
   protected lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
     BaseTest.testedProtocolVersionValidation
@@ -88,6 +89,15 @@ trait TestEssentials
     BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
     BaseTest.defaultStaticSynchronizerParameters
+
+  protected implicit lazy val testedHashingSchemeVersion: HashingSchemeVersion =
+    HashingSchemeVersion.getHashingSchemeVersionsForProtocolVersion(testedProtocolVersion).last1
+
+  protected lazy val testedApiHashingSchemeVersion: ApiHashingSchemeVersion =
+    testedHashingSchemeVersion.toLedgerApiProto
+
+  protected implicit lazy val partiesKind: PartyKind =
+    BaseTest.testedPartiesKind(testedHashingSchemeVersion)
 
   // default to providing an empty trace context to all tests
   protected implicit def traceContext: TraceContext = TraceContext.empty
@@ -259,6 +269,9 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
         pos: Position
     ): Either[E, A] =
       eitherT.value.futureValueUS(timeout)(pos)
+
+    def succeedOnFutureCompleteOrShutdown(implicit pos: Position): Unit =
+      eitherT.value.succeedOnFutureCompleteOrShutdown(pos)
   }
 
   implicit class CheckedTFutureUnlessShutdownSyntax[A, N, R](
@@ -287,6 +300,14 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
       futureValueUS(PatienceConfiguration.Timeout(defaultPatience.timeout))(pos)
     def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit pos: Position): A =
       fut.unwrap.futureValue(timeout).onShutdown(fail("Unexpected shutdown"))
+    def succeedOnFutureCompleteOrShutdown(implicit pos: Position): Unit =
+      fut.succeedOnFutureCompleteOrShutdown(PatienceConfiguration.Timeout(defaultPatience.timeout))(
+        pos
+      )
+    def succeedOnFutureCompleteOrShutdown(timeout: PatienceConfiguration.Timeout)(implicit
+        pos: Position
+    ): Unit =
+      fut.unwrap.futureValue(timeout).map(_ => ()).onShutdown(())
   }
 
   implicit class UnlessShutdownSyntax[A](us: UnlessShutdown[A]) {
@@ -451,8 +472,6 @@ trait BaseTest
   lazy val CantonTestsPath: String = BaseTest.CantonTestsPath
   lazy val CantonTestsDevPath: String = BaseTest.CantonTestsDevPath
   lazy val PerformanceTestPath: String = BaseTest.PerformanceTestPath
-  lazy val DamlTestFilesPath: String = BaseTest.DamlTestFilesPath
-  lazy val DamlTestLfDevFilesPath: String = BaseTest.DamlTestLfDevFilesPath
   // TODO(#25385): Consider deduplicating the upgrade test DARs below
   lazy val FooV1Path: String = BaseTest.FooV1Path
   lazy val FooV2Path: String = BaseTest.FooV2Path
@@ -601,15 +620,18 @@ object BaseTest {
     case object MultiPartySubmission extends UnsupportedExternalPartyTest
     // TODO(i29530): Support multi root node submissions for external parties
     case object MultiRootNodeSubmission extends UnsupportedExternalPartyTest
+    // TODO(i30278): Either support command tracking for external parties or drop it entirely
+    case object CommandTracking extends UnsupportedExternalPartyTest
     // TODO(i30256): Synchronizer routing for external parties
     case object MultiSynchronizerParties extends UnsupportedExternalPartyTest
   }
 
   lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
-  lazy val testedPartiesKind: PartyKind = sys.env
+
+  def testedPartiesKind(hashingSchemeVersion: HashingSchemeVersion): PartyKind = sys.env
     .get("CANTON_TEST_EXTERNAL_PARTIES")
     .filter(_ == "true")
-    .map[PartyKind](_ => PartyKind.External)
+    .map[PartyKind](_ => PartyKind.External(hashingSchemeVersion))
     .getOrElse[PartyKind](PartyKind.Local)
 
   lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
@@ -620,19 +642,16 @@ object BaseTest {
   )
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
-  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.4.0.dar")
-  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.4.0.dar")
-  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.4.0.dar")
-  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.4.0.dar")
+  lazy val CantonTestsPath: String = getResourcePath("CantonTests-1.0.0.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-1.0.0.dar")
+  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-1.0.0.dar")
+  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-1.0.0.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
-  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.4.0.dar")
-  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.4.0.dar")
-  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.4.0.dar")
   // TODO(#25385): Deduplicate these upgrading test DARs
   lazy val FooV1Path: String = getResourcePath("foo-0.0.1.dar")
   lazy val FooV2Path: String = getResourcePath("foo-0.0.2.dar")
   lazy val FooV3Path: String = getResourcePath("foo-0.0.3.dar")
-  lazy val UpgradeTestsPath: String = getResourcePath("UpgradeTests-3.4.0.dar")
+  lazy val UpgradeTestsPath: String = getResourcePath("UpgradeTests-1.0.0.dar")
   lazy val UpgradeTestsCompatPath: String = getResourcePath("UpgradeTests-4.0.0.dar")
   lazy val UpgradeTestsIncompatPath: String = getResourcePath("UpgradeTests-5.0.0.dar")
   lazy val VettingDepPath: String = getResourcePath("VettingDep-1.0.0.dar")

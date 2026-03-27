@@ -4,6 +4,12 @@
 package com.digitalasset.canton.platform.apiserver.tls
 
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
+import com.daml.tls.{
+  ServerAuthRequirementConfig,
+  TlsClientCertificate,
+  TlsClientConfig,
+  TlsServerConfig,
+}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
 import com.digitalasset.canton.grpc.sampleservice.HelloServiceReferenceImplementation
@@ -87,6 +93,8 @@ final case class TlsFixture(
           desiredPort = Port.Dynamic,
           maxInboundMessageSize = ServerConfig.defaultMaxInboundMessageSize.unwrap,
           maxInboundMetadataSize = ServerConfig.defaultMaxInboundMetadataSize.unwrap,
+          maxConcurrentStreamsPerConnection =
+            ServerConfig.defaultMaxConcurrentStreamsPerConnection.unwrap,
           address = None,
           tlsConfiguration = serverTlsConfiguration,
           servicesExecutor = servicesExecutor,

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.tests.multihostedparties
 
 import com.digitalasset.canton.BaseTest.CantonLfV21
+import com.digitalasset.canton.annotations.RollbackTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{CommandFailure, InstanceReference, ParticipantReference}
 import com.digitalasset.canton.crypto.CryptoPureApi
@@ -92,13 +93,14 @@ sealed trait OnlinePartyReplicationCascadingRepetitionsTest
         new NetworkBootstrapper(S1M1)
       }
       .addConfigTransforms(
-        ConfigTransforms.unsafeEnableOnlinePartyReplication(
+        ConfigTransforms.enableAlphaOnlinePartyReplicationSupport(
           Map(
             "participant1" -> (() => createSourceParticipantTestInterceptor()),
             "participant2" -> (() => createSourceParticipantTestInterceptor()),
             "participant3" -> (() => createSourceParticipantTestInterceptor()),
             "participant4" -> (() => createSourceParticipantTestInterceptor()),
-          )
+          ),
+          enableUnsafeSequencerChannelSupport = true,
         )*
       )
       .withSetup { implicit env =>
@@ -346,6 +348,7 @@ sealed trait OnlinePartyReplicationCascadingRepetitionsTest
 //   registerPlugin(new UseH2(loggerFactory))
 // }
 
+@RollbackTest
 class OnlinePartyReplicationCascadingRepetitionsTestPostgres
     extends OnlinePartyReplicationCascadingRepetitionsTest {
   registerPlugin(new UsePostgres(loggerFactory))

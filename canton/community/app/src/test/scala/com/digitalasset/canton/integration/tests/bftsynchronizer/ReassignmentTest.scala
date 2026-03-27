@@ -6,6 +6,7 @@ package com.digitalasset.canton.integration.tests.bftsynchronizer
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.admin.api.client.data.SequencerConnections
+import com.digitalasset.canton.annotations.RollbackTest
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
@@ -19,7 +20,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
-import com.digitalasset.canton.topology.{ForceFlag, PartyId, PhysicalSynchronizerId}
+import com.digitalasset.canton.topology.{ForceFlag, Party, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SynchronizerAlias, config}
 
@@ -44,8 +45,8 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
   private var synchronizerId2: PhysicalSynchronizerId = _
   private var synchronizerOwnersD2: NonEmpty[Seq[InstanceReference]] = _
 
-  private var alice: PartyId = _
-  private var bob: PartyId = _
+  private var alice: Party = _
+  private var bob: Party = _
 
   private var contractId: Iou.ContractId = _
 
@@ -108,12 +109,12 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
 
     "Allocate a party" in { implicit env =>
       import env.*
-      alice = participant1.parties.enable(
+      alice = participant1.parties.testing.enable(
         "alice",
         synchronizeParticipants = Seq(participant2),
         synchronizer = synchronizer1,
       )
-      bob = participant2.parties.enable(
+      bob = participant2.parties.testing.enable(
         "bob",
         synchronizeParticipants = Seq(participant1),
         synchronizer = synchronizer1,
@@ -163,13 +164,13 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       clue(s"upload and vet dar on $synchronizer2")
       Seq(participant1, participant2).dars
         .upload(CantonExamplesPath, synchronizerId = synchronizerId2)
-      participant1.parties.enable(
-        "alice",
+      participant1.parties.testing.also_enable(
+        alice,
         synchronizeParticipants = Seq(participant2),
         synchronizer = synchronizer2,
       )
-      participant2.parties.enable(
-        "bob",
+      participant2.parties.testing.also_enable(
+        bob,
         synchronizeParticipants = Seq(participant1),
         synchronizer = synchronizer2,
       )
@@ -275,6 +276,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
 //  )
 //}
 
+@RollbackTest
 class ReassignmentTestBFTOrderingPostgres extends ReassignmentTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseBftSequencer(loggerFactory))

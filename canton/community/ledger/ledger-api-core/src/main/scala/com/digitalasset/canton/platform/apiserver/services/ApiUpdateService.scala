@@ -73,7 +73,12 @@ final class ApiUpdateService(
             }
             logger.trace(s"Update request: $req.")
             updateService
-              .updates(req.startExclusive, req.endInclusive, req.updateFormat)
+              .updates(
+                req.startExclusive,
+                req.endInclusive,
+                req.updateFormat,
+                descendingOrder = false,
+              )
               .via(logger.enrichedDebugStream("Responding with updates.", updatesLoggable))
               .via(logger.logErrorsOnStream)
               .via(StreamMetrics.countElements(metrics.lapi.streams.updates))

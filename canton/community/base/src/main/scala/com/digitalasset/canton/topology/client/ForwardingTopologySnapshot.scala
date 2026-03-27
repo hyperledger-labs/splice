@@ -51,6 +51,11 @@ class ForwardingTopologySnapshot(
   ): FutureUnlessShutdown[Map[ParticipantId, ParticipantAttributes]] =
     parent.loadParticipantStates(participants)
 
+  override def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+    parent.wasEverOnboarded(participantId)
+
   override private[client] def loadActiveParticipantsOf(
       party: PartyId,
       participantStates: Seq[ParticipantId] => FutureUnlessShutdown[
@@ -105,15 +110,10 @@ class ForwardingTopologySnapshot(
       "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
     since = "3.5.0",
   )
-  override def allMembers()(implicit
+  override def knownMembers()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]] =
-    parent.allMembers()
-
-  override def isMemberKnown(member: Member)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Boolean] =
-    parent.isMemberKnown(member)
+    parent.knownMembers()
 
   override def areMembersKnown(members: Set[Member])(implicit
       traceContext: TraceContext
@@ -158,15 +158,15 @@ class ForwardingTopologySnapshot(
   ): FutureUnlessShutdown[Option[SigningKeysWithThreshold]] =
     parent.signingKeysWithThreshold(party)
 
-  override def synchronizerUpgradeOngoing()(implicit
+  override def announcedLsu()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
-    parent.synchronizerUpgradeOngoing()
+    parent.announcedLsu()
 
-  override def sequencerConnectionSuccessors()(implicit
+  override def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[SequencerId, LsuSequencerConnectionSuccessor]] =
-    parent.sequencerConnectionSuccessors()
+    parent.sequencerConnectionSuccessors(successorPsid)
 }
 
 class CachingTopologySnapshot(
@@ -233,8 +233,18 @@ class CachingTopologySnapshot(
     .buildTracedAsync[FutureUnlessShutdown, ParticipantId, Map[PackageId, VettedPackage]](
       cache = cachingConfigs.packageVettingCache.buildScaffeine(loggerFactory),
       loader = implicit traceContext => x => parent.loadVettedPackages(x),
-      allLoader =
-        Some(implicit traceContext => participants => parent.loadVettedPackages(participants.toSet)),
+      allLoader = Some(implicit traceContext =>
+        participants =>
+          parent
+            .loadVettedPackages(participants.toSet)
+            .map(foundVettedPackages =>
+              participants
+                .map(participant =>
+                  participant -> foundVettedPackages.getOrElse(participant, Map.empty)
+                )
+                .toMap
+            )
+      ),
     )(logger, "packageVettingCache")
 
   private val mediatorsCache =
@@ -247,7 +257,8 @@ class CachingTopologySnapshot(
   private val memberCache: TracedAsyncLoadingCache[FutureUnlessShutdown, Member, Boolean] =
     ScaffeineCache.buildTracedAsync[FutureUnlessShutdown, Member, Boolean](
       cache = cachingConfigs.memberCache.buildScaffeine(loggerFactory),
-      loader = implicit traceContext => member => parent.isMemberKnown(member),
+      loader = implicit traceContext =>
+        member => parent.areMembersKnown(Set(member)).map(_.contains(member)),
       allLoader = Some(implicit traceContext =>
         members =>
           parent
@@ -255,6 +266,15 @@ class CachingTopologySnapshot(
             .map(knownMembers => members.map(m => m -> knownMembers.contains(m)).toMap)
       ),
     )(logger, "memberCache")
+
+  private val wasEverOnboardedCache
+      : TracedAsyncLoadingCache[FutureUnlessShutdown, ParticipantId, Boolean] =
+    ScaffeineCache.buildTracedAsync[FutureUnlessShutdown, ParticipantId, Boolean](
+      cache = cachingConfigs.memberCache.buildScaffeine(
+        loggerFactory
+      ), // reuse the config from memberCache
+      loader = implicit traceContext => participantId => parent.wasEverOnboarded(participantId),
+    )(logger, "wasEverOnboardedCache")
 
   private val synchronizerParametersCache =
     new AtomicReference[
@@ -299,7 +319,7 @@ class CachingTopologySnapshot(
   override def allKeys(
       members: Seq[Member]
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[Member, KeyCollection]] =
-    keyCache.getAll(members)
+    keyCache.getAll(members).map(_.filter { case (_, keys) => !keys.isEmpty })
 
   override def loadActiveParticipantsOf(
       party: PartyId,
@@ -332,7 +352,9 @@ class CachingTopologySnapshot(
   override def loadVettedPackages(participants: Set[ParticipantId])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[ParticipantId, Map[PackageId, VettedPackage]]] =
-    packageVettingCache.getAll(participants)
+    packageVettingCache
+      .getAll(participants)
+      .map(_.filter { case (_, vettedPackages) => vettedPackages.nonEmpty })
 
   private[client] override def findUnvettedPackagesOrDependencies(
       participant: ParticipantId,
@@ -374,20 +396,20 @@ class CachingTopologySnapshot(
       "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
     since = "3.5.0",
   )
-  override def allMembers()(implicit
+  override def knownMembers()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]] =
-    getAndCache(allMembersCache, parent.allMembers())
-
-  override def isMemberKnown(member: Member)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Boolean] =
-    memberCache.get(member)
+    getAndCache(allMembersCache, parent.knownMembers())
 
   override def areMembersKnown(members: Set[Member])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]] =
     memberCache.getAll(members).map(_.collect { case (member, _isKnown @ true) => member }.toSet)
+
+  override def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+    wasEverOnboardedCache.get(participantId)
 
   override def memberFirstKnownAt(
       member: Member
@@ -438,13 +460,13 @@ class CachingTopologySnapshot(
   ): FutureUnlessShutdown[Option[SigningKeysWithThreshold]] =
     signingKeysWithThresholdCache.get(party)
 
-  override def synchronizerUpgradeOngoing()(implicit
+  override def announcedLsu()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
-    getAndCache(synchronizerUpgradeCache, parent.synchronizerUpgradeOngoing())
+    getAndCache(synchronizerUpgradeCache, parent.announcedLsu())
 
-  override def sequencerConnectionSuccessors()(implicit
+  override def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[SequencerId, LsuSequencerConnectionSuccessor]] =
-    parent.sequencerConnectionSuccessors()
+    parent.sequencerConnectionSuccessors(successorPsid)
 }

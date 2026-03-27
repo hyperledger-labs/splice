@@ -143,10 +143,10 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         )
         with TopologyManagerError
 
-    final case class NotFoundForSynchronizer(synchronizerId: SynchronizerId)(implicit
+    final case class NoActiveSynchronizer(synchronizerId: SynchronizerId)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"Topology store for synchronizer $synchronizerId is not known."
+          cause = s"No active synchronizer found for $synchronizerId."
         )
         with TopologyManagerError
 
@@ -687,7 +687,34 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
     )(implicit
         override val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"The topology snapshot was rejected because it was inconsistent."
+          cause = "The topology snapshot was rejected because it was inconsistent."
+        )
+        with TopologyManagerError
+
+    final case class MissingSynchronizerSequencerState()(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            "The topology snapshot was rejected because it is missing the synchronizer sequencer state."
+        )
+        with TopologyManagerError
+
+    final case class MultipleLogicalSynchronizerIds(synchronizerIds: Set[SynchronizerId])(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"The topology snapshot was rejected because it contains synchronizer sequencer states with multiple differing syncrhonizer ids: $synchronizerIds."
+        )
+        with TopologyManagerError
+
+    final case class UnexpectedPhysicalSynchronizerId(
+        fromParameters: PhysicalSynchronizerId,
+        fromAnnouncement: PhysicalSynchronizerId,
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause =
+            s"Sequencer is being initialized with physical synchronizer id $fromParameters, " +
+              s"not matching the announced upgrade successor id $fromAnnouncement in the provided topology snapshot."
         )
         with TopologyManagerError
   }
@@ -903,14 +930,14 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   }
 
   @Explanation(
-    "This error indicates that a synchronizer upgrade is ongoing and only mappings related to synchronizer upgrade are permitted."
+    "This error indicates that an LSU is scheduled and only mappings related to synchronizer upgrade are permitted."
   )
   @Resolution(
     "Contact the owners of the synchronizer about the ongoing synchronizer upgrade."
   )
-  object OngoingSynchronizerUpgrade
+  object AnnouncedLsuTopologyFreeze
       extends ErrorCode(
-        id = "TOPOLOGY_ONGOING_SYNCHRONIZER_UPGRADE",
+        id = "TOPOLOGY_LSU_TOPOLOGY_FREEZE",
         InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(synchronizerId: SynchronizerId)(implicit
@@ -923,20 +950,18 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   }
 
   @Explanation(
-    "This error indicates that a synchronizer upgrade is not ongoing, which prevents some upgrade operations from being performed."
+    "This error indicates that an LSU is not announced, which prevents some upgrade operations from being performed."
   )
-  @Resolution(
-    "Contact the owners of the synchronizer about the ongoing synchronizer upgrade."
-  )
-  object NoOngoingSynchronizerUpgrade
+  @Resolution("Contact the owners of the synchronizer about the LSU.")
+  object NoLsuAnnounced
       extends ErrorCode(
-        id = "TOPOLOGY_NO_ONGOING_SYNCHRONIZER_UPGRADE",
+        id = "TOPOLOGY_NO_LSU_ANNOUNCED",
         InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Failure()(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"The operation cannot be performed because no upgrade is ongoing"
+          cause = "The operation cannot be performed because no LSU is announced"
         )
         with TopologyManagerError
   }
@@ -947,7 +972,10 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
       |- it is greater than all previous synchronizer announcements
       |""")
   object InvalidSynchronizerSuccessor
-      extends ErrorCode(id = "TOPOLOGY_INVALID_SUCCESSOR", InvalidIndependentOfSystemState) {
+      extends ErrorCode(
+        id = "TOPOLOGY_INVALID_SUCCESSOR_PHYSICAL_SYNCHRONIZER_ID",
+        InvalidIndependentOfSystemState,
+      ) {
     final case class Reject(
         successorSynchronizerId: PhysicalSynchronizerId,
         details: String,
@@ -959,7 +987,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         with TopologyManagerError
 
     object Reject {
-      def conflictWithCurrentPSId(
+      def conflictWithCurrentPsid(
           currentSynchronizerId: PhysicalSynchronizerId,
           successorSynchronizerId: PhysicalSynchronizerId,
       )(implicit loggingContext: ErrorLoggingContext): Reject =
@@ -975,9 +1003,32 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         Reject(
           successorSynchronizerId = successorSynchronizerId,
           details =
-            s"conflicts with previous announcement with successor $previouslyAnnouncedSuccessor",
+            s"conflicts with previous announcement with successor $previouslyAnnouncedSuccessor. " +
+              s"Changing the announcement (including the upgrade time) requires a new announcement " +
+              s"with an increasing synchronizer id",
         )
     }
+  }
+
+  @Explanation(
+    "This error indicates that successor physical synchronizer id specific on the sequencer successor differs from the one of the LSU announcement."
+  )
+  @Resolution("""Change the physical synchronizer id and submit again.""")
+  object LsuSequencerSuccessorInvalidSuccessorPsid
+      extends ErrorCode(
+        id = "LSU_SEQUENCER_SUCCESSOR_INVALID_SUCCESSOR_PSID",
+        InvalidIndependentOfSystemState,
+      ) {
+    final case class Reject(
+        sequencerId: SequencerId,
+        successorPsid: PhysicalSynchronizerId,
+        expectedSuccessorPsid: PhysicalSynchronizerId,
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause =
+            s"Lsu sequencer successor for sequencer $sequencerId is invalid because it mentions successor $successorPsid but the current LSU announcement mentions $expectedSuccessorPsid"
+        )
+        with TopologyManagerError
   }
 
   @Explanation(
@@ -998,8 +1049,24 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
             s"The upgrade time $upgradeTime must be after the effective ${effective.value} of the synchronizer upgrade announcement for synchronizer $synchronizerId."
         )
         with TopologyManagerError
-
   }
+
+  @Explanation("This error indicates that the timestamp to query the topology is incorrect.")
+  @Resolution("Reconnect the node to the synchronizer or use an earlier timestamp for the query.")
+  object InvalidQueryTime
+      extends ErrorCode(id = "TOPOLOGY_INVALID_QUERY_TIME", InvalidGivenCurrentSystemStateOther) {
+    final case class Reject(
+        synchronizerId: SynchronizerId,
+        topologyKnownUntil: CantonTimestamp,
+        queryTime: CantonTimestamp,
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause =
+            s"Topology of synchronizer $synchronizerId is known until $topologyKnownUntil but tried to query at $queryTime"
+        )
+        with TopologyManagerError
+  }
+
   abstract class SynchronizerErrorGroup extends ErrorGroup()
 
   abstract class ParticipantErrorGroup extends ErrorGroup()

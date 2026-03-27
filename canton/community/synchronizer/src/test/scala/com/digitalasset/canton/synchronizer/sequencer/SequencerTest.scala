@@ -12,17 +12,16 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.messages.{EnvelopeContent, UnsignedProtocolMessage}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.protocol.{v30, v31}
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.client.RequestSigner
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.{InMemorySequencerStore, SequencerStore}
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.*
@@ -136,7 +135,7 @@ class SequencerTest
         DefaultProcessingTimeouts.testing,
         storage,
         sequencerStore,
-        SequencingTimeBound(SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive),
+        lsuSequencingBounds = None,
         clock,
         topologyClientMember,
         crypto,
@@ -204,6 +203,9 @@ class SequencerTest
     override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
       v30.EnvelopeContent.SomeEnvelopeContent.Empty
 
+    override def toProtoSomeEnvelopeContentV31: v31.EnvelopeContent.SomeEnvelopeContent =
+      v31.EnvelopeContent.SomeEnvelopeContent.Empty
+
     override def productElement(n: Int): Any = fail("shouldn't be used")
     override def productArity: Int = fail("shouldn't be used")
     override def canEqual(that: Any): Boolean = fail("shouldn't be used")
@@ -245,12 +247,12 @@ class SequencerTest
         )(
           "member registration"
         )
-        signedSubmission <- RequestSigner(aliceCrypto, testedProtocolVersion, loggerFactory)
+        signedSubmission <- RequestSigner(aliceCrypto, loggerFactory)
           .signRequest(
             submission,
             HashPurpose.SubmissionRequestSignature,
             aliceCrypto.currentSnapshotApproximation.futureValueUS,
-            Some(clock.now),
+            None, // not needed for unit tests; session signing keys disabled
           )
           .valueOrFail("sign request")
         _ <- sequencer.sendAsyncSigned(signedSubmission).valueOrFail("send")
@@ -268,11 +270,15 @@ class SequencerTest
         aliceDeliverEvent.batch.envelopes shouldBe empty // as we didn't send a message to ourself
 
         bobDeliverEvent.messageIdO shouldBe None
-        bobDeliverEvent.batch.envelopes.map(_.bytes) should contain only
+        bobDeliverEvent.batch.envelopes.map(
+          _.toClosedUncompressedEnvelopeUnsafe.bytes
+        ) should contain only
           EnvelopeContent(message1, testedProtocolVersion).toByteString
 
         caroleDeliverEvent.messageIdO shouldBe None
-        caroleDeliverEvent.batch.envelopes.map(_.bytes) should contain only
+        caroleDeliverEvent.batch.envelopes.map(
+          _.toClosedUncompressedEnvelopeUnsafe.bytes
+        ) should contain only
           EnvelopeContent(message2, testedProtocolVersion).toByteString
       }
     }

@@ -8,29 +8,43 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.protocol.v30.TrafficState
 import com.digitalasset.canton.sequencer.admin.v30
 import com.digitalasset.canton.sequencer.admin.v30.{
+  GenerateAuthenticationTokenRequest,
+  GenerateAuthenticationTokenResponse,
   GetLsuTrafficControlStateRequest,
   GetLsuTrafficControlStateResponse,
+  GetThroughputCapRequest,
+  GetThroughputCapResponse,
   OnboardingStateResponse,
   OnboardingStateV2Request,
   OnboardingStateV2Response,
+  PerformLsuSequencingTestRequest,
+  PerformLsuSequencingTestResponse,
   SetLsuTrafficControlStateRequest,
   SetLsuTrafficControlStateResponse,
+  SetThroughputCapRequest,
+  SetThroughputCapResponse,
   SetTrafficPurchasedRequest,
   SetTrafficPurchasedResponse,
 }
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, SubmissionRequestType}
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.IndividualThroughputCapConfig
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{LsuTrafficState, TimestampSelector}
 import com.digitalasset.canton.synchronizer.sequencer.{
   OnboardingStateForSequencer,
@@ -38,7 +52,8 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   Sequencer,
   SequencerSnapshot,
 }
-import com.digitalasset.canton.time.SynchronizerTimeTracker
+import com.digitalasset.canton.synchronizer.sequencing.authentication.MemberAuthenticationService
+import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
@@ -71,12 +86,44 @@ class GrpcSequencerAdministrationService(
     topologyClient: SynchronizerTopologyClient,
     synchronizerTimeTracker: SynchronizerTimeTracker,
     staticSynchronizerParameters: StaticSynchronizerParameters,
+    authenticationService: MemberAuthenticationService,
+    parameters: CantonNodeParameters,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     executionContext: ExecutionContext,
     materializer: Materializer,
 ) extends v30.SequencerAdministrationServiceGrpc.SequencerAdministrationService
     with NamedLogging {
+
+  /** Generate an authentication token for a member. Only use for troubleshooting purposes. Requires
+    * testing features config flag enabled.
+    */
+  override def generateAuthenticationToken(
+      request: GenerateAuthenticationTokenRequest
+  ): Future[GenerateAuthenticationTokenResponse] = if (parameters.enableTestingFeatures) {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val result = for {
+      member <- Member.fromProtoPrimitive(request.member, "member")
+      expiresIn <- request.expiresIn.traverse(expiresInO =>
+        NonNegativeFiniteDuration.fromProtoPrimitive("expires_in")(expiresInO)
+      )
+    } yield {
+      val storedToken = authenticationService.generateAuthenticationToken(member, expiresIn)
+      GenerateAuthenticationTokenResponse(
+        storedToken.token.toProtoPrimitive,
+        Some(storedToken.expireAt.toProtoTimestamp),
+      )
+    }
+    mapErrNewEUS(CantonGrpcUtil.wrapErrUS(result))
+  } else {
+    Future.failed(
+      io.grpc.Status.FAILED_PRECONDITION
+        .withDescription(
+          "This endpoint requires the 'canton.features.enable-testing-commands = yes' config flag"
+        )
+        .asRuntimeException()
+    )
+  }
 
   override def pruningStatus(
       request: v30.PruningStatusRequest
@@ -116,26 +163,33 @@ class GrpcSequencerAdministrationService(
                   .map(member -> _)
                   .leftMap(member -> _)
             }
-            if (errors.nonEmpty) {
-              val errorMessage = errors.mkShow().toString
-              FutureUnlessShutdown.failed(
-                io.grpc.Status.INTERNAL
-                  .withDescription(
-                    s"Failed to retrieve traffic state for some members: $errorMessage"
+            val res: EitherT[FutureUnlessShutdown, TrafficControlError, Map[String, TrafficState]] =
+              if (errors.nonEmpty) {
+                val errorMessage = errors.mkShow().toString
+                EitherT.left[Map[String, TrafficState]](
+                  FutureUnlessShutdown.failed(
+                    io.grpc.Status.INTERNAL
+                      .withDescription(
+                        s"Failed to retrieve traffic state for some members: $errorMessage"
+                      )
+                      .asRuntimeException()
                   )
-                  .asRuntimeException()
-              )
-            } else {
-              FutureUnlessShutdown.pure(
-                trafficStates.map { case (member, state) =>
-                  member.toProtoPrimitive -> state.toProtoV30
-                }.toMap
-              )
-            }
+                )
+              } else {
+                EitherT.right[TrafficControlError](
+                  FutureUnlessShutdown.pure(
+                    trafficStates.map { case (member, state) =>
+                      member.toProtoPrimitive -> state.toProtoV30
+                    }.toMap
+                  )
+                )
+              }
+
+            res
           }
           .map(v30.TrafficControlStateResponse(_))
 
-        CantonGrpcUtil.mapErrNewEUS(EitherT.right(response))
+        CantonGrpcUtil.mapErrNewEUS(response)
     }
   }
 
@@ -446,6 +500,64 @@ class GrpcSequencerAdministrationService(
           .setLsuTrafficControlState(trafficStates)
           .leftMap(_.toCantonRpcError)
     } yield SetLsuTrafficControlStateResponse()
+
+    mapErrNewEUS(result)
+  }
+
+  private def parseRequestType(requestType: String) =
+    SubmissionRequestType
+      .fromStringForCap(requestType)
+      .toRight(
+        ProtoDeserializationError.ValueConversionError(
+          "type",
+          s"Unknown submission type $requestType",
+        )
+      )
+
+  override def setThroughputCap(
+      request: SetThroughputCapRequest
+  ): Future[SetThroughputCapResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val SetThroughputCapRequest(requestType, config) = request
+    val result = for {
+      cfg <- config.traverse(IndividualThroughputCapConfig.fromAdminProto)
+      requestType <- parseRequestType(requestType)
+    } yield {
+      sequencer.setThroughputCap(requestType, cfg)
+      SetThroughputCapResponse()
+    }
+    mapErrNewEUS(wrapErrUS(result))
+  }
+
+  override def getThroughputCap(
+      request: GetThroughputCapRequest
+  ): Future[GetThroughputCapResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val GetThroughputCapRequest(requestType) = request
+    val result = parseRequestType(requestType)
+      .map { cap =>
+        GetThroughputCapResponse(
+          config = sequencer.getThroughputCap(cap).map(_.toAdminProto)
+        )
+      }
+    mapErrNewEUS(wrapErrUS(result))
+  }
+
+  override def performLsuSequencingTest(
+      request: PerformLsuSequencingTestRequest
+  ): Future[PerformLsuSequencingTestResponse] = {
+    implicit val traceContext = TraceContextGrpc.fromGrpcContext
+
+    val result: EitherT[FutureUnlessShutdown, RpcError, PerformLsuSequencingTestResponse] = for {
+      mediatorGroup <- wrapErrUS(
+        ProtoConverter.parseNonNegativeInt(
+          "recipient_mediator_group",
+          request.recipientMediatorGroup,
+        )
+      ).map(MediatorGroupRecipient(_))
+
+      _ <- sequencer.performLsuSequencingTest(mediatorGroup).leftMap(_.toCantonRpcError)
+    } yield PerformLsuSequencingTestResponse()
 
     mapErrNewEUS(result)
   }

@@ -72,8 +72,6 @@ class ParticipantReplicaManager(
           _ <- participantServices.ledgerApiIndexerContainer.initializeNext()
           _ = logger.info("Participant replica is becoming active: Ledger API Indexer started")
           _ <- participantServices.cantonSyncService.refreshCaches()
-          // Run participant node state recovery
-          _ = logger.info("Participant replica is becoming active: SyncService initialized")
           // Start up the Ledger API server
           _ <- participantServices.ledgerApiServerContainer.initializeNext()
           _ = logger.info("Participant replica is becoming active: Ledger API Server started")
@@ -82,8 +80,17 @@ class ParticipantReplicaManager(
           _ = logger.info(
             "Participant replica is becoming active: Ledger API dependent services started"
           )
+          // LSU
+          _ <- EitherTUtil.toFutureUnlessShutdown(
+            participantServices.cantonSyncService
+              .finishLSUs()
+              .leftMap(err => new RuntimeException(s"Unable to finish LSUs: $err"))
+          )
           // Reconnect to the synchronizers to start processing
           _ <- connectSynchronizers(participantServices.cantonSyncService)
+
+          _ = participantServices.cantonSyncService.attemptPendingHandshakesSuccessors()
+
           _ = logger.info("Participant replica is becoming active: Synchronizers reconnected")
           // Start the schedulers, pruning scheduler depends on the Ledger API server
           _ <- FutureUnlessShutdown.outcomeF(participantServices.schedulers.start())

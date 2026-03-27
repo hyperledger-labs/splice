@@ -69,14 +69,17 @@ import com.digitalasset.canton.protocol.messages.{
   SignedProtocolMessage,
 }
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, LfVersionedTransaction}
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.PossiblyIgnoredProtocolEvent
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.topology.{
   ConfiguredPhysicalSynchronizerId,
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  SequencerId,
   Synchronizer,
   SynchronizerId,
 }
@@ -285,10 +288,9 @@ private[console] object ParticipantCommands {
     def reconnect_all(
         runner: AdminCommandRunner,
         ignoreFailures: Boolean,
-    ): ConsoleCommandResult[Unit] =
-      runner.adminCommand(
-        ParticipantAdminCommands.SynchronizerConnectivity.ReconnectSynchronizers(ignoreFailures)
-      )
+    ): ConsoleCommandResult[Unit] = runner.adminCommand(
+      ParticipantAdminCommands.SynchronizerConnectivity.ReconnectSynchronizers(ignoreFailures)
+    )
 
     def disconnect(
         runner: AdminCommandRunner,
@@ -700,10 +702,16 @@ class ParticipantPruningAdministrationGroup(
       |is higher than the offset returned by `find_safe_offset` on any synchronizer with events
       |preceding the pruning offset."""
   )
-  def prune_internally(pruneUpTo: Long): Unit =
+  def prune_internally(
+      pruneUpTo: Long,
+      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState] = None,
+  ): Unit =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run(
-        adminCommand(ParticipantAdminCommands.Pruning.PruneInternallyCommand(pruneUpTo))
+        adminCommand(
+          ParticipantAdminCommands.Pruning
+            .PruneInternallyCommand(pruneUpTo, safeToPruneCommitmentState)
+        )
       )
     }
 
@@ -2648,6 +2656,36 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def logout(synchronizerAlias: SynchronizerAlias): Unit = consoleEnvironment.run {
       adminCommand(
         ParticipantAdminCommands.SynchronizerConnectivity.Logout(synchronizerAlias)
+      )
+    }
+
+    @Help.Summary("Perform a manual LSU")
+    @Help.Description("""
+        |Perform a local manual logical synchronizer upgrade to
+        |switch to the designated successor.
+        |
+        |Parameters:
+        |- currentPsid: current physical synchronizer id
+        |- successorPsid: physical synchronizer id of the successor
+        |- upgradeTime:
+        |     If defined:
+        |       - MUST be higher than any message received by the node on the synchronizer id
+        |       - Upgrade will not start until all events until upgrade_time have been processed
+        |     If empty:
+        |       - Clean synchronizer index from ledger api server will be used.
+        |- sequencerSuccessors:
+        |     The sequencer connection definitions to connect to the new sequencers.
+        |     SHOULD contain one entry for each sequencer currently registered by the participant
+        |""")
+    def perform_manual_lsu(
+        currentPsid: PhysicalSynchronizerId,
+        successorPsid: PhysicalSynchronizerId,
+        upgradeTime: Option[CantonTimestamp],
+        sequencerSuccessors: Map[SequencerId, GrpcConnection],
+    ): Unit = consoleEnvironment.run {
+      adminCommand(
+        ParticipantAdminCommands.SynchronizerConnectivity
+          .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
       )
     }
   }

@@ -60,16 +60,18 @@ import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.protocol.messages.{AcsCommitment, CommitmentPeriod}
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.topology.transaction.{GrpcConnection, ParticipantPermission}
 import com.digitalasset.canton.topology.{
   ConfiguredPhysicalSynchronizerId,
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  SequencerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -80,12 +82,12 @@ import com.google.protobuf.timestamp.Timestamp
 import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, ManagedChannel}
+import io.scalaland.chimney.dsl.*
 
 import java.io.{File, IOException}
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.annotation.nowarn
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, MILLISECONDS}
 
@@ -703,62 +705,15 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportPartyAcs(
-        acsChunk: ByteString,
-        workflowIdPrefix: String,
-        contractImportMode: ContractImportMode,
-        representativePackageIdOverride: RepresentativePackageIdOverride,
-    ) extends GrpcAdminCommand[
-          v30.ImportPartyAcsRequest,
-          v30.ImportPartyAcsResponse,
-          Unit,
-        ] {
-
-      override type Svc = PartyManagementServiceStub
-
-      override def createService(channel: ManagedChannel): PartyManagementServiceStub =
-        v30.PartyManagementServiceGrpc.stub(channel)
-
-      override protected def createRequest(): Either[String, v30.ImportPartyAcsRequest] =
-        Right(
-          v30.ImportPartyAcsRequest(
-            acsChunk,
-            workflowIdPrefix,
-            contractImportMode.toProtoV30,
-            Some(representativePackageIdOverride.toProtoV30),
-          )
-        )
-
-      override protected def submitRequest(
-          service: PartyManagementServiceStub,
-          request: v30.ImportPartyAcsRequest,
-      ): Future[v30.ImportPartyAcsResponse] =
-        GrpcStreamingUtils.streamToServer(
-          service.importPartyAcs,
-          (bytes: Array[Byte]) =>
-            v30.ImportPartyAcsRequest(
-              ByteString.copyFrom(bytes),
-              workflowIdPrefix,
-              contractImportMode.toProtoV30,
-              Some(representativePackageIdOverride.toProtoV30),
-            ),
-          request.acsSnapshot,
-        )
-
-      override protected def handleResponse(
-          response: v30.ImportPartyAcsResponse
-      ): Either[String, Unit] = Either.unit
-
-    }
-
-    final case class ImportPartyAcsV2(
         file: File,
         synchronizerId: SynchronizerId,
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,
         representativePackageIdOverride: RepresentativePackageIdOverride,
+        party: Option[PartyId],
     ) extends GrpcAdminCommand[
           Unit,
-          v30.ImportPartyAcsV2Response,
+          v30.ImportPartyAcsResponse,
           Unit,
         ] {
 
@@ -774,15 +729,15 @@ object ParticipantAdminCommands {
       override protected def submitRequest(
           service: PartyManagementServiceStub,
           request: Unit,
-      ): Future[v30.ImportPartyAcsV2Response] = {
+      ): Future[v30.ImportPartyAcsResponse] = {
         val acsSnapshotBytes =
           ByteString.copyFrom(better.files.File(file.getAbsolutePath).loadBytes)
         val isFirstChunk = new AtomicBoolean(true)
         GrpcStreamingUtils.streamToServer(
-          service.importPartyAcsV2,
+          service.importPartyAcs,
           bytes => {
             val isFirst = isFirstChunk.getAndSet(false)
-            v30.ImportPartyAcsV2Request(
+            v30.ImportPartyAcsRequest(
               ByteString.copyFrom(bytes),
               synchronizerId = Option.when(isFirst)(synchronizerId.toProtoPrimitive),
               workflowIdPrefix =
@@ -790,6 +745,7 @@ object ParticipantAdminCommands {
               contractImportMode = Option.when(isFirst)(contractImportMode.toProtoV30),
               representativePackageIdOverride =
                 Option.when(isFirst)(representativePackageIdOverride.toProtoV30),
+              partyId = Option.when(isFirst)(party.map(_.toProtoPrimitive)).flatten,
             )
           },
           acsSnapshotBytes,
@@ -797,7 +753,7 @@ object ParticipantAdminCommands {
       }
 
       override protected def handleResponse(
-          response: v30.ImportPartyAcsV2Response
+          response: v30.ImportPartyAcsResponse
       ): Either[String, Unit] = Either.unit
     }
 
@@ -840,97 +796,6 @@ object ParticipantAdminCommands {
   }
 
   object ParticipantRepairManagement {
-
-    // TODO(#24610) – Remove, replaced by ExportAcs
-    @nowarn("cat=deprecation")
-    final case class ExportAcsOld(
-        parties: Set[PartyId],
-        partiesOffboarding: Boolean,
-        filterSynchronizerId: Option[SynchronizerId],
-        timestamp: Option[Instant],
-        observer: StreamObserver[v30.ExportAcsOldResponse],
-        force: Boolean,
-    ) extends GrpcAdminCommand[
-          v30.ExportAcsOldRequest,
-          CancellableContext,
-          CancellableContext,
-        ] {
-
-      override type Svc = ParticipantRepairServiceStub
-
-      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
-        v30.ParticipantRepairServiceGrpc.stub(channel)
-
-      override protected def createRequest(): Either[String, v30.ExportAcsOldRequest] =
-        Right(
-          v30.ExportAcsOldRequest(
-            parties.map(_.toLf).toSeq,
-            filterSynchronizerId.map(_.toProtoPrimitive).getOrElse(""),
-            timestamp.map(Timestamp.apply),
-            force = force,
-            partiesOffboarding = partiesOffboarding,
-          )
-        )
-
-      override protected def submitRequest(
-          service: ParticipantRepairServiceStub,
-          request: v30.ExportAcsOldRequest,
-      ): Future[CancellableContext] = {
-        val context = Context.current().withCancellation()
-        context.run(() => service.exportAcsOld(request, observer))
-        Future.successful(context)
-      }
-
-      override protected def handleResponse(
-          response: CancellableContext
-      ): Either[String, CancellableContext] = Right(response)
-
-      override def timeoutType: GrpcAdminCommand.TimeoutType =
-        GrpcAdminCommand.DefaultUnboundedTimeout
-    }
-
-    // TODO(#24610) - Remove, replaced by ImportAcs
-    @nowarn("cat=deprecation")
-    final case class ImportAcsOld(
-        acsChunk: ByteString,
-        workflowIdPrefix: String,
-    ) extends GrpcAdminCommand[
-          v30.ImportAcsOldRequest,
-          v30.ImportAcsOldResponse,
-          Unit,
-        ] {
-
-      override type Svc = ParticipantRepairServiceStub
-
-      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
-        v30.ParticipantRepairServiceGrpc.stub(channel)
-
-      override protected def createRequest(): Either[String, v30.ImportAcsOldRequest] =
-        Right(
-          v30.ImportAcsOldRequest(
-            acsChunk,
-            workflowIdPrefix,
-          )
-        )
-
-      override protected def submitRequest(
-          service: ParticipantRepairServiceStub,
-          request: v30.ImportAcsOldRequest,
-      ): Future[v30.ImportAcsOldResponse] =
-        GrpcStreamingUtils.streamToServer(
-          service.importAcsOld,
-          (bytes: Array[Byte]) =>
-            v30.ImportAcsOldRequest(
-              ByteString.copyFrom(bytes),
-              workflowIdPrefix,
-            ),
-          request.acsSnapshot,
-        )
-
-      override protected def handleResponse(
-          response: v30.ImportAcsOldResponse
-      ): Either[String, Unit] = Right(())
-    }
 
     final case class ExportAcs(
         parties: Set[PartyId],
@@ -985,57 +850,6 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportAcs(
-        acsChunk: ByteString,
-        workflowIdPrefix: String,
-        contractImportMode: ContractImportMode,
-        representativePackageIdOverride: RepresentativePackageIdOverride,
-        excludedStakeholders: Set[PartyId],
-    ) extends GrpcAdminCommand[
-          v30.ImportAcsRequest,
-          v30.ImportAcsResponse,
-          Unit,
-        ] {
-
-      override type Svc = ParticipantRepairServiceStub
-
-      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
-        v30.ParticipantRepairServiceGrpc.stub(channel)
-
-      override protected def createRequest(): Either[String, v30.ImportAcsRequest] =
-        Right(
-          v30.ImportAcsRequest(
-            acsChunk,
-            workflowIdPrefix,
-            contractImportMode.toProtoV30,
-            excludedStakeholders.map(_.toProtoPrimitive).toSeq,
-            Some(representativePackageIdOverride.toProtoV30),
-          )
-        )
-
-      override protected def submitRequest(
-          service: ParticipantRepairServiceStub,
-          request: v30.ImportAcsRequest,
-      ): Future[v30.ImportAcsResponse] =
-        GrpcStreamingUtils.streamToServer(
-          service.importAcs,
-          (bytes: Array[Byte]) =>
-            v30.ImportAcsRequest(
-              ByteString.copyFrom(bytes),
-              workflowIdPrefix,
-              contractImportMode.toProtoV30,
-              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
-              Some(representativePackageIdOverride.toProtoV30),
-            ),
-          request.acsSnapshot,
-        )
-
-      override protected def handleResponse(
-          response: v30.ImportAcsResponse
-      ): Either[String, Unit] = Right(())
-    }
-
-    // TODO(#30342) - Consolidate with ImportAcs, or separate it clearly
-    final case class ImportAcsV2(
         importFilePath: File,
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,
@@ -1044,7 +858,7 @@ object ParticipantAdminCommands {
         synchronizerId: SynchronizerId,
     ) extends GrpcAdminCommand[
           Unit,
-          v30.ImportAcsV2Response,
+          v30.ImportAcsResponse,
           Unit,
         ] {
 
@@ -1059,15 +873,15 @@ object ParticipantAdminCommands {
       override protected def submitRequest(
           service: ParticipantRepairServiceStub,
           request: Unit,
-      ): Future[v30.ImportAcsV2Response] = {
+      ): Future[v30.ImportAcsResponse] = {
         val acsBytes =
           ByteString.copyFrom(better.files.File(importFilePath.getAbsolutePath).loadBytes)
         val isFirstChunk = new AtomicBoolean(true)
         GrpcStreamingUtils.streamToServer(
-          service.importAcsV2,
+          service.importAcs,
           (bytes: Array[Byte]) => {
             val isFirst = isFirstChunk.getAndSet(false)
-            v30.ImportAcsV2Request(
+            v30.ImportAcsRequest(
               ByteString.copyFrom(bytes),
               Option.when(isFirst)(workflowIdPrefix),
               Option.when(isFirst)(contractImportMode.toProtoV30),
@@ -1081,7 +895,7 @@ object ParticipantAdminCommands {
       }
 
       override protected def handleResponse(
-          response: v30.ImportAcsV2Response
+          response: v30.ImportAcsResponse
       ): Either[String, Unit] = Right(())
     }
 
@@ -1326,15 +1140,15 @@ object ParticipantAdminCommands {
       ): Either[String, Unit] = Either.unit
     }
 
-    final case class PerformManualLsu(
-        currentPSId: PhysicalSynchronizerId,
-        successorPSId: PhysicalSynchronizerId,
+    final case class PerformLateLsu(
+        currentPsid: PhysicalSynchronizerId,
+        successorPsid: PhysicalSynchronizerId,
         upgradeTime: CantonTimestamp,
         successorConfig: SynchronizerConnectionConfig,
         sequencerConnectionValidation: SequencerConnectionValidation,
     ) extends GrpcAdminCommand[
-          v30.PerformManualLsuRequest,
-          v30.PerformManualLsuResponse,
+          v30.PerformLateLsuRequest,
+          v30.PerformLateLsuResponse,
           Unit,
         ] {
       override type Svc = ParticipantRepairServiceStub
@@ -1342,13 +1156,13 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         v30.ParticipantRepairServiceGrpc.stub(channel)
 
-      override protected def createRequest(): Either[String, v30.PerformManualLsuRequest] =
+      override protected def createRequest(): Either[String, v30.PerformLateLsuRequest] =
         Right(
-          v30.PerformManualLsuRequest(
-            physicalSynchronizerId = currentPSId.toProtoPrimitive,
-            successor = v30.PerformManualLsuRequest
+          v30.PerformLateLsuRequest(
+            physicalSynchronizerId = currentPsid.toProtoPrimitive,
+            successor = v30.PerformLateLsuRequest
               .Successor(
-                physicalSynchronizerId = successorPSId.toProtoPrimitive,
+                physicalSynchronizerId = successorPsid.toProtoPrimitive,
                 announcedUpgradeTime = upgradeTime.toProtoTimestamp.some,
                 config = successorConfig.toProtoV30.some,
                 sequencerConnectionValidation = sequencerConnectionValidation.toProtoV30,
@@ -1359,12 +1173,12 @@ object ParticipantAdminCommands {
 
       override protected def submitRequest(
           service: ParticipantRepairServiceStub,
-          request: v30.PerformManualLsuRequest,
-      ): Future[v30.PerformManualLsuResponse] =
-        service.performManualLsu(request)
+          request: v30.PerformLateLsuRequest,
+      ): Future[v30.PerformLateLsuResponse] =
+        service.performLateLsu(request)
 
       override protected def handleResponse(
-          response: v30.PerformManualLsuResponse
+          response: v30.PerformLateLsuResponse
       ): Either[String, Unit] = Either.unit
     }
   }
@@ -1717,6 +1531,36 @@ object ParticipantAdminCommands {
 
       override protected def handleResponse(response: v30.LogoutResponse): Either[String, Unit] =
         Either.unit
+    }
+
+    final case class PerformManualLsu(
+        currentPsid: PhysicalSynchronizerId,
+        successorPsid: PhysicalSynchronizerId,
+        upgradeTime: Option[CantonTimestamp],
+        sequencerSuccessors: Map[SequencerId, GrpcConnection],
+    ) extends Base[v30.PerformManualLsuRequest, v30.PerformManualLsuResponse, Unit] {
+
+      override protected def createRequest(): Either[String, v30.PerformManualLsuRequest] =
+        v30
+          .PerformManualLsuRequest(
+            physicalSynchronizerId = currentPsid.toProtoPrimitive,
+            successorPhysicalSynchronizerId = successorPsid.toProtoPrimitive,
+            upgradeTime = upgradeTime.map(_.toProtoTimestamp),
+            sequencerSuccessors = sequencerSuccessors.map { case (sequencerId, connection) =>
+              sequencerId.toProtoPrimitive -> connection.toProtoV30
+                .transformInto[v30.PerformManualLsuRequest.SequencerConnection]
+            },
+          )
+          .asRight
+
+      override protected def submitRequest(
+          service: SynchronizerConnectivityServiceStub,
+          request: v30.PerformManualLsuRequest,
+      ): Future[v30.PerformManualLsuResponse] = service.performManualLsu(request)
+
+      override protected def handleResponse(
+          response: v30.PerformManualLsuResponse
+      ): Either[String, Unit] = Either.unit
     }
   }
 
@@ -2355,7 +2199,7 @@ object ParticipantAdminCommands {
       override protected def createRequest(): Either[String, v30.GetSafePruningOffsetRequest] =
         for {
           beforeOrAt <- CantonTimestamp.fromInstant(beforeOrAt)
-        } yield v30.GetSafePruningOffsetRequest(Some(beforeOrAt.toProtoTimestamp), ledgerEnd)
+        } yield v30.GetSafePruningOffsetRequest(Some(beforeOrAt.toProtoTimestamp), ledgerEnd, None)
 
       override protected def submitRequest(
           service: PruningServiceStub,
@@ -2374,10 +2218,19 @@ object ParticipantAdminCommands {
       }
     }
 
-    final case class PruneInternallyCommand(pruneUpTo: Long)
-        extends Base[v30.PruneRequest, v30.PruneResponse, Unit] {
+    final case class PruneInternallyCommand(
+        pruneUpTo: Long,
+        safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
+    ) extends Base[v30.PruneRequest, v30.PruneResponse, Unit] {
       override protected def createRequest(): Either[String, v30.PruneRequest] =
-        Right(v30.PruneRequest(pruneUpTo))
+        Right(
+          v30.PruneRequest(
+            pruneUpTo,
+            safeToPruneCommitmentState.map(
+              _.toProtoV30
+            ),
+          )
+        )
 
       override protected def submitRequest(
           service: PruningServiceStub,

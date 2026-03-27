@@ -167,6 +167,7 @@ class PingService(
         synchronizerId = synchronizerId.map(_.toProtoPrimitive).getOrElse(""),
         packageIdSelectionPreference = Nil,
         prefetchContractKeys = Nil,
+        tapsMaxPasses = None,
       ),
       timeout.duration.toScala,
     )
@@ -407,7 +408,7 @@ object PingService {
       created.foreach { contract =>
         acs.put(contract.contractId.contractId, contract) match {
           case Some(_) => logger.error(s"Duplicate contract $contract observed!")
-          case None => logger.info(s"Observed create of $contract")
+          case None => logger.debug(s"Observed create of $contract")
         }
         // respond if we are the active instance
         if (isActive) {

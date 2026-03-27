@@ -6,7 +6,7 @@ package com.digitalasset.canton.topology.client
 import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage, SigningKeysWithThreshold}
+import com.digitalasset.canton.crypto.SigningKeysWithThreshold
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -62,6 +62,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import scala.concurrent.ExecutionContext
+import scala.math.Ordered.orderingToOrdered
 import scala.reflect.ClassTag
 
 /** Base topology snapshot loader to share implementation between StoreBased- and
@@ -125,6 +126,10 @@ abstract class BaseTopologySnapshot(
       }
       .getOrElse(FutureUnlessShutdown.pure(Map.empty))
 
+  override def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean]
+
   override private[client] def findUnvettedPackagesOrDependencies(
       participant: ParticipantId,
       packages: Set[PackageId],
@@ -160,7 +165,7 @@ abstract class BaseTopologySnapshot(
       for {
         storedTx <- collectLatestTransaction(
           TopologyMapping.Code.SynchronizerParametersState,
-          transactions
+          transactions.asSnapshotAtMaxEffectiveTime
             .collectOfMapping[SynchronizerParametersState]
             .result,
         ).toRight(s"Unable to fetch synchronizer parameters at $timestamp")
@@ -186,7 +191,7 @@ abstract class BaseTopologySnapshot(
       for {
         storedTx <- collectLatestTransaction(
           TopologyMapping.Code.SequencingDynamicParametersState,
-          transactions
+          transactions.asSnapshotAtMaxEffectiveTime
             .collectOfMapping[DynamicSequencingParametersState]
             .result,
         ).toRight(s"Unable to fetch sequencing parameters at $timestamp")
@@ -345,14 +350,6 @@ abstract class BaseTopologySnapshot(
     } yield fullySpecifiedPartyMap
   }
 
-  // TODO(#28232) this can be removed as this is now an invariant enforced on the topology store
-  private def findMembersWithoutSigningKeys[T <: Member](members: Seq[T])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Set[T]] =
-    signingKeys(members, SigningKeyUsage.All).map(keys =>
-      members.filter(keys.get(_).forall(_.isEmpty)).toSet
-    )
-
   /** returns the list of currently known mediator groups */
   override def mediatorGroups()(implicit
       traceContext: TraceContext
@@ -366,8 +363,6 @@ abstract class BaseTopologySnapshot(
 
     for {
       transactions <- fetchMediatorSynchronizerStates()
-      mediatorsInAllGroups = transactions.flatMap(_.mapping.allMediatorsInGroup)
-      mediatorsWithoutSigningKeys <- findMembersWithoutSigningKeys(mediatorsInAllGroups)
     } yield {
       transactions
         .groupBy(_.mapping.group)
@@ -375,14 +370,13 @@ abstract class BaseTopologySnapshot(
           val mds = collectLatestMapping(
             TopologyMapping.Code.MediatorSynchronizerState,
             seq.sortBy(_.validFrom),
+          ).getOrElse(
+            throw new IllegalStateException("Group-by would not have produced empty seq")
           )
-            .getOrElse(
-              throw new IllegalStateException("Group-by would not have produced empty seq")
-            )
           MediatorGroup(
             groupId,
-            mds.active.filterNot(mediatorsWithoutSigningKeys),
-            mds.observers.filterNot(mediatorsWithoutSigningKeys),
+            mds.active,
+            mds.observers,
             mds.threshold,
           )
         }
@@ -403,22 +397,14 @@ abstract class BaseTopologySnapshot(
         transactions.collectOfMapping[SequencerSynchronizerState].result,
       )
     }
-    for {
-      sds <- fetchSequencerSynchronizerState()
-      allSequencers = sds.toList.flatMap(_.allSequencers)
-      sequencersWithoutSigningKeys <- findMembersWithoutSigningKeys(allSequencers)
-    } yield {
-      sds.map { (sds: SequencerSynchronizerState) =>
-        SequencerGroup(
-          sds.active.filterNot(sequencersWithoutSigningKeys),
-          sds.observers.filterNot(sequencersWithoutSigningKeys),
-          sds.threshold,
-        )
-      }
-    }
+    fetchSequencerSynchronizerState().map(_.map { (sds: SequencerSynchronizerState) =>
+      SequencerGroup(
+        sds.active,
+        sds.observers,
+        sds.threshold,
+      )
+    })
   }
-
-  private val keysRequiredForParticipants = Set(KeyPurpose.Signing, KeyPurpose.Encryption)
 
   private def getParticipantsWithCertificates(
       storedTxs: StoredTopologyTransactions[Replace, TopologyMapping]
@@ -434,37 +420,16 @@ abstract class BaseTopologySnapshot(
         ).map(pid -> _)
       }
 
-  // TODO(#28232) this can be removed as this is now an invariant enforced on the topology store
-  private def getParticipantsWithCertAndKeys(
-      storedTxs: StoredTopologyTransactions[Replace, TopologyMapping],
-      participantsWithCertificates: Set[ParticipantId],
-  )(implicit traceContext: TraceContext): Set[ParticipantId] =
-    storedTxs
-      .collectOfMapping[OwnerToKeyMapping]
-      .result
-      .groupBy(_.mapping.member)
-      .collect {
-        case (pid: ParticipantId, seq)
-            if participantsWithCertificates(pid) && collectLatestMapping(
-              TopologyMapping.Code.OwnerToKeyMapping,
-              seq.sortBy(_.validFrom),
-            ).exists(otk =>
-              keysRequiredForParticipants.diff(otk.keys.forgetNE.map(_.purpose).toSet).isEmpty
-            ) =>
-          pid
-      }
-      .toSet
-
   private def getParticipantSynchronizerPermissions(
       storedTxs: StoredTopologyTransactions[Replace, TopologyMapping],
-      participantsWithCertAndKeys: Set[ParticipantId],
+      validParticipantsWithCerts: Set[ParticipantId],
   )(implicit traceContext: TraceContext): Map[ParticipantId, ParticipantSynchronizerPermission] =
     storedTxs
       .collectOfMapping[ParticipantSynchronizerPermission]
       .result
       .groupBy(_.mapping.participantId)
       .collect {
-        case (pid, seq) if participantsWithCertAndKeys(pid) =>
+        case (pid, seq) if validParticipantsWithCerts(pid) =>
           val mapping =
             collectLatestMapping(
               TopologyMapping.Code.ParticipantSynchronizerPermission,
@@ -504,8 +469,6 @@ abstract class BaseTopologySnapshot(
           findTransactionsByUids(
             types = Seq(
               TopologyMapping.Code.SynchronizerTrustCertificate,
-              // TODO(#28232) this can be removed as this is now an invariant enforced on the topology store
-              TopologyMapping.Code.OwnerToKeyMapping,
               TopologyMapping.Code.ParticipantSynchronizerPermission,
             ),
             filterUid = participantsNE,
@@ -517,28 +480,18 @@ abstract class BaseTopologySnapshot(
       // 1. Participant needs to have requested access to synchronizer by issuing a synchronizer trust certificate
       val participantsWithCertificates = getParticipantsWithCertificates(storedTxs)
       val participantsIdsWithCertificates = participantsWithCertificates.keySet
-      // 2. Participant needs to have keys registered on the synchronizer
-      // TODO(#28232) this can be removed as this is now an invariant enforced on the topology store
-      val participantsWithCertAndKeys =
-        getParticipantsWithCertAndKeys(storedTxs, participantsIdsWithCertificates)
-      // Warn about participants with cert but no keys
-      (participantsIdsWithCertificates -- participantsWithCertAndKeys).foreach { pid =>
-        logger.warn(
-          s"Participant $pid has a synchronizer trust certificate, but no keys on synchronizer ${synchronizerParametersState.synchronizerId}"
-        )
-      }
-      // 3. Attempt to look up permissions/trust from participant synchronizer permission
+      // 2. Attempt to look up permissions/trust from participant synchronizer permission
       val participantSynchronizerPermissions =
-        getParticipantSynchronizerPermissions(storedTxs, participantsWithCertAndKeys)
+        getParticipantSynchronizerPermissions(storedTxs, participantsIdsWithCertificates)
 
-      participantsWithCertAndKeys.toSeq.mapFilter { pid =>
+      participantsIdsWithCertificates.toSeq.mapFilter { pid =>
         val supportedFeatures =
           participantsWithCertificates.get(pid).toList.flatMap(_.featureFlags)
         if (
           synchronizerParametersState.parameters.onboardingRestriction.isRestricted && !participantSynchronizerPermissions
             .contains(pid)
         ) {
-          // 4a. If the synchronizer is restricted, we must have found a ParticipantSynchronizerPermission for the participants, otherwise
+          // 3a. If the synchronizer is restricted, we must have found a ParticipantSynchronizerPermission for the participants, otherwise
           // the participants shouldn't have been able to onboard to the synchronizer in the first place.
           // In case we don't find a ParticipantSynchronizerPermission, we don't return the participant with default permissions, but we skip it.
           logger.warn(
@@ -555,7 +508,7 @@ abstract class BaseTopologySnapshot(
             .setDefaultLimitIfNotSet(
               DynamicSynchronizerParameters.defaultParticipantSynchronizerLimits
             )
-          // 4b. Apply default permissions/trust of submission/ordinary if missing participant synchronizer permission and
+          // 3b. Apply default permissions/trust of submission/ordinary if missing participant synchronizer permission and
           // grab rate limits from dynamic synchronizer parameters if not specified
           Some(
             pid -> ParticipantAttributes(
@@ -609,11 +562,6 @@ abstract class BaseTopologySnapshot(
       )
       .getOrElse(FutureUnlessShutdown.pure(Map.empty))
 
-  override def isMemberKnown(member: Member)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Boolean] =
-    areMembersKnown(Set(member)).map(_.nonEmpty)
-
   override def areMembersKnown(
       members: Set[Member]
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[Member]] = {
@@ -621,6 +569,7 @@ abstract class BaseTopologySnapshot(
     val mediators = members.collect { case MediatorId(uid) => uid }
     val sequencers = members.collect { case SequencerId(uid) => uid }
 
+    // a participant is considered known if an SynchronizerTrustCertificate transaction for it exists
     val knownParticipantsF = NonEmpty
       .from(participants)
       .map { participantsNE =>
@@ -637,6 +586,7 @@ abstract class BaseTopologySnapshot(
       }
       .getOrElse(FutureUnlessShutdown.pure(Set.empty[Member]))
 
+    // a mediator is considered known if an MediatorSynchronizerState transaction for it exists
     val knownMediatorsF = if (mediators.nonEmpty) {
       findTransactionsByUids(
         types = Seq(MediatorSynchronizerState.code),
@@ -691,25 +641,28 @@ abstract class BaseTopologySnapshot(
         }
     }
 
-  override def synchronizerUpgradeOngoing()(implicit
+  override def announcedLsu()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
     findTransactionsByUids(
-      types = Seq(TopologyMapping.Code.SynchronizerUpgradeAnnouncement),
+      types = Seq(TopologyMapping.Code.LsuAnnouncement),
       filterUid = NonEmpty(Seq, psid.uid),
-    ).map(_.collectOfMapping[LsuAnnouncement].result.toList match {
-      case atMostOne @ (_ :: Nil | Nil) =>
-        atMostOne
-          .map(tx =>
+    ).map(
+      _.collectOfMapping[LsuAnnouncement].result
+        .filter(_.mapping.successorSynchronizerId > psid)
+        .toList match {
+        case Nil => None
+        case one :: Nil =>
+          Some(
             (
-              SynchronizerSuccessor(tx.mapping.successorSynchronizerId, tx.mapping.upgradeTime),
-              tx.validFrom,
+              SynchronizerSuccessor(one.mapping.successorSynchronizerId, one.mapping.upgradeTime),
+              one.validFrom,
             )
           )
-          .headOption
-      case _moreThanOne =>
-        ErrorUtil.invalidState("Found more than one SynchronizerUpgradeAnnouncement mapping")
-    })
+        case _moreThanOne =>
+          ErrorUtil.invalidState("Found more than one LsuAnnouncement mapping")
+      }
+    )
 
   protected def collectLatestMapping[T <: TopologyMapping](
       typ: TopologyMapping.Code,

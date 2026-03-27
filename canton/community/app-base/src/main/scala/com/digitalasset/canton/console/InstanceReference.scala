@@ -3,13 +3,14 @@
 
 package com.digitalasset.canton.console
 
-import com.digitalasset.canton.SequencerAlias
+import com.daml.tls.TlsClientConfig
 import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.FindPruningTimestampCommand
 import com.digitalasset.canton.admin.api.client.data.topology.ListParticipantSynchronizerPermissionResult
 import com.digitalasset.canton.admin.api.client.data.{
   GrpcSequencerConnection,
   MediatorStatus,
+  MemberAuthenticationToken,
   NodeStatus,
   ParticipantStatus,
   SequencerConnections,
@@ -64,7 +65,10 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.{SequencerAlias, config}
+import com.google.protobuf.ByteString
 
+import java.util.Base64
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -129,17 +133,6 @@ trait InstanceReference
   def parties: PartiesAdministrationGroup
 
   def topology: TopologyAdministrationGroup
-
-  private lazy val trafficControl_ =
-    new TrafficControlAdministrationGroup(
-      this,
-      consoleEnvironment,
-      loggerFactory,
-    )
-  @Help.Summary("Traffic control related commands")
-  @Help.Group("Traffic")
-  def traffic_control: TrafficControlAdministrationGroup = trafficControl_
-
 }
 
 object InstanceReference {
@@ -229,10 +222,9 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     ): Either[String, MetricValue] = check(FeatureFlag.Testing) {
       val candidates = consoleEnvironment.environment.configuredOpenTelemetry.onDemandMetricsReader
         .read()
+
       val res = candidates
-        .find { data =>
-          data.getName.equals(metricName)
-        }
+        .find(_.getName.equals(metricName))
         .toList
         .flatMap(MetricValue.fromMetricData)
         .filter(filterByNodeAndAttribute(attributes))
@@ -240,7 +232,8 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
         case one :: Nil => Right(one)
         case Nil =>
           Left(s"No metric of name $metricName with instance name $name found.")
-        case other => Left(s"Found ${other.length} matching metrics")
+        case other =>
+          Left(s"Found ${other.length} matching metrics")
       }
     }
 
@@ -584,6 +577,16 @@ abstract class ParticipantReference(
   @Help.Group("Repair")
   def repair: ParticipantRepairAdministration = repair_
 
+  private lazy val trafficControl_ =
+    new ParticipantTrafficControlAdministrationGroup(
+      this,
+      consoleEnvironment,
+      loggerFactory,
+    )
+  @Help.Summary("Traffic control related commands")
+  @Help.Group("Traffic")
+  def traffic_control: ParticipantTrafficControlAdministrationGroup = trafficControl_
+
   /** Waits until for every participant p (drawn from consoleEnvironment.participants.all) that is
     * running and initialized and for each synchronizer to which both this participant and p are
     * connected the vetted_package transactions in the authorized store are the same as in the
@@ -868,7 +871,7 @@ abstract class SequencerReference(
 
   @Help.Summary("Admin traffic control related commands")
   @Help.Group("Traffic")
-  override def traffic_control: TrafficControlSequencerAdministrationGroup =
+  def traffic_control: TrafficControlSequencerAdministrationGroup =
     sequencerTrafficControl
 
   @Help.Summary("Returns the logical synchronizer id of the synchronizer")
@@ -1014,6 +1017,60 @@ abstract class SequencerReference(
             parameters
         }
     }
+  }
+
+  @Help.Summary("Sequencer authentication related commands")
+  object authentication {
+    @Help.Summary(
+      "Generate an authentication token for a given member on this sequencer",
+      FeatureFlag.Testing,
+    )
+    @Help.Description(
+      """Generates a token that can be used to authenticate
+        |on behalf of a member on this sequencer.
+        |If expiresIn is empty, the configured maxTokenExpirationInterval
+        |config on the sequencer will be used.
+        |Only use for troubleshooting. Requires enable-testing-commands to be enabled.
+        |
+        |Parameters:
+        |- member: Member to generate the token for
+        |- expiresIn: Optional duration after which the token will expire.
+        |  When empty, the maxTokenExpirationInterval configured on the sequencer is used
+        |"""
+    )
+    def generate_authentication_token(
+        member: Member,
+        expiresIn: Option[config.NonNegativeFiniteDuration] = None,
+    ): MemberAuthenticationToken = check(FeatureFlag.Testing) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          SequencerAdminCommands.GenerateAuthenticationToken(member, expiresIn.map(_.toInternal))
+        )
+      }
+    }
+
+    @Help.Summary(
+      "Invalidates an authentication token on the sequencer and disconnects the corresponding member"
+    )
+    @Help.Description(
+      """Invalidates the authentication token and disconnects the sequencer client of its member"""
+    )
+    def logout(token: ByteString): Unit = doLogout(token)
+
+    @Help.Summary(
+      "Invalidates a base64 encoded authentication token on the sequencer and disconnects the corresponding member"
+    )
+    @Help.Description(
+      """Invalidates the authentication token and disconnects the sequencer client of its member"""
+    )
+    def logout(token: String): Unit = doLogout(ByteString.copyFrom(Base64.getDecoder.decode(token)))
+
+    private def doLogout(token: ByteString): Unit =
+      consoleEnvironment.run {
+        publicApiClient.publicApiCommand(
+          SequencerPublicCommands.Logout(token)
+        )
+      }
   }
 
   @Help.Summary("Pruning of the sequencer")

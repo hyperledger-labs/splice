@@ -5,19 +5,20 @@ package com.digitalasset.canton.caching
 
 import cats.syntax.flatMap.*
 import cats.{FlatMap, Functor}
+import com.daml.metrics.CacheMetrics
 import com.daml.metrics.api.MetricHandle.Gauge
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.metrics.CacheMetrics
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
 import com.github.benmanes.caffeine.cache.RemovalCause
 import com.github.blemale.scaffeine.{AsyncCache, AsyncLoadingCache, Scaffeine}
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.BiFunction
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
@@ -194,16 +195,15 @@ object ScaffeineCache {
       with NamedLogging {
 
     private val auxCache: TrieMap[K2, K] = TrieMap.empty[K2, K]
+    private val approxSize: AtomicInteger = new AtomicInteger(0)
 
-    private def putAuxCache(key: K2, value: K): Unit = {
-      auxCache.put(key, value).discard
-      updateMetrics()
-    }
+    private def putAuxCache(key: K2, value: K): Unit =
+      if (auxCache.put(key, value).isEmpty)
+        updateMetrics(1)
 
-    private def removeAuxCache(key: K2): Unit = {
-      auxCache.remove(key).discard
-      updateMetrics()
-    }
+    private def removeAuxCache(key: K2): Unit =
+      if (auxCache.remove(key).nonEmpty)
+        updateMetrics(-1)
 
     private val mainCache = ScaffeineCache.buildMappedAsync[K, V](
       cache = cache,
@@ -212,8 +212,8 @@ object ScaffeineCache {
       },
     )(tracedLogger, context)
 
-    private def updateMetrics(): Unit =
-      sizeMetric.updateValue(auxCache.size)
+    private def updateMetrics(cnt: Int): Unit =
+      sizeMetric.updateValue(approxSize.updateAndGet(s => Math.max(0, s + cnt)))
 
     def getFuture(
         key: K,
@@ -289,7 +289,7 @@ object ScaffeineCache {
 
     def invalidateAll(): Unit = {
       auxCache.clear()
-      updateMetrics()
+      approxSize.set(0)
       mainCache.invalidateAll()
     }
 
@@ -341,6 +341,15 @@ object ScaffeineCache {
       // The Caffeine cache's get method wraps exceptions from the loader in a `CompletionException`.
       // We should strip it here.
       FutureUtil.unwrapCompletionException(underlying.get(key))
+    )
+
+    /** @see
+      *   com.github.blemale.scaffeine.AsyncLoadingCache.getIfPresent
+      */
+    def getIfPresent(key: K): Option[F[V]] = (
+      // The Caffeine cache's get method wraps exceptions from the loader in a `CompletionException`.
+      // We should strip it here.
+      underlying.getIfPresent(key).map(f => tunnel.exit(FutureUtil.unwrapCompletionException(f)))
     )
 
     /** @see
@@ -421,6 +430,12 @@ object ScaffeineCache {
       F.map(underlying.getAll(keys.map(Traced(_))))(_.map { case (tracedKey, value) =>
         tracedKey.unwrap -> value
       })
+
+    /** @see
+      *   com.github.blemale.scaffeine.AsyncLoadingCache.getIfPresent
+      */
+    def getIfPresent(key: K)(implicit traceContext: TraceContext): Option[F[V]] =
+      underlying.getIfPresent(Traced(key))
 
     /** @see
       *   com.github.blemale.scaffeine.AsyncLoadingCache.put

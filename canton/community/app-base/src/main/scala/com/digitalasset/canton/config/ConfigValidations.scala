@@ -20,8 +20,11 @@ import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.daml.lf.transaction.NextGenContractStateMachine
+import com.google.common.annotations.VisibleForTesting
 
 import java.net.URI
+import scala.concurrent.duration.Duration
 
 object ConfigValidations extends NamedLogging {
   import TraceContext.Implicits.Empty.*
@@ -32,7 +35,7 @@ object ConfigValidations extends NamedLogging {
 
   private val Valid: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
-  protected def toValidated(errors: Seq[String]): Validated[NonEmpty[Seq[String]], Unit] = NonEmpty
+  private def toValidated(errors: Seq[String]): Validated[NonEmpty[Seq[String]], Unit] = NonEmpty
     .from(errors)
     .map(Validated.invalid[NonEmpty[Seq[String]], Unit])
     .getOrElse(Validated.Valid(()))
@@ -76,11 +79,14 @@ object ConfigValidations extends NamedLogging {
       warnIfUnsafeMinProtocolVersion,
       adminTokenSafetyCheckParticipants,
       adminTokenConfigsMatchOnParticipants,
+      topologyAwarePackageSelectionCheckParticipants,
       eitherUserListsOrPrivilegedTokensOnParticipants,
       validateSelectedSchemes,
       sessionSigningKeysOnlyWithKmsAndSchemesAreSupported,
+      sessionSigningKeysParamsValidation,
       distinctScopesAndAudiencesOnAuthServices,
       engineAdditionalConsistencyChecksParticipants,
+      engineContractStateModeParticipants,
       dbLockFeaturesRequireUsingLockSupportingStorage,
       highlyAvailableSequencerTotalNodeCount,
       noDuplicateStorageUnlessReplicated,
@@ -199,11 +205,9 @@ object ConfigValidations extends NamedLogging {
         case participant: ParticipantNodeConfig =>
           toList(
             participant.httpLedgerApi.enabled && participant.httpLedgerApi.internalPort.isEmpty,
-            portNotSetError(
-              nodeType = nodeConfig.nodeTypeName,
-              nodeName = name.unwrap,
-              service = "http-ledger-api",
-            ),
+            s"canton.${nodeConfig.nodeTypeName}s.${name.unwrap}.http-ledger-api.port not set. " +
+              s"Either set a port (canton.${nodeConfig.nodeTypeName}s.${name.unwrap}.http-ledger-api.port = <port>) " +
+              s"or disable the service (canton.${nodeConfig.nodeTypeName}s.${name.unwrap}.http-ledger-api.enabled = false).",
           ) ++ toList(
             participant.ledgerApi.internalPort.isEmpty,
             portNotSetError(
@@ -232,7 +236,7 @@ object ConfigValidations extends NamedLogging {
     toValidated(errors)
   }
 
-  def portNotSetError(
+  private def portNotSetError(
       nodeType: String,
       nodeName: String,
       service: String,
@@ -261,14 +265,14 @@ object ConfigValidations extends NamedLogging {
   def alphaProtocolVersionRequiresNonStandardError(nodeType: String, nodeName: String) =
     s"Enabling alpha-version-support for $nodeType $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
 
-  def snapshotDirRequiresNonStandard(
+  private def snapshotDirRequiresNonStandard(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
 
     val errors = config.allLocalNodes.toSeq.mapFilter {
       case (name, nodeConfig: ParticipantNodeConfig) =>
         val nonStandardConfig = config.parameters.nonStandardConfig
-        val snapshotSupportEnabled = nodeConfig.features.snapshotDir.nonEmpty
+        val snapshotSupportEnabled = nodeConfig.parameters.engine.snapshotDir.nonEmpty
         Option.when(!nonStandardConfig && snapshotSupportEnabled)(
           s"Setting snapshot-dir for ${nodeConfig.nodeTypeName} ${name.unwrap} requires you to explicitly set canton.parameters.non-standard-config = yes"
         )
@@ -342,6 +346,18 @@ object ConfigValidations extends NamedLogging {
     toValidated(errors)
   }
 
+  private def topologyAwarePackageSelectionCheckParticipants(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = config.participants.toSeq.mapFilter { case (name, participantConfig) =>
+      val tapsConfig = participantConfig.ledgerApi.topologyAwarePackageSelection
+      Option.when(tapsConfig.maxPassesLimit < tapsConfig.maxPassesDefault)(
+        s"For participant ${name.unwrap}, topology-aware-package-selection.max-passes-limit (${tapsConfig.maxPassesLimit}) must be greater than or equal to max-passes-default (${tapsConfig.maxPassesDefault})"
+      )
+    }
+    toValidated(errors)
+  }
+
   private def engineAdditionalConsistencyChecksParticipants(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
@@ -350,6 +366,20 @@ object ConfigValidations extends NamedLogging {
         participantConfig.parameters.engine.enableAdditionalConsistencyChecks && !config.parameters.nonStandardConfig
       )(
         s"Enabling additional consistency checks on the Daml Engine for participant ${name.unwrap} requires to explicitly set canton.parameters.non-standard-config = true"
+      )
+    }
+    toValidated(errors)
+  }
+
+  private def engineContractStateModeParticipants(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = config.participants.toSeq.mapFilter { case (name, participantConfig) =>
+      val mode = participantConfig.parameters.engine.contractStateMode
+      Option.when(
+        mode != NextGenContractStateMachine.Mode.default && !config.parameters.nonStandardConfig
+      )(
+        s"Changing the contract state machine mode to $mode on the Daml Engine for participant ${name.unwrap} requires to explicitly set canton.parameters.non-standard-config = true"
       )
     }
     toValidated(errors)
@@ -367,7 +397,7 @@ object ConfigValidations extends NamedLogging {
       val supportedEncryptionKeySpecs = cryptoConfig.encryption.keys.allowed
 
       def prefixErrors(validated: Seq[String]): Seq[String] =
-        validated.map(err => s"Node $nodeName: $err")
+        validated.map(err => s"${nodeConfig.nodeTypeName} $nodeName: $err")
 
       val signingAlgoCheck: Seq[String] =
         cryptoConfig.signing.algorithms.default.zip(supportedSigningAlgoSpecs) match {
@@ -481,7 +511,7 @@ object ConfigValidations extends NamedLogging {
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val errors: Seq[String] = config.allLocalNodes.toSeq.flatMap { case (nodeName, nodeConfig) =>
       def prefixErrors(validated: Seq[String]): Seq[String] =
-        validated.map(err => s"Node $nodeName: $err")
+        validated.map(err => s"${nodeConfig.nodeTypeName} $nodeName: $err")
 
       val cryptoConfig = nodeConfig.crypto
       val sessionSigningKeysConfig = cryptoConfig.sessionSigningKeys
@@ -524,6 +554,88 @@ object ConfigValidations extends NamedLogging {
             )
         }
       } else Nil
+      prefixErrors(errorList)
+    }
+    toValidated(errors)
+  }
+
+  /** Minimum allowed key validity must satisfy:
+    *   - (> 2 × cutOff) → to ensure there is a usable duration for the key's validity.
+    *   - (> toleranceShift + cutOff) → to ensure there is still a usable period "in the future" for
+    *     the key.
+    */
+  @VisibleForTesting
+  def minValidityDuration(toleranceShiftDuration: Duration, cutOffDuration: Duration): Duration = {
+    val cutOff2x = cutOffDuration.mul(2.0)
+    val tolerancePlusCutOff = toleranceShiftDuration + cutOffDuration
+
+    cutOff2x.max(tolerancePlusCutOff)
+  }
+
+  private def sessionSigningKeysParamsValidation(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors: Seq[String] = config.allLocalNodes.toSeq.flatMap { case (nodeName, nodeConfig) =>
+      def prefixErrors(validated: Seq[String]): Seq[String] =
+        validated.map(err => s"${nodeConfig.nodeTypeName} $nodeName: $err")
+
+      val nonStandardConfig = config.parameters.nonStandardConfig
+
+      val maxSequencingTimeOffset =
+        nodeConfig.sequencerClient.defaultMaxSequencingTimeOffset
+
+      val cryptoConfig = nodeConfig.crypto
+      val sessionSigningKeysConfig = cryptoConfig.sessionSigningKeys
+
+      val keyValidityDuration = sessionSigningKeysConfig.keyValidityDuration
+      val toleranceShiftDuration = sessionSigningKeysConfig.toleranceShiftDuration
+      val cutOffDuration = sessionSigningKeysConfig.cutOffDuration
+      val keyEvictionPeriod = sessionSigningKeysConfig.keyEvictionPeriod
+
+      val minValidity =
+        minValidityDuration(toleranceShiftDuration.duration, cutOffDuration.duration)
+
+      val errorList =
+        // skip checks if session signing keys are disabled or bound checks are turned off
+        if (
+          !sessionSigningKeysConfig.enabled || (sessionSigningKeysConfig.disableBoundChecks && nonStandardConfig)
+        ) Nil
+        else if (sessionSigningKeysConfig.disableBoundChecks && !nonStandardConfig)
+          Seq(
+            s"Disabling bound checks on session signing key validity parameters is only allowed with a " +
+              s"`nonStandardConfig` and must only be used for testing."
+          )
+        else if (keyValidityDuration.duration <= minValidity)
+          Seq(
+            s"The selected session signing key validity duration of $keyValidityDuration " +
+              s"is too short. It must be longer than ${NonNegativeFiniteDuration.tryFromDuration(minValidity)}."
+          )
+        // tolerance > cut-off → to ensure a freshly generated key can be picked for the current timestamp.
+        else if (toleranceShiftDuration.duration <= cutOffDuration.duration)
+          Seq(
+            s"The selected session signing key tolerance shift duration of " +
+              s"$toleranceShiftDuration must be longer than the cut-off (" +
+              s"$cutOffDuration)."
+          )
+        // keyValidity - tolerance - cut-off >= maxSequencingTimeOffset → to ensure that when the default max
+        // sequencing time is used, the submission request signature remains valid until that time.
+        else if (
+          (keyValidityDuration.duration - toleranceShiftDuration.duration - cutOffDuration.duration) <
+            maxSequencingTimeOffset.duration
+        )
+          Seq(
+            s"The selected session signing key validity parameters do not align with " +
+              s"the current default max sequencing time offset ($maxSequencingTimeOffset). " +
+              s"Parameters must be chosen so that " +
+              s"`keyValidityDuration` - `toleranceShiftDuration` - `cutOffDuration` >= `defaultMaxSequencingTimeOffset`."
+          )
+        else if (keyEvictionPeriod.duration <= keyValidityDuration.duration)
+          Seq(
+            s"The selected session signing key eviction period of " +
+              s"$keyEvictionPeriod must be longer than the key validity duration (" +
+              s"$keyValidityDuration)."
+          )
+        else Nil
       prefixErrors(errorList)
     }
     toValidated(errors)
@@ -595,18 +707,6 @@ object ConfigValidations extends NamedLogging {
   private def sequencerClientRetryDelays(
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
-    val CantonConfig(
-      sequencers,
-      mediators,
-      participants,
-      _,
-      _,
-      _,
-      _,
-      _,
-      _,
-    ) = config
-
     val sequencerClientConfigs =
       config.allLocalNodes.fmap(_.sequencerClient)
 

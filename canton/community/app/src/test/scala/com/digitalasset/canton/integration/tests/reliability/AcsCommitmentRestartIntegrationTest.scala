@@ -16,7 +16,10 @@ import com.digitalasset.canton.integration.plugins.{
   UseProgrammableSequencer,
   UseReferenceBlockSequencer,
 }
-import com.digitalasset.canton.integration.tests.util.{CommitmentTestUtil, IntervalDuration}
+import com.digitalasset.canton.integration.tests.acs.commitment.util.{
+  CommitmentTestUtil,
+  IntervalDuration,
+}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -59,6 +62,8 @@ trait AcsCommitmentRestartIntegrationTest
     EnvironmentDefinition.P2_S1M1
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
+        // enabling retries to be on the safe side
+        ConfigTransforms.setPingRetries(true),
         ProgrammableSequencer.configOverride(this.getClass.toString, loggerFactory),
         ConfigTransforms.updateCommitmentCheckpointInterval(
           PositiveDurationSeconds.ofSeconds(checkpointInterval.duration.getSeconds)

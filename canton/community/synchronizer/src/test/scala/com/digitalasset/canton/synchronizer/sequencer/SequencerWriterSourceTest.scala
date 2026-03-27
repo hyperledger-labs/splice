@@ -9,7 +9,7 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -17,20 +17,10 @@ import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  LogEntry,
-  NamedLoggerFactory,
-  SuppressionRule,
-  TracedLogger,
-}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
-import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
-  PayloadToEventTimeBoundExceeded,
-  SequencedBeforeOrAtLowerBound,
-}
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.PayloadToEventTimeBoundExceeded
 import com.digitalasset.canton.synchronizer.sequencer.store.{
   BytesPayload,
   DeliverErrorStoreEvent,
@@ -65,7 +55,6 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.scalatest.Assertion
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.wordspec.AsyncWordSpec
-import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -76,7 +65,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-class SequencerWriterSourceTest
+final class SequencerWriterSourceTest
     extends AsyncWordSpec
     with BaseTest
     with HasExecutorService
@@ -101,10 +90,8 @@ class SequencerWriterSourceTest
 
     override def notifyOfLocalWrite(
         notification: WriteNotification
-    )(implicit traceContext: TraceContext): Future[Unit] =
-      Future.successful {
-        listenerRef.get().foreach(listener => listener(notification))
-      }
+    ): Unit =
+      listenerRef.get().foreach(listener => listener(notification))
 
     override def readSignalsForMember(
         member: Member,
@@ -117,7 +104,6 @@ class SequencerWriterSourceTest
 
   private class Env(
       keepAliveInterval: Option[NonNegativeFiniteDuration],
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       blockSequencerMode: Boolean,
   ) extends FlagCloseableAsync {
     override val timeouts: ProcessingTimeout = SequencerWriterSourceTest.this.timeouts
@@ -192,8 +178,8 @@ class SequencerWriterSourceTest
         loggerFactory,
         testedProtocolVersion,
         SequencerMetrics.noop(suiteName),
+        lsuSequencingBounds = None,
         blockSequencerMode = blockSequencerMode,
-        SequencingTimeBound(sequencingTimeLowerBoundExclusive),
       )(executorService, implicitly[TraceContext], implicitly[ErrorLoggingContext])
         .toMat(Sink.ignore)(Keep.both),
       errorLogMessagePrefix = "Writer flow failed",
@@ -221,11 +207,9 @@ class SequencerWriterSourceTest
 
   private def withEnv(
       keepAliveInterval: Option[NonNegativeFiniteDuration] = None,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp] =
-        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
       blockSequencerMode: Boolean = true,
   )(testCode: Env => Future[Assertion]): Future[Assertion] = {
-    val env = new Env(keepAliveInterval, sequencingTimeLowerBoundExclusive, blockSequencerMode)
+    val env = new Env(keepAliveInterval, blockSequencerMode)
     val result = testCode(env)
     result.onComplete(_ => env.close())
     result
@@ -284,122 +268,6 @@ class SequencerWriterSourceTest
         events <- store.readEvents(registeredAlice.memberId, alice, registeredAlice.registeredFrom)
       } yield events.events shouldBe empty
     }
-  }
-
-  "sequencing time lower bound" when {
-    val lowerBoundExclusive = CantonTimestamp.Epoch.plusSeconds(10)
-
-    "in blockSequencerMode" should {
-      "prevent sends below or at the sequencing time" in withEnv(
-        sequencingTimeLowerBoundExclusive = Some(lowerBoundExclusive),
-        blockSequencerMode = true,
-      ) { env =>
-        import env.*
-
-        clock.now should be < lowerBoundExclusive
-
-        loggerFactory.assertEventuallyLogsSeq(
-          SuppressionRule.Level(Level.INFO) && SuppressionRule.forLogger[WritePayloadsFlow.type]
-        )(
-          for {
-            registeredAlice <- store.registerMember(alice, CantonTimestamp.Epoch)
-            _ <- store.registerMember(sequencerMember, CantonTimestamp.Epoch)
-            deliver1 = DeliverStoreEvent.ensureSenderReceivesEvent(
-              registeredAlice.memberId,
-              messageId1,
-              Set.empty,
-              payload1,
-              None,
-              None,
-            )
-            _ = offerDeliverOrFail(Presequenced.alwaysValid(deliver1, Some(clock.now)))
-            _ = offerDeliverOrFail(
-              Presequenced.alwaysValid(deliver1, Some(lowerBoundExclusive))
-            )
-            _ = offerDeliverOrFail(
-              Presequenced.alwaysValid(deliver1, Some(lowerBoundExclusive.immediateSuccessor))
-            )
-            _ <- FutureUnlessShutdown.outcomeF(completeFlow())
-            events <- store.readEvents(
-              registeredAlice.memberId,
-              alice,
-              registeredAlice.registeredFrom,
-            )
-          } yield {
-            events.events.loneElement.timestamp shouldBe lowerBoundExclusive.immediateSuccessor
-          },
-          LogEntry.assertLogSeq(
-            Seq(
-              (
-                entry => entry.shouldBeCantonErrorCode(SequencedBeforeOrAtLowerBound),
-                "sequencing error",
-              )
-            )
-          ),
-        )
-      }
-    }
-
-    "not in blockSequencerMode" should {
-      "prevent sends below the sequencing time" in withEnv(
-        sequencingTimeLowerBoundExclusive = Some(lowerBoundExclusive),
-        blockSequencerMode = false,
-      ) { env =>
-        import env.*
-
-        clock.now should be < lowerBoundExclusive
-
-        val f1 = loggerFactory.assertEventuallyLogsSeq(
-          SuppressionRule.Level(Level.INFO) && SuppressionRule.forLogger[WritePayloadsFlow.type]
-        )(
-          for {
-            registeredAlice <- store.registerMember(alice, CantonTimestamp.Epoch)
-            _ <- store.registerMember(sequencerMember, CantonTimestamp.Epoch)
-            deliver1 = DeliverStoreEvent.ensureSenderReceivesEvent(
-              registeredAlice.memberId,
-              messageId1,
-              Set.empty,
-              payload1,
-              None,
-              None,
-            )
-            _ = offerDeliverOrFail(Presequenced.alwaysValid(deliver1))
-          } yield (),
-          LogEntry.assertLogSeq(
-            Seq(
-              (
-                entry => entry.shouldBeCantonErrorCode(SequencedBeforeOrAtLowerBound),
-                "sequencing error",
-              )
-            )
-          ),
-        )
-
-        f1.flatMap { _ =>
-          clock.advanceTo(lowerBoundExclusive.immediateSuccessor)
-
-          for {
-            (aliceId, aliceRegisteredFrom) <- store
-              .lookupMember(alice)
-              .map(registeredAliceO =>
-                (registeredAliceO.value.memberId -> registeredAliceO.value.registeredFrom)
-              )
-            deliver2 = DeliverStoreEvent.ensureSenderReceivesEvent(
-              aliceId,
-              messageId2,
-              Set.empty,
-              payload2,
-              None,
-              None,
-            )
-            _ = offerDeliverOrFail(Presequenced.alwaysValid(deliver2))
-            _ <- FutureUnlessShutdown.outcomeF(completeFlow())
-            events <- store.readEvents(aliceId, alice, aliceRegisteredFrom)
-          } yield events.events.loneElement.timestamp shouldBe lowerBoundExclusive.immediateSuccessor
-        }
-      }
-    }
-
   }
 
   "max sequencing time" should {
@@ -551,7 +419,7 @@ class SequencerWriterSourceTest
 
         batch = Batch.fromClosed(
           testedProtocolVersion,
-          ClosedEnvelope.create(
+          ClosedUncompressedEnvelope.create(
             ByteString.EMPTY,
             Recipients.cc(bob),
             Seq.empty,
@@ -573,7 +441,7 @@ class SequencerWriterSourceTest
                   protocolVersion = testedProtocolVersion,
                 ),
                 sequencingTime = CantonTimestamp.Epoch.immediateSuccessor,
-                deliverToMembers = Set(alice, bob),
+                recipients = Set(MemberRecipient(alice), MemberRecipient(bob)),
                 batch = batch,
                 submissionTraceContext = TraceContext.empty,
                 trafficReceiptO = None,
@@ -592,6 +460,7 @@ class SequencerWriterSourceTest
               case Sequenced(
                     _,
                     deliverError @ DeliverErrorStoreEvent(aliceId, _, _, _, _),
+                    _,
                   ) =>
                 deliverError
             }.value
@@ -635,7 +504,7 @@ class SequencerWriterSourceTest
 
         val removeListener = eventSignaller.attachWriteListener { notification =>
           // ignore notifications for no-one as that's just our keep alives
-          if (notification != WriteNotification.None) {
+          if (notification != WriteNotification.NoTarget) {
             val newItems = items.updateAndGet(_ :+ notification)
 
             if (newItems.sizeIs == writeCount) {
@@ -657,7 +526,10 @@ class SequencerWriterSourceTest
       combinedNotificationsF map { notification =>
         forAll(members) { member =>
           withClue(s"expecting notification for $member") {
-            notification.isBroadcastOrIncludes(member) shouldBe true
+            notification should matchPattern {
+              case WriteNotification.All =>
+              case WriteNotification.Members(memberIds) if memberIds.contains(member) =>
+            }
           }
         }
 

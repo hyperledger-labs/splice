@@ -9,6 +9,7 @@ import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.{
   ClientSettings,
+  FutureSettings,
   LocalSettings,
   NetworkSettings,
   PartitionMode,
@@ -23,6 +24,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulati
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology.SimulationTopologyHelpers.generateNodeOnboardingDelay
 import org.scalatest.Assertion
+import org.slf4j.event.Level
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.Random
@@ -46,6 +48,9 @@ class BftOrderingSimulationTest1NodeNoFaults extends BftOrderingSimulationTest {
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           NetworkSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
+          FutureSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           durationOfFirstPhaseWithFaults,
@@ -97,6 +102,9 @@ class BftOrderingSimulationTestWithProgressiveOnboardingAndDelayNoFaults
         NetworkSettings(
           randomSeed = randomSourceToCreateSettings.nextLong()
         ),
+        FutureSettings(
+          randomSeed = randomSourceToCreateSettings.nextLong()
+        ),
         durationOfFirstPhaseWithFaults,
         durationOfSecondPhaseWithoutFaults,
       ),
@@ -146,6 +154,9 @@ class BftOrderingSimulationTestWithConcurrentOnboardingsNoFaults extends BftOrde
           NetworkSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
+          FutureSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
           durationOfFirstPhase,
           durationOfSecondPhase,
         ),
@@ -175,8 +186,17 @@ class BftOrderingSimulationTestWithOnboardingAndKeyRotationsNoFaults
     extends BftOrderingSimulationTest {
   override def numberOfRuns: Int = 5
 
-  private val random = new Random(4)
+  private val randomSourceToCreateSettings = new Random(4)
   private val durationOfFirstPhaseWithFaults = 1.minute
+
+  override def allowedWarnings: Seq[LogEntry => Assertion] = Seq(
+    // Invalid acks may be received after a key is rotated
+    { logEntry =>
+      logEntry.level should be(Level.WARN)
+      logEntry.message should include("sent invalid ACK for batch")
+      logEntry.loggerName should include("AvailabilityModule")
+    }
+  )
 
   override def generateSettings: SimulationTestSettings = SimulationTestSettings(
     numberOfInitialNodes = 2,
@@ -184,15 +204,20 @@ class BftOrderingSimulationTestWithOnboardingAndKeyRotationsNoFaults
       Seq,
       SimulationTestStageSettings(
         SimulationSettings(
-          LocalSettings(random.nextLong()),
-          NetworkSettings(random.nextLong()),
+          LocalSettings(randomSeed = randomSourceToCreateSettings.nextLong()),
+          NetworkSettings(randomSeed = randomSourceToCreateSettings.nextLong()),
+          FutureSettings(randomSeed = randomSourceToCreateSettings.nextLong()),
           durationOfFirstPhaseWithFaults,
         ),
         TopologySettings(
-          random.nextLong(),
+          randomSourceToCreateSettings.nextLong(),
           shouldDoKeyRotations = true,
-          nodeOnboardingDelays =
-            Seq(generateNodeOnboardingDelay(durationOfFirstPhaseWithFaults, random)),
+          nodeOnboardingDelays = Seq(
+            generateNodeOnboardingDelay(
+              durationOfFirstPhaseWithFaults,
+              randomSourceToCreateSettings,
+            )
+          ),
         ),
       ),
     ),
@@ -223,6 +248,9 @@ class BftOrderingSimulationTestWithPartitions extends BftOrderingSimulationTest 
             partitionMode = PartitionMode.IsolateSingle,
             partitionSymmetry = PartitionSymmetry.Symmetric,
           ),
+          FutureSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
           durationOfFirstPhaseWithPartitions,
         ),
         TopologySettings(randomSourceToCreateSettings.nextLong()),
@@ -250,6 +278,9 @@ class BftOrderingSimulationTest2NodesBootstrap extends BftOrderingSimulationTest
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           NetworkSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
+          FutureSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           durationOfFirstPhaseWithFaults,
@@ -280,6 +311,9 @@ class BftOrderingEmptyBlocksSimulationTest extends BftOrderingSimulationTest {
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           NetworkSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
+          FutureSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           durationOfFirstPhaseWithFaults,
@@ -322,6 +356,9 @@ class BftOrderingSimulationTest2NodesLargeRequests extends BftOrderingSimulation
           NetworkSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
+          FutureSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
           durationOfFirstPhaseWithFaults,
           durationOfSecondPhaseWithoutFaults,
           clientSettings = ClientSettings(
@@ -361,6 +398,9 @@ class BftOrderingSimulationTest2NodesCrashFaults extends BftOrderingSimulationTe
           NetworkSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
+          FutureSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
           durationOfFirstPhaseWithFaults,
           durationOfSecondPhaseWithoutFaults,
         ),
@@ -390,6 +430,9 @@ class BftOrderingSimulationTest4NodesCrashFaults extends BftOrderingSimulationTe
             crashRestartChance = Probability(0.01),
           ),
           NetworkSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
+          ),
+          FutureSettings(
             randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           durationOfFirstPhaseWithFaults,
@@ -439,6 +482,9 @@ class BftOrderingSimulationTestOffboarding extends BftOrderingSimulationTest {
           NetworkSettings(
             randomSeed = randomSourceToCreateSettings.nextLong(),
             packetLoss = Probability(0.2),
+          ),
+          FutureSettings(
+            randomSeed = randomSourceToCreateSettings.nextLong()
           ),
           durationOfFirstPhaseWithFaults,
           durationOfSecondPhaseWithoutFaults,

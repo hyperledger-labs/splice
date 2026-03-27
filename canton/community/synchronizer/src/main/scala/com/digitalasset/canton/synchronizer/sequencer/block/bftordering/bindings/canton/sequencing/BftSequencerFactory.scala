@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing
 
+import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.SequencingTimeBound
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
@@ -21,6 +21,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.{
   BlockSequencerFactory,
 }
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
+import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.synchronizer.sequencer.{
   AuthenticationServices,
@@ -48,6 +49,7 @@ class BftSequencerFactory(
     sequencerId: SequencerId,
     nodeParameters: SequencerNodeParameters,
     metrics: SequencerMetrics,
+    executorServiceMetrics: ExecutorServiceMetrics,
     override val loggerFactory: NamedLoggerFactory,
     testingInterceptor: Option[TestingInterceptor],
 )(implicit ec: ExecutionContextExecutor)
@@ -96,6 +98,7 @@ class BftSequencerFactory(
       sequencerSnapshot.flatMap(_.additional),
       nodeParameters.exitOnFatalFailures,
       metrics.bftOrdering,
+      executorServiceMetrics,
       synchronizerLoggerFactory,
       nodeParameters.loggingConfig.queryCost,
       ec,
@@ -116,7 +119,7 @@ class BftSequencerFactory(
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
       synchronizerLoggerFactory: NamedLoggerFactory,
-      sequencingTimeLowerBoundExclusive: SequencingTimeBound,
+      lsuSequencingBounds: Option[LsuSequencingBounds],
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
       ec: ExecutionContext,
@@ -140,7 +143,7 @@ class BftSequencerFactory(
       clock,
       rateLimitManager,
       orderingTimeFixMode,
-      sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+      lsuSequencingBounds,
       nodeParameters.processingTimeouts,
       nodeParameters.loggingConfig.eventDetails,
       nodeParameters.loggingConfig.api.printer,
