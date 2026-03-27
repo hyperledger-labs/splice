@@ -4,7 +4,6 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
   CnChartVersion,
@@ -17,7 +16,6 @@ import {
   fetchAndInstallParticipantBootstrapDump,
   getAdditionalJvmOptions,
   getValidatorAppApiAudience,
-  installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   installValidatorSecrets,
@@ -33,6 +31,10 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  BucketConfig,
+  installBucketSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/buckets';
 import { Secret } from '@pulumi/kubernetes/core/v1';
 import { Output } from '@pulumi/pulumi';
 
@@ -46,7 +48,7 @@ export type ExtraDomain = {
 export type ValidatorBackupConfig = {
   // If not set the secret will be created.
   secret?: pulumi.Resource;
-  config: BackupConfig;
+  config: BucketConfig;
 };
 
 type BasicValidatorConfig = {
@@ -150,7 +152,7 @@ export async function installValidatorApp(
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
     ? config.backupConfig.secret
       ? config.backupConfig.secret
-      : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.location.bucket)
+      : installBucketSecret(config.xns, config.backupConfig.config.location.bucket)
     : undefined;
 
   const validatorOnboardingSecret =

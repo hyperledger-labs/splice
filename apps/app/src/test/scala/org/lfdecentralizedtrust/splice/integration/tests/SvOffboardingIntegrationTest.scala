@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.util.FutureInstances.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
@@ -20,6 +19,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   IsTheCantonSequencerBFTEnabled,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
@@ -33,8 +33,8 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
-import cats.syntax.parallel.*
-import cats.instances.seq.*
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
   pauseAllDsoDelegateTriggers,
   resumeAllDsoDelegateTriggers,
@@ -192,7 +192,11 @@ class SvOffboardingIntegrationTest
         }
       }
       withClue("pause offboarding triggers") {
-        cantonMediatorSequencerTriggers.parTraverse_(_.pause()).futureValue
+        MonadUtil
+          .parTraverseWithLimit_(PositiveInt.tryCreate(4))(cantonMediatorSequencerTriggers)(
+            _.pause()
+          )
+          .futureValue
       }
 
       actAndCheck(
@@ -222,6 +226,7 @@ class SvOffboardingIntegrationTest
                 .getPartyToParticipant(
                   decentralizedSynchronizerId,
                   sv3Backend.getDsoInfo().dsoParty,
+                  topologySnapshot = TopologySnapshot.Sequenced,
                 )
                 .futureValue
                 .mapping
@@ -283,7 +288,10 @@ class SvOffboardingIntegrationTest
             clue("Check mediator offboarding") {
               val mediators =
                 sv3Backend.appState.participantAdminConnection
-                  .getMediatorSynchronizerState(decentralizedSynchronizerId)
+                  .getMediatorSynchronizerState(
+                    decentralizedSynchronizerId,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
                   .futureValue
                   .mapping
                   .active
@@ -315,7 +323,10 @@ class SvOffboardingIntegrationTest
             clue("Check sequencer offboarding") {
               val sequencers =
                 sv3Backend.appState.participantAdminConnection
-                  .getSequencerSynchronizerState(decentralizedSynchronizerId)
+                  .getSequencerSynchronizerState(
+                    decentralizedSynchronizerId,
+                    topologySnapshot = TopologySnapshot.Sequenced,
+                  )
                   .futureValue
                   .mapping
                   .active

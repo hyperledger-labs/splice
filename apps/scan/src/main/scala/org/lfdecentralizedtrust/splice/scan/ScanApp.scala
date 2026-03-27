@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
+import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
@@ -28,6 +29,7 @@ import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource 
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
+  HttpScanStreamHandler,
   HttpTokenStandardAllocationHandler,
   HttpTokenStandardAllocationInstructionHandler,
   HttpTokenStandardMetadataHandler,
@@ -44,9 +46,12 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanEventStore,
   ScanKeyValueProvider,
   ScanKeyValueStore,
+  ScanRewardsReferenceStore,
   ScanStore,
 }
+import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
 import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbAppActivityRecordStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -55,6 +60,7 @@ import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.store.{
   ChoiceContextContractFetcher,
   PageLimit,
+  S3BucketConnection,
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.HasHealth
@@ -64,7 +70,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
@@ -244,7 +250,7 @@ class ScanApp(
       )
       kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
       kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
-      bulkStorage = new BulkStorage(
+      bulkStorage = BulkStorage(
         scanStorageConfigV1,
         config.bulkStorage,
         acsSnapshotStore,
@@ -252,9 +258,38 @@ class ScanApp(
         currentMigrationId = migrationInfo.currentMigrationId,
         kvProvider,
         retryProvider.metricsFactory,
+        config.automation,
+        backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),
+        retryProvider,
         loggerFactory,
       )
-      scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
+      // Conditionally create traffic summary ingestion dependencies
+      sequencerTrafficClientO =
+        if (config.enableAppActivityRecordAndTrafficIngestion) {
+          Some(
+            new SequencerTrafficClient(
+              config.sequencerAdminClient,
+              ScanApp.this,
+              nodeMetrics.grpcClientMetrics,
+              loggerFactory,
+            )
+          )
+        } else None
+      appActivityRecordStoreO =
+        if (config.enableAppActivityRecordAndTrafficIngestion) {
+          Some(
+            new DbAppActivityRecordStore(
+              storage,
+              loggerFactory,
+            )
+          )
+        } else None
+      scanVerdictStore = DbScanVerdictStore(
+        storage,
+        updateHistory,
+        appActivityRecordStoreO,
+        loggerFactory,
+      )(ec)
       scanEventStore = new ScanEventStore(
         scanVerdictStore,
         updateHistory,
@@ -302,6 +337,24 @@ class ScanApp(
         appInitConnection,
         loggerFactory,
       )
+      rewardsReferenceStoreO =
+        if (config.enableAppActivityRecordAndTrafficIngestion) {
+          val rewardsStore = ScanRewardsReferenceStore(
+            key = ScanRewardsReferenceStore.Key(
+              dsoParty = dsoParty,
+              synchronizerId = synchronizerId,
+            ),
+            storage,
+            loggerFactory,
+            retryProvider,
+            migrationInfo,
+            participantId,
+            config.automation.ingestion,
+            config.parameters.defaultLimit,
+          )
+          automation.registerRewardsReferenceStoreIngestion(rewardsStore)
+          Some(rewardsStore)
+        } else None
       verdictAutomation = new ScanVerdictAutomationService(
         config,
         clock,
@@ -312,6 +365,8 @@ class ScanApp(
         migrationInfo.currentMigrationId,
         synchronizerId,
         nodeMetrics.verdictIngestion,
+        sequencerTrafficClientO,
+        rewardsReferenceStoreO,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
@@ -323,14 +378,22 @@ class ScanApp(
         updateHistory,
         acsSnapshotStore,
         scanEventStore,
+        bulkStorage,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
+        config.serveAppActivityRecordsAndTraffic,
         clock,
         loggerFactory,
         packageVersionSupport,
         bftSequencersWithAdminConnections,
         initialRound,
+        externalTransactionHashThresholdTime = config.externalTransactionHashThresholdTime,
+        config.updateHistoryMaxPageSize,
+        config.publicUrl,
+      )
+      scanStreamHandler = new HttpScanStreamHandler(
+        config.bulkStorage.s3.map(S3BucketConnection(_, loggerFactory))
       )
       contractFetcher = ChoiceContextContractFetcher.createStoreWithLedgerFallback(
         config.parameters.contractFetchLedgerFallbackConfig,
@@ -406,6 +469,10 @@ class ScanApp(
                 ScanResource.routes(
                   scanHandler,
                   buildRouteForOperation(_, "scan"),
+                ),
+                ScanStreamResource.routes(
+                  scanStreamHandler,
+                  buildRouteForOperation(_, "scan_stream"),
                 ),
                 TokenStandardTransferInstructionResource.routes(
                   tokenStandardTransferInstructionHandler,

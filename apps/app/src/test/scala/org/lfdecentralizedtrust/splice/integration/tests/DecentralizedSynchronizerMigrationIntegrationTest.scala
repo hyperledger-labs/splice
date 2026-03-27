@@ -1,7 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File.apply
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.SynchronizerAlias
@@ -16,7 +18,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -50,6 +51,7 @@ import org.lfdecentralizedtrust.splice.console.{
   WalletAppClientReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
@@ -698,19 +700,22 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             val namespaceChangeResult =
               withClueAndLog("decentralized namespace can be modified on the new domain") {
-                majorityUpgradeNodes.parTraverse { upgradeNode =>
-                  val connection = upgradeNode.newParticipantConnection
-                  for {
-                    result <- connection
-                      .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                        "keep just sv1",
-                        decentralizedSynchronizerId,
-                        dsoPartyDecentralizedNamespace,
-                        _ => NonEmpty(Set, sv1Party.uid.namespace),
-                        RetryFor.WaitingOnInitDependency,
-                      )
-                  } yield result
-                }.futureValue
+                MonadUtil
+                  .parTraverseWithLimit(PositiveInt.tryCreate(4))(majorityUpgradeNodes) {
+                    upgradeNode =>
+                      val connection = upgradeNode.newParticipantConnection
+                      for {
+                        result <- connection
+                          .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                            "keep just sv1",
+                            decentralizedSynchronizerId,
+                            dsoPartyDecentralizedNamespace,
+                            _ => NonEmpty(Set, sv1Party.uid.namespace),
+                            RetryFor.WaitingOnInitDependency,
+                          )
+                      } yield result
+                  }
+                  .futureValue
               }
 
             withClueAndLog("migrate the late joining node") {
@@ -724,6 +729,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
+                    topologySnapshot = TopologySnapshot.Sequenced,
                   )
                   .futureValue
                   .base
@@ -749,6 +755,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
+                    topologySnapshot = TopologySnapshot.Sequenced,
                   )
                   .futureValue
                   .mapping
@@ -1143,8 +1150,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
   ): Unit = {
-    nodes
-      .parTraverse { node =>
+    MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes) { node =>
         SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
           node,
           decentralizedSynchronizerId,

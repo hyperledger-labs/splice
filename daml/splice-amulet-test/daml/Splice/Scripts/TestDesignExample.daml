@@ -16,6 +16,7 @@ import Splice.Expiry
 import Splice.Types
 import Splice.Fees
 import Splice.Scripts.Util
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 
 arbiterPaymentAmount : Decimal
 arbiterPaymentAmount = 1.0
@@ -36,8 +37,8 @@ template Escrow
       controller p
       do LockedAmulet{lock,amulet=locked} <- fetchButArchiveLater (ForOwner with dso; owner = p) lockedAmulet -- archived as part of unlocking
          require "lock holder matches locked amulet " ([arbiter] == lock.holders)
-         result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
-         let cid = result.amuletSum.amulet
+         result <- exercise lockedAmulet LockedAmulet_UnlockV2
+         let cid = result.amuletCid
          let transfer = Transfer with
                sender = p
                provider = arbiter
@@ -61,7 +62,7 @@ template Escrow
          exerciseAppTransfer dso transferContext transfer
 
 test_designExample : Script ()
-test_designExample= do
+test_designExample = do
   -- bootstrap app
   app <- setupApp
 
@@ -87,15 +88,8 @@ test_designExample= do
   let lockedAmuletAmount = 1000.25
   lockTo1 app alice arbiter.primaryParty lockedAmuletAmount (days 90)
 
-  -- check rewards that are issued for the locking tx
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 2)
-  appRewardCoupon === AppRewardCoupon with
-    dso = app.dso
-    provider = alice.primaryParty
-    beneficiary = Some alice.primaryParty
-    featured = False
-    amount = transferConfig.createFee.fee + transferConfig.lockHolderFee.fee
-    round = Round 2
+  -- no rewards as it isunfeatured
+  [] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 2)
 
   [(lockedAmulet, _)] <- query @LockedAmulet alice.primaryParty
   -- advance 40k rounds
@@ -104,15 +98,8 @@ test_designExample= do
 
   let refreshAmuletAmount = 5.0
   pay app alice alice.primaryParty refreshAmuletAmount
-  -- check reward issued by this payment
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 40002)
-  appRewardCoupon === AppRewardCoupon with
-    dso = app.dso
-    provider = alice.primaryParty
-    beneficiary = Some alice.primaryParty
-    featured = False
-    amount = transferConfig.createFee.fee
-    round = Round 40002
+  -- no rewards as unfeatured
+  [] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 40002)
 
   [(paymentAmulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount == refreshAmuletAmount)
 
@@ -142,7 +129,6 @@ test_designExample= do
       holdingFees = 0.0 -- no holding fees charged on transfer
       inputAmuletHoldingFees = transferConfig.holdingFee.rate * 2.0 -- there are 2 input amulets
       outputAmuletHoldingFees = transferConfig.holdingFee.rate * 3.0  -- there are 2 output amulets + 1 amulet for the change
-      outputFees = [lockedAmuletFee, transferredAmuletFee]
       senderChangeAmount =
         refreshAmuletAmount
         - arbiterPaymentAmount
@@ -162,7 +148,7 @@ test_designExample= do
     inputAmuletAmount = refreshAmuletAmount + lockedAmuletAmount
     balanceChanges = Map.empty
     holdingFees
-    outputFees
+    outputFees = [0.0, 0.0]
     senderChangeAmount
     senderChangeFee = transferConfig.createFee.fee
     amuletPrice = 1.0
@@ -204,6 +190,7 @@ test_designExample= do
       in expiringAmount transferConfig.holdingFee amount c2.round
 
   -- check app reward issued by the escrow refresh
+  convertAllFeaturedAppActivityMarkers app.dso
   [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 50002)
   appRewardCoupon === AppRewardCoupon with
     dso = app.dso
@@ -212,7 +199,6 @@ test_designExample= do
     featured = True
     amount =
       -- rewards are issued for all output fees, but not the senderChangeFee
-      sum outputFees +
       transferConfig.extraFeaturedAppRewardAmount
     round = Round 50002
 
@@ -220,6 +206,7 @@ test_designExample= do
   runNextIssuance app
   let reimbursementAmount = 0.5
   pay app arbiter alice.primaryParty reimbursementAmount
+  convertAllFeaturedAppActivityMarkers app.dso
 
   [(_, appReward)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 50003)
   appReward === AppRewardCoupon with

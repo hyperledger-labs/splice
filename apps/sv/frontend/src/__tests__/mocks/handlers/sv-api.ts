@@ -186,7 +186,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
 
   rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-    return res(ctx.json<FeatureSupportResponse>({ no_holding_fees_on_transfers: false }));
+    return res(ctx.json<FeatureSupportResponse>({}));
   }),
 
   validatorLicensesHandler(svUrl),
@@ -219,7 +219,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
     if (partyId === 'a-party-id::1014912492' || partyId === svPartyId) {
       return res(
         ctx.json({
-          participant_id: svPartyId,
+          participant_ids: [svPartyId],
         })
       );
     } else {

@@ -14,7 +14,7 @@ import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
 
-import { GCPBucketSchema } from './config';
+import { TopologySnapshotSchema } from './config';
 
 const SvCometbftConfigSchema = z
   .object({
@@ -80,6 +80,11 @@ const Auth0ConfigSchema = z
     clientId: z.string().optional(),
   })
   .strict();
+const AppsPgConfigSchema = z
+  .object({
+    cloudSql: CloudSqlWithOverrideConfigSchema,
+  })
+  .strict();
 const SvAppConfigSchema = z
   .object({
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
@@ -93,6 +98,10 @@ const SvAppConfigSchema = z
     resources: K8sResourceSchema,
   })
   .strict();
+const BulkStorageConfigSchema = z.object({
+  enabled: z.boolean(),
+});
+export type BulkStorageConfig = z.infer<typeof BulkStorageConfigSchema>;
 const ScanAppConfigSchema = z
   .object({
     bigQuery: z
@@ -101,6 +110,7 @@ const ScanAppConfigSchema = z
         prefix: z.string(),
       })
       .optional(),
+    bulkStorage: BulkStorageConfigSchema.optional(),
     additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
     additionalJvmOptions: z.string().optional(),
     resources: K8sResourceSchema,
@@ -130,6 +140,7 @@ const SingleSvConfigSchema = z
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.optional(),
     mediator: SvMediatorConfigSchema.optional(),
+    appsPg: AppsPgConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
     validatorApp: SvValidatorAppConfigSchema.optional(),
@@ -163,7 +174,7 @@ const SingleSvConfigSchema = z
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
-    periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
+    periodicSnapshots: z.object({ topology: TopologySnapshotSchema.optional() }).optional(),
     versionOverride: CnChartVersionSchema.optional(),
   })
   .strict();

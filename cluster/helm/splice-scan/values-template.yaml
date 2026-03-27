@@ -66,5 +66,14 @@ service:
     port: 80
 logLevel: DEBUG
 
+# bulk storage configuration (still in dev, please do not enable in prod)
+# bulk-storage:
+#   s-3:
+#     bucketName:
+#     region:
+#     endpoint:
+#     secretName:
+# publicUrl:
+
 # should stakater reloader annotation be added (note: reloader needs to be installed separatley)
 enableReloader: true

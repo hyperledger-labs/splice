@@ -6,7 +6,6 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   ansDomainPrefix,
   appsAffinityAndTolerations,
-  BackupConfig,
   btoa,
   ChartValues,
   CLUSTER_BASENAME,
@@ -23,7 +22,6 @@ import {
   imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
-  installBootstrapDataBucketSecret,
   InstalledHelmChart,
   installSpliceHelmChart,
   installSvAppSecrets,
@@ -44,6 +42,7 @@ import {
   configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
+  installScanBulkStorage,
   installSvLoopback,
   SvParticipant,
   valuesForSvApp,
@@ -51,6 +50,10 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SvConfig, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
+import {
+  BucketConfig,
+  installBucketSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/buckets';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
@@ -136,7 +139,7 @@ export async function installSvNode(
     baseConfig.auth0Client
   );
 
-  const periodicBackupConfig: BackupConfig | undefined = baseConfig.periodicBackupConfig
+  const periodicBackupConfig: BucketConfig | undefined = baseConfig.periodicBackupConfig
     ? {
         ...baseConfig.periodicBackupConfig,
         location: {
@@ -149,8 +152,7 @@ export async function installSvNode(
     : undefined;
 
   const svConfig = configForSv(baseConfig.nodeName);
-  const periodicTopologySnapshotConfig: BackupConfig | undefined = svConfig.periodicSnapshots
-    ?.topology
+  const periodicTopologySnapshotConfig = svConfig.periodicSnapshots?.topology
     ? await topologySnapshotConfig(
         svConfig.periodicSnapshots?.topology,
         `${CLUSTER_BASENAME}/${xns.logicalName}`
@@ -162,20 +164,28 @@ export async function installSvNode(
     prefix: baseConfig.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
   };
 
-  const config = { ...baseConfig, periodicBackupConfig, identitiesBackupLocation };
+  const bulkStorageBucket = svConfig.scanApp?.bulkStorage
+    ? installScanBulkStorage(xns, svConfig.scanApp.bulkStorage)
+    : undefined;
 
-  const identitiesBackupConfigSecret = installBootstrapDataBucketSecret(
+  const config = {
+    ...baseConfig,
+    periodicBackupConfig,
+    identitiesBackupLocation,
+    bulkStorageBucket,
+  };
+
+  const identitiesBackupConfigSecret = installBucketSecret(
     xns,
     config.identitiesBackupLocation.bucket
   );
 
   const topologySnapshotConfigSecret = periodicTopologySnapshotConfig
-    ? installBootstrapDataBucketSecret(xns, periodicTopologySnapshotConfig.location.bucket)
+    ? installBucketSecret(xns, periodicTopologySnapshotConfig.location.bucket)
     : undefined;
-
   const backupConfigSecret: pulumi.Resource | undefined = config.periodicBackupConfig
     ? config.periodicBackupConfig.location.bucket != config.identitiesBackupLocation.bucket
-      ? installBootstrapDataBucketSecret(xns, config.periodicBackupConfig.location.bucket)
+      ? installBucketSecret(xns, config.periodicBackupConfig.location.bucket)
       : identitiesBackupConfigSecret
     : undefined;
 
@@ -235,7 +245,7 @@ export async function installSvNode(
       `cn-apps-pg`,
       `cn-apps-pg`,
       config.version,
-      spliceConfig.pulumiProjectConfig.cloudSql,
+      svConfig.appsPg?.cloudSql ?? spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       {
         logicalDecoding: !!baseConfig.scanBigQuery,
@@ -403,8 +413,12 @@ async function installValidator(
   });
 }
 
-function internalScanUrl(config: SvConfig): pulumi.Output<string> {
-  return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
+function publicScanUrl(config: SvConfig) {
+  return `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`;
+}
+
+function internalScanUrl(config: SvConfig): string {
+  return `http://scan-app.${config.nodeName}:5012`;
 }
 
 function installSvApp(
@@ -458,7 +472,7 @@ function installSvApp(
         skipInitialization: svsConfig?.synchronizer?.skipInitialization,
       },
     scan: {
-      publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+      publicUrl: publicScanUrl(config),
       internalUrl: internalScanUrl(config),
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
@@ -575,6 +589,19 @@ function installScan(
     logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
+    ...(config.bulkStorageBucket
+      ? {
+          bulkStorage: {
+            s3: {
+              region: config.bulkStorageBucket.region,
+              bucketName: config.bulkStorageBucket.bucketName,
+              endpoint: 'https://storage.googleapis.com', // gcs endpoint for s3
+              secretName: config.bulkStorageBucket.secretName,
+            },
+          },
+        }
+      : {}),
+    publicUrl: publicScanUrl(config),
   };
 
   if (svsConfig?.scan?.externalRateLimits) {

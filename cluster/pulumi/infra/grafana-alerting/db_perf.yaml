@@ -1,0 +1,56 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Performance
+      folder: database
+      interval: 1m
+      rules:
+        - uid: cff8qodcdd3i8a
+          title: PG Sequential Scans
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: sum by(datname, namespace, relname, schemaname) (rate(pg_stat_user_tables_seq_tup_read{namespace=~"sv-da-1"}[1m]))
+                instant: true
+                intervalMs: 1000
+                legendFormat: '{{namespace}}/{{schemaname}}.{{relname}}'
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 200000
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params: []
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          keepFiringFor: 5m
+          annotations:
+            summary: Large DB sequential scan detected
+          labels: {}
+          isPaused: false

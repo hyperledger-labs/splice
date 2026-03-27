@@ -11,7 +11,7 @@ import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Pekko source for compressing data and dumping it to S3 objects.
   * The data is compressed into chunks of size >=config.bulkZstdFrameSize. Each chunk is a frame
@@ -36,114 +36,21 @@ class S3ZstdObjects(
 
   private def getFlow(
       getObjectKey: Int => String
-  ): Flow[ByteString, S3ZstdObjects.Output, NotUsed] =
+  ): Flow[ByteString, String, NotUsed] =
     Flow[ByteString]
-      .via(ZstdGroupedWeight(storageConfig.bulkZstdFrameSize))
-      .statefulMap(() =>
-        State(
-          s3Connection.newAppendWriteObject(
-            getObjectKey(0)
-          ),
-          0,
-          0,
+      .via(ZstdGroupedWeight(storageConfig.zstdCompressionLevel, storageConfig.bulkZstdFrameSize))
+      .via(
+        GroupedWeightS3ObjectFlow(
+          s3Connection,
+          getObjectKey,
+          storageConfig.bulkMaxFileSize,
+          appConfig.maxParallelPartUploads,
+          loggerFactory,
         )
-      )(
-        {
-          case (state, chunk)
-              if state.s3ObjSize + chunk.bytes.length > storageConfig.bulkMaxFileSize =>
-            logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${storageConfig.bulkMaxFileSize}, so this is the last chunk for the object"
-            )
-            (
-              State(
-                s3Connection.newAppendWriteObject(
-                  getObjectKey(state.s3ObjIdx + 1)
-                ),
-                state.s3ObjIdx + 1,
-                0,
-              ),
-              ObjectChunk(
-                chunk.bytes,
-                state.obj,
-                true,
-                chunk.isLast,
-                state.obj.prepareUploadNext(),
-              ),
-            )
-          case (state, chunk) =>
-            logger.debug(
-              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${storageConfig.bulkMaxFileSize}"
-            )
-            (
-              State(
-                state.obj,
-                state.s3ObjIdx,
-                state.s3ObjSize + chunk.bytes.length,
-              ),
-              ObjectChunk(
-                chunk.bytes,
-                state.obj,
-                false,
-                chunk.isLast,
-                state.obj.prepareUploadNext(),
-              ),
-            )
-        },
-        onComplete = state => {
-          Some(
-            ObjectChunk(ByteString.empty, state.obj, true, true, -1)
-          )
-        },
       )
-      .mapAsync(appConfig.maxParallelPartUploads) {
-        case chunk: ObjectChunk if chunk.partNumber >= 0 =>
-          logger.debug(
-            s"Uploading a chunk of size ${chunk.bytes.toArrayUnsafe().length} as partNumber ${chunk.partNumber} of ${chunk.obj.key}"
-          )
-          chunk.obj.upload(chunk.partNumber, chunk.bytes.asByteBuffer).map(_ => chunk)
-        case chunk => Future.successful(chunk)
-      }
-      .mapAsync(1) {
-        case chunk: ObjectChunk if chunk.isLastChunkInObject =>
-          logger.debug(
-            s"Finished uploading part ${chunk.partNumber}, which is the last one for the object ${chunk.obj.key}, finishing the upload"
-          )
-          chunk.obj
-            .finish()
-            .map(_ =>
-              Some(
-                S3ZstdObjects
-                  .Output(chunk.obj.key, chunk.isLastObject)
-              )
-            )
-        case chunk => {
-          logger.debug(s"Finished uploading part ${chunk.partNumber} to object ${chunk.obj.key}")
-          Future.successful(None)
-        }
-      }
-      .collect { case Some(out) => out }
-
-  private case class State(
-      obj: s3Connection.AppendWriteObject,
-      s3ObjIdx: Int,
-      s3ObjSize: Int,
-  )
-  private case class ObjectChunk(
-      bytes: ByteString,
-      obj: s3Connection.AppendWriteObject,
-      isLastChunkInObject: Boolean,
-      isLastObject: Boolean,
-      partNumber: Int,
-  )
-
 }
 
 object S3ZstdObjects {
-  case class Output(
-      objectKey: String,
-      isLastObject: Boolean,
-  )
-
   def apply(
       config: ScanStorageConfig,
       appConfig: BulkStorageConfig,
@@ -153,6 +60,6 @@ object S3ZstdObjects {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[ByteString, Output, NotUsed] =
+  ): Flow[ByteString, String, NotUsed] =
     new S3ZstdObjects(config, appConfig, s3Connection, loggerFactory).getFlow(getObjectKey)
 }

@@ -38,8 +38,9 @@ class LocalSequencerConnectionsTrigger(
     store: SvDsoStore,
     sequencerInternalConfig: ClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     migrationId: Long,
-    newSequencerConnectionPool: Boolean,
+    reconnectOnSynchronizerConfigurationChange: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -72,7 +73,7 @@ class LocalSequencerConnectionsTrigger(
       } { publishedSequencerInfo =>
         participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           decentralizedSynchronizerAlias,
-          newSequencerConnectionPool,
+          reconnectOnSynchronizerConfigurationChange,
           setLocalSequencerConnection(
             publishedSequencerInfo,
             sequencerInternalConfig,
@@ -113,8 +114,7 @@ class LocalSequencerConnectionsTrigger(
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
-            // TODO(#2666) Make the delays configurable.
-            sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+            sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
           )
           if (
             ParticipantAdminConnection.dropSequencerId(

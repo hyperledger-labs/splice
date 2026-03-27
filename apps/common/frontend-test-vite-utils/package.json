@@ -14,9 +14,9 @@
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "5.2.2",
     "@types/node": "22.14.0",
-    "eslint": "9.24.0",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "10.1.1",
-    "msw": "^1.2.5",
+    "msw": "^2.12.14",
     "nodemon": "^3.1.9",
     "prettier": "3.5.3",
     "typescript": "5.8.3",
@@ -32,5 +32,11 @@
     "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "start": "nodemon -V -e ts,json -i lib/ -x \"npm run build\""
+  },
+  "dependencies": {
+    "dompurify": "^3.3.3",
+    "jose": "^4.15.9",
+    "jsondiffpatch": "^0.7.3",
+    "zod": "^3.25.76"
   }
 }

@@ -38,8 +38,9 @@ class ReconcileSequencerConnectionsTrigger(
     scanConnection: BftScanConnection,
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
     initialSynchronizerTimeO: Option[CantonTimestamp],
-    newSequencerConnectionPool: Boolean,
+    reconnectOnSynchronizerConfigurationChange: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -105,8 +106,7 @@ class ReconcileSequencerConnectionsTrigger(
                         ),
                         patience,
                       ),
-                      // TODO(#2666) Make the delays configurable.
-                      sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+                      sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
                     )
                 }
                 participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
@@ -114,7 +114,7 @@ class ReconcileSequencerConnectionsTrigger(
                     alias,
                     sequencerConnectionConfig,
                   ),
-                  newSequencerConnectionPool,
+                  reconnectOnSynchronizerConfigurationChange,
                   modifySequencerConnections(sequencerConnectionConfig),
                   RetryFor.Automation,
                 )

@@ -13,3 +13,5 @@ export * from './loopback';
 export * from './approvedIdentities';
 export * from './svApp';
 export * from './validatorApp';
+export * from './bulkStorage';
+export * from './svConfigsBasic';

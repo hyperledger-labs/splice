@@ -14,7 +14,7 @@ import {
   isDevNet,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { svConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { svConfigsBasic } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigsBasic';
 
 import { gcpDnsProject } from './config';
 
@@ -189,7 +189,7 @@ function clusterCertificate(
         `*.validator1.${dnsName}`,
         `*.splitwell.${dnsName}`,
         `*.sv.${dnsName}`,
-      ].concat(svConfigs.map(sv => `*.${sv.ingressName}.${dnsName}`))
+      ].concat(svConfigsBasic.map(sv => `*.${sv.ingressName}.${dnsName}`))
     )
     .flat();
 

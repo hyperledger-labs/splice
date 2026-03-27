@@ -18,18 +18,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait PackageVersionSupport extends NamedLogging {
 
-  def supportBootstrapWithNonZeroRound(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_17,
-    )
-  }
-
   def supportsMergeDuplicatedValidatorLicense(
       dsoGovernanceParties: Seq[PartyId],
       amuletParties: Seq[PartyId],
@@ -81,33 +69,6 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
-  // TODO(#2257): remove this flag once the holding fees change has been rolled out to MainNet
-  def noHoldingFeesOnTransfers(dsoParty: PartyId, now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      Seq(dsoParty),
-      PackageIdResolver.Package.SpliceAmulet,
-      now,
-      DarResources.amulet,
-      // This is when the AmuletRules transfer choice was changed to not charge holding fees
-      DarResources.amulet_0_1_14,
-    )
-  }
-
-  def supportsExpectedDsoParty(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceAmulet,
-      now,
-      DarResources.amulet,
-      // this is when the expectedDsoParty was added to all choices granted to users on AmuletRules and ExternalAmuletRules
-      DarResources.amulet_0_1_11,
-    )
-  }
-
   def supportDevelopmentFund(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
@@ -131,6 +92,36 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.amulet,
       DarResources.amulet_0_1_16,
     )
+
+  def supports24hSubmissionDelay(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      DarResources.amulet,
+      DarResources.amulet_0_1_17,
+    )
+  }
+
+  // Synonym for supports24hSubmissionDelay as both features were introduced in amulet_0_1_17
+
+  def supportsExpireTransferInstructions(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = supports24hSubmissionDelay(parties, now)
+
+  def supports24hSubmissionDelayDsoGovernance(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance,
+      DarResources.dsoGovernance_0_1_23,
+    )
+  }
 
   private def isDarSupported(
       parties: Seq[PartyId],

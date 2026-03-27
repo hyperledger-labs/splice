@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.*
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
   HttpClientConfig,
@@ -14,6 +15,9 @@ import org.lfdecentralizedtrust.splice.config.{
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
+import org.lfdecentralizedtrust.splice.store.Limit
+
+import java.time.Instant
 
 trait BaseScanAppConfig {}
 
@@ -53,6 +57,8 @@ case class ScanAppBackendConfig(
     mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
+    enableAppActivityRecordAndTrafficIngestion: Boolean = false,
+    serveAppActivityRecordsAndTraffic: Boolean = false,
     isFirstSv: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     enableForcedAcsSnapshots: Boolean = false,
@@ -63,6 +69,7 @@ case class ScanAppBackendConfig(
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
     updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
+    updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
@@ -70,12 +77,22 @@ case class ScanAppBackendConfig(
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
     bulkStorage: BulkStorageConfig = BulkStorageConfig(),
+    publicUrl: Option[Uri] = None,
+    // The thresholdDate from which external transaction hashes are included in the updates from internal ScanAPIs.
+    // TODO(#4249): use on-ledger synchronization for switching record times
+    externalTransactionHashThresholdTime: Option[Instant] =
+      ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
+}
+
+object ScanAppBackendConfig {
+  val DefaultExternalTransactionHashThresholdTime: Option[Instant] =
+    Some(java.time.Instant.parse("2030-01-01T00:00:00Z"))
 }
 
 final case class ScanCacheConfig(

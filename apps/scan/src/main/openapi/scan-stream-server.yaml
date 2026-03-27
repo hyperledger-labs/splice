@@ -1,0 +1,53 @@
+openapi: 3.0.0
+info:
+  title: Scan Streaming API
+  version: 0.0.1
+tags:
+  - name: external
+    description: |
+      These endpoints are intended for public usage and will remain backward-compatible.
+  - name: internal
+    description: |
+      For internal usage only, not guaranteed to be stable or backward-compatible.
+  - name: deprecated
+    description: |
+      These endpoints are deprecated and will be removed in a future release.
+  - name: scan
+    description: |
+      The internal and external endpoints.
+  - name: pre-alpha
+    description: |
+      Still under active development, highly unstable. Do not use in production.
+servers:
+  - url: https://example.com/api/scan
+paths:
+
+  # Note for developers working on this openAPI spec: we generate only server-side code from this file,
+  # not client-side. Client-side code in `ScanStreamClient` must be modified manually to reflect any changes in this spec.
+
+  # TODO(#3429): include in autogen'ed docs
+
+  /v0/history/bulk/download/{object_key}:
+    get:
+      tags: [pre-alpha, scan]
+      x-jvm-package: scanStream
+      operationId: "bulkStorageDownload"
+      description: Download a bulk storage object
+      parameters:
+        - name: "object_key"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+              application/octet-stream:
+                schema:
+                  type: string
+                  format: binary
+                  x-scala-type: org.apache.pekko.http.scaladsl.model.ResponseEntity
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+

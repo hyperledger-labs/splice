@@ -8,7 +8,7 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
-import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageVettingLookupService}
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
@@ -55,7 +55,10 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.sequencing.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
@@ -546,6 +549,8 @@ object SpliceConfig {
     implicit val SubmissionRequestAmplificationReader
         : ConfigReader[SubmissionRequestAmplification] =
       deriveReader[SubmissionRequestAmplification]
+    implicit val sequencerConnectionPoolDelaysReader: ConfigReader[SequencerConnectionPoolDelays] =
+      deriveReader[SequencerConnectionPoolDelays]
     implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] = {
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
@@ -597,6 +602,8 @@ object SpliceConfig {
       deriveReader[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigReader[RangeConfig] =
       deriveReader[RangeConfig]
+    implicit val packageVettingCacheConfig: ConfigReader[PackageVettingLookupService.CacheConfig] =
+      deriveReader[PackageVettingLookupService.CacheConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -997,6 +1004,8 @@ object SpliceConfig {
     implicit val submissionRequestAmplificationWriter
         : ConfigWriter[SubmissionRequestAmplification] =
       deriveWriter[SubmissionRequestAmplification]
+    implicit val sequencerConnectionPoolDelaysWriter: ConfigWriter[SequencerConnectionPoolDelays] =
+      deriveWriter[SequencerConnectionPoolDelays]
     implicit val sequencerPruningConfig: ConfigWriter[SequencerPruningConfig] =
       deriveWriter[SequencerPruningConfig]
     implicit val svMediatorConfig: ConfigWriter[SvMediatorConfig] =
@@ -1034,6 +1043,8 @@ object SpliceConfig {
       deriveWriter[AmuletConversionRateFeedConfig]
     implicit val rangeConfig: ConfigWriter[RangeConfig] =
       deriveWriter[RangeConfig]
+    implicit val packageVettingCacheConfig: ConfigWriter[PackageVettingLookupService.CacheConfig] =
+      deriveWriter[PackageVettingLookupService.CacheConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

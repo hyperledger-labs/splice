@@ -64,7 +64,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -443,7 +443,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -534,7 +534,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -565,8 +565,8 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "pvc": {
-          "name": "party-allocator-keys",
-          "volumeStorageClass": "standard-rwo"
+          "name": "party-allocator-keys-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "tolerations": [
           {
@@ -625,7 +625,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -643,7 +643,9 @@
           "name": "cn-mocknet"
         },
         "db": {
-          "volumeSize": "50Gi"
+          "pvcTemplateName": "pg-data-hd",
+          "volumeSize": "200Gi",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -710,7 +712,7 @@
                     },
                     {
                       "key": "cn_apps",
-                      "operator": "NotIn",
+                      "operator": "In",
                       "values": [
                         "hyperdisk"
                       ]
@@ -764,8 +766,8 @@
           "secretName": "postgres-secrets"
         },
         "pvc": {
-          "volumeName": "domain-migration-validator-pvc",
-          "volumeStorageClass": "standard-rwo"
+          "volumeName": "domain-migration-validator-hd-pvc",
+          "volumeStorageClass": "hyperdisk-standard-rwo"
         },
         "scanClient": {
           "scanType": "bft-custom",

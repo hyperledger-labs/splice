@@ -452,6 +452,69 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       }
     }
 
+    "listExpiredAmuletTransferInstructions" should {
+
+      "return expired instructions and respect ignored parties" in {
+        val now = Instant.parse("2025-01-01T12:00:00.000000Z")
+        val past = now.minusSeconds(3600)
+        val future = now.plusSeconds(3600)
+        val amount = new java.math.BigDecimal("10.0").setScale(10)
+
+        val expiredCid = amuletTransferInstruction(
+          sender = userParty(1),
+          receiver = userParty(3),
+          amount = amount,
+          requestedAt = past.minusSeconds(60),
+          expiresAt = past,
+        )
+
+        val activeCid = amuletTransferInstruction(
+          sender = userParty(1),
+          receiver = userParty(2),
+          amount = amount,
+          requestedAt = now,
+          expiresAt = future,
+        )
+
+        val ignoredCid = amuletTransferInstruction(
+          sender = userParty(2),
+          receiver = userParty(1),
+          amount = amount,
+          requestedAt = past.minusSeconds(60),
+          expiresAt = past,
+        )
+
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(Seq(expiredCid, activeCid, ignoredCid))(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+
+          resultAll <- store.listExpiredAmuletTransferInstructions(Set.empty)(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100),
+          )(traceContext)
+
+          resultFiltered <- store.listExpiredAmuletTransferInstructions(Set(userParty(2)))(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100),
+          )(traceContext)
+
+        } yield {
+          val allContracts = resultAll.map(_.contract)
+          allContracts should contain(expiredCid)
+          allContracts should contain(ignoredCid)
+          allContracts should not contain activeCid
+
+          val filteredContracts = resultFiltered.map(_.contract)
+          filteredContracts should contain(expiredCid)
+          filteredContracts should not contain ignoredCid
+          filteredContracts should not contain activeCid
+        }
+      }
+    }
+
     "listConfirmations" should {
 
       "list all confirmations with a matching action" in {
@@ -636,15 +699,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet ++ provider1OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider2OutOfRound.map(_.contractId).toSet ++ provider1OutOfRound
               .map(_.contractId)
               .toSet
           }
@@ -682,15 +747,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet ++ provider2OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe provider1OutOfRound.map(_.contractId).toSet ++ provider2OutOfRound
               .map(_.contractId)
               .toSet
           }
@@ -730,15 +797,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
               .map(_.contractId)
               .toSet
           }
@@ -781,15 +850,17 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )
         } yield {
           result should have size 2
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 2
-            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
               .map(_.contractId)
               .toSet
           }
-          forExactly(1, result) { case RoundBatch(round, cids) =>
+          forExactly(1, result) { case RoundBatch(round, cs) =>
             round shouldBe 3
-            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
+            cs.map(_.contractId)
+              .toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
               .map(_.contractId)
               .toSet
           }
@@ -979,9 +1050,8 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           ignoredExpiredRewardsPartyIds = Set.empty,
         )
       } yield {
-        result should have size 1
-        result.head.closedRoundNumber shouldBe 2
-        result.head.validatorCoupons should have size 3
+        result.loneElement.closedRoundNumber shouldBe 2
+        result.loneElement.validatorCoupons should have size 3
       }
     }
 
@@ -1885,6 +1955,11 @@ class DbSvDsoStoreTest
           appActivityMarker(
             provider = providerParty(n)
           )
+        ) ++ (1 to 3).map(n =>
+          appActivityMarker(
+            provider = providerParty(n),
+            beneficiary = Some(providerParty(1)),
+          )
         )
       val thresholds = Seq.range(0, 5)
       for {
@@ -1892,15 +1967,41 @@ class DbSvDsoStoreTest
         _ <- MonadUtil.sequentialTraverse(markers)(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
-        actualMarkers <- store.listFeaturedAppActivityMarkers(1000)
         results <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
           store
-            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold)
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold, Set.empty)
+            .map(result => (threshold, result))
+        )
+        resultsNoProvider1 <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold, Set(providerParty(1)))
+            .map(result => (threshold, result))
+        )
+        resultsNoProvider2 <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold, Set(providerParty(2)))
+            .map(result => (threshold, result))
+        )
+        resultsNoProvider1And2 <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(
+              threshold,
+              Set(providerParty(1), providerParty(2)),
+            )
             .map(result => (threshold, result))
         )
       } yield {
         forAll(results) { case (threshold, result) =>
-          result shouldBe (threshold <= actualMarkers.size)
+          result shouldBe (threshold <= markers.size)
+        }
+        forAll(resultsNoProvider1) { case (threshold, result) =>
+          result shouldBe (threshold <= 2)
+        }
+        forAll(resultsNoProvider2) { case (threshold, result) =>
+          result shouldBe (threshold <= 5)
+        }
+        forAll(resultsNoProvider1And2) { case (threshold, result) =>
+          result shouldBe (threshold <= 1)
         }
       }
     }
@@ -1913,7 +2014,13 @@ class DbSvDsoStoreTest
         appActivityMarker(
           provider = providerParty(n)
         )
-      )
+      ) ++
+        (1 to 10).map(n =>
+          appActivityMarker(
+            provider = providerParty(n),
+            beneficiary = Some(providerParty(1)),
+          )
+        )
 
     "fetch all contracts with complete bounds" in {
       for {
@@ -1925,14 +2032,16 @@ class DbSvDsoStoreTest
           .listFeaturedAppActivityMarkersByContractIdHash(
             Int.MinValue,
             0,
-            10,
+            20,
+            Set.empty,
           )
           .map(_.map(_.contractId))
         results2 <- store
           .listFeaturedAppActivityMarkersByContractIdHash(
             1,
             Int.MaxValue,
-            10,
+            20,
+            Set.empty,
           )
           .map(_.map(_.contractId))
       } yield {
@@ -1941,6 +2050,54 @@ class DbSvDsoStoreTest
         val set2: Set[ContractId[?]] = results2.toSet
         set1.union(set2) shouldBe markers.map(_.contractId).toSet
         set1.intersect(set2) shouldBe empty
+      }
+    }
+
+    "fetch all contracts for non-ignored parties" in {
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(markers)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        resultsNoProvider1 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            Int.MaxValue,
+            20,
+            Set(providerParty(1)),
+          )
+          .map(_.map(_.contractId))
+        resultsNoProvider2 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            Int.MaxValue,
+            20,
+            Set(providerParty(2)),
+          )
+          .map(_.map(_.contractId))
+        resultsNoProvider1And2 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            Int.MaxValue,
+            20,
+            Set(providerParty(1), providerParty(2)),
+          )
+          .map(_.map(_.contractId))
+      } yield {
+        def filteredMarkers(parties: Set[PartyId]) =
+          markers.filter(m =>
+            !parties.contains(PartyId.tryFromProtoPrimitive(m.payload.provider)) && !parties
+              .contains(PartyId.tryFromProtoPrimitive(m.payload.beneficiary))
+          )
+        resultsNoProvider1.toSet shouldBe filteredMarkers(Set(providerParty(1)))
+          .map(_.contractId)
+          .toSet
+        resultsNoProvider2.toSet shouldBe filteredMarkers(Set(providerParty(2)))
+          .map(_.contractId)
+          .toSet
+        resultsNoProvider1And2.toSet shouldBe filteredMarkers(
+          Set(providerParty(1), providerParty(2))
+        ).map(_.contractId).toSet
       }
     }
 
@@ -1954,6 +2111,7 @@ class DbSvDsoStoreTest
           Int.MinValue,
           Int.MaxValue,
           2,
+          Set.empty,
         )
       } yield {
         limitedResults should have(size(2))

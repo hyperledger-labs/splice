@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
@@ -22,7 +22,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -91,7 +90,16 @@ class DomainConnector(
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
-            .single(GrpcSequencerConnection.tryCreate(url))
+            .tryMany(
+              connections = Seq(GrpcSequencerConnection.tryCreate(url)),
+              sequencerTrustThreshold = PositiveInt.one,
+              sequencerLivenessMargin = NonNegativeInt.zero,
+              submissionRequestAmplification = SubmissionRequestAmplification(
+                PositiveInt.one,
+                config.sequencerRequestAmplificationPatience,
+              ),
+              sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays,
+            )
         ).pure[Future]
     }
   }
@@ -120,7 +128,8 @@ class DomainConnector(
     participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
       overwriteExistingConnection = true,
-      newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
+      reconnectOnSynchronizerConfigurationChange =
+        config.parameters.enabledFeatures.reconnectOnSynchronizerConfigurationChange,
       retryFor = RetryFor.WaitingOnInitDependency,
     )
   }
@@ -133,7 +142,7 @@ class DomainConnector(
       // The only case where this can happen is during a domain migration and even then
       // it is fairly unlikely outside of tests for validators to come up fast enough that
       // scan has not yet updated.
-      RetryFor.ClientCalls,
+      RetryFor.WaitingOnInitDependency, // because the scan connections might still be in bootstrap phase
       "scan_sequencer_connections",
       "non-empty sequencer connections from scan",
       getSequencerConnectionsFromScan(Right(clock))
@@ -182,8 +191,7 @@ class DomainConnector(
                     ),
                     sequencerLivenessMargin =
                       Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
-                    // TODO(#2666) Make the delays configurable.
-                    sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+                    sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays,
                   )
               }
             }.toMap
@@ -244,11 +252,11 @@ class DomainConnector(
     // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
     val validConnections = sequencers
       .collect {
-        case DsoSequencer(sequencerMigrationId, _, url, svName, availableAfter)
+        case DsoSequencer(sequencerMigrationId, id, url, _, availableAfter)
             if migrationId == sequencerMigrationId && url.nonEmpty && !domainTime.toInstant
               .isBefore(availableAfter) =>
           for {
-            sequencerAlias <- SequencerAlias.create(svName)
+            sequencerAlias <- SequencerAlias.create(id.toProtoPrimitive)
             grpcSequencerConnection <- GrpcSequencerConnection.create(
               url,
               None,

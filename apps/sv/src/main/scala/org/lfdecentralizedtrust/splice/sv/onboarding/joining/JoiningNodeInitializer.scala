@@ -15,11 +15,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnectionPoolDelays,
-  SequencerConnections,
-}
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
@@ -37,7 +33,10 @@ import org.lfdecentralizedtrust.splice.config.{
   UpgradesConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
+  TopologySnapshot,
+  TopologyTransactionType,
+}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -151,8 +150,7 @@ class JoiningNodeInitializer(
           // We only have a single connection here.
           sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification,
-          // TODO(#2666) Make the delays configurable.
-          sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+          sequencerConnectionPoolDelays = config.participantClient.sequencerConnectionPoolDelays,
         ),
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
         // This is changed to false after SV onboarding completes.
@@ -263,6 +261,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 upgradesConfig,
                 packageVersionSupport,
+                decentralizedSynchronizerId,
                 config.parameters.enabledFeatures,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -299,6 +298,7 @@ class JoiningNodeInitializer(
                 svConnection,
                 joiningConfig,
                 packageVersionSupport,
+                decentralizedSynchronizerId,
               )
           } yield dsoAutomation
         }
@@ -308,8 +308,6 @@ class JoiningNodeInitializer(
       _ <- establishInitialRound(
         connection,
         upgradesConfig,
-        packageVersionSupport,
-        svParty,
       )
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
@@ -558,8 +556,13 @@ class JoiningNodeInitializer(
       "submission_rights",
       description,
       for {
+        // We do actually want to be able to submit after this so wait until the effective time.
         dsoPartyHosting <- participantAdminConnection
-          .getPartyToParticipant(synchronizerId, dsoParty)
+          .getPartyToParticipant(
+            synchronizerId,
+            dsoParty,
+            topologySnapshot = TopologySnapshot.Effective,
+          )
       } yield {
         dsoPartyHosting.mapping.participants.find(_.participantId == participantId) match {
           case None =>
@@ -814,6 +817,7 @@ class JoiningNodeInitializer(
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
         packageVersionSupport: PackageVersionSupport,
+        synchronizerId: SynchronizerId,
     ): Future[SvDsoAutomationService] = {
       joiningConfig match {
         case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) =>
@@ -854,6 +858,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNode,
                   upgradesConfig,
                   packageVersionSupport,
+                  synchronizerId,
                   config.parameters.enabledFeatures,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
@@ -907,6 +912,7 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
           config.latestPackagesOnly,
+          config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
         )
         _ <- vetting.vetCurrentPackages(
           synchronizerId,

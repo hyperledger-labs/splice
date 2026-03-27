@@ -239,7 +239,7 @@ export class Auth0Manager {
     };
 
     const response = this.httpClient.get
-      .success(`${this.auth0Tenant}/api/v2/users?${query}`, undefined, { headers })
+      .success(`${this.auth0Tenant}/api/v2/users?${query}`, null, { headers })
       .then(resp => jsonStringDecoder(listUsersResponse, resp.body));
 
     return !!response?.find(u => u.email === email);

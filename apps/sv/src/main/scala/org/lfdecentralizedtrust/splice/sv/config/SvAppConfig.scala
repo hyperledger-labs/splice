@@ -11,7 +11,10 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.sequencing.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
@@ -33,7 +36,11 @@ import org.lfdecentralizedtrust.splice.config.{
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
+import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
+  DarResources,
+  PackageVettingLookupService,
+}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
@@ -89,10 +96,9 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = SpliceUtil.defaultInitialTickDuration,
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
-      initialMaxNumInputs: Int = 100,
+      initialMaxNumInputs: Long = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      zeroTransferFees: Boolean = true,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
@@ -104,6 +110,8 @@ object SvOnboardingConfig {
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
+      optValidatorFaucetCap: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -268,6 +276,8 @@ final case class SvParticipantClientConfig(
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 case class SvAppBackendConfig(
@@ -342,6 +352,7 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    delegatelessAutomationExpiredAmuletTransferInstructionBatchSize: Int = 100,
     // configuration to periodically take topology snapshots
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
@@ -374,6 +385,8 @@ case class SvAppBackendConfig(
     convertFeaturedAppActivityMarkerObservers: Boolean = true,
     // Whether to ensure that heuristic free confirmation responses get enabled on the synchronizer via the ReconcileDynamicSynchronizerConfigTrigger.
     enableFreeConfirmationResponses: Boolean = true,
+    packageVettingCache: PackageVettingLookupService.CacheConfig =
+      PackageVettingLookupService.CacheConfig(),
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =
@@ -466,6 +479,8 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
+      SequencerConnectionPoolDelays.default,
     pruning: Option[PruningConfig] = Some(
       PruningConfig(
         cron = "0 /10 * * * ?", // Run every 10min,

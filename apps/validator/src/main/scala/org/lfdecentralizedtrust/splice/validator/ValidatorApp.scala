@@ -55,10 +55,8 @@ import org.lfdecentralizedtrust.splice.migration.{
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
-  MinimalScanConnection,
   SingleScanConnection,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
@@ -141,8 +139,6 @@ class ValidatorApp(
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
-    // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
-    _ <- ensureVersionMatch(config.scanClient)
     _ <- withParticipantAdminConnection { participantAdminConnection =>
       readRestoreDump match {
         case Some(migrationDump) =>
@@ -261,7 +257,7 @@ class ValidatorApp(
                       participantAdminConnection,
                       config.timeTrackerMinObservationDuration,
                       config.timeTrackerObservationLatency,
-                      config.parameters.enabledFeatures.newSequencerConnectionPool,
+                      config.parameters.enabledFeatures.reconnectOnSynchronizerConfigurationChange,
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
@@ -310,7 +306,13 @@ class ValidatorApp(
             // before the automation kicks in.
             _ <- appInitStep("Vet packages") {
               for {
-                amuletRules <- scanConnection.getAmuletRules()
+                amuletRules <- retryProvider.retry(
+                  RetryFor.WaitingOnInitDependency,
+                  "get_amulet_rules_init",
+                  "retrieving AmuletRules from scan",
+                  scanConnection.getAmuletRules(),
+                  logger,
+                )
                 globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
                   traceContext
                 )
@@ -329,6 +331,7 @@ class ValidatorApp(
                   participantAdminConnection,
                   loggerFactory,
                   config.latestPackagesOnly,
+                  config.parameters.enabledFeatures.enableUnsupportedDarsUnvetting,
                 )
                 _ <-
                   MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
@@ -477,6 +480,7 @@ class ValidatorApp(
       logger: TracedLogger,
       retryProvider: RetryProvider,
   )(implicit traceContext: TraceContext): Future[ByteString] =
+    // TODO (hyperledger-labs/splice#4026) use the standard BftScanConnection instead of creating a new SingleScanConnection.
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "get_acs_snapshot_from_single_scan",
@@ -590,51 +594,6 @@ class ValidatorApp(
       logger,
     )
   }
-
-  private def ensureVersionMatch(scanClientConfig: BftScanClientConfig)(implicit
-      traceContext: TraceContext
-  ): Future[Unit] =
-    retryProvider.waitUntil(
-      RetryFor.WaitingOnInitDependency,
-      "version_check",
-      "version checked via scan",
-      // we checkVersionCompatibility on every Splice app connection
-      scanClientConfig match {
-        case BftScanClientConfig.TrustSingle(url, _) =>
-          val config = ScanAppClientConfig(NetworkAppClientConfig(url))
-          MinimalScanConnection(
-            config,
-            amuletAppParameters.upgradesConfig,
-            retryProvider,
-            loggerFactory,
-          ).flatMap(con => con.checkActive().andThen(_ => con.close()))
-        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _, _) =>
-          seedUrls
-            .traverse { url =>
-              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
-              MinimalScanConnection(
-                config,
-                amuletAppParameters.upgradesConfig,
-                retryProvider,
-                loggerFactory,
-              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
-            }
-            .map(_ => ())
-        case BftScanClientConfig.Bft(seedUrls, _, _, _) =>
-          seedUrls
-            .traverse { url =>
-              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
-              MinimalScanConnection(
-                config,
-                amuletAppParameters.upgradesConfig,
-                retryProvider,
-                loggerFactory,
-              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
-            }
-            .map(_ => ())
-      },
-      logger,
-    )
 
   private def withSvConnection[T](
       svConfig: NetworkAppClientConfig
@@ -937,6 +896,7 @@ class ValidatorApp(
         retryProvider,
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
+        config.sequencerConnectionPoolDelays,
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,
