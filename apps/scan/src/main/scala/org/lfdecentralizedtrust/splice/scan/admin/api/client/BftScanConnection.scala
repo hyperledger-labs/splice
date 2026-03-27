@@ -83,9 +83,7 @@ import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
@@ -752,7 +750,7 @@ object BftScanConnection {
     */
   private def keyToGroupResponses[T](
       r1: Try[T]
-  )(implicit ec: ExecutionContext, mat: Materializer): Future[BftScanConnection.ScanResponse[T]] = {
+  ): Future[BftScanConnection.ScanResponse[T]] = {
     r1 match {
       case Success(value) => Future.successful(BftScanConnection.SuccessfulResponse(value))
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpNonJsonResponse) =>
