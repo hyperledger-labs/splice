@@ -16,9 +16,7 @@ const transfersFailed = new Counter('transfers_failed');
 
 export function doIfOnboarded(validatorClient: ValidatorClient, action: () => void): void {
   const userStatus = validatorClient.v0.wallet.userStatus();
-  if (userStatus === undefined) {
-    validatorClient.v0.register();
-  } else if (userStatus.user_onboarded && userStatus.user_wallet_installed) {
+  if (userStatus?.user_onboarded && userStatus?.user_wallet_installed) {
     if (!userStatus.has_featured_app_right && validatorClient.featured === true) {
       validatorClient.v0.wallet.selfGrantFeatureAppRight();
     } else if (userStatus.has_featured_app_right && validatorClient.featured === false) {
@@ -26,6 +24,8 @@ export function doIfOnboarded(validatorClient: ValidatorClient, action: () => vo
     } else {
       action();
     }
+  } else {
+    validatorClient.v0.register();
   }
 }
 
