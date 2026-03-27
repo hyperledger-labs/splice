@@ -226,7 +226,7 @@ class BftScanConnectionTest
   }
   val notFoundFailure = new BaseAppConnection.UnexpectedHttpJsonResponse(
     StatusCodes.NotFound,
-    HttpEntity(ContentTypes.`application/json`, """{"error":"not_found"}"""),
+    io.circe.Json.obj("error" -> io.circe.Json.fromString("not found")),
   )
   val notFoundCommandFailure = HttpCommandException(
     HttpRequest(),
