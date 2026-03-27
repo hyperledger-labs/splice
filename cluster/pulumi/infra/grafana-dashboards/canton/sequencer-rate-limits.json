@@ -1264,7 +1264,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "",
   "title": "Sequencer Rate Limits",
   "uid": "eb26bc60-6c26-408a-b0de-befc19f6915c",
   "version": 2,
