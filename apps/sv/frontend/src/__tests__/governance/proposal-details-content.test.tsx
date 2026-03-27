@@ -385,9 +385,7 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Revoke Validator License/);
 
-    const revokeSection = screen.getByTestId(
-      'proposal-details-revoke-validator-license-section'
-    );
+    const revokeSection = screen.getByTestId('proposal-details-revoke-validator-license-section');
     expect(revokeSection).toBeInTheDocument();
 
     const licenseLabel = screen.getByTestId('proposal-details-validator-license-label');
