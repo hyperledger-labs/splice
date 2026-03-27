@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
-import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -48,13 +47,12 @@ abstract class PackageVettingTrigger(
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
       dsoRules <- getDsoRules()
-      additionalPackageIdsToUnvet = resolvePackageIdsToUnvet(additionalPackagesToUnvet)
       _ <- runIfInputChanged(
         Seq(
           domainId.toString,
           amuletRules.contractId.toString,
           dsoRules.contractId.toString,
-        ) ++ voteRequests.map(_.toString) ++ additionalPackageIdsToUnvet
+        ) ++ voteRequests.map(_.toString) ++ additionalPackagesToUnvet.map(_.toString())
       )(
         vetting.vetPackages(
           domainId,
@@ -74,7 +72,9 @@ abstract class PackageVettingTrigger(
       vettedPackageIds = vettedPackages.flatMap(_.mapping.packages).map(_.packageId)
       unsupportedPackages = DarResourcesUtil.filterUnsupportedPackageVersions(
         vettedPackageIds,
-        additionalPackageIdsToUnvet,
+        enableUnsupportedDarsUnvetting,
+        latestPackagesOnly,
+        additionalPackagesToUnvet,
       )
       isUnvettingEnable =
         unsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
@@ -102,26 +102,4 @@ abstract class PackageVettingTrigger(
       Future.unit
     }
   }
-
-  private def resolvePackageIdsToUnvet(
-      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]]
-  )(implicit
-      tc: TraceContext
-  ): Seq[LfPackageId] =
-    additionalPackagesToUnvet.toSeq.flatMap { case (packageName, versions) =>
-      versions.toSeq.flatMap { version =>
-        DarResourcesUtil.lookupPackageMetadata(
-          packageName,
-          version,
-        ) match {
-          case None =>
-            logger.warn(
-              s"Package $packageName version $version requested for unvetting is not found on this node."
-            )
-            None
-          case Some(resource) =>
-            Some(LfPackageId.assertFromString(resource.packageId))
-        }
-      }
-    }
 }

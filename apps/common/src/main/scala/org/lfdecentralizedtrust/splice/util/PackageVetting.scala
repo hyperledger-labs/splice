@@ -233,7 +233,7 @@ class PackageVetting(
       amuletConfigSchedule: AmuletConfigSchedule,
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
       additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
-  ) = {
+  )(implicit tc: TraceContext) = {
     (futureAmuletConfigFromVoteRequests.collect { case (Some(effectiveAt), config) =>
       (effectiveAt, config)
     } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
