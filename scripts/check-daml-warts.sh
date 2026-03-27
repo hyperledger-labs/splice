@@ -15,7 +15,7 @@ set -euo pipefail
 ignored_files=(
   'daml/splice-util/daml/Splice/Util.daml'
   'token-standard/examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml'
-  'token-standard/splice-token-standard-test-v2/daml/Splice/Testing/Apps/TradingAppV2.daml'
+  'token-standard/examples/splice-token-test-trading-app-v2/daml/Splice/Testing/Apps/TradingAppV2.daml'
   'token-standard/splice-token-standard-utils/daml/Splice/TokenStandard/Utils/Internal/Allocations.daml'
   'token-standard/splice-token-standard-utils/daml/Splice/TokenStandard/Utils/Internal/Choices.daml'
   'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/DelegateProxy.daml'

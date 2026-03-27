@@ -7,8 +7,6 @@
 -- Used as part of the testing infrastructure to test the V2 token standard DvP workflows.
 module Splice.Testing.Apps.TradingAppV2 where
 
--- TODO(#4619): move trading app into its own package to enable its use in integration tests
-
 import DA.Foldable (forA_)
 import DA.Optional (catOptionals)
 import DA.Map qualified as Map
