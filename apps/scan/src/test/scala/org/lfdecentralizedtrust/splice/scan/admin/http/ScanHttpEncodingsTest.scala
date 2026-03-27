@@ -42,6 +42,10 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
       val receiver = mkPartyId("receiver")
       val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
+      val extTxnHashHexString = "4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"
+      val externalTxnHash =
+        HexString.parseToByteString(extTxnHashHexString).getOrElse(ByteString.EMPTY)
+
       val javaTree = mkExerciseTx(
         offset = 99,
         root = exercisedEvent(
@@ -65,6 +69,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         ),
         Seq(toCreatedEvent(amuletContract, Seq(receiver))),
         dummyDomain,
+        externalTransactionHash = externalTxnHash,
       )
 
       val original = TreeUpdateWithMigrationId(
@@ -85,7 +90,6 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
         case _ => fail("Expected UpdateHistoryTransaction")
       }
       val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
-
       decoded shouldBe original
     }
   }
@@ -288,11 +292,13 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           rightChildId1 -> mkCreate(rightChildId1),
           rightChildId2 -> mkCreate(rightChildId2),
         ),
+        externalTransactionHash =
+          Some("4d68f590e4a298d9617ebe07b98c6ecbe04b7f3d7a5327f0e0ad4719638302b7"),
       )
     )
 
     val withoutLocalData = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original, None)
+      .makeConsistentAcrossSvs(original, ExternalHashInclusionPolicy.AlwaysInclude, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -338,7 +344,7 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
 
     // makeConsistentAcrossSvs() should be idempotent
     val withoutLocalData2 = ScanHttpEncodings
-      .makeConsistentAcrossSvs(original, None)
+      .makeConsistentAcrossSvs(original, ExternalHashInclusionPolicy.AlwaysInclude, None)
       .update
       .update
       .asInstanceOf[TransactionTreeUpdate]
@@ -671,6 +677,22 @@ class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Match
           mkTree,
           DamlValueEncoding.ProtobufJson,
           ScanHttpEncodings.V1,
+          hashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+          externalTransactionHashThresholdTime = Some(thresholdDate),
+        )
+      ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+        value.externalTransactionHash shouldBe Some(extTxnHashHexString)
+      }
+    }
+
+    "return the hash when policy is AlwaysInclude irrespective of record time" in {
+      val thresholdDate = Instant.parse("2100-06-30T00:00:01Z")
+      inside(
+        ScanHttpEncodings.encodeUpdate(
+          mkTree,
+          DamlValueEncoding.ProtobufJson,
+          ScanHttpEncodings.V1,
+          hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
           externalTransactionHashThresholdTime = Some(thresholdDate),
         )
       ) { case httpApi.UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>

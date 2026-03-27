@@ -25,6 +25,7 @@ case class ScanStorageConfig(
     bulkDbReadChunkSize: Int, // Chunk size to read from the DB for copying to bulk storage
     bulkZstdFrameSize: Long, // Size of each zstd frame. In prod, must be >= 5 MB as each frame is written as a part in multi-part upload, which are enforced by most s3 implementations to be >= 5MB each
     bulkMaxFileSize: Long, // Max file size (estimated, may end up being slightly bigger) for bulk storage objects
+    zstdCompressionLevel: Int,
 ) {
   require(
     dbAcsSnapshotPeriodHours > 0 && 24 % dbAcsSnapshotPeriodHours == 0,
@@ -133,5 +134,6 @@ object ScanStorageConfigs {
     bulkDbReadChunkSize = 1000,
     bulkZstdFrameSize = 12L * 1024 * 1024,
     bulkMaxFileSize = 128L * 1024 * 1024,
+    zstdCompressionLevel = 3,
   )
 }

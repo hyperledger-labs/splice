@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
   TxLogBackfillingTrigger,
+  UpdateIngestionService,
 }
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
@@ -19,7 +20,12 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
   UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanRewardsReferenceStore,
+  ScanStore,
+}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -72,6 +78,21 @@ class ScanAutomationService(
   )
 
   registerUpdateHistoryIngestion(updateHistory)
+
+  def registerRewardsReferenceStoreIngestion(
+      rewardsReferenceStore: ScanRewardsReferenceStore
+  ): Unit =
+    registerService(
+      new UpdateIngestionService(
+        rewardsReferenceStore.getClass.getSimpleName,
+        rewardsReferenceStore.multiDomainAcsStore.ingestionSink,
+        connection(SpliceLedgerConnectionPriority.High),
+        config.automation,
+        backoffClock = triggerContext.pollingClock,
+        triggerContext.retryProvider,
+        triggerContext.loggerFactory,
+      )
+    )
 
   if (config.updateHistoryBackfillEnabled) {
     registerTrigger(

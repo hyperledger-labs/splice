@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatusReport
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppConfigs_
 import org.lfdecentralizedtrust.splice.console.{
@@ -14,8 +15,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
-
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -113,19 +112,23 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     val sv1SequencerAdminConnection =
       sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
     val sv1SequencerId = sv1SequencerAdminConnection.getSequencerId.futureValue
-    val newDecentralizedNamespace = Seq(
-      sv1SequencerAdminConnection,
-      sv1Backend.appState.participantAdminConnection,
-      sv2Backend.appState.participantAdminConnection,
-    ).parTraverse { connection =>
-      connection
-        .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-          decentralizedSynchronizerId,
-          dsoParty.uid.namespace,
-          sv1SequencerId.uid.namespace,
-          RetryFor.WaitingOnInitDependency,
+    val newDecentralizedNamespace = MonadUtil
+      .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+        Seq(
+          sv1SequencerAdminConnection,
+          sv1Backend.appState.participantAdminConnection,
+          sv2Backend.appState.participantAdminConnection,
         )
-    }.futureValue
+      ) { connection =>
+        connection
+          .ensureDecentralizedNamespaceDefinitionProposalAccepted(
+            decentralizedSynchronizerId,
+            dsoParty.uid.namespace,
+            sv1SequencerId.uid.namespace,
+            RetryFor.WaitingOnInitDependency,
+          )
+      }
+      .futureValue
       .headOption
       .value
     newDecentralizedNamespace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
@@ -155,20 +158,24 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     } finally {
       // Remove the sequencer again, otherwise the logic for resetting the namespace to only contain
       // sv1 will fail.
-      Seq(
-        sv1Backend.appState.participantAdminConnection,
-        sv2Backend.appState.participantAdminConnection,
-        sv3Backend.appState.participantAdminConnection,
-        sv4Backend.appState.participantAdminConnection,
-      ).parTraverse { connection =>
-        connection
-          .ensureDecentralizedNamespaceDefinitionRemovalProposal(
-            decentralizedSynchronizerId,
-            dsoParty.uid.namespace,
-            sv1SequencerId.uid.namespace,
-            RetryFor.WaitingOnInitDependency,
+      MonadUtil
+        .parTraverseWithLimit(PositiveInt.tryCreate(4))(
+          Seq(
+            sv1Backend.appState.participantAdminConnection,
+            sv2Backend.appState.participantAdminConnection,
+            sv3Backend.appState.participantAdminConnection,
+            sv4Backend.appState.participantAdminConnection,
           )
-      }.futureValue
+        ) { connection =>
+          connection
+            .ensureDecentralizedNamespaceDefinitionRemovalProposal(
+              decentralizedSynchronizerId,
+              dsoParty.uid.namespace,
+              sv1SequencerId.uid.namespace,
+              RetryFor.WaitingOnInitDependency,
+            )
+        }
+        .futureValue
         .headOption
         .value
     }
