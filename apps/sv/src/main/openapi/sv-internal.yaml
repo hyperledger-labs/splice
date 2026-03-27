@@ -626,6 +626,21 @@ paths:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
 
+  /v0/admin/sv/featured-app-rights:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "listFeaturedAppRights"
+      description: |
+        List all `FeaturedAppRight` contracts.
+      responses:
+        "200":
+          description: All featured app rights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFeaturedAppRightsByProviderResponse"
+
   /v0/admin/sv/featured-app-rights/{provider_party_id}:
     get:
       tags: [sv]

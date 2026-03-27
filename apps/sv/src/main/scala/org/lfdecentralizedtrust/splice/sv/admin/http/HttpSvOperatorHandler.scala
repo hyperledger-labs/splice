@@ -451,6 +451,26 @@ class HttpSvOperatorHandler(
       .map(r0.FeatureSupportResponseOK(_))
   }
 
+  override def listFeaturedAppRights(
+      respond: r0.ListFeaturedAppRightsResponse.type
+  )()(
+      extracted: ActAsKnownUserRequest
+  ): Future[r0.ListFeaturedAppRightsResponse] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.listFeaturedAppRights") { _ => _ =>
+      for {
+        scanConnection <- scanConnectionF
+        featuredAppRights <- scanConnection.listFeaturedAppRights()
+      } yield {
+        respond.OK(
+          definitions.ListFeaturedAppRightsByProviderResponse(
+            featuredAppRights.map(_.toHttp).toVector
+          )
+        )
+      }
+    }
+  }
+
   override def listFeaturedAppRightsByProvider(
       respond: r0.ListFeaturedAppRightsByProviderResponse.type
   )(providerPartyId: String)(
