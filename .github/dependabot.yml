@@ -75,3 +75,15 @@ updates:
       - "martinflorian-da"
     commit-message:
       prefix: "[ci] "
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    labels:
+      - "submodule-bump"
+    assignees:
+      - "krzysztofczyz-da"
+      - "mblaze-da"
+      - "martinflorian-da"
+    commit-message:
+      prefix: "[ci] "
