@@ -148,8 +148,13 @@ abstract class BaseAppConnection(
 }
 
 object BaseAppConnection {
+  def truncate(json: Json, maxLength: Int = 100): String = {
+    val jsonString = json.noSpaces
+    if (jsonString.length > maxLength) jsonString.take(maxLength - 3) + "..."
+    else jsonString
+  }
   final class UnexpectedHttpJsonResponse(val statusCode: StatusCode, val content: Json)
-      extends Throwable(s"Unexpected Http Json Response (status $statusCode): $content")
+      extends Throwable(s"Unexpected Http Json Response (status $statusCode): ${truncate(content)}")
   final class UnexpectedHttpMalformedJsonResponse(val statusCode: StatusCode, val content: String)
       extends Throwable(
         s"Unexpected Http response, with json header but a malformed Json content (status $statusCode): $content"
