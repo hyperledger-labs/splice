@@ -23,7 +23,7 @@ import {
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
@@ -69,7 +69,6 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [revokeRightOptions, setRevokeRightOptions] = useState<Option[]>([]);
-  const revokeProviderValidationCounter = useRef(0);
   const mutation = useProposalMutation();
 
   // TODO(#1819): use either search params or props and not both.
@@ -96,30 +95,20 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     }
   };
 
-  const validateRevokeProviderAndLoadRights = async (value: string) => {
-    if (formAction !== 'SRARC_RevokeFeaturedAppRight') return undefined;
+  const loadFeaturedAppRightsAndValidate = async (value: string) => {
     if (validatePartyId(value)) return undefined;
-
-    const currentValidationId = ++revokeProviderValidationCounter.current;
 
     try {
       const response = await svAdminClient.listFeaturedAppRightsByProvider(value);
-      if (currentValidationId !== revokeProviderValidationCounter.current) {
-        return undefined;
-      }
-
-      const options = response.featured_app_rights.map(contract => ({
+      const options = response.featured_app_rights.map((contract: { contract_id: string }) => ({
         key: contract.contract_id,
         value: contract.contract_id,
       }));
       setRevokeRightOptions(options);
-
-      return options.length === 0 ? 'No featured application rights found for provider' : undefined;
+      return undefined;
     } catch {
-      if (currentValidationId === revokeProviderValidationCounter.current) {
-        setRevokeRightOptions([]);
-      }
-      return 'Could not load featured application rights';
+      setRevokeRightOptions([]);
+      return 'Could not load featured app rights for this provider';
     }
   };
 
@@ -313,21 +302,15 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                   validators={{
                     onChange: ({ value }) => validatePartyId(value),
                     onChangeAsyncDebounceMs: 500,
-                    onChangeAsync: ({ value }) => validateRevokeProviderAndLoadRights(value),
+                    onChangeAsync: ({ value }) => loadFeaturedAppRightsAndValidate(value),
                   }}
                 >
                   {field => (
                     <field.TextField
                       title={providerFieldTitle}
                       id={`${testIdPrefix}-partyId`}
-                      subtitle={
-                        field.state.meta.isValidating ? 'Loading featured app rights...' : undefined
-                      }
-                      onChange={() => {
-                        revokeProviderValidationCounter.current += 1;
-                        setRevokeRightOptions([]);
-                        form.setFieldValue('rightCid', '');
-                      }}
+                      subtitle={field.state.meta.isValidating ? 'Loading app rights...' : undefined}
+                      onChange={() => setRevokeRightOptions([])}
                     />
                   )}
                 </form.AppField>

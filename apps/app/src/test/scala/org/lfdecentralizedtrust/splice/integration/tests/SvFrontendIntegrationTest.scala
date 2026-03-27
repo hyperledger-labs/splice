@@ -393,9 +393,7 @@ class SvFrontendIntegrationTest
             }
           }
 
-          eventually() {
-            extraFormOps(webDriver)
-          }
+          extraFormOps(webDriver)
 
           eventually() {
             inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
@@ -544,7 +542,7 @@ class SvFrontendIntegrationTest
       val existingProposalTrackingCids =
         sv1Backend.listVoteRequests().map(getTrackingId(_).contractId).toSet
 
-      val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>
+      withFrontEnd("sv1") { implicit webDriver =>
         loginToGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
         selectActionAndNavigateToForm(action, formPrefix)
         fillAndSubmitProposalForm(
@@ -555,7 +553,7 @@ class SvFrontendIntegrationTest
           extraFormOps,
         )
       }
-      eventually() {
+      val proposalContractId = eventually() {
         val newRequests = sv1Backend.listVoteRequests().filter { request =>
           val trackingCid = getTrackingId(request).contractId
           !existingProposalTrackingCids.contains(trackingCid)
@@ -1489,7 +1487,6 @@ class SvFrontendIntegrationTest
       assertCreateProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") {
         implicit webDriver =>
           fillOutTextField("revoke-featured-app-partyId", providerPartyId)
-
           selectFirstMuiOption("revoke-featured-app-rightCid-dropdown")
       }
     }
@@ -1573,6 +1570,7 @@ class SvFrontendIntegrationTest
       webDriver.findElement(By.tagName("body")).sendKeys(org.openqa.selenium.Keys.ESCAPE)
 
       val dropdown = webDriver.findElement(By.id(dropdownId))
+      dropdown.getAttribute("aria-disabled") should not be "true"
       dropdown.click()
 
       val options = webDriver.findElements(By.cssSelector("li[role='option']"))
