@@ -2,7 +2,7 @@
 """Push store performance metrics to the Prometheus Pushgateway using the prometheus_client library.
 
 Usage:
-  python3 push_perf_metrics.py
+  python3 push_store_ingestion_perf_metrics.py
 """
 
 import json
@@ -13,7 +13,7 @@ from pathlib import Path
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 METRICS_DIR = Path("/tmp/store-ingestion-perf-metrics")
-PUSHGATEWAY_URL="http://prometheus-pushgateway.monitoring:9091"
+PUSHGATEWAY_URL="http://prometheus-pushgateway.observability:9091"
 
 
 def push_metrics() -> None:

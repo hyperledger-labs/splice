@@ -132,7 +132,7 @@ abstract class StoreIngestionPerformanceTest(
   private def ingestAll(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
       tc: TraceContext
   ): Future[StoreIngestionPerfMetrics] = {
-    var totalTime = BigDecimal(0)
+    var totalTimeNs = BigDecimal(0)
     var totalItems = 0L
     var totalBatches = 0L
     Source
@@ -154,12 +154,12 @@ abstract class StoreIngestionPerformanceTest(
           .map { _ =>
             val after = System.nanoTime()
             val duration = after - before
-            totalTime += duration
+            totalTimeNs += duration
             totalItems += batch.length
             totalBatches += 1
-            val avg = totalTime / totalItems
+            val avg = totalTimeNs / totalItems
             val msg =
-              f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTime ns"
+              f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTimeNs ns"
             logger.info(msg)
             println(s"${this.getClass.getName}: $msg")
           }
@@ -168,7 +168,7 @@ abstract class StoreIngestionPerformanceTest(
         StoreIngestionPerfMetrics(
           totalItems = totalItems,
           totalBatches = totalBatches,
-          totalTime = totalTime,
+          totalTimeNs = totalTimeNs,
         )
       )
   }
