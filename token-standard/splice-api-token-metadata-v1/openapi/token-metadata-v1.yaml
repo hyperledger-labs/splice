@@ -7,7 +7,7 @@ info:
   description: |
     Implemented by token registries for the purpose of serving metadata about
     their tokens and the standards supported by the registry.
-  version: 1.0.0
+  version: 1.1.0
 paths:
 
   /registry/metadata/v1/info:
@@ -159,6 +159,16 @@ components:
           default: 10
         supportedApis:
           $ref: "#/components/schemas/SupportedApis"
+        showAccountInputFields:
+          description: |
+            Informs wallets whether the instrument supports non-basic accounts
+            and the wallet should thus show input fields for the account
+            provider and the account id in input forms for transfers and allocations.
+
+            Note that wallets should always show non-null account providers and
+            account ids when displaying transfers and allocations.
+          type: boolean
+          default: false
       required:
         [
           "id",

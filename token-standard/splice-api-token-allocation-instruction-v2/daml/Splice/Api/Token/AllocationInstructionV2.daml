@@ -1,7 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Interfaces to enable wallets to instruct the registry to create allocations.
+-- | V2 interfaces to enable wallets to instruct the registry to create allocations.
 module Splice.Api.Token.AllocationInstructionV2 where
 
 import DA.Map qualified as Map
@@ -14,26 +14,45 @@ import Splice.Api.Token.AllocationV2
 -- AllocationInstruction
 ------------------------
 
+data AllocationInstructionAction
+    = AIA_Withdraw
+    | -- | Used to represent registry-specific actions that need to happen
+      -- for the allocation to be created.
+      AIA_Custom with
+        id : Text
+          -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
+          -- Namespaced analogously to metadata keys.
+        description : Text
+          -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
+        meta : Metadata
+          -- ^ Additional metadata specific to the action, used for extensibility.
+    deriving (Show, Eq)
+
 -- | View for `AllocationInstruction`.
 data AllocationInstructionView = AllocationInstructionView with
     originalInstructionCid : Optional (ContractId AllocationInstruction)
       -- ^ The contract id of the original allocation instruction contract.
       -- Used by the wallet to track the lineage of allocation instructions through multiple steps.
       --
-      -- Only set if the registry evolves the allocation instruction in multiple steps.
+      -- Only set if the registry evolved the allocation instruction in multiple steps.
     allocation : AllocationSpecification
       -- ^ The allocation that this instruction should create.
-    pendingActions : Map.Map Party Text
-      -- ^ The pending actions to be taken by different actors to create the allocation.
-      --
-      -- ^ This field can by used to report on the progress of registry specific
-      -- workflows that are required to prepare the allocation.
     requestedAt : Time
-      -- ^ The time at which the allocation was requested.
+      -- ^ The time at which the allocation was originally requested.
     inputHoldingCids : [ContractId Holding]
       -- ^ The holdings to be used to fund the allocation.
       --
+      -- Empty for allocations that do not require funding.
+      --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
+    availableActions : Map.Map [Party] [AllocationInstructionAction]
+      -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
+      --
+      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- and which other parties they might be waiting on to take their action.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, registry-specific delegation contracts to be in place.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for
       -- extensibility; e.g., more detailed status information.
@@ -50,28 +69,22 @@ interface AllocationInstruction where
   viewtype AllocationInstructionView
 
   allocationInstruction_withdrawImpl : ContractId AllocationInstruction -> AllocationInstruction_Withdraw -> Update AllocationInstructionResult
-  allocationInstruction_updateImpl : ContractId AllocationInstruction -> AllocationInstruction_Update -> Update AllocationInstructionResult
+  allocationInstruction_withdrawExtraObservers : AllocationInstruction_Withdraw -> [Party]
 
-  choice AllocationInstruction_Withdraw : AllocationInstructionResult
+  nonconsuming choice AllocationInstruction_Withdraw : AllocationInstructionResult
     -- ^ Withdraw the allocation instruction as the sender.
     with
+      actors : [Party]
+        -- ^ Parties executing the withdrawal.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized settlement execution.
+        --
+        -- Registries are free to decide on the required authorization for withdrawal. They MUST however report the parties that can withdraw unilaterally via the `AllocationView.canWithdraw` field, so that wallets can show the withdrawal option to the user.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).allocation.transferLeg.sender
+    observer allocationInstruction_withdrawExtraObservers this arg
+    controller actors
     do allocationInstruction_withdrawImpl this self arg
-
-  choice AllocationInstruction_Update : AllocationInstructionResult
-    -- ^ Update the state of the allocation instruction. Used by the registry to
-    -- execute registry internal workflow steps that advance the state of the
-    -- allocation instruction. A reason may be communicated via the metadata.
-    with
-      extraActors : [Party]
-        -- ^ Extra actors authorizing the update. Implementations MUST check that
-        -- this field contains the expected actors for the specific update.
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller (view this).allocation.transferLeg.instrumentId.admin, extraActors
-    do allocationInstruction_updateImpl this self arg
 
 
 -- AllocationFactory
@@ -91,54 +104,53 @@ data AllocationFactoryView = AllocationFactoryView with
 interface AllocationFactory where
   viewtype AllocationFactoryView
 
+  allocationFactory_allocateExtraObservers : AllocationFactory_Allocate -> [Party]
+
   allocationFactory_allocateImpl : ContractId AllocationFactory -> AllocationFactory_Allocate -> Update AllocationInstructionResult
   allocationFactory_publicFetchImpl : ContractId AllocationFactory -> AllocationFactory_PublicFetch -> Update AllocationFactoryView
 
   nonconsuming choice AllocationFactory_Allocate : AllocationInstructionResult
-    -- ^ Generic choice for the sender's wallet to request the allocation of
-    -- assets to a specific leg of a settlement. It depends on the registry
-    -- whether this results in the allocation being created directly
-    -- or in an allocation instruction being created instead.
+    -- ^ Request the creation of an allocation for legs of a specific instrument.
+    --
+    -- It depends on the registry whether this results in the allocation being
+    -- created directly or in an allocation instruction being created instead.
     with
-      expectedAdmin : Party
-        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
-        -- the admin of the factory.
-        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
-        -- their own participant. That way they can ensure that it is safe to exercise a choice
-        -- on a factory contract acquired from an untrusted source *provided*
-        -- all vetted Daml packages only contain interface implementations
-        -- that check the expected admin party.
       allocation : AllocationSpecification
-        -- ^ The allocation which should be created.
+        -- ^ The allocation which should be created. All legs must be for the same instrument.
+        --
+        -- Implementations MUST validate that the instrument admin of the legs matches the admin of the factory.
       requestedAt : Time
         -- ^ The time at which the allocation was requested.
       inputHoldingCids : [ContractId Holding]
-        -- ^ The holdings that SHOULD be used to fund the allocation.
+        -- ^ The holdings matching the instrument of the legs that SHOULD be used to fund the allocation.
         --
-        -- MAY be empty for registries that do not represent their holdings on-ledger; or
-        -- for registries that support automatic selection of holdings for allocations.
+        -- MUST be empty for allocations that do not require funding.
         --
-        -- If specified, then the successful allocation MUST archive all of these holdings, so
-        -- that the execution of the allocation conflicts with any other allocations
-        -- using these holdings. Thereby allowing that the sender can use
-        -- deliberate contention on holdings to prevent duplicate allocations.
+        -- For allocations that require funding,, implementations MUST consume
+        -- all provided holdings as part of creating the allocation. Thereby
+        -- enabling the authorizer's wallet to use contention on these holdings to
+        -- prevent creating duplicate allocations.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
-    controller allocation.transferLeg.sender
+      actors : [Party]
+        -- ^ Actors executing the allocation.
+        --
+        -- Implementations MUST check their concrete values to avoid unauthorized allocation creation.
+        --
+        -- Implementations SHOULD allow the initation of the allocation if the `actors`
+        -- is equal to the `authorizer` of the allocation. Likewise, for accounts
+        -- where the account provider has the right to allocate funds, the registry
+        -- SHOULD allow the initiation of the allocation if the `actors` are
+        -- equal to the account provider.
+    observer allocationFactory_allocateExtraObservers this arg
+    controller actors
     do allocationFactory_allocateImpl this self arg
 
   nonconsuming choice AllocationFactory_PublicFetch : AllocationFactoryView
     with
-      expectedAdmin : Party
-        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
-        -- the admin of the factory.
-        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
-        -- their own participant. That way they can ensure that it is safe to exercise a choice
-        -- on a factory contract acquired from an untrusted source *provided*
-        -- all vetted Daml packages only contain interface implementations
-        -- that check the expected admin party.
-      actor : Party
-    controller actor
+      actors : [Party]
+        -- ^ Parties executing the fetch.
+    controller actors
     do allocationFactory_publicFetchImpl this self arg
 
 

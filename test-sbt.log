@@ -1,0 +1,15 @@
+[info] stderr: File:     daml/Splice/Tests/TestAmuletTokenDvP_V1V2Mixed.daml
+[info] stderr: Hidden:   no
+[info] stderr: Range:    92:51-92:95
+[info] stderr: Source:   Script
+[info] stderr: Severity: DsWarning
+[info] stderr: Message:
+[info] stderr: Tried to fetch or exercise f1062fc175ba5b51bd242d1953a1f0aeab5481711776f0610bf6bef0994a3a9f:Splice.Amulet:Amulet on contract 00de180e217b6398da0715005ad7c7ae29b731d755c52c1077324457487ea50ecb but none of the reading parties [venue] are contract stakeholders [bob,dso-party-de203044]. Use of divulged contracts is deprecated and incompatible with pruning. To remedy, add one of the readers [venue] as an observer to the contract.
+[info] stderr: File:     daml/Splice/Tests/TestAmuletTokenDvP_V1V2Mixed.daml
+[info] stderr: Hidden:   no
+[info] stderr: Range:    92:51-92:95
+[info] stderr: Source:   Script
+[info] stderr: Severity: DsWarning
+[info] stderr: Message:
+[info] stderr: urg
+[info] stderr: Tried to fetch or exercise f1062fc175ba5b51bd242d1953a1f0aeab5481711776f0610bf6bef0994a3a9f:Splice.Amulet:Amulet on contract 00de180e217b6398da0715005ad7c7ae29b731d755c52c1077324457487ea50ecb but none of the reading parties [venue] are contract stakeholders [bob,dso-party-de203044]. Use of divulged contracts is deprecated and incompatible with pruning. To remedy, add one of the readers [venue] as an observer to the contract.

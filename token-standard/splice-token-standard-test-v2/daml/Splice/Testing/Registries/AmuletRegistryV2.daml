@@ -11,6 +11,7 @@ module Splice.Testing.Registries.AmuletRegistryV2
 
   , AmuletRegistry(..)
   , initialize
+  , amuletToMultiRegistry
 
     -- * Amulet registry specific functions
   , tapFaucet
@@ -37,6 +38,7 @@ import DA.Foldable (forA_)
 import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
+import DA.Map qualified as Map
 import DA.Time
 import DA.Text qualified as T
 
@@ -45,10 +47,10 @@ import Splice.Api.Token.HoldingV2 as Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
 import Splice.Api.Token.AllocationInstructionV2
 import Splice.Api.Token.TransferInstructionV2
+import Splice.TokenStandard.Utils (upcast)
 
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
 import Splice.Expiry
@@ -61,16 +63,22 @@ import Splice.Round
 import Splice.ValidatorLicense
 
 import Splice.Testing.UtilsV2
-import Splice.Testing.Registries.AmuletRegistryV2.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.TokenStandard.RegistryApiV2
 
 import Daml.Script
+
+
+-- TODO(#4621): this code should not exist on its own at all. There's only one
+-- AmuletRegistry, and it should implement both APIs fix this as part of merging
+-- the V1 and V2 test suites.
+
 
 -- Registry representation
 --------------------------
 
 -- | A reference to a mock amulet registry.
--- Use it via the the token standard functions provided by the "Splice.Testing.RegistryApiV2" module
+-- Use it via the the token standard functions provided by the "Splice.Testing.RegistryApi" module
 -- and type-class; or via the amulet specific functions exported from this module.
 data AmuletRegistry = AmuletRegistry with
     dso : Party
@@ -80,12 +88,16 @@ data AmuletRegistry = AmuletRegistry with
 instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
-  getAllocation_TransferContext app cid _meta = registryApi_getAllocationTransferContext app cid
+  getSettlementFactory = registryApi_getSettlementFactory
   getAllocation_WithdrawContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getTransferInstruction_AcceptContext app cid _meta = registryApi_getTransferInstruction_AcceptContext app cid
   getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
   getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
+
+-- | Convert the single registry to a multi-registry.
+amuletToMultiRegistry : AmuletRegistry -> MultiRegistry
+amuletToMultiRegistry registry = Map.singleton registry.dso (mkGenericRegistry registry)
 
 
 -- Registry initialization
@@ -110,10 +122,10 @@ initialize config = do
   -- use a time that is easy to reason about in script outputs
   setTime config.demoTime
 
-  dso <- allocatePartyExact config.dsoPartyName
+  dso <- allocateParty config.dsoPartyName
   let registry = AmuletRegistry with
         dso
-        instrumentId = amuletInstrumentId dso
+        instrumentId = upcast (amuletInstrumentId dso)
 
   let defaultAmuletConfigSchedule = Schedule with
         initialValue = defaultAmuletConfig
@@ -135,6 +147,7 @@ initialize config = do
 
   -- return the off-ledger reference to the registry for later script steps
   return registry
+
 
 -- | Tap the faucet on DevNet to get a specified amount of Amulet.
 tapFaucet : AmuletRegistry -> Party -> Decimal -> Script (ContractId Holding)
@@ -210,11 +223,11 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getExternalPartyConfigStateContext registry
-  let isSelfTransfer = arg.transfer.sender == arg.transfer.receiver
+  let isSelfTransfer = arg.transfer.sender.owner == arg.transfer.receiver.owner
   (optPreapproval, preapprovalC) <-
     if isSelfTransfer
       then pure (None, emptyOpenApiChoiceContext)
-      else lookupPreapprovalWithContext registry arg.transfer.receiver
+      else lookupPreapprovalWithContext registry arg.transfer.receiver.owner
   featuredAppRightC <- case optPreapproval of
     None -> pure emptyOpenApiChoiceContext
     Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
@@ -237,15 +250,30 @@ registryApi_getAllocationFactory registry arg = do
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
     disclosures = fullContext.disclosures
 
-registryApi_getAllocationTransferContext
-  : AmuletRegistry -> ContractId Allocation -> Script OpenApiChoiceContext
-registryApi_getAllocationTransferContext registry allocCid = do
+registryApi_getSettlementFactory
+  : AmuletRegistry
+  -> SettlementFactory_SettleBatch
+  -> Script (EnrichedFactoryChoice SettlementFactory SettlementFactory_SettleBatch)
+registryApi_getSettlementFactory registry arg = do
+  (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getExternalPartyConfigStateContext registry
-  Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
-  featuredAppRightC <- getFeaturedAppRightContext registry amuletAlloc.allocation.settlement.executor
-  -- need to disclose the amulet contract, as the executor has no visibility into it
-  lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletAlloc.lockedAmulet
-  pure $ withExtraDisclosures lockedAmuletD (transferC <> featuredAppRightC)
+  -- Note: the real backend implementation has two options:
+  --
+  -- 1. fetch the interface view of `V2.Allocation` and use the `holdingCids` field to
+  --    determine the candidate locked amulets to disclose as done below
+  -- 2. fetch the allocation contract directly as either an `AmuletAllocationV2` or `AmuletAllocation`
+  --    and use the `lockedAmulet` field to determine the locked amulet to disclose.
+  --
+  -- Option 2 seems preferable from given an architecture where the backend does not
+  -- ingest interfaces, but only works with the concrete templates.
+  --
+  lockedDs <- forA arg.allocationCids $ \allocCid -> do
+    getLockedAmuletForAllocationsD registry allocCid
+  let fullContext = withExtraDisclosures (extAmuletRulesD <> mconcat lockedDs) transferC
+  pure EnrichedFactoryChoice with
+    factoryCid = toInterfaceContractId @SettlementFactory extAmuletRulesCid
+    arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
+    disclosures = fullContext.disclosures
 
 registryApi_getTransferInstruction_AcceptContext
   : AmuletRegistry -> ContractId TransferInstruction -> Script OpenApiChoiceContext
@@ -285,24 +313,22 @@ registryApi_getAllocation_abortTwoStepTransferContext
 registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
   -- check whether the locked amulet is still active, so that aborts still work
   -- even if the owner of the LockedAmulet expired it
-  Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId instrCid)
-  optLockedAmulet <- queryContractId @LockedAmulet registry.dso amuletAlloc.lockedAmulet
-  let lockedAmuletActive = isSome optLockedAmulet
-  -- this can only happen if the locked amulet already expired
-  now <- getTime
-  unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleBefore <= now) $
-    fail "Invariant violation: the locked amulet is archived, but the settlement is not yet expired"
-  -- this context communicates whether to unlock the amulet
-  let expireLockC = OpenApiChoiceContext with
-        disclosures = mempty
-        choiceContext = mkAmuletContext $ TextMap.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
-  if lockedAmuletActive
-    then do
-      -- disclose the amulet contract, as the caller might not be able to see it
-      lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletAlloc.lockedAmulet
-      pure $ withExtraDisclosures lockedAmuletD expireLockC
-    else
-      pure expireLockC
+  lockedCid <- lookupLockedAmuletOfAllocation registry instrCid
+  case lockedCid of
+    None -> pure emptyOpenApiChoiceContext
+    Some la -> do
+      optLockedAmulet <- queryContractId @LockedAmulet registry.dso la
+      let lockedAmuletActive = isSome optLockedAmulet
+      let expireLockC = OpenApiChoiceContext with
+            disclosures = mempty
+            choiceContext = mkAmuletContext $ TextMap.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
+      if lockedAmuletActive
+        then do
+          -- disclose the amulet contract, as the caller might not be able to see it
+          lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso la
+          pure $ withExtraDisclosures lockedAmuletD expireLockC
+        else
+          pure expireLockC
 
 
 -- Internal functions
@@ -360,7 +386,7 @@ getExternalPartyConfigStateContext registry = do
 
 lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional TransferPreapproval, OpenApiChoiceContext)
 lookupPreapprovalWithContext registry receiver = do
-  preapprovals  <- queryFilter @TransferPreapproval registry.dso (\preapproval -> preapproval.receiver == receiver)
+  preapprovals  <- queryFilter @TransferPreapproval receiver (\preapproval -> preapproval.receiver == receiver)
   case preapprovals of
     [] -> pure (None, emptyOpenApiChoiceContext)
     (preapprovalCid, preapproval) :: _ ->  do
@@ -384,6 +410,21 @@ getFeaturedAppRightContext registry provider = do
         disclosures = rightDisc
         choiceContext = mkAmuletContext $
           TextMap.fromList [ (featuredAppRightContextKey, AV_ContractId (coerceContractId rightCid)) ]
+
+lookupLockedAmuletOfAllocation : AmuletRegistry -> ContractId Allocation -> Script (Optional (ContractId LockedAmulet))
+lookupLockedAmuletOfAllocation registry allocCid = do
+  Some allocView <- queryInterfaceContractId @Allocation registry.dso allocCid
+  case allocView.holdingCids of
+    [] -> pure None
+    [holdingCid] -> pure (Some (coerceContractId holdingCid))
+    _ -> fail $ T.unlines ["unexpected: multiple holding cids for allocation:", show allocView]
+
+getLockedAmuletForAllocationsD : AmuletRegistry -> ContractId Allocation -> Script Disclosures'
+getLockedAmuletForAllocationsD registry allocCid = do
+  optLockedAmuletCid <- lookupLockedAmuletOfAllocation registry allocCid
+  case optLockedAmuletCid of
+    None -> return mempty
+    Some la -> queryDisclosure' @LockedAmulet registry.dso la
 
 emptyOpenApiChoiceContext : OpenApiChoiceContext
 emptyOpenApiChoiceContext = OpenApiChoiceContext with

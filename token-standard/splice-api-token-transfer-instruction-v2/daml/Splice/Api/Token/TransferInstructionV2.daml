@@ -1,7 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Instruct transfers of holdings between parties.
+-- | V2 API to instruct transfers of holdings between accounts.
 module Splice.Api.Token.TransferInstructionV2 where
 
 import qualified DA.Map as Map
@@ -9,11 +9,12 @@ import qualified DA.Map as Map
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 
--- | A specification of a transfer of holdings between two parties.
+
+-- | A specification of a transfer of holdings between two accounts.
 data Transfer = Transfer with
-    sender : Party
+    sender : Account
       -- ^ The sender of the transfer.
-    receiver : Party
+    receiver : Account
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
@@ -28,6 +29,10 @@ data Transfer = Transfer with
       --
       -- Registries SHOULD NOT execute the transfer instruction after this time,
       -- so that senders can retry creating a new transfer instruction after this time.
+      --
+      -- Registries MAY limit the duration between `requestedAt` and
+      -- `executeBefore` to limit the resources spent on tracking active
+      -- transfer instructions.
     inputHoldingCids : [ContractId Holding]
       -- ^ The holding contracts that should be used to fund the transfer.
       --
@@ -48,7 +53,7 @@ data TransferInstructionResult = TransferInstructionResult with
      -- ^ The output of the step.
     senderChangeCids : [ContractId Holding]
       -- ^ New holdings owned by the sender created to return "change". Can be used
-      -- by callers to batch creating or updating multiple transfer instructions
+      -- by actors to batch creating or updating multiple transfer instructions
       -- in a single Daml transaction.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
@@ -68,6 +73,8 @@ data TransferInstructionResult_Output
         receiverHoldingCids : [ContractId Holding]
           -- ^ The newly created holdings owned by the receiver as part of successfully
           -- completing the transfer.
+          --
+          -- MAY be empty if the registry does not represent holdings on-ledger.
   | TransferInstructionResult_Failed
       -- ^ Use this result to communicate that the transfer did not succeed and all holdings (minus fees)
       -- have been returned to the sender.
@@ -77,18 +84,22 @@ data TransferInstructionResult_Output
 -- TransferInstruction
 ------------------------
 
--- | Status of a transfer instruction.
-data TransferInstructionStatus
-  = TransferPendingReceiverAcceptance
-      -- ^ The transfer is pending acceptance by the receiver.
-  | TransferPendingInternalWorkflow
-      -- ^ The transfer is pending actions to be taken as part of registry internal workflows.
-      with
-        pendingActions : Map.Map Party Text
-          -- ^ The actions that a party could take to advance the transfer.
-          --
-          -- This field can by used to inform wallet users whether they need to take an action or not.
-  deriving (Show, Eq)
+-- | Actions to advance the state of a transfer instruction.
+data TransferInstructionAction
+    = TIA_Accept
+    | TIA_Reject
+    | TIA_Withdraw
+    | -- | Used to represent registry-specific actions that need to happen
+      -- for the transfer instruction to advance.
+      TIA_Custom with
+        id : Text
+          -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
+          -- Namespaced analogously to metadata keys.
+        description : Text
+          -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
+        meta : Metadata
+          -- ^ Additional metadata specific to the action, used for extensibility.
+    deriving (Show, Eq)
 
 -- | View for `TransferInstruction`.
 data TransferInstructionView = TransferInstructionView with
@@ -96,76 +107,90 @@ data TransferInstructionView = TransferInstructionView with
       -- ^ The contract id of the original transfer instruction contract.
       -- Used by the wallet to track the lineage of transfer instructions through multiple steps.
       --
-      -- Only set if the registry evolves the transfer instruction in multiple steps.
+      -- Only set if the registry evolved the transfer instruction in multiple steps.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
-    status : TransferInstructionStatus
-      -- ^ The status of the transfer instruction.
+    availableActions : Map.Map [Party] [TransferInstructionAction]
+      -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
+      --
+      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- and which other parties they might be waiting on to take their action.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, registry-specific delegation contracts to be in place.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
 
 -- | An interface for tracking the status of a transfer instruction,
 -- i.e., a request to a registry app to execute a transfer.
---
--- Registries MAY evolve the transfer instruction in multiple steps. They SHOULD
--- do so using only the choices on this interface, so that wallets can reliably
--- parse the transaction history and determine whether the instruction ultimately
--- succeeded or failed.
 interface TransferInstruction where
   viewtype TransferInstructionView
 
   transferInstruction_acceptImpl : ContractId TransferInstruction -> TransferInstruction_Accept -> Update TransferInstructionResult
   transferInstruction_rejectImpl : ContractId TransferInstruction -> TransferInstruction_Reject -> Update TransferInstructionResult
   transferInstruction_withdrawImpl : ContractId TransferInstruction -> TransferInstruction_Withdraw -> Update TransferInstructionResult
-  transferInstruction_updateImpl : ContractId TransferInstruction -> TransferInstruction_Update -> Update TransferInstructionResult
 
-  choice TransferInstruction_Accept : TransferInstructionResult
-    -- ^ Accept the transfer as the receiver.
+  nonconsuming choice TransferInstruction_Accept : TransferInstructionResult
+    -- ^ Accept the transfer
     --
-    -- This choice is only available if the instruction is in
-    -- `TransferPendingReceiverAcceptance` state.
+    -- Implementations MUST ensure that the transfer instruction is archived upon acceptance.
+    -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Accept`
+    -- where possible to maximize compatibility with v1 transaction parsers.
     --
     -- Note that while implementations will typically return `TransferInstructionResult_Completed`,
     -- this is not guaranteed. The result of the choice is implementation-specific and MAY
     -- be any of the three possible results.
     with
+      actors : [Party]
+        -- ^ The parties accepting the transfer offer.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized acceptance.
+        --
+        -- Implementations SHOULD allow the owner and the provider of the recipient
+        -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.receiver
+    controller actors
     do transferInstruction_acceptImpl this self arg
 
-  choice TransferInstruction_Reject : TransferInstructionResult
-    -- ^ Reject the transfer as the receiver.
+  nonconsuming choice TransferInstruction_Reject : TransferInstructionResult
+    -- ^ Reject the transfer offer represented by the transfer instruction.
     --
-    -- This choice is only available if the instruction is in
-    -- `TransferPendingReceiverAcceptance` state.
+    -- Implementations MUST ensure that the transfer instruction is archived upon rejection.
+    -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Reject`
+    -- where possible to maximize compatibility with v1 transaction parsers.
     with
+      actors : [Party]
+        -- ^ The parties rejecting the transfer offer.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized rejection.
+        --
+        -- Implementations SHOULD allow the owner and the provider of the recipient
+        -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.receiver
+    controller actors
     do transferInstruction_rejectImpl this self arg
 
-  choice TransferInstruction_Withdraw : TransferInstructionResult
-    -- ^ Withdraw the transfer instruction as the sender.
+  nonconsuming choice TransferInstruction_Withdraw : TransferInstructionResult
+    -- ^ Withdraw the transfer offer represented by the transfer instruction.
+    --
+    -- Implementations MUST ensure that the transfer instruction is archived upon withdrawal.
+    -- They SHOULD do so by calling `TransferInstructionV1.TransferInstruction_Withdraw`
+    -- where possible to maximize compatibility with v1 transaction parsers.
     with
+      actors : [Party]
+        -- ^ The parties withdrawing the transfer instruction.
+        --
+        -- Implementations MUST check these parties to avoid unauthorized withdrawal.
+        --
+        -- Implementations SHOULD allow the owner and the provider of the sender
+        -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.sender
+    controller actors
     do transferInstruction_withdrawImpl this self arg
-
-  choice TransferInstruction_Update : TransferInstructionResult
-    -- ^ Update the state of the transfer instruction. Used by the registry to
-    -- execute registry internal workflow steps that advance the state of the
-    -- transfer instruction. A reason may be communicated via the metadata.
-    with
-      extraActors : [Party]
-        -- ^ Extra actors authorizing the update. Implementations MUST check that
-        -- this field contains the expected actors for the specific update.
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.instrumentId.admin, extraActors
-    do transferInstruction_updateImpl this self arg
 
 
 -- Transfer Factory
@@ -182,35 +207,28 @@ interface TransferFactory where
     -- ^ Instruct the registry to execute a transfer.
     -- Implementations MUST ensure that this choice fails if `transfer.executeBefore` is in the past.
     with
-      expectedAdmin : Party
-        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
-        -- the admin of the factory.
-        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
-        -- their own participant. That way they can ensure that it is safe to exercise a choice
-        -- on a factory contract acquired from an untrusted source *provided*
-        -- all vetted Daml packages only contain interface implementations
-        -- that check the expected admin party.
       transfer : Transfer
         -- ^ The transfer to execute.
+        --
+        -- Implementations MUST validate that the admin of the instrument matches the admin of the factory.
+      actors : [Party]
+        -- ^ The parties instructing the transfer, if different from the owner of the source account
+        --
+        -- Implementations MUST check these parties to avoid unauthorized transfer instructions.
+        --
+        -- Implementations SHOULD allow the owner and the provider of the source
+        -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
-    controller transfer.sender
+    controller actors
     do transferFactory_transferImpl this self arg
 
   nonconsuming choice TransferFactory_PublicFetch : TransferFactoryView
     -- ^ Fetch the view of the factory contract.
     with
-      expectedAdmin : Party
-        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
-        -- the admin of the factory.
-        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
-        -- their own participant. That way they can ensure that it is safe to exercise a choice
-        -- on a factory contract acquired from an untrusted source *provided*
-        -- all vetted Daml packages only contain interface implementations
-        -- that check the expected admin party.
-      actor : Party
-        -- ^ The party fetching the contract.
-    controller actor
+      actors : [Party]
+        -- ^ Parties executing the fetch.
+    controller actors
     do transferFactory_publicFetchImpl this self arg
 
 -- | View for `TransferFactory`.

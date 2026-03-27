@@ -6,12 +6,19 @@ module Splice.AmuletTransferInstruction (
   standardTransferToTwoStepTransfer,
 ) where
 
+import DA.Assert (assertDeadlineExceeded)
+import DA.Map qualified as Map
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2 qualified as Api.TransferInstructionV2
+
+import Splice.TokenStandard.Utils
 
 import Splice.Amulet
 import Splice.Amulet.TwoStepTransfer
-import DA.Assert (assertDeadlineExceeded)
+import Splice.Util (require)
+
 
 -- | A transfer instruction for transferring Amulet tokens pending on receiver
 -- acceptance.
@@ -42,6 +49,19 @@ template AmuletTransferInstruction
       transferInstruction_withdrawImpl _self arg = do
         abortAmuletTransferInstruction this arg.extraArgs
 
+    interface instance Api.TransferInstructionV2.TransferInstruction for AmuletTransferInstruction where
+      view = Api.TransferInstructionV2.TransferInstructionView with
+        originalInstructionCid = None
+        transfer = upcast transfer
+        availableActions = Map.fromList
+          [ ([transfer.sender], [Api.TransferInstructionV2.TIA_Withdraw])
+          , ([transfer.receiver], [Api.TransferInstructionV2.TIA_Accept, Api.TransferInstructionV2.TIA_Reject])
+          ]
+        meta = emptyMetadata
+
+      Api.TransferInstructionV2.transferInstruction_acceptImpl = transferInstruction_v2_receiverActor_acceptDefaultImplUsingV1 transfer.receiver
+      Api.TransferInstructionV2.transferInstruction_rejectImpl = transferInstruction_v2_receiverActor_rejectDefaultImplUsingV1 transfer.receiver
+      Api.TransferInstructionV2.transferInstruction_withdrawImpl = transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1 transfer.sender
 
 -- Transfer instruction evolution
 ---------------------------------
@@ -72,8 +92,8 @@ executeTransferInstr instr extraArgs = do
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 abortAmuletTransferInstruction instr extraArgs = do
-  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
-  senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+  let lockExpiresAt = instr.transfer.executeBefore
+  senderHoldingCids <- abortTwoStepTransfer lockExpiresAt instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
     senderChangeCids = senderHoldingCids
     output = TransferInstructionResult_Failed
@@ -81,10 +101,10 @@ abortAmuletTransferInstruction instr extraArgs = do
 
 updateAmuletTransferInstruction : AmuletTransferInstruction -> [Party] -> ExtraArgs -> Update TransferInstructionResult
 updateAmuletTransferInstruction instr extraActors extraArgs = do
-  assertMsg "Amulet transfer expiry does not support extra actors" (null extraActors)
+  require "No extra actors on transfer expiry" (null extraActors)
   assertDeadlineExceeded "Transfer.executeBefore" instr.transfer.executeBefore
-  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
-  senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+  let lockExpiresAt = instr.transfer.executeBefore
+  senderHoldingCids <- abortTwoStepTransfer lockExpiresAt instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
     senderChangeCids = senderHoldingCids
     output = TransferInstructionResult_Failed

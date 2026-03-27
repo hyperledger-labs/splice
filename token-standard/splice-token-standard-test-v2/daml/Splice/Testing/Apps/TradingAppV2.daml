@@ -1,119 +1,157 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | An example of how to build an OTC trading app for multi-leg standard token trades.
+-- | An example of how to build an OTC trading app that supports V1/V2 mixed settlements
+-- with extra privacy for V2 allocations..
 --
--- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
+-- Used as part of the testing infrastructure to test the V2 token standard DvP workflows.
 module Splice.Testing.Apps.TradingAppV2 where
 
-import DA.Foldable qualified as F
-import DA.Optional (fromOptional, fromSomeNote)
-import DA.Set as Set
-import DA.TextMap as TextMap
-import DA.Traversable qualified as Traversable
+-- TODO(#4619): move trading app into its own package to enable its use in integration tests
 
-import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
-import Splice.Api.Token.AllocationRequestV2
+import DA.Foldable (forA_)
+import DA.Optional (catOptionals)
+import DA.Map qualified as Map
+import DA.Set qualified as Set
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationRequestV1 qualified as V1
+import Splice.Api.Token.AllocationV2 qualified as V2
+import Splice.Api.Token.AllocationRequestV2 qualified as V2
+import Splice.Api.Token.HoldingV2 qualified as V2
+
+import Splice.TokenStandard.Utils
 
 
-template OTCTradeProposal with
-    venue : Party
-    tradeCid : Optional (ContractId OTCTradeProposal) -- Tracking-id for the trade being proposed. Set to None for new trades.
-    transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
-    approvers : [Party] -- ^ Parties that have approved the proposal
+-- | A request to a single trading account to authorize their legs to the trade.
+template OTCTradeAllocationRequest with
+    authorizer : V2.Account
+    settlement : V2.SettlementInfo
+    transferLegs : [V2.TransferLeg]
   where
-    signatory approvers
-    observer venue, tradingParties transferLegs
+    signatory settlement.executors
+    observer accountParties authorizer
 
-    -- This is test code, so we don't care about the contention here.
-    -- Moreover, likely the number of trading parties is going to be low anyways.
-    choice OTCTradeProposal_Accept : ContractId OTCTradeProposal
-      with
-        approver : Party
-      controller approver
-      do
-        let newApprovers = approver :: approvers
-        let traders = tradingParties transferLegs
-        require "Approver is a trading party" (approver `Set.member` traders)
-        require "Approver is new" (approver `notElem` approvers)
-        create this with
-          approvers = newApprovers
-          tradeCid = Some (fromOptional self tradeCid)
+    interface instance V1.AllocationRequest for OTCTradeAllocationRequest where
+      view = downcast (view @V2.AllocationRequest (toInterface this))
 
-    choice OTCTradeProposal_Reject : ()
-      with
-        trader : Party
-      controller trader
-      do require "Trader is a trading party" (trader `Set.member` tradingParties transferLegs)
+      allocationRequest_RejectImpl = allocationRequestV1_rejectDefaultImpl (accountParties authorizer)
+      allocationRequest_WithdrawImpl = allocationRequestV1_withdrawDefaultImpl (toInterface this)
 
-    choice OTCTradeProposal_InitiateSettlement : ContractId OTCTrade
+    interface instance V2.AllocationRequest for OTCTradeAllocationRequest where
+      view = V2.AllocationRequestView with
+        settlement
+        transferLegs
+        authorizer
+        availableActions = Map.fromList
+          [ ([p], [V2.ARA_Accept, V2.ARA_Reject]) | p <- accountParties authorizer ]
+        meta = emptyMetadata
+
+      allocationRequest_acceptExtraObservers = allocationRequestV2_acceptDefaultExtraObservers this
+      allocationRequest_rejectExtraObservers = allocationRequestV2_rejectDefaultExtraObservers this
+      allocationRequest_withdrawExtraObservers = allocationRequestV2_withdrawDefaultExtraObservers this
+
+      allocationRequest_acceptImpl = allocationRequestV2_acceptDefaultImpl [[p] | p <- accountParties authorizer]
+      allocationRequest_rejectImpl = allocationRequestV2_rejectDefaultImplUsingV1 [[p] | p <- accountParties authorizer]
+      allocationRequest_withdrawImpl = allocationRequestV2_withdrawDefaultImplUsingV1 (toInterface this)
+
+
+-- | A batch of allocations for the same admin together with the factory and its
+-- extra arguments required to settle them in a batch.
+data SettlementBatch = SettlementBatch with
+    allocationCids : [ContractId V2.Allocation]
+    factoryCid : ContractId V2.SettlementFactory
+    extraArgs : ExtraArgs
+  deriving (Eq, Show)
+
+-- | A matched trade ready to settle.
+template OTCTrade with
+    venue : Party
+    transferLegs : [V2.TransferLeg] -- ^ Transfers to settle.
+    createdAt : Time -- ^ When the matched trade was created on-ledger.
+    settleAt : Time -- ^ When the trade should be settled by.
+    settlementDeadline : Optional Time -- ^ Deadline for when the settlement should be completed.
+    autoReceiptAuthorizers : [Party]
+      -- ^ Parties that will authorize receipt into their basic accounts
+      -- directly as part of settlement and thus do not require the creation of
+      -- an allocation for the receipt of the transfer.
+  where
+    signatory venue
+
+    nonconsuming choice OTCTrade_RequestAllocations : [ContractId OTCTradeAllocationRequest]
       with
-        prepareUntil : Time
-        settleBefore : Time
       controller venue
       do
-        require "All trading parties have approved" (Set.fromList approvers == tradingParties transferLegs)
-        now <- getTime
-        require "Preparation time has not passed" (now < prepareUntil)
-        require "Preparation time before settlement time" (prepareUntil < settleBefore)
-        create OTCTrade with
-          venue
-          transferLegs
-          tradeCid = fromOptional self tradeCid
-          createdAt = now
-          prepareUntil
-          settleBefore
+        let settlement = mkOtcTradeSettlementInfo self this
+        results <- forA (Map.toList $ splitLegsByTradingAccount transferLegs) $ \(authorizer, transferLegs) -> do
+          let noRequestRequired =
+                authorizer `elem` map basicAccount autoReceiptAuthorizers &&
+                all (\leg -> leg.sender /= authorizer) transferLegs
+          if noRequestRequired
+            then pure None
+            else do
+              Some <$> create OTCTradeAllocationRequest with
+                authorizer
+                settlement
+                transferLegs
+        pure (catOptionals results)
 
-tradeAllocations
-  : SettlementInfo -> TextMap Api.Token.AllocationV2.TransferLeg
-  -> TextMap AllocationSpecification
-tradeAllocations settlementInfo transferLegs =
-  TextMap.fromList $ do
-    (transferLegId, transferLeg) <- TextMap.toList transferLegs
-    let spec = AllocationSpecification with
-          settlement = settlementInfo
-          transferLegId
-          transferLeg
-    pure (transferLegId, spec)
-
-template OTCTrade
-  with
-    venue : Party
-    transferLegs : TextMap Api.Token.AllocationV2.TransferLeg
-    tradeCid : ContractId OTCTradeProposal
-    createdAt : Time
-    prepareUntil : Time
-    settleBefore : Time
-  where
-    signatory venue, tradingParties transferLegs
-
-    choice OTCTrade_Settle : TextMap Allocation_ExecuteTransferResult
+    choice OTCTrade_Settle : OTCTrade_SettleResult
       with
-        allocationsWithContext : TextMap (ContractId Allocation, ExtraArgs)
-      controller venue
+        batchesByAdmin : Map.Map Party SettlementBatch
+          -- ^ Allocations and their batch settlement factories sorted by admin party
+        allocationRequests : [ContractId OTCTradeAllocationRequest]
+          -- ^ Allocation request to archive as part of settlement.
+        extraSettlementAuthorizers : [Party]
+          -- ^ Extra settlement authorizers required by the given allocations.
+          -- Mainly used to settle V1 allocations, which require sender and receiver approval
+          -- to settle.
+          --
+          -- Note: a more sophisticated app might only add the extra authority on a per-admin
+          -- basis, so that extra authorizers for assets from one admin do not see the
+          -- settlement of assets from another admin for which their authorization is not required.
+      controller venue, extraSettlementAuthorizers
       do
-        -- check timing constraints
-        now <- getTime
-        require "Settlement deadline has not passed" (now < settleBefore)
-        -- validate and execute transferLegs
-        let settlementInfo = SettlementInfo with
-              executor = venue
-              requestedAt = createdAt
-              settlementRef = makeTradeRef tradeCid
-              allocateBefore = prepareUntil
-              settleBefore
-              meta = emptyMetadata
-        let expectedAllocations = tradeAllocations settlementInfo transferLegs
-        let mergedMaps = zipTextMaps allocationsWithContext expectedAllocations
-        forTextMapWithKey mergedMaps \legId (optAllocWithContext,  optExpectedAlloc) -> do
-          let (allocCid, extraArgs) = fromSomeNote ("Allocation cid and extra arg is missing for leg " <> legId) optAllocWithContext
-          let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected leg " <> legId) optExpectedAlloc
-          -- fetch and validate the allocation instruction
-          instr <- fetch @Allocation allocCid
-          let instrView = view @Allocation instr
-          require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
-          exercise allocCid (Allocation_ExecuteTransfer extraArgs)
+        -- compute reference data
+        let settlement = mkOtcTradeSettlementInfo self this
+            transferLegsByAdmin = splitLegsByAdmin transferLegs
+
+        -- Archive requests known to be active at this point, so that trader
+        -- wallets won't see the archival of the allocation without a
+        -- corresponding archival of the request.
+        forA_ allocationRequests $ \reqCid -> do
+          req <- fetch reqCid
+          archive reqCid
+          requireMatchExpected ("AllocationRequest.settlement", req.settlement) settlement
+          -- note: we are not checking that there is a request for every traders, as it could be
+          -- there there is a request that got rejected but the allocation still got created.
+          --
+          -- In a real app, we expect that the trading app runs cleanup automation that
+          -- archives requests for which no matching trade exists.
+
+        -- prudent engineering: check that the extra settlement authorizers are really required
+        allocViews <- forA (Map.values batchesByAdmin) $ \batch -> do
+          forA batch.allocationCids $ \allocCid -> do
+            alloc <- fetch allocCid
+            pure (view alloc)
+        validateExtraSettlementAuthorizers this extraSettlementAuthorizers (concat allocViews)
+
+        -- important: we must iterate over all transfer legs to ensure that ALL of them get settled
+        results <- forA (Map.toList transferLegsByAdmin) $ \(admin, transferLegs) -> do
+          case Map.lookup admin batchesByAdmin of
+            None -> abort $ "No settlement batch found for admin " <> show admin
+            Some batch -> do
+              result <- exercise batch.factoryCid V2.SettlementFactory_SettleBatch with
+                extraReceiptAuthorizers = map basicAccount autoReceiptAuthorizers
+                settlement
+                transferLegs
+                allocationCids = batch.allocationCids
+                actors = venue :: extraSettlementAuthorizers
+                extraArgs = batch.extraArgs
+              pure (admin, result)
+
+        pure OTCTrade_SettleResult with
+          resultsByAdmin = Map.fromList results
 
 
     -- NOTE: this choice is an approximation to what a real app would do.
@@ -121,85 +159,146 @@ template OTCTrade
     -- the first cancellation.  A better approach would be to leave a marker
     -- contract in place until the `settleBefore` time, so that the venue
     -- retains the ability to cancel the allocations that are created.
-    choice OTCTrade_Cancel : TextMap (Optional Allocation_CancelResult)
+    choice OTCTrade_Cancel : OTCTrade_CancelResult
       with
-        allocationsWithContext : TextMap (ContractId Allocation, ExtraArgs)
-      controller venue
+        allocationsWithContext : [(ContractId V2.Allocation, ExtraArgs)]
+        allocationRequestCids : [ContractId OTCTradeAllocationRequest]
+        extraSettlementAuthorizers : [Party]
+          -- ^ Extra settlement authorizers of allocations, which thus also need to approve their cancellation.
+          -- Used primarily to cancel V1 allocations, which require sender and receiver approval to cancel.
+      controller venue, extraSettlementAuthorizers
       do
-        -- validate and cancel transferLegs
-        let settlementInfo = SettlementInfo with
-              executor = venue
-              requestedAt = createdAt
-              settlementRef = makeTradeRef tradeCid
-              allocateBefore = prepareUntil
-              settleBefore
-              meta = emptyMetadata
-        let expectedAllocations = tradeAllocations settlementInfo transferLegs
-        let mergedMaps = zipTextMaps allocationsWithContext expectedAllocations
-          -- fetch and validate the allocation instruction
-        forTextMapWithKey mergedMaps \legId (optAllocWithContext,  optExpectedAlloc) ->
-          -- skip the leg if there is no matching allocation to cancel
-          Traversable.forA optAllocWithContext $ \(allocCid, extraArgs) -> do
-            -- fetch and validate the allocation instruction
-            let expectedAlloc = fromSomeNote ("Allocation with context provided for unexpected leg " <> legId) optExpectedAlloc
-            instr <- fetch @Allocation allocCid
-            let instrView = view @Allocation instr
-            require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
-            exercise allocCid (Allocation_Cancel extraArgs)
+        let settlement = mkOtcTradeSettlementInfo self this
+        forA_ allocationRequestCids $ \reqCid -> do
+            req <- fetch reqCid
+            archive reqCid
+            requireMatchExpected ("AllocationRequest.settlement", req.settlement) settlement
+        results <- forA allocationsWithContext $ \(allocCid, extraArgs) -> do
+            alloc <- fetch allocCid
+            -- validate the allocation request matches this trade
+            let allocView = view alloc
+            requireMatchExpected ("Allocation.settlement", allocView.allocation.settlement) settlement
+            result <- exercise allocCid $ V2.Allocation_Cancel with
+              actors = venue :: allocView.extraSettlementAuthorizers
+              extraArgs
+            pure (allocView, result)
+        -- prudent engineering: check that the extra settlement authorizers are really required
+        validateExtraSettlementAuthorizers this extraSettlementAuthorizers (map (._1) results)
+        pure OTCTrade_CancelResult with
+          results = [ (allocView.allocation.authorizer, result) | (allocView, result) <- results ]
 
+data OTCTrade_SettleResult = OTCTrade_SettleResult with
+  resultsByAdmin : Map.Map Party V2.SettlementFactory_SettleBatchResult
 
-    interface instance AllocationRequest for OTCTrade where
-      view = AllocationRequestView with
-        settlement = SettlementInfo with
-          executor = venue
-          requestedAt = createdAt
-          settlementRef = makeTradeRef tradeCid
-          allocateBefore = prepareUntil
-          settleBefore
-          meta = emptyMetadata
-        transferLegs
-        meta = emptyMetadata
+data OTCTrade_CancelResult = OTCTrade_CancelResult with
+  results : [(V2.Account, V2.Allocation_CancelResult)]
 
-      allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
-        -- Note: this corresponds to signalling early that one is going to fail to deliver one's assets.
-        -- A real trading app will likely demand punitive charges for this.
-        require "Actor is a sender" (F.any (\leg -> actor == leg.sender) transferLegs)
-        pure ChoiceExecutionMetadata with meta = emptyMetadata
-
-      allocationRequest_WithdrawImpl _self _extraArgs =
-        -- just archiving the trade is enough
-        pure ChoiceExecutionMetadata with meta = emptyMetadata
-
-
-tradingParties : TextMap Api.Token.AllocationV2.TransferLeg -> Set.Set Party
-tradingParties = F.foldl (\acc t -> Set.insert t.sender (Set.insert t.receiver acc)) Set.empty
-
--- | Check whether a required condition is true. If it's not, abort the
--- transaction with a message saying that the requirement was not met.
-require : CanAssert m => Text -> Bool -> m ()
-require msg invariant =
-  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
-
-makeTradeRef : ContractId OTCTradeProposal -> Api.Token.AllocationV2.Reference
-makeTradeRef tradeCid = Api.Token.AllocationV2.Reference with
+makeTradeRef : ContractId OTCTrade -> V2.Reference
+makeTradeRef tradeCid = V2.Reference with
   id = "OTCTradeProposal" -- set to the name of the template to simplify debugging
   cid = Some (coerceContractId tradeCid)
 
+mkOtcTradeSettlementInfo : ContractId OTCTrade -> OTCTrade -> V2.SettlementInfo
+mkOtcTradeSettlementInfo otcTradeCid otcTrade = V2.SettlementInfo with
+  executors = [otcTrade.venue]
+  requestedAt = otcTrade.createdAt
+  settlementRef = makeTradeRef otcTradeCid
+  settleAt = otcTrade.settleAt
+  meta = emptyMetadata
+  settlementDeadline = otcTrade.settlementDeadline
 
--- Additional text map utilities
---------------------------------
-
-zipTextMaps : TextMap a -> TextMap b -> TextMap (Optional a, Optional b)
-zipTextMaps m1 m2 =
-  TextMap.merge
-    (\_ v1 -> Some (Some v1, None))
-    (\_ v2 -> Some (None, Some v2))
-    (\_ v1 v2 -> Some (Some v1, Some v2))
-    m1
-    m2
-
-forTextMapWithKey : Applicative f => TextMap a -> (Text -> a -> f b) -> f (TextMap b)
-forTextMapWithKey m f =
-    TextMap.fromList <$> mapA f' (TextMap.toList m)
+validateExtraSettlementAuthorizers : OTCTrade -> [Party] -> [V2.AllocationView] -> Update ()
+validateExtraSettlementAuthorizers otcTrade extraSettlementAuthorizers allocViews = do
+    require' ("extraSettlementAuthorizers", Set.fromList extraSettlementAuthorizers) isEqualR
+      ("required extra settlement authorizers", requiredExtraSettlementAuthorizers)
   where
-    f' (k, v) = (k,) <$> f k v
+    requiredExtraSettlementAuthorizers = Set.delete otcTrade.venue $
+      Set.fromList otcTrade.autoReceiptAuthorizers <>
+      mconcat [ Set.fromList allocView.extraSettlementAuthorizers | allocView <- allocViews ]
+
+
+-- V1 Authorization infrastructure
+----------------------------------
+
+-- | An agreement to authorize the settlement of a trade by the venue, as an
+-- additional settlementAuthorizer. Used to settle V1 allocations, which require
+-- extra settlement authorizers to authorize the batch settlement.
+template TradeSettlementAgreement with
+    venue : Party
+    trader : Party
+  where
+    signatory venue, trader
+
+    nonconsuming choice TradeSettlementAgreement_OTCTrade_Settle : OTCTrade_SettleResult
+      with
+        tradeCid : ContractId OTCTrade
+        settleArg : OTCTrade_Settle
+        settlementAgreementCids : [ContractId TradeSettlementAgreement]
+        authorizingTraders : [Party]
+      observer settleArg.extraSettlementAuthorizers
+        -- make the final set of extra settlement authorizers see this choice to
+        -- avoid extra views
+      controller venue, authorizingTraders
+      do
+        useOrAddAuthority venue trader settlementAgreementCids authorizingTraders
+          (\finalAuthorizers -> do
+              trade <- fetch tradeCid
+              requireMatchExpected ("trade.venue", trade.venue) venue
+              require' ("final authorizing traders", finalAuthorizers) isEqualSetR ("settleArg.extraSettlementAuthorizers", settleArg.extraSettlementAuthorizers)
+              exercise tradeCid settleArg
+          )
+          (\cid cids newAuthorizingTraders -> do
+              exercise cid TradeSettlementAgreement_OTCTrade_Settle with
+                tradeCid
+                settleArg
+                settlementAgreementCids = cids
+                authorizingTraders = newAuthorizingTraders
+          )
+
+    nonconsuming choice TradeSettlementAgreement_OTCTrade_Cancel : OTCTrade_CancelResult
+      with
+        tradeCid : ContractId OTCTrade
+        cancelArg : OTCTrade_Cancel
+        settlementAgreementCids : [ContractId TradeSettlementAgreement]
+        authorizingTraders : [Party]
+      observer cancelArg.extraSettlementAuthorizers
+        -- make the final set of extra settlement authorizers see this choice to
+        -- avoid extra views
+      controller venue, authorizingTraders
+      do
+        useOrAddAuthority venue trader settlementAgreementCids authorizingTraders
+          (\finalAuthorizers -> do
+              trade <- fetch tradeCid
+              requireMatchExpected ("trade.venue", trade.venue) venue
+              require' ("final authorizing traders", finalAuthorizers) isEqualSetR ("cancelArg.extraSettlementAuthorizers", cancelArg.extraSettlementAuthorizers)
+              exercise tradeCid cancelArg
+          )
+          (\cid cids newAuthorizingTraders -> do
+              exercise cid TradeSettlementAgreement_OTCTrade_Cancel with
+                tradeCid
+                cancelArg
+                settlementAgreementCids = cids
+                authorizingTraders = newAuthorizingTraders
+          )
+
+useOrAddAuthority
+  : Party -- ^ Venue
+  -> Party -- ^ Trader
+  -> [ContractId TradeSettlementAgreement]
+  -> [Party]
+  -> ([Party] -> Update r)
+  -> (ContractId TradeSettlementAgreement ->[ContractId TradeSettlementAgreement] -> [Party] -> Update r)
+  -> Update r
+useOrAddAuthority venue trader settlementAgreementCids authorizingTraders useAuthority addAuthority = do
+  -- validate args
+  require' ("trader", trader) (notR isMemberR) ("authorizingTraders", authorizingTraders)
+  let newAuthorizingTraders = trader :: authorizingTraders
+  case settlementAgreementCids of
+    [] -> useAuthority newAuthorizingTraders
+    cid :: cids -> do
+      -- add authority from this agreement
+      settlementAgreement <- fetch cid
+      requireMatchExpected ("settlementAgreement.venue", settlementAgreement.venue) venue
+      addAuthority cid cids newAuthorizingTraders
+
+

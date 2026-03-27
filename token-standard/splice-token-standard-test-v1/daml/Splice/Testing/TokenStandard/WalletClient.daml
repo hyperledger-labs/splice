@@ -26,23 +26,30 @@ module Splice.Testing.TokenStandard.WalletClient
     -- * Reading allocations
     listRequestedAllocations,
 
+    listAllocationRequests,
+    acceptAllocationRequest,
   ) where
 
 import DA.Action (unless)
-import DA.Optional (isSome)
+import DA.Foldable (forA_)
+import DA.Optional
 import DA.TextMap qualified as TextMap
 
-import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
-import Splice.Api.Token.TransferInstructionV1
-import Splice.Api.Token.AllocationRequestV1
-import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
+import Splice.Api.Token.AllocationV1 qualified as V1
+import Splice.Api.Token.AllocationInstructionV1 qualified as V1
+import Splice.Api.Token.AllocationRequestV1 qualified as V1
+import Splice.Api.Token.HoldingV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+
+import Splice.Testing.TokenStandard.RegistryApi
+import Splice.Testing.Utils
 
 import Daml.Script
 
 -- | List the hodlings of a party of a specific instrument.
-listHoldings : Party -> InstrumentId -> Script [(ContractId Holding, HoldingView)]
+listHoldings : Party -> V1.InstrumentId -> Script [(ContractId V1.Holding, V1.HoldingView)]
 listHoldings p instrumentId = do
-  holdings <- queryInterface @Holding p
+  holdings <- queryInterface @V1.Holding p
   let instrumendHoldings = do
         (cid, Some holding) <- holdings
         guard (holding.instrumentId == instrumentId)
@@ -50,23 +57,27 @@ listHoldings p instrumentId = do
         pure (cid, holding)
   pure instrumendHoldings
 
-listLockedHoldings : Party -> InstrumentId -> Script [(ContractId Holding, HoldingView)]
+listLockedHoldings : Party -> V1.InstrumentId -> Script [(ContractId V1.Holding, V1.HoldingView)]
 listLockedHoldings p instrumentId =
   filter (\(_, holding) -> isSome (holding.lock)) <$> listHoldings p instrumentId
 
+listUnlockedHoldings : Party -> V1.InstrumentId -> Script [(ContractId V1.Holding, V1.HoldingView)]
+listUnlockedHoldings p instrumentId =
+  filter (\(_, holding) -> isNone (holding.lock)) <$> listHoldings p instrumentId
+
 -- | List the cids of the hodlings of a party of a specific instrument.
-listHoldingCids : Party -> InstrumentId -> Script [ContractId Holding]
+listHoldingCids : Party -> V1.InstrumentId -> Script [ContractId V1.Holding]
 listHoldingCids p instrumentId = (map fst) <$> listHoldings p instrumentId
 
 -- | Check that a holding with a specific amount exists for the given owner.
-checkHoldingWithAmountExists : Party -> InstrumentId -> Decimal -> Script ()
+checkHoldingWithAmountExists : Party -> V1.InstrumentId -> Decimal -> Script ()
 checkHoldingWithAmountExists p instrumentId amount = do
   holdings <- map snd <$> listHoldings p instrumentId
   unless (any (\holding -> holding.amount == amount) holdings) $
     fail (show p <> " is missing holding of value " <> show amount <> " in " <> show holdings)
 
 -- | Check the bounds on a party's total balance of all holdings of the given instrument.
-checkBalanceBounds : Party -> InstrumentId -> (Decimal, Decimal) -> Script ()
+checkBalanceBounds : Party -> V1.InstrumentId -> (Decimal, Decimal) -> Script ()
 checkBalanceBounds p instrumentId (lb, ub) = do
   holdings <- listHoldings p instrumentId
   let total = sum $ map (._2.amount) holdings
@@ -75,14 +86,13 @@ checkBalanceBounds p instrumentId (lb, ub) = do
     " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
 
 -- | Check the exact value of on an individual holding's amount.
-checkHolding : Party -> ContractId Holding -> Decimal -> Script ()
+checkHolding : Party -> ContractId V1.Holding -> Decimal -> Script ()
 checkHolding p holdingCid amount = checkHoldingBounds p holdingCid (amount, amount)
 
 -- | Check the bounds on an individual holding's amount.
-checkHoldingBounds : Party -> ContractId Holding -> (Decimal, Decimal) -> Script ()
+checkHoldingBounds : Party -> ContractId V1.Holding -> (Decimal, Decimal) -> Script ()
 checkHoldingBounds p holdingCid (lb, ub) = do
   holdingO <- queryInterfaceContractId p holdingCid
-  debug holdingO
   let holding = case holdingO of
         None -> error $ "Holding " <> show holdingCid <> " was not found"
         Some holding -> holding
@@ -91,43 +101,78 @@ checkHoldingBounds p holdingCid (lb, ub) = do
     " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
 
 -- | Check the approximate value (+/- 1.0) a party's total balance of all holdings of the given instrument.
-checkBalanceApprox : Party -> InstrumentId -> Decimal -> Script ()
+checkBalanceApprox : Party -> V1.InstrumentId -> Decimal -> Script ()
 checkBalanceApprox p instrumentId approximateBalance =
   checkBalanceBounds p instrumentId (approximateBalance - 1.0, approximateBalance + 1.0)
 
 -- | Check the approximate (+/- 1.0) amount of an individual holding.
-checkHoldingApprox : Party -> ContractId Holding -> Decimal -> Script ()
+checkHoldingApprox : Party -> ContractId V1.Holding -> Decimal -> Script ()
 checkHoldingApprox p holdingCid approximateAmount = checkHoldingBounds p holdingCid (approximateAmount - 1.0, approximateAmount + 1.0)
 
 -- | Check the exact value a party's total balance of all holdings of the given instrument.
-checkBalance : Party -> InstrumentId -> Decimal -> Script ()
+checkBalance : Party -> V1.InstrumentId -> Decimal -> Script ()
 checkBalance p instrumentId balance =
   checkBalanceBounds p instrumentId (balance, balance)
 
 -- | List pending transfer offers (as sender or receiver)
-listTransferOffers : Party -> InstrumentId -> Script [(ContractId TransferInstruction, TransferInstructionView)]
+listTransferOffers : Party -> V1.InstrumentId -> Script [(ContractId V1.TransferInstruction, V1.TransferInstructionView)]
 listTransferOffers p instrumentId = do
-  instrs <- queryInterface @TransferInstruction p
+  instrs <- queryInterface @V1.TransferInstruction p
   let pendingOffers = do
         (cid, Some instr) <- instrs
         guard (instr.transfer.instrumentId == instrumentId)
-        guard (instr.status == TransferPendingReceiverAcceptance)
+        guard (instr.status == V1.TransferPendingReceiverAcceptance)
         guard (p == instr.transfer.sender || p == instr.transfer.receiver)
         pure (cid, instr)
   pure pendingOffers
 
 -- | List all allocations requested from the owner for a specific instrument.
-listRequestedAllocations : Party -> InstrumentId -> Script [AllocationSpecification]
+listRequestedAllocations : Party -> V1.InstrumentId -> Script [V1.AllocationSpecification]
 listRequestedAllocations p instrumentId = do
-  reqs <- queryInterface @AllocationRequest p
+  reqs <- queryInterface @V1.AllocationRequest p
   trace reqs $ pure ()
   let amuletAllocs = do
         (_reqCid, Some req) <- reqs
         (tfId, tf) <- TextMap.toList req.transferLegs
         guard (tf.instrumentId == instrumentId)
         guard (p == tf.sender)
-        pure AllocationSpecification with
+        pure V1.AllocationSpecification with
           settlement = req.settlement
           transferLegId = tfId
           transferLeg = tf
   pure amuletAllocs
+
+-- | List all allocation requests of the given party.
+listAllocationRequests : Party -> Script [V1.AllocationRequestView]
+listAllocationRequests p = do
+  reqs <- queryInterface @V1.AllocationRequest p
+  return [ reqView | (_, Some reqView) <- reqs ]
+
+-- | Accept the allocation request by authorizing the transfer of all its requested legs
+-- for the admin of the given requestr
+--
+-- TODO(#4517): add multi-registry support once we have private assets
+acceptAllocationRequest
+  :  RegistryApi registry => Party -> registry -> Party -> V1.AllocationRequestView -> Script ()
+acceptAllocationRequest admin registry sender req = do
+  let requestedAllocations = do
+        (legId, leg) <- TextMap.toList req.transferLegs
+        guard (leg.instrumentId.admin == admin)
+        guard (sender == leg.sender)
+        pure V1.AllocationSpecification with
+          settlement = req.settlement
+          transferLegId = legId
+          transferLeg = leg
+  now <- getTime
+  -- create the allocations one-by-one
+  forA_ requestedAllocations $ \allocation -> do
+    inputHoldings <- listUnlockedHoldings sender allocation.transferLeg.instrumentId
+    enrichedChoice <- getAllocationFactory registry V1.AllocationFactory_Allocate with
+      expectedAdmin = admin
+      allocation
+      inputHoldingCids = map fst inputHoldings
+      requestedAt = now
+      extraArgs = emptyExtraArgs
+    submitWithDisclosures' sender enrichedChoice.disclosures $
+      exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+

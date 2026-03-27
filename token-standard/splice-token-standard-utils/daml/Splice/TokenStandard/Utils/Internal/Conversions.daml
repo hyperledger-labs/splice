@@ -1,0 +1,224 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Internal module implementing conversion functions between v1 and v2 of the token standard.
+--
+-- Import 'Splice.TokenStandard.Utils' to get access to the public ones.
+module Splice.TokenStandard.Utils.Internal.Conversions (
+  -- * API conversion
+  BackwardCompatible(..),
+  ForwardCompatible(..),
+
+  -- * Metadata conversion
+  timeToMeta,
+  timeFromMeta,
+  maxTime,
+  partiesFromMeta,
+  partiesToMeta,
+  dropMeta,
+  validateNoMeta,
+
+  -- * Account utils
+  basicAccount,
+  isBasicAccount,
+  accountParties,
+  ensureBasicAccount,
+
+  -- ** Account metadata conversion
+  accountToMeta,
+  accountFromMeta,
+  dropAccountMeta,
+  ensureNoAccountMeta,
+  validateNoAccountMeta,
+
+-- TODO(#4517): add unit tests for the non-trivial functions
+
+) where
+
+import DA.Action
+import DA.Date
+import DA.Optional
+import DA.Text qualified as T
+import DA.Time
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+
+
+
+-- Utils
+--------
+epoch : Time
+epoch = time (date 1970 Jan 1) 0 0 0
+
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
+
+encodeTime : Time -> Text
+encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
+
+decodeTime : Text -> Time
+decodeTime t = case T.parseInt t of
+  Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
+  None -> error ("Cannot parse time " <> t)
+
+
+
+-- Metadata utils
+-------------------------
+
+-- | Namespace for token standard V2 which is published as CIP-112.
+v2Namespace : Text
+v2Namespace = "cip-112/"
+
+insertOptional : Text -> Optional a -> TextMap.TextMap a -> TextMap.TextMap a
+insertOptional k ov m = case ov of
+  None -> m
+  Some v -> TextMap.insert k v m
+
+
+timeToMeta : Text -> Time -> Metadata -> Metadata
+timeToMeta field t meta =
+  Metadata $ TextMap.insert (v2Namespace <> field) (encodeTime t) meta.values
+
+timeFromMeta : Text -> Metadata -> Optional Time
+timeFromMeta field meta =
+  decodeTime <$> TextMap.lookup (v2Namespace <> field) meta.values
+
+
+-- Account metadata utils
+--------------------------
+
+basicAccount : Party -> HoldingV2.Account
+basicAccount p = HoldingV2.Account None None p
+
+-- | True if the account is a basic account.
+isBasicAccount : HoldingV2.Account -> Bool
+isBasicAccount account = isNone account.provider && isNone account.id
+
+-- | The owner and optional provider of an account.
+accountParties : HoldingV2.Account -> [Party]
+accountParties account = case account.provider of
+  Some provider | provider /= account.owner -> [account.owner, provider]
+  _ -> [account.owner]
+
+providerKey : Text -> Text
+providerKey field = v2Namespace <> field <> ".provider"
+
+idKey : Text -> Text
+idKey field = v2Namespace <> field <> ".id"
+
+accountToMeta : Text -> HoldingV2.Account -> Metadata -> Metadata
+accountToMeta field account meta =
+  Metadata $
+  insertOptional (providerKey field) (partyToText <$> account.provider) $
+  insertOptional (idKey field) account.id $
+  meta.values
+
+accountFromMeta : Party -> Text -> Metadata -> HoldingV2.Account
+accountFromMeta owner field meta =
+  HoldingV2.Account with
+    provider = (TextMap.lookup (providerKey field) meta.values) >>= partyFromText
+    id = TextMap.lookup (idKey field) meta.values
+    owner
+
+dropAccountMeta : Text -> Metadata -> Metadata
+dropAccountMeta fieldName meta =
+  Metadata $
+  TextMap.delete (providerKey fieldName) $
+  TextMap.delete (idKey fieldName) $
+  meta.values
+
+ensureNoAccountMeta : Text -> Text -> Metadata -> Update ()
+ensureNoAccountMeta path fieldName meta = do
+    check (providerKey fieldName)
+    check (idKey fieldName)
+  where
+    check k = case TextMap.lookup k meta.values of
+      None -> pure ()
+      Some v -> fail $ "Unexpected account information in metadata on v2 choice for '" <> path <> fieldName <> "': " <> show v
+
+ensureBasicAccount : Text -> HoldingV2.Account -> Update ()
+ensureBasicAccount fieldName account = do
+  unless (isBasicAccount account) $
+    abort $ "Expected a basic account for field '" <> fieldName <> "', but got: " <> show account
+
+validateNoAccountMeta : Text -> Metadata -> Bool
+validateNoAccountMeta fieldName meta =
+    validateNoMeta (providerKey fieldName) meta &&
+    validateNoMeta (idKey fieldName) meta
+
+validateNoMeta : Text -> Metadata -> Bool
+validateNoMeta fieldName meta = isNone $ TextMap.lookup (v2Namespace <> fieldName) meta.values
+
+dropMeta : Text -> Metadata -> Metadata
+dropMeta field meta = Metadata $ TextMap.delete (v2Namespace <> field) meta.values
+
+partiesToMeta : Text -> [Party] -> Metadata -> Metadata
+partiesToMeta field parties meta
+  | null parties = meta
+  | otherwise =
+      Metadata $
+      TextMap.insert (v2Namespace <> field) (T.intercalate "," (map partyToText parties)) $
+      meta.values
+
+partiesFromMeta : Text -> Metadata -> [Party]
+partiesFromMeta field meta =
+    case TextMap.lookup (v2Namespace <> field) meta.values of
+      None -> []
+      Some txt -> map tryPartyFromText (T.splitOn "," txt)
+  where
+    tryPartyFromText p = case partyFromText p of
+      None -> error $ "Invalid party in metadata field '" <> field <> "': " <> p
+      Some party -> party
+
+
+-- Class based conversion
+---------------------------
+
+-- | A backwards compatible API upgrade from v1 to v2.
+class BackwardCompatible v1 v2 where
+  upcast : v1 -> v2
+
+class ForwardCompatible v1 v2 where
+  downcast : v2 -> v1
+
+
+-- Holding
+----------
+
+instance ForwardCompatible HoldingV1.InstrumentId HoldingV2.InstrumentId where
+  downcast (HoldingV2.InstrumentId {..}) = HoldingV1.InstrumentId with ..
+
+instance BackwardCompatible HoldingV1.InstrumentId HoldingV2.InstrumentId where
+  upcast (HoldingV1.InstrumentId {..}) = HoldingV2.InstrumentId with ..
+
+instance ForwardCompatible HoldingV1.Lock HoldingV2.Lock where
+  downcast (HoldingV2.Lock {..}) = HoldingV1.Lock with ..
+
+instance BackwardCompatible HoldingV1.Lock HoldingV2.Lock where
+  upcast (HoldingV1.Lock {..}) = HoldingV2.Lock with ..
+
+instance ForwardCompatible (ContractId HoldingV1.Holding) (ContractId HoldingV2.Holding) where
+  downcast = coerceInterfaceContractId
+
+instance BackwardCompatible (ContractId HoldingV1.Holding) (ContractId HoldingV2.Holding) where
+  upcast = coerceInterfaceContractId
+
+instance ForwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
+  downcast v2 = HoldingV1.HoldingView with
+    owner = v2.account.owner
+    instrumentId = downcast v2.instrumentId
+    amount = v2.amount
+    lock = downcast <$> v2.lock
+    meta = accountToMeta "account" v2.account v2.meta
+
+instance BackwardCompatible HoldingV1.HoldingView HoldingV2.HoldingView where
+  upcast v1 = HoldingV2.HoldingView with
+    account = accountFromMeta v1.owner "account" v1.meta
+    instrumentId = upcast v1.instrumentId
+    amount = v1.amount
+    lock = upcast <$> v1.lock
+    meta = v1.meta

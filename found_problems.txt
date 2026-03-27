@@ -1,0 +1,9 @@
+[info] stderr: Hidden:   no
+[info] stderr: Range:    92:51-92:95
+[info] stderr: Source:   Script
+[info] stderr: Message:
+[info] stderr: Hidden:   no
+[info] stderr: Range:    92:51-92:95
+[info] stderr: Source:   Script
+[info] stderr: Message:
+[info] stderr: urg

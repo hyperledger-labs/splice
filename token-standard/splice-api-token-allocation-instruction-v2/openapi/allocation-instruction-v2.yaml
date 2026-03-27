@@ -3,11 +3,11 @@
 
 openapi: 3.0.0
 info:
-  title: allocation instruction off-ledger API
+  title: V2 allocation instruction off-ledger API
   description: |
     Implemented by token registries for using and managing
     allocation instructions by wallets.
-  version: 1.0.0
+  version: 2.0.0
 paths:
 
   /registry/allocation-instruction/v2/allocation-factory:
@@ -98,6 +98,10 @@ components:
         The context required to exercise a choice on a contract via an interface.
         Used to retrieve additional reference date that is passed in via disclosed contracts,
         which are in turn referred to via their contract ID in the `choiceContextData`.
+
+        Asset implementations SHOULD avoid that this value depends on contract-ids passed
+        in the choice arguments, so that clients can prefetch choice contexts when chaining
+        multiple token standard actions together in a single Daml transaction.
       type: object
       properties:
         choiceContextData:

@@ -26,7 +26,10 @@ amuletPrefix = "amulet." <> splicePrefix
 -- | Shared definition of the instrument-id used for amulets.
 amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
 amuletInstrumentId dso =
-  Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
+  Api.Token.HoldingV1.InstrumentId with admin = dso; id = amuletInstrumentIdName
+
+amuletInstrumentIdName : Text
+amuletInstrumentIdName = "Amulet"
 
 -- | Add an optional metadata entry.
 optionalMetadata : Text -> (a -> Text) -> Optional a -> TextMap Text -> TextMap Text
