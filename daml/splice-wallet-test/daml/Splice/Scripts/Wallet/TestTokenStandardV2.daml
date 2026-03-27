@@ -1,0 +1,242 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.Wallet.TestTokenStandardV2 where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.Map as Map
+import DA.Time
+
+import qualified Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
+import qualified Splice.Api.Token.AllocationInstructionV2 as Api.Token.AllocationInstructionV2
+import qualified Splice.Api.Token.AllocationRequestV2 as Api.Token.AllocationRequestV2
+import qualified Splice.Api.Token.TransferInstructionV2 as Api.Token.TransferInstructionV2
+import Splice.Api.Token.MetadataV1
+import Splice.TokenStandard.Utils (basicAccount, netAllocationCreditAmount)
+
+import Splice.Wallet.Install
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
+import Splice.Testing.Apps.TradingAppV2 qualified as TradingAppV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+import Splice.Tests.TestAmuletTokenDvP_V1V2Mixed (querySettleableTrades, settleWithTradeAgreements)
+
+import Daml.Script
+
+
+-- Setup utilities
+------------------
+
+setupInstall : Party -> Text -> Script (Party, Party, ContractId WalletAppInstall)
+setupInstall dsoParty name = do
+  validatorParty <- allocateParty (name <> "Validator")
+  endUserParty <- allocateParty name
+  installCid <- submitMulti [endUserParty, validatorParty] [] $ createCmd WalletAppInstall with
+    endUserParty
+    endUserName = name <> "_user"
+    dsoParty
+    validatorParty
+  pure (endUserParty, validatorParty, installCid)
+
+
+-- Tests
+--------
+
+testTokenStandardTransfer : Script ()
+testTokenStandardTransfer = script do
+  registry <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
+
+  (alice, aliceValidator, aliceInstall) <- setupInstall registry.dso "alice"
+  (bob, bobValidator, bobInstall) <- setupInstall registry.dso "bob"
+
+  holdingCid <- AmuletRegistryV2.tapFaucet registry alice 100.0
+
+  now <- getTime
+
+  let
+    initialTransfer = Api.Token.TransferInstructionV2.Transfer with
+      sender = basicAccount alice
+      receiver = basicAccount bob
+      amount = 10.0
+      instrumentId = registry.instrumentId
+      requestedAt = now
+      executeBefore = now `addRelTime` days 1
+      inputHoldingCids = [holdingCid]
+      meta = emptyMetadata
+
+  let initiateTransferAsAlice inputHoldingCids = do
+        enrichedChoice <- RegistryApiV2.getTransferFactory registry
+          Api.Token.TransferInstructionV2.TransferFactory_Transfer with
+            transfer = initialTransfer with inputHoldingCids
+            extraArgs = emptyExtraArgs
+            actors = [alice]
+        submit (actAs aliceValidator <> readAs alice <> disclose' enrichedChoice.disclosures) $
+          exerciseCmd aliceInstall WalletAppInstall_TransferFactoryV2_Transfer with
+            transferFactoryCid = enrichedChoice.factoryCid
+            transferArg = Api.Token.TransferInstructionV2.TransferFactory_Transfer with
+              actors = [alice]
+              transfer = enrichedChoice.arg.transfer
+              extraArgs = enrichedChoice.arg.extraArgs
+
+  -- test withdraw
+  result <- initiateTransferAsAlice [holdingCid]
+
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  let change1 = result.senderChangeCids
+
+  context <- RegistryApiV2.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
+  result <- submit (actAs aliceValidator <> readAs alice <> disclose' context.disclosures) $
+    exerciseCmd aliceInstall WalletAppInstall_TransferInstructionV2_Withdraw with
+      transferInstructionCid = aliceInstrCid
+      withdrawArg = Api.Token.TransferInstructionV2.TransferInstruction_Withdraw with
+        actors = [alice]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+
+  -- test reject
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Failed === result.output
+  let change2 = result.senderChangeCids
+
+  result <- initiateTransferAsAlice (change1 ++ change2)
+
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  let change3 = result.senderChangeCids
+
+  result <- submitMulti [bobValidator] [bob, registry.dso] $
+    exerciseCmd bobInstall WalletAppInstall_TransferInstructionV2_Reject with
+      transferInstructionCid = aliceInstrCid
+      rejectArg = Api.Token.TransferInstructionV2.TransferInstruction_Reject with
+        actors = [bob]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Failed === result.output
+  let change4 = result.senderChangeCids
+
+  -- test accept
+  result <- initiateTransferAsAlice (change3 ++ change4)
+
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  context <- RegistryApiV2.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
+
+  result <- submitMulti [bobValidator] [bob, registry.dso] $
+    exerciseCmd bobInstall WalletAppInstall_TransferInstructionV2_Accept with
+      transferInstructionCid = aliceInstrCid
+      acceptArg = Api.Token.TransferInstructionV2.TransferInstruction_Accept with
+        actors = [bob]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+
+  Api.Token.TransferInstructionV2.TransferInstructionResult_Completed _ <- pure result.output
+
+  -- check balances
+  WalletClientV2.checkBalance alice registry.instrumentId 90.0
+  WalletClientV2.checkBalance bob registry.instrumentId 10.0
+
+  -- no instructions are left over
+  [] <- queryInterface @Api.Token.TransferInstructionV2.TransferInstruction registry.dso
+
+  pure ()
+
+
+
+testTokenStandardAllocateV2 : Script ()
+testTokenStandardAllocateV2 = script do
+  registry <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
+
+  venue <- allocateParty "venue"
+
+  (alice, aliceValidator, aliceInstall) <- setupInstall registry.dso "alice"
+  (bob, bobValidator, _bobInstall) <- setupInstall registry.dso "bob"
+
+  -- setup funds for alice
+  AmuletRegistryV2.tapFaucet registry alice 1000.0
+
+  let amuletId = registry.instrumentId
+  let mkTransfer sender receiver amount = Api.Token.AllocationV2.TransferLeg with
+        transferLegId = "leg1"
+        sender = basicAccount sender
+        receiver = basicAccount receiver
+        amount
+        instrumentId = amuletId
+        meta = emptyMetadata
+  let aliceLeg = mkTransfer alice bob 100.0
+
+  -- venue proposes trade
+  now <- getTime
+  otcTradeCid <- submit venue $ createCmd TradingAppV2.OTCTrade with
+    venue = venue
+    transferLegs = [aliceLeg]
+    createdAt = now
+    settleAt = now `addRelTime` hours 1
+    settlementDeadline = Some (now `addRelTime` hours 2)
+    autoReceiptAuthorizers = []
+
+  -- venue creates allocation requests
+  submit venue $ exerciseCmd otcTradeCid TradingAppV2.OTCTrade_RequestAllocations
+
+  -- have bob and alice accept their requests; and make alice accidentally accept twice
+  forA_ [(alice, aliceValidator, False), (alice, aliceValidator, True), (bob, bobValidator, True)] $ \(actor, validator, acceptRequest) -> do
+    let authorizer = basicAccount actor
+    reqs <- WalletClientV2.listAllocationRequestsV2 authorizer actor
+    [(installCid, _)] <- query @WalletAppInstall actor
+    forA_ reqs $ \(reqCid, req) -> do
+      let fundingAmount = negate $ netAllocationCreditAmount authorizer req.transferLegs
+      inputHoldingCids <- if fundingAmount > 0.0
+        then WalletClientV2.listUnlockedHoldingCidsFor authorizer actor amuletId
+        else pure []
+      enrichedChoice <- RegistryApiV2.getAllocationFactory registry Api.Token.AllocationInstructionV2.AllocationFactory_Allocate with
+        allocation = Api.Token.AllocationV2.AllocationSpecification with
+          authorizer
+          settlement = req.settlement
+          transferLegs = req.transferLegs  -- no filter in this example, as the test trade affects only amulet
+        inputHoldingCids
+        requestedAt = now
+        extraArgs = emptyExtraArgs
+        actors = [actor]
+
+      submit (actAs validator <> readAs actor <> disclose' enrichedChoice.disclosures) $
+        exerciseCmd installCid WalletAppInstall_AllocationFactoryV2_Allocate with
+          allocationFactory = enrichedChoice.factoryCid
+          allocateArg = enrichedChoice.arg
+          allocationReqCid = if acceptRequest then Some reqCid else None
+
+  -- no allocation requests are left over
+  [] <- queryInterface @Api.Token.AllocationRequestV2.AllocationRequest registry.dso
+
+  -- alice withdraws one of her allocations
+  ((allocCid, _) :: _) <- WalletClientV2.listAllocationsV2 (basicAccount alice) alice
+  context <- RegistryApiV2.getAllocation_WithdrawContext registry allocCid emptyMetadata
+  submit (actAs aliceValidator <> readAs alice <> disclose' context.disclosures) $
+    exerciseCmd aliceInstall WalletAppInstall_AllocationV2_Withdraw with
+      allocationCid = allocCid
+      withdrawArg = Api.Token.AllocationV2.Allocation_Withdraw with
+        actors = [alice]
+        extraArgs = ExtraArgs with
+          context = context.choiceContext
+          meta = emptyMetadata
+
+  -- venue settles the trade
+
+  [trade] <- querySettleableTrades registry venue
+  settleWithTradeAgreements trade
+
+  -- no allocations are left over
+  [] <- queryInterface @Api.Token.AllocationV2.Allocation registry.dso
+
+  -- check expected funds
+  WalletClientV2.checkBalance alice amuletId 900.0
+  WalletClientV2.checkBalance bob amuletId 100.0
+
+  pure ()
+
+
+-- disclose' : EnrichedFactoryChoice t ch -> Disclosures
+disclose' : GetField "disclosures" r (Map k Disclosure) => r -> SubmitOptions
+disclose' ds = discloseMany (Map.values ds.disclosures)

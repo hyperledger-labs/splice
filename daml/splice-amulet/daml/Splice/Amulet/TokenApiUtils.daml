@@ -15,6 +15,7 @@ import DA.Text qualified as T
 import Splice.Api.Token.MetadataV1
 import Splice.Api.FeaturedAppRightV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
 
 
 splicePrefix : Text
@@ -27,6 +28,11 @@ amuletPrefix = "amulet." <> splicePrefix
 amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
 amuletInstrumentId dso =
   Api.Token.HoldingV1.InstrumentId with admin = dso; id = amuletInstrumentIdName
+
+-- | V2 instrument id
+amuletInstrumentIdV2 : Party -> Api.Token.HoldingV2.InstrumentId
+amuletInstrumentIdV2 dso =
+  Api.Token.HoldingV2.InstrumentId with admin = dso; id = amuletInstrumentIdName
 
 amuletInstrumentIdName : Text
 amuletInstrumentIdName = "Amulet"

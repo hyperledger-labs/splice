@@ -11,11 +11,16 @@ import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
--- TODO(#4620): add support for allocation v2
 
 import qualified Splice.Api.Token.AllocationV1
 import qualified Splice.Api.Token.AllocationInstructionV1
 import qualified Splice.Api.Token.TransferInstructionV1
+import qualified Splice.Api.Token.AllocationV2
+import qualified Splice.Api.Token.AllocationInstructionV2
+import qualified Splice.Api.Token.AllocationRequestV2
+import qualified Splice.Api.Token.TransferInstructionV2
+import qualified Splice.TokenStandard.Utils as TokenStandard.Utils
+
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.Types
@@ -628,6 +633,9 @@ template WalletAppInstall
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise transferInstructionCid withdrawArg
 
+    -- V1 token standard API support
+    --------------------------------
+
     -- This is a dedicated choice rather than going through AmuletOperation as it behaves a bit differently than all the other operations:
     -- 1. We cannot use rewards as inputs.
     -- 2. We can use expired locked amulets as inputs.
@@ -652,6 +660,91 @@ template WalletAppInstall
          let sender = (view allocation).allocation.transferLeg.sender
          require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
          exercise allocationCid withdrawArg
+
+    -- V2 token standard API support
+    ---------------------------------
+
+    nonconsuming choice WalletAppInstall_TransferFactoryV2_Transfer : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
+      with
+        transferFactoryCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferFactory
+        transferArg : Splice.Api.Token.TransferInstructionV2.TransferFactory_Transfer
+      controller validatorParty
+      do TokenStandard.Utils.requireMatchExpected ("transfer.instrumentId", transferArg.transfer.instrumentId) (amuletInstrumentIdV2 dsoParty)
+         exercise transferFactoryCid transferArg
+
+    nonconsuming choice WalletAppInstall_TransferInstructionV2_Accept : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
+      with
+        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction
+        acceptArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Accept
+      controller validatorParty
+      do checkTransferInstructionV2 dsoParty transferInstructionCid acceptArg.actors endUserParty
+         exercise transferInstructionCid acceptArg
+
+    nonconsuming choice WalletAppInstall_TransferInstructionV2_Reject : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
+      with
+        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction
+        rejectArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Reject
+      controller validatorParty
+      do checkTransferInstructionV2 dsoParty transferInstructionCid rejectArg.actors endUserParty
+         exercise transferInstructionCid rejectArg
+
+    nonconsuming choice WalletAppInstall_TransferInstructionV2_Withdraw : Splice.Api.Token.TransferInstructionV2.TransferInstructionResult
+      with
+        transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction
+        withdrawArg : Splice.Api.Token.TransferInstructionV2.TransferInstruction_Withdraw
+      controller validatorParty
+      do checkTransferInstructionV2 dsoParty transferInstructionCid withdrawArg.actors endUserParty
+         exercise transferInstructionCid withdrawArg
+
+    nonconsuming choice WalletAppInstall_AllocationFactoryV2_Allocate : Splice.Api.Token.AllocationInstructionV2.AllocationInstructionResult
+      with
+        allocationFactory : ContractId Splice.Api.Token.AllocationInstructionV2.AllocationFactory
+        allocateArg : Splice.Api.Token.AllocationInstructionV2.AllocationFactory_Allocate
+        allocationReqCid : Optional (ContractId Splice.Api.Token.AllocationRequestV2.AllocationRequest)
+          -- ^ Allocation request to accept at the same time as creating the allocation.
+          --
+          -- Useful for replay protection when creating allocations that do not require funding.
+          --
+          -- Optional in case the allocation request should be left as-is, e.g., because
+          -- it is used in another registry-specific UI to create an allocation.
+      controller validatorParty
+      do
+        TokenStandard.Utils.checkActors allocateArg.actors [[endUserParty]]
+        checkAllocationSpecificationV2 dsoParty allocateArg.allocation endUserParty
+        forA_ allocationReqCid $ \reqCid -> do
+          req <- fetchUncheckedButArchiveLater reqCid
+          TokenStandard.Utils.requireMatchExpected
+            ("allocationReq.settlement", (view req).settlement) allocateArg.allocation.settlement
+          exercise reqCid Splice.Api.Token.AllocationRequestV2.AllocationRequest_Accept with
+            actors = [endUserParty]
+            extraArgs = ExtraArgs emptyChoiceContext emptyMetadata
+        exercise allocationFactory allocateArg
+
+    nonconsuming choice WalletAppInstall_AllocationV2_Withdraw : Splice.Api.Token.AllocationV2.Allocation_WithdrawResult
+      with
+        allocationCid : ContractId Splice.Api.Token.AllocationV2.Allocation
+        withdrawArg : Splice.Api.Token.AllocationV2.Allocation_Withdraw
+      controller validatorParty
+      do
+        TokenStandard.Utils.checkActors withdrawArg.actors [[endUserParty]]
+        allocation <- fetchCheckedInterface (ForDso dsoParty) allocationCid
+        checkAllocationSpecificationV2 dsoParty (view allocation).allocation endUserParty
+        exercise allocationCid withdrawArg
+
+
+checkTransferInstructionV2 : Party -> ContractId Splice.Api.Token.TransferInstructionV2.TransferInstruction -> [Party] -> Party -> Update ()
+checkTransferInstructionV2 dsoParty transferInstructionCid actors endUserParty = do
+  TokenStandard.Utils.checkActors actors [[endUserParty]]
+  instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstructionCid
+  TokenStandard.Utils.requireMatchExpected
+    ("instruction.transfer.instrumentId", (view instruction).transfer.instrumentId) (amuletInstrumentIdV2 dsoParty)
+
+checkAllocationSpecificationV2 : Party -> Splice.Api.Token.AllocationV2.AllocationSpecification -> Party -> Update ()
+checkAllocationSpecificationV2 dsoParty allocation endUserParty = do
+  TokenStandard.Utils.requireMatchExpected ("allocation.authorizer", allocation.authorizer) (TokenStandard.Utils.basicAccount endUserParty)
+  let amuletId = amuletInstrumentIdV2 dsoParty
+  forA_ allocation.transferLegs $ \leg -> do
+    TokenStandard.Utils.requireMatchExpected (leg.transferLegId <> ".instrumentId", leg.instrumentId) amuletId
 
 unpackCid : AnyValue -> AnyContractId
 unpackCid (AV_ContractId cid) = cid

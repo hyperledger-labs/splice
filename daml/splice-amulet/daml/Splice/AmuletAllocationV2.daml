@@ -41,7 +41,7 @@ template AmuletAllocationV2
     ensure
       isBasicAccount allocation.authorizer &&
       isValidAllocationSpecificationV2
-        (\instrumentId -> instrumentId == V2.InstrumentId dso amuletInstrumentIdName)
+        (\instrumentId -> instrumentId == amuletInstrumentIdV2 dso)
         allocation
 
     interface instance V2.Allocation for AmuletAllocationV2 where
