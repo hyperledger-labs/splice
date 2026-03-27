@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import BuildCommon.{disableTests, sharedSettings}
+import BuildCommon.sharedSettings
 import sbt.Keys.libraryDependencies
-import sbt.file
+import sbt.{file, Test}
 import wartremover.WartRemover.autoImport._
 
 object Wartremover {
@@ -13,10 +13,10 @@ object Wartremover {
     sbt.Project
       .apply("splice-wartremover-extension", file("build-tools/wart-remover-extension"))
       .settings(
-        disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
-          wartremover_dep
+          wartremover_dep,
+          scalatest % Test,
         ),
       )
   }
@@ -27,6 +27,7 @@ object Wartremover {
 
   lazy val spliceWarts = Seq(
     wartremoverErrors ++= extraWartRemoverErrors,
+    wartremoverErrors += Wart.custom("org.lfdecentralizedtrust.splice.wart.ParTraverse"),
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `splice-wartremover-extension`
     ),

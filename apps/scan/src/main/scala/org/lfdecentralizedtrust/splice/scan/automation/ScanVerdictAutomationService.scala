@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.sequencer.SequencerTrafficClient
+import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanMediatorVerdictIngestionMetrics
 import org.lfdecentralizedtrust.splice.store.{
@@ -39,7 +40,7 @@ class ScanVerdictAutomationService(
     synchronizerId: SynchronizerId,
     ingestionMetrics: ScanMediatorVerdictIngestionMetrics,
     sequencerTrafficClientO: Option[SequencerTrafficClient],
-    appActivityComputation: AppActivityComputation,
+    rewardsReferenceStoreO: Option[ScanRewardsReferenceStore],
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -55,6 +56,11 @@ class ScanVerdictAutomationService(
 
   override def companion: AutomationServiceCompanion = ScanVerdictAutomationService
 
+  private val appActivityComputationO: Option[AppActivityComputation] =
+    rewardsReferenceStoreO.map { store =>
+      new AppActivityComputation(store, loggerFactory)
+    }
+
   registerTrigger(
     new ScanVerdictStoreIngestion(
       triggerContext,
@@ -65,7 +71,7 @@ class ScanVerdictAutomationService(
       synchronizerId,
       ingestionMetrics,
       sequencerTrafficClientO,
-      appActivityComputation,
+      appActivityComputationO,
     )
   )
 }

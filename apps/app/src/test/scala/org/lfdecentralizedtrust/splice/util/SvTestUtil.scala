@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.util
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Transaction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -29,7 +31,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.Assertion
 
 import java.math.RoundingMode
@@ -157,30 +158,32 @@ trait SvTestUtil extends TestCommon {
 
         // Concurrent uses of log suppression don't work so we suppress here instead of within eventually succeeds
         loggerFactory.suppressErrors {
-          svsToCastVotes.parTraverse { sv =>
-            Future {
-              clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
-                val svVoteRequest = eventually() {
-                  onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.tryCreate(4))(svsToCastVotes) { sv =>
+              Future {
+                clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
+                  val svVoteRequest = eventually() {
+                    onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+                  }
+                  getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
                 }
-                getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
-              }
-              clue(s"${sv.name} accepts vote") {
-                eventually() {
-                  try {
-                    sv.castVote(
-                      voteRequest.contractId,
-                      true,
-                      "url",
-                      "description",
-                    )
-                  } catch {
-                    case NonFatal(e) => fail(e)
+                clue(s"${sv.name} accepts vote") {
+                  eventually() {
+                    try {
+                      sv.castVote(
+                        voteRequest.contractId,
+                        true,
+                        "url",
+                        "description",
+                      )
+                    } catch {
+                      case NonFatal(e) => fail(e)
+                    }
                   }
                 }
               }
             }
-          }.futureValue
+            .futureValue
         }
       },
     )(
@@ -246,30 +249,32 @@ trait SvTestUtil extends TestCommon {
 
         // Concurrent uses of log suppression don't work so we suppress here instead of within eventually succeeds
         loggerFactory.suppressErrors {
-          svsToCastVotes.parTraverse { sv =>
-            Future {
-              clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
-                val svVoteRequest = eventually() {
-                  onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+          MonadUtil
+            .parTraverseWithLimit(PositiveInt.four)(svsToCastVotes) { sv =>
+              Future {
+                clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
+                  val svVoteRequest = eventually() {
+                    onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+                  }
+                  getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
                 }
-                getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
-              }
-              clue(s"${sv.name} accepts vote") {
-                eventually() {
-                  try {
-                    sv.castVote(
-                      voteRequest.contractId,
-                      true,
-                      "url",
-                      "description",
-                    )
-                  } catch {
-                    case NonFatal(e) => fail(e)
+                clue(s"${sv.name} accepts vote") {
+                  eventually() {
+                    try {
+                      sv.castVote(
+                        voteRequest.contractId,
+                        true,
+                        "url",
+                        "description",
+                      )
+                    } catch {
+                      case NonFatal(e) => fail(e)
+                    }
                   }
                 }
               }
             }
-          }.futureValue
+            .futureValue
         }
       },
     )(

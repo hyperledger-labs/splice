@@ -219,7 +219,7 @@ class DomainMigrationInitializer(
         packageVersionSupport,
         clock,
         retryProvider,
-        logger,
+        loggerFactory,
         config.domainMigrationId,
         config.scan,
       )

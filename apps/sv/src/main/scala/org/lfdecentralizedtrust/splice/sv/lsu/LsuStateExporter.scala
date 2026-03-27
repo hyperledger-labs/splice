@@ -35,6 +35,7 @@ class LsuStateExporter(
       sequencerIdentityDump <- sequencerIdentityStore.getNodeIdentitiesDump()
       mediatorIdentityDump <- mediatorIdentityStore.getNodeIdentitiesDump()
     } yield {
+      logger.info(s"Finished exporting LSU state for upgrade at $upgradesAt")
       LsuState(
         upgradesAt.toInstant,
         SynchronizerNodeIdentities(

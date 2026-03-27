@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
@@ -18,7 +20,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.tracing.NoReportingTracerProvider
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.pekko.Done
 import org.apache.pekko.actor.CoordinatedShutdown
@@ -340,8 +341,8 @@ object SpliceTests extends LazyLogging {
       NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {
         case Some(foundDso: SvOnboardingConfig.FoundDso) =>
           foundDso.initialTickDuration.asJava
-        case Some(_: SvOnboardingConfig.JoinWithKey) |
-            Some(_: SvOnboardingConfig.DomainMigration) | None =>
+        case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
+            Some(_: SvOnboardingConfig.RollForwardLsu) | None =>
           fail("Failed to retrieve defaultTickDuration from sv1.")
       }).toSeconds)
 
@@ -355,7 +356,7 @@ object SpliceTests extends LazyLogging {
         case Some(foundDso: SvOnboardingConfig.FoundDso) =>
           foundDso.initialSynchronizerFeesConfig
         case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
-            None =>
+            Some(_: SvOnboardingConfig.RollForwardLsu) | None =>
           fail("Failed to retrieve defaultSynchronizerFeesConfig from sv1.")
       }
 
@@ -489,7 +490,9 @@ object SpliceTests extends LazyLogging {
     protected def stopAllAsync(
         nodes: AppBackendReference*
     )(implicit ec: ExecutionContext): Future[Unit] = {
-      nodes.parTraverse(node => Future { node.stop() }).map(_ => ())
+      MonadUtil
+        .parTraverseWithLimit(PositiveInt.tryCreate(4))(nodes.toSeq)(node => Future { node.stop() })
+        .map(_ => ())
     }
 
     def registerHttpConnectionPoolsCleanup(implicit

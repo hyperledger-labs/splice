@@ -20,6 +20,7 @@ import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, Pruning
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -39,6 +40,7 @@ import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  SequencerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -49,6 +51,7 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
+import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.github.blemale.scaffeine.Scaffeine
@@ -792,6 +795,17 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
+
+  def performManualLsu(
+      currentPsid: PhysicalSynchronizerId,
+      successorPsid: PhysicalSynchronizerId,
+      upgradeTime: Option[CantonTimestamp],
+      sequencerSuccessors: Map[SequencerId, GrpcConnection],
+  )(implicit tc: TraceContext): Future[Unit] =
+    runCmd(
+      ParticipantAdminCommands.SynchronizerConnectivity
+        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
+    )
 }
 
 object ParticipantAdminConnection {

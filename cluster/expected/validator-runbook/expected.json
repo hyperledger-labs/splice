@@ -552,7 +552,7 @@
           "name": "cn-mocknet"
         },
         "config": {
-          "jsonLedgerApiUrl": "http://participant-3:7575",
+          "jsonLedgerApiUrl": "http://participant-2:7575",
           "keyDirectory": "/keys",
           "maxParties": 1234,
           "parallelism": 321,

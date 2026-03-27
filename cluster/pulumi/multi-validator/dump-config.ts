@@ -7,7 +7,10 @@ import { initDumpConfig } from '../common/src/dump-config-common';
 async function main() {
   await initDumpConfig();
   const installNode = await import('./src/installNode');
-  installNode.installNode();
+  await installNode.installNode();
 }
 
-main();
+main().catch(e => {
+  console.error(e.stack ?? e.message ?? e);
+  process.exit(1);
+});

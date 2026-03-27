@@ -223,6 +223,12 @@ object SvOnboardingConfig {
       case other => other
     }
   }
+
+  case class RollForwardLsu(
+      name: String,
+      newPhysicalSynchronizerSerial: NonNegativeInt,
+      newPhysicalSynchronizerprotocolVersion: ProtocolVersion,
+  ) extends SvOnboardingConfig
 }
 
 final case class InitialAnsConfig(
@@ -392,6 +398,7 @@ case class SvAppBackendConfig(
         case _: SvOnboardingConfig.FoundDso => true
         case _: SvOnboardingConfig.JoinWithKey => true
         case _: SvOnboardingConfig.DomainMigration => false
+        case _: SvOnboardingConfig.RollForwardLsu => false
       }
   override val nodeTypeName: String = "SV"
 
