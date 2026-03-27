@@ -13,7 +13,7 @@ from pathlib import Path
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 METRICS_DIR = Path("/tmp/store-ingestion-perf-metrics")
-PUSHGATEWAY_URL="http://prometheus-pushgateway.observability:9091"
+PUSHGATEWAY_URL="http://prometheus-pushgateway.observability.svc.cluster.local:9091"
 
 
 def push_metrics() -> None:
