@@ -34,7 +34,7 @@ class PackageVetting(
   def vetCurrentPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
-      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val currentPackageConfig = schedule.getConfigAsOf(clock.now).packageConfig
@@ -102,7 +102,7 @@ class PackageVetting(
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
-      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =

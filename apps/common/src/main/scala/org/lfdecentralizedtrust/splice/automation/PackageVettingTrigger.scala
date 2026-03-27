@@ -6,9 +6,14 @@ package org.lfdecentralizedtrust.splice.automation
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
+  DarResources,
+  PackageIdResolver,
+  ParticipantAdminConnection,
+}
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, DarResourcesUtil, PackageVetting}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -76,13 +81,18 @@ abstract class PackageVettingTrigger(
         latestPackagesOnly,
         additionalPackagesToUnvet,
       )
-      isUnvettingEnable =
-        unsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
+      // Unvet unsupported packages only if they are currently vetted to avoid Canton failing conformance checks
+      resolvedUnsupportedPackages = resolvePackagesToUnvetFromVettingState(
+        vettedPackageIds,
+        unsupportedPackages.map(_.packageId).map(PackageId.assertFromString),
+      )
+      isUnvettingEnabled =
+        resolvedUnsupportedPackages.nonEmpty && enableUnvetting && enableUnsupportedDarsUnvetting
       // See https://github.com/DACH-NY/canton/issues/29834: make it work for non-sv validators as well
-      _ = if (isUnvettingEnable) {
+      _ = if (isUnvettingEnabled) {
         vetting.unvetPackages(
           domainId,
-          unsupportedPackages,
+          resolvedUnsupportedPackages,
           Some((context.pollingClock, maxVettingDelay)),
         )
       }
@@ -102,4 +112,12 @@ abstract class PackageVettingTrigger(
       Future.unit
     }
   }
+
+  private def resolvePackagesToUnvetFromVettingState(
+      vettedPackageIds: Seq[PackageId],
+      unsupportedPackagesIds: Seq[PackageId],
+  ): Seq[DarResource] =
+    unsupportedPackagesIds
+      .filter(vettedPackageIds.toSet)
+      .flatMap(DarResources.pkgIdToDarResource.get)
 }
