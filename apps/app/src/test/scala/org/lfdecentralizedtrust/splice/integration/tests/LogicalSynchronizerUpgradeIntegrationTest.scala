@@ -13,7 +13,6 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.util.HexString
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
@@ -58,6 +57,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     with StandaloneCanton
     with HasExecutionContext
     with SynchronizerFeesTestUtil
+    with LsuTestUtil
     with TryValues {
 
   override protected def runEventHistorySanityCheck: Boolean = false
@@ -572,23 +572,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
         allBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
       }
     }
-  }
-
-  private def scheduleLsu(
-      topologyFreezeTime: CantonTimestamp,
-      upgradeTime: CantonTimestamp,
-      serial: Long,
-  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    scheduleLogicalSynchronizerUpgrade(
-      sv1Backend,
-      Seq(sv2Backend, sv3Backend),
-      new LogicalSynchronizerUpgradeSchedule(
-        topologyFreezeTime.toInstant,
-        upgradeTime.toInstant,
-        serial,
-        sv1Backend.config.localSynchronizerNodes.current.protocolVersion.toString,
-      ),
-    )
   }
 
   private def waitForLsuAnnouncement()(implicit env: SpliceTestConsoleEnvironment): Unit = {
