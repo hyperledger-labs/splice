@@ -39,7 +39,6 @@ import org.apache.pekko.http.scaladsl.model.{
   HttpHeader,
   HttpResponse,
   MediaTypes,
-  ResponseEntity,
   StatusCode,
   Uri,
 }
