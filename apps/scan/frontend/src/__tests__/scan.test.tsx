@@ -36,24 +36,6 @@ test('home screen shows up', async () => {
   expect(appName).toBeDefined();
 });
 
-test('round of latest data is displayed', async () => {
-  server.use(
-    rest.get(`${scanUrl}/v0/round-of-latest-data`, (_, res, ctx) => {
-      return res(ctx.json<GetRoundOfLatestDataResponse>({ round: 0, effectiveAt: new Date() }));
-    })
-  );
-
-  render(<AppWithConfig />);
-
-  const roundOfLatestDataText = await screen.findByTestId('round-of-latest-data-text');
-  const roundOfLatestDataValue = await screen.findByTestId('round-of-latest-data-value');
-
-  expect(roundOfLatestDataText.textContent).toMatch(
-    /The content on this page is computed as of round:/
-  );
-  expect(roundOfLatestDataValue.textContent).toBe('0');
-});
-
 test('total circulating amulet balance is displayed', async () => {
   render(<AppWithConfig />);
 

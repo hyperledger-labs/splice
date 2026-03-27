@@ -52,15 +52,6 @@ const Root: React.FC = () => {
           </Typography>
         </Grid>
 
-        <Grid size={{ xs: 4 }}>
-          <div id="as-of-round">
-            <Typography variant="body2" data-testid="round-of-latest-data-text">
-              The content on this page is computed as of round:{' '}
-              <span data-testid="round-of-latest-data-value">{round}</span>
-            </Typography>
-          </div>
-        </Grid>
-
         <Grid size={{ xs: 12, lg: 6 }} data-testid="circulating-supply-container">
           <TotalAmuletBalance />
         </Grid>
