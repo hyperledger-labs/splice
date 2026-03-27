@@ -28,6 +28,7 @@ export type ValidatorConf = {
 export function setup(): ValidatorConf[] {
   const validatorConfs: ValidatorConf[] = [];
 
+  console.info(`Setting up load test with ${settings.validators.length} validators, ${settings.usersPerValidator} users per validator, and ${settings.featuredUsersPerValidator} featured users per validator.`);
   settings.validators.forEach((validator, validatorIndex) => {
     let tokens: string[] = [];
     let featured: boolean[] = [];
