@@ -8,6 +8,8 @@
 -- wallet or custom automation that uses the Ledger API directly.
 module Splice.Api.Token.AllocationRequestV2 where
 
+import DA.Map as Map
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2
@@ -103,6 +105,20 @@ interface AllocationRequest where
     controller actors
     do allocationRequest_withdrawImpl this self arg
 
+-- | Actions available on an allocation request.
+data AllocationRequestAction
+    = ARA_Accept
+    | ARA_Reject
+    | -- | Used to represent app-specific actions on allocation requests.
+      ARA_Custom with
+        id : Text
+          -- ^ Machine-readable identifier of the action, e.g., used for matching in the wallet.
+          -- Namespaced analogously to metadata keys.
+        description : Text
+          -- ^ Brief human-readable description of the action, e.g., used for display in the wallet.
+        meta : Metadata
+          -- ^ Additional metadata specific to the action, used for extensibility.
+    deriving (Show, Eq)
 
 -- | View of an `AllocationRequest`.
 data AllocationRequestView = AllocationRequestView with
@@ -119,6 +135,14 @@ data AllocationRequestView = AllocationRequestView with
       --
       -- This may or may not be a complete list of transfer legs that are part of the settlement,
       -- depending on the confidentiality requirements of the app.
+    availableActions : Map.Map [Party] [AllocationRequestAction]
+      -- ^ The actions that the wallet can present to the user on the allocation request.
+      --
+      -- This field can by used to inform wallet users whether they can take an action or not;
+      -- and which other parties they might be waiting on to take their action.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, app-specific delegation contracts to be in place.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation request, used for extensibility.
   deriving (Show, Eq)

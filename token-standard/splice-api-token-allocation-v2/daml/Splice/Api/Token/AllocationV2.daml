@@ -143,9 +143,6 @@ data AllocationView = AllocationView with
       --
       -- Supports multiple parties for actions that require joint authorization. Executing them
       -- will require appropriate, registry-specific delegation contracts to be in place.
-      --
-      -- Implementations SHOULD minimize the amount of data in this field for efficiency reasons,
-      -- as it needs to be populated for every allocation using the Ledger API.
     meta : Metadata
       -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
@@ -208,8 +205,11 @@ interface Allocation where
         -- - For V1 allocations, the actors MUST additionally include the owners
         --   of the sender and receiver accounts of the transfer legs.
         --
-        -- This authorization is required as all of these parties are expected to guarantee
-        -- atomic settlement.
+        -- This authorization is required as all of these parties are expected
+        -- to guarantee atomic settlement. This authorization is typically provided
+        -- as part of the `SettlementFactory_SettleBatch` choice, which should
+        -- be used by the executors and the extra settlement authorizers to
+        -- settle V2 allocations.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     observer allocation_settleExtraObservers this arg
@@ -362,7 +362,7 @@ interface SettlementFactory where
         --
         --  - the allocations were created for the `settlement` being settled
         --  - the transfer legs of the allocations authorize both send and
-        --    receipt for the transfers in the order specified in `transferLegs`
+        --    receipt for the transfers specified in `transferLegs`
         --  - the `transferLegs` cover exactly the transfers authorized by the
         --    allocations
         --

@@ -202,7 +202,7 @@ allocationV2_settleDefaultImplUsingV1 this self (AllocationV2.Allocation_Settle{
       -- We tag it as a mint of 0.0 holding amount, as that is as good as any of
       -- the other options.
       --
-      -- Recievers using V2 wallets will parse the choice as a whole and ignore this metadata.
+      -- Receivers using V2 wallets will parse the choice as a whole and ignore this metadata.
 
       -- TODO(#4550): attempt to do better as part of switching to event based history parsing
 
@@ -541,7 +541,7 @@ allocationRequestV2_rejectDefaultImplUsingV1
   -> AllocationRequestV2.AllocationRequest_Reject
   -> Update AllocationRequestV2.AllocationRequest_RejectResult
 allocationRequestV2_rejectDefaultImplUsingV1 allowedActors self arg = do
-  -- check actors here to avoid leadking authority
+  -- check actors here to avoid leaking authority
   checkActors arg.actors allowedActors
   case arg.actors of
     [actor] -> do

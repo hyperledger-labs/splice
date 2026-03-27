@@ -78,8 +78,10 @@ template AmuletAllocation
     interface instance V2.Allocation for AmuletAllocation where
       view = upcast (view (toInterface @V1.Allocation this))
 
+      -- executors are required actors on the settle choice, and thus do not have to be added as extra observers for settle
       allocation_settleExtraObservers _arg = []
-      -- add the executor as an extra observer, as they otherwise only see the V1 choice by default
+
+      -- add the executor as an extra observer on the choices below, as they otherwise only see the V1 choice by default
       allocation_cancelExtraObservers _arg = [allocation.settlement.executor]
       allocation_withdrawExtraObservers _arg = [allocation.settlement.executor]
 

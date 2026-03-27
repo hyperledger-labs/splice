@@ -43,6 +43,8 @@ template OTCTradeAllocationRequest with
         settlement
         transferLegs
         authorizer
+        availableActions = Map.fromList
+          [ ([p], [V2.ARA_Accept, V2.ARA_Reject]) | p <- accountParties authorizer ]
         meta = emptyMetadata
 
       allocationRequest_acceptExtraObservers = allocationRequestV2_acceptDefaultExtraObservers this
@@ -124,7 +126,7 @@ template OTCTrade with
           -- note: we are not checking that there is a request for every traders, as it could be
           -- there there is a request that got rejected but the allocation still got created.
           --
-          -- In a real app, we expect there to be cleanup automation that
+          -- In a real app, we expect that the trading app runs cleanup automation that
           -- archives requests for which no matching trade exists.
 
         -- prudent engineering: check that the extra settlement authorizers are really required

@@ -13,6 +13,7 @@ import Splice.Api.Token.AllocationV2
 
 -- AllocationInstruction
 ------------------------
+
 data AllocationInstructionAction
     = AIA_Withdraw
     | -- | Used to represent registry-specific actions that need to happen
