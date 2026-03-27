@@ -2544,8 +2544,8 @@ object HttpScanAppClient {
   }
 
   case class GetBulkUpdateHistory(
-      afterRecordTime: CantonTimestamp,
-      atOrBeforeRecordTime: CantonTimestamp,
+      startRecordTime: CantonTimestamp,
+      endRecordTime: CantonTimestamp,
       nextPageToken: Option[String],
       limit: Int,
   ) extends InternalBaseCommand[
@@ -2558,8 +2558,8 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkUpdateHistoryObjectsResponse] =
       client.listBulkUpdateHistoryObjects(
         definitions.ListBulkUpdateHistoryObjectsRequest(
-          afterRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
-          atOrBeforeRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          startRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          endRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
           nextPageToken,
           limit,
         ),

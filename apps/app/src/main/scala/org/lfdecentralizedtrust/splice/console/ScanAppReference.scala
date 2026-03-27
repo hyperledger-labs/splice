@@ -777,16 +777,16 @@ abstract class ScanAppReference(
 
   @Help.Summary("List all objects in bulk storage with updates between given timestamps")
   def getBulkUpdateHistory(
-      afterTimestamp: CantonTimestamp,
-      atOrBeforeTimestamp: CantonTimestamp,
+      startTimestamp: CantonTimestamp,
+      endTimestamp: CantonTimestamp,
       nextPageToken: Option[String],
       limit: Int,
   ): definitions.ListBulkUpdateHistoryObjectsResponse =
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetBulkUpdateHistory(
-          afterTimestamp,
-          atOrBeforeTimestamp,
+          startTimestamp,
+          endTimestamp,
           nextPageToken,
           limit,
         )

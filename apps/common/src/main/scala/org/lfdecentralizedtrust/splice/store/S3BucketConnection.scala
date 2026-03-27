@@ -56,9 +56,15 @@ class S3BucketConnection(
   def listObjects: Future[ListObjectsResponse] =
     s3Client.listObjects(ListObjectsRequest.builder().bucket(bucketName).build()).asScala
 
-  private def s3List(
+  /*
+    Iterates through all pages of an S3 listObjectsV2 request, applying the provided function to
+    extract the relevant names from each page (e.g. object keys, or folder prefixes), and returns the
+    top `limit` names sorted alphabetically. The function is used for both listing objects and listing folders.
+    It is safe to use on long lists, memory-wise, as it always keeps in memory only the top `limit` names seen so far.
+   */
+  private def firstNamesFromS3List(
       listRequest: ListObjectsV2Request,
-      pageToContent: ListObjectsV2Response => Iterable[String],
+      namesFromPage: ListObjectsV2Response => Iterable[String],
       limit: Limit,
   )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] = {
     Source
@@ -66,7 +72,7 @@ class S3BucketConnection(
         s3Client.listObjectsV2Paginator(listRequest)
       )
       .fold(Seq.empty[String])((acc, page) => {
-        val content = pageToContent(page)
+        val content = namesFromPage(page)
         applyLimit(
           "listObjects",
           limit,
@@ -82,7 +88,7 @@ class S3BucketConnection(
       keyFilter: String => Boolean,
       limit: Limit,
   )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
-    s3List(
+    firstNamesFromS3List(
       ListObjectsV2Request
         .builder()
         .bucket(bucketName)
@@ -97,7 +103,7 @@ class S3BucketConnection(
       folderFilter: String => Boolean,
       limit: Limit,
   )(implicit tc: TraceContext, as: ActorSystem): Future[Seq[String]] =
-    s3List(
+    firstNamesFromS3List(
       ListObjectsV2Request
         .builder()
         .bucket(bucketName)

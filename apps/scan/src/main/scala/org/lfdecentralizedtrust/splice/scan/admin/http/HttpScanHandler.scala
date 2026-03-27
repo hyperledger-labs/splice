@@ -2515,8 +2515,8 @@ class HttpScanHandler(
               .asRuntimeException()
           )
         case Some((_, updateHistoryBulkStorage, publicUrl)) =>
-          val afterTs = Codec.tryDecode(Codec.OffsetDateTime)(body.afterRecordTime)
-          val upToTs = Codec.tryDecode(Codec.OffsetDateTime)(body.atOrBeforeRecordTime)
+          val afterTs = Codec.tryDecode(Codec.OffsetDateTime)(body.startRecordTime)
+          val upToTs = Codec.tryDecode(Codec.OffsetDateTime)(body.endRecordTime)
           updateHistoryBulkStorage
             .getUpdatesBetweenDates(
               afterTs,

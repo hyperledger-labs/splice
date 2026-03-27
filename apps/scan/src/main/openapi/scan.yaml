@@ -4094,18 +4094,18 @@ components:
     ListBulkUpdateHistoryObjectsRequest:
       type: object
       required:
-        - after_record_time
-        - at_or_before_record_time
+        - start_record_time
+        - end_record_time
         - page_size
       properties:
-        after_record_time:
+        start_record_time:
           description: |
             The returned objects must include all updates with record time greater than start_record_time (but may also include updates before it).
           type: string
           format: date-time
-        at_or_before_record_time:
+        end_record_time:
           description: |
-            The returned objects must include all updates with record time at most up_to_or_before record time (but may also include updates after it).
+            The returned objects must include all updates with record time at most end_record_time (but may also include updates after it).
           type: string
           format: date-time
         next_page_token:
