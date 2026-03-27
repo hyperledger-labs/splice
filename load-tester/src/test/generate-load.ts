@@ -3,15 +3,16 @@
 import BigNumber from 'bignumber.js';
 import { Gauge } from 'k6/metrics';
 
-
-
 import { Auth0Manager } from '../client/auth0/auth0';
 import { logInUser } from '../client/auth0/helpers';
 import { encodeJwtHmac256 } from '../client/jwt';
-import { doIfOnboarded, sendAndWaitForTransferOffer, waitForBalance } from '../client/validator/helpers';
+import {
+  doIfOnboarded,
+  sendAndWaitForTransferOffer,
+  waitForBalance,
+} from '../client/validator/helpers';
 import settings from '../settings';
 import { pickTwoRandomUsers, syncRetryUndefined } from '../utils';
-
 
 export const options = { ...settings.options };
 

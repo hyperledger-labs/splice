@@ -3,12 +3,9 @@
 import BigNumber from 'bignumber.js';
 import { Counter, Trend } from 'k6/metrics';
 
-
-
 import { syncRetryUndefined } from '../../utils';
 import { GetBalanceResponse } from './models';
 import { ValidatorClient } from './validator';
-
 
 const createOfferLatency = new Trend('create_offer_latency', true);
 const offerSyncLatency = new Trend('offer_sync_latency', true);

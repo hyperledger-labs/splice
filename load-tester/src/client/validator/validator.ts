@@ -1,15 +1,22 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-
 /* @ts-expect-error typings unavailable */
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
-
-
 import { getTomorrowMs, jsonStringDecoder } from '../../utils';
 import { HttpClient } from '../http';
-import { AcceptTransferOfferResponse, CreateTransferOfferResponse, GetBalanceResponse, ListTransferOffersResponse, UserStatusResponse, acceptTransferOfferResponse, createTransferOfferResponse, getBalanceResponse, listTransferOffersResponse, userStatusResponse } from './models';
-
+import {
+  AcceptTransferOfferResponse,
+  CreateTransferOfferResponse,
+  GetBalanceResponse,
+  ListTransferOffersResponse,
+  UserStatusResponse,
+  acceptTransferOfferResponse,
+  createTransferOfferResponse,
+  getBalanceResponse,
+  listTransferOffersResponse,
+  userStatusResponse,
+} from './models';
 
 export class ValidatorClient {
   private http: HttpClient;

@@ -3,7 +3,6 @@
 import { sleep } from 'k6';
 import http, { RefinedParams, RefinedResponse, ResponseType } from 'k6/http';
 
-
 type ResponseHandler = {
   then: <T>(handleResponse: (n: RefinedResponse<'text'>) => T) => T;
 };
