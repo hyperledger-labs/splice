@@ -4,16 +4,19 @@
 -- | V2 amulet allocation, which can and should be settled using `V2.SettlementFactory_SettleBatch`.
 module Splice.AmuletAllocationV2 (
   AmuletAllocationV2(..),
+  netAmuletCreditAmount,
 ) where
 
 import DA.Assert (assertWithinDeadline)
 import DA.Foldable (forA_)
 import DA.Optional (isNone, isSome)
+import DA.TextMap qualified as TextMap
+import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
-import Splice.TokenStandard.Utils
+import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet
 import Splice.AmuletRules
@@ -86,7 +89,7 @@ template AmuletAllocationV2
           assertWithinDeadline "allocation.settlement.settlementDeadline" deadline
         -- compute total funds to move
         let authorizer = allocation.authorizer.owner
-        let netAmount = netAllocationCreditAmount (basicAccount authorizer) allocation.transferLegs
+        let netAmount = netAmuletCreditAmount dso (basicAccount authorizer) allocation.transferLegs
         if netAmount >= 0.0 then do
           require "No locked amulet expected for credit amount >= 0" (isNone lockedAmulet)
           if netAmount > 0.0
@@ -102,8 +105,9 @@ template AmuletAllocationV2
 
               let reason = "Settle net positive allocation for settlement " <> allocation.settlement.settlementRef.id
               pure V2.Allocation_SettleResult with
-                authorizerHoldingCids = [toInterfaceContractId newHoldingCid]
+                authorizerHoldingCids = TextMap.fromList [(amuletInstrumentIdName, [toInterfaceContractId newHoldingCid])]
                 meta = simpleHoldingTxMeta TxKind_Mint (Some reason) None
+                -- TODO(#4550): revisit whether this mint is the right choice once we know how to do tx history parsing v2
           else do
             -- No holding change ==> no tx history metadata
             pure V2.Allocation_SettleResult with
@@ -114,21 +118,33 @@ template AmuletAllocationV2
           require "Locked amulet expected for negative net amount" (isSome lockedAmulet)
           forA_ lockedAmulet $ \cid -> do
              lockedAmulet <- fetchAndArchive (ForOwner with dso = dso; owner = authorizer) cid
-             require "Locked amulet amount match amount" (lockedAmulet.amulet.amount.initialAmount == negate netAmount)
+             requireMatchExpected ("lockedAmulet.amount", lockedAmulet.amulet.amount.initialAmount) (negate netAmount)
 
           let reason = "Settle net negative allocation for settlement " <> show allocation.settlement.settlementRef
           pure V2.Allocation_SettleResult with
             authorizerHoldingCids = mempty
             meta = simpleHoldingTxMeta TxKind_Burn (Some reason) None
+            -- TODO(#4550): revisit whether this burn is the right choice once we know how to do tx history parsing v2
 
 
-unlockAmuletAllocationV2 : AmuletAllocationV2 -> ExtraArgs -> Update [ContractId V2.Holding]
+unlockAmuletAllocationV2 : AmuletAllocationV2 -> ExtraArgs -> Update (TextMap.TextMap [ContractId V2.Holding])
 unlockAmuletAllocationV2 amuletAllocation extraArgs = do
   case amuletAllocation.lockedAmulet of
-    None -> return []
+    None -> return TextMap.empty
     Some la -> do
       let lockExpiresAt = amuletAllocation.expiresAt
-      map upcast <$> abortTwoStepTransfer lockExpiresAt la extraArgs
+      holdingCids <- abortTwoStepTransfer lockExpiresAt la extraArgs
+      pure $ TextMap.fromList [ (amuletInstrumentIdName, map upcast holdingCids) ]
+
+
+netAmuletCreditAmount : Party -> V2.Account -> [V2.TransferLeg] -> Decimal
+netAmuletCreditAmount dso authorizer transferLegs =
+    case Map.lookup amuletId creditAmounts of
+      None -> error $ "netAmuletCreditAmount: no legs for amulet instrument: " <> show (amuletId, transferLegs)
+      Some creditAmount -> creditAmount
+  where
+    creditAmounts = netAllocationCreditAmounts authorizer transferLegs
+    amuletId = amuletInstrumentIdV2 dso
 
 
 -- instances

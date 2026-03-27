@@ -14,9 +14,9 @@ module Splice.Tests.TestAmuletTokenDvP_V1V2Mixed where
 import Daml.Script
 
 import DA.Action
-import DA.Foldable (forA_, foldMap)
+import DA.Foldable (forA_)
 import DA.Map as Map hiding (filter)
-import DA.List (dedupOn, dedupSort)
+import DA.List (dedupSort)
 import DA.Optional
 import DA.Set qualified as Set
 import DA.Text qualified as T
@@ -33,14 +33,18 @@ import Splice.TokenStandard.Utils
 
 import Splice.Amulet (LockedAmulet, LockedAmulet_OwnerExpireLockV2(..))
 
-import Splice.Testing.Apps.TradingAppV2 hiding (require)
-import Splice.Testing.UtilsV2
+import Splice.Testing.Apps.TradingAppV2 qualified as TradingAppV2
+import Splice.Testing.Apps.TradingAppV2_Backend qualified as TradingAppV2
+
+import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.Registries.TestTokenV1_RegistryV1 qualified as TestTokenV1_RegistryV1
+import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenV2_RegistryV2
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistryV1
-import Splice.Testing.TokenStandard.WalletClient qualified as WalletClientV1
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 
 
 -- Tests definitions
@@ -56,28 +60,37 @@ data TestEnvironment = TestEnvironment
     allParties : [Party]
     registryV2 : AmuletRegistryV2.AmuletRegistry
     registryV1 : AmuletRegistryV1.AmuletRegistry
+    tty1Registry : TestTokenV1_RegistryV1.TestTokenV1Registry
+    tty2Registry : TestTokenV2_RegistryV2.TestTokenV2Registry
+    registries : MultiRegistry.MultiRegistry
     amuletId : V2.InstrumentId
     -- TODO(#4515): add the registry for the private asset
-  deriving (Show, Eq)
+
+data TestInstrumentId
+  = AM  -- amulet
+  | X1 | Y1 | Z1  -- V1 assets with different instrument-ids
+  | X2 | Y2 | Z2  -- V2 assets with different instrument-ids
+  deriving (Eq, Show)
 
 data TestHolding = TestHolding with
     owner : Party
     amount : Decimal
     locked : Bool
-    -- TODO(#4517): add instrument-id, test funding from locked holdings, and expired locked holdings
+    instrumentId : TestInstrumentId
+    -- TODO(#4517): test funding from locked holdings, and expired locked holdings
   deriving (Eq, Show)
 
-mkH : Party -> Decimal -> TestHolding
-mkH owner amount = TestHolding owner amount False
+mkH : TestInstrumentId -> Party -> Decimal -> TestHolding
+mkH instrumentId owner amount = TestHolding owner amount False instrumentId
 
-mkLH : Party -> Decimal -> TestHolding
-mkLH owner amount = TestHolding owner amount True
+mkLH : TestInstrumentId -> Party -> Decimal -> TestHolding
+mkLH instrumentId owner amount = TestHolding owner amount True instrumentId
 
 data TestLeg = TestLeg with
     sender : Party
     receiver : Party
     amount : Decimal
-    -- TODO(#4517): add instrument-id once we have private holdings
+    instrumentId : TestInstrumentId
   deriving (Eq, Show)
 
 data TestWorkflow
@@ -96,11 +109,14 @@ data TestTrade = TestTrade with
     initialHoldings : [TestHolding]
     transferLegs : [TestLeg]
     expectedNumRequests : Int
-    expectedNumAllocations : Int
+    expectedNumAllocationsV1 : Int
+      -- ^ note: V1 allocation means *V1-only* allocations
+    expectedNumAllocationsV2 : Int
     expectedHoldingsAfterAllocation : [TestHolding]
     testWorkflow : TestWorkflow
     expectedFinalHoldings : [TestHolding]
   deriving (Eq, Show)
+
 
 -- Test suite: single transfers
 -------------------------------
@@ -111,18 +127,20 @@ singleTransferTest TestEnvironment{..} =
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
     partiesWithAutoReceipt = []
-    initialHoldings = [mkH alice 100.0]
+    initialHoldings = [mkH AM alice 100.0]
     transferLegs = [aliceToBob]
     expectedNumRequests = 2
-    expectedNumAllocations = 2
-    expectedHoldingsAfterAllocation = [mkLH alice 1.0, mkH alice 99.0]
+    expectedNumAllocationsV1 = 0
+    expectedNumAllocationsV2 = 2
+    expectedHoldingsAfterAllocation = [mkLH AM alice 1.0, mkH AM alice 99.0]
     testWorkflow = SettleTrade
-    expectedFinalHoldings = [mkH bob 1.0, mkH alice 99.0]
+    expectedFinalHoldings = [mkH AM bob 1.0, mkH AM alice 99.0]
   where
     aliceToBob = TestLeg with
         sender = alice
         receiver = bob
         amount = 1.0
+        instrumentId = AM
 
 singleTransferTest_allV2 = runTest $ \env ->
   singleTransferTest env
@@ -130,7 +148,8 @@ singleTransferTest_allV2 = runTest $ \env ->
 singleTransferTest_senderV1 = runTest $ \env@TestEnvironment{..} ->
   (singleTransferTest env) with
     partiesWithV1Wallet = [alice]
-    expectedNumAllocations = 2
+    expectedNumAllocationsV1 = 0
+    expectedNumAllocationsV2 = 2
     partiesWithSettlementAgreements = [alice, bob]
 
 singleTransferTest_receiverV1 = runTest $ \env@TestEnvironment{..} ->
@@ -138,7 +157,8 @@ singleTransferTest_receiverV1 = runTest $ \env@TestEnvironment{..} ->
     partiesWithV1Wallet = [bob]
     partiesWithAutoReceipt = [bob]
     expectedNumRequests = 1 -- only one request is sent, as bob has enabled auto-receipt
-    expectedNumAllocations = 1
+    expectedNumAllocationsV1 = 0
+    expectedNumAllocationsV2 = 1
     partiesWithSettlementAgreements = [bob]
 
 singleTransferTest_allV2_cancel = runTest $ \env@TestEnvironment{..} ->
@@ -146,7 +166,7 @@ singleTransferTest_allV2_cancel = runTest $ \env@TestEnvironment{..} ->
     testWorkflow = WithdrawAndCancel with
       withdrawers = [alice]
       locksToExpireBeforeWithdrawal = []
-    expectedFinalHoldings = [mkH alice 99.0, mkH alice 1.0]
+    expectedFinalHoldings = [mkH AM alice 99.0, mkH AM alice 1.0]
 
 -- TODO(#4517): expand coverage of cancellation and withdrawal tests
 
@@ -154,52 +174,176 @@ singleTransferTest_allV2_cancel = runTest $ \env@TestEnvironment{..} ->
 -- Test suite: bilateral DvPs with fees
 ---------------------------------------
 
-dvpWithFeeTest : TestEnvironment -> TestTrade
-dvpWithFeeTest TestEnvironment{..} =
+bilateralDvPWithFeeTest : TestEnvironment -> TestTrade
+bilateralDvPWithFeeTest TestEnvironment{..} =
   TestTrade with
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
     partiesWithAutoReceipt = []
-    initialHoldings = [mkH alice 100.0, mkH bob 100.0]
-    transferLegs = [aliceToBob, bobToVenue]
+    initialHoldings =
+      [ mkH AM alice 100.0
+      , mkH AM bob 100.0
+      , mkH X2 bob 50.0
+      ]
+    transferLegs =
+      [ aliceToBob, bobToVenue
+      , bobToAliceX2
+      ]
     expectedNumRequests = 3
-    expectedNumAllocations = 3
-    expectedHoldingsAfterAllocation = [mkLH alice 20.0, mkH alice 80.0, mkH bob 100.0]
+    expectedNumAllocationsV1 = 0
+    expectedNumAllocationsV2 = 5 -- alice, bob for both admins, venue for one admin
+    expectedHoldingsAfterAllocation =
+      [ mkLH AM alice 20.0, mkH AM alice 80.0
+      , mkH AM bob 100.0
+      , mkH X2 bob 10.0, mkLH X2 bob 40.0
+      ]
     testWorkflow = SettleTrade
-    expectedFinalHoldings = [mkH alice 80.0, mkH bob 100.0, mkH bob 19.0, mkH venue 1.0]
+    expectedFinalHoldings =
+      [ mkH AM alice 80.0
+      , mkH X2 alice 40.0
+      , mkH AM bob 100.0, mkH AM bob 19.0, mkH X2 bob 10.0
+      , mkH AM venue 1.0
+      ]
   where
     aliceToBob = TestLeg with
         sender = alice
         receiver = bob
         amount = 20.0
+        instrumentId = AM
+    bobToAliceX2 = TestLeg with
+        sender = bob
+        receiver = alice
+        amount = 40.0
+        instrumentId = X2
     bobToVenue = TestLeg with
         sender = bob
         receiver = venue
         amount = 1.0
+        instrumentId = AM
 
-dvpWithFeeTest_onlyV2 = runTest $ \env ->
-  dvpWithFeeTest env
+bilateralDvPWithFeeTest_onlyV2 = runTest $ \env ->
+  bilateralDvPWithFeeTest env
 
-dvpWithFeeTest_onlyV2_venueAutoReceipt = runTest $ \env@TestEnvironment{..} ->
-  (dvpWithFeeTest env) with
+bilateralDvPWithFeeTest_onlyV2_venueAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+  (bilateralDvPWithFeeTest env) with
     partiesWithAutoReceipt = [venue]
     expectedNumRequests = 2 -- no request sent to venue, as it has enabled auto-receipt
-    expectedNumAllocations = 2
-    partiesWithSettlementAgreements = [bob]
+    expectedNumAllocationsV1 = 0
+    expectedNumAllocationsV2 = 4
 
-dvpWithFeeTest_onlyV2_venueBobAutoReceipt = runTest $ \env@TestEnvironment{..} ->
-  (dvpWithFeeTest env) with
+bilateralDvPWithFeeTest_onlyV2_venueBobAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+  (bilateralDvPWithFeeTest env) with
     partiesWithAutoReceipt = [venue, bob]
     expectedNumRequests = 2 -- request still sent to bob as they are a sender
-    expectedNumAllocations = 2
+    expectedNumAllocationsV1 = 0
+    expectedNumAllocationsV2 = 4
     partiesWithSettlementAgreements = [bob]
 
-dvpWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
-  (dvpWithFeeTest env) with
+bilateralDvPWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
+  (bilateralDvPWithFeeTest env) with
     testWorkflow = WithdrawAndCancel with
       withdrawers = []
-      locksToExpireBeforeWithdrawal = [mkLH alice 20.0]
-    expectedFinalHoldings = [mkH alice 80.0, mkH alice 20.0, mkH bob 100.0]
+      locksToExpireBeforeWithdrawal = [mkLH AM alice 20.0]
+    expectedFinalHoldings =
+      [ mkH AM alice 80.0, mkH AM alice 20.0
+      , mkH AM bob 100.0
+      , mkH X2 bob 10.0, mkH X2 bob 40.0
+      ]
+
+
+-- Test suite: multilateral DvPs with fees
+---------------------------------------
+
+multiDvPWithFeeTest : TestEnvironment -> TestTrade
+multiDvPWithFeeTest TestEnvironment{..} =
+  TestTrade with
+    partiesWithV1Wallet = []
+    partiesWithSettlementAgreements =
+      [alice, bob] -- We need settlement agreements due to the V1 asset transfer from bob to alice
+    partiesWithAutoReceipt = []
+    initialHoldings =
+      [ mkH AM alice 100.0
+      , mkH AM bob 100.0
+      , mkH X1 bob 50.0
+      , mkH X2 bob 20.0, mkH Y2 bob 3.0
+      ]
+    transferLegs =
+      [ aliceToBob, bobToVenue, bobToAliceX2, bobToAliceY2
+      , bobToAliceX1
+      ]
+    expectedNumRequests = 3
+    expectedNumAllocationsV1 = 1
+    expectedNumAllocationsV2 = 5
+    expectedHoldingsAfterAllocation =
+      [ mkLH AM alice 20.0, mkH AM alice 80.0
+      , mkH AM bob 100.0
+      , mkH X1 bob 10.0, mkLH X1 bob 40.0
+      , mkH X2 bob 15.0, mkLH X2 bob 5.0, mkLH Y2 bob 0.3, mkH Y2 bob 2.7
+      ]
+    testWorkflow = SettleTrade
+    expectedFinalHoldings =
+      [ mkH AM alice 80.0
+      , mkH X1 alice 40.0
+      , mkH X2 alice 5.0, mkH Y2 alice 0.3
+      , mkH AM bob 100.0, mkH AM bob 19.0, mkH X2 bob 15.0, mkH Y2 bob 2.7
+      , mkH X1 bob 10.0
+      , mkH AM venue 1.0
+      ]
+  where
+    aliceToBob = TestLeg with
+        sender = alice
+        receiver = bob
+        amount = 20.0
+        instrumentId = AM
+    bobToAliceX1 = TestLeg with
+        sender = bob
+        receiver = alice
+        amount = 40.0
+        instrumentId = X1
+    bobToAliceX2 = TestLeg with
+        sender = bob
+        receiver = alice
+        amount = 5.0
+        instrumentId = X2
+    bobToAliceY2 = TestLeg with
+        sender = bob
+        receiver = alice
+        amount = 0.3
+        instrumentId = Y2
+    bobToVenue = TestLeg with
+        sender = bob
+        receiver = venue
+        amount = 1.0
+        instrumentId = AM
+
+multiDvPWithFeeTest_onlyV2 = runTest $ \env ->
+  multiDvPWithFeeTest env
+
+multiDvPWithFeeTest_onlyV2_venueAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+  (multiDvPWithFeeTest env) with
+    partiesWithAutoReceipt = [venue]
+    expectedNumRequests = 2 -- no request sent to venue, as it has enabled auto-receipt
+    expectedNumAllocationsV1 = 1
+    expectedNumAllocationsV2 = 4
+
+multiDvPWithFeeTest_onlyV2_venueBobAutoReceipt = runTest $ \env@TestEnvironment{..} ->
+  (multiDvPWithFeeTest env) with
+    partiesWithAutoReceipt = [venue, bob]
+    expectedNumRequests = 2 -- request still sent to bob as they are a sender
+    expectedNumAllocationsV1 = 1
+    expectedNumAllocationsV2 = 4
+
+multiDvPWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
+  (multiDvPWithFeeTest env) with
+    testWorkflow = WithdrawAndCancel with
+      withdrawers = []
+      locksToExpireBeforeWithdrawal = [mkLH AM alice 20.0]
+    expectedFinalHoldings =
+      [ mkH AM alice 80.0, mkH AM alice 20.0
+      , mkH AM bob 100.0
+      , mkH X1 bob 10.0, mkH X1 bob 40.0
+      , mkH X2 bob 15.0, mkH X2 bob 5.0, mkH Y2 bob 0.3, mkH Y2 bob 2.7
+      ]
 
 -- TODO(#4517): test withdrawal with an expired and one unexpired lock
 
@@ -213,6 +357,12 @@ dvpWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
 
 -- TODO(#4517): test that duplicate allocations of the same leg cannot be settled
 
+-- TODO(#4515): test allocation workflow with different accounts for cash and security leg
+
+-- TODO(#4515): test V2 wallet accepting allocation request from a V1 app using mix of V1 and V2 assets
+
+-- TODO(#4515): test multiple-accounts for TT2; provider authorization for allocation; multiple instrument-ids in TT2
+
 
 -- Test exececution infrastructure
 -----------------------------------
@@ -224,13 +374,20 @@ runTest mkTest = do
 
   -- setup initial funds
   forA_ test.initialHoldings $ \TestHolding{..} -> do
-    AmuletRegistryV2.tapFaucet env.registryV2 owner amount
+    case instrumentId of
+      AM -> AmuletRegistryV2.tapFaucet env.registryV2 owner amount
+      tt
+        | "1" `T.isSuffixOf` show tt ->
+            upcast <$> TestTokenV1_RegistryV1.mint env.tty1Registry owner (show tt) amount
+        | otherwise -> do
+            let instrumentName = show tt
+            TestTokenV2_RegistryV2.mint env.tty2Registry (basicAccount owner) instrumentName amount
 
   checkHoldings env "initial holdings" test.initialHoldings
 
   -- setup settlement agreements
   forA_ test.partiesWithSettlementAgreements $ \trader -> do
-    submitMulti [env.venue, trader] [] $ createCmd TradeSettlementAgreement with
+    submitMulti [env.venue, trader] [] $ createCmd TradingAppV2.TradeSettlementAgreement with
       venue = env.venue
       trader
 
@@ -242,11 +399,11 @@ runTest mkTest = do
           sender = basicAccount sender
           receiver = basicAccount receiver
           amount
-          instrumentId = env.amuletId
+          instrumentId = mkInstrumentId env instrumentId
           meta = emptyMetadata
   now <- getTime
   let settlementDeadline = now `addRelTime` hours 2
-  let otcTrade = OTCTrade with
+  let otcTrade = TradingAppV2.OTCTrade with
         venue = env.venue
         transferLegs
         settleAt = now `addRelTime` hours 1
@@ -256,9 +413,9 @@ runTest mkTest = do
   otcTradeCid <- submit env.venue $ createCmd otcTrade
 
   -- create allocation requests
-  submit env.venue $ exerciseCmd otcTradeCid OTCTrade_RequestAllocations
+  submit env.venue $ exerciseCmd otcTradeCid TradingAppV2.OTCTrade_RequestAllocations
 
-  reqs <- query @OTCTradeAllocationRequest env.venue
+  reqs <- query @TradingAppV2.OTCTradeAllocationRequest env.venue
   checkEqual "number of allocation requests" test.expectedNumRequests (length reqs)
 
   -- have all parties accept the allocation requests
@@ -266,28 +423,33 @@ runTest mkTest = do
    forA_ env.allParties $ \trader -> do
     if trader `elem` test.partiesWithV1Wallet
       then do
-        reqs <- WalletClientV1.listAllocationRequests trader
-        forA_ reqs $ \req -> do
-          WalletClientV1.acceptAllocationRequest env.registryV1.dso env.registryV1 trader req
+        reqs <- WalletClientV2.listAllocationRequestsV1 trader
+        forA_ reqs $ \(_, req) -> do
+          WalletClientV2.acceptAllocationRequestV1 env.registries trader req
       else do
         reqs <- WalletClientV2.listAllocationRequestsV2 (basicAccount trader) trader
-        trace ("num requests for", trader, length reqs) $
-         forA_ reqs $ \req -> do
-          WalletClientV2.acceptAllocationRequestV2 (AmuletRegistryV2.amuletToMultiRegistry env.registryV2)
-            (basicAccount trader) trader req
+        -- Batch all request acceptances together in a single transaction
+        -- Note: whether to do this or not is a wallet UX concern.
+        batches <- forA reqs $ \req -> do
+          WalletClientV2.mkAcceptAllocationRequestV2 env.registries trader req
+        void $ WalletClientV2.executeTSABatch trader (mconcat batches)
 
   -- check locked holdings
   checkHoldings env "holdings after allocation" test.expectedHoldingsAfterAllocation
 
   -- check that a settleable trade exists
-  trades <- querySettleableTrades env.registryV2 env.venue
+  trades <- TradingAppV2.querySettleableTrades env.registries env.venue
   trade <- expectOneElement "settleable trade" (show . (.batchesByAdmin)) trades
 
-  let actualNumAllocations = sum [ length batch.allocationCids | batch <- Map.values trade.batchesByAdmin ]
-  checkEqual "number of allocations" test.expectedNumAllocations actualNumAllocations
+  allocationsV1 <- queryInterface @V1.Allocation env.venue
+  allocationsV2 <- queryInterface @V2.Allocation env.venue
+  let v2Cids = Set.fromList $ map fst allocationsV2
+  let v1OnlyAllocations = filter (\(cid, _) -> not (Set.member (upcast cid) v2Cids)) allocationsV1
+  checkEqual "number of allocations v1" test.expectedNumAllocationsV1 (length v1OnlyAllocations)
+  checkEqual "number of allocations v2" test.expectedNumAllocationsV2 (length allocationsV2)
 
   case test.testWorkflow of
-    SettleTrade -> void $ settleWithTradeAgreements trade
+    SettleTrade -> void $ TradingAppV2.settleWithTradeAgreements trade
     WithdrawAndCancel {..} -> do
       -- expire locks on holdings specified holdings
       forA_ locksToExpireBeforeWithdrawal $ \TestHolding{..} -> do
@@ -306,9 +468,11 @@ runTest mkTest = do
       forA_ withdrawers $ \withdrawer -> do
         -- TODO(#4517): V1 withdraw
         allocs <- queryInterface @V2.Allocation withdrawer
-        forA_ allocs $ \(allocCid, _alloc) -> do
+        forA_ allocs $ \(allocCid, optAllocView) -> do
           -- TODO(#4517): also test lock expiry
-          context <- RegistryApiV2.getAllocation_WithdrawContext env.registryV2 allocCid emptyMetadata
+          Some allocView <- pure optAllocView
+          registry <- MultiRegistry.getRegistryApiV2 env.registries (allocationAdmin allocView.allocation)
+          context <- RegistryApiV2.getAllocation_WithdrawContext registry allocCid emptyMetadata
           submitWithDisclosures' withdrawer context.disclosures $ exerciseCmd allocCid
             V2.Allocation_Withdraw with
               actors = [withdrawer]
@@ -317,9 +481,9 @@ runTest mkTest = do
                 meta = emptyMetadata
 
       -- cancel trade
-      trades <- queryTradesWithAllocations env.venue
+      trades <- TradingAppV2.queryTradesWithAllocations env.venue
       trade <- expectOneElement "trade to cancel" show trades
-      cancelWithTradeAgreements env.registryV2 trade
+      TradingAppV2.cancelWithTradeAgreements env.registries trade
 
       pure ()
 
@@ -338,30 +502,56 @@ runTest mkTest = do
 
 setupTestEnvironment : Script TestEnvironment
 setupTestEnvironment = do
-  allParties <- forA ["venue","alice", "bob", "charlie", "dora"] \p ->
-    allocatePartyExact p
+  allParties <- forA ["venue","alice", "bob", "charlie", "dora"] \n -> do
+    p <- allocatePartyExact n
+    WalletClientV2.createBatchingUtility p
+    pure p
   let [venue, alice, bob, charlie, dora] = allParties
+
+  -- amulet registry setup
   registryV2 <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
   let amuletId = registryV2.instrumentId
   let registryV1 = AmuletRegistryV1.AmuletRegistry with
         dso = registryV2.dso
         instrumentId = downcast amuletId
+
+  -- test token v1 registry setup
+  tty1Registry <- TestTokenV1_RegistryV1.initialize TestTokenV1_RegistryV1.defaultTestTokenV1RegistryConfig
+
+  -- test token v2 registry setup
+  tty2Registry <- TestTokenV2_RegistryV2.initialize TestTokenV2_RegistryV2.defaultTestTokenV2RegistryConfig
+
+  let registries = Map.fromList
+        [ (registryV2.dso, MultiRegistry.mkRegistryApisV1V2 registryV1 registryV2)
+        , (tty1Registry.admin, MultiRegistry.mkRegistryApisV1 tty1Registry)
+        , (tty2Registry.admin, MultiRegistry.mkRegistryApisV2 tty2Registry )
+        ]
   pure TestEnvironment with ..
 
+mkInstrumentId : TestEnvironment -> TestInstrumentId -> V2.InstrumentId
+mkInstrumentId env = \case
+  AM -> env.amuletId
+  symbol
+    | "1" `T.isSuffixOf` show symbol -> V2.InstrumentId with
+        id = show symbol
+        admin = env.tty1Registry.admin
+    | otherwise -> V2.InstrumentId with
+        id = show symbol
+        admin = env.tty2Registry.admin
 
 checkHoldings : TestEnvironment -> Text -> [TestHolding] -> Script ()
 checkHoldings env description expectedHoldings = do
   let holdingsByOwner = Map.fromListWithR (++) $ do
         TestHolding{..} <- expectedHoldings
-        pure (owner, [(amount, locked)])
+        pure (owner, [(amount, locked, mkInstrumentId env instrumentId)])
   forA_ env.allParties $ \owner -> do
-    actualHoldings <- WalletClientV2.listHoldings owner env.amuletId
+    actualHoldings <- WalletClientV2.listHoldings' owner
     case Map.lookup owner holdingsByOwner of
       None -> unless (Prelude.null actualHoldings) $
         fail $ T.unlines $
           description <> ": expected no holdings for " <> show owner <> ", but got: " :: map (show . snd) actualHoldings
       Some expectedAmountAndLocks -> do
-        let actualAmounts = dedupSort [ (h.amount, isSome h.lock) | (_, h) <- actualHoldings ]
+        let actualAmounts = dedupSort [ (h.amount, isSome h.lock, h.instrumentId) | (_, h) <- actualHoldings ]
         let expectedAmounts = dedupSort expectedAmountAndLocks
         unless (actualAmounts == expectedAmounts) $
           fail $ T.unlines $
@@ -385,198 +575,5 @@ expectOneElement description pretty xs =
     [x] -> pure x
     [] -> fail $ "Expected exactly one " <> description <> ", but got none."
     xs -> fail $ T.unlines $ "Expected exactly one " <> description <> ", but got: " :: map pretty xs
-
-
-
--- Test version of the trading app backend functionality
----------------------------------------------------------
-
-data TradeWithAllocations = TradeWithAllocations
-  with
-    otcTradeCid : ContractId OTCTrade
-    otcTrade : OTCTrade
-    allocations : [(ContractId V2.Allocation, V2.AllocationView)]
-    extraSettlementAuthorizers : Set.Set Party
-    allocationRequestCids : [ContractId OTCTradeAllocationRequest]
-  deriving (Eq, Show)
-
-data SettleableTrade = SettleableTrade with
-    otcTradeCid : ContractId OTCTrade
-    otcTrade : OTCTrade
-    disclosures : Disclosures'
-    batchesByAdmin : Map Party SettlementBatch
-    extraSettlementAuthorizers : Set.Set Party
-    allocationRequestCids : [ContractId OTCTradeAllocationRequest]
-
--- | Helper type of a transfer leg together with its authorizer.
-type AuthorizedLeg = (V2.Account, V2.TransferLeg)
-
-toAuthorizedLegs : V2.TransferLeg -> [AuthorizedLeg]
-toAuthorizedLegs leg
-  | leg.sender == leg.receiver = [(leg.sender, leg)] -- self-transfers are authorized only once
-  | otherwise = [(leg.sender, leg), (leg.receiver, leg)]
-
-splitAllocationsByAdmin : [(ContractId V2.Allocation, V2.AllocationView)] -> Map Party [(ContractId V2.Allocation, V2.AllocationView)]
-splitAllocationsByAdmin allocations =
-  Map.fromListWithR (++) $ do
-    (cid, allocView) <- allocations
-    let tl::_ = allocView.allocation.transferLegs
-        admin = tl.instrumentId.admin
-    pure (admin, [(cid, allocView)])
-
-
--- | Find all trades for the venue together with their allocations and allocation requests.
-queryTradesWithAllocations : Party -> Script [TradeWithAllocations]
-queryTradesWithAllocations venue = do
-  otcTrades <- query @OTCTrade venue
-  forA otcTrades $ \(otcTradeCid, otcTrade) -> do
-    let settlementRef = makeTradeRef otcTradeCid
-    -- query matching allocation requests
-    allocationRequests <- queryFilter @OTCTradeAllocationRequest venue
-      (\req -> req.settlement.settlementRef == settlementRef)
-    -- query matching allocations
-    allAllocations <- queryInterface @V2.Allocation venue
-    let allocations = do
-          (cid, Some allocation) <- allAllocations
-          guard (allocation.allocation.settlement.settlementRef == settlementRef)
-          pure (cid, allocation)
-
-    pure TradeWithAllocations with
-      otcTradeCid
-      otcTrade
-      allocations
-      allocationRequestCids = map fst allocationRequests
-      extraSettlementAuthorizers =
-        (Set.fromList otcTrade.autoReceiptAuthorizers) <>
-        mconcat do
-          (_cid, allocView) <- allocations
-          pure (Set.fromList allocView.extraSettlementAuthorizers)
-
--- | Find all trades for the venue that can be settled.
-querySettleableTrades : RegistryApiV2.RegistryApi registry => registry -> Party -> Script [SettleableTrade]
-querySettleableTrades registry venue = do
-  trades <- queryTradesWithAllocations venue
-  fmap catOptionals $ forA trades $ \trade -> do
-    -- check whether the expected authorizations for the trade are present in the allocations
-    --
-    -- Note: the following check is a bit hacky. A more robust way to implement
-    -- it would be to compute the requested allocations the same way as the
-    -- actual allocation requests are computed, and attempt to find for each
-    -- authorizer the matching allocations.
-    let otcTrade = trade.otcTrade
-    let autoReceiptAuthorizers = map basicAccount otcTrade.autoReceiptAuthorizers
-    let expectedAuthorizations = do
-          authz@(authorizer, leg) <- concatMap toAuthorizedLegs otcTrade.transferLegs
-          -- authorization is only required for senders, and for receivers that have not enabled auto-receipt
-          guard (leg.sender == authorizer || authorizer `notElem` autoReceiptAuthorizers)
-          pure authz
-
-    let actualAuthorizations = do
-          (_cid, allocView) <- trade.allocations
-          leg <- allocView.allocation.transferLegs
-          pure (allocView.allocation.authorizer, leg)
-
-    trace (show (map fst trade.allocations)) $
-      if Set.fromList expectedAuthorizations `Set.isSubsetOf` Set.fromList actualAuthorizations
-        then Some <$> mkSettleableTrade trade
-        else pure None
-  where
-    mkSettleableTrade trade = do
-      let otcTrade = trade.otcTrade
-      let otcTradeCid = trade.otcTradeCid
-      let allocationsByAdmin = splitAllocationsByAdmin trade.allocations
-      let extraSettlementAuthorizers = Set.toList trade.extraSettlementAuthorizers
-      settleBatchContexts <-
-        forA (Map.toList $ splitLegsByAdmin otcTrade.transferLegs) $ \(admin, transferLegs) -> do
-          Some allocations <- pure $ Map.lookup admin allocationsByAdmin
-          let allocationCids = map fst allocations
-          -- Note: this must match the call constructed within OTCTrade_Settle
-          let settleBatchArg = V2.SettlementFactory_SettleBatch with
-                settlement = mkOtcTradeSettlementInfo otcTradeCid otcTrade
-                transferLegs
-                allocationCids
-                extraArgs = emptyExtraArgs
-                extraReceiptAuthorizers = map basicAccount (venue :: extraSettlementAuthorizers)
-                actors = venue :: extraSettlementAuthorizers
-          -- query off-ledger API of admin to get the settlement context.
-          -- For V2 this is required only once per admin, which is much better than the once per allocation required for V1.
-          context <- RegistryApiV2.getSettlementFactory registry settleBatchArg
-          let batch = SettlementBatch with
-                factoryCid = context.factoryCid
-                allocationCids
-                extraArgs = context.arg.extraArgs
-          pure ((admin, batch), context.disclosures)
-
-      pure $ SettleableTrade with
-        otcTradeCid
-        otcTrade
-        disclosures = foldMap (._2) settleBatchContexts
-        batchesByAdmin = Map.fromList $ map (._1) settleBatchContexts
-        extraSettlementAuthorizers = trade.extraSettlementAuthorizers
-        allocationRequestCids = trade.allocationRequestCids
-
--- | Settle a trade using the trade agreements for the required extra authority.
-settleWithTradeAgreements : SettleableTrade -> Script OTCTrade_SettleResult
-settleWithTradeAgreements trade = do
-  let venue = trade.otcTrade.venue
-  let extraAuthorizers = Set.delete venue $ trade.extraSettlementAuthorizers
-  let settleArg = OTCTrade_Settle with
-        batchesByAdmin = trade.batchesByAdmin
-        allocationRequests = trade.allocationRequestCids
-        extraSettlementAuthorizers = Set.toList extraAuthorizers
-
-  if Set.null extraAuthorizers
-    then do
-      -- settle directly if no extra authorizations are required
-      submitWithDisclosures' venue trade.disclosures $ exerciseCmd trade.otcTradeCid settleArg
-    else do
-      -- find agreements and use them to add the required authorization
-      agreements <- queryFilter @TradeSettlementAgreement venue (\a -> a.trader `Set.member` extraAuthorizers)
-      -- exercise settlement using the agreements as authorization
-      case map fst agreements of
-       [] -> fail $ "No settlement agreement found for required authorizers: " <> show extraAuthorizers
-       agreementCid :: agreementCids -> do
-          submitWithDisclosures' venue trade.disclosures $
-            exerciseCmd agreementCid TradeSettlementAgreement_OTCTrade_Settle with
-              tradeCid = trade.otcTradeCid
-              settleArg
-              settlementAgreementCids = agreementCids
-              authorizingTraders = []
-
--- | Cancel a trade using the trade agreements for the required extra authority for cancelling V1 allocations.
-cancelWithTradeAgreements : RegistryApiV2.RegistryApi registry => registry -> TradeWithAllocations -> Script OTCTrade_CancelResult
-cancelWithTradeAgreements registry trade = do
-  -- grab context for allocation cancellation
-  allocationsWithContext <- forA trade.allocations $ \(allocCid, _allocView) -> do
-    -- TODO(#4517): adjust registry API to actors pattern as part of increasing test coverage
-    context <- RegistryApiV2.getAllocation_CancelContext registry allocCid emptyMetadata
-    let extraArgs = ExtraArgs with
-          context = context.choiceContext
-          meta = emptyMetadata
-    pure ((allocCid, extraArgs), context.disclosures)
-
-  let venue = trade.otcTrade.venue
-  let extraAuthorizers = trade.extraSettlementAuthorizers
-  let cancelArg = OTCTrade_Cancel with
-        allocationsWithContext = map fst allocationsWithContext
-        allocationRequestCids = trade.allocationRequestCids
-        extraSettlementAuthorizers = Set.toList trade.extraSettlementAuthorizers
-  let disclosures = foldMap snd allocationsWithContext
-
-  if Set.null extraAuthorizers
-    then do
-      -- cancel directly if no extra authorizations are required
-      submitWithDisclosures' venue disclosures $ exerciseCmd trade.otcTradeCid cancelArg
-    else do
-      -- find agreements and use them to add the required authorization
-      agreements <- queryFilter @TradeSettlementAgreement venue (\a -> a.trader `Set.member` extraAuthorizers)
-      let agreementCid :: agreementCids =
-            map (._1) $ dedupOn (._2.trader) agreements -- gracefully handle duplicate agreements if they exist
-      submitWithDisclosures' venue disclosures $
-        exerciseCmd agreementCid TradeSettlementAgreement_OTCTrade_Cancel with
-          tradeCid = trade.otcTradeCid
-          cancelArg
-          settlementAgreementCids = agreementCids
-          authorizingTraders = []
 
 

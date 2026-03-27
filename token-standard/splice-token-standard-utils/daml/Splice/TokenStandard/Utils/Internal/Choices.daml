@@ -19,6 +19,10 @@ module Splice.TokenStandard.Utils.Internal.Choices (
   isSubsetOfR,
   notR,
   oneOfR,
+  isGreaterOrEqualR,
+  isGreaterR,
+  isLessR,
+  isLessOrEqualR,
 
   -- * Choice implementations
   publicFetchDefaultImpl,
@@ -30,13 +34,24 @@ module Splice.TokenStandard.Utils.Internal.Choices (
 
 
   -- * Holding metadata
+
   -- TODO(#4550): check whether this export is required once we know how v2 tx parsing will work
   reasonMetaKey,
   txKindMetaKey,
+
+  -- * Missing TextMap utilities
+  textMapUnionWith,
+  textMapSingleton,
+  textMapValues,
+  textMapKeys,
+  textMapZip,
+  textMapZipWithDefault,
+  textMapTraverseWithKey,
 ) where
 
 import DA.Map qualified as Map
 import DA.Text qualified as T
+import DA.TextMap qualified as TextMap
 import DA.Set qualified as Set
 
 
@@ -71,6 +86,22 @@ require' (desc1, v1) (descFailure, predicate) (desc2, v2)
 -- | Predicate to check equality.
 isEqualR : Eq a => (Text, a -> a -> Bool)
 isEqualR = ("is not equal to", (==))
+
+-- | Predicate to check >=.
+isGreaterOrEqualR : Ord a => (Text, a -> a -> Bool)
+isGreaterOrEqualR = ("is less than", (>=))
+
+-- | Predicate to check >.
+isGreaterR : Ord a => (Text, a -> a -> Bool)
+isGreaterR = ("is not greater than", (>))
+
+-- | Predicate to check <.
+isLessR : Ord a => (Text, a -> a -> Bool)
+isLessR = ("is not less than", (<))
+
+-- | Predicate to check <=.
+isLessOrEqualR : Ord a => (Text, a -> a -> Bool)
+isLessOrEqualR = ("is greater than", (<=))
 
 -- | Predicate to check list membership.
 isMemberR : Ord a => (Text, a -> [a] -> Bool)
@@ -161,3 +192,52 @@ publicFetchDefaultImpl
   => t -> ContractId i -> arg -> Update v
 publicFetchDefaultImpl this _self _arg = do
   pure (view (toInterface this : i))
+
+
+-- Missing TextMap utilities
+------------------------------
+
+-- TODO(#4865): upstream these to the Daml stdlib
+
+-- | Create a text map with a single key-value pair.
+textMapSingleton : Text -> a -> TextMap.TextMap a
+textMapSingleton k v = TextMap.fromList [(k, v)]
+
+-- | Values of a text map.
+textMapValues : TextMap.TextMap a -> [a]
+textMapValues = map snd . TextMap.toList
+
+-- | Keys of a text map.
+textMapKeys : TextMap.TextMap a -> [Text]
+textMapKeys = map fst . TextMap.toList
+
+-- | Union of two text maps, using the provided function to resolve conflicts.
+textMapUnionWith : (a -> a -> a) -> TextMap.TextMap a -> TextMap.TextMap a -> TextMap.TextMap a
+textMapUnionWith f =
+  TextMap.merge
+    (\_ v1 -> Some v1)
+    (\_ v2 -> Some v2)
+    (\_ v1 v2 -> Some (f v1 v2))
+
+-- | Zip two text maps together, keeping all keys from both maps.
+textMapZip : TextMap.TextMap a -> TextMap.TextMap b -> TextMap.TextMap (Optional a, Optional b)
+textMapZip =
+  TextMap.merge
+    (\_ v1 -> Some (Some v1, None))
+    (\_ v2 -> Some (None, Some v2))
+    (\_ v1 v2 -> Some (Some v1, Some v2))
+
+-- | Zip two text maps together, keeping all keys from both maps. For missing values, use the provided default value.
+textMapZipWithDefault : a -> TextMap.TextMap a -> TextMap.TextMap a -> TextMap.TextMap (a, a)
+textMapZipWithDefault defaultValue =
+  TextMap.merge
+    (\_ v1 -> Some (v1, defaultValue))
+    (\_ v2 -> Some (defaultValue, v2))
+    (\_ v1 v2 -> Some (v1, v2))
+
+-- | Like `Traversable.traverse` but with access to the key of each element as well.
+textMapTraverseWithKey : Applicative f => TextMap.TextMap a -> (Text -> a -> f b) -> f (TextMap.TextMap b)
+textMapTraverseWithKey m f =
+    TextMap.fromList <$> mapA f' (TextMap.toList m)
+  where
+    f' (k, v) = (k,) <$> f k v

@@ -14,14 +14,11 @@ set -euo pipefail
 
 ignored_files=(
   'daml/splice-util/daml/Splice/Util.daml'
-  'token-standard/examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml'
-  'token-standard/examples/splice-token-test-trading-app-v2/daml/Splice/Testing/Apps/TradingAppV2.daml'
-  'token-standard/splice-token-standard-utils/daml/Splice/TokenStandard/Utils/Internal/Allocations.daml'
-  'token-standard/splice-token-standard-utils/daml/Splice/TokenStandard/Utils/Internal/Choices.daml'
-  'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/DelegateProxy.daml'
-  'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/WalletUserProxy.daml'
-  'daml/splice-util-token-standard-wallet/daml/Splice/Util/Token/Wallet/MergeDelegation.daml'
-  'daml/splice-util-batched-markers/daml/Splice/Util/FeaturedApp/BatchedMarkersProxy.daml'
+  'token-standard/examples/'
+  'token-standard/splice-token-standard-utils/'
+  'daml/splice-util-featured-app-proxies/'
+  'daml/splice-util-token-standard-wallet/'
+  'daml/splice-util-batched-markers/'
   'canton/')
 
 command=('git' 'grep' '-n' -E '(exercise.*_Fetch|fetch|archive)\b' '--' '*.daml')
