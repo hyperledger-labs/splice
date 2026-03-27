@@ -15,12 +15,8 @@
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.4.4",
-    "dompurify": "^3.3.3",
-    "jose": "^4.15.9",
-    "jsondiffpatch": "^0.7.3",
-    "msw": "^2.12.14",
     "web-vitals": "4.2.4",
-    "zod": "^3.25.76"
+    "zod": "3.19.1"
   },
   "devDependencies": {
     "@tanstack/eslint-plugin-query": "5.91.3",
@@ -28,7 +24,7 @@
     "@types/node": "22.14.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.6",
-    "eslint": "^9.39.4",
+    "eslint": "9.24.0",
     "eslint-config-prettier": "10.1.1",
     "prettier": "3.5.3",
     "typescript": "5.8.3",
