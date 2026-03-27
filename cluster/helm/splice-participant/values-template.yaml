@@ -48,5 +48,5 @@ extraInitContainers: []
 # set to true to disable auth (this is highly insecure)
 disableAuth: false
 
-# should stakater reloader annotation be added (note: reloader needs to be installed separatley)
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
 enableReloader: true

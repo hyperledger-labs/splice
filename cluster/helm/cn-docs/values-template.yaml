@@ -5,7 +5,7 @@ imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
 enableGcsProxy: false
 
-# should stakater reloader annotation be added (note: reloader needs to be installed separatley)
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
 enableReloader: true
 
 # k8s affinity for all deployed pods (optional)

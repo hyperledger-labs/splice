@@ -21,5 +21,5 @@ metrics:
 # k8s tolerations for all deployed pods (optional)
 # tolerations:
 
-# should stakater reloader annotation be added (note: reloader needs to be installed separatley)
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
 enableReloader: true
