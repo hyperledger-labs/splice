@@ -386,9 +386,7 @@ describe('Revoke Featured App Form', () => {
     expect(screen.getByTestId('revokeProviderPartyId-field').textContent).toBe(
       'a-party-id::1014912492'
     );
-    expect(screen.getByTestId('revokeRight-title').textContent).toBe(
-      'Featured Application Right Contract ID'
-    );
+    expect(screen.getByTestId('revokeRight-title').textContent).toBe('Proposal ID');
     expect(screen.getByTestId('revokeRight-field').textContent).toBe('rightCid123');
   });
 

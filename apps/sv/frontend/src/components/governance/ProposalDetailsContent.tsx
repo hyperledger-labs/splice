@@ -576,7 +576,7 @@ const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
       sx={{ display: 'contents' }}
     >
       <DetailItem
-        label="Provider ID"
+        label="Provider Party ID"
         value={provider}
         labelId="proposal-details-feature-app-label"
         valueId="proposal-details-feature-app-value"
@@ -622,7 +622,7 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
         />
       )}
       <DetailItem
-        label="Featured Application Right Contract ID"
+        label="Proposal ID"
         value={
           <CopyableIdentifier
             value={rightContractId}

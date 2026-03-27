@@ -245,7 +245,7 @@ describe('Proposal Details Content', () => {
     expect(featuredAppSection).toBeInTheDocument();
 
     const provider = screen.getByTestId('proposal-details-feature-app-label');
-    expect(provider.textContent).toMatch(/Provider ID/);
+    expect(provider.textContent).toMatch(/Provider Party ID/);
 
     const providerValue = screen.getByTestId('proposal-details-feature-app-value');
     expect(providerValue.textContent).toMatch(/provider/);

@@ -227,15 +227,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         return await svAdminClient.listFeaturedAppRightsByProvider(providerPartyId);
       },
       listAllFeaturedAppRights: async (): Promise<ListFeaturedAppRightsByProviderResponse> => {
-        // TODO: replace with generated client method once the TS client is regenerated
-        const response = await fetch(`${url}/v0/admin/sv/featured-app-rights`, {
-          headers: {
-            Authorization: `Bearer ${userAccessToken}`,
-            Accept: 'application/json',
-          },
-        });
-        if (!response.ok) throw new Error(`Failed to list featured app rights: ${response.status}`);
-        return await response.json();
+        return await svAdminClient.listFeaturedAppRights();
       },
     };
   }, [url, userAccessToken]);

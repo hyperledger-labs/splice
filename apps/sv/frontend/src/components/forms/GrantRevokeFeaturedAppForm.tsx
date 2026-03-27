@@ -49,7 +49,7 @@ const GRANT_REVOKE_FEATURED_APP_CONFIG = {
   },
   SRARC_RevokeFeaturedAppRight: {
     providerFieldTitle: 'Provider Party ID',
-    rightCidFieldTitle: 'Featured Application Right Contract ID',
+    rightCidFieldTitle: 'Proposal ID',
     testIdPrefix: 'revoke-featured-app',
     reviewFormKey: 'revoke-right' as const,
   },

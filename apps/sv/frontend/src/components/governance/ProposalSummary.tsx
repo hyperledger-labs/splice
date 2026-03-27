@@ -115,11 +115,7 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
               title="Provider Party ID"
               value={props.providerPartyId}
             />
-            <ProposalField
-              id="revokeRight"
-              title="Featured Application Right Contract ID"
-              value={props.revokeRight}
-            />
+            <ProposalField id="revokeRight" title="Proposal ID" value={props.revokeRight} />
           </>
         )}
 
