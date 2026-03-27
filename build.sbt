@@ -2005,8 +2005,8 @@ lazy val `apps-dar-resources-generator` =
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
-      `splice-featured-app-api-v1-daml`,
-      `splice-featured-app-api-v2-daml`,
+      `splice-api-featured-app-v1-daml`,
+      `splice-api-featured-app-v2-daml`,
       `splice-util-batched-markers-daml`,
     )
     .settings(
