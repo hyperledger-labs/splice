@@ -28,13 +28,6 @@
     "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.18",
     "@daml.js/splice-wallet-payments": "file:common/frontend/daml.js/splice-wallet-payments-0.1.17",
     "@daml.js/splitwell": "file:common/frontend/daml.js/splitwell-0.1.18",
-    "dompurify": "^3.3.3",
-    "eslint": "^9.39.4",
-    "jose": "^4.15.9",
-    "jsondiffpatch": "^0.7.3",
-    "msw": "^2.12.14",
-    "vite": "^8.0.2",
-    "xunit-viewer": "^10.6.1",
-    "zod": "^3.25.76"
+    "xunit-viewer": "^10.6.1"
   }
 }
