@@ -7,7 +7,6 @@ import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
 import {
   GetAmuletRulesResponse,
   GetBackfillingStatusResponse,
-  GetRoundOfLatestDataResponse,
 } from '@lfdecentralizedtrust/scan-openapi';
 import { test, expect } from 'vitest';
 
