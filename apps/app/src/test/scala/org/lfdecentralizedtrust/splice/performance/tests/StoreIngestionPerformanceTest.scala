@@ -175,8 +175,7 @@ abstract class StoreIngestionPerformanceTest(
   }
 
   /** A separate Python script pushes the metrics to Prometheus Pushgateway.
-    * We structure JSON file making the python side mostly readonly.
-    * So we can add new metrics to JSON without changing python script.
+    * We structure JSON file making the python side mostly readonly, enabling to add new metrics to JSON without changing python script.
     */
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
   private def writeMetricsFile(metrics: StoreIngestionPerfMetrics, success: Boolean): Unit = {
