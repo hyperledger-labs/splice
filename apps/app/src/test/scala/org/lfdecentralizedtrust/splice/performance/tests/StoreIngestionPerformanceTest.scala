@@ -60,7 +60,7 @@ abstract class StoreIngestionPerformanceTest(
     val store = mkStore(storage)
     TraceContext
       .withNewTraceContext(this.getClass.getName) { implicit tc =>
-        for {
+        (for {
           _ <- store.ingestionSink.initialize()
           _ <- sanityCheckTables(storage) { count =>
             Option.when(count != 0)(
@@ -69,13 +69,23 @@ abstract class StoreIngestionPerformanceTest(
           }
           txs = loadTxsFromDump()
           metrics <- ingestAll(store, txs)
-          _ = writeMetricsFile(metrics)
           _ <- sanityCheckTables(storage) { count =>
             Option.when(count == 0)(
               s"Expected table to be non-empty after ingestion, but no rows were inserted."
             )
           }
-        } yield ()
+          _ = writeMetricsFile(metrics, success = true)
+        } yield ()).recoverWith { case ex =>
+          writeMetricsFile(
+            StoreIngestionPerfMetrics(
+              totalItems = 0,
+              totalBatches = 0,
+              totalTimeNs = BigDecimal(0),
+            ),
+            success = false,
+          )
+          Future.failed(ex)
+        }
       }
   }
 
@@ -174,16 +184,24 @@ abstract class StoreIngestionPerformanceTest(
   }
 
   /** A separate Python script pushes the metrics to Prometheus Pushgateway.
+    * We structure JSON file making the python side mostly readonly.
     */
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
-  private def writeMetricsFile(metrics: StoreIngestionPerfMetrics): Unit = {
+  private def writeMetricsFile(metrics: StoreIngestionPerfMetrics, success: Boolean): Unit = {
+    val completionEpochSec = java.time.Instant.now().getEpochSecond
+    val successInt = if (success) 1 else 0
+    val jobName = "splice_perf_ingestion"
     val json =
       s"""{
          |  "test_name": "$testName",
-         |  "avg_item_time_ns": ${metrics.avgItemTimeNs},
-         |  "total_items": ${metrics.totalItems},
-         |  "total_time_ns": ${metrics.totalTimeNs},
-         |  "total_batches": ${metrics.totalBatches}
+         |  "metrics": [
+         |    {"name": "${jobName}_avg_item_time_ns", "description": "Average nanoseconds per ingested item","value": ${metrics.avgItemTimeNs}},
+         |    {"name": "${jobName}_total_items","description": "Total number of items ingested","value": ${metrics.totalItems}},
+         |    {"name": "${jobName}_total_time_ns","description": "Total ingestion time in nanoseconds","value": ${metrics.totalTimeNs}},
+         |    {"name": "${jobName}_total_batches","description": "Total number of batches ingested","value": ${metrics.totalBatches}},
+         |    {"name": "${jobName}_completion_timestamp_seconds","description": "Epoch seconds when the test run completed","value": $completionEpochSec},
+         |    {"name": "${jobName}_success","description": "Test run succeeded (1) or failed (0)","value": $successInt}
+         |  ]
          |}""".stripMargin
 
     println(s"Ingestion metrics for $testName:\n$json")

@@ -48,6 +48,9 @@ jobs:
           additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
           extra_env_vars: 'POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST" POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER" POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"'
           pre_sbt_cmd: |
+            echo "Clearing stale metrics files"
+            rm -rf /tmp/store-ingestion-perf-metrics
+
             echo "Clearing database"
             PGPASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD" psql \
               -h"$PERFORMANCE_TESTS_DB_HOST" \
@@ -62,7 +65,7 @@ jobs:
           cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
 
       - name: Push metrics to Prometheus Pushgateway
-        if: ${{ always() }} #TBD
+        if: ${{ always() }}
         run: |
           python3 apps/app/src/test/resources/performance/push_store_ingestion_perf_metrics.py
 
