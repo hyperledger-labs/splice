@@ -144,11 +144,11 @@ object RewardComputationInputsTest {
       ),
     ),
 
-    // --- 2. More traffic dilutes rate ---
+    // --- 2. More traffic dilutes issuance per MB ---
 
-    // MainNet: doubled traffic price $120/MB → more coupons → lower rate
+    // MainNet: doubled traffic price $120/MB → more coupons → lower issuance per MB
     TestCase(
-      label = "MainNet: doubled traffic price $120/MB dilutes rate",
+      label = "MainNet: doubled traffic price $120/MB dilutes issuance per MB",
       inputs = mainNet.copy(trafficPrice = n(BigDecimal("120"))),
       totalRoundAppActivityWeight = 95129376L,
       expected = RewardIssuanceParams(
@@ -206,11 +206,11 @@ object RewardComputationInputsTest {
       ),
     ),
 
-    // --- 4. Cap binds with multiple providers ---
+    // --- 4. Cap binds with higher total traffic ---
 
     // Simple: cap = 0.2, 2 MB → cap binds, unclaimed = 0.05
     TestCase(
-      label = "simple: cap binds with multiple MB of traffic",
+      label = "simple: lower cap with 2 MB total traffic produces unclaimed rewards",
       inputs = simpleArithmetic.copy(featuredAppRewardCap = n(BigDecimal("0.2"))),
       totalRoundAppActivityWeight = 2000000L,
       expected = RewardIssuanceParams(
