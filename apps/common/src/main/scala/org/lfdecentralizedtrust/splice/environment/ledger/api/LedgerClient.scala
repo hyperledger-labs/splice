@@ -335,6 +335,8 @@ private[environment] class LedgerClient(
           packageIdSelectionPreference = Seq.empty,
           prefetchContractKeys = Seq.empty,
           estimateTrafficCost = None,
+          hashingSchemeVersion = None,
+          tapsMaxPasses = None,
         )
       )
     } yield result

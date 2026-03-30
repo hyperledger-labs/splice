@@ -126,4 +126,6 @@ case class SharedSpliceAppParameters(
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
 
   def dispatchQueueBackpressureLimit: NonNegativeInt = ???
+
+  override def enableTestingFeatures = false
 }
