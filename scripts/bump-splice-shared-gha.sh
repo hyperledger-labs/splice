@@ -8,13 +8,13 @@ set -euo pipefail
 submodule_name="splice-shared-gha"
 
 git submodule update --init --force --remote -- "$submodule_name"
-git add -u
 
 if git diff --exit-code --quiet $submodule_name; then
   echo "$submodule_name version is up to date."
   exit 0
 fi
 
+git add -u
 echo "$submodule_name version is not up to date. Creating a PR..."
 
 git add "$submodule_name"
