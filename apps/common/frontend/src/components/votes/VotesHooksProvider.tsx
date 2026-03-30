@@ -18,19 +18,19 @@ export const VotesHooksContext = React.createContext<VotesHooks | undefined>(und
 export interface BaseVotesHooks {
   isReadOnly: boolean;
   useListDsoRulesVoteRequests: () => UseQueryResult<Contract<VoteRequest>[]>;
-  // useListVoteRequestResult: (
-  //   limit: number,
-  //   actionName?: string,
-  //   requester?: string,
-  //   effectiveFrom?: string,
-  //   effectiveTo?: string,
-  //   accepted?: boolean,
-  //   retry?: boolean
-  // ) => UseQueryResult<DsoRules_CloseVoteRequestResult[]>;
-  // useListVotes: (contractIds: ContractId<VoteRequest>[]) => UseQueryResult<SvVote[]>;
+  useListVoteRequestResult: (
+    limit: number,
+    actionName?: string,
+    requester?: string,
+    effectiveFrom?: string,
+    effectiveTo?: string,
+    accepted?: boolean,
+    retry?: boolean
+  ) => UseQueryResult<DsoRules_CloseVoteRequestResult[]>;
+  useListVotes: (contractIds: ContractId<VoteRequest>[]) => UseQueryResult<SvVote[]>;
   useAmuletPriceVotes: () => UseQueryResult<AmuletPriceVote[]>;
   useDsoInfos: () => UseQueryResult<DsoInfo>;
-  // useVoteRequest: (contractId: ContractId<VoteRequest>) => UseQueryResult<Contract<VoteRequest>>;
+  useVoteRequest: (contractId: ContractId<VoteRequest>) => UseQueryResult<Contract<VoteRequest>>;
 }
 
 export type VotesHooks = BaseVotesHooks;
