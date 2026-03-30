@@ -1,7 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { Optional } from '@daml/types';
-import { AmuletConfig, PackageConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
+import {
+  AmuletConfig,
+  PackageConfig,
+  RewardConfig,
+} from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import { Tuple2 } from '@daml.js/daml-prim-DA-Types-1.0.0/lib/DA/Types';
 import { Set as DamlSet } from '@daml.js/daml-stdlib-DA-Set-Types-1.0.0/lib/DA/Set/Types';
 import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types';
@@ -105,6 +109,8 @@ export function buildAmuletConfigChanges(
     ),
 
     ...buildPackageConfigChanges(before?.packageConfig, after?.packageConfig),
+
+    ...buildRewardConfigChanges(before?.rewardConfig, after?.rewardConfig),
   ] as ConfigChange[];
 
   return showAllFields ? changes : changes.filter(c => c.currentValue !== c.newValue);
@@ -306,6 +312,38 @@ function buildIssuanceCurveChanges(
       .flat() || [];
 
   return [...initialValues, ...futureValues];
+}
+
+function buildRewardConfigChanges(
+  before: RewardConfig | null | undefined,
+  after: RewardConfig | null | undefined
+) {
+  return [
+    {
+      fieldName: 'rewardConfigMintingVersion',
+      label: 'Reward config: Minting version',
+      currentValue: before?.mintingVersion || '',
+      newValue: after?.mintingVersion || '',
+    },
+    {
+      fieldName: 'rewardConfigDryRunVersion',
+      label: 'Reward config: Dry-run version',
+      currentValue: before?.dryRunVersion || '',
+      newValue: after?.dryRunVersion || '',
+    },
+    {
+      fieldName: 'rewardConfigBatchSize',
+      label: 'Reward config: Batch size',
+      currentValue: before?.batchSize || '',
+      newValue: after?.batchSize || '',
+    },
+    {
+      fieldName: 'rewardConfigRewardCouponTimeToLive',
+      label: 'Reward config: Reward coupon time to live (microseconds)',
+      currentValue: before?.rewardCouponTimeToLive.microseconds || '',
+      newValue: after?.rewardCouponTimeToLive.microseconds || '',
+    },
+  ] as ConfigChange[];
 }
 
 function buildDecentralizedSynchronizerChanges(

@@ -85,6 +85,7 @@ export function buildAmuletRulesConfigFromChanges(
     'issuanceCurveInitialValueOptDevelopmentFundPercentage'
   );
   const externalPartyConfigStateTickDuration = getValue('externalPartyConfigStateTickDuration');
+  const rewardConfigMintingVersion = getValue('rewardConfigMintingVersion');
   const amuletConfig: AmuletConfig<'USD'> = {
     tickDuration: { microseconds: getValue('tickDuration') },
     transferPreapprovalFee: transferPreapprovalFee === '' ? null : transferPreapprovalFee,
@@ -147,6 +148,21 @@ export function buildAmuletRulesConfigFromChanges(
       wallet: getValue('packageConfigWallet'),
       walletPayments: getValue('packageConfigWalletPayments'),
     },
+
+    rewardConfig:
+      rewardConfigMintingVersion === ''
+        ? null
+        : {
+            mintingVersion: getValue('rewardConfigMintingVersion'),
+            dryRunVersion:
+              getValue('rewardConfigDryRunVersion') === ''
+                ? null
+                : getValue('rewardConfigDryRunVersion'),
+            batchSize: getValue('rewardConfigBatchSize'),
+            rewardCouponTimeToLive: {
+              microseconds: getValue('rewardConfigRewardCouponTimeToLive'),
+            },
+          },
   };
 
   return amuletConfig;
