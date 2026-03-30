@@ -39,7 +39,7 @@ def _push_metrics_for_test(test_name: str, data: dict) -> None:
         registry=registry,
         grouping_key=grouping_key,
     )
-    print(f"  Pushed {len(data['metrics'])} metric(s) for '{test_name}'")
+    print(f"Pushed {len(data['metrics'])} metric(s) for '{test_name}'")
 
 
 def push_metrics() -> None:
@@ -52,18 +52,18 @@ def push_metrics() -> None:
         print(f"No metric files found in {METRICS_DIR}, nothing to push.")
         return
 
-    errors = 0
+    error_files = 0
     for metrics_file in json_files:
         try:
             data = _read_metrics_file(metrics_file)
             test_name = data.get("test_name", metrics_file.stem)
             _push_metrics_for_test(test_name, data)
         except Exception as e:
-            errors += 1
-            print(f"  ERROR processing {metrics_file}: {e}", file=sys.stderr)
+            error_files += 1
+            print(f"Error processing {metrics_file}: {e}", file=sys.stderr)
 
-    if errors:
-        print(f"{errors} file(s) failed to push.", file=sys.stderr)
+    if error_files:
+        print(f"{error_files} file(s) failed to push.", file=sys.stderr)
         sys.exit(1)
 
 
