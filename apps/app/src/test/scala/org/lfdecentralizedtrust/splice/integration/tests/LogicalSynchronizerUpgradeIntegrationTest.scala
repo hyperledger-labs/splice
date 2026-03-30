@@ -138,6 +138,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
 
+  private def bobValidatorLocal(implicit env: SpliceTestConsoleEnvironment) = {
+    v("bobValidatorLocal")
+  }
+
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
     initDso()
     startAllSync(aliceValidatorBackend, splitwellValidatorBackend)
@@ -293,7 +297,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
 
-    val bobValidatorLocal = v("bobValidatorLocal")
     clue("Start bob validator local, onboard and tap before upgrade") {
       runBobValidatorWithStandaloneParticipant("before-upgrade")(
         onboardUserAndTapAmulet(
@@ -615,7 +618,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
         // manually stop stuff as we destroy the new synchronizer as it runs in process
-        val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
+        val validators = Seq(aliceValidatorBackend, splitwellValidatorBackend)
         stopAllAsync(validators*).futureValue
         validators.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
         stopAllAsync(allNodes*).futureValue
@@ -634,12 +637,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
       ),
       Seq(),
       s"lsu-bob-validator-$hint",
-      "EXTRA_PARTICIPANT_ADMIN_USER" -> bobValidatorBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> bobValidatorLocal.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> s"participant_extra_$dbsSuffix",
     ) {
-      bobValidatorBackend.startSync()
+      bobValidatorLocal.startSync()
       run
-      bobValidatorBackend.stop()
+      bobValidatorLocal.stop()
     }
   }
 
