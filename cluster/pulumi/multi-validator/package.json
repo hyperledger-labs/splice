@@ -3,7 +3,7 @@
   "main": "src/index.ts",
   "devDependencies": {
     "@types/sinon": "^21.0.0",
-    "sinon": "^21.0.1"
+    "sinon": "^21.0.3"
   },
   "dependencies": {
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"

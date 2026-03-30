@@ -83,9 +83,7 @@ import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
@@ -705,7 +703,7 @@ object BftScanConnection {
       nTargetSuccess: Int,
       logger: TracedLogger,
       shortenResponsesForLog: T => Any = identity[T],
-  )(implicit ec: ExecutionContext, tc: TraceContext, mat: Materializer): Future[T] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     require(requestFrom.nonEmpty, "At least one request must be made.")
 
     val responses =
@@ -752,7 +750,7 @@ object BftScanConnection {
     */
   private def keyToGroupResponses[T](
       r1: Try[T]
-  )(implicit ec: ExecutionContext, mat: Materializer): Future[BftScanConnection.ScanResponse[T]] = {
+  ): Future[BftScanConnection.ScanResponse[T]] = {
     r1 match {
       case Success(value) => Future.successful(BftScanConnection.SuccessfulResponse(value))
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpNonJsonResponse) =>
@@ -762,18 +760,9 @@ object BftScanConnection {
           BftScanConnection.TextFailureResponse(unexpected.statusCode, unexpected.content)
         )
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpJsonResponse) =>
-        Unmarshal(unexpected.entity)
-          .to[ByteString]
-          .flatMap(s =>
-            io.circe.jawn.parseByteBuffer(s.asByteBuffer) match {
-              case Right(value) =>
-                Future.successful(
-                  BftScanConnection.HttpFailureResponse(unexpected.statusCode, value)
-                )
-              case Left(failure) =>
-                Future.successful(BftScanConnection.ExceptionFailureResponse(failure))
-            }
-          )
+        Future.successful(
+          BftScanConnection.HttpFailureResponse(unexpected.statusCode, unexpected.content)
+        )
       case Failure(unexpected: HttpCommandException) =>
         Future.successful(
           BftScanConnection.HttpFailureResponse(
@@ -790,7 +779,7 @@ object BftScanConnection {
       logger: TracedLogger,
       consensusResponse: Try[T],
       responses: ConcurrentHashMap[BftScanConnection.ScanResponse[T], List[Uri]],
-  )(implicit ec: ExecutionContext, mat: Materializer, tc: TraceContext): Unit = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Unit = {
     keyToGroupResponses(consensusResponse).foreach { consensusResponseKey =>
       responses.remove(consensusResponseKey)
       responses.forEach { (disagreeingResponse, scanUrls) =>
