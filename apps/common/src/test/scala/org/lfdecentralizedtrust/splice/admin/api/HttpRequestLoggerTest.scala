@@ -7,8 +7,8 @@ import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.BaseTest
 import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.{RejectionHandler, Route}
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
@@ -22,21 +22,15 @@ class HttpRequestLoggerTest extends AnyWordSpec with BaseTest with ScalatestRout
     loggerFactory,
   )
 
-  private def rejectionHandler = HttpRequestLogger.loggingRejectionHandler(
-    apiLoggingConfig,
-    loggerFactory,
-  )
-
-  /** Simulates the behavior: a single HttpRequestLogger at the top level
-    * with handleRejections(loggingRejectionHandler) INSIDE the logger.
-    * The logger logs the request and uses mapResponse to log the response.
-    * handleRejections seals the route, converting rejections to HTTP responses
-    * so mapResponse sees all outcomes. loggingRejectionHandler additionally
-    * logs the rejection status code during conversion.
+  /** Simulates the production behavior: HttpRequestLogger wraps handleRejections.
+    * handleRejections seals the route with the default RejectionHandler, converting
+    * rejections into HTTP responses so mapResponse (inside HttpRequestLogger) sees
+    * all outcomes and logs exactly one "Responding with status code" per request —
+    * whether matched or rejected.
     */
   private def route: Route =
     loggerDirective {
-      handleRejections(rejectionHandler) {
+      handleRejections(RejectionHandler.default) {
         concat(
           pathPrefix("api" / "admin") {
             complete(StatusCodes.OK, "admin")
@@ -60,16 +54,10 @@ class HttpRequestLoggerTest extends AnyWordSpec with BaseTest with ScalatestRout
         },
         { logEntries =>
           // Exactly one "received request"
-          val receivedLogs = logEntries.filter(_.message.contains("received request"))
-          receivedLogs should have size 1
+          forExactly(1, logEntries)(_.message should include("received request"))
 
           // Exactly one response log from mapResponse
-          val respondingLogs = logEntries.filter(_.message.contains("Responding with status code"))
-          respondingLogs should have size 1
-
-          // No rejection log — the route matched
-          val rejectedLogs = logEntries.filter(_.message.contains("rejected with status code"))
-          rejectedLogs shouldBe empty
+          forExactly(1, logEntries)(_.message should include("Responding with status code"))
         },
       )
     }
@@ -83,18 +71,13 @@ class HttpRequestLoggerTest extends AnyWordSpec with BaseTest with ScalatestRout
         },
         { logEntries =>
           // One "received request"
-          val receivedLogs = logEntries.filter(_.message.contains("received request"))
-          receivedLogs should have size 1
+          forExactly(1, logEntries)(_.message should include("received request"))
 
-          // loggingRejectionHandler logs the rejection
-          val rejectedLogs = logEntries.filter(_.message.contains("rejected with status code"))
-          rejectedLogs should have size 1
-          rejectedLogs.head.message should include("404")
-
-          // mapResponse also sees the rejection-converted response (it's inside handleRejections)
-          val respondingLogs = logEntries.filter(_.message.contains("Responding with status code"))
-          respondingLogs should have size 1
-          respondingLogs.head.message should include("404")
+          // mapResponse logs exactly one outcome — the rejection-converted 404 response
+          forExactly(1, logEntries) { entry =>
+            entry.message should include("Responding with status code")
+            entry.message should include("404")
+          }
         },
       )
     }
@@ -102,7 +85,7 @@ class HttpRequestLoggerTest extends AnyWordSpec with BaseTest with ScalatestRout
     "one log entry per request when methods conflict across siblings" in {
       val newStyleMethodRoute: Route =
         loggerDirective {
-          handleRejections(rejectionHandler) {
+          handleRejections(RejectionHandler.default) {
             concat(
               pathPrefix("api" / "data") {
                 post {
@@ -127,16 +110,10 @@ class HttpRequestLoggerTest extends AnyWordSpec with BaseTest with ScalatestRout
         },
         { logEntries =>
           // Exactly one "received request"
-          val receivedLogs = logEntries.filter(_.message.contains("received request"))
-          receivedLogs should have size 1
+          forExactly(1, logEntries)(_.message should include("received request"))
 
           // One clean response
-          val respondingLogs = logEntries.filter(_.message.contains("Responding with status code"))
-          respondingLogs should have size 1
-
-          // No rejection — the GET route matched
-          val rejectedLogs = logEntries.filter(_.message.contains("rejected with status code"))
-          rejectedLogs shouldBe empty
+          forExactly(1, logEntries)(_.message should include("Responding with status code"))
         },
       )
     }

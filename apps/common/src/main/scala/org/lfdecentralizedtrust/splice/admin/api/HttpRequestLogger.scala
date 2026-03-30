@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.admin.api
 
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
-import org.apache.pekko.http.scaladsl.server.{Directive0, RejectionHandler, RequestContext}
+import org.apache.pekko.http.scaladsl.server.{Directive0, RequestContext}
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -39,33 +39,6 @@ object HttpRequestLogger {
     maxMetadataSize = loggingConfig.maxMetadataSize,
     loggerFactory = loggerFactory,
   )
-
-  /** Creates a RejectionHandler that logs the rejection status code, then delegates to the
-    * default handler to produce the appropriate HTTP response. This should be used at the
-    * top level of the route tree (via handleRejections) to seal the route — ensuring all
-    * rejections become Complete responses with their reason logged.
-    *
-    * Must be placed OUTSIDE the HttpRequestLogger directive so that the logger's
-    * mapResponse sees the rejection-converted responses too.
-    */
-  def loggingRejectionHandler(
-      loggingConfig: ApiLoggingConfig,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit traceContext: TraceContext): RejectionHandler = {
-    val inst = new HttpRequestLogger(
-      loggingConfig.messagePayloads,
-      loggingConfig.maxMethodLength,
-      loggingConfig.maxStringLength,
-      loggingConfig.maxMetadataSize,
-      loggerFactory,
-    )
-    RejectionHandler.default.mapRejectionResponse { response =>
-      if (response.status.isFailure()) {
-        inst.logger.debug(s"HTTP request rejected with status code: ${response.status}")
-      }
-      response
-    }
-  }
 }
 
 final class HttpRequestLogger(

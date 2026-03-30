@@ -12,8 +12,8 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.server.{RejectionHandler, Route}
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.Route
 import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.environment.SpliceStatus
@@ -77,13 +77,10 @@ object HttpAdminService {
       withTraceContext { traceContext =>
         // The logger logs the request and uses mapResponse to log the response.
         // handleRejections (inside the logger) seals the route: rejections are
-        // converted to HTTP responses so mapResponse sees all outcomes.
-        // loggingRejectionHandler additionally logs the rejection status code.
+        // converted to HTTP responses so mapResponse sees all outcomes and logs
+        // exactly one "Responding with status code" per request.
         HttpRequestLogger(apiLoggingConfig, loggerFactory)(traceContext) {
-          handleRejections(
-            HttpRequestLogger
-              .loggingRejectionHandler(apiLoggingConfig, loggerFactory)(traceContext)
-          ) {
+          handleRejections(RejectionHandler.default) {
             encodeResponse(concat((commonAdminRoute +: routes.get())*))
           }
         }
