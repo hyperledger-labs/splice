@@ -63,6 +63,7 @@ trait AmuletConfigUtil extends TestCommon {
       existingAmuletConfig.featuredAppActivityMarkerAmount,
       existingAmuletConfig.optDevelopmentFundManager,
       existingAmuletConfig.externalPartyConfigStateTickDuration,
+      existingAmuletConfig.rewardConfig,
     )
   }
 

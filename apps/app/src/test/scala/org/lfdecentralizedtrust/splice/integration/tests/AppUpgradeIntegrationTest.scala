@@ -265,6 +265,7 @@ class AppUpgradeIntegrationTest
             amuletConfig.featuredAppActivityMarkerAmount,
             amuletConfig.optDevelopmentFundManager,
             amuletConfig.externalPartyConfigStateTickDuration,
+            amuletConfig.rewardConfig,
           )
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_SetConfig(
