@@ -6,11 +6,12 @@ package org.lfdecentralizedtrust.splice.admin.api.client
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ApiRequestLoggerBase
-import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc, W3CTraceContext}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext, TraceContextGrpc, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.*
-import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall
+import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
+import io.opentelemetry.api.trace.{Span, Tracer}
 
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -24,9 +25,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ApiClientRequestLogger(
     override protected val loggerFactory: NamedLoggerFactory,
     config: ApiLoggingConfig,
+    tracer: Tracer,
 ) extends ApiRequestLoggerBase(loggerFactory, config)
     with ClientInterceptor
-    with NamedLogging {
+    with NamedLogging
+    with Spanning {
 
   private val cancelled: AtomicBoolean = new AtomicBoolean(false)
 
@@ -45,10 +48,13 @@ class ApiClientRequestLogger(
     val methodName = method.getFullMethodName
     val shortMethod = show"${methodName.readableLoggerName(config.maxMethodLength)}"
 
-    val optCallerContext = TraceContextGrpc.inferCallerTraceContext(callOptions)
-    val requestTraceContext = TraceContext.withNewTraceContext(shortMethod)(identity)
-    val callerTraceContext =
-      optCallerContext.filter(_.traceId.isDefined).getOrElse(requestTraceContext)
+    val (span, traceContext) = TraceContextGrpc
+      .inferCallerTraceContext(callOptions)
+      .fold(
+        TraceContext.withNewTraceContext(shortMethod)(traceContext =>
+          startSpan(shortMethod)(traceContext, tracer)
+        )
+      )(existingTrace => startSpan(shortMethod)(existingTrace, tracer))
 
     val receiver = next.authority()
 
@@ -62,17 +68,20 @@ class ApiClientRequestLogger(
         ): Unit = {
           // We use the caller context here, as there's no log message to communicate the binding of the new trace-id
           // to the one used by the caller.
-          W3CTraceContext.injectIntoGrpcMetadata(callerTraceContext, headers)
+          W3CTraceContext.injectIntoGrpcMetadata(
+            traceContext,
+            headers,
+          )
 
-          super.start(responseListener, headers)
+          super.start(
+            new SpanClosingClientCallListener[RespT](responseListener, span),
+            headers,
+          )
         }
+
       }
     } else {
-      val tidInfo =
-        // TODO(#969): consider flushing out empty and missing trace contexts, as they typically indicate missed opportunities to simplify debugging
-        if (optCallerContext.isEmpty) "no caller tid".unquoted
-        else if (callerTraceContext == requestTraceContext) "empty caller tid".unquoted
-        else requestTraceContext.showTraceId
+      val tidInfo = traceContext.showTraceId
 
       def createLogMessage(message: String): String = {
         show"Request ($tidInfo) $shortMethod to ${receiver.unquoted}: ${message.unquoted}"
@@ -81,14 +90,23 @@ class ApiClientRequestLogger(
       new LoggingClientCall(
         clientCall,
         createLogMessage,
-        callerTraceContext = callerTraceContext,
-        requestTraceContext = requestTraceContext,
+        traceContext,
+        span,
       )
     }
   }
 
-  /** Intercepts events sent by the server.
-    */
+  class SpanClosingClientCallListener[RespT](
+      delegate: ClientCall.Listener[RespT],
+      span: Span,
+  ) extends SimpleForwardingClientCallListener[RespT](delegate) {
+
+    override def onClose(status: Status, trailers: Metadata): Unit = {
+      super.onClose(status, trailers)
+      span.end()
+    }
+  }
+
   class LoggingClientCallListener[ReqT, RespT](
       delegate: ClientCall.Listener[RespT],
       createLogMessage: String => String,
@@ -124,8 +142,8 @@ class ApiClientRequestLogger(
   class LoggingClientCall[ReqT, RespT](
       delegate: ClientCall[ReqT, RespT],
       createLogMessage: String => String,
-      callerTraceContext: TraceContext,
-      requestTraceContext: TraceContext,
+      traceContext: TraceContext,
+      span: Span,
   ) extends ForwardingClientCall.SimpleForwardingClientCall[ReqT, RespT](delegate) {
 
     /** Called when the client starts the call */
@@ -135,16 +153,19 @@ class ApiClientRequestLogger(
           s"sending request headers ${cutMessage(headers)}"
         )
       )(
-        callerTraceContext
+        traceContext
       )
       val loggingListener =
-        new LoggingClientCallListener(
-          responseListener,
-          createLogMessage,
-          callerTraceContext = callerTraceContext,
+        new SpanClosingClientCallListener(
+          new LoggingClientCallListener(
+            responseListener,
+            createLogMessage,
+            callerTraceContext = traceContext,
+          ),
+          span,
         )
 
-      W3CTraceContext.injectIntoGrpcMetadata(requestTraceContext, headers)
+      W3CTraceContext.injectIntoGrpcMetadata(traceContext, headers)
 
       delegate.start(loggingListener, headers)
     }
@@ -155,7 +176,7 @@ class ApiClientRequestLogger(
         createLogMessage(
           s"sending request ${cutMessage(message)}"
         )
-      )(callerTraceContext)
+      )(traceContext)
       delegate.sendMessage(message)
     }
 
@@ -165,7 +186,7 @@ class ApiClientRequestLogger(
         createLogMessage(
           s"half closing"
         )
-      )(callerTraceContext)
+      )(traceContext)
       delegate.halfClose()
     }
 
@@ -175,7 +196,7 @@ class ApiClientRequestLogger(
         createLogMessage(
           s"cancelling request: $message. Caused by $cause."
         )
-      )(callerTraceContext)
+      )(traceContext)
       delegate.cancel(message, cause)
       cancelled.set(true)
     }
@@ -185,7 +206,7 @@ class ApiClientRequestLogger(
         createLogMessage(
           s"requesting $numMessages to be delivered."
         )
-      )(callerTraceContext)
+      )(traceContext)
       delegate.request(numMessages)
     }
   }

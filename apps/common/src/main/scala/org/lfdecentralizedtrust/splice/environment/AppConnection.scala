@@ -34,6 +34,7 @@ import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{CallCredentials, Deadline, Status}
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{
   HttpHeader,
   HttpResponse,
@@ -149,6 +150,7 @@ abstract class AppConnection(
     apiLoggingConfig: ApiLoggingConfig,
     override val loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
+    tracer: Tracer,
 )(implicit ec: ExecutionContextExecutor)
     extends BaseAppConnection(loggerFactory)
     with FlagCloseableAsync
@@ -182,6 +184,7 @@ abstract class AppConnection(
           new ApiClientRequestLogger(
             loggerFactory,
             apiLoggingConfig,
+            tracer,
           ),
           new GrpcMetricsClientInterceptor(grpcClientMetrics),
         )
