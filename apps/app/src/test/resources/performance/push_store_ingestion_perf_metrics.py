@@ -2,8 +2,6 @@
 """Push store performance metrics to the Prometheus Pushgateway.
 Usage:
   python3 push_store_ingestion_perf_metrics.py
-
-  TODO: Add git info (commit hash etc)
 """
 
 import json
