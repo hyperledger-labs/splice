@@ -17,7 +17,9 @@ const Root: React.FC = () => {
               Explore, search and find answers to current network configuration details.
             </Typography>
 
-            <TotalAmuletBalance />
+            <div data-testid="circulating-supply-container">
+              <TotalAmuletBalance />
+            </div>
 
             <NetworkInfo />
           </Stack>
