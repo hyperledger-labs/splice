@@ -897,7 +897,7 @@ object ParticipantAdminCommands {
               Some(representativePackageIdOverride.toProtoV30),
               Some(synchronizerId.toProtoPrimitive),
             )
-          )
+          ),
         )
       }
 

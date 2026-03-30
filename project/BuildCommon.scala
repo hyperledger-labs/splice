@@ -730,11 +730,11 @@ object BuildCommon {
           scalatest,
         ),
         Compile / unmanagedSourceDirectories := Seq(
-          baseDirectory.value / "src/test/scala",
+          baseDirectory.value / "src/test/scala"
         ),
         Compile / unmanagedSources / includeFilter := "InMemoryMetricsFactory.scala" || "MetricValues.scala",
         Test / unmanagedSourceDirectories := Seq.empty,
-        scalacOptions += "-Wconf:msg=unused value of type:s"
+        scalacOptions += "-Wconf:msg=unused value of type:s",
       )
   }
 
@@ -1040,7 +1040,9 @@ object BuildCommon {
       .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
       .dependsOn(`canton-wartremover-annotations`, `canton-slick-fork`)
       .settings(
-        Test / scalacOptions ++= Seq("-Wconf:msg=synchronized not selected from this instance:silent"),
+        Test / scalacOptions ++= Seq(
+          "-Wconf:msg=synchronized not selected from this instance:silent"
+        ),
         disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(

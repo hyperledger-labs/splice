@@ -95,7 +95,7 @@ class ResourceTemplateDecoder(
     )
       .interfaces(
         QualifiedName.assertFromString(
-          s"${companion.getTemplateIdWithPackageId.getModuleName}:${companion.getTemplateIdWithPackageId.getEntityName}",
+          s"${companion.getTemplateIdWithPackageId.getModuleName}:${companion.getTemplateIdWithPackageId.getEntityName}"
         )
       )
       .viewType

@@ -57,7 +57,7 @@ final case class UseTinyProxy(tinyProxyConfig: TinyProxyConfig)
 
   override def afterEnvironmentCreated(
       config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
   ): Unit = {
     externalPlugin.afterEnvironmentCreated(config, environment)
     externalPlugin.start(
@@ -105,7 +105,10 @@ final case class UseTinyProxy(tinyProxyConfig: TinyProxyConfig)
     backgroundProcessHandler.killAndRemove()
   }
 
-  override def beforeEnvironmentDestroyed(config: CantonConfig, environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): Unit =
+  override def beforeEnvironmentDestroyed(
+      config: CantonConfig,
+      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+  ): Unit =
     externalPlugin.beforeEnvironmentDestroyed(config, environment)
 }
 

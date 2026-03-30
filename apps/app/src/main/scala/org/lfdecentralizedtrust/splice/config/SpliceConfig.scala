@@ -109,7 +109,7 @@ case class SpliceConfig(
         )
       )
     ),
-  features: CantonFeatures = CantonFeatures(),
+    features: CantonFeatures = CantonFeatures(),
 ) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 

@@ -136,7 +136,8 @@ object CantonDependencies {
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % canton_library_version
   lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % canton_library_version
 
-  lazy val daml_testing_utils = "com.digitalasset.canton" %% "testing-utils" % canton_library_version
+  lazy val daml_testing_utils =
+    "com.digitalasset.canton" %% "testing-utils" % canton_library_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk18on" % bouncy_castle_version

@@ -382,7 +382,7 @@ class ParticipantPartyMigrator(
   }
 
   private def importAcs(
-    synchronizerId: SynchronizerId,
+      synchronizerId: SynchronizerId,
       partyIds: Set[PartyId],
       getAcsSnapshot: PartyId => Future[ByteString],
   ): Future[Unit] = {

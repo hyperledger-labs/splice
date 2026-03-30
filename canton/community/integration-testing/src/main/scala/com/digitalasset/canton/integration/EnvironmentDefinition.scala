@@ -276,7 +276,9 @@ object EnvironmentDefinition extends LazyLogging {
 
   def S2M1(
       synchronizerOwnersOverride: Option[Seq[InstanceReference]] = None
-  )(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): NetworkTopologyDescription = {
+  )(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -302,7 +304,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  def S4M4(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): NetworkTopologyDescription = {
+  def S4M4(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
