@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.util.SvTestUtil
 
 import scala.jdk.CollectionConverters.*
 
-class CopyVotesTimeBasedIntegrationTest
+class CopyVotesIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with SvTestUtil {
 
@@ -22,7 +22,7 @@ class CopyVotesTimeBasedIntegrationTest
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
-      .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
           ConfigTransforms.updateAllSvAppConfigs { (name, svConfig) =>
