@@ -1,9 +1,0 @@
-diff a/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/mediator/service/GrpcMediatorInspectionService.scala b/canton/community/synchronizer/src/main/scala/com/digitalasset/canton/synchronizer/mediator/service/GrpcMediatorInspectionService.scala	(rejected hunks)
-@@ -258,6 +258,7 @@
-       confirmingParties = params.quorums
-         .map(q => mediatorV30.Quorum(q.confirmers.keySet.toSeq, q.threshold.value)),
-       subViews = childNodes,
-+      viewHash = view.viewHash.toRootHash.getCryptographicEvidence,
-     )
-   }
- 
