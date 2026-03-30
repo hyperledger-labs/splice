@@ -66,7 +66,7 @@ import com.digitalasset.daml.lf.engine.{
   ResultPrefetch,
 }
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.*
+import com.digitalasset.daml.lf.transaction.{NextGenContractStateMachine, *}
 import com.digitalasset.daml.lf.value.ContractIdVersion
 import io.grpc.stub.StreamObserver
 import org.scalatest.OptionValues.*
@@ -81,12 +81,13 @@ import scala.util.{Failure, Success}
 class TestSubmissionService(
     participantId: ParticipantId,
     maxDeduplicationDuration: NonNegativeFiniteDuration,
-    damle: Engine,
+    engine: Engine,
     contractResolver: LfContractId => TraceContext => Future[Option[FatContractInstance]],
     keyResolver: TestKeyResolver,
     packageResolver: PackageResolver,
     syncService: SyncService,
     mkPackageMap: TraceContext => Future[Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]],
+    contractStateMode: NextGenContractStateMachine.Mode = NextGenContractStateMachine.Mode.default,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
@@ -144,7 +145,7 @@ class TestSubmissionService(
       commands: CommandsWithMetadata,
       transaction: SubmittedTransaction,
       nodeSeeds: ImmArray[(NodeId, crypto.Hash)],
-      globalKeyInputs: Map[LfGlobalKey, Option[LfContractId]],
+      globalKeyInputs: Map[LfGlobalKey, Vector[LfContractId]],
   )(implicit traceContext: TraceContext): Future[Completion] = {
     val submitterInfo = commands.submitterInfo(maxDeduplicationDuration.duration)
     val meta = commands.transactionMeta(transaction, nodeSeeds)
@@ -232,7 +233,7 @@ class TestSubmissionService(
       submitterInfo: SubmitterInfo,
       meta: TransactionMeta,
       transaction: SubmittedTransaction,
-      keyMapping: Map[LfGlobalKey, Option[LfContractId]],
+      keyMapping: Map[LfGlobalKey, Vector[LfContractId]],
   )(implicit traceContext: TraceContext): Future[Unit] =
     submitTransaction(submitterInfo, meta, transaction, keyMapping).map {
       case SubmissionResult.Acknowledged => ()
@@ -243,7 +244,7 @@ class TestSubmissionService(
       submitterInfo: SubmitterInfo,
       meta: TransactionMeta,
       transaction: SubmittedTransaction,
-      keyMapping: Map[LfGlobalKey, Option[LfContractId]],
+      keyMapping: Map[LfGlobalKey, Vector[LfContractId]],
   )(implicit traceContext: TraceContext): Future[SubmissionResult] =
     for {
       routingSynchronizerState <- syncService.getRoutingSynchronizerState
@@ -315,7 +316,7 @@ class TestSubmissionService(
       .toSet
 
     result =
-      damle.submit(
+      engine.submit(
         packageMap = packageMap,
         packagePreference = packagePreference,
         submitters = actAs.map(_.toLf).toSet,
@@ -325,6 +326,7 @@ class TestSubmissionService(
         prefetchKeys = Seq.empty,
         submissionSeed = submissionSeed,
         contractIdVersion = ContractIdVersion.V1,
+        contractStateMode = contractStateMode,
       )
 
     txOrErr <- resolve(result)
@@ -362,17 +364,22 @@ class TestSubmissionService(
 
       case ResultNeedPackage(packageId, resume) =>
         for {
-          pckgO <- packageResolver(packageId)(traceContext).failOnShutdownToAbortException(
-            "TestSubmissionService"
-          )
+          pckgO <- packageResolver
+            .resolve(packageId, PackageResolver.ignoreMissingPackage)
+            .failOnShutdownToAbortException(
+              "TestSubmissionService"
+            )
           r <- resolve(resume(pckgO))
         } yield r
 
-      case ResultNeedKey(key, resume) =>
+      case ResultNeedKey(key, _, _, resume) =>
+        // TODO(#30398) review this code once engine really support NUCK
+
         val gk = key.globalKey
         for {
           cidO <- keyResolver.resolveKey(gk)(traceContext)
-          r <- resolve(resume(cidO))
+          contracts <- cidO.toList.parTraverse(contractResolver(_)(traceContext))
+          r <- resolve(resume(contracts.flatten.toVector, None))
         } yield r
 
       case ResultInterruption(continue, _) =>
@@ -409,12 +416,15 @@ object TestSubmissionService {
       customKeyResolver: Option[TestKeyResolver] = None,
       checkAuthorization: Boolean = true,
       enableLfDev: Boolean = false,
+      contractStateMode: NextGenContractStateMachine.Mode =
+        NextGenContractStateMachine.Mode.devDefault,
   )(implicit env: TestConsoleEnvironment): TestSubmissionService = {
     import env.*
 
     val participantNode = participant.underlying.value
+    val loggerFactory = participantNode.loggerFactory
 
-    val damle = new Engine(
+    val engine = new Engine(
       EngineConfig(
         allowedLanguageVersions =
           if (enableLfDev)
@@ -422,7 +432,8 @@ object TestSubmissionService {
           else
             LanguageVersion.stableLfVersionsRange,
         checkAuthorization = checkAuthorization,
-      )
+      ),
+      loggerFactory,
     )
 
     def resolveContract(
@@ -435,20 +446,18 @@ object TestSubmissionService {
 
     val keyResolver = customKeyResolver.getOrElse(ActiveKeyResolver(participant))
 
-    val packageResolver: PackageResolver = id =>
-      tc => participantNode.sync.packageService.getPackage(id)(tc)
-
-    val loggerFactory = participantNode.loggerFactory
+    val packageResolver: PackageResolver = participantNode.sync.packageService.packageResolver
 
     new TestSubmissionService(
       participant.id,
       participantNode.sync.maxDeduplicationDuration,
-      damle,
+      engine,
       resolveContract,
       keyResolver,
       packageResolver,
       participantNode.sync,
       mkPackageMap(participantNode)(_),
+      contractStateMode,
       loggerFactory,
     )
   }

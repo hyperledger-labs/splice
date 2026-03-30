@@ -5,16 +5,17 @@ package com.digitalasset.canton.platform.apiserver
 
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.ledger.resources.ResourceOwner
+import com.daml.tls.TlsServerConfig
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.auth.*
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.health.HealthChecks
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.ledger.api.auth.*
 import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedClaimResolver
-import com.digitalasset.canton.ledger.api.health.HealthChecks
-import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.util.{TimeProvider, TimeProviderType}
 import com.digitalasset.canton.ledger.localstore.api.{
   IdentityProviderConfigStore,
   PartyRecordStore,
@@ -26,14 +27,13 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
-import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.{
   CommandProgressTracker,
   DynamicSynchronizerParameterGetter,
 }
+import com.digitalasset.canton.platform.apiserver.services.ApiContractService
 import com.digitalasset.canton.platform.apiserver.services.admin.PartyAllocation
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
-import com.digitalasset.canton.platform.apiserver.services.{ApiContractService, TimeProviderType}
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
@@ -42,10 +42,12 @@ import com.digitalasset.canton.platform.config.{
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ContractValidator.ContractAuthenticatorFn
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.Engine
+import com.digitalasset.daml.lf.transaction.NextGenContractStateMachine as ContractStateMachine
 import io.grpc.{BindableService, ServerInterceptor}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -62,6 +64,8 @@ object ApiServiceOwner {
       address: Option[String] = DefaultAddress, // This defaults to "localhost" when set to `None`.
       maxInboundMessageSize: Int = DefaultMaxInboundMessageSize,
       maxInboundMetadataSize: Int = ServerConfig.defaultMaxInboundMetadataSize.unwrap,
+      maxConcurrentStreamsPerConnection: Int =
+        ServerConfig.defaultMaxConcurrentStreamsPerConnection.unwrap,
       port: Port = DefaultPort,
       tls: Option[TlsServerConfig] = DefaultTls,
       seeding: Seeding = DefaultSeeding,
@@ -90,6 +94,7 @@ object ApiServiceOwner {
       otherServices: immutable.Seq[BindableService] = immutable.Seq.empty,
       otherInterceptors: List[ServerInterceptor] = List.empty,
       engine: Engine,
+      contractStateMode: ContractStateMachine.Mode,
       queryExecutionContext: ExecutionContextExecutor,
       commandExecutionContext: ExecutionContextExecutor,
       checkOverloaded: TraceContext => Option[state.SubmissionResult] =
@@ -100,7 +105,6 @@ object ApiServiceOwner {
       partyManagementServiceConfig: PartyManagementServiceConfig =
         ApiServiceOwner.DefaultPartyManagementServiceConfig,
       packageServiceConfig: PackageServiceConfig = ApiServiceOwner.DefaultPackageServiceConfig,
-      engineLoggingConfig: EngineLoggingConfig,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
       contractAuthenticator: ContractAuthenticatorFn,
@@ -111,6 +115,7 @@ object ApiServiceOwner {
       packagePreferenceBackend: PackagePreferenceBackend,
       apiLoggingConfig: ApiLoggingConfig,
       apiContractService: ApiContractService,
+      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
   )(implicit
       actorSystem: ActorSystem,
       materializer: Materializer,
@@ -170,6 +175,7 @@ object ApiServiceOwner {
         indexService = indexService,
         authorizer = authorizer,
         engine = engine,
+        contractStateMode = contractStateMode,
         timeProvider = timeServiceBackend.getOrElse(TimeProvider.UTC),
         timeProviderType =
           timeServiceBackend.fold[TimeProviderType](TimeProviderType.WallClock)(_ =>
@@ -196,7 +202,6 @@ object ApiServiceOwner {
         userManagementServiceConfig = userManagement,
         partyManagementServiceConfig = partyManagementServiceConfig,
         packageServiceConfig = packageServiceConfig,
-        engineLoggingConfig = engineLoggingConfig,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
         contractAuthenticator = contractAuthenticator,
@@ -204,6 +209,7 @@ object ApiServiceOwner {
         interactiveSubmissionServiceConfig = interactiveSubmissionServiceConfig,
         interactiveSubmissionEnricher = interactiveSubmissionEnricher,
         packagePreferenceBackend = packagePreferenceBackend,
+        safeToPruneCommitmentState = safeToPruneCommitmentState,
         logger = loggerFactory.getTracedLogger(this.getClass),
         apiContractService = apiContractService,
       )(materializer, executionSequencerFactory, tracer).withServices(otherServices)
@@ -213,6 +219,7 @@ object ApiServiceOwner {
         port,
         maxInboundMessageSize,
         maxInboundMetadataSize,
+        maxConcurrentStreamsPerConnection,
         address,
         tls,
         // TODO (i28340) fix order of interceptors

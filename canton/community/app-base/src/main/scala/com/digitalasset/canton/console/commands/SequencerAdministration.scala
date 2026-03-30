@@ -33,6 +33,7 @@ import com.digitalasset.canton.sequencer.admin.v30.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.SequencerId
 import com.google.protobuf.ByteString
 
@@ -175,9 +176,19 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   @Help.Summary(
     "Initialize a sequencer for the logical upgrade from the state of its predecessor, streaming the state from a file"
   )
+  @Help.Description("""
+      |Parameters:
+      |- predecessorState: Retrieved using sequencer.topology.transactions.sequencer_lsu_state
+      |- synchronizerParameters: Synchronizer parameters of the node
+      |- ignorePsidCheck:
+      |    If true, it will not be checked that that current physical synchronizer id matches
+      |    the successor in the topology state. Should be used *only* in disaster
+      |    recovery scenarios (roll forward).
+      |""")
   def initialize_from_lsu_predecessor(
       inputFile: String,
       synchronizerParameters: StaticSynchronizerParameters,
+      ignorePsidCheck: Boolean = false,
       waitForReady: Boolean = true,
   ): Unit = {
     if (waitForReady) node.health.wait_for_ready_for_initialization()
@@ -189,6 +200,7 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
             new java.io.FileInputStream(inputFile)
           ),
           synchronizerParameters.toInternal,
+          ignorePsidCheck = ignorePsidCheck,
         )
       )
     }
@@ -228,6 +240,18 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     }
   }
 
+  @Help.Summary("Test sequencing around LSU upgrade")
+  @Help.Description(
+    """Allows to test sequencing on the successor synchronizer by sequencing a message.
+      |
+      |Parameters:
+      |- recipientMediatorGroup: Recipient group that will receive the message.
+      |"""
+  )
+  def test_lsu_sequencing(recipientMediatorGroup: MediatorGroupIndex): Unit =
+    consoleEnvironment.run(
+      runner.adminCommand(SequencerAdminCommands.PerformLsuSequencingTest(recipientMediatorGroup))
+    )
 }
 
 class SequencerHealthAdministration(

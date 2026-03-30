@@ -458,11 +458,14 @@ trait ParticipantTopologySnapshotClient {
 
   this: BaseTopologySnapshotClient =>
 
-  /** Checks whether the provided participant exists and is active. Active means:
-    *   1. The participant has a SynchronizerTrustCertificate. 2. The synchronizer is either
-    *      unrestricted or there is a ParticipantSynchronizerPermission for the participant. 3. The
-    *      participant has an OwnerToKeyMapping with signing and encryption keys.
+  /** Checks whether the provided participant has ever onboarded in the past, i.e. if there is any
+    * STC corresponding to their participant ID, regardless of whether it is presently active or
+    * not.
     */
+  def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean]
+
   def isParticipantActive(participantId: ParticipantId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
@@ -663,21 +666,12 @@ trait SynchronizerGovernanceSnapshotClient {
 trait MembersTopologySnapshotClient {
   this: BaseTopologySnapshotClient =>
 
-  /** Convenience method to determine all members with `isMemberKnown`. */
   @deprecated(
     message =
       "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
     since = "3.5.0",
   )
-  def allMembers()(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[Member]]
-
-  /** Determines if a member is known on the synchronizer (through a SynchronizerTrustCertificate,
-    * MediatorSynchronizerState, or SequencerSynchronizerState). Note that a "known" member is not
-    * necessarily authorized to use the synchronizer.
-    */
-  def isMemberKnown(member: Member)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Boolean]
+  def knownMembers()(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[Member]]
 
   /** Convenience method to check `isMemberKnown` for several members. */
   def areMembersKnown(members: Set[Member])(implicit
@@ -691,18 +685,17 @@ trait MembersTopologySnapshotClient {
 
 trait SynchronizerUpgradeClient {
 
-  /** In case the synchronizer owners have announced a synchronizer upgrade, returns the physical
-    * synchronizer id of the successor of this synchronizer and the upgrade time. Otherwise, returns
-    * None.
+  /** In case the synchronizer owners have announced an LSU, returns the physical synchronizer id of
+    * the successor of this synchronizer and the upgrade time. Otherwise, returns None.
     */
-  def synchronizerUpgradeOngoing()(implicit
+  def announcedLsu()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]]
 
   /** Returns the known sequencer connection details for the successor synchronizer as published by
     * the sequencers.
     */
-  def sequencerConnectionSuccessors()(implicit
+  def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[SequencerId, LsuSequencerConnectionSuccessor]]
 }
@@ -888,6 +881,10 @@ private[client] trait KeyTopologySnapshotClientLoader extends KeyTopologySnapsho
 private[client] trait ParticipantTopologySnapshotLoader extends ParticipantTopologySnapshotClient {
 
   this: BaseTopologySnapshotClient & KeyTopologySnapshotClient =>
+
+  override def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean]
 
   override def isParticipantActive(participantId: ParticipantId)(implicit
       traceContext: TraceContext

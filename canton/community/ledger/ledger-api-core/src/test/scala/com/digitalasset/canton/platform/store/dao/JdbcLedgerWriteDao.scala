@@ -5,8 +5,8 @@ package com.digitalasset.canton.platform.store.dao
 
 import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.api.ParticipantId
-import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.TestAcsChangeFactory
 import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId.SameAsContractPackageId
@@ -65,7 +65,7 @@ private class JdbcLedgerWriteDao(
     ) => FutureUnlessShutdown[Vector[Offset]],
     contractLoader: ContractLoader,
     lfValueTranslation: LfValueTranslation,
-    contractStore: LedgerApiContractStore,
+    contractStore: LedgerApiContractStoreImpl,
     pruningOffsetService: PruningOffsetService,
 )(implicit ec: ExecutionContext)
     extends LedgerReadDao
@@ -173,6 +173,7 @@ private class JdbcLedgerWriteDao(
               completionInfo = info,
               reasonTemplate = reason,
               synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
+              isTransaction = true,
             )
           ),
         )
@@ -237,7 +238,7 @@ private class JdbcLedgerWriteDao(
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse] = for {
     _ <- Future.successful(logger.info("Storing contracts into participant contract store"))
-    _ <- contractStore
+    _ <- contractStore.participantContractStore
       .storeContracts(
         transaction.nodes.values
           .collect { case create: Node.Create => create }
@@ -252,12 +253,13 @@ private class JdbcLedgerWriteDao(
           )
           .toSeq
       )
+      .failOnShutdownToAbortException("storeTransaction")
 
     contractIds =
       transaction.nodes.values
         .collect { case create: Node.Create => create.coid }
 
-    internalContractIds <- contractStore.lookupBatchedInternalIds(contractIds)
+    internalContractIds <- contractStore.lookupBatchedInternalIdsNonReadThrough(contractIds)
 
     _ <- Future.successful(logger.info("Storing transaction"))
     _ <- dbDispatcher
@@ -278,7 +280,7 @@ private class JdbcLedgerWriteDao(
                 optNodeSeeds = None, // not used for DbDto generation
                 optByKeyNodes = None, // not used for DbDto generation
               ),
-              transaction = transaction,
+              transactionInfo = state.Update.TransactionAccepted.TransactionInfo(transaction),
               updateId = updateId,
               synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
               recordTime = CantonTimestamp(recordTime),

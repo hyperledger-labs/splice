@@ -75,6 +75,7 @@ trait TestEnvironment[C <: SharedCantonConfig[C]]
       BatchingConfig(),
       loggerFactory,
       NoReportingTracerProvider,
+      environment.executorServiceMetrics,
     )(executionContext, TraceContext.empty)
 
   private lazy val crypto: Crypto =

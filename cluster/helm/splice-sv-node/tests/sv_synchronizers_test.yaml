@@ -194,3 +194,47 @@ tests:
             }
       - isNull:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')]
+
+  - it: "sets synchronizers configuration with skipInitialization without error"
+    set:
+      synchronizers:
+        skipInitialization: true
+        current:
+          sequencerPublicUrl: "https://sequencer1.test.com"
+          sequencerAddress: "sequencer1-address"
+          mediatorAddress: "mediator1-address"
+          enableBftSequencer: true
+          sequencerPruningConfig:
+            enabled: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
+          value: |
+            canton.sv-apps.sv.local-synchronizer-nodes.current {
+              sequencer {
+                is-bft-sequencer = true
+                admin-api {
+                  address = "sequencer1-address"
+                  port = 5009
+                }
+                internal-api {
+                  address = "sequencer1-address"
+                  port = 5008
+                }
+                external-public-api-url = "https://sequencer1.test.com"
+              }
+              mediator {
+                admin-api {
+                  address = "mediator1-address"
+                  port = 5007
+                }
+              }
+            }
+      - isNull:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_SKIPINITIALIZATION')]
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION')].value
+          value: "canton.sv-apps.sv.skip-synchronizer-initialization = true"

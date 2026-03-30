@@ -4,6 +4,7 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core
 
 import com.daml.jwt.JwtTimestampLeeway
+import com.daml.tls.{TlsClientConfig, TlsServerConfig}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{
@@ -18,8 +19,6 @@ import com.digitalasset.canton.config.{
   PemFileOrString,
   ServerConfig,
   StorageConfig,
-  TlsClientConfig,
-  TlsServerConfig,
 }
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
@@ -42,6 +41,9 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
   DefaultMaxRequestPayloadBytes,
   DefaultMaxRequestsInBatch,
   DefaultMinRequestsInBatch,
+  DefaultOutputEnqueueMaxRetries,
+  DefaultOutputEnqueueMaxRetryDelay,
+  DefaultOutputFetchMinimumDelay,
   DefaultOutputFetchTimeout,
   DefaultOutputFetchTimeoutCap,
   LeaderSelectionPolicyConfig,
@@ -51,6 +53,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
+import com.digitalasset.canton.util.retry
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 
 import java.io.File
@@ -170,7 +173,10 @@ final case class BftBlockOrdererConfig(
     delayedInitQueueMaxSize: Int = DefaultDelayedInitQueueMaxSize,
     epochStateTransferRetryTimeout: FiniteDuration = DefaultEpochStateTransferTimeout,
     outputFetchTimeout: FiniteDuration = DefaultOutputFetchTimeout,
+    outputFetchMinimumDelay: FiniteDuration = DefaultOutputFetchMinimumDelay,
     outputFetchTimeoutCap: FiniteDuration = DefaultOutputFetchTimeoutCap,
+    outputEnqueueMaxRetries: Int = DefaultOutputEnqueueMaxRetries,
+    outputEnqueueMaxRetryDelay: FiniteDuration = DefaultOutputEnqueueMaxRetryDelay,
     initialNetwork: Option[P2PNetworkConfig] = None,
     standalone: Option[BftBlockOrderingStandaloneNetworkConfig] = None,
     // TODO(#24184) make a dynamic sequencing parameter
@@ -210,8 +216,11 @@ object BftBlockOrdererConfig {
   val DefaultConsensusEmptyBlockCreationTimeout: FiniteDuration = 5.seconds
   val DefaultDelayedInitQueueMaxSize: Int = 1024
   val DefaultEpochStateTransferTimeout: FiniteDuration = 10.seconds
-  val DefaultOutputFetchTimeout: FiniteDuration = 2.second
-  val DefaultOutputFetchTimeoutCap: FiniteDuration = 20.second
+  val DefaultOutputFetchTimeout: FiniteDuration = 500.milliseconds
+  val DefaultOutputFetchMinimumDelay: FiniteDuration = 500.milliseconds
+  val DefaultOutputFetchTimeoutCap: FiniteDuration = 5.second
+  val DefaultOutputEnqueueMaxRetries: Int = retry.Forever
+  val DefaultOutputEnqueueMaxRetryDelay: FiniteDuration = 5.seconds
 
   val DefaultHowLongToBlackList: LeaderSelectionPolicyConfig.HowLongToBlacklist =
     LeaderSelectionPolicyConfig.HowLongToBlacklist.Linear
@@ -343,6 +352,8 @@ object BftBlockOrdererConfig {
       tls: Option[TlsServerConfig] = None,
       override val maxInboundMessageSize: NonNegativeInt =
         ServerConfig.defaultMaxInboundMessageSize,
+      override val maxConcurrentStreamsPerConnection: NonNegativeInt =
+        ServerConfig.defaultMaxConcurrentStreamsPerConnection,
       override val limits: Option[ActiveRequestLimitsConfig] = None,
   ) extends ServerConfig {
     override val name: String = "peer-to-peer"

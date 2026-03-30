@@ -11,9 +11,10 @@ import com.daml.jwt.{
   StandardJWTPayload,
   StandardJWTTokenFormat,
 }
+import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, PositiveInt}
-import com.digitalasset.canton.config.{AuthServiceConfig, PemFile, TlsServerConfig}
+import com.digitalasset.canton.config.{AuthServiceConfig, PemFile}
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.integration.tests.jsonapi.HttpServiceTestFixture.UseTls
@@ -112,7 +113,6 @@ trait HttpJsonApiTestBase extends CantonFixture {
         createChannel(participant1)
         darFiles.foreach(path => participant1.dars.upload(path.toFile.getAbsolutePath))
       }
-
   def adHocHttp(participantSelector: ParticipantSelector, token: Option[String] = None)(implicit
       env: TestConsoleEnvironment
   ): Future[AbstractHttpServiceIntegrationTestFuns.HttpServiceTestFixtureData] = {

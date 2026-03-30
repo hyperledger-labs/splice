@@ -89,6 +89,7 @@ class GrpcSequencerInitializationService(
           topologySnapshot,
           synchronizerParams,
           doResetTimes = true,
+          ignoreLsuPsidCheck = false,
         ).map(InitializeSequencerFromGenesisStateResponse(_)),
       responseObserver,
     )
@@ -100,31 +101,45 @@ class GrpcSequencerInitializationService(
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     GrpcStreamingUtils.streamFromClient(
       _.topologySnapshot,
-      _.synchronizerParameters,
+      req => (req.synchronizerParameters, req.ignorePsidCheck),
       (
           topologySnapshot: ByteString,
-          synchronizerParams: Option[v30.StaticSynchronizerParameters],
-      ) =>
+          ctx: (Option[v30.StaticSynchronizerParameters], Boolean),
+      ) => {
+        val (synchronizerParams, ignoreLsuPsidCheck) = ctx
+
         initializeSequencerFromGenesisStateV2(
           topologySnapshot,
           synchronizerParams,
           doResetTimes = false,
-        ).map(_ => InitializeSequencerFromLsuPredecessorResponse()),
+          ignoreLsuPsidCheck = ignoreLsuPsidCheck,
+        ).map(_ => InitializeSequencerFromLsuPredecessorResponse())
+      },
       responseObserver,
     )
   }
 
-  /** Use for major upgrades and logical upgrades
+  /** Initializes the sequencer from a topology state snapshot.
+    *
+    * Used for major upgrades, logical upgrades, and initializing from an LSU predecessor.
     *
     * @param doResetTimes
-    *   If sequenced and effective time should be set to MinValue Use true for major upgrades
+    *   Determines whether sequenced and effective times should be reset to MinValue. Use `true` for
+    *   genesis states (brand-new networks) to start a new timeline. Use `false` when initializing
+    *   from an LSU predecessor to preserve historical timestamps and maintain continuity.
+    *
+    * @param ignoreLsuPsidCheck
+    *   Only matters after LSU. If true, it will not be checked that that current PSId matches the
+    *   successor in the topology state. Should be used *only* in disaster recovery scenarios (roll
+    *   forward).
     * @return
-    *   True if the sequencer is replicated
+    *   True if the sequencer is replicated.
     */
   private def initializeSequencerFromState(
       topologySnapshot: ByteString,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
       doResetTimes: Boolean,
+      ignoreLsuPsidCheck: Boolean,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     val res: EitherT[Future, RpcError, Boolean] = for {
       topologyState <- EitherT.fromEither[Future](
@@ -135,7 +150,8 @@ class GrpcSequencerInitializationService(
       replicated <- initializeSequencerFromGenesisStateInternal(
         topologyState,
         synchronizerParameters,
-        doResetTimes,
+        doResetTimes = doResetTimes,
+        ignoreLsuPsidCheck = ignoreLsuPsidCheck,
       )
     } yield replicated
     mapErrNew(res)
@@ -156,6 +172,7 @@ class GrpcSequencerInitializationService(
           topologySnapshot,
           synchronizerParams,
           doResetTimes = true,
+          ignoreLsuPsidCheck = false,
         ).map(InitializeSequencerFromGenesisStateV2Response(_)),
       responseObserver,
     )
@@ -165,6 +182,7 @@ class GrpcSequencerInitializationService(
       topologySnapshot: ByteString,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
       doResetTimes: Boolean,
+      ignoreLsuPsidCheck: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[Boolean] = {
@@ -184,16 +202,31 @@ class GrpcSequencerInitializationService(
       replicated <- initializeSequencerFromGenesisStateInternal(
         topologyState,
         synchronizerParameters,
-        doResetTimes,
+        doResetTimes = doResetTimes,
+        ignoreLsuPsidCheck = ignoreLsuPsidCheck,
       )
     } yield replicated
     mapErrNew(res)
   }
 
+  /** @param topologyState
+    *   Topology state the sequencer should be initialized with.
+    * @param synchronizerParameters
+    *   Static synchronizer parameters
+    * @param doResetTimes
+    *   Determines whether sequenced and effective times should be reset to MinValue. Use `true` for
+    *   genesis states (brand-new networks) to start a new timeline. Use `false` when initializing
+    *   from an LSU predecessor to preserve historical timestamps and maintain continuity.
+    * @param ignoreLsuPsidCheck
+    *   Only matters after LSU. If true, it will not be checked that that current PSId matches the
+    *   successor in the topology state. Should be used *only* in disaster recovery scenarios (roll
+    *   forward).
+    */
   private def initializeSequencerFromGenesisStateInternal(
       topologyState: GenericStoredTopologyTransactions,
       synchronizerParameters: Option[v30.StaticSynchronizerParameters],
       doResetTimes: Boolean,
+      ignoreLsuPsidCheck: Boolean,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, RpcError, Boolean] =
@@ -232,7 +265,7 @@ class GrpcSequencerInitializationService(
       )
 
       physicalSynchronizerId = PhysicalSynchronizerId(synchronizerId, synchronizerParameters)
-      expectedUpgradePSIdO = genesisState
+      expectedUpgradePsidO = genesisState
         .collectOfMapping[LsuAnnouncement]
         .collectLatestByUniqueKey
         .collectOfType[
@@ -244,13 +277,13 @@ class GrpcSequencerInitializationService(
 
       // If there's an announcement in the topology snapshot, we expect that the sequencer being initialized is the successor
       _ <- EitherT.fromEither[Future](
-        expectedUpgradePSIdO.fold(Right(()): Either[RpcError, Unit])(expectedUpgradePSId =>
+        expectedUpgradePsidO.fold(Right(()): Either[RpcError, Unit])(expectedUpgradePsid =>
           Either.cond(
-            expectedUpgradePSId == physicalSynchronizerId,
+            ignoreLsuPsidCheck || expectedUpgradePsid == physicalSynchronizerId,
             (),
             TopologyManagerError.InconsistentTopologySnapshot.UnexpectedPhysicalSynchronizerId(
               physicalSynchronizerId,
-              expectedUpgradePSId,
+              expectedUpgradePsid,
             ),
           )
         )

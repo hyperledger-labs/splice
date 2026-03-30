@@ -29,9 +29,6 @@ object Dependencies {
   lazy val jwks_rsa =
     "com.auth0" % "jwks-rsa" % "0.21.2"
 
-  lazy val daml_lf_archive_reader =
-    "com.daml" %% "daml-lf-archive-reader" % CantonDependencies.daml_libraries_version
-
   lazy val daml_lf_validation =
     "com.daml" %% "daml-lf-validation" % CantonDependencies.canton_library_version
 

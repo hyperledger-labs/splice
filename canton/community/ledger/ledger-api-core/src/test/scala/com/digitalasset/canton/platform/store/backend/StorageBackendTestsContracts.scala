@@ -3,7 +3,12 @@
 
 package com.digitalasset.canton.platform.store.backend
 
+import com.digitalasset.canton.platform.store.backend.ContractStorageBackend.{
+  KeysPageQuery,
+  KeysPageResult,
+}
 import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.Identifier
 import com.digitalasset.daml.lf.transaction.GlobalKey
@@ -25,13 +30,15 @@ private[backend] trait StorageBackendTestsContracts
   it should "correctly find key states" in {
     val key1 = GlobalKey.assertBuild(
       Identifier.assertFromString("A:B:C"),
-      ValueUnit,
       someTemplateId.pkg.name,
+      ValueUnit,
+      crypto.Hash.hashPrivateKey("dummy-key-hash-1"),
     )
     val key2 = GlobalKey.assertBuild(
       Identifier.assertFromString("A:B:C"),
-      ValueText("value"),
       someTemplateId.pkg.name,
+      ValueText("value"),
+      crypto.Hash.hashPrivateKey("dummy-key-hash-2"),
     )
     val internalContractId = 123L
     val internalContractId2 = 223L
@@ -176,6 +183,191 @@ private[backend] trait StorageBackendTestsContracts
     keyStateKey2_5 shouldBe Some(internalContractId4)
   }
 
+  it should "correctly find non unique contract key contracts" in {
+    val key1 = GlobalKey.assertBuild(
+      Identifier.assertFromString("A:B:C"),
+      someTemplateId.pkg.name,
+      ValueUnit,
+      crypto.Hash.hashPrivateKey("1"),
+    )
+    val key2 = GlobalKey.assertBuild(
+      Identifier.assertFromString("A:B:C"),
+      someTemplateId.pkg.name,
+      ValueText("value"),
+      keyHash = crypto.Hash.hashPrivateKey("2"),
+    )
+    val internalContractId = 123L
+    val internalContractId2 = 223L
+    val internalContractId3 = 323L
+    val internalContractId4 = 423L
+    val signatory = Ref.Party.assertFromString("signatory")
+
+    val dtos: Vector[DbDto] = Vector(
+      dtosCreate(
+        event_offset = 1L,
+        event_sequential_id = 1L,
+        internal_contract_id = internalContractId4,
+        create_key_hash = Some(key1.hash.toHexString),
+      )(
+        stakeholders = Set(signatory),
+        template_id = someTemplateId,
+      ),
+      dtosCreate(
+        event_offset = 2L,
+        event_sequential_id = 2L,
+        internal_contract_id = internalContractId,
+        create_key_hash = Some(key2.hash.toHexString),
+      )(
+        stakeholders = Set(signatory),
+        template_id = someTemplateId,
+      ),
+      dtosCreate(
+        event_offset = 3L,
+        event_sequential_id = 3L,
+        internal_contract_id = internalContractId2,
+        create_key_hash = Some(key1.hash.toHexString),
+      )(
+        stakeholders = Set(signatory),
+        template_id = someTemplateId,
+      ),
+      dtosConsumingExercise(
+        event_offset = 4L,
+        event_sequential_id = 4L,
+        internal_contract_id = Some(internalContractId2),
+        stakeholders = Set(signatory),
+        template_id = someTemplateId,
+        deactivated_event_sequential_id = Some(3L),
+      ),
+      dtosCreate(
+        event_offset = 5L,
+        event_sequential_id = 5L,
+        internal_contract_id = internalContractId3,
+        create_key_hash = Some(key1.hash.toHexString),
+      )(
+        stakeholders = Set(signatory),
+        template_id = someTemplateId,
+      ),
+    ).flatten
+
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
+    executeSql(ingest(dtos, _))
+    executeSql(
+      updateLedgerEnd(offset(5), 5L)
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 1,
+          nextPageToken = None,
+          validAtEventSeqId = 5,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId3),
+      nextPageToken = Some(2L),
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 1,
+          nextPageToken = Some(5L),
+          validAtEventSeqId = 5,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId4),
+      nextPageToken = None,
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 10,
+          nextPageToken = None,
+          validAtEventSeqId = 5,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId3, internalContractId4),
+      nextPageToken = None,
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 3,
+          nextPageToken = None,
+          validAtEventSeqId = 5,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId3, internalContractId4),
+      nextPageToken = None,
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 2,
+          nextPageToken = None,
+          validAtEventSeqId = 5,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId3, internalContractId4),
+      nextPageToken = None,
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 3,
+          nextPageToken = None,
+          validAtEventSeqId = 4,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId4),
+      nextPageToken = None,
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key1,
+          limit = 3,
+          nextPageToken = None,
+          validAtEventSeqId = 3,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId2, internalContractId4),
+      nextPageToken = None,
+    )
+
+    executeSql(
+      backend.contract.nonUniqueContractKey(
+        KeysPageQuery(
+          key = key2,
+          limit = 3,
+          nextPageToken = None,
+          validAtEventSeqId = 5,
+        )
+      )
+    ) shouldBe KeysPageResult(
+      internalContractIds = Vector(internalContractId),
+      nextPageToken = None,
+    )
+  }
+
   it should "correctly find active contracts" in {
     val internalContractId = 123L
     val internalContractId2 = 223L
@@ -246,16 +438,18 @@ private[backend] trait StorageBackendTestsContracts
       )
     )
     val activeIds = executeSql(
-      backend.event.updateStreamingQueries.fetchActiveIds(
-        stakeholderO = Some(signatory),
-        templateIdO = None,
-        activeAtEventSeqId = 1000,
-      )(_)(
-        PaginatingAsyncStream.IdFilterInput(
-          startExclusive = 0L,
-          endInclusive = 1000L,
+      backend.event.updateStreamingQueries
+        .fetchActiveIds(
+          stakeholderO = Some(signatory),
+          templateIdO = None,
+          activeAtEventSeqId = 1000,
         )
-      )
+        .fetchPage(_)(
+          PaginatingAsyncStream.PaginationFromTo.ascending(
+            startExclusive = 0L,
+            endInclusive = 1000L,
+          )
+        )
     )
     val lastActivations = executeSql(
       backend.contract.lastActivations(
@@ -354,28 +548,32 @@ private[backend] trait StorageBackendTestsContracts
       )
     )
     val activeIds2 = executeSql(
-      backend.event.updateStreamingQueries.fetchActiveIds(
-        stakeholderO = Some(signatory),
-        templateIdO = None,
-        activeAtEventSeqId = 2L,
-      )(_)(
-        PaginatingAsyncStream.IdFilterInput(
-          startExclusive = 0L,
-          endInclusive = 2L,
+      backend.event.updateStreamingQueries
+        .fetchActiveIds(
+          stakeholderO = Some(signatory),
+          templateIdO = None,
+          activeAtEventSeqId = 2L,
         )
-      )
+        .fetchPage(_)(
+          PaginatingAsyncStream.PaginationFromTo.ascending(
+            startExclusive = 0L,
+            endInclusive = 2L,
+          )
+        )
     )
     val activeIds4 = executeSql(
-      backend.event.updateStreamingQueries.fetchActiveIds(
-        stakeholderO = Some(signatory),
-        templateIdO = None,
-        activeAtEventSeqId = 4,
-      )(_)(
-        PaginatingAsyncStream.IdFilterInput(
-          startExclusive = 0L,
-          endInclusive = 4L,
+      backend.event.updateStreamingQueries
+        .fetchActiveIds(
+          stakeholderO = Some(signatory),
+          templateIdO = None,
+          activeAtEventSeqId = 4,
         )
-      )
+        .fetchPage(_)(
+          PaginatingAsyncStream.PaginationFromTo.ascending(
+            startExclusive = 0L,
+            endInclusive = 4L,
+          )
+        )
     )
     val lastActivations = executeSql(
       backend.contract.lastActivations(

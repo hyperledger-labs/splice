@@ -33,7 +33,6 @@ import com.digitalasset.canton.console.{
   InstanceReference,
 }
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
-import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.FeatureFlag.Preview
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -42,8 +41,9 @@ import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.grpc.{ByteStringStreamObserver, OutputFileStreamObserver}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.*
+import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.{
   ExportTopologySnapshotResponse,
   ExportTopologySnapshotV2Response,
@@ -2816,7 +2816,7 @@ class TopologyAdministrationGroup(
           adminCommand(
             TopologyAdminCommands.Read.ListMediatorSynchronizerState(
               BaseQuery(
-                synchronizerId,
+                synchronizerId.map(TopologyStoreId.Synchronizer(_)),
                 proposals,
                 timeQuery,
                 operation,
@@ -3008,7 +3008,7 @@ class TopologyAdministrationGroup(
         mustFullyAuthorize: Boolean = false,
     ): SignedTopologyTransaction[TopologyChangeOp, MediatorSynchronizerState] = {
 
-      val mediatorStateResult = list(synchronizerId = synchronizerId, group = Some(group))
+      val mediatorStateResult = list(synchronizerId = Some(synchronizerId), group = Some(group))
         .maxByOption(_.context.serial)
         .getOrElse(throw new IllegalArgumentException(s"Unknown mediator group $group"))
 
@@ -3671,7 +3671,7 @@ class TopologyAdministrationGroup(
           |- sequencerId: The ID of the sequencer that will be reachable by the provided endpoints.
           |- endpoints: A list of URIs of the endpoints with which the sequencer is reachable on the
           |  successor synchronizer.
-          |- synchronizerId: The logical synchronizer ID.
+          |- successorSynchronizerId: The physical synchronizer id the sequencer will belong to.
           |- customTrustCertificates: A trust certificate in case the sequencer's TLS certificate is
           |  not signed via certificates trusted by the OS's default trusted certificates.
           |- store:
@@ -3700,7 +3700,7 @@ class TopologyAdministrationGroup(
       def propose_successor(
           sequencerId: SequencerId,
           endpoints: NonEmpty[Seq[URI]],
-          synchronizerId: PhysicalSynchronizerId,
+          successorSynchronizerId: PhysicalSynchronizerId,
           customTrustCertificates: Option[ByteString] = None,
           store: Option[TopologyStoreId] = None,
           mustFullyAuthorize: Boolean = false,
@@ -3720,7 +3720,7 @@ class TopologyAdministrationGroup(
                   .map { case (validatedEndpoints, useTls) =>
                     LsuSequencerConnectionSuccessor(
                       sequencerId,
-                      synchronizerId,
+                      successorSynchronizerId,
                       GrpcConnection(
                         validatedEndpoints,
                         useTls,
@@ -3733,7 +3733,7 @@ class TopologyAdministrationGroup(
                 change = operation,
                 mustFullyAuthorize = mustFullyAuthorize,
                 forceChanges = ForceFlags.none,
-                store = store.getOrElse(synchronizerId),
+                store = store.getOrElse(successorSynchronizerId.logical),
                 waitToBecomeEffective = synchronize,
               )
             )

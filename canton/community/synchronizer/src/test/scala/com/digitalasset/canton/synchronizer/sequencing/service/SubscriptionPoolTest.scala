@@ -4,6 +4,7 @@
 package com.digitalasset.canton.synchronizer.sequencing.service
 
 import cats.implicits.*
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -20,6 +21,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.Future
 
+@UnstableTest // TODO(#30535)
 class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   def pid(s: String): Member = {
     val id = UniqueIdentifier.fromProtoPrimitive_(s"$s::default").map(ParticipantId(_)).value
@@ -109,10 +111,12 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
       manager.activeSubscriptions() shouldBe empty
       assertNum(0)
 
-      // all should have only been closed once
-      subscription1.closeCount shouldEqual 1
-      subscription2.closeCount shouldEqual 1
-      subscription3.closeCount shouldEqual 1
+      eventually() {
+        // all should have only been closed once
+        subscription1.closeCount shouldEqual 1
+        subscription2.closeCount shouldEqual 1
+        subscription3.closeCount shouldEqual 1
+      }
     }
 
     "drop excess connections" in {
@@ -245,10 +249,12 @@ class SubscriptionPoolTest extends AnyWordSpec with BaseTest with HasExecutionCo
           manager.create(() => FutureUnlessShutdown.pure(sub1), participant1),
           manager.create(() => FutureUnlessShutdown.pure(sub2), participant1),
         ).sequence.value.futureValue
-        _ = manager.closeSubscriptions(participant1, waitForClosed = true)
+        _ = manager.closeSubscriptions(participant1)
       } yield {
-        sub1.isClosing shouldBe true
-        sub2.isClosing shouldBe true
+        eventually() {
+          sub1.isClosing shouldBe true
+          sub2.isClosing shouldBe true
+        }
       }
     }
 

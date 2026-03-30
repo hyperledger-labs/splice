@@ -11,6 +11,7 @@ import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 
 import java.time.Duration
 
@@ -65,18 +66,17 @@ final class LsuParticipantOnboardingDuringLsuIntegrationTest extends LsuBase {
       )
 
       environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
-
+      transferTraffic()
       eventually() {
-        participant1.synchronizers.is_connected(fixture.newPSId) shouldBe true
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+        participant1.synchronizers.is_connected(fixture.newPsid) shouldBe true
 
         // P2 can now join
         participant2.synchronizers.connect(sequencer2, daName)
       }
 
       oldSynchronizerNodes.all.stop()
-
-      environment.simClock.value.advance(Duration.ofSeconds(1))
-      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
+      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now, logger)
     }
   }
 }

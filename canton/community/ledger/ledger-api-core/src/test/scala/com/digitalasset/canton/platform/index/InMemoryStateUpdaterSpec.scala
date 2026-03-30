@@ -4,9 +4,9 @@
 package com.digitalasset.canton.platform.index
 
 import cats.data.NonEmptyVector
-import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
+import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
@@ -34,8 +34,10 @@ import com.digitalasset.canton.platform.apiserver.services.admin.PartyAllocation
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
 import com.digitalasset.canton.platform.index.InMemoryStateUpdater.PrepareResult
 import com.digitalasset.canton.platform.index.InMemoryStateUpdaterSpec.*
+import com.digitalasset.canton.platform.indexer.parallel.ParallelIndexerSubscription.Batch
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.cache.{
+  AchsStateCache,
   ContractStateCaches,
   InMemoryFanoutBuffer,
   MutableLedgerEndCache,
@@ -706,6 +708,7 @@ object InMemoryStateUpdaterSpec {
       )(emptyTraceContext)
 
     val ledgerEndCache: MutableLedgerEndCache = mock[MutableLedgerEndCache]
+    val achsStateCache: AchsStateCache = mock[AchsStateCache]
     val contractStateCaches: ContractStateCaches = mock[ContractStateCaches]
     val offsetCheckpointCache: OffsetCheckpointCache = mock[OffsetCheckpointCache]
     val inMemoryFanoutBuffer: InMemoryFanoutBuffer = mock[InMemoryFanoutBuffer]
@@ -733,6 +736,7 @@ object InMemoryStateUpdaterSpec {
     val inMemoryState = new InMemoryState(
       participantId = participantId,
       ledgerEndCache = ledgerEndCache,
+      achsStateCache = achsStateCache,
       contractStateCaches = contractStateCaches,
       offsetCheckpointCache = offsetCheckpointCache,
       inMemoryFanoutBuffer = inMemoryFanoutBuffer,
@@ -915,7 +919,18 @@ object InMemoryStateUpdaterSpec {
     def runFlow(
         input: Seq[(Vector[(Offset, Update)], LedgerEnd, TraceContext)]
     )(implicit mat: Materializer): Done =
-      Source(input)
+      Source(input.map { case (updates, ledgerEnd, tc) =>
+        Batch(
+          ledgerEnd = ledgerEnd,
+          batch = (),
+          batchSize = updates.size,
+          offsetsUpdates = updates,
+          missingDeactivatedActivations = Map.empty,
+          eventCount = 0L,
+          batchTraceContext = tc,
+          distinctRawStrings = Nil,
+        ): Batch[?]
+      })
         .via(inMemoryStateUpdater(false))
         .runWith(Sink.ignore)
         .futureValue
@@ -1008,7 +1023,8 @@ object InMemoryStateUpdaterSpec {
     Update.SequencedTransactionAccepted(
       completionInfoO = None,
       transactionMeta = someTransactionMeta,
-      transaction = CommittedTransaction(TransactionBuilder.Empty),
+      transactionInfo =
+        Update.TransactionAccepted.TransactionInfo(CommittedTransaction(TransactionBuilder.Empty)),
       updateId = txId2,
       synchronizerId = SynchronizerId.tryFromString("da::default"),
       recordTime = CantonTimestamp.MinValue,
@@ -1135,7 +1151,18 @@ object InMemoryStateUpdaterSpec {
     var checkpoints: Seq[OffsetCheckpoint] = Seq.empty
 
     val output = sourceSomes
-      .map((_, someLedgerEnd, emptyTraceContext))
+      .map(updates =>
+        Batch(
+          ledgerEnd = someLedgerEnd,
+          batch = (),
+          batchSize = updates.size,
+          offsetsUpdates = updates,
+          missingDeactivatedActivations = Map.empty,
+          eventCount = 0L,
+          batchTraceContext = emptyTraceContext,
+          distinctRawStrings = Nil,
+        )
+      )
       .via(
         InMemoryStateUpdaterFlow
           .updateOffsetCheckpointCacheFlowWithTickingSource(
@@ -1146,7 +1173,7 @@ object InMemoryStateUpdaterSpec {
             tick = sourceNones,
           )
       )
-      .map(_._1)
+      .map(_.offsetsUpdates)
       .alsoTo(Sink.foreach(_ => offerNext()))
       .runWith(Sink.seq)
 
@@ -1165,7 +1192,7 @@ object InMemoryStateUpdaterSpec {
     Update.SequencedTransactionAccepted(
       completionInfoO = None,
       transactionMeta = someTransactionMeta,
-      transaction = transaction,
+      transactionInfo = Update.TransactionAccepted.TransactionInfo(transaction),
       updateId = txId1,
       synchronizerId = synchronizerId,
       recordTime = CantonTimestamp(Timestamp(t)),
@@ -1255,6 +1282,7 @@ object InMemoryStateUpdaterSpec {
       reasonTemplate = FinalReason(new Status()),
       synchronizerId = synchronizerId,
       recordTime = CantonTimestamp.assertFromLong(t),
+      isTransaction = true,
     )
 
   private def sequencerIndexMoved(

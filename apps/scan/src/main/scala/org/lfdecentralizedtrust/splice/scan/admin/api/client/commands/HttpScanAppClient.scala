@@ -8,7 +8,8 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
-import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
+import com.daml.tls.TlsClientConfig
+import com.digitalasset.canton.config.RequireTypes
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{

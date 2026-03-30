@@ -5,8 +5,8 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.binding
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.metrics.ExecutorServiceMetrics
 import com.daml.metrics.api.MetricsContext
-import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -137,6 +137,7 @@ final class BftBlockOrderer(
     sequencerSnapshotInfo: Option[SequencerSnapshot.ImplementationSpecificInfo],
     exitOnFatalFailures: Boolean,
     metrics: BftOrderingMetrics,
+    executorServiceMetrics: ExecutorServiceMetrics,
     override val loggerFactory: NamedLoggerFactory,
     queryCostMonitoring: Option[QueryCostMonitoringConfig],
     executionContext: ExecutionContextExecutor,
@@ -153,10 +154,10 @@ final class BftBlockOrderer(
       Threading.newExecutionContext(
         "bft-orderer-dedicated-ec",
         noTracingLogger,
-        None,
         PositiveInt.tryCreate(
           Threading.detectNumberOfThreads(noTracingLogger).value / divisor
         ),
+        executorServiceMetrics,
       )
     }
 
@@ -214,6 +215,7 @@ final class BftBlockOrderer(
     Threading.newExecutionContext(
       loggerFactory.threadName + "-dp2p-server-grpc-executor-context",
       noTracingLogger,
+      executorServiceMetrics = executorServiceMetrics,
     )
 
   // Standalone mode doesn't support authentication
@@ -274,7 +276,14 @@ final class BftBlockOrderer(
 
   private val p2pEndpointsStore = setupP2PEndpointsStore(localStorage)
   private val availabilityStore =
-    AvailabilityStore(config.batchAggregator, localStorage, timeouts, loggerFactory)
+    AvailabilityStore(
+      config.batchAggregator,
+      nodeParameters.cachingConfigs,
+      metrics,
+      localStorage,
+      timeouts,
+      loggerFactory,
+    )
   private val epochStore = EpochStore(config.batchAggregator, localStorage, timeouts, loggerFactory)
   private val outputStore = OutputMetadataStore(localStorage, timeouts, loggerFactory)
   private val pruningSchedulerStore =
@@ -336,6 +345,8 @@ final class BftBlockOrderer(
       BlockNumber(sequencerSubscriptionInitialHeight),
       timeouts,
       loggerFactory,
+      config.outputEnqueueMaxRetries,
+      config.outputEnqueueMaxRetryDelay,
     )(
       abort = sys.error
     )
@@ -405,10 +416,16 @@ final class BftBlockOrderer(
       )
     val topologyProvider =
       config.standalone.fold[OrderingTopologyProvider[PekkoEnv]](
-        new CantonOrderingTopologyProvider(cryptoApi, loggerFactory, metrics)
+        new CantonOrderingTopologyProvider(
+          cryptoApi,
+          EpochLength(config.epochLength), // TODO(#24184) make this dynamic sequencing parameter
+          loggerFactory,
+          metrics,
+        )
       ) { standaloneConfig =>
         new FixedFileBasedOrderingTopologyProvider(
           standaloneConfig,
+          EpochLength(config.epochLength),
           cryptoApi.pureCrypto,
           metrics,
         )
@@ -418,9 +435,6 @@ final class BftBlockOrderer(
       thisNode,
       config,
       BlockNumber(sequencerSubscriptionInitialHeight),
-      // TODO(#18910) test with multiple epoch lengths >= 1 (incl. 1)
-      // TODO(#19289) support dynamically configurable epoch length
-      EpochLength(config.epochLength),
       stores,
       topologyProvider,
       blockSubscription,
@@ -514,13 +528,11 @@ final class BftBlockOrderer(
         CantonServerBuilder
           .forConfig(
             config = serverConfig,
-            adminTokenDispenser = None,
             executor = p2pServerGrpcExecutor,
             loggerFactory = loggerFactory,
             apiLoggingConfig = nodeParameters.loggingConfig.api,
             tracing = nodeParameters.tracing,
             grpcMetrics = metrics.grpcMetrics,
-            NoOpTelemetry,
           )
           .addService(
             ServerInterceptors.intercept(
@@ -535,7 +547,8 @@ final class BftBlockOrderer(
                 maybeServerAuthenticatingFilter,
                 maybeAuthenticationServices.map(_.authenticationServerInterceptor),
               ).flatten.asJava,
-            )
+            ),
+            withLogging = false,
           )
       config.standalone.foreach { _ =>
         val standaloneService =
@@ -546,7 +559,8 @@ final class BftBlockOrderer(
             StandaloneBftOrderingServiceGrpc.bindService(
               standaloneService,
               executionContext,
-            )
+            ),
+            withLogging = false,
           )
           .discard
       }
@@ -658,8 +672,8 @@ final class BftBlockOrderer(
       // Shutdown the server-authenticating server-side filter early (as it's also a client of the auth service),
       //  if authentication is enabled.
       (maybeServerAuthenticatingFilter.map(_.closeAsync()).getOrElse(Seq.empty) ++
+        blockSubscription.closeAsync() ++
         Seq[AsyncOrSyncCloseable](
-          SyncCloseable("blockSubscription.close()", blockSubscription.close()),
           SyncCloseable("epochStore.close()", epochStore.close()),
           SyncCloseable("outputStore.close()", outputStore.close()),
           SyncCloseable("availabilityStore.close()", availabilityStore.close()),

@@ -11,14 +11,12 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.UnitTestContext.DelayCount
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Epoch
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Bootstrap.bootstrapEpoch
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.EpochInProgress
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
-  EpochStore,
-  Genesis,
-}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.{
   BaseIgnoringUnitTestEnv,
   FailingCryptoProvider,
@@ -52,12 +50,14 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.Consensus.ConsensusMessage.SegmentCompletedEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.Consensus.SegmentCancelledEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.*
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.Start
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Availability,
   Consensus,
   ConsensusSegment,
   P2PNetworkOut,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   BftSequencerBaseTest,
   fakeCellModule,
@@ -113,7 +113,7 @@ class IssSegmentModuleTest
     SecondEpochNumber,
     BlockNumber(10L),
     testEpochLength,
-    Genesis.GenesisTopologyActivationTime,
+    TestBootstrapTopologyActivationTime,
   )
   private val block9Commits1Node = Seq(
     Commit
@@ -354,10 +354,10 @@ class IssSegmentModuleTest
           )
         }
         inside(availabilityCell.get()) {
-          case Some(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Some(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(1L)
             e shouldBe EpochNumber.First
-            o.nodes shouldBe Set(myId)
+            m.orderingTopology.nodes shouldBe Set(myId)
             ackO shouldBe empty
         }
         consensus.allFuturesHaveFinished shouldBe true
@@ -382,10 +382,10 @@ class IssSegmentModuleTest
         // Upon receiving a Start signal (in a non-first epoch), Consensus should ask for a Proposal from Availability
         consensus.receive(ConsensusSegment.Start)
         inside(availabilityCell.get()) {
-          case Some(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Some(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(10L)
             e shouldBe SecondEpochNumber
-            o.nodes shouldBe Set(myId)
+            m.orderingTopology.nodes shouldBe Set(myId)
             ackO shouldBe empty
         }
         availabilityCell.set(None)
@@ -482,10 +482,10 @@ class IssSegmentModuleTest
           )
         }
         inside(availabilityCell.get()) {
-          case Some(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Some(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(11L)
             e shouldBe SecondEpochNumber
-            o.nodes shouldBe Set(myId)
+            m.orderingTopology.nodes shouldBe Set(myId)
             ackO shouldBe Seq(aBatchId)
         }
         context.delayedMessages should matchPattern {
@@ -523,10 +523,10 @@ class IssSegmentModuleTest
         // Consensus.Start message from Network module(s) should trigger request for proposal
         consensus.receive(ConsensusSegment.Start)
         inside(availabilityBuffer.toSeq) {
-          case Seq(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Seq(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(13L)
             e shouldBe SecondEpochNumber
-            o shouldBe fullTopology
+            m.orderingTopology shouldBe fullTopology
             ackO shouldBe empty
         }
         availabilityBuffer.clear()
@@ -637,10 +637,10 @@ class IssSegmentModuleTest
         )
 
         inside(availabilityBuffer.toSeq) {
-          case Seq(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Seq(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(17L)
             e shouldBe SecondEpochNumber
-            o shouldBe fullTopology
+            m.orderingTopology shouldBe fullTopology
             ackO shouldBe Seq(aBatchId)
         }
         context.delayedMessages should matchPattern {
@@ -866,10 +866,10 @@ class IssSegmentModuleTest
         )
 
         inside(availabilityBuffer.toSeq) {
-          case Seq(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Seq(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(11L)
             e shouldBe SecondEpochNumber
-            o.nodes shouldBe Set(myId)
+            m.orderingTopology.nodes shouldBe Set(myId)
             ackO shouldBe Seq(aBatchId)
         }
         p2pBuffer.clear()
@@ -1142,10 +1142,10 @@ class IssSegmentModuleTest
         consensus.receive(ConsensusSegment.Start)
         context.runPipedMessagesAndReceiveOnModule(consensus)
         inside(availabilityBuffer.toSeq) {
-          case Seq(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Seq(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe BlockNumber(10L)
             e shouldBe SecondEpochNumber
-            o.nodes shouldBe Set(myId)
+            m.orderingTopology.nodes shouldBe Set(myId)
             ackO shouldBe empty
         }
         availabilityBuffer.clear()
@@ -1374,7 +1374,7 @@ class IssSegmentModuleTest
           prepareFromPrePrepare(remotePrePrepare.message)(from = from)
         def baseCommit(from: BftNodeId) =
           commitFromPrePrepare(remotePrePrepare.message)(from = from)
-        val epochInfo = EpochInfo.mk(
+        val epochInfo = EpochInfo.forTesting(
           remotePrePrepare.message.blockMetadata.epochNumber,
           remotePrePrepare.message.blockMetadata.blockNumber,
           testEpochLength,
@@ -1579,10 +1579,10 @@ class IssSegmentModuleTest
         // be included into a PrePrepare, but this PrePrepare will not be ordered. Correct peers will
         // reject this Proposal, and the local node will eventually receive the other CommitCertificates.
         inside(availabilityBuffer.toSeq) {
-          case Seq(Availability.Consensus.CreateProposal(b, e, o, _, ackO)) =>
+          case Seq(Availability.Consensus.CreateProposal(b, e, m, _, ackO)) =>
             b shouldBe blockMetadata2.blockNumber
             e shouldBe EpochNumber.First
-            o.nodes shouldBe allIds.toSet
+            m.orderingTopology.nodes shouldBe allIds.toSet
             ackO shouldBe Seq.empty
         }
         availabilityBuffer.clear()
@@ -2069,6 +2069,40 @@ class IssSegmentModuleTest
         }
         succeed
       }
+
+      "only consider if we're blocking progress after availability has been given a chance to reply" in {
+        implicit val context: ProgrammableUnitTestContext[ConsensusSegment.Message] =
+          new ProgrammableUnitTestContext
+        val consensus = createIssSegmentModule[ProgrammableUnitTestEnv](
+          otherNodes = otherIds.toSet,
+          cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
+        )(epochInfo = SecondEpochInfo)
+
+        // start message initiates a pull to availability which we start to wait for a response to
+        consensus.receive(ConsensusSegment.Start)
+
+        val blockMetadata = secondEpochBlockMetadata4Nodes(blockOrder4Nodes.indexOf(otherIds(0)))
+        consensus.receive(
+          ConsensusSegment.ConsensusMessage.BlockOrdered(blockMetadata, isEmpty = false)
+        )
+        // we are blocking progress but we don't start ordering an empty block until we've heard back from availability
+        context.runPipedMessages() shouldBe empty
+
+        // after hearing back from availability, we can start ordering an empty block
+        consensus.receive(
+          ConsensusSegment.ConsensusMessage.LocalAvailability(
+            Consensus.LocalAvailability.NoProposalAvailableYet
+          )
+        )
+        context.runPipedMessages() should matchPattern {
+          case Seq(
+                MessageFromPipeToSelf(
+                  Some(PbftSignedNetworkMessage(SignedMessage(pp: PrePrepare, _))),
+                  _,
+                )
+              ) if pp.block.proofs.isEmpty =>
+        }
+      }
     }
 
     "receiving an internal block inactivity timeout" should {
@@ -2093,6 +2127,66 @@ class IssSegmentModuleTest
         succeed
       }
     }
+
+    "receiving commit certificate during view-change" should {
+      "not create a PbftTimeout" in {
+        implicit val context: ProgrammableUnitTestContext[ConsensusSegment.Message] =
+          new ProgrammableUnitTestContext
+        val consensusBuffer =
+          new ArrayBuffer[Consensus.Message[ProgrammableUnitTestEnv]](defaultBufferSize)
+        val segmentModule = createIssSegmentModule[ProgrammableUnitTestEnv](
+          otherNodes = otherIds.toSet,
+          leader = otherIds(0),
+          parentModuleRef = fakeRecordingModule(consensusBuffer),
+          cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
+        )()
+
+        val blockMetadata =
+          BlockMetadata(EpochNumber.First, segmentModule.getSegmentState.segment.firstBlockNumber)
+        segmentModule.receive(Start)
+        context.runPipedMessagesUntilNoMorePiped(segmentModule)
+        context.lastDelayedMessage shouldBe Some(
+          1 -> PbftNormalTimeout(blockMetadata, ViewNumber.First)
+        )
+
+        context.runOneDelayedMessage(segmentModule)
+        context.runPipedMessagesUntilNoMorePiped(segmentModule)
+
+        segmentModule.getSegmentState.isViewChangeInProgress shouldBe true // we are in view-change
+        context.delayedMessages shouldBe empty // and don't have any time-out scheduled
+
+        val prePrepare = PrePrepare.create(
+          blockMetadata,
+          ViewNumber.First,
+          oneRequestOrderingBlock3Ack,
+          CanonicalCommitSet(Set.empty),
+          myId,
+        )
+        val commitCertificate = CommitCertificate(
+          prePrepare.fakeSign,
+          Seq(
+            commitFromPrePrepare(prePrepare)(from = myId),
+            commitFromPrePrepare(prePrepare)(from = otherIds(0)),
+            commitFromPrePrepare(prePrepare)(from = otherIds(1)),
+          ),
+        )
+
+        segmentModule.receive(RetransmittedCommitCertificate(otherIds(0), commitCertificate))
+        context.runPipedMessagesUntilNoMorePiped(segmentModule)
+
+        // the block got ordered
+        consensusBuffer should contain(
+          Consensus.ConsensusMessage.BlockOrdered(
+            orderedBlockFromPrePrepare(prePrepare),
+            commitCertificate,
+            hasCompletedLedSegment = false,
+          )
+        )
+
+        // but we still don't have any timeout scheduled
+        context.delayedMessages shouldBe empty
+      }
+    }
   }
 
   def createIssSegmentModule[E <: BaseIgnoringUnitTestEnv[E]](
@@ -2104,15 +2198,15 @@ class IssSegmentModuleTest
       cryptoProvider: CryptoProvider[E] = new FailingCryptoProvider[E],
       leader: BftNodeId = myId,
       epochLength: EpochLength = testEpochLength,
-      latestCompletedEpochLastCommits: Seq[SignedMessage[Commit]] = GenesisEpoch.lastBlockCommits,
+      latestCompletedEpochLastCommits: Seq[SignedMessage[Commit]] = Seq.empty,
       otherNodes: Set[BftNodeId] = Set.empty,
       storeMessages: Boolean = false,
       epochStore: EpochStore[E] = new InMemoryUnitTestEpochStore[E](),
       epochInProgress: EpochStore.EpochInProgress = EpochStore.EpochInProgress(),
   )(
-      epochInfo: EpochInfo = GenesisEpoch.info.next(
+      epochInfo: EpochInfo = bootstrapEpoch(TestBootstrapTopologyActivationTime).info.next(
         epochLength,
-        Genesis.GenesisTopologyActivationTime,
+        TopologyActivationTime(CantonTimestamp.MinValue.immediateSuccessor),
       )
   ): IssSegmentModule[E] = {
     implicit val metricsContext: MetricsContext = MetricsContext.Empty

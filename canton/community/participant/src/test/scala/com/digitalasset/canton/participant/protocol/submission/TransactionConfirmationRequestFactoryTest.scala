@@ -15,7 +15,6 @@ import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.{
   ParticipantAuthorizationError,
@@ -51,6 +50,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ResourceUtil
+import com.digitalasset.daml.lf.transaction.LegacyContractStateMachine
 import monocle.macros.syntax.lens.*
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -83,7 +83,6 @@ class TransactionConfirmationRequestFactoryTest
   private def createCryptoSnapshot(
       partyToParticipant: Map[ParticipantId, Seq[LfPartyId]],
       permission: ParticipantPermission = Submission,
-      keyPurposes: Set[KeyPurpose] = KeyPurpose.All,
       freshKeys: Boolean = false,
   ): SynchronizerSnapshotSyncCryptoApi = {
 
@@ -91,7 +90,7 @@ class TransactionConfirmationRequestFactoryTest
     TestingTopology()
       .withReversedTopology(map)
       .withSynchronizers(physicalSynchronizerId)
-      .withKeyPurposes(keyPurposes)
+      .withKeyPurposes(KeyPurpose.All)
       .withFreshKeys(freshKeys)
       .build(loggerFactory)
       .forOwnerAndSynchronizer(submittingParticipant, physicalSynchronizerId)
@@ -151,7 +150,7 @@ class TransactionConfirmationRequestFactoryTest
           transactionUuid: UUID,
           _topologySnapshot: TopologySnapshot,
           _contractOfId: ContractInstanceOfId,
-          _keyResolver: LfKeyResolver,
+          _keyResolver: LegacyContractStateMachine.KeyResolver,
           _maxSequencingTime: CantonTimestamp,
           validatePackageVettings: Boolean,
       )(implicit
@@ -186,7 +185,7 @@ class TransactionConfirmationRequestFactoryTest
           topologySnapshot: TopologySnapshot,
           contractOfId: ContractInstanceOfId,
           _rbContext: RollbackContext,
-          _keyResolver: LfKeyResolver,
+          _keyResolver: LegacyContractStateMachine.KeyResolver,
           _absolutizer: ContractIdAbsolutizer,
       )(implicit traceContext: TraceContext): EitherT[
         FutureUnlessShutdown,
@@ -201,7 +200,6 @@ class TransactionConfirmationRequestFactoryTest
     // in the end.
     new TransactionConfirmationRequestFactory(
       submittingParticipant,
-      wallClock,
       LoggingConfig(),
       loggerFactory,
       parallel = false,
@@ -418,6 +416,7 @@ class TransactionConfirmationRequestFactoryTest
                 example.keyResolver,
                 mediator,
                 newCryptoSnapshot,
+                wallClock.now, // not needed for unit tests; session signing keys disabled
                 sessionKeyStore,
                 contractInstanceOfId,
                 maxSequencingTime,
@@ -446,6 +445,7 @@ class TransactionConfirmationRequestFactoryTest
             multipleRoots.keyResolver,
             mediator,
             newCryptoSnapshot,
+            wallClock.now, // not needed for unit tests; session signing keys disabled
             store,
             contractInstanceOfId,
             maxSequencingTime,
@@ -479,6 +479,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               cryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -543,6 +544,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               emptyCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -586,6 +588,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               confirmationOnlyCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -626,6 +629,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               newCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -663,6 +667,7 @@ class TransactionConfirmationRequestFactoryTest
               singleFetch.keyResolver,
               mediator,
               submitterOnlyCryptoSnapshot,
+              wallClock.now, // not needed for unit tests; session signing keys disabled
               sessionKeyStore,
               contractInstanceOfId,
               maxSequencingTime,
@@ -681,63 +686,6 @@ class TransactionConfirmationRequestFactoryTest
             )
         }
       }
-    }
-
-    "participants" when {
-      def runNoKeyTest(name: String, availableKeys: Set[KeyPurpose]): Unit =
-        name must {
-          "be rejected" in {
-            val noKeyCryptoSnapshot =
-              createCryptoSnapshot(defaultTopology, keyPurposes = availableKeys)
-            val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
-
-            ResourceUtil.withResourceM(
-              new SessionKeyStoreWithInMemoryCache(
-                SessionEncryptionKeyCacheConfig(),
-                timeouts,
-                loggerFactory,
-              )
-            ) { sessionKeyStore =>
-              loggerFactory.assertLoggedWarningsAndErrorsSeq(
-                factory
-                  .createConfirmationRequest(
-                    singleFetch.wellFormedUnsuffixedTransaction,
-                    submitterInfo,
-                    workflowId,
-                    singleFetch.keyResolver,
-                    mediator,
-                    noKeyCryptoSnapshot,
-                    sessionKeyStore,
-                    contractInstanceOfId,
-                    maxSequencingTime,
-                    testedProtocolVersion,
-                  )
-                  .value
-                  .failOnShutdown
-                  .map {
-                    case Left(ParticipantAuthorizationError(message)) =>
-                      message shouldBe s"$submittingParticipant does not host $submitter or is not active."
-                    case otherwise =>
-                      fail(
-                        s"should have failed with a participant authorization error, but returned result: $otherwise"
-                      )
-                  },
-                LogEntry.assertLogSeq(
-                  Seq.empty,
-                  mayContain = Seq(
-                    _.warningMessage should include(
-                      "has a synchronizer trust certificate, but no keys on synchronizer"
-                    )
-                  ),
-                ),
-              )
-            }
-          }
-        }
-
-      runNoKeyTest("they have no public keys", availableKeys = Set.empty)
-      runNoKeyTest("they have no public signing keys", availableKeys = Set(KeyPurpose.Encryption))
-      runNoKeyTest("they have no public encryption keys", availableKeys = Set(KeyPurpose.Signing))
     }
   }
 }

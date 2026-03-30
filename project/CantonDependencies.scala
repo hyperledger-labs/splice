@@ -6,14 +6,15 @@ import sbt.*
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.5.0-snapshot.20260203.14554.0.v07f81520"
-  val canton_library_version = "3.5.0-snapshot.20260206.17966.0.va5798b31"
+  val version: String = "3.5.0-snapshot.20260325.14629.0.v2e54bd46"
+  val canton_library_version = "3.5.0-snapshot.20260327.18467.0.ved5cb1a4"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
-  val daml_java_codegen_version = version
+  // TODO(DACH-NY/canton#31699) Remove overwrite when java codegen is fixed
+  val daml_java_codegen_version = "3.5.0-snapshot.20260203.14554.0.v07f81520"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
@@ -54,7 +55,7 @@ object CantonDependencies {
   lazy val pureconfig_cats = "com.github.pureconfig" %% "pureconfig-cats" % pureconfig_version
 
   lazy val scala_collection_contrib =
-    "org.scala-lang.modules" %% "scala-collection-contrib" % "0.3.0"
+    "org.scala-lang.modules" %% "scala-collection-contrib" % "0.2.2"
   lazy val scala_reflect = "org.scala-lang" % "scala-reflect" % scala_version
   lazy val shapeless = "com.chuusai" %% "shapeless" % "2.3.12"
 
@@ -81,22 +82,24 @@ object CantonDependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 
   lazy val daml_test_evidence_tag =
-    "com.daml" %% "test-evidence-tag" % daml_libraries_version
+    "com.daml" %% "test-evidence-tag" % canton_library_version
   lazy val daml_test_evidence_scalatest =
-    "com.daml" %% "test-evidence-scalatest" % daml_libraries_version
+    "com.daml" %% "test-evidence-scalatest" % canton_library_version
   lazy val daml_test_evidence_generator_scalatest =
-    "com.daml" %% "test-evidence-generator" % daml_libraries_version
-  lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
+    "com.daml" %% "test-evidence-generator" % canton_library_version
+  lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive" % canton_library_version
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % canton_library_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % canton_library_version
-  lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % daml_libraries_version
+  lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % canton_library_version
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % canton_library_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % canton_library_version
   lazy val daml_lf_api_type_signature =
     "com.daml" %% "daml-lf-api-type-signature" % canton_library_version
   lazy val daml_libs_scala_grpc_test_utils =
-    "com.daml" %% "grpc-test-utils" % daml_libraries_version
+    "com.daml" %% "grpc-test-utils" % canton_library_version
+  lazy val daml_grpc_utils =
+    "com.daml" %% "daml-grpc-utils" % canton_library_version
 
   lazy val canton_java_bindings = "com.daml" % "bindings-java" % canton_library_version
   lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
@@ -123,26 +126,21 @@ object CantonDependencies {
   lazy val os_lib = "com.lihaoyi" %% "os-lib" % "0.10.3"
   lazy val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.4.2"
 
-  lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
-  lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
-  lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
-  lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
-  lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
-  lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
-  lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
-  lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
-  lazy val daml_ledger_api_value_proto =
-    "com.daml" % "ledger-api-value-proto" % daml_libraries_version
+  lazy val daml_nonempty = "com.daml" %% "nonempty" % canton_library_version
+  lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % canton_library_version
+  lazy val daml_tracing = "com.daml" %% "observability-tracing" % canton_library_version
+  lazy val daml_executors = "com.daml" %% "executors" % canton_library_version
+  lazy val daml_ports = "com.daml" %% "ports" % canton_library_version
+  lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % canton_library_version
   lazy val daml_ledger_api_value_scalapb =
-    "com.daml" %% "ledger-api-value-scalapb" % daml_libraries_version
+    "com.daml" %% "ledger-api-value-scalapb" % canton_library_version
   lazy val daml_ledger_api_value_java =
-    "com.daml" % "ledger-api-value-java-proto" % daml_libraries_version
-  lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
-  lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
-  lazy val daml_rs_grpc_testing_utils =
-    "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
-  lazy val daml_http_test_utils = "com.daml" %% "http-test-utils" % daml_libraries_version
-  lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
+    "com.daml" % "ledger-api-value-java-proto" % canton_library_version
+  lazy val daml_timer_utils = "com.daml" %% "timer-utils" % canton_library_version
+  lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % canton_library_version
+
+  lazy val daml_testing_utils =
+    "com.digitalasset.canton" %% "testing-utils" % canton_library_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk18on" % bouncy_castle_version

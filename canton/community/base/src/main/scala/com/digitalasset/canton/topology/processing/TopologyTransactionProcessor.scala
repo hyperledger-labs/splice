@@ -5,6 +5,7 @@ package com.digitalasset.canton.topology.processing
 
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
+import com.daml.metrics.CacheMetrics
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
@@ -22,7 +23,6 @@ import com.digitalasset.canton.lifecycle.{
   LifeCycle,
 }
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.CacheMetrics
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.protocol.messages.{
   DefaultOpenEnvelope,
@@ -190,8 +190,11 @@ class TopologyTransactionProcessor(
       // let our client know about the latest known information right now, but schedule the updating
       // of the approximate time subsequently
       val maxEffective = clientInitTimes.map { case (effective, _) => effective }.max1
-      val minApproximate = clientInitTimes.map { case (_, approximate) => approximate }.min1
-      listenersUpdateHeadWithoutTopologyChanges(sequencedTs, maxEffective, minApproximate)
+      listenersUpdateHeadWithoutTopologyChanges(
+        sequencedTs,
+        maxEffective,
+        sequencedTs.toApproximate,
+      )
 
       val directExecutionContext = DirectExecutionContext(noTracingLogger)
       clientInitTimes.foreach { case (effective, _approximate) =>
@@ -448,8 +451,8 @@ class TopologyTransactionProcessor(
       txs: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     // processing an event with a sequencing time less than what was already in the store
-    // when initializing TopologyTransactionProcessor means that is it is being replayed
-    // after crash recovery (eg reconnecting to a synchronizer or restart after a crash)
+    // when initializing TopologyTransactionProcessor means that it is being replayed
+    // after crash recovery (e.g., reconnecting to a synchronizer or restart after a crash)
     for {
       maxSequencedTimeAtInitialization <- synchronizeWithClosing(
         "max-sequenced-time-at-initialization"
@@ -486,13 +489,17 @@ class TopologyTransactionProcessor(
       validUpgradeAnnouncements = validTransactions
         .mapFilter(_.selectMapping[LsuAnnouncement])
 
-      _ = validUpgradeAnnouncements.foreach { announcement =>
-        announcement.operation match {
-          case TopologyChangeOp.Replace =>
-            terminateProcessing.notifyUpgradeAnnouncement(announcement.mapping.successor)
-          case TopologyChangeOp.Remove => terminateProcessing.notifyUpgradeCancellation()
+      _ <- synchronizeWithClosing("process-lsu-upgrade")(
+        MonadUtil.sequentialTraverse(validUpgradeAnnouncements) { announcement =>
+          announcement.operation match {
+            case TopologyChangeOp.Replace =>
+              terminateProcessing.notifyUpgradeAnnouncement(announcement.mapping.successor)
+              FutureUnlessShutdown.unit
+
+            case TopologyChangeOp.Remove => terminateProcessing.notifyUpgradeCancellation()
+          }
         }
-      }
+      )
 
       _ <- synchronizeWithClosing("notify-topology-transaction-observers")(
         MonadUtil.sequentialTraverse(listeners.get()) { listenerGroup =>
@@ -532,7 +539,7 @@ object TopologyTransactionProcessor {
 
   def createProcessorAndClientForSynchronizer(
       topologyStore: TopologyStore[TopologyStoreId.SynchronizerStore],
-      synchronizerUpgradeTime: Option[CantonTimestamp],
+      upgradeTimeFromPredecessor: Option[CantonTimestamp],
       pureCrypto: SynchronizerCryptoPureApi,
       parameters: CantonNodeParameters,
       topologyConfig: TopologyConfig,
@@ -572,14 +579,15 @@ object TopologyTransactionProcessor {
       loggerFactory,
     )
 
-    val topologyClientF = TopologyClientFactory.create(
+    val topologyClientF = WriteThroughCacheSynchronizerTopologyClient.create(
       clock,
       staticSynchronizerParameters,
       topologyStore,
       cache,
-      synchronizerUpgradeTime,
+      upgradeTimeFromPredecessor,
       NoPackageDependencies,
       parameters.cachingConfigs,
+      parameters.enableAdditionalConsistencyChecks,
       topologyConfig,
       parameters.processingTimeouts,
       futureSupervisor,

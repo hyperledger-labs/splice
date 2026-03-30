@@ -29,7 +29,6 @@ import com.digitalasset.canton.ledger.participant.state.{
   AcsChange,
   ContractStakeholdersAndReassignmentCounter,
   RepairIndex,
-  SequencerIndex,
   SynchronizerIndex,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -70,6 +69,7 @@ import com.digitalasset.canton.pruning.{
   ConfigForSlowCounterParticipants,
   ConfigForSynchronizerThresholds,
 }
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
@@ -334,7 +334,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       ),
     )
 
-    val sequencerClient = new TestSequencerClientSend
+    val sequencerClient = new TestSequencerClientSend(wallClock)
 
     val changeTimes =
       (timeProofs
@@ -371,6 +371,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       localId,
       sequencerClient,
       synchronizerCrypto,
+      None,
       sortedReconciliationIntervalsProvider,
       store,
       _ => (),
@@ -389,6 +390,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       new SimClock(loggerFactory = loggerFactory),
       exitOnFatalFailures = true,
       BatchingConfig(),
+      asynchronousInitialization = true,
       // do not delay sending commitments for testing, because tests often expect to see commitments after an interval
       Some(CommitmentSendDelay(Some(NonNegativeProportion.zero), Some(NonNegativeProportion.zero))),
       increasePerceivedComputationTimeForCommitments = Option.when(
@@ -903,7 +905,11 @@ class AcsCommitmentProcessorTest
 
     snapshotF.flatMap { snapshot =>
       SignedProtocolMessage
-        .trySignAndCreate(payload, snapshot, None)
+        .trySignAndCreate(
+          payload,
+          snapshot,
+          None, // not needed for unit tests; session signing keys disabled
+        )
     }
   }
 
@@ -945,6 +951,7 @@ class AcsCommitmentProcessorTest
           localId,
           byStkhSet,
           crypto,
+          None,
           at,
           None,
           parallelism,
@@ -1213,6 +1220,7 @@ class AcsCommitmentProcessorTest
             localId,
             snapshot1,
             crypto,
+            None,
             ts(0),
             None,
             parallelism,
@@ -1225,6 +1233,7 @@ class AcsCommitmentProcessorTest
             localId,
             snapshot2,
             crypto,
+            None,
             ts(0),
             None,
             parallelism,
@@ -1237,6 +1246,7 @@ class AcsCommitmentProcessorTest
             localId,
             snapshot3,
             crypto,
+            None,
             ts(0),
             None,
             parallelism,
@@ -1451,7 +1461,8 @@ class AcsCommitmentProcessorTest
       val acsCommitmentStore = mock[AcsCommitmentStore]
       when(
         acsCommitmentStore.noOutstandingCommitments(
-          any[CantonTimestamp]
+          any[CantonTimestamp],
+          any[Option[SafeToPruneCommitmentState]],
         )(
           any[TraceContext]
         )
@@ -1467,9 +1478,7 @@ class AcsCommitmentProcessorTest
           .latestSafeToPruneTick(
             requestJournalStore,
             Some(
-              SynchronizerIndex.of(
-                SequencerIndex(CantonTimestamp.Epoch)
-              )
+              SynchronizerIndex.forSequencedUpdate(CantonTimestamp.Epoch)
             ),
             constantSortedReconciliationIntervalsProvider(defaultReconciliationInterval),
             acsCommitmentStore,
@@ -1487,7 +1496,8 @@ class AcsCommitmentProcessorTest
       val acsCommitmentStore = mock[AcsCommitmentStore]
       when(
         acsCommitmentStore.noOutstandingCommitments(
-          any[CantonTimestamp]
+          any[CantonTimestamp],
+          any[Option[SafeToPruneCommitmentState]],
         )(
           any[TraceContext]
         )
@@ -1532,7 +1542,8 @@ class AcsCommitmentProcessorTest
       val acsCommitmentStore = mock[AcsCommitmentStore]
       when(
         acsCommitmentStore.noOutstandingCommitments(
-          any[CantonTimestamp]
+          any[CantonTimestamp],
+          any[Option[SafeToPruneCommitmentState]],
         )(
           any[TraceContext]
         )
@@ -1573,9 +1584,7 @@ class AcsCommitmentProcessorTest
             Some(
               SynchronizerIndex(
                 None,
-                Some(
-                  SequencerIndex(ts2)
-                ),
+                Some(ts2),
                 recordTime = ts2, // record time cannot include pending request at ts3
               )
             ),
@@ -1600,7 +1609,7 @@ class AcsCommitmentProcessorTest
             Some(
               SynchronizerIndex(
                 None,
-                Some(SequencerIndex(ts3)),
+                Some(ts3),
                 recordTime = ts3,
               )
             ),
@@ -1630,7 +1639,8 @@ class AcsCommitmentProcessorTest
 
       when(
         acsCommitmentStore.noOutstandingCommitments(
-          any[CantonTimestamp]
+          any[CantonTimestamp],
+          any[Option[SafeToPruneCommitmentState]],
         )(
           any[TraceContext]
         )
@@ -1665,9 +1675,7 @@ class AcsCommitmentProcessorTest
                     counter = RepairCounter.Genesis,
                   )
                 ),
-                Some(
-                  SequencerIndex(tsCleanRequest)
-                ),
+                Some(tsCleanRequest),
                 recordTime = tsCleanRequest, // record time cannot include pending request at ts3
               )
             ),
@@ -1693,7 +1701,8 @@ class AcsCommitmentProcessorTest
       val acsCommitmentStore = mock[AcsCommitmentStore]
       when(
         acsCommitmentStore.noOutstandingCommitments(
-          any[CantonTimestamp]
+          any[CantonTimestamp],
+          any[Option[SafeToPruneCommitmentState]],
         )(
           any[TraceContext]
         )
@@ -1763,7 +1772,7 @@ class AcsCommitmentProcessorTest
                       counter = RepairCounter.Genesis,
                     )
                   ),
-                  Some(SequencerIndex(tsCleanRequest2)),
+                  Some(tsCleanRequest2),
                   recordTime = tsCleanRequest2,
                 )
               ),
@@ -4112,6 +4121,7 @@ class AcsCommitmentProcessorTest
                 key.map(mockStringInterning.party.externalize) -> value
               },
               crypto,
+              None,
               ts(2),
               parallelism,
             )
@@ -4146,6 +4156,7 @@ class AcsCommitmentProcessorTest
                 key.map(mockStringInterning.party.externalize) -> value
               },
               crypto,
+              None,
               ts(4),
               parallelism,
             )
@@ -4207,6 +4218,7 @@ class AcsCommitmentProcessorTest
               localId,
               rc.snapshot().active,
               crypto,
+              None,
               ts(2),
               None,
               parallelism,
@@ -4219,6 +4231,7 @@ class AcsCommitmentProcessorTest
               localId,
               rc.snapshot().active,
               crypto,
+              None,
               ts(2),
               None,
               parallelism,
@@ -4232,6 +4245,7 @@ class AcsCommitmentProcessorTest
               localId,
               rc.snapshot().active,
               crypto,
+              None,
               ts(4),
               None,
               parallelism,
@@ -4244,6 +4258,7 @@ class AcsCommitmentProcessorTest
               localId,
               rc.snapshot().active,
               crypto,
+              None,
               ts(4),
               None,
               parallelism,
@@ -4286,6 +4301,7 @@ class AcsCommitmentProcessorTest
                 key.map(mockStringInterning.party.externalize) -> value
               },
               crypto,
+              None,
               ts(2),
               parallelism,
             )
@@ -4314,6 +4330,7 @@ class AcsCommitmentProcessorTest
                 key.map(mockStringInterning.party.externalize) -> value
               },
               crypto,
+              None,
               ts(2),
               parallelism,
             )
@@ -4372,6 +4389,7 @@ class AcsCommitmentProcessorTest
                 key.map(mockStringInterning.party.externalize) -> value
               },
               crypto,
+              None,
               ts(2),
               parallelism,
             )
@@ -4400,6 +4418,7 @@ class AcsCommitmentProcessorTest
                 key.map(mockStringInterning.party.externalize) -> value
               },
               crypto,
+              None,
               ts(2),
               parallelism,
             )

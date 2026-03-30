@@ -50,6 +50,13 @@ final class InteractiveSubmissionTrafficCostEstimationTest
   private var bankE: ExternalParty = _
   private var localEmily: Party = _
 
+  // Update the traffic parameters to set base event cost and base traffic rate to 0
+  // This allows for easier assertions over traffic consumed
+  private val trafficControlParams = TrafficControlParameters.default.copy(
+    maxBaseTrafficAmount = NonNegativeLong.zero,
+    baseEventCost = NonNegativeLong.zero,
+  )
+
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
       .withSetup { implicit env =>
@@ -81,14 +88,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
         bankE = ppn.parties.testing.external.enable("Bank")
         localEmily = participant1.parties.enable("Emily")
       }
-      .withTrafficControl(
-        // Update the traffic parameters to set base event cost and base traffic rate to 0
-        // This allows for easier assertions over traffic consumed
-        TrafficControlParameters.default.copy(
-          maxBaseTrafficAmount = NonNegativeLong.zero,
-          baseEventCost = NonNegativeLong.zero,
-        )
-      )
+      .withTrafficControl(trafficControlParams)
       .withSetup { implicit env =>
         import env.*
         // Top up all members with max traffic
@@ -140,6 +140,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       commandId = UUID.randomUUID().toString,
       estimateTrafficCost = hints,
       disclosedContracts = disclosedContracts,
+      hashingSchemeVersion = testedApiHashingSchemeVersion,
     )
     logger.debug(s"Estimated traffic cost: ${prepared.costEstimation.value}")
     val estimatedTrafficCost = prepared.costEstimation.value.totalTrafficCostEstimation
@@ -154,7 +155,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
     )
   }
 
-  def createCycleCmdFromParty(party: Party) =
+  def createCycleCmdFromParty(party: Party): Command =
     createCycleCommandJava(party, UUID.randomUUID().toString)
 
   private def runCostEstimateOnAllNodeCombinations(
@@ -163,7 +164,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       disclosedContracts: Seq[DisclosedContract] = Seq.empty,
   )(implicit
       env: TestConsoleEnvironment
-  ) =
+  ): Unit =
     // Try all combinations of ppn / epn.
     // The accuracy will vary because of how hosting relationships affect view decomposition
     // and confirmation responses but it at least allows to check that the estimation is bounded
@@ -341,6 +342,30 @@ final class InteractiveSubmissionTrafficCostEstimationTest
       )
     }
 
+    "estimate accurately when not charging for confirmation responses" in { implicit env =>
+      import env.*
+      sequencer1.topology.synchronizer_parameters.propose_update(
+        synchronizerId = synchronizer1Id,
+        _.update(trafficControl =
+          Some(trafficControlParams.copy(freeConfirmationResponses = true))
+        ),
+        synchronize = Some(environmentTimeouts.default),
+      )
+      estimateTrafficCost(
+        None,
+        0.05,
+        preparingPn = cpn,
+        submittingPn = cpn,
+        aliceE.partyId,
+        commands = Seq(createCycleCmdFromParty(aliceE)),
+        prepared => {
+          // Expect the confirmation response cost to be 0
+          prepared.costEstimation.value.confirmationResponseTrafficCostEstimation shouldBe 0L
+          cpn.ledger_api.commands.external.submit_prepared(aliceE, prepared)
+        },
+      )
+    }
+
     "disable traffic cost estimation" in { implicit env =>
       ppn(env).ledger_api.javaapi.interactive_submission
         .prepare(
@@ -348,6 +373,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
           Seq(createCycleCmdFromParty(aliceE)),
           commandId = UUID.randomUUID().toString,
           estimateTrafficCost = Some(CostEstimationHints.defaultInstance.withDisabled(true)),
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
         .costEstimation shouldBe empty
     }
@@ -364,6 +390,7 @@ final class InteractiveSubmissionTrafficCostEstimationTest
           Seq(aliceE.partyId),
           Seq(createCycleCmdFromParty(aliceE)),
           commandId = UUID.randomUUID().toString,
+          hashingSchemeVersion = testedApiHashingSchemeVersion,
         )
         .costEstimation
         .value

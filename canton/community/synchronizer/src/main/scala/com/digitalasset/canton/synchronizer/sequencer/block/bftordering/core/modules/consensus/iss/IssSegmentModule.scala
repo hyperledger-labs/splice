@@ -180,7 +180,7 @@ class IssSegmentModule[E <: Env[E]](
 
         logger.info(
           s"Received `Start` message, segment ${segmentState.segment} is complete = ${segmentState.isSegmentComplete}, " +
-            s"view change in progress = ${segmentState.isViewChangeInProgress}"
+            s"view change in progress = ${segmentState.isViewChangeInProgress} view number = ${segmentState.currentView}"
         )
         if (!segmentState.isSegmentComplete && !segmentState.isViewChangeInProgress)
           viewChangeTimeoutManager.scheduleTimeout(
@@ -190,11 +190,13 @@ class IssSegmentModule[E <: Env[E]](
         maybeOriginalLeaderSegmentState.filter(_.canReceiveProposals).foreach { mySegmentState =>
           if (epoch.info.number == EpochNumber.First && mySegmentState.isNextSlotFirst) {
             // Order an empty block to populate the canonical commit set for the BFT time calculation.
-            orderBlock(
-              OrderingBlock.empty,
-              mySegmentState,
-              logPrefix = "Ordering an empty block for the first epoch",
-            )
+            context.withNewTraceContext { implicit traceContext =>
+              orderBlock(
+                OrderingBlock.empty,
+                mySegmentState,
+                logPrefix = "Ordering an empty block for the first epoch",
+              )
+            }
           } else {
             // Ask availability for batches to be ordered if we have slots available.
             val currentBlockBeingOrdered = mySegmentState.nextBlockToPropose
@@ -214,9 +216,12 @@ class IssSegmentModule[E <: Env[E]](
             // is blocking progress for other segments. Otherwise, it won't do anything for the moment.
             val logPrefix =
               s"$messageType: received message from local availability that no proposals are available yet"
-            maybeOriginalLeaderSegmentState.foreach { mySegmentState =>
-              if (mySegmentState.canReceiveProposals && mySegmentState.isProgressBlocked) {
-                orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+            maybeOriginalLeaderSegmentState.foreach { segmentState =>
+              segmentState.receivedResponseFromAvailability()
+              if (segmentState.canReceiveProposals && segmentState.isProgressBlocked) {
+                context.withNewTraceContext { implicit traceContext =>
+                  orderBlock(OrderingBlock.empty, segmentState, logPrefix)
+                }
               } else {
                 logger.debug(
                   s"$logPrefix. Since we are not blocking progress, nothing to do at the moment."
@@ -231,7 +236,9 @@ class IssSegmentModule[E <: Env[E]](
               s"$messageType: received proposal for block $forBlock from local availability with batch IDs: " +
                 s"${orderingBlock.proofs.map(_.batchId)}"
 
-            maybeOriginalLeaderSegmentState.foreach { mySegmentState =>
+            maybeOriginalLeaderSegmentState.foreach { segmentState =>
+              if (segmentState.segmentIsInProgress && forBlock == segmentState.nextBlockToPropose)
+                segmentState.receivedResponseFromAvailability()
               // Depending on the timing of events, it is possible that Consensus has an outstanding
               // proposal request to Availability when a view change occurs. A completed view change often
               // leads to completed blocks, and even a completed epoch. As a result, Consensus may receive
@@ -245,25 +252,26 @@ class IssSegmentModule[E <: Env[E]](
               // The proposal will be in this case ignored, which means that Availability will never get an ack
               // for it, so when we start a new epoch and make a new proposal request, we should get the same
               // proposal again.
-              if (mySegmentState.canReceiveProposals) {
+              if (segmentState.canReceiveProposals) {
                 // An outstanding proposal, requested before a view change, could end up coming after the epoch changes.
                 // In that case we also want to discard it by detecting that this request was not made during the current epoch.
-                if (forBlock != mySegmentState.nextBlockToPropose) {
+                if (forBlock != segmentState.nextBlockToPropose) {
                   resetWaitingForProposal()
                   logger.info(
-                    s"$logPrefix. Ignoring it because it is for block number $forBlock but the next block to order is ${mySegmentState.nextBlockToPropose}."
+                    s"$logPrefix. Ignoring it because it is for block number $forBlock but the next block to order is ${segmentState.nextBlockToPropose}."
                   )
                 } else {
                   emitProposalWaitLatency()
                   logger.debug(
                     s"$logPrefix. Expected proposal for block number $forBlock. ordering a new block."
                   )
-                  orderBlock(orderingBlock, mySegmentState, logPrefix)
+                  orderBlock(orderingBlock, segmentState, logPrefix)
                 }
               } else {
                 resetWaitingForProposal()
                 logger.info(
-                  s"$logPrefix. Not using block because we can't assign more slots at the moment. Probably because of a view change."
+                  s"$logPrefix. Ignoring proposal because we cannot assign more slots at the moment. Reason: ${segmentState.reasonForNoProposal
+                      .getOrElse("None")}."
                 )
               }
             }
@@ -277,7 +285,9 @@ class IssSegmentModule[E <: Env[E]](
           if (mySegmentState.canReceiveProposals && mySegmentState.isProgressBlocked) {
             val logPrefix =
               s"$messageType: new block completed and we are blocking progress"
-            orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+            context.withNewTraceContext { implicit traceContext =>
+              orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+            }
           }
         }
 
@@ -286,7 +296,9 @@ class IssSegmentModule[E <: Env[E]](
           if (mySegmentState.canReceiveProposals) {
             val logPrefix =
               s"$messageType: block timeout reached so ordering an empty block"
-            orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+            context.withNewTraceContext { implicit traceContext =>
+              orderBlock(OrderingBlock.empty, mySegmentState, logPrefix)
+            }
           }
         }
 
@@ -345,7 +357,7 @@ class IssSegmentModule[E <: Env[E]](
         // Consider changing timeout manipulation: stop once CompleteBlock is emitted and then
         //   reschedule once OrderedBlockStored. This avoids counting delays in async DB writes
         //   against a correct leader, albeit with some additional complexity.
-        if (!segmentState.isSegmentComplete)
+        if (!segmentState.isSegmentComplete && !segmentState.isViewChangeInProgress)
           viewChangeTimeoutManager.scheduleTimeout(
             PbftNormalTimeout(segmentBlockMetadata, segmentState.currentView)
           )
@@ -463,7 +475,7 @@ class IssSegmentModule[E <: Env[E]](
 
     signMessage(prePrepare)(
       context,
-      if (orderingBlock.proofs.isEmpty) TraceContext.empty else traceContext,
+      traceContext,
     )
   }
 
@@ -586,7 +598,8 @@ class IssSegmentModule[E <: Env[E]](
       case PbftBlockState.SignPbftMessage(pbftMessage) =>
         signMessage(pbftMessage)
 
-      case SendPbftMessage(pbftMessage, store) =>
+      case SendPbftMessage(pbftMessage, store, traceContextFromProcessResult) =>
+        implicit val traceContext: TraceContext = traceContextFromProcessResult
         def sendMessage(): Unit = {
           val nodes = epoch.currentMembership.otherNodes
           logger.debug(
@@ -611,7 +624,8 @@ class IssSegmentModule[E <: Env[E]](
           case _ => sendMessage()
         }
 
-      case CompletedBlock(commitCertificate) =>
+      case CompletedBlock(commitCertificate, traceContextFromProcessResult) =>
+        implicit val traceContext: TraceContext = traceContextFromProcessResult
         logger.debug(
           s"CompletedBlock commitCertificate: View=${commitCertificate.prePrepare.message.viewNumber}, From=${commitCertificate.prePrepare.from}, Block=${commitCertificate.prePrepare.message.blockMetadata}"
         )
@@ -689,10 +703,10 @@ class IssSegmentModule[E <: Env[E]](
       forBlock: BlockNumber,
       orderedBatchIds: Seq[BatchId] = Seq.empty,
   )(implicit
-      traceContext: TraceContext,
-      context: E#ActorContextT[ConsensusSegment.Message],
-  ): Unit = {
+      context: E#ActorContextT[ConsensusSegment.Message]
+  ): Unit = context.withNewTraceContext { implicit traceContext =>
     logger.debug(s"Consensus requesting a new proposal for block $forBlock from local availability")
+    maybeOriginalLeaderSegmentState.foreach(_.startWaitingForAvailabilityResponse())
     waitingForProposalSince = Some(Instant.now())
     blockStartTimeoutManager.scheduleTimeout(
       ConsensusSegment.Internal.BlockInactivityTimeout
@@ -701,7 +715,7 @@ class IssSegmentModule[E <: Env[E]](
       Availability.Consensus.CreateProposal(
         forBlock,
         epoch.info.number,
-        epoch.currentMembership.orderingTopology,
+        epoch.currentMembership,
         cryptoProvider,
         orderedBatchIds,
       )
@@ -749,6 +763,9 @@ class IssSegmentModule[E <: Env[E]](
   }
 
   @VisibleForTesting
+  private[iss] def getSegmentState: SegmentState = segmentState
+
+  @VisibleForTesting
   private[iss] def generateFutureId(): FutureId = {
     val id = nextFutureId
     waitingForFutureIds.add(id).discard
@@ -767,6 +784,10 @@ class IssSegmentModule[E <: Env[E]](
       context: E#ActorContextT[ConsensusSegment.Message],
       traceContext: TraceContext,
   ): Unit = {
+    logger.debug(
+      "Cancelling timeouts and closing module for segment starting with block " +
+        s"${segmentState.segment.firstBlockNumber} in epoch $epochNumber due to '$actionName''"
+    )
     viewChangeTimeoutManager.cancelTimeout()
     blockStartTimeoutManager.cancelTimeout()
     context.become(
@@ -774,6 +795,7 @@ class IssSegmentModule[E <: Env[E]](
         waitingForFutureIds,
         actionName,
         parent,
+        traceContext,
         segmentState.segment.firstBlockNumber,
         epochNumber,
         messageToParent,

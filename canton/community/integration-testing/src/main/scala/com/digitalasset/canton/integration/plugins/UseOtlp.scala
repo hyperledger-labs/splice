@@ -7,15 +7,10 @@ import cats.implicits.catsSyntaxOptionId
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.grpc.DamlGrpcServerMetrics
-import com.daml.tracing.NoOpTelemetry
+import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.auth.AsyncForwardingListener
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{
-  AdminServerConfig,
-  ApiLoggingConfig,
-  CantonConfig,
-  TlsServerConfig,
-}
+import com.digitalasset.canton.config.{AdminServerConfig, ApiLoggingConfig, CantonConfig}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
 import com.digitalasset.canton.lifecycle.LifeCycle.{CloseableServer, toCloseableServer}
@@ -146,18 +141,16 @@ class UseOtlp(
 
     val serverBuilder = CantonServerBuilder
       .forConfig(
-        serverConfig,
-        None,
-        executionContext,
-        loggerFactory,
+        config = serverConfig,
+        executor = executionContext,
+        loggerFactory = loggerFactory,
         apiLoggingConfig = ApiLoggingConfig(messagePayloads = false),
-        TracingConfig(),
-        (
+        tracing = TracingConfig(),
+        grpcMetrics = (
           new DamlGrpcServerMetrics(NoOpMetricsFactory, "test"),
           new ActiveRequestsMetrics(NoOpMetricsFactory, "test")(MetricsContext.Empty),
         ),
-        NoOpTelemetry,
-        Seq(new HeaderPrinter(loggerFactory)),
+        additionalInterceptors = Seq(new HeaderPrinter(loggerFactory)),
       )
       .addService(otlpServer.bindService)
     val server = serverBuilder.build.start()

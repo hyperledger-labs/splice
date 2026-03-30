@@ -5,6 +5,7 @@ package com.digitalasset.canton.integration.tests.security
 
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.javaapi.data
+import com.digitalasset.canton.annotations.NuckTest
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.damltests.java.refs.Refs
 import com.digitalasset.canton.damltestsdev.java.basickeys.{BasicKey, KeyOps}
@@ -23,7 +24,7 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
-import com.digitalasset.canton.participant.protocol.ProtocolProcessor
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.LocalRejectError.MalformedRejects.ModelConformance
 import com.digitalasset.canton.protocol.messages.Verdict
 import com.digitalasset.canton.protocol.{LfContractId, LfSubmittedTransaction}
@@ -144,31 +145,33 @@ trait ModelConformanceIntegrationTest
       // 2. create([])
       // So the id cidOfNode2 is used before the creation of the underlying contract.
       val ((result, events), _) = loggerFactory.assertLogs(
-        ProtocolProcessor.withApprovalContradictionCheckDisabled(loggerFactory) {
-          replacingConfirmationResult(
-            daId,
-            sequencer1,
-            mediator1,
-            withMediatorVerdict(Verdict.Approve(testedProtocolVersion)),
-          ) {
-            trackingLedgerEvents(Seq(participant1), Seq.empty) {
-              maliciousP1
-                .submitCommand(
-                  cmdsWithMetadata,
-                  transactionInterceptor = tx => {
-                    LfSubmittedTransaction(
-                      tx.mapCid(cid => if (cid == dummyLfCid) cidOfNode2 else cid)
-                    )
-                  },
-                )
-                .futureValueUS
-            }
+        replacingConfirmationResult(
+          daId,
+          sequencer1,
+          mediator1,
+          withMediatorVerdict(Verdict.Approve(testedProtocolVersion)),
+        ) {
+          trackingLedgerEvents(Seq(participant1), Seq.empty) {
+            maliciousP1
+              .submitCommand(
+                cmdsWithMetadata,
+                transactionInterceptor = tx => {
+                  LfSubmittedTransaction(
+                    tx.mapCid(cid => if (cid == dummyLfCid) cidOfNode2 else cid)
+                  )
+                },
+              )
+              .futureValueUS
           }
         },
         _.shouldBeCantonError(
           ModelConformance,
           _ should fullyMatch regex raw"Rejected transaction due to a failed model conformance check: " +
             raw"Contract id \S+ created in node NodeId\(1\) is referenced before in NodeId\(0\)",
+        ),
+        _.shouldBeCantonError(
+          SyncServiceAlarm,
+          _ shouldBe "Mediator approved a request that has been locally rejected.",
         ),
       )
 
@@ -238,6 +241,7 @@ trait ModelConformanceIntegrationTest
 
 }
 
+@NuckTest
 class ModelConformanceIntegrationTestPostgres extends ModelConformanceIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseBftSequencer(loggerFactory))
