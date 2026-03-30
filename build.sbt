@@ -978,6 +978,7 @@ lazy val `apps-common` =
         kubernetes_client,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
+        CantonDependencies.pekko_http_testkit % Test,
         scalapb_runtime_grpc,
         scalapb_runtime,
         scalapb_json4,
