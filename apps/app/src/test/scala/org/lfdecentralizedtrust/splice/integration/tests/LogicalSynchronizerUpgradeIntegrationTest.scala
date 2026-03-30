@@ -297,13 +297,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
 
+    val bobValidatorWalletLocal = wc(
+      "bobValidatorWalletLocal"
+    )
     clue("Start bob validator local, onboard and tap before upgrade") {
       runBobValidatorWithStandaloneParticipant("before-upgrade")(
         onboardUserAndTapAmulet(
           bobValidatorLocal,
-          wc(
-            "bobValidatorWalletLocal"
-          ),
+          bobValidatorWalletLocal,
         )
       )
     }
@@ -393,14 +394,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .size should be >= topologyTransactionsOnTheSync
       }
 
-      clue("Validator connects to the new sequencers and sync topology") {
+      clue("Validator connects to the new sequencers and syncs topology") {
         eventually(60.seconds) {
           val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
           participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = false)
         }
       }
 
-      clue("SVs connect to the new sequencers and sync topology") {
+      clue("SVs connect to the new sequencers and syncs topology") {
         allBackends.par.map { backend =>
           eventually() {
             participantIsConnectedToNewSynchronizer(
@@ -605,13 +606,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
               isSv4Connected = false,
             )
           }
-          onboardUserAndTapAmulet(
-            bobValidatorLocal,
-            wc(
-              "bobValidatorWalletLocal"
-            ),
-            20,
-            70 to 70,
+          bobValidatorWalletLocal.tap(20)
+          checkWallet(
+            bobValidatorLocal.getValidatorPartyId(),
+            bobValidatorWalletLocal,
+            Seq((70, 70)),
           )
           eventually(60.seconds) {
             participantIsConnectedToNewSynchronizer(
