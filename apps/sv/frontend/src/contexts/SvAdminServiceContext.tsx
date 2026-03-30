@@ -19,6 +19,7 @@ import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListFeaturedAppRightsByProviderResponse,
+  ListFeaturedAppRightsResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
@@ -89,7 +90,7 @@ export interface SvAdminClient {
   listFeaturedAppRightsByProvider: (
     providerPartyId: string
   ) => Promise<ListFeaturedAppRightsByProviderResponse>;
-  listAllFeaturedAppRights: () => Promise<ListFeaturedAppRightsByProviderResponse>;
+  listAllFeaturedAppRights: () => Promise<ListFeaturedAppRightsResponse>;
 }
 
 class ApiMiddleware
@@ -226,7 +227,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       ): Promise<ListFeaturedAppRightsByProviderResponse> => {
         return await svAdminClient.listFeaturedAppRightsByProvider(providerPartyId);
       },
-      listAllFeaturedAppRights: async (): Promise<ListFeaturedAppRightsByProviderResponse> => {
+      listAllFeaturedAppRights: async (): Promise<ListFeaturedAppRightsResponse> => {
         return await svAdminClient.listFeaturedAppRights();
       },
     };

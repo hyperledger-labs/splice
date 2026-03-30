@@ -639,7 +639,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListFeaturedAppRightsByProviderResponse"
+                $ref: "#/components/schemas/ListFeaturedAppRightsResponse"
 
   /v0/admin/sv/featured-app-rights/{provider_party_id}:
     get:
@@ -647,7 +647,7 @@ paths:
       x-jvm-package: sv_operator
       operationId: "listFeaturedAppRightsByProvider"
       description: |
-        List all `FeaturedAppRight` contracts for the provider.
+        Lookup the `FeaturedAppRight` contract for a provider.
       parameters:
         - name: "provider_party_id"
           in: "path"
@@ -656,7 +656,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Featured app rights for provider
+          description: Featured app right for provider
           content:
             application/json:
               schema:
@@ -1234,9 +1234,21 @@ components:
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
 
+    ListFeaturedAppRightsResponse:
+      description: |
+        All contracts of Daml template `Splice.Amulet.FeaturedAppRight`.
+      type: object
+      required:
+        - featured_app_rights
+      properties:
+        featured_app_rights:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
     ListFeaturedAppRightsByProviderResponse:
       description: |
-        Contracts of Daml template `Splice.Amulet.FeaturedAppRight` for a provider.
+        The `Splice.Amulet.FeaturedAppRight` contract for a specific provider, if it exists.
       type: object
       required:
         - featured_app_rights

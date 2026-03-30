@@ -463,7 +463,7 @@ class HttpSvOperatorHandler(
         featuredAppRights <- scanConnection.listFeaturedAppRights()
       } yield {
         respond.OK(
-          definitions.ListFeaturedAppRightsByProviderResponse(
+          definitions.ListFeaturedAppRightsResponse(
             featuredAppRights.map(_.toHttp).toVector
           )
         )
@@ -487,13 +487,13 @@ class HttpSvOperatorHandler(
             )
         }
         scanConnection <- scanConnectionF
-        featuredAppRights <- scanConnection.listFeaturedAppRights()
+        featuredAppRight <- scanConnection.lookupFeaturedAppRight(provider)
       } yield {
-        val providerRights = featuredAppRights
-          .filter(_.payload.provider == provider.toProtoPrimitive)
-          .map(_.toHttp)
-          .toVector
-        respond.OK(definitions.ListFeaturedAppRightsByProviderResponse(providerRights))
+        respond.OK(
+          definitions.ListFeaturedAppRightsByProviderResponse(
+            featuredAppRight.map(_.toHttp).toVector
+          )
+        )
       }
     }
   }
