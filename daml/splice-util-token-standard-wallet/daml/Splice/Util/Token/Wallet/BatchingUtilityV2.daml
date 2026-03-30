@@ -1,14 +1,13 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | Utility template for executing multiple token standard actions in a single
--- transaction with chaining of input holdings.
+-- | Utility template for token standard V2 wallets to execute multiple token
+-- standard actions in a single transaction with chaining of input holdings.
 --
 -- Long-term Canton will likely gain support for constructing transactions in
 -- multiple steps, where later steps can fetch contracts created in earlier
 -- steps. Right now that support does not exist, which is why we provide this
 -- batching utility.
---
 module Splice.Util.Token.Wallet.BatchingUtilityV2 where
 
 
@@ -31,10 +30,15 @@ import Splice.Api.Token.AllocationRequestV2 qualified as V2
 
 import Splice.TokenStandard.Utils
 
+
+-- Managing holdings
+--------------------
+
 data HoldingMap = HoldingMap with
     byAdminAndAccount : Map.Map (Party, V2.Account) [ContractId V2.Holding] -- FIXME: define type with named fields for tuple; or provide maps by account
   deriving (Eq, Show)
 
+-- | Retrieve all holdings of a particular account of instruments of an admin.
 getHoldingsFor : (Party, V2.Account) -> HoldingMap -> ([ContractId V2.Holding], HoldingMap)
 getHoldingsFor k (HoldingMap with byAdminAndAccount) =
   case Map.lookup k byAdminAndAccount of
@@ -45,40 +49,34 @@ storeHoldingsFor : (Party, V2.Account) -> [ContractId V2.Holding] -> HoldingMap 
 storeHoldingsFor k cids (HoldingMap with byAdminAndAccount) =
   HoldingMap with byAdminAndAccount = Map.insertWith (++) k cids byAdminAndAccount
 
-data BatchingUtility_AcceptAllocationRequestV1Result = BatchingUtility_AcceptAllocationRequestV1Result with
-    allocationResults : [V1.AllocationInstructionResult]
-    outputHoldingMap : HoldingMap
-  deriving (Eq, Show)
 
-data BatchingUtility_AcceptAllocationRequestV2Result = BatchingUtility_AcceptAllocationRequestV2Result with
-    allocationResults : Map.Map Party V2.AllocationInstructionResult
-    outputHoldingMap : HoldingMap
-  deriving (Eq, Show)
+-- Representing token standard actions and their results
+--------------------------------------------------------
 
-data ChoiceCallV1 arg = ChoiceCallV1 with
-    actor : Party
+-- | A call to a choice.
+data ChoiceCall arg = ChoiceCall with
     cid : AnyContractId
     arg : arg
   deriving (Eq, Show)
 
-data ChoiceCallV2 arg = ChoiceCallV2 with
-    cid : AnyContractId
-    arg : arg
-  deriving (Eq, Show)
-
+-- | A token standard action.
 data TokenStandardAction
   = TSA_AcceptAllocationRequestV2 BatchingUtility_AcceptAllocationRequestV2
-  | TSA_TransferFactory_TransferV2 (ChoiceCallV2 V2.TransferFactory_Transfer)
-  | TSA_TransferInstruction_AcceptV2 (ChoiceCallV2 V2.TransferInstruction_Accept)
+  | TSA_TransferFactory_TransferV2 (ChoiceCall V2.TransferFactory_Transfer)
+  | TSA_TransferInstruction_AcceptV2 (ChoiceCall V2.TransferInstruction_Accept)
 
   -- compatibility action for V1 apps that expect V1 allocations; and for V1 assets that only support V1 allocations
   | TSA_AcceptAllocationRequestV1 BatchingUtility_AcceptAllocationRequestV1
 
   -- compatibility actions for assets that only support V1 interfaces
-  | TSA_TransferFactory_TransferV1 (ChoiceCallV1 V1.TransferFactory_Transfer)
-  | TSA_TransferInstruction_AcceptV1 (ChoiceCallV1 V1.TransferInstruction_Accept)
+  | TSA_TransferFactory_TransferV1 (ChoiceCall V1.TransferFactory_Transfer)
+  | TSA_TransferInstruction_AcceptV1 (ChoiceCall V1.TransferInstruction_Accept)
   deriving (Eq, Show)
 
+  -- FIXME: add all other actions
+
+
+-- | The result of a token standard action.
 data TokenStandardActionResult
   = TSAR_AcceptAllocationRequestV1Result BatchingUtility_AcceptAllocationRequestV1Result
   | TSAR_AcceptAllocationRequestV2Result BatchingUtility_AcceptAllocationRequestV2Result
@@ -86,17 +84,26 @@ data TokenStandardActionResult
   | TSAR_TransferInstructionResultV2 V2.TransferInstructionResult
   deriving (Eq, Show)
 
+-- | The result of execution a batch of token standard actions.
 data BatchingUtility_ExecuteBatchResult = BatchingUtility_ExecuteBatchResult with
     actionResults : [TokenStandardActionResult]
+      -- ^ Results are delivered in the same order as the actions.
     outputHoldingMap : HoldingMap
 
+
+-- Batching utility
+-------------------
 
 -- | This batching utility is intended to be used for V2 wallets to interact
 -- with both V1 and V2 apps and V1 and V2 assets.
 template BatchingUtility
   with
     provider : Party
-    -- FIXME: whitelisting
+      -- ^ The party that provides the batching utility service, e.g., a wallet provider
+      -- or the user themselves.
+
+    -- FIXME: whitelisting of which parties can use the utility. Useful in particular for users so
+    -- that they are the only ones that can use the utility.
   where
     signatory provider
 
@@ -104,7 +111,7 @@ template BatchingUtility
       with
         actions : [TokenStandardAction]
         inputHoldingMap : HoldingMap
-        actor : Party
+        actor : Party  -- QUESTION: should we allow multiple actors to be uniform wrt the actors pattern?
       controller actor
       do
         let executeAction (holdingMap, results) action = case action of
@@ -118,10 +125,21 @@ template BatchingUtility
                 result <- exercise self arg
                 pure (result.outputHoldingMap, TSAR_AcceptAllocationRequestV2Result result :: results)
 
-              TSA_TransferFactory_TransferV1 (ChoiceCallV1 with cid; arg) -> do
+              TSA_TransferFactory_TransferV1 (ChoiceCall with cid; arg) -> do
                 require' ("transfer sender", arg.transfer.sender) isEqualR ("actor", actor)
                 let account = basicAccount actor
                 -- FIXME: this lookup can return holdings of the wrong instrument id, which is not allowed in V1
+
+                -- QUESTION: should we change V2 interfaces to take and return
+                -- `TextMap [ContractId Holding]` instead of `[ContractId Holding]`, where
+                -- the map keys are `instrumentId.id`s, so that
+                -- chaining at the Daml level can properly disambiguate holdings of different instrument ids?
+
+                -- It seems that we actually have to given that
+                --
+                --  1. otherwise implementations need to fetch al Holdings to figure out which ones to actually use
+                --  2. V1 implementations are likely picky about only being given instrumentIds that match the allocation or transfer
+
                 let (inputHoldingCids, newHoldingMap) = getHoldingsFor (actor, account) holdingMap
                 let cid' = coerceContractId cid : ContractId V1.TransferFactory
                 let transfer' = arg.transfer with inputHoldingCids = map downcast inputHoldingCids : [ContractId V1.Holding]
@@ -132,7 +150,7 @@ template BatchingUtility
                 let result' = TSAR_TransferInstructionResultV1 result
                 pure (holdingMapWithOutputs, result' :: results)
 
-              TSA_TransferInstruction_AcceptV1 (ChoiceCallV1 with cid; arg) -> do
+              TSA_TransferInstruction_AcceptV1 (ChoiceCall with cid; arg) -> do
                 let cid' = coerceContractId cid : ContractId V1.TransferInstruction
                 instr <- fetch cid'
                 let receiver = (view instr).transfer.receiver
@@ -148,7 +166,7 @@ template BatchingUtility
                 let result' = TSAR_TransferInstructionResultV1 result
                 pure (holdingMapWithOutputs, result' :: results)
 
-              TSA_TransferFactory_TransferV2 (ChoiceCallV2 with cid; arg) -> do
+              TSA_TransferFactory_TransferV2 (ChoiceCall with cid; arg) -> do
                 require' ("arg.actors", arg.actors) isEqualR ("actor", [actor]) -- FIXME: actors pattern?
                 let account = basicAccount actor
                 -- FIXME: this lookup can return holdings of the wrong instrument id, which is not allowed in V2
@@ -162,7 +180,7 @@ template BatchingUtility
                 let result' = TSAR_TransferInstructionResultV2 result
                 pure (holdingMapWithOutputs, result' :: results)
 
-              TSA_TransferInstruction_AcceptV2 (ChoiceCallV2 with cid; arg) -> do
+              TSA_TransferInstruction_AcceptV2 (ChoiceCall with cid; arg) -> do
                 require' ("arg.actors", arg.actors) isEqualR ("actor", [actor]) -- FIXME: actors pattern?
                 let cid' = coerceContractId cid : ContractId V2.TransferInstruction
                 result <- exercise cid' arg
@@ -185,7 +203,7 @@ template BatchingUtility
 
 
     -- | Accept an allocation request using the V1 allocation factory interface.
-    -- This MUST only be used to accept allocation requests from V1 apps.
+    -- Use this to accept rquests from V1 apps; and to accept requests for V1 assets that only support V1 interfaces.
     --
     -- All account references are interpreted as references to basic accounts.
     nonconsuming choice BatchingUtility_AcceptAllocationRequestV1
@@ -194,6 +212,8 @@ template BatchingUtility
         reqView : V1.AllocationRequestView
         acceptedAt : Time
         factoryCalls : TextMap.TextMap (ContractId V1.AllocationFactory, ExtraArgs) -- FIXME: define type with named fields
+          -- ^ Legs for which no factory call is provided are assumed to be for
+          -- V2 assets and will be allocated for in `BatchingUtility_AcceptAllocationRequestV2`.
         inputHoldingMap : HoldingMap
         actor : Party
       controller provider
@@ -207,7 +227,10 @@ template BatchingUtility
         -- execute the factory calls with proper threading of input holdings
         let executeCall (holdingMap, results) (legId, leg) = do
               case TextMap.lookup legId factoryCalls of
-                None -> fail ("No factory call provided for leg " <> show legId)
+                None ->
+                  -- No factory call provided ==> the leg will be handled using v2
+                  -- ==> skip this leg and do not create an allocation for it
+                  pure (holdingMap, results)
                 Some (factoryCid, extraArgs) -> do
                   let admin = leg.instrumentId.admin
                   -- FIXME: just passing in input holdings for all instrument ids of the admin feels a bit weird
@@ -231,6 +254,16 @@ template BatchingUtility
           outputHoldingMap
 
 
+    -- | Accept an allocation request using the V2 allocation factory interface for the assets that support it.
+    --
+    -- To accept allocation requests that require the allocation of both V1 and V2 assets,
+    -- call both `BatchingUtility_AcceptAllocationRequestV1` and
+    -- `BatchingUtility_AcceptAllocationRequestV2` in the same batch execution
+    -- with appropriate factory calls provided to ensure that each leg is
+    -- allocated exactly once.
+    --
+    -- QUESTION: @bame-da wdyt about this split of responsibility between the two choices?
+
     nonconsuming choice BatchingUtility_AcceptAllocationRequestV2
       : BatchingUtility_AcceptAllocationRequestV2Result
       with
@@ -238,6 +271,8 @@ template BatchingUtility
         acceptExtraArgs : ExtraArgs
         acceptedAt : Time
         factoriesByAdmin : Map.Map Party (ContractId V2.AllocationFactory, ExtraArgs) -- FIXME: consider naming tuple args
+          -- ^ Legs for admins whose factory is not provided are assumed to be
+          -- for V1 assets and will not be allocated for in this choice.
         inputHoldingMap : HoldingMap
         actor : Party
       controller provider
@@ -246,7 +281,6 @@ template BatchingUtility
         -- fetch and validate request
         req <- fetch reqCid
         let reqView = view req
-        -- FIXME: consider adding back multiple authorizers to support different accounts controlled by the same actor
         let authorizer = reqView.authorizer
         require' ("actor", actor) isMemberR ("accountParties authorizer", accountParties authorizer)
         -- signal request acceptance to app
@@ -285,3 +319,12 @@ template BatchingUtility
 
 
 
+data BatchingUtility_AcceptAllocationRequestV1Result = BatchingUtility_AcceptAllocationRequestV1Result with
+    allocationResults : [V1.AllocationInstructionResult]
+    outputHoldingMap : HoldingMap
+  deriving (Eq, Show)
+
+data BatchingUtility_AcceptAllocationRequestV2Result = BatchingUtility_AcceptAllocationRequestV2Result with
+    allocationResults : Map.Map Party V2.AllocationInstructionResult
+    outputHoldingMap : HoldingMap
+  deriving (Eq, Show)

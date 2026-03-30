@@ -28,6 +28,8 @@ module Splice.Testing.TokenStandard.WalletClientV2
     listAllocationRequestsV2,
     listAllocationsV2,
 
+    listAllocationRequestsV1,
+
     createBatchingUtility,
     acceptAllocationRequestV1,
     acceptAllocationRequestV2,
@@ -164,6 +166,10 @@ listAllocationsV2 tradingAccount actor = do
   allocs <- queryInterface @V2.Allocation actor
   pure [ (allocCid, allocView) | (allocCid, Some allocView) <- allocs, tradingAccount == allocView.allocation.authorizer ]
 
+listAllocationRequestsV1 : Party -> Script [(ContractId V1.AllocationRequest, V1.AllocationRequestView)]
+listAllocationRequestsV1 actor = do
+  reqs <- queryInterface @V1.AllocationRequest actor
+  return [(reqCid, reqView) | (reqCid, Some reqView) <- reqs]
 
 listAllocationRequestsV2 : V2.Account -> Party -> Script [(ContractId V2.AllocationRequest, V2.AllocationRequestView)]
 listAllocationRequestsV2 tradingAccount actor = do

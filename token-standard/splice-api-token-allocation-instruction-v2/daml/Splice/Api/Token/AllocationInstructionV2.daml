@@ -126,10 +126,15 @@ interface AllocationFactory where
         --
         -- MUST be empty for allocations that do not require funding.
         --
-        -- For allocations that require funding,, implementations MUST consume
+        -- For allocations that require funding, implementations MUST consume
         -- all provided holdings as part of creating the allocation. Thereby
         -- enabling the authorizer's wallet to use contention on these holdings to
         -- prevent creating duplicate allocations.
+
+        -- QUESTION: should we weaken the requirement and just require that all non-consumed holdings are returned
+        -- in the choice result as part of the `authorizerHoldingCids` so that callers can properly chain their calls?
+        --
+        -- FIXME adjust comment once the question is resolved
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
       actors : [Party]

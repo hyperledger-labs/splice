@@ -40,7 +40,6 @@ import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistryV1
-import Splice.Testing.TokenStandard.WalletClient qualified as WalletClientV1
 
 
 -- Tests definitions
@@ -266,11 +265,11 @@ runTest mkTest = do
   -- have all parties accept the allocation requests
   trace ("all parties", env.allParties) $
    forA_ env.allParties $ \trader -> do
+    -- FIXME: create TODO notes for testing mixed version settlement with true v1 assets that only support the v1 interfaces
     if trader `elem` test.partiesWithV1Wallet
       then do
-        -- FIXME: listing in V2 wallet
-        reqs <- WalletClientV1.listAllocationRequests trader
-        forA_ reqs $ \req -> do
+        reqs <- WalletClientV2.listAllocationRequestsV1 trader
+        forA_ reqs $ \(_, req) -> do
           WalletClientV2.acceptAllocationRequestV1 env.registryV1.dso env.registryV1 trader req
       else do
         reqs <- WalletClientV2.listAllocationRequestsV2 (basicAccount trader) trader
