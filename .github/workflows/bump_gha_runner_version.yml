@@ -31,7 +31,7 @@ jobs:
           artifactory_user: dummy
           artifactory_password: dummy
           target: default
-      
+
       - name: Check for the latest version and create a PR to splice
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:

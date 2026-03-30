@@ -34,6 +34,7 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
+          cache_version: 7
           test_name: oss
           target: 'oss'
 
@@ -90,4 +91,3 @@ jobs:
           service_account: "${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}"
           notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
           slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
-
