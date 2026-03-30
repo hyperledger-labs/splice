@@ -116,7 +116,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       )
       // use the standalone participant
       .addConfigTransforms((_, config) => {
-        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(22_100, Seq("bobValidatorLocal"))(
+        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(21_900, Seq("bobValidatorLocal"))(
           config.copy(
             validatorApps = config.validatorApps + (
               InstanceName.tryCreate("bobValidatorLocal") -> {
