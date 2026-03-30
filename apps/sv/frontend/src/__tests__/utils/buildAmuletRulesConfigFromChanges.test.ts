@@ -218,6 +218,36 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         currentValue: '0.1.1',
         newValue: '0.2.0',
       },
+      {
+        fieldName: 'rewardConfigMintingVersion',
+        label: 'Reward config: Minting version',
+        currentValue: 'RewardVersion_FeaturedAppMarkers',
+        newValue: 'RewardVersion_TrafficBasedAppRewards',
+      },
+      {
+        fieldName: 'rewardConfigDryRunVersion',
+        label: 'Reward config: Dry-run version',
+        currentValue: '',
+        newValue: 'RewardVersion_TrafficBasedAppRewards',
+      },
+      {
+        fieldName: 'rewardConfigBatchSize',
+        label: 'Reward config: Batch size',
+        currentValue: '100',
+        newValue: '200',
+      },
+      {
+        fieldName: 'rewardConfigRewardCouponTimeToLive',
+        label: 'Reward config: Reward coupon time to live (microseconds)',
+        currentValue: '129600000000',
+        newValue: '259200000000',
+      },
+      {
+        fieldName: 'rewardConfigAppRewardCouponThreshold',
+        label: 'Reward config: App reward coupon threshold ($)',
+        currentValue: '0.5',
+        newValue: '1.0',
+      },
     ];
 
     const result = buildAmuletRulesConfigFromChanges(changes);
@@ -264,6 +294,14 @@ describe('buildAmuletRulesConfigFromChanges', () => {
     expect(result.packageConfig.validatorLifecycle).toBe('0.2.0');
     expect(result.packageConfig.wallet).toBe('0.2.0');
     expect(result.packageConfig.walletPayments).toBe('0.2.0');
+
+    expect(result.rewardConfig).toEqual({
+      mintingVersion: 'RewardVersion_TrafficBasedAppRewards',
+      dryRunVersion: 'RewardVersion_TrafficBasedAppRewards',
+      batchSize: '200',
+      rewardCouponTimeToLive: { microseconds: '259200000000' },
+      appRewardCouponThreshold: '1.0',
+    });
   });
 
   test('should handle multiple transfer fee steps', () => {

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
+import { AmuletConfig, RewardVersion } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import { Tuple2 } from '@daml.js/daml-prim-DA-Types-1.0.0/lib/DA/Types';
 import * as damlTypes from '@daml/types';
 import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types';
@@ -85,6 +85,7 @@ export function buildAmuletRulesConfigFromChanges(
     'issuanceCurveInitialValueOptDevelopmentFundPercentage'
   );
   const externalPartyConfigStateTickDuration = getValue('externalPartyConfigStateTickDuration');
+  const rewardConfigMintingVersion = getValue('rewardConfigMintingVersion');
   const amuletConfig: AmuletConfig<'USD'> = {
     tickDuration: { microseconds: getValue('tickDuration') },
     transferPreapprovalFee: transferPreapprovalFee === '' ? null : transferPreapprovalFee,
@@ -147,6 +148,22 @@ export function buildAmuletRulesConfigFromChanges(
       wallet: getValue('packageConfigWallet'),
       walletPayments: getValue('packageConfigWalletPayments'),
     },
+
+    rewardConfig:
+      rewardConfigMintingVersion === ''
+        ? null
+        : {
+            mintingVersion: getValue('rewardConfigMintingVersion') as RewardVersion,
+            dryRunVersion:
+              getValue('rewardConfigDryRunVersion') === ''
+                ? null
+                : (getValue('rewardConfigDryRunVersion') as RewardVersion),
+            batchSize: getValue('rewardConfigBatchSize'),
+            rewardCouponTimeToLive: {
+              microseconds: getValue('rewardConfigRewardCouponTimeToLive'),
+            },
+            appRewardCouponThreshold: getValue('rewardConfigAppRewardCouponThreshold'),
+          },
   };
 
   return amuletConfig;
