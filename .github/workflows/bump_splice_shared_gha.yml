@@ -3,7 +3,6 @@ on:
   schedule:
     - cron: '30 */2 * * *'  # Bihourly everyday
   workflow_dispatch:
-  pull_request: #test
 
 jobs:
   bump_splice_shared_gha_version:
