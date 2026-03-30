@@ -143,6 +143,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     amuletConfig.featuredAppActivityMarkerAmount,
     amuletConfig.optDevelopmentFundManager,
     amuletConfig.externalPartyConfigStateTickDuration,
+    amuletConfig.rewardConfig,
   )
 
 }
