@@ -416,7 +416,7 @@ class ParticipantAdminConnection(
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcs(
+          .ImportAcsBytes(
             chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,

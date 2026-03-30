@@ -862,6 +862,56 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportAcs(
+        importFilePath: File,
+        workflowIdPrefix: String,
+        contractImportMode: ContractImportMode,
+        representativePackageIdOverride: RepresentativePackageIdOverride,
+        excludedStakeholders: Set[PartyId],
+        synchronizerId: SynchronizerId,
+    ) extends GrpcAdminCommand[
+          Unit,
+          v30.ImportAcsResponse,
+          Unit,
+        ] {
+
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        v30.ParticipantRepairServiceGrpc.stub(channel)
+
+      override protected def createRequest(): Either[String, Unit] =
+        Right(())
+
+      override protected def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: Unit,
+      ): Future[v30.ImportAcsResponse] = {
+        val acsBytes =
+          ByteString.copyFrom(better.files.File(importFilePath.getAbsolutePath).loadBytes)
+        val isFirstChunk = new AtomicBoolean(true)
+        GrpcStreamingUtils.streamToServer(
+          service.importAcs,
+          (bytes: Array[Byte]) => {
+            val isFirst = isFirstChunk.getAndSet(false)
+            v30.ImportAcsRequest(
+              ByteString.copyFrom(bytes),
+              Option.when(isFirst)(workflowIdPrefix),
+              Option.when(isFirst)(contractImportMode.toProtoV30),
+              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
+              Option.when(isFirst)(representativePackageIdOverride.toProtoV30),
+              Option.when(isFirst)(synchronizerId.toProtoPrimitive),
+            )
+          },
+          acsBytes,
+        )
+      }
+
+      override protected def handleResponse(
+          response: v30.ImportAcsResponse
+      ): Either[String, Unit] = Right(())
+    }
+
+    final case class ImportAcsBytes(
         acsChunk: Seq[ByteString],
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,

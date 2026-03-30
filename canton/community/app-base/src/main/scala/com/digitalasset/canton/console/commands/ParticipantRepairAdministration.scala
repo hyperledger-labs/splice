@@ -34,6 +34,7 @@ import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, Synchr
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ReassignmentCounter, SequencerCounter, SynchronizerAlias}
+import java.util.UUID
 import io.grpc.Context
 
 import scala.util.{Failure, Success, Try}
@@ -298,7 +299,21 @@ class ParticipantRepairAdministration(
       representativePackageIdOverride: RepresentativePackageIdOverride =
         RepresentativePackageIdOverride.NoOverride,
       excludedStakeholders: Set[PartyId] = Set.empty,
-  ): Unit = ???
+  ): Unit =
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
+            new java.io.File(importFilePath),
+            if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
+            contractImportMode,
+            representativePackageIdOverride,
+            excludedStakeholders,
+            synchronizerId,
+          )
+        )
+      }
+    }
 
   @Help.Summary("Add specified contracts to a specific synchronizer on the participant")
   @Help.Description(
