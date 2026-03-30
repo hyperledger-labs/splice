@@ -53,6 +53,8 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest {
 
 object RewardComputationInputsTest {
 
+  import RewardComputationInputs.{fromBigDecimal as n}
+
   // 600s tick → 52560 rounds/year
   private val tickDurationMicros: Long = 600L * 1000000L
   private val microsPerYear: Long = 365L * 24 * 3600 * 1000000L
@@ -68,15 +70,15 @@ object RewardComputationInputsTest {
     * appRewardCouponThreshold = 0.5 → threshold_CC = 0.5
     */
   private val baseline = RewardComputationInputs(
-    amuletToIssuePerYear = roundsPerYear, // yields exactly 1.0 per round
-    appRewardPercentage = BigDecimal("0.5"),
-    featuredAppRewardCap = BigDecimal("100"),
-    unfeaturedAppRewardCap = BigDecimal("0"),
-    developmentFundPercentage = BigDecimal("0.1"),
+    amuletToIssuePerYear = n(roundsPerYear), // yields exactly 1.0 per round
+    appRewardPercentage = n(BigDecimal("0.5")),
+    featuredAppRewardCap = n(BigDecimal("100")),
+    unfeaturedAppRewardCap = n(BigDecimal("0")),
+    developmentFundPercentage = n(BigDecimal("0.1")),
     tickDurationMicros = tickDurationMicros,
-    amuletPrice = BigDecimal("1.0"),
-    trafficPrice = BigDecimal("1.0"),
-    appRewardCouponThreshold = BigDecimal("0.5"),
+    amuletPrice = n(BigDecimal("1.0")),
+    trafficPrice = n(BigDecimal("1.0")),
+    appRewardCouponThreshold = n(BigDecimal("0.5")),
   )
 
   case class TestCase(
@@ -129,7 +131,7 @@ object RewardComputationInputsTest {
     // unclaimed = 0.45 - 0.1 * 1.0 = 0.35
     TestCase(
       label = "cap binds, producing unclaimed rewards",
-      inputs = baseline.copy(featuredAppRewardCap = BigDecimal("0.1")),
+      inputs = baseline.copy(featuredAppRewardCap = n(BigDecimal("0.1"))),
       totalRoundAppActivityWeight = 1000000L,
       expected = RewardIssuanceParams(
         issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.1"),
@@ -139,14 +141,15 @@ object RewardComputationInputsTest {
       ),
     ),
     // Zero traffic → totalCoupons_CC = 0
-    // issuancePerCoupon = 0 (guard)
-    // rate = 0, unclaimed = 0.45 - 0 = 0.45
+    // issuancePerCoupon = capPerCoupon (Daml returns cap when no coupons)
+    // rate = trafficPriceInCCperMB * capPerCoupon = 1.0 * 100 = 100
+    // unclaimed = 0.45 - 100 * 0 = 0.45
     TestCase(
       label = "zero traffic: all rewards unclaimed",
       inputs = baseline,
       totalRoundAppActivityWeight = 0L,
       expected = RewardIssuanceParams(
-        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0"),
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("100"),
         threshold_CC = BigDecimal("0.5"),
         totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
         unclaimedAppRewardAmount = BigDecimal("0.45"),
@@ -159,7 +162,7 @@ object RewardComputationInputsTest {
     // unclaimed = 0.45 - 0.9 * 0.5 = 0.0
     TestCase(
       label = "amuletPrice affects threshold and traffic conversion",
-      inputs = baseline.copy(amuletPrice = BigDecimal("2.0")),
+      inputs = baseline.copy(amuletPrice = n(BigDecimal("2.0"))),
       totalRoundAppActivityWeight = 1000000L,
       expected = RewardIssuanceParams(
         issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.45"),
@@ -169,12 +172,14 @@ object RewardComputationInputsTest {
       ),
     ),
     // Cap = 0.2, 2 MB → totalCoupons_CC = 2.0
-    // issuancePerCoupon = min(0.45 / 2.0, 0.2) = min(0.225, 0.2) = 0.2
+    // scaledTotalCoupons = 0.2 * 2.0 = 0.4
+    // cappedRewardsToIssue = min(0.45, 0.4) = 0.4
+    // issuancePerCoupon = (0.4 * 0.2) / 0.4 = 0.2
     // rate = 1.0 * 0.2 = 0.2
     // unclaimed = 0.45 - 0.2 * 2.0 = 0.05
     TestCase(
       label = "cap binds with multiple MB of traffic",
-      inputs = baseline.copy(featuredAppRewardCap = BigDecimal("0.2")),
+      inputs = baseline.copy(featuredAppRewardCap = n(BigDecimal("0.2"))),
       totalRoundAppActivityWeight = 2000000L,
       expected = RewardIssuanceParams(
         issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.2"),
