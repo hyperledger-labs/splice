@@ -3,18 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
-  ScheduledTaskTrigger,
+  OnAssignedContractTrigger,
+  TaskNoop,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import ScheduledTaskTrigger.ReadyTask
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   Reason,
@@ -24,7 +22,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.sv.SvApp
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.util.Contract
+import org.lfdecentralizedtrust.splice.util.AssignedContract
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,102 +38,73 @@ class CopyVotesTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends ScheduledTaskTrigger[CopyVotesTrigger.Task]() {
-
-  import CopyVotesTrigger.*
+) extends OnAssignedContractTrigger.Template[
+      VoteRequest.ContractId,
+      VoteRequest,
+    ](
+      store,
+      VoteRequest.COMPANION,
+    ) {
 
   private val thisSvParty = store.key.svParty.toProtoPrimitive
 
   private def getThisSvName(svs: java.util.Map[String, SvInfo]): Option[String] =
     svs.asScala.get(thisSvParty).map(_.name)
 
-  override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
-      tc: TraceContext
-  ): Future[Seq[Task]] =
+  override def completeTask(
+      task: AssignedContract[VoteRequest.ContractId, VoteRequest]
+  )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
       sourceSvExists = SvApp.isSvName(sourceSvName, dsoRules.contract)
       thisSvNameOpt = getThisSvName(dsoRules.contract.payload.svs)
-      tasks <- (sourceSvExists, thisSvNameOpt) match {
+      outcome <- (sourceSvExists, thisSvNameOpt) match {
         case (false, _) =>
           logger.warn(
             s"Source SV '$sourceSvName' not found in DsoRules.svs; cannot copy votes"
           )
-          Future.successful(Seq.empty)
+          Future.successful(TaskNoop)
         case (_, None) =>
           logger.warn(
             s"This SV party '$thisSvParty' not found in DsoRules.svs; cannot copy votes"
           )
-          Future.successful(Seq.empty)
+          Future.successful(TaskNoop)
         case (true, Some(myName)) =>
-          store.listVoteRequests().map { requests =>
-            requests
-              .flatMap { voteRequest =>
-                val votes = voteRequest.payload.votes.asScala
-                val sourceVoteOpt = votes.get(sourceSvName)
-                val thisSvHasVoted = votes.contains(myName)
-                sourceVoteOpt match {
-                  case Some(sourceVote) if !thisSvHasVoted =>
-                    Seq(Task(voteRequest, sourceVote))
-                  case _ =>
-                    Seq.empty
-                }
-              }
-              .take(limit)
+          val votes = task.payload.votes.asScala
+          val sourceVoteOpt = votes.get(sourceSvName)
+          val thisSvHasVoted = votes.contains(myName)
+          sourceVoteOpt match {
+            case Some(sourceVote) if !thisSvHasVoted =>
+              val trackingCid = task.payload.trackingCid.toScala
+                .getOrElse(task.contractId)
+              for {
+                resolvedVoteRequest <- store.getVoteRequest(trackingCid)
+                reason = new Reason(
+                  sourceVote.reason.url,
+                  s"Copied from $sourceSvName: ${sourceVote.reason.body}",
+                )
+                cmd = dsoRules.exercise(
+                  _.exerciseDsoRules_CastVote(
+                    resolvedVoteRequest.contractId,
+                    new Vote(
+                      thisSvParty,
+                      sourceVote.accept,
+                      reason,
+                      Optional.empty(),
+                    ),
+                  )
+                )
+                _ <- connection
+                  .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
+                  .noDedup
+                  .yieldResult()
+              } yield TaskSuccess(
+                s"Copied ${if (sourceVote.accept) "accept"
+                  else "reject"} vote from $sourceSvName on vote request ${task.contractId}"
+              )
+            case _ =>
+              Future.successful(TaskNoop)
           }
       }
-    } yield tasks
-
-  override protected def completeTask(
-      task: ReadyTask[Task]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val trackingCid = task.work.voteRequest.payload.trackingCid.toScala
-      .getOrElse(task.work.voteRequest.contractId)
-    for {
-      dsoRules <- store.getDsoRules()
-      resolvedVoteRequest <- store.getVoteRequest(trackingCid)
-      reason = new Reason(
-        task.work.sourceVote.reason.url,
-        s"Copied from $sourceSvName: ${task.work.sourceVote.reason.body}",
-      )
-      cmd = dsoRules.exercise(
-        _.exerciseDsoRules_CastVote(
-          resolvedVoteRequest.contractId,
-          new Vote(
-            thisSvParty,
-            task.work.sourceVote.accept,
-            reason,
-            Optional.empty(),
-          ),
-        )
-      )
-      _ <- connection
-        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
-        .noDedup
-        .yieldResult()
-    } yield TaskSuccess(
-      s"Copied ${if (task.work.sourceVote.accept) "accept"
-        else "reject"} vote from $sourceSvName on vote request ${task.work.voteRequest.contractId}"
-    )
-  }
-
-  override protected def isStaleTask(
-      task: ReadyTask[Task]
-  )(implicit tc: TraceContext): Future[Boolean] =
-    store.multiDomainAcsStore.containsArchived(
-      Seq(task.work.voteRequest.contractId)
-    )
-}
-
-object CopyVotesTrigger {
-  final case class Task(
-      voteRequest: Contract[VoteRequest.ContractId, VoteRequest],
-      sourceVote: Vote,
-  ) extends PrettyPrinting {
-
-    override protected def pretty: Pretty[this.type] = prettyOfClass(
-      param("voteRequest", _.voteRequest),
-      param("sourceVoteAccept", (t: Task) => (t.sourceVote.accept: Boolean)),
-    )
-  }
+    } yield outcome
 }
