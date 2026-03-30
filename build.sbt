@@ -40,7 +40,6 @@ lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-adjustable-clock` = BuildCommon.`canton-daml-adjustable-clock`
 lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
-lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
 lazy val `canton-base-errors` = BuildCommon.`canton-base-errors`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
@@ -103,7 +102,6 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-daml`,
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
-    `splice-util-token-standard-wallet-test-daml`,
     `splice-util-token-standard-wallet-test-daml`,
     `splice-util-batched-markers-daml`,
     `splice-util-batched-markers-test-daml`,

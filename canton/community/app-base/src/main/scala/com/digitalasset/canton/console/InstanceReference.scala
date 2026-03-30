@@ -233,7 +233,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
         case Nil =>
           Left(s"No metric of name $metricName with instance name $name found.")
         case other =>
-          Left(s"Found ${other.length} matching metrics")
+          Left(s"Found ${other.length} matching metrics: $other")
       }
     }
 

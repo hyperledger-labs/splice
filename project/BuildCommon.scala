@@ -243,6 +243,15 @@ object BuildCommon {
             "apps-frontends/clean",
             "cleanCnDars",
             "docs/clean",
+            "splice-util-featured-app-proxies-daml/clean",
+            "splice-token-test-dummy-holding-daml/clean",
+            "splice-token-test-trading-app-daml/clean",
+            "splice-util-token-standard-wallet-daml/clean",
+            "splice-util-token-standard-wallet-test-daml/clean",
+            "splice-util-batched-markers-daml/clean",
+            "splice-util-batched-markers-test-daml/clean",
+            "splice-featured-app-api-v1-daml/clean",
+            "splice-featured-app-api-v2-daml/clean",
           ).map(";" + _).mkString(""),
         ) ++
         addCommandAlias("splice-clean", "; clean-splice") ++
@@ -425,23 +434,6 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-daml-grpc-utils` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-daml-grpc-utils", file("canton/base/grpc-utils"))
-      .dependsOn(
-        `canton-google-common-protos-scala`
-      )
-      .settings(
-        sharedCantonSettings,
-        libraryDependencies ++= Seq(
-          grpc_api,
-          scalapb_runtime_grpc,
-          scalatest % Test,
-        ),
-      )
-  }
-
   lazy val `canton-daml-jwt` = {
     import CantonDependencies._
     sbt.Project
@@ -469,7 +461,6 @@ object BuildCommon {
       .apply("canton-util-observability", file("canton/community/util-observability"))
       .dependsOn(
         `canton-base-errors` % "compile->compile;test->test",
-        `canton-daml-grpc-utils`,
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
@@ -477,6 +468,7 @@ object BuildCommon {
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          daml_grpc_utils,
           better_files,
           canton_observability_metrics,
           canton_contextualized_logging,
@@ -598,7 +590,6 @@ object BuildCommon {
       .dependsOn(
         `canton-slick-fork`,
         `canton-util-external`,
-        `canton-daml-grpc-utils`,
         `canton-daml-jwt`,
         `canton-daml-tls`,
         `canton-ledger-common`,
@@ -1128,7 +1119,6 @@ object BuildCommon {
       .disablePlugins(WartRemover, ScalafmtPlugin)
       .dependsOn(
         `canton-util-external`,
-        `canton-daml-grpc-utils`,
         `canton-daml-jwt`,
         `canton-util-observability`,
       )

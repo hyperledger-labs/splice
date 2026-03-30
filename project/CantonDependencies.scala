@@ -98,6 +98,8 @@ object CantonDependencies {
     "com.daml" %% "daml-lf-api-type-signature" % canton_library_version
   lazy val daml_libs_scala_grpc_test_utils =
     "com.daml" %% "grpc-test-utils" % canton_library_version
+  lazy val daml_grpc_utils =
+    "com.daml" %% "daml-grpc-utils" % canton_library_version
 
   lazy val canton_java_bindings = "com.daml" % "bindings-java" % canton_library_version
   lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
