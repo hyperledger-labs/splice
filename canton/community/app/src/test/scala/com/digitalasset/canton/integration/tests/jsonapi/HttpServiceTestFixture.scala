@@ -13,13 +13,9 @@ import com.daml.jwt.{
   StandardJWTPayload,
   StandardJWTTokenFormat,
 }
+import com.daml.tls.{TlsClientCertificate, TlsClientConfig, TlsServerConfig}
+import com.digitalasset.canton.config.PemFile
 import com.digitalasset.canton.config.RequireTypes.ExistingFile
-import com.digitalasset.canton.config.{
-  PemFile,
-  TlsClientCertificate,
-  TlsClientConfig,
-  TlsServerConfig,
-}
 import com.digitalasset.canton.http.UserId
 import com.digitalasset.canton.http.util.NewBoolean
 import com.digitalasset.canton.logging.{NamedLoggerFactory, SuppressingLogger}
@@ -43,7 +39,7 @@ object HttpServiceTestFixture {
 
   lazy val staticPkgIdAccount: Ref.PackageRef = {
     import com.digitalasset.daml.lf.{archive, typesig}
-    val darFile = JarResourceUtils.resourceFile("Account-3.4.0.dar")
+    val darFile = JarResourceUtils.resourceFile("Account-1.0.0.dar")
     val dar = archive.UniversalArchiveReader.assertReadFile(darFile)
     Ref.PackageRef.assertFromString(typesig.PackageSignature.read(dar.main)._2.packageId)
   }

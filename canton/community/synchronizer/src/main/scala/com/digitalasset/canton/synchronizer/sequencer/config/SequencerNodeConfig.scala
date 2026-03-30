@@ -5,7 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.config
 
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
-import com.digitalasset.canton.synchronizer.config.PublicServerConfig
+import com.digitalasset.canton.synchronizer.config.{DeclarativeSequencerConfig, PublicServerConfig}
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.SequencerHighAvailabilityConfig
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.synchronizer.sequencer.{SequencerConfig, SequencerHealthConfig}
@@ -58,6 +58,7 @@ final case class SequencerNodeConfig(
     acknowledgementsConflateWindow: Option[PositiveFiniteDuration] = Some(
       PositiveFiniteDuration.ofSeconds(45)
     ),
+    declarative: DeclarativeSequencerConfig = DeclarativeSequencerConfig(),
 ) extends LocalNodeConfig
     with ConfigDefaults[Option[DefaultPorts], SequencerNodeConfig] {
 
@@ -74,8 +75,8 @@ final case class SequencerNodeConfig(
 
   override def withDefaults(
       ports: Option[DefaultPorts]
-  ): SequencerNodeConfig = {
-    val withDefaults = ports
+  ): SequencerNodeConfig =
+    ports
       .fold(this)(ports =>
         this
           .focus(_.publicApi.internalPort)
@@ -97,16 +98,20 @@ final case class SequencerNodeConfig(
                 )
             )
         case other => other
-      }
 
-    withDefaults
+      }
       .focus(_.replication)
+      // Even though the block sequencer does not support replicas, want to turn on replication
+      // to take care of cases when more than one instance of the sequencer is started with the same
+      // database setup and identity (typical in Kubernetes setups) and allow simultaneous startup of one instance
+      // while another is shutting down. The exception is the reference sequencer, which relies on multiple nodes
+      // using the same database for ordering blocks and handles that on a different level of the code.
       .modify(replication =>
-        // The block sequencer does not support replicas, so we must not enable replication
-        // even if the storage supports it (sse #13844).
-        if (withDefaults.sequencer.supportsReplicas)
-          ReplicationConfig.withDefaultO(storage, replication)
-        else replication.map(_.copy(enabled = Some(false)))
+        sequencer match {
+          // TODO(#29603): remove this logic once reference sequencer is gone. The reference sequencer does not
+          case SequencerConfig.External(sequencerType, _, _) if sequencerType == "reference" => None
+          case _ => ReplicationConfig.withDefaultO(storage, replication)
+        }
       )
-  }
+
 }

@@ -112,6 +112,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
         persistentState,
         syncPersistentStateManager,
       )
+
       // check and issue the synchronizer trust certificate
       _ <- EitherTUtil.ifThenET(!config.initializeFromTrustedSynchronizer)(
         topologyDispatcher.trustSynchronizer(psid)
@@ -203,9 +204,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
           SequencerClientFactory(
             psid,
             synchronizerCryptoApi,
-            synchronizerCrypto,
             sequencerClientConfig,
-            participantNodeParameters.tracing.propagation,
             testingConfig,
             sequencerAggregatedInfo.staticSynchronizerParameters,
             participantNodeParameters.processingTimeouts,
@@ -224,9 +223,8 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
             participantNodeParameters.loggingConfig,
             participantNodeParameters.exitOnFatalFailures,
             synchronizerLoggerFactory,
-            ProtocolVersionCompatibility.supportedProtocols(participantNodeParameters),
           ),
-          participantNodeParameters.unsafeOnlinePartyReplication
+          participantNodeParameters.alphaOnlinePartyReplicationSupport
             .map(_ =>
               new SequencerChannelClientFactory(
                 psid,
@@ -283,19 +281,19 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
           participantId,
           persistentState.sequencedEventStore,
           persistentState.sendTrackerStore,
-          RequestSigner(
-            synchronizerCryptoApi,
-            sequencerAggregatedInfo.staticSynchronizerParameters.protocolVersion,
-            loggerFactory,
-          ),
+          RequestSigner(synchronizerCryptoApi, loggerFactory),
           sequencerAggregatedInfo.sequencerConnections,
           synchronizerPredecessor,
-          sequencerAggregatedInfo.expectedSequencersO,
           connectionPool,
         )
-        .leftMap[SynchronizerRegistryError](
-          SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(_)
-        )
+        .leftMap[SynchronizerRegistryError] {
+          case SequencerClientFactory.RetryableError(err) =>
+            SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencersTransient.Error(
+              err
+            )
+          case SequencerClientFactory.NonRetryableError(err) =>
+            SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(err)
+        }
 
       _ <- downloadSynchronizerTopologyStateForInitializationIfNeeded(
         syncPersistentStateManager,
@@ -303,7 +301,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
         topologyFactory.createInitialTopologySnapshotValidator(),
         topologyClient,
         sequencerClient,
-        sequencerAggregatedInfo,
+        sequencerAggregatedInfo.staticSynchronizerParameters,
       ).thereafter {
         case Success(AbortedDueToShutdown) =>
           /*
@@ -380,7 +378,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
       topologySnapshotValidator: InitialTopologySnapshotValidator,
       topologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
-      sequencerAggregatedInfo: SequencerAggregatedInfo,
+      staticParameters: StaticSynchronizerParameters,
   )(implicit
       ec: ExecutionContextExecutor,
       traceContext: TraceContext,
@@ -399,7 +397,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
             topologySnapshotValidator,
             topologyClient,
             sequencerClient,
-            sequencerAggregatedInfo.staticSynchronizerParameters.protocolVersion,
+            staticParameters.protocolVersion,
           )
           .leftMap[SynchronizerRegistryError](
             SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(_)

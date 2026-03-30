@@ -18,7 +18,7 @@ import Wartremover.spliceWarts
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
-import CantonDependencies.{daml_ledger_api_value_proto, excludeTranscodeConflictingDependencies}
+import CantonDependencies.excludeTranscodeConflictingDependencies
 import org.latestbit.sbt.gcs.GcsPlugin.autoImport.googleCredentialsDisable
 
 import java.util.concurrent.atomic.AtomicInteger
@@ -250,6 +250,15 @@ object BuildCommon {
             "apps-frontends/clean",
             "cleanCnDars",
             "docs/clean",
+            "splice-util-featured-app-proxies-daml/clean",
+            "splice-token-test-dummy-holding-daml/clean",
+            "splice-token-test-trading-app-daml/clean",
+            "splice-util-token-standard-wallet-daml/clean",
+            "splice-util-token-standard-wallet-test-daml/clean",
+            "splice-util-batched-markers-daml/clean",
+            "splice-util-batched-markers-test-daml/clean",
+            "splice-featured-app-api-v1-daml/clean",
+            "splice-featured-app-api-v2-daml/clean",
           ).map(";" + _).mkString(""),
         ) ++
         addCommandAlias("splice-clean", "; clean-splice") ++
@@ -411,7 +420,7 @@ object BuildCommon {
       .dependsOn(
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-observability`,
-        `canton-util-external` % "test",
+        `canton-util-external`,
       )
       .settings(
         sharedCantonSettings,
@@ -432,23 +441,6 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-daml-grpc-utils` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-daml-grpc-utils", file("canton/base/grpc-utils"))
-      .dependsOn(
-        `canton-google-common-protos-scala`
-      )
-      .settings(
-        sharedCantonSettings,
-        libraryDependencies ++= Seq(
-          grpc_api,
-          scalapb_runtime_grpc,
-          scalatest % Test,
-        ),
-      )
-  }
-
   lazy val `canton-daml-jwt` = {
     import CantonDependencies._
     sbt.Project
@@ -459,7 +451,6 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           auth0_java,
           auth0_jwks,
-          daml_http_test_utils % Test,
           daml_test_evidence_generator_scalatest % Test,
           scalatest % Test,
           scalaz_core,
@@ -477,7 +468,6 @@ object BuildCommon {
       .apply("canton-util-observability", file("canton/community/util-observability"))
       .dependsOn(
         `canton-base-errors` % "compile->compile;test->test",
-        `canton-daml-grpc-utils`,
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
@@ -485,6 +475,7 @@ object BuildCommon {
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          daml_grpc_utils,
           better_files,
           canton_observability_metrics,
           canton_contextualized_logging,
@@ -606,7 +597,6 @@ object BuildCommon {
       .dependsOn(
         `canton-slick-fork`,
         `canton-util-external`,
-        `canton-daml-grpc-utils`,
         `canton-daml-jwt`,
         `canton-daml-tls`,
         `canton-ledger-common`,
@@ -706,7 +696,6 @@ object BuildCommon {
           better_files,
           cats,
           cats_law,
-          daml_metrics_test_lib,
           jul_to_slf4j,
           mockito_scala,
           opentelemetry_api,
@@ -723,6 +712,30 @@ object BuildCommon {
       )
   }
 
+  // Canton publishes observability-testing but not the test code.
+  // However, community-integration-testing depends on the InMemoryMetricsFactory which is in the test code.
+  lazy val `canton-observability-metrics-testing` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-observability-metrics-testing", file("canton/base/observability/metrics"))
+      .disablePlugins(WartRemover)
+      .settings(
+        sharedCantonSettings,
+        sharedSettings,
+        libraryDependencies ++= Seq(
+          canton_observability_metrics,
+          daml_testing_utils,
+          scalatest,
+        ),
+        Compile / unmanagedSourceDirectories := Seq(
+          baseDirectory.value / "src/test/scala"
+        ),
+        Compile / unmanagedSources / includeFilter := "InMemoryMetricsFactory.scala" || "MetricValues.scala",
+        Test / unmanagedSourceDirectories := Seq.empty,
+        scalacOptions += "-Wconf:msg=unused value of type:s",
+      )
+  }
+
   lazy val `canton-community-integration-testing` = {
     import CantonDependencies._
     sbt.Project
@@ -732,6 +745,7 @@ object BuildCommon {
         `canton-community-app-base`,
         `canton-community-testing`,
         `canton-community-reference-driver`,
+        `canton-observability-metrics-testing`,
       )
       .settings(
         excludeTranscodeConflictingDependencies,
@@ -745,7 +759,7 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           toxiproxy_java,
           opentelemetry_proto,
-          daml_http_test_utils,
+          daml_testing_utils,
         ),
 
         // This library contains a lot of testing helpers that previously existing in testing scope
@@ -759,7 +773,7 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-community-common", file("canton/community/common"))
-      .enablePlugins(BuildInfoPlugin, DamlPlugin)
+      .enablePlugins(DamlPlugin)
       .dependsOn(
         `canton-blake2b`,
         `canton-pekko-fork` % "compile->compile;test->test",
@@ -1024,6 +1038,9 @@ object BuildCommon {
       .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
       .dependsOn(`canton-wartremover-annotations`, `canton-slick-fork`)
       .settings(
+        Test / scalacOptions ++= Seq(
+          "-Wconf:msg=synchronized not selected from this instance:silent"
+        ),
         disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
@@ -1109,7 +1126,6 @@ object BuildCommon {
       .disablePlugins(WartRemover, ScalafmtPlugin)
       .dependsOn(
         `canton-util-external`,
-        `canton-daml-grpc-utils`,
         `canton-daml-jwt`,
         `canton-util-observability`,
       )
@@ -1158,11 +1174,7 @@ object BuildCommon {
           scalatestScalacheck % Test,
           daml_lf_data,
           daml_lf_transaction,
-          daml_http_test_utils % Test,
-          daml_testing_utils % Test,
           daml_ports % Test,
-          daml_tracing_test_lib % Test,
-          daml_rs_grpc_testing_utils % Test,
         ),
         Test / fork := true,
         Test / testForkedParallel := true,
@@ -1200,7 +1212,6 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
-          daml_libs_scala_grpc_test_utils,
           daml_ports,
           hikaricp,
           guava,
@@ -1297,7 +1308,6 @@ object BuildCommon {
       // compile proto files that we've extracted here
       Compile / PB.protoSources ++= Seq(target.value / "protobuf_external"),
       libraryDependencies ++= Seq(
-        daml_ledger_api_value_proto % "protobuf"
       ),
     )
 

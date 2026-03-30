@@ -249,6 +249,7 @@ private[topology] class PartyReplicationChaos(val logger: TracedLogger) extends 
       validFrom = Some(onboardingTx.validFrom),
       beginOffsetExclusive = fromLedgerEnd,
       completeAfter = PositiveInt.one,
+      onboarding = false,
     )
     logOperationStep("party replication")(
       s"Exporting ACS at offset $partyAddedOffset for $party from ${from.id}"
@@ -266,7 +267,7 @@ private[topology] class PartyReplicationChaos(val logger: TracedLogger) extends 
         }
       }
 
-      to.repair.import_acsV2(importFilePath = file.canonicalPath, synchronizerId = daId)
+      to.repair.import_acs(importFilePath = file.canonicalPath, synchronizerId = daId)
       logOperationStep("party replication")(
         s"Done replicating party $party from ${from.id} to ${to.id}; reconnecting ${to.id} to the synchronizer"
       )

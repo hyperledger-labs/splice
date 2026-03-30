@@ -11,8 +11,8 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{KeepAliveClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{Crypto, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -148,7 +148,11 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       logger.debug(s"Starting connection pool")
       setupInitializationTimeout()
 
-      updateTrackedConnections(toBeAdded = config.connections, toBeRemoved = Set.empty)
+      updateTrackedConnections(
+        toBeAdded = config.connections,
+        toBeRemoved = Set.empty,
+        isInitialUpdate = true,
+      )
     }
 
     EitherT(initializedP.futureUS)
@@ -209,6 +213,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
   private def updateTrackedConnections(
       toBeAdded: immutable.Iterable[ConnectionXConfig],
       toBeRemoved: Set[ConnectionXConfig],
+      isInitialUpdate: Boolean,
   )(implicit traceContext: TraceContext): Unit =
     lock.exclusive {
       val removedConnections =
@@ -232,6 +237,12 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       removedConnections.foreach { connection =>
         connection.fatal("removed from config")
       }
+      if (isInitialUpdate) {
+        metrics.removeMetricsForAllConnections()
+      } else {
+        metrics.removeMetricsForConnection(toBeRemoved.map(_.name))
+      }
+
       // If start() or updateConfig() is called after the pool has been closed, we don't want to start new connections
       if (!isClosing) {
         newConnections.map(new ConnectionHandler(_)).foreach(_.startConnection())
@@ -378,7 +389,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       for {
         _ <- newConfig.validate
         _ <- Either.cond(
-          newConfig.expectedPSIdO == currentConfig.expectedPSIdO,
+          newConfig.expectedPsidO == currentConfig.expectedPsidO,
           (),
           SequencerConnectionXPoolError.InvalidConfigurationError(
             "The expected physical synchronizer ID can only be changed during a node restart."
@@ -432,6 +443,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
         updateTrackedConnections(
           toBeAdded = changedConnections.added,
           toBeRemoved = changedConnections.removed,
+          isInitialUpdate = false,
         )
       }
     }
@@ -452,8 +464,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
       threshold: PositiveInt
   )(implicit traceContext: TraceContext): Unit =
     if (!isClosing && !isThresholdStillReachable(threshold)) {
-      val message =
-        s"Trust threshold of ${config.trustThreshold} is no longer reachable"
+      val message = s"Trust threshold of ${config.trustThreshold} is no longer reachable"
       logger.info(message)
       if (
         initializedP
@@ -562,7 +573,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
         bootstrapCell.get match {
           case None =>
-            if (currentConfig.expectedPSIdO.forall(_ == attributes.physicalSynchronizerId)) {
+            if (currentConfig.expectedPsidO.forall(_ == attributes.physicalSynchronizerId)) {
               markValidated(connection)
               getBootstrapIfThresholdReached(currentConfig.trustThreshold)
                 .valueOr(ErrorUtil.invalidState(_)) // We cannot reach the threshold multiple times
@@ -574,7 +585,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
             } else {
               logger.warn(
                 s"Connection ${connection.name} is not on expected synchronizer:" +
-                  s" expected ${currentConfig.expectedPSIdO}," +
+                  s" expected ${currentConfig.expectedPsidO}," +
                   s" got ${attributes.physicalSynchronizerId}. Closing connection."
               )
               connection.fatal(reason = "invalid synchronizer")
@@ -755,6 +766,7 @@ class GrpcSequencerConnectionXPoolFactory(
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
     authConfig: AuthenticationTokenManagerConfig,
+    keepAliveClientConfigO: Option[KeepAliveClientConfig],
     member: Member,
     clock: Clock,
     crypto: Crypto,
@@ -781,6 +793,7 @@ class GrpcSequencerConnectionXPoolFactory(
     val connectionFactory = new GrpcInternalSequencerConnectionXFactory(
       clientProtocolVersions,
       minimumProtocolVersion,
+      keepAliveClientConfigO,
       metrics,
       metricsContext,
       futureSupervisor,
@@ -810,7 +823,7 @@ class GrpcSequencerConnectionXPoolFactory(
 
   override def createFromOldConfig(
       sequencerConnections: SequencerConnections,
-      expectedPSIdO: Option[PhysicalSynchronizerId],
+      expectedPsidO: Option[PhysicalSynchronizerId],
       tracingConfig: TracingConfig,
       name: String,
   )(implicit
@@ -822,7 +835,7 @@ class GrpcSequencerConnectionXPoolFactory(
     val poolConfig = SequencerConnectionXPoolConfig.fromSequencerConnections(
       sequencerConnections,
       tracingConfig,
-      expectedPSIdO,
+      expectedPsidO,
     )
     logger.debug(s"poolConfig = $poolConfig")
 

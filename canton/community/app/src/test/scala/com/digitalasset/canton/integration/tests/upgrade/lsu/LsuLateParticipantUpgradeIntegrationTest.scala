@@ -16,8 +16,11 @@ import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
+
+import java.time.Duration
 
 /*
  * This test is used to test manual late upgrade.
@@ -132,7 +135,7 @@ final class LsuLateParticipantUpgradeIntegrationTest extends LsuBase {
       // P3 performs handshake with the new synchronizer
       eventually() {
         participant3.underlying.value.sync.syncPersistentStateManager
-          .get(fixture.newPSId)
+          .get(fixture.newPsid)
           .value
           .parameterStore
           .lastParameters
@@ -156,12 +159,13 @@ final class LsuLateParticipantUpgradeIntegrationTest extends LsuBase {
         .toLfContractId
 
       environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
-
+      transferTraffic()
       eventually() {
-        participant1.synchronizers.is_connected(fixture.newPSId) shouldBe true
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+        participant1.synchronizers.is_connected(fixture.newPsid) shouldBe true
       }
 
-      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
+      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now, logger)
 
       sequencer1.stop()
       mediator1.stop()
@@ -194,11 +198,11 @@ final class LsuLateParticipantUpgradeIntegrationTest extends LsuBase {
       import env.*
 
       val newSynchronizerConnectionConfig =
-        participant1.synchronizers.config(fixture.newPSId).value
+        participant1.synchronizers.config(fixture.newPsid).value
 
-      def manualLsu(p: ParticipantReference): Unit = p.repair.perform_manual_lsu(
+      def manualLsu(p: ParticipantReference): Unit = p.repair.perform_late_lsu(
         currentPhysicalSynchronizerId = daId,
-        successorPhysicalSynchronizerId = fixture.newPSId,
+        successorPhysicalSynchronizerId = fixture.newPsid,
         announcedUpgradeTime = fixture.upgradeTime,
         successorConfig = newSynchronizerConnectionConfig,
       )
@@ -238,7 +242,7 @@ final class LsuLateParticipantUpgradeIntegrationTest extends LsuBase {
           acsFile,
         )
 
-        p.repair.import_acsV2(acsFile, fixture.newPSId.logical)
+        p.repair.import_acs(fixture.newPsid.logical, acsFile)
 
         if (!upgradeBeforeACSRepair) {
           manualLsu(p)
@@ -249,7 +253,7 @@ final class LsuLateParticipantUpgradeIntegrationTest extends LsuBase {
 
         p.synchronizers.reconnect_all()
         eventually() {
-          p.synchronizers.is_connected(fixture.newPSId) shouldBe true
+          p.synchronizers.is_connected(fixture.newPsid) shouldBe true
         }
 
         p.health.ping(env.participant1.id)
@@ -261,7 +265,7 @@ final class LsuLateParticipantUpgradeIntegrationTest extends LsuBase {
       // P4 late upgrade
       manualLsu(participant4)
       eventually() {
-        participant4.synchronizers.is_connected(fixture.newPSId) shouldBe true
+        participant4.synchronizers.is_connected(fixture.newPsid) shouldBe true
       }
 
       participant4.health.ping(env.participant1.id)

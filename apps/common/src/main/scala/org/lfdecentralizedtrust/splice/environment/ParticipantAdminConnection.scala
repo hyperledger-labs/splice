@@ -401,7 +401,7 @@ class ParticipantAdminConnection(
       ByteString.copyFrom(chunks.asJava)
     )
 
-  def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
+  def uploadAcsSnapshot(acsBytes: Seq[ByteString], synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
@@ -416,12 +416,13 @@ class ParticipantAdminConnection(
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcs(
+          .ImportAcsBytes(
             chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,
             excludedStakeholders = Set.empty,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+            synchronizerId = synchronizerId,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),

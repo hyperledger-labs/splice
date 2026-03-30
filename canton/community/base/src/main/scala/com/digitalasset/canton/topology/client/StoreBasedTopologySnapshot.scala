@@ -51,6 +51,21 @@ class StoreBasedTopologySnapshot(
         None,
       )
 
+  override def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+    store
+      .findAllTransactions(
+        asOf = this.timestamp,
+        asOfInclusive = true,
+        isProposal = false,
+        types = Seq(TopologyMapping.Code.SynchronizerTrustCertificate),
+        filterUid = NonEmpty.from(Seq(participantId.uid)),
+        filterNamespace = None,
+        pagination = None,
+      )
+      .map(_.signedTransactions.nonEmpty)
+
   private def findTransactionsByType(
       types: Seq[TopologyMapping.Code]
   )(implicit
@@ -77,7 +92,7 @@ class StoreBasedTopologySnapshot(
   ): FutureUnlessShutdown[Seq[DynamicSynchronizerParametersWithValidity]] = store
     .inspect(
       proposals = false,
-      timeQuery = TimeQuery.Range(None, Some(timestamp)),
+      timeQuery = TimeQuery.Range(None, Some(timestamp)), // validFrom <= timestamp
       asOfExclusiveO = None,
       op = Some(TopologyChangeOp.Replace),
       types = Seq(TopologyMapping.Code.SynchronizerParametersState),
@@ -85,7 +100,7 @@ class StoreBasedTopologySnapshot(
       namespaceFilter = None,
     )
     .map {
-      _.collectOfMapping[SynchronizerParametersState].result
+      _.collectOfMapping[SynchronizerParametersState].asSnapshotAtMaxEffectiveTime.result
         .map { storedTx =>
           val dps = storedTx.mapping
           DynamicSynchronizerParametersWithValidity(
@@ -148,7 +163,7 @@ class StoreBasedTopologySnapshot(
       "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
     since = "3.5.0",
   )
-  override def allMembers()(implicit
+  override def knownMembers()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]] =
     findTransactionsByType(
@@ -193,7 +208,7 @@ class StoreBasedTopologySnapshot(
         )
     }
 
-  override def sequencerConnectionSuccessors()(implicit
+  override def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[SequencerId, LsuSequencerConnectionSuccessor]] =
     findTransactionsByType(
@@ -202,7 +217,7 @@ class StoreBasedTopologySnapshot(
       txs
         .collectOfMapping[LsuSequencerConnectionSuccessor]
         .toTopologyState
-        .map(m => m.sequencerId -> m)
+        .collect { case m if m.successorPsid == successorPsid => m.sequencerId -> m }
         .toMap
     )
 }

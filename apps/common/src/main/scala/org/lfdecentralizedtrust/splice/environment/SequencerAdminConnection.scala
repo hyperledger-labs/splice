@@ -128,6 +128,7 @@ class SequencerAdminConnection(
   def initializeFromPredecessor(
       topologySnapshot: Path,
       staticSynchronizerParameters: StaticSynchronizerParameters,
+      ignorePsidCheck: Boolean = false,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
@@ -136,6 +137,7 @@ class SequencerAdminConnection(
       SequencerAdminCommands.InitializeFromLsuPredecessor(
         inputStream,
         staticSynchronizerParameters,
+        ignorePsidCheck,
       )
     ).andThen(_ => inputStream.close())
   }

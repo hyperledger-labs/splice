@@ -14,6 +14,66 @@ import scala.concurrent.ExecutionContext
 
 object GroupAddressResolver {
 
+  def resolveMediatorAndSequencerGroupRecipients(
+      groupRecipients: Set[GroupRecipient],
+      topologyOrSequencingSnapshot: TopologySnapshot,
+  )(implicit
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): FutureUnlessShutdown[Map[GroupRecipient, Set[Member]]] =
+    if (groupRecipients.isEmpty) FutureUnlessShutdown.pure(Map.empty)
+    else
+      for {
+        mediatorGroupByMember <- resolveMediatorGroupRecipients(
+          groupRecipients,
+          topologyOrSequencingSnapshot,
+        )
+        sequencersOfSynchronizer <- resolveSequencersOfSynchronizers(
+          groupRecipients,
+          topologyOrSequencingSnapshot,
+        )
+      } yield mediatorGroupByMember ++ Map(SequencersOfSynchronizer -> sequencersOfSynchronizer)
+
+  private def resolveMediatorGroupRecipients(
+      groupRecipients: Set[GroupRecipient],
+      topologyOrSequencingSnapshot: TopologySnapshot,
+  )(implicit
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): FutureUnlessShutdown[Map[GroupRecipient, Set[Member]]] = {
+    val mediatorGroups = groupRecipients.collect { case MediatorGroupRecipient(group) =>
+      group
+    }.toSeq
+    if (mediatorGroups.isEmpty)
+      FutureUnlessShutdown.pure(Map.empty)
+    else
+      for {
+        groups <- topologyOrSequencingSnapshot
+          .mediatorGroupsOfAll(mediatorGroups)
+          .leftMap(_ => Seq.empty[MediatorGroup])
+          .merge
+      } yield asGroupRecipientsToMembers(groups)
+  }
+
+  def resolveSequencersOfSynchronizers(
+      groupRecipients: Set[GroupRecipient],
+      topologyOrSequencingSnapshot: TopologySnapshot,
+  )(implicit
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): FutureUnlessShutdown[Set[Member]] =
+    if (groupRecipients.contains(SequencersOfSynchronizer))
+      for {
+        sequencers <-
+          topologyOrSequencingSnapshot
+            .sequencerGroup()
+            .map(
+              _.map(group => (group.active ++ group.passive).toSet[Member])
+                .getOrElse(Set.empty[Member])
+            )
+      } yield sequencers
+    else FutureUnlessShutdown.pure(Set.empty)
+
   @nowarn("cat=deprecation")
   def resolveGroupsToMembers(
       groupRecipients: Set[GroupRecipient],
@@ -25,47 +85,22 @@ object GroupAddressResolver {
     if (groupRecipients.isEmpty) FutureUnlessShutdown.pure(Map.empty)
     else
       for {
-        mediatorGroupByMember <- {
-          val mediatorGroups = groupRecipients.collect { case MediatorGroupRecipient(group) =>
-            group
-          }.toSeq
-          if (mediatorGroups.isEmpty)
-            FutureUnlessShutdown.pure(Map.empty[GroupRecipient, Set[Member]])
-          else
-            for {
-              groups <- topologyOrSequencingSnapshot
-                .mediatorGroupsOfAll(mediatorGroups)
-                .leftMap(_ => Seq.empty[MediatorGroup])
-                .merge
-            } yield asGroupRecipientsToMembers(groups)
-        }
-        allRecipients <- {
+        resolvedMediatorAndSequencerGroupRecipients <-
+          resolveMediatorAndSequencerGroupRecipients(
+            groupRecipients,
+            topologyOrSequencingSnapshot,
+          )
+        allMembers <- {
           if (!groupRecipients.contains(AllMembersOfSynchronizer)) {
-            FutureUnlessShutdown.pure(Map.empty[GroupRecipient, Set[Member]])
+            FutureUnlessShutdown.pure(Map.empty)
           } else {
 
             topologyOrSequencingSnapshot
-              .allMembers()
+              .knownMembers()
               .map(members => Map((AllMembersOfSynchronizer: GroupRecipient, members)))
           }
         }
-
-        sequencersOfSynchronizer <- {
-          val useSequencersOfSynchronizer = groupRecipients.contains(SequencersOfSynchronizer)
-          if (useSequencersOfSynchronizer) {
-            for {
-              sequencers <-
-                topologyOrSequencingSnapshot
-                  .sequencerGroup()
-                  .map(
-                    _.map(group => (group.active ++ group.passive).toSet[Member])
-                      .getOrElse(Set.empty[Member])
-                  )
-            } yield Map((SequencersOfSynchronizer: GroupRecipient) -> sequencers)
-          } else
-            FutureUnlessShutdown.pure(Map.empty[GroupRecipient, Set[Member]])
-        }
-      } yield mediatorGroupByMember ++ sequencersOfSynchronizer ++ allRecipients
+      } yield resolvedMediatorAndSequencerGroupRecipients ++ allMembers
 
   def asGroupRecipientsToMembers(
       groups: Seq[MediatorGroup]
@@ -75,5 +110,5 @@ object GroupAddressResolver {
         MediatorGroupRecipient(group.index) -> (group.active ++ group.passive)
           .toSet[Member]
       )
-      .toMap[GroupRecipient, Set[Member]]
+      .toMap
 }

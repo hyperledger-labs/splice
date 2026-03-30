@@ -167,10 +167,10 @@ Connection has failed validation
 # During the LSU at upgrade time submissions time-out
 Submission timed out at
 
-# TODO(DACH-NY/canton-network-internal#4296) Remove once Canton fixes their metrics
-Instrument daml.mediator.response-latency.duration.seconds has recorded a negative value.
-
 # SV that joins late as part of the LSU test
 Missing successor information for the following sequencers.*sv4
+
+# We don't use the onboarding flag clearance atm.
+Skipping insertion of pending onboarding flag clearance operation as no party ID was provided
 
 # Make sure to have a trailing newline

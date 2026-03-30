@@ -64,7 +64,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       DefaultProcessingTimeouts.testing,
       storage,
       sequencerStore,
-      sequencingTimeLowerBoundExclusive = None,
+      lsuSequencingBounds = None,
       clock,
       sequencerId,
       crypto,
@@ -93,7 +93,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       val testSequencerWrapper =
         TestDatabaseSequencerWrapper(sequencer.asInstanceOf[DatabaseSequencer])
 
-      val requestSigner = RequestSigner(crypto, testedProtocolVersion, loggerFactory)
+      val requestSigner = RequestSigner(crypto, loggerFactory)
 
       for {
         signedRequest <- valueOrFail(
@@ -102,7 +102,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
               request,
               HashPurpose.SubmissionRequestSignature,
               crypto.currentSnapshotApproximation.futureValueUS,
-              Some(clock.now),
+              None, // not needed for unit tests; session signing keys disabled
             )
             .failOnShutdown
         )(s"Sign request")
@@ -159,6 +159,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
               snapshot,
               latestSequencerEventTimestamp = None,
               initialTopologyEffectiveTimestamp = None,
+              latestPendingTopologyTransactionTimestamp = None,
             )
           )
         )
@@ -178,7 +179,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
             request2,
             HashPurpose.SubmissionRequestSignature,
             crypto.currentSnapshotApproximation.futureValueUS,
-            Some(clock.now),
+            None, // not needed for unit tests; session signing keys disabled
           )
         )(s"Sign request")
         _ <- {

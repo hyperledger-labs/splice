@@ -9,7 +9,6 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.*
-import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader.SequencerAggregatedInfo
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.{CryptoConfig, ProcessingTimeout, TestingConfigInternal}
@@ -42,15 +41,15 @@ import com.digitalasset.canton.sequencing.client.{
 }
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnectionXPoolFactory,
-  SequencerConnectionValidation,
+  SequencerConnectionXPool,
   SequencerConnections,
 }
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersionCompatibility
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -82,7 +81,6 @@ class GrpcSynchronizerRegistry(
     replaySequencerConfig: AtomicReference[Option[ReplayConfig]],
     packageMetadataView: PackageMetadataView,
     metrics: SynchronizerAlias => ConnectedSynchronizerMetrics,
-    sequencerInfoLoader: SequencerInfoLoader,
     override protected val futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
 )(
@@ -142,174 +140,13 @@ class GrpcSynchronizerRegistry(
     Either[SynchronizerRegistryError, (SynchronizerHandle, SynchronizerConnectionConfig)]
   ] = {
 
-    val sequencerConnections: SequencerConnections =
-      config.sequencerConnections
-
-    val useNewConnectionPool = participantNodeParameters.sequencerClient.useNewConnectionPool
-
-    val synchronizerLoggerFactory = loggerFactory.append(
-      "synchronizerAlias",
-      config.synchronizerAlias.toString,
-    )
-
-    val connectionPoolFactory = new GrpcSequencerConnectionXPoolFactory(
-      clientProtocolVersions =
-        ProtocolVersionCompatibility.supportedProtocols(participantNodeParameters),
-      minimumProtocolVersion = participantNodeParameters.protocolConfig.minimumProtocolVersion,
-      authConfig = participantNodeParameters.sequencerClient.authToken,
-      member = participantId,
-      clock = clock,
-      crypto = cryptoApiProvider.crypto,
-      seedForRandomnessO = testingConfig.sequencerTransportSeed,
-      metrics = metrics(config.synchronizerAlias).sequencerClient.connectionPool,
-      metricsContext = MetricsContext.Empty,
-      futureSupervisor = futureSupervisor,
-      timeouts = timeouts,
-      loggerFactory = synchronizerLoggerFactory,
-    )
-
-    val connectionPoolE = connectionPoolFactory
-      .createFromOldConfig(
-        sequencerConnections = config.sequencerConnections,
-        expectedPSIdO = config.synchronizerId,
-        tracingConfig = participantNodeParameters.tracing,
-        name = if (useNewConnectionPool) "main" else "dummy",
-      )
-      .leftMap[SynchronizerRegistryError](error =>
-        SynchronizerRegistryError.SynchronizerRegistryInternalError.InvalidState(error.toString)
-      )
+    val connectionPoolE = getConnectionPool(config)
 
     val runE = for {
+      ret <- connectHandshakeGeneric(connectionPoolE, config)
       connectionPool <- connectionPoolE.toEitherT[FutureUnlessShutdown]
-      _ <-
-        if (useNewConnectionPool) {
-          connectionPool.start().leftMap {
-            case error: SequencerConnectionXPoolError.TimeoutError =>
-              SynchronizerRegistryError.ConnectionErrors.SynchronizerIsNotAvailable
-                .Error(config.synchronizerAlias, error.toString)
+      (info, updatedConfig) = ret
 
-            case error @ (_: SequencerConnectionXPoolError.ThresholdUnreachableError |
-                _: SequencerConnectionXPoolError.InvalidConfigurationError) =>
-              SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
-                .Error(error.toString)
-          }
-        } else EitherTUtil.unitUS[SynchronizerRegistryError]
-
-      info <-
-        if (useNewConnectionPool) {
-          // TODO:(i27260): Cleanup old code
-          // This builds a `SequencerAggregatedInfo` structure to satisfy further code that expects it to be present:
-          //
-          // - The updating of the configuration performed below needs `info.sequencerConnections.aliasToConnection`
-          //   to update the sequencer IDs.
-          // - The `SynchronizerRegistryHelpers` use `info.sequencerConnections` to initialize a
-          //   `SequencerConnectClient` and talk to the `SequencerConnectService` (see TODO(i27618)).
-          // - The `SequencerChannelClient` (used by Online Party Replication?) needs `info.sequencerConnections` and
-          //   `info.expectedSequencersO` to validate its configuration and initialize transports (it still uses transports).
-          //
-          // The connections used for building this information with the transport mechanism however depends on the
-          // validation mode (all, active only, etc.), whereas with the connection pool we only have the threshold-many
-          // connections that were needed to initialize the pool.
-          //
-          // It is unclear at this point whether this may lead to incorrect behaviors of those components.
-          val psid = connectionPool.physicalSynchronizerIdO.getOrElse(
-            ErrorUtil.invalidState(
-              "a successfully started connection pool must have the synchronizer ID defined"
-            )
-          )
-          val staticParameters = connectionPool.staticSynchronizerParametersO.getOrElse(
-            ErrorUtil.invalidState(
-              "a successfully started connection pool must have the static parameters defined"
-            )
-          )
-
-          NonEmpty.from(connectionPool.getAllConnections()) match {
-            case Some(allConnectionsNE) =>
-              val expectedSequencers = allConnectionsNE.map { connection =>
-                val name = connection.config.name
-                val alias = name.substring(0, name.lastIndexOf('-'))
-                val sequencerId = connection.attributes.sequencerId
-                SequencerAlias.tryCreate(alias) -> sequencerId
-              }.toMap
-              val aliasToSequencerConnection = expectedSequencers.map { case (alias, sequencerId) =>
-                val sequencerConnection = config.sequencerConnections.aliasToConnection
-                  .getOrElse(alias, ErrorUtil.invalidState(s"Unknown alias: $alias"))
-                alias -> sequencerConnection.withSequencerId(sequencerId)
-              }.toMap
-
-              SequencerConnections
-                .many(
-                  NonEmptyUtil.fromUnsafe(aliasToSequencerConnection.values.toSeq),
-                  config.sequencerConnections.sequencerTrustThreshold,
-                  config.sequencerConnections.sequencerLivenessMargin,
-                  config.sequencerConnections.submissionRequestAmplification,
-                  config.sequencerConnections.sequencerConnectionPoolDelays,
-                )
-                .leftMap(error =>
-                  SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
-                    .Error(error)
-                )
-                .map(newSequencerConnections =>
-                  SequencerAggregatedInfo(
-                    psid = psid,
-                    staticSynchronizerParameters = staticParameters,
-                    expectedSequencersO = Some(expectedSequencers),
-                    sequencerConnections = newSequencerConnections,
-                  )
-                )
-                .toEitherT[FutureUnlessShutdown]
-
-            case None => // This should not happen because the pool was successfully started
-              val error = SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
-                .Error("No validated connection found")
-              EitherT.leftT[FutureUnlessShutdown, SequencerAggregatedInfo](error)
-          }
-        } else
-          sequencerInfoLoader
-            .loadAndAggregateSequencerEndpoints(
-              config.synchronizerAlias,
-              config.synchronizerId,
-              sequencerConnections,
-              SequencerConnectionValidation.ThresholdActive,
-            )(traceContext, CloseContext(this))
-            .leftMap(SynchronizerRegistryError.fromSequencerInfoLoaderError)
-
-      _ <- CryptoHandshakeValidator
-        .validate(info.staticSynchronizerParameters, cryptoConfig)
-        .leftMap(
-          SynchronizerRegistryError.HandshakeErrors.SynchronizerCryptoHandshakeFailed.Error(_)
-        )
-        .toEitherT[FutureUnlessShutdown]
-
-      _ <- aliasManager
-        .processHandshake(config.synchronizerAlias, info.psid)
-        .leftMap(SynchronizerRegistryHelpers.fromSynchronizerAliasManagerError)
-
-      updatedConfigE = {
-        val connectionsWithSequencerId = info.sequencerConnections.aliasToConnection
-        val updatedConnections = config.sequencerConnections.aliasToConnection.map {
-          case (_, connection) =>
-            val potentiallyUpdatedConnection =
-              connectionsWithSequencerId.getOrElse(connection.sequencerAlias, connection)
-            val updatedConnection = potentiallyUpdatedConnection.sequencerId
-              .map(connection.withSequencerId)
-              .getOrElse(connection)
-            updatedConnection
-        }.toSeq
-        SequencerConnections
-          .many(
-            updatedConnections,
-            config.sequencerConnections.sequencerTrustThreshold,
-            config.sequencerConnections.sequencerLivenessMargin,
-            config.sequencerConnections.submissionRequestAmplification,
-            config.sequencerConnections.sequencerConnectionPoolDelays,
-          )
-          .map(connections => config.copy(sequencerConnections = connections))
-
-      }
-      updatedConfig <- EitherT
-        .fromEither[FutureUnlessShutdown](updatedConfigE)
-        .leftMap(SynchronizerRegistryInternalError.InvalidState(_))
       synchronizerHandle <- getSynchronizerHandle(
         config,
         synchronizerPredecessor,
@@ -346,6 +183,197 @@ class GrpcSynchronizerRegistry(
       case Success(UnlessShutdown.Outcome(Right(_))) =>
       // In case of error or exception, ensure the pool is closed
       case _ => connectionPoolE.foreach(_.close())
+    }.value
+  }
+
+  private def getConnectionPool(config: SynchronizerConnectionConfig)(implicit
+      traceContext: TraceContext
+  ): Either[SynchronizerRegistryError, SequencerConnectionXPool] = {
+    val synchronizerLoggerFactory = loggerFactory.append(
+      "synchronizerAlias",
+      config.synchronizerAlias.toString,
+    )
+
+    val connectionPoolFactory = new GrpcSequencerConnectionXPoolFactory(
+      clientProtocolVersions =
+        ProtocolVersionCompatibility.supportedProtocols(participantNodeParameters),
+      minimumProtocolVersion = participantNodeParameters.protocolConfig.minimumProtocolVersion,
+      authConfig = participantNodeParameters.sequencerClient.authToken,
+      keepAliveClientConfigO = participantNodeParameters.sequencerClient.keepAliveClient,
+      member = participantId,
+      clock = clock,
+      crypto = cryptoApiProvider.crypto,
+      seedForRandomnessO = testingConfig.sequencerTransportSeed,
+      metrics = metrics(config.synchronizerAlias).sequencerClient.connectionPool,
+      metricsContext = MetricsContext.Empty,
+      futureSupervisor = futureSupervisor,
+      timeouts = timeouts,
+      loggerFactory = synchronizerLoggerFactory,
+    )
+
+    connectionPoolFactory
+      .createFromOldConfig(
+        sequencerConnections = config.sequencerConnections,
+        expectedPsidO = config.synchronizerId,
+        tracingConfig = participantNodeParameters.tracing,
+        name = "main",
+      )
+      .leftMap[SynchronizerRegistryError](error =>
+        SynchronizerRegistryError.SynchronizerRegistryInternalError.InvalidState(error.toString)
+      )
+  }
+
+  private def connectHandshakeGeneric(
+      connectionPoolE: Either[SynchronizerRegistryError, SequencerConnectionXPool],
+      config: SynchronizerConnectionConfig,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[
+    FutureUnlessShutdown,
+    SynchronizerRegistryError,
+    (SequencerAggregatedInfo, SynchronizerConnectionConfig),
+  ] = {
+
+    for {
+      connectionPool <- connectionPoolE.toEitherT[FutureUnlessShutdown]
+      _ <- connectionPool.start().leftMap {
+        case error: SequencerConnectionXPoolError.TimeoutError =>
+          SynchronizerRegistryError.ConnectionErrors.SynchronizerIsNotAvailable
+            .Error(config.synchronizerAlias, error.toString)
+
+        case error @ (_: SequencerConnectionXPoolError.ThresholdUnreachableError |
+            _: SequencerConnectionXPoolError.InvalidConfigurationError) =>
+          SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
+            .Error(error.toString)
+      }
+
+      info <- {
+        // TODO:(i27260): Cleanup old code
+        // This builds a `SequencerAggregatedInfo` structure to satisfy further code that expects it to be present:
+        //
+        // - The updating of the configuration performed below needs `info.sequencerConnections.aliasToConnection`
+        //   to update the sequencer IDs.
+        // - The `SynchronizerRegistryHelpers` use `info.sequencerConnections` to initialize a
+        //   `SequencerConnectClient` and talk to the `SequencerConnectService` (see TODO(i27618)).
+        // - The `SequencerChannelClient` (used by Online Party Replication?) needs `info.sequencerConnections` and
+        //   `info.expectedSequencersO` to validate its configuration and initialize transports (it still uses transports).
+        //
+        // The connections used for building this information with the transport mechanism however depends on the
+        // validation mode (all, active only, etc.), whereas with the connection pool we only have the threshold-many
+        // connections that were needed to initialize the pool.
+        //
+        // It is unclear at this point whether this may lead to incorrect behaviors of those components.
+        val psid = connectionPool.physicalSynchronizerIdO.getOrElse(
+          ErrorUtil.invalidState(
+            "a successfully started connection pool must have the synchronizer ID defined"
+          )
+        )
+        val staticParameters = connectionPool.staticSynchronizerParametersO.getOrElse(
+          ErrorUtil.invalidState(
+            "a successfully started connection pool must have the static parameters defined"
+          )
+        )
+
+        NonEmpty.from(connectionPool.getAllConnections()) match {
+          case Some(allConnectionsNE) =>
+            val expectedSequencers = allConnectionsNE.map { connection =>
+              val name = connection.config.name
+              val alias = name.substring(0, name.lastIndexOf('-'))
+              val sequencerId = connection.attributes.sequencerId
+              SequencerAlias.tryCreate(alias) -> sequencerId
+            }.toMap
+            val aliasToSequencerConnection = expectedSequencers.map { case (alias, sequencerId) =>
+              val sequencerConnection = config.sequencerConnections.aliasToConnection
+                .getOrElse(alias, ErrorUtil.invalidState(s"Unknown alias: $alias"))
+              alias -> sequencerConnection.withSequencerId(sequencerId)
+            }.toMap
+
+            SequencerConnections
+              .many(
+                NonEmptyUtil.fromUnsafe(aliasToSequencerConnection.values.toSeq),
+                config.sequencerConnections.sequencerTrustThreshold,
+                config.sequencerConnections.sequencerLivenessMargin,
+                config.sequencerConnections.submissionRequestAmplification,
+                config.sequencerConnections.sequencerConnectionPoolDelays,
+              )
+              .leftMap(error =>
+                SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
+                  .Error(error)
+              )
+              .map(newSequencerConnections =>
+                SequencerAggregatedInfo(
+                  psid = psid,
+                  staticSynchronizerParameters = staticParameters,
+                  expectedSequencersO = Some(expectedSequencers),
+                  sequencerConnections = newSequencerConnections,
+                )
+              )
+              .toEitherT[FutureUnlessShutdown]
+
+          case None => // This should not happen because the pool was successfully started
+            val error = SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
+              .Error("No validated connection found")
+            EitherT.leftT[FutureUnlessShutdown, SequencerAggregatedInfo](error)
+        }
+      }
+
+      _ <- CryptoHandshakeValidator
+        .validate(info.staticSynchronizerParameters, cryptoConfig)
+        .leftMap(
+          SynchronizerRegistryError.HandshakeErrors.SynchronizerCryptoHandshakeFailed.Error(_)
+        )
+        .toEitherT[FutureUnlessShutdown]
+
+      _ <- aliasManager
+        .processHandshake(config.synchronizerAlias, info.psid)
+        .leftMap(SynchronizerRegistryHelpers.fromSynchronizerAliasManagerError)
+
+      updatedConfigE = {
+        val connectionsWithSequencerId = info.sequencerConnections.aliasToConnection
+        val updatedConnections = config.sequencerConnections.aliasToConnection.map {
+          case (_, connection) =>
+            val potentiallyUpdatedConnection =
+              connectionsWithSequencerId.getOrElse(connection.sequencerAlias, connection)
+            val updatedConnection = potentiallyUpdatedConnection.sequencerId
+              .map(connection.withSequencerId)
+              .getOrElse(connection)
+            updatedConnection
+        }.toSeq
+        SequencerConnections
+          .many(
+            updatedConnections,
+            config.sequencerConnections.sequencerTrustThreshold,
+            config.sequencerConnections.sequencerLivenessMargin,
+            config.sequencerConnections.submissionRequestAmplification,
+            config.sequencerConnections.sequencerConnectionPoolDelays,
+          )
+          .map(connections => config.copy(sequencerConnections = connections))
+      }
+
+      updatedConfig <- EitherT
+        .fromEither[FutureUnlessShutdown](updatedConfigE)
+        .leftMap(SynchronizerRegistryInternalError.InvalidState(_): SynchronizerRegistryError)
+
+      // create persistent state for the synchronizer if it does not exist yet
+      _ <- syncPersistentStateManager
+        .lookupOrCreatePersistentState(
+          info.psid,
+          info.staticSynchronizerParameters,
+        )
+    } yield (info, updatedConfig)
+  }
+
+  override def pureHandshake(
+      config: SynchronizerConnectionConfig
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[
+    Either[SynchronizerRegistryError, (SequencerAggregatedInfo, SynchronizerConnectionConfig)]
+  ] = {
+    val connectionPoolE = getConnectionPool(config)
+
+    connectHandshakeGeneric(connectionPoolE, config).thereafter { _ =>
+      connectionPoolE.foreach(_.close())
     }.value
   }
 }

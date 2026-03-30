@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.config
 
 import cats.syntax.option.*
 import com.daml.jwt.JwtTimestampLeeway
+import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.DeprecatedConfigUtils.DeprecatedFieldsFor
 import com.digitalasset.canton.config.RequireTypes.*
@@ -30,13 +31,13 @@ import com.digitalasset.canton.platform.config.{
 }
 import com.digitalasset.canton.platform.indexer.IndexerConfig
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.store.PrunableByTimeParameters
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 import monocle.macros.syntax.lens.*
 
-import java.nio.file.Path
 import scala.concurrent.duration.DurationInt
 
 /** Base for all participant configs - both local and remote */
@@ -107,18 +108,18 @@ final case class ParticipantNodeConfig(
   override def withDefaults(
       ports: Option[DefaultPorts]
   ): ParticipantNodeConfig =
-    ports.fold(this)(ports =>
-      this
-        .focus(_.ledgerApi.internalPort)
-        .modify(ports.ledgerApiPort.setDefaultPort)
-        .focus(_.adminApi.internalPort)
-        .modify(ports.participantAdminApiPort.setDefaultPort)
-        .focus(_.replication)
-        .modify(ReplicationConfig.withDefaultO(storage, _))
-        .focus(_.httpLedgerApi.internalPort)
-        .modify(ports.jsonLedgerApiPort.setDefaultPort)
-    )
-
+    ports
+      .fold(this)(ports =>
+        this
+          .focus(_.ledgerApi.internalPort)
+          .modify(ports.ledgerApiPort.setDefaultPort)
+          .focus(_.adminApi.internalPort)
+          .modify(ports.participantAdminApiPort.setDefaultPort)
+          .focus(_.httpLedgerApi.internalPort)
+          .modify(ports.jsonLedgerApiPort.setDefaultPort)
+      )
+      .focus(_.replication)
+      .modify(ReplicationConfig.withDefaultO(storage, _))
 }
 
 object ParticipantNodeConfig {
@@ -130,7 +131,17 @@ object ParticipantNodeConfig {
           "http-ledger-api.server",
           since = "3.4.0",
           to = Seq("http-ledger-api"),
-        )
+        ),
+        DeprecatedConfigUtils.MovedConfigPath(
+          "features.profileDir",
+          since = "3.5.0",
+          to = Seq("parameters.engine"),
+        ),
+        DeprecatedConfigUtils.MovedConfigPath(
+          "features.snapshotDir",
+          since = "3.5.0",
+          to = Seq("parameters.engine"),
+        ),
       )
     }
   }
@@ -138,17 +149,8 @@ object ParticipantNodeConfig {
   object DeprecatedImplicits extends ParticipantNodeConfigDeprecationsImplicits
 }
 
-/** Participant features configuration
-  *
-  * @param profileDir
-  *   path to the directory used for Daml profiling
-  * @param snapshotDir
-  *   path to the directory used for saving transaction tree snapshots
-  */
-final case class ParticipantFeaturesConfig(
-    profileDir: Option[Path] = None,
-    snapshotDir: Option[Path] = None,
-)
+/** Participant features configuration */
+final case class ParticipantFeaturesConfig()
 
 /** Configuration to connect the console to a participant running remotely.
   *
@@ -227,6 +229,8 @@ final case class LedgerApiServerConfig(
     ),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
     maxInboundMetadataSize: NonNegativeInt = ServerConfig.defaultMaxInboundMetadataSize,
+    maxConcurrentStreamsPerConnection: NonNegativeInt =
+      ServerConfig.defaultMaxConcurrentStreamsPerConnection,
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
     postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
     databaseConnectionTimeout: config.NonNegativeFiniteDuration =
@@ -348,6 +352,10 @@ object TestingTimeServiceConfig {
   * @param doNotAwaitOnCheckingIncomingCommitments
   *   Enable fully asynchronous checking of incoming commitments. This may result in some incoming
   *   commitments not being checked in case of crashes or HA failovers.
+  * @param commitmentAsynchronousInitialization
+  *   Enables asynchronous initialization of the ACS commitment processor. This speeds up
+  *   reconnection to a synchronizer at the expense of potentially increased memory and resource
+  *   consumption while the initialization is running in the background.
   * @param commitmentCheckpointInterval
   *   Checkpoint interval for commitments. Smaller intervals lead to less resource-intensive crash
   *   recovery, at the cost of more frequent DB writing of checkpoints. Regardless of this
@@ -400,17 +408,19 @@ final case class ParticipantNodeParameterConfig(
     watchdog: Option[WatchdogConfig] = None,
     packageMetadataView: PackageMetadataViewConfig = PackageMetadataViewConfig(),
     commandProgressTracker: CommandProgressTrackerConfig = CommandProgressTrackerConfig(),
-    unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig] = None,
+    alphaOnlinePartyReplicationSupport: Option[AlphaOnlinePartyReplicationConfig] = None,
     // TODO(#25344): check whether this should be removed
     automaticallyPerformLsu: Boolean = true,
     activationFrequencyForWarnAboutConsistencyChecks: Long = 1000,
     reassignmentsConfig: ReassignmentsConfig = ReassignmentsConfig(),
     doNotAwaitOnCheckingIncomingCommitments: Boolean = false,
+    commitmentAsynchronousInitialization: Boolean = false,
     commitmentCheckpointInterval: config.PositiveDurationSeconds =
       config.PositiveDurationSeconds.ofMinutes(1),
     commitmentMismatchDebugging: Boolean = false,
     commitmentProcessorNrAcsChangesBehindToTriggerCatchUp: Option[PositiveInt] = None,
     commitmentReduceParallelism: NonNegativeInt = NonNegativeInt.one,
+    commitmentUseDbSnapshotForParticipantLookup: Boolean = false,
     autoSyncProtocolFeatureFlags: Boolean = true,
     alphaMultiSynchronizerSupport: Boolean = false,
 ) extends LocalNodeParametersConfig
@@ -425,6 +435,7 @@ final case class ParticipantStoreConfig(
     pruningMetricUpdateInterval: Option[config.PositiveDurationSeconds] =
       config.PositiveDurationSeconds.ofHours(1L).some,
     journalPruning: JournalPruningConfig = JournalPruningConfig(),
+    safeToPruneCommitmentState: Option[SafeToPruneCommitmentState] = None,
 )
 
 /** Control background journal pruning
@@ -513,13 +524,15 @@ object ContractLoaderConfig {
   private val defaultMaxParallelism: PositiveInt = PositiveInt.tryCreate(5)
 }
 
-/** Parameters for the Online Party Replication (OPR) preview feature (unsafe for production)
+/** Parameters for the Online Party Replication (OnPR) alpha preview feature
   */
-final case class UnsafeOnlinePartyReplicationConfig(
-    testInterceptor: Option[UnsafeOnlinePartyReplicationConfig.TestInterceptor] = None
+final case class AlphaOnlinePartyReplicationConfig(
+    testInterceptor: Option[AlphaOnlinePartyReplicationConfig.TestInterceptor] = None,
+    unsafeSequencerChannelSupport: Boolean = false,
+    pauseSynchronizerIndexingDuringPartyReplication: Boolean = false,
 )
 
-object UnsafeOnlinePartyReplicationConfig {
+object AlphaOnlinePartyReplicationConfig {
 
   /** The PartyReplicator supports adding a test interceptor for manipulating behavior during tests.
     * This is used for delaying and/or dropping messages to verify the behavior in abnormal

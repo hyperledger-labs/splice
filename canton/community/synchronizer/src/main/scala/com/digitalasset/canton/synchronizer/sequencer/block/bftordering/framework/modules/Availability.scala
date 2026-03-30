@@ -21,7 +21,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   ProofOfAvailability,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.OrderedBlockForOutput
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
   MessageFrom,
   OrderingRequest,
@@ -42,6 +42,8 @@ object Availability {
   final case object NoOp extends Message[Nothing]
 
   final case object Start extends Message[Nothing]
+
+  final case object DelayedProposalResponse extends Message[Nothing]
 
   sealed trait RemoteProtocolMessage
       extends Message[Nothing]
@@ -92,6 +94,7 @@ object Availability {
         batchId: BatchId,
         epochNumber: EpochNumber,
         from: BftNodeId,
+        addedToStore: Boolean,
     ) extends LocalDissemination
 
     final case class RemoteBatchStoredSigned(
@@ -453,14 +456,14 @@ object Availability {
     final case class CreateProposal[E <: Env[E]](
         forBlock: BlockNumber,
         currentEpochNumber: EpochNumber,
-        currentOrderingTopology: OrderingTopology,
+        currentMembership: Membership,
         currentCryptoProvider: CryptoProvider[E],
         orderedBatchIds: Seq[BatchId] = Seq.empty,
     ) extends Consensus[E]
 
     final case class UpdateTopologyDuringStateTransfer[E <: Env[E]](
-        orderingTopology: OrderingTopology,
-        cryptoProvider: CryptoProvider[E],
+        currentMembership: Membership,
+        currentCryptoProvider: CryptoProvider[E],
     ) extends Consensus[E]
 
     final case class Ordered(batchIds: Seq[BatchId]) extends Consensus[Nothing]

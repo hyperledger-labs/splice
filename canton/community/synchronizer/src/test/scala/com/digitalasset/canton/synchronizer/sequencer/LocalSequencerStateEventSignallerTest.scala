@@ -3,13 +3,12 @@
 
 package com.digitalasset.canton.synchronizer.sequencer
 
-import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberId
 import com.digitalasset.canton.topology.{Member, ParticipantId}
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.apache.pekko.actor.ActorSystem
@@ -19,7 +18,6 @@ import org.scalatest.wordspec.FixtureAsyncWordSpec
 import org.scalatest.{Assertion, FutureOutcome}
 
 import java.util.concurrent.atomic.AtomicLong
-import scala.collection.immutable.SortedSet
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
@@ -81,14 +79,11 @@ class LocalSequencerStateEventSignallerTest
   "writer updates without subscribers don't block writer" in { env =>
     import env.*
 
+    (0 until 3001).toList.foreach(_ =>
+      signaller.notifyOfLocalWrite(WriteNotification.forMemberIds(NonEmpty(Set, aliceId)))
+    )
     for {
-      // write a number that will certainly exceed any local buffers the pekko stream operators may have
-      // the test here is just checking it doesn't deadlock
-      _ <- (0 until 3001).toList.parTraverse(_ =>
-        signaller.notifyOfLocalWrite(WriteNotification.Members(SortedSet(aliceId)))
-      )
-      // regardless of all of the prior events that were pummeled only a single signal is produced when subscribed
-      // what's past is prologue
+      // none of the previously produced signals are retained for future subscriptions
       aliceSignals <- PekkoUtil.runSupervised(
         signaller
           .readSignalsForMember(alice, aliceId)
@@ -99,7 +94,7 @@ class LocalSequencerStateEventSignallerTest
         errorLogMessagePrefix = "writer updates",
       )
     } yield {
-      aliceSignals should have size (2) // there is a one item buffer on both the source queue and broadcast hub
+      aliceSignals shouldBe empty
     }
   }
 
@@ -114,8 +109,10 @@ class LocalSequencerStateEventSignallerTest
         Source
           .tick(0.seconds, 100.millis, ())
           .take(numSignals.toLong)
-          .mapAsync(1)(_ =>
-            signaller.notifyOfLocalWrite(WriteNotification.Members(SortedSet(aliceId, bobId)))
+          .map(_ =>
+            signaller.notifyOfLocalWrite(
+              WriteNotification.forMemberIds(NonEmpty(Set, aliceId, bobId))
+            )
           )
           .toMat(Sink.ignore)(Keep.right),
         errorLogMessagePrefix = "notifier",
@@ -159,5 +156,4 @@ class LocalSequencerStateEventSignallerTest
       alice.size should be < bob.length
     }
   }
-
 }

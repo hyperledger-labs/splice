@@ -4,10 +4,11 @@
 package com.digitalasset.canton.integration.tests.multihostedparties
 
 import cats.syntax.parallel.*
+import com.digitalasset.canton.annotations.RollbackTest
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ConsoleCommandTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{BatchingConfig, ConsoleCommandTimeout}
 import com.digitalasset.canton.crypto.TestHash
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -24,6 +25,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus
+import com.digitalasset.canton.participant.config.AlphaOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.party.PartyReplicationTestInterceptorImpl
 import com.digitalasset.canton.participant.protocol.party.{
   PartyReplicationSourceParticipantProcessor,
@@ -80,7 +82,8 @@ sealed trait OnlinePartyReplicationParticipantProtocolTest
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1_S1M1
       .addConfigTransforms(
-        ConfigTransforms.unsafeEnableOnlinePartyReplication()*
+        ConfigTransforms
+          .enableAlphaOnlinePartyReplicationSupport(enableUnsafeSequencerChannelSupport = true)*
       )
       .withSetup { implicit env =>
         import env.*
@@ -163,7 +166,7 @@ sealed trait OnlinePartyReplicationParticipantProtocolTest
 
       // Wait for partyToParticipant mapping to become effective on the source participant via ledger api
       val partyToSourceParticipantEffectiveAtOffset = eventually() {
-        val offsetPartyAddedToTPO = (for {
+        val offsetPartyOnboardingOnTPO = (for {
           ptp <- sourceParticipant.ledger_api.updates.topology_transactions(
             completeAfter = PositiveInt.two,
             partyIds = Seq(alice),
@@ -171,14 +174,14 @@ sealed trait OnlinePartyReplicationParticipantProtocolTest
           )
           topologyEvent <- ptp.topologyTransaction.events
           offset = ptp.topologyTransaction.offset
-          partyAdded <- topologyEvent.event.participantAuthorizationAdded.toList
-        } yield (partyAdded, offset)).collect {
-          case (partyAdded, offset)
-              if partyAdded.participantId == targetParticipant.id.uid.toProtoPrimitive =>
+          partyOnboarding <- topologyEvent.event.participantAuthorizationOnboarding.toList
+        } yield (partyOnboarding, offset)).collect {
+          case (onboarding, offset)
+              if onboarding.participantId == targetParticipant.id.uid.toProtoPrimitive =>
             Offset.tryFromLong(offset)
         }.lastOption
-        offsetPartyAddedToTPO.nonEmpty shouldBe true
-        offsetPartyAddedToTPO.value
+        offsetPartyOnboardingOnTPO.nonEmpty shouldBe true
+        offsetPartyOnboardingOnTPO.value
       }
 
       // Run a ping to make sure the AcsInspection does not get upset about the timestamp at the end
@@ -258,6 +261,8 @@ sealed trait OnlinePartyReplicationParticipantProtocolTest
         noOpProgressAndCompletionCallback2,
         targetParticipant.underlying.value.sync.participantNodePersistentState,
         connectedSynchronizer,
+        AlphaOnlinePartyReplicationConfig(pauseSynchronizerIndexingDuringPartyReplication = true),
+        BatchingConfig(),
         futureSupervisor,
         exitOnFatalFailures = false,
         timeouts,
@@ -421,6 +426,7 @@ sealed trait OnlinePartyReplicationParticipantProtocolTest
 //   registerPlugin(new UseH2(loggerFactory))
 // }
 
+@RollbackTest
 final class OnlinePartyReplicationParticipantProtocolTestPostgres
     extends OnlinePartyReplicationParticipantProtocolTest {
   registerPlugin(new UsePostgres(loggerFactory))

@@ -29,7 +29,8 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.daml.lf.transaction.TransactionErrors.KeyInputError
+import com.digitalasset.daml.lf.transaction.LegacyContractStateMachine as ContractStateMachine
+import com.digitalasset.daml.lf.transaction.LegacyTransactionErrors.KeyInputError
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -57,7 +58,7 @@ trait TransactionTreeFactory {
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
-      keyResolver: LfKeyResolver,
+      keyResolver: ContractStateMachine.KeyResolver,
       maxSequencingTime: CantonTimestamp,
       validatePackageVettings: Boolean,
   )(implicit
@@ -82,7 +83,7 @@ trait TransactionTreeFactory {
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
       rbContext: RollbackContext,
-      keyResolver: LfKeyResolver,
+      keyResolver: ContractStateMachine.KeyResolver,
       absolutizer: ContractIdAbsolutizer,
   )(implicit traceContext: TraceContext): EitherT[
     FutureUnlessShutdown,

@@ -19,6 +19,7 @@ import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerErrorGroup
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
+import com.digitalasset.canton.protocol.messages.LsuSequencingTestMessage
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
   MessageId,
@@ -68,6 +69,23 @@ object SequencerError extends SequencerErrorGroup {
           val ack = signedAcknowledgeRequest.content
           s"Member ${ack.member} has acknowledged the timestamp ${ack.timestamp} but signature from ${signedAcknowledgeRequest.timestampOfSigningKey} failed to be verified at $latestValidTimestamp: $error"
         })
+        with LogOnCreation {
+      def logError(): Unit = logWithContext()(logger)
+    }
+  }
+
+  @Explanation("""
+                 |This error indicates that the node has detected an invalid signature on a LsuSequencingTestMessage.
+                 |This most likely indicates that the request is bogus and has been created by a malicious sequencer.
+                 |So it will not get processed.
+                 |""")
+  object InvalidLsuSequencingTestSignature
+      extends AlarmErrorCode("INVALID_LSU_SEQUENCING_TEST_MESSAGE_SIGNATURE") {
+    final case class Error(
+        lsuSequencingTestMessage: LsuSequencingTestMessage,
+        error: SignatureCheckError,
+    )(implicit logger: ErrorLoggingContext)
+        extends Alarm(s"Message $lsuSequencingTestMessage failed signature verification: $error")
         with LogOnCreation {
       def logError(): Unit = logWithContext()(logger)
     }
@@ -304,10 +322,8 @@ object SequencerError extends SequencerErrorGroup {
     """This error indicates that the sequencer has already been initialized and cannot be used for a synchronizer upgrade."""
   )
   @Resolution(
-    """Verify that the sequencer has been properly configured with logical upgrade predecessor information for the new sequencer.
-    | Currently it is expected that a config option `canton.sequencers.<sequencer>.parameters.sequencing-time-lower-bound-exclusive`
-    | has been specified and is set to the announced LSU upgrade time.
-    | It may be necessary to start with a fresh sequencer node for the upgrade to succeed."""
+    """Verify that the sequencer has been properly initialized with the topology state export from the predecessor
+      | and the node's configuration contains `<node>.init.auto-init = false` for the new sequencer."""
   )
   object SequencerPastUpgradeTime
       extends ErrorCode(
@@ -321,6 +337,25 @@ object SequencerError extends SequencerErrorGroup {
     ) extends CantonBaseError.Impl(
           cause =
             s"Synchronizer $synchronizerId is currently at $currentTime which is past the upgrade time $upgradeTime"
+        )
+        with LsuSequencerError
+  }
+
+  @Explanation(
+    """This error indicates that the payload of the traffic control state doesn't match the current synchronizer upgrade."""
+  )
+  @Resolution(
+    """Verify that the correct traffic control state is being used. See the error message for details."""
+  )
+  object InvalidTrafficState
+      extends ErrorCode(
+        "SEQUENCER_LSU_INVALID_TRAFFIC_STATE",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      ) {
+    final case class Error(
+        errorMessage: String
+    ) extends CantonBaseError.Impl(
+          cause = s"Invalid traffic control state: $errorMessage"
         )
         with LsuSequencerError
   }
@@ -346,16 +381,16 @@ object SequencerError extends SequencerErrorGroup {
   }
 
   @Explanation(
-    """This error indicates that sequencer is not aware of an ongoing logical upgrade on the synchronizer."""
+    """This error indicates that sequencer is not aware of an announced LSU on the synchronizer."""
   )
   @Resolution(
-    """Either there's no ongoing upgrade or sequencer is not caught up with processing on the synchronizer.
+    """Either there is no LSU announced or sequencer is not caught up with processing on the synchronizer.
       | Need to make sure that has indeed been announced and became effective
       | and that sequencer has caught up past it becoming effective. Can be retried safely."""
   )
-  object NoOngoingLsu
+  object NoLsuAnnounced
       extends ErrorCode(
-        "SEQUENCER_LSU_NO_ONGOING",
+        "SEQUENCER_NO_LSU_ANNOUNCED",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Error(

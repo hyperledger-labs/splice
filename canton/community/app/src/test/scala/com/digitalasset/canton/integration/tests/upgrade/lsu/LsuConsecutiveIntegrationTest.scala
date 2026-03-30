@@ -3,9 +3,6 @@
 
 package com.digitalasset.canton.integration.tests.upgrade.lsu
 
-import com.digitalasset.canton.admin.api.client.data.SynchronizerConnectionConfig
-import com.digitalasset.canton.config
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.*
@@ -15,8 +12,9 @@ import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
 import com.digitalasset.canton.integration.tests.upgrade.lsu.LsuBase.Fixture
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.version.ProtocolVersion
 
 import java.time.Duration
@@ -24,7 +22,7 @@ import scala.annotation.nowarn
 
 /*
  * This test is used to test the consecutive LSUs.
- * The consecutive PSIds are:
+ * The consecutive psids are:
  *
  * - (lsid, 0, tested protocol version)
  * - (lsid, 1, pv=dev)
@@ -84,25 +82,12 @@ final class LsuConsecutiveIntegrationTest extends LsuBase {
 
         participants.local.start()
 
-        participants.all.synchronizers.connect(
-          SynchronizerConnectionConfig(
-            synchronizerAlias = daName,
-            sequencerConnections = sequencer1,
-            timeTracker = SynchronizerTimeTrackerConfig(observationLatency =
-              config.NonNegativeFiniteDuration.Zero
-            ),
-          )
-        )
+        participants.all.synchronizers.connect(defaultSynchronizerConnectionConfig())
+
+        setDefaultsDynamicSynchronizerParameters(daId, synchronizerOwners1)
 
         participants.all.dars.upload(CantonExamplesPath)
         participant1.health.ping(participant2)
-
-        synchronizerOwners1.foreach(
-          _.topology.synchronizer_parameters.propose_update(
-            daId,
-            _.copy(reconciliationInterval = config.PositiveDurationSeconds.ofSeconds(1)),
-          )
-        )
       }
 
   "LSU" should {
@@ -110,7 +95,7 @@ final class LsuConsecutiveIntegrationTest extends LsuBase {
       import env.*
 
       val fixture1 = Fixture(
-        currentPSId = daId,
+        currentPsid = daId,
         upgradeTime = upgradeTime1,
         oldSynchronizerNodes = SynchronizerNodes(Seq(sequencer1), Seq(mediator1)),
         newSynchronizerNodes = SynchronizerNodes(Seq(sequencer2), Seq(mediator2)),
@@ -121,7 +106,7 @@ final class LsuConsecutiveIntegrationTest extends LsuBase {
       )
 
       val fixture2 = Fixture(
-        currentPSId = fixture1.newPSId,
+        currentPsid = fixture1.newPsid,
         upgradeTime = upgradeTime2,
         oldSynchronizerNodes = fixture1.newSynchronizerNodes,
         newSynchronizerNodes = SynchronizerNodes(Seq(sequencer3), Seq(mediator3)),
@@ -136,7 +121,7 @@ final class LsuConsecutiveIntegrationTest extends LsuBase {
 
       // Perform the two LSUs
       Seq(fixture1, fixture2).foreach { fixture =>
-        logger.info(s"Preparing to do LSU from ${fixture.currentPSId} to ${fixture.newPSId}")
+        logger.info(s"Preparing to do LSU from ${fixture.currentPsid} to ${fixture.newPsid}")
 
         IouSyntax.createIou(participant2)(bank, alice).discard
 
@@ -145,18 +130,18 @@ final class LsuConsecutiveIntegrationTest extends LsuBase {
         performSynchronizerNodesLsu(fixture)
 
         environment.simClock.value.advanceTo(fixture.upgradeTime.immediateSuccessor)
-
+        transferTraffic(Some(fixture))
         eventually() {
-          participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
+          environment.simClock.value.advance(Duration.ofSeconds(1))
+          participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe true
         }
 
         fixture.oldSynchronizerNodes.all.stop()
 
-        environment.simClock.value.advance(Duration.ofSeconds(1))
-
         waitForTargetTimeOnSequencer(
           fixture.newSynchronizerNodes.sequencers.loneElement,
           environment.clock.now,
+          logger,
         )
 
         IouSyntax.createIou(participant2)(bank, alice).discard

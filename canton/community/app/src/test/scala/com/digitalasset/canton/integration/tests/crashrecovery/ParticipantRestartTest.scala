@@ -23,6 +23,8 @@ import com.daml.ledger.api.v2.transaction_filter.{
 import com.daml.ledger.api.v2.value.Value
 import com.daml.ledger.javaapi as javab
 import com.daml.ledger.javaapi.data.{Command, Transaction}
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nonempty.NonEmpty
 import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.Reliability.{
@@ -40,6 +42,7 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
   UpdateWrapper,
 }
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -83,10 +86,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.inspection.{
-  JournalGarbageCollectorControl,
-  SyncStateInspection,
-}
+import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.admin.workflows.java.canton.internal.ping.Ping
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
@@ -94,7 +94,6 @@ import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors
 import com.digitalasset.canton.participant.protocol.{RequestJournal, TransactionProcessor}
 import com.digitalasset.canton.participant.pruning.PruningProcessor
-import com.digitalasset.canton.participant.store.memory.PackageMetadataView
 import com.digitalasset.canton.participant.store.{
   ParticipantNodePersistentState,
   StoredSynchronizerConnectionConfig,
@@ -129,6 +128,7 @@ import com.digitalasset.canton.time.{PositiveSeconds, SimClock}
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{
   KnownPhysicalSynchronizerId,
+  Party,
   PartyId,
   PhysicalSynchronizerId,
   SynchronizerId,
@@ -392,6 +392,7 @@ abstract class ParticipantRestartTest
             BatchingConfig(),
             loggerFactory,
             NoReportingTracerProvider,
+            new ExecutorServiceMetrics(NoOpMetricsFactory),
           )
           .valueOrFailShutdown("create pure crypto")
       )
@@ -455,7 +456,6 @@ abstract class ParticipantRestartTest
             (staticSynchronizerParameters: StaticSynchronizerParameters) =>
               SynchronizerCrypto(crypto, staticSynchronizerParameters),
             env.environment.clock,
-            mock[PackageMetadataView],
             Eval.now(pnps.ledgerApiStore),
             Eval.now(pnps.contractStore),
             ParticipantTestMetrics,
@@ -480,29 +480,32 @@ abstract class ParticipantRestartTest
     val synchronizerConnectionConfigStore = mock[SynchronizerConnectionConfigStore]
     when(synchronizerConnectionConfigStore.getAllStatusesFor(any[SynchronizerId]))
       .thenReturn(Right(NonEmpty.mk(Seq, SynchronizerConnectionConfigStore.Active)))
-    when(synchronizerConnectionConfigStore.getActive(any[SynchronizerId])).thenReturn(
-      // StoredSynchronizerConnectionConfig is final and cannot be mocked.
-      // Therefore, we need to construct the full object, just to "mock" configuredPSId.
-      Right(
-        StoredSynchronizerConnectionConfig(
-          SynchronizerConnectionConfig(
-            synchronizerAlias = daName,
-            sequencerConnections = SequencerConnections.single(
-              GrpcSequencerConnection(
-                NonEmpty(Seq, Endpoint("not-relevant", Port.tryCreate(1))),
-                transportSecurity = false,
-                customTrustCertificates = None,
-                sequencerAlias = SequencerAlias.tryCreate("not used"),
-                sequencerId = None,
-              )
-            ),
+
+    // StoredSynchronizerConnectionConfig is final and cannot be mocked.
+    // Therefore, we need to construct the full object, just to "mock" configuredPsid.
+    val activeSynchronizer =
+      StoredSynchronizerConnectionConfig(
+        SynchronizerConnectionConfig(
+          synchronizerAlias = daName,
+          sequencerConnections = SequencerConnections.single(
+            GrpcSequencerConnection(
+              NonEmpty(Seq, Endpoint("not-relevant", Port.tryCreate(1))),
+              transportSecurity = false,
+              customTrustCertificates = None,
+              sequencerAlias = SequencerAlias.tryCreate("not used"),
+              sequencerId = None,
+            )
           ),
-          status = SynchronizerConnectionConfigStore.Active,
-          configuredPSId = KnownPhysicalSynchronizerId(daId), // this is the relevant field
-          predecessor = None,
-        )
+        ),
+        status = SynchronizerConnectionConfigStore.Active,
+        configuredPsid = KnownPhysicalSynchronizerId(daId), // this is the relevant field
+        predecessor = None,
       )
-    )
+    when(synchronizerConnectionConfigStore.getActive(any[SynchronizerId]))
+      .thenReturn(Right(activeSynchronizer))
+    when(synchronizerConnectionConfigStore.getAllFor(any[SynchronizerId]))
+      .thenReturn(Right(NonEmpty.mk(Seq, activeSynchronizer)))
+
     val aliasResolution = mock[SynchronizerAliasResolution]
     when(aliasResolution.logicalSynchronizerIds).thenReturn(Set(daId.logical))
     when(synchronizerConnectionConfigStore.aliasResolution).thenReturn(aliasResolution)
@@ -541,7 +544,6 @@ abstract class ParticipantRestartTest
       Eval.now(participantNodePersistentState),
       mock[SynchronizerConnectionConfigStore],
       timeouts,
-      JournalGarbageCollectorControl.NoOp,
       mock[ConnectedSynchronizersLookup],
       mock[SyncCryptoApiParticipantProvider],
       participant.id,
@@ -637,7 +639,7 @@ class ParticipantRestartCausalityIntegrationTest extends ParticipantRestartTest 
   }
 
   def reassign(
-      bob: PartyId,
+      bob: Party,
       obs: List[PartyId],
       pkg: String,
       participantBob: ParticipantReference,
@@ -710,24 +712,24 @@ class ParticipantRestartCausalityIntegrationTest extends ParticipantRestartTest 
     val participantAlice = participant1
     val participantBob = participant2
 
-    val alice = participantAlice.parties.enable(
+    val alice = participantAlice.parties.testing.enable(
       "Alice",
       synchronizeParticipants = Seq(participantBob),
       synchronizer = daName,
     )
-    participantAlice.parties.enable(
-      "Alice",
+    participantAlice.parties.testing.also_enable(
+      alice,
       synchronizeParticipants = Seq(participantBob),
       synchronizer = acmeName,
     )
 
-    val bob = participantBob.parties.enable(
+    val bob = participantBob.parties.testing.enable(
       "Bob",
       synchronizeParticipants = Seq(participantAlice),
       synchronizer = daName,
     )
-    participantBob.parties.enable(
-      "Bob",
+    participantBob.parties.testing.also_enable(
+      bob,
       synchronizeParticipants = Seq(participantAlice),
       synchronizer = acmeName,
     )
@@ -786,24 +788,24 @@ class ParticipantRestartCausalityIntegrationTest extends ParticipantRestartTest 
     val participantBob = participant2
 
     val alice =
-      participantAlice.parties.enable(
+      participantAlice.parties.testing.enable(
         "Alice",
         synchronizeParticipants = Seq(participantBob),
         synchronizer = daName,
       )
-    participantAlice.parties.enable(
-      "Alice",
+    participantAlice.parties.testing.also_enable(
+      alice,
       synchronizeParticipants = Seq(participantBob),
       synchronizer = acmeName,
     )
 
-    val bob = participantBob.parties.enable(
+    val bob = participantBob.parties.testing.enable(
       "Bob",
       synchronizeParticipants = Seq(participantAlice),
       synchronizer = daName,
     )
-    participantBob.parties.enable(
-      "Bob",
+    participantBob.parties.testing.also_enable(
+      bob,
       synchronizeParticipants = Seq(participantAlice),
       synchronizer = acmeName,
     )
@@ -1005,7 +1007,7 @@ class ParticipantRestartRealClockIntegrationTest extends ParticipantRestartTest 
 
     // Use Alice instead of the P1 admin party at least until #16073 is fixed and the ledger api sees
     // participant admin parties.
-    val alice = participant1.parties.enable(
+    val alice = participant1.parties.testing.enable(
       "Alice",
       synchronizeParticipants = Nil,
       synchronizer = daName,
@@ -1080,7 +1082,7 @@ class ParticipantRestartRealClockIntegrationTest extends ParticipantRestartTest 
     assertActiveContractsMatchBetweenCantonAndLedgerApiServer(participant1)
   }
 
-  "successfully restart during a bong" taggedAs (
+  "successfully restart during a bong" taggedAs
     ReliabilityTest(
       Component("Bong application", "connected to single non-replicated participant"),
       AdverseScenario(
@@ -1092,112 +1094,111 @@ class ParticipantRestartRealClockIntegrationTest extends ParticipantRestartTest 
         action = "retries on timeouts and connection issues",
       ),
       outcome = "bong can progress whenever the participant is running",
-    )
-  ) in { implicit env =>
-    import env.*
+    ) in { implicit env =>
+      import env.*
 
-    console.set_command_timeout(
-      NonNegativeDuration.tryFromDuration(console.command_timeout.duration.mul(2))
-    )
-
-    startSynchronizers(Seq(EnvironmentDefinition.S1M1))
-
-    val participant1 = startAndGet("participant1")
-    val participant2 = startAndGet("participant2")
-
-    connectToDa(participant1)
-    connectToDa(participant2)
-
-    val stateInspection1 = stateInspectionFor(participant1)
-    val stateInspection2 = stateInspectionFor(participant2)
-
-    val p1_count = grabCountsRemote(daName, stateInspection1)
-    val p2_count = grabCountsRemote(daName, stateInspection2)
-
-    val levels: Int = 6
-    val restartF = Future {
-      val before = poll(40.seconds, 10.milliseconds) {
-        val p1_count2 = grabCountsRemote(daName, stateInspection1)
-        // wait until a quarter of the levels have been dealt with
-        assert(
-          p1_count2.acceptedTransactionCount - p1_count.acceptedTransactionCount >= math
-            .pow(2, (levels + 1d) / 4),
-          s"A quarter of levels have not yet been dealt with",
-        )
-        // make sure the bong hasn't finished
-        assert(
-          p1_count2.acceptedTransactionCount - p1_count.acceptedTransactionCount <= 3 * math
-            .pow(2, (levels + 1d) / 4),
-          s"Bong almost finished",
-        )
-        p1_count2.pcsCount
-      }
-
-      logger.info(s"Restarting $participant1 at pcs count $before")
-      stopAndRestart(participant1)
-      val afterRestartTs = Instant.now()
-      logger.info(s"After restart time chosen: $afterRestartTs")
-      val after = grabCountsRemote(daName, stateInspection1).pcsCount
-
-      logger.info(s"After restart, $participant1 has pcs count $after")
-
-      (before, after, afterRestartTs)
-    }
-
-    val bongF = Future {
-      participant2.testing.bong(
-        targets = Set(participant1.id, participant2.id),
-        validators = Set(participant1.id),
-        levels = levels,
-        timeout = 120.seconds,
+      console.set_command_timeout(
+        NonNegativeDuration.tryFromDuration(console.command_timeout.duration.mul(2))
       )
-    }
 
-    val patience = defaultPatience.copy(timeout = 180.seconds)
-    bongF.futureValue(patience, Position.here)
-    val (contractsBeforeRestart, contractsAfterRestart, afterRestartTs) =
-      restartF.futureValue(patience, Position.here)
+      startSynchronizers(Seq(EnvironmentDefinition.S1M1))
 
-    val bongCounts = IntegrationTestUtilities.expectedGrabbedCountsForBong(levels, validators = 1)
-    assert(
-      contractsBeforeRestart <= contractsAfterRestart,
-      s"More contracts found before restart than after restart",
-    )
-    assert(
-      contractsAfterRestart - p1_count.pcsCount <= bongCounts.pcsCount - 10,
-      s"Restart did not happen in the middle of the bong",
-    )
+      val participant1 = startAndGet("participant1")
+      val participant2 = startAndGet("participant2")
 
-    eventually(2.minutes) {
-      val limit = (math.pow(2, levels + 2d) + 200).toInt
-      val p1_count2 = grabCountsRemote(daName, stateInspection1, limit)
-      val p2_count2 = grabCountsRemote(daName, stateInspection2, limit)
-      assertResult(
-        p1_count.plus(bongCounts),
-        s"For p1: Initial count + bong count should be the final count",
-      )(p1_count2)
-      assertResult(
-        p2_count.plus(bongCounts),
-        s"For p2: Initial count + bong count should be the final count",
-      )(p2_count2)
-      // and final bong got archived
-      stateInspection1
-        .findContracts(daName, None, None, filterTemplate = Some("^Canton.Internal.Bong"), 100)
-        .filter(_._1) shouldBe empty
-    }
+      connectToDa(participant1)
+      connectToDa(participant2)
 
-    eventually(20.seconds) {
-      val optSafeTs = stateInspection1.noOutstandingCommitmentsTs(daName, CantonTimestamp.now())
-      if (!optSafeTs.exists(_.toInstant > afterRestartTs))
-        fail(s"Safe pruning point $optSafeTs before $afterRestartTs")
-      else {
-        logger.info(s"Safe pruning point $optSafeTs moved after $afterRestartTs")
+      val stateInspection1 = stateInspectionFor(participant1)
+      val stateInspection2 = stateInspectionFor(participant2)
+
+      val p1_count = grabCountsRemote(daName, stateInspection1)
+      val p2_count = grabCountsRemote(daName, stateInspection2)
+
+      val levels: Int = 6
+      val restartF = Future {
+        val before = poll(40.seconds, 10.milliseconds) {
+          val p1_count2 = grabCountsRemote(daName, stateInspection1)
+          // wait until a quarter of the levels have been dealt with
+          assert(
+            p1_count2.acceptedTransactionCount - p1_count.acceptedTransactionCount >= math
+              .pow(2, (levels + 1d) / 4),
+            s"A quarter of levels have not yet been dealt with",
+          )
+          // make sure the bong hasn't finished
+          assert(
+            p1_count2.acceptedTransactionCount - p1_count.acceptedTransactionCount <= 3 * math
+              .pow(2, (levels + 1d) / 4),
+            s"Bong almost finished",
+          )
+          p1_count2.pcsCount
+        }
+
+        logger.info(s"Restarting $participant1 at pcs count $before")
+        stopAndRestart(participant1)
+        val afterRestartTs = Instant.now()
+        logger.info(s"After restart time chosen: $afterRestartTs")
+        val after = grabCountsRemote(daName, stateInspection1).pcsCount
+
+        logger.info(s"After restart, $participant1 has pcs count $after")
+
+        (before, after, afterRestartTs)
       }
-    }
 
-    assertActiveContractsMatchBetweenCantonAndLedgerApiServer(participant1, stateInspection1)
-    assertActiveContractsMatchBetweenCantonAndLedgerApiServer(participant2, stateInspection2)
-  }
+      val bongF = Future {
+        participant2.testing.bong(
+          targets = Set(participant1.id, participant2.id),
+          validators = Set(participant1.id),
+          levels = levels,
+          timeout = 120.seconds,
+        )
+      }
+
+      val patience = defaultPatience.copy(timeout = 180.seconds)
+      bongF.futureValue(patience, Position.here)
+      val (contractsBeforeRestart, contractsAfterRestart, afterRestartTs) =
+        restartF.futureValue(patience, Position.here)
+
+      val bongCounts = IntegrationTestUtilities.expectedGrabbedCountsForBong(levels, validators = 1)
+      assert(
+        contractsBeforeRestart <= contractsAfterRestart,
+        s"More contracts found before restart than after restart",
+      )
+      assert(
+        contractsAfterRestart - p1_count.pcsCount <= bongCounts.pcsCount - 10,
+        s"Restart did not happen in the middle of the bong",
+      )
+
+      eventually(2.minutes) {
+        val limit = (math.pow(2, levels + 2d) + 200).toInt
+        val p1_count2 = grabCountsRemote(daName, stateInspection1, limit)
+        val p2_count2 = grabCountsRemote(daName, stateInspection2, limit)
+        assertResult(
+          p1_count.plus(bongCounts),
+          s"For p1: Initial count + bong count should be the final count",
+        )(p1_count2)
+        assertResult(
+          p2_count.plus(bongCounts),
+          s"For p2: Initial count + bong count should be the final count",
+        )(p2_count2)
+        // and final bong got archived
+        stateInspection1
+          .findContracts(daName, None, None, filterTemplate = Some("^Canton.Internal.Bong"), 100)
+          .filter(_._1) shouldBe empty
+      }
+
+      eventually(20.seconds) {
+        val optSafeTs = stateInspection1.noOutstandingCommitmentsTs(daName, CantonTimestamp.now())
+        if (!optSafeTs.exists(_.toInstant > afterRestartTs))
+          fail(s"Safe pruning point $optSafeTs before $afterRestartTs")
+        else {
+          logger.info(s"Safe pruning point $optSafeTs moved after $afterRestartTs")
+        }
+      }
+
+      assertActiveContractsMatchBetweenCantonAndLedgerApiServer(participant1, stateInspection1)
+      assertActiveContractsMatchBetweenCantonAndLedgerApiServer(participant2, stateInspection2)
+    }
 
   "restart with inflight validation requests" in { implicit env =>
     import env.*
@@ -1310,23 +1311,23 @@ class ParticipantRestartRealClockIntegrationTest extends ParticipantRestartTest 
     val stateInspection1 = stateInspectionFor(participant1)
     val participantBob = participant2
 
-    val alice = participant1.parties.enable(
+    val alice = participant1.parties.testing.enable(
       "Alice",
       synchronizeParticipants = Seq(participantBob),
       synchronizer = daName,
     )
-    participant1.parties.enable(
-      "Alice",
+    participant1.parties.testing.also_enable(
+      alice,
       synchronizeParticipants = Seq(participantBob),
       synchronizer = acmeName,
     )
-    val bob = participantBob.parties.enable(
+    val bob = participantBob.parties.testing.enable(
       "Bob",
       synchronizeParticipants = Seq(participant1),
       synchronizer = daName,
     )
-    participantBob.parties.enable(
-      "Bob",
+    participantBob.parties.testing.also_enable(
+      bob,
       synchronizeParticipants = Seq(participant1),
       synchronizer = acmeName,
     )
@@ -1400,26 +1401,26 @@ class ParticipantRestartRealClockIntegrationTest extends ParticipantRestartTest 
     val participantAlice = participant1
     val participantBob = participant2
 
-    val alice = participantAlice.parties.enable(
+    val alice = participantAlice.parties.testing.enable(
       "Alice",
       synchronizeParticipants = Seq(participantBob),
       synchronizer = daName,
     )
-    participantAlice.parties.enable(
-      "Alice",
+    participantAlice.parties.testing.also_enable(
+      alice,
       synchronizeParticipants = Seq(participantBob),
       synchronizer = acmeName,
     )
     val participantAliceId =
       participantAlice.id // Do not inline into policy because this internally performs a GRPC call
 
-    val bob = participantBob.parties.enable(
+    val bob = participantBob.parties.testing.enable(
       "Bob",
       synchronizeParticipants = Seq(participantAlice),
       synchronizer = daName,
     )
-    participantBob.parties.enable(
-      "Bob",
+    participantBob.parties.testing.also_enable(
+      bob,
       synchronizeParticipants = Seq(participantAlice),
       synchronizer = acmeName,
     )
@@ -1497,7 +1498,7 @@ class ParticipantRestartRealClockIntegrationTest extends ParticipantRestartTest 
         .incomplete_unassigned_of_party(bob)
 
       withClue("there should be exactly one pending reassignment") {
-        incompleteUnassigned should have length (1)
+        incompleteUnassigned should have length 1
       }
 
       withClue("assignment should succeed") {
@@ -1562,6 +1563,8 @@ abstract class ParticipantRestartStaticTimeIntegrationTestBase(
     EnvironmentDefinition.P2S1M1_Manual
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
+        // enabling retries to be on the safe side
+        ConfigTransforms.setPingRetries(true),
         ProgrammableSequencer.configOverride(this.getClass.toString, loggerFactory),
         // Set a small request size for the participant so that the participant's sequencer client refuses to
         // send big requests to the sequencer and thus the participant can produce a rejection event
@@ -1860,7 +1863,7 @@ abstract class ParticipantRestartStaticTimeIntegrationTestBase(
     val participant1 = startAndGet("participant1")
     connectToDa(participant1)
     participant1.dars.upload(CantonExamplesPath)
-    val alice = participant1.parties.enable("Alice", synchronizeParticipants = Nil)
+    val alice = participant1.parties.testing.enable("Alice", synchronizeParticipants = Nil)
     val participant1Id =
       participant1.id // Do not inline into the sequencer policy because this call has side effects
 
@@ -2033,7 +2036,7 @@ abstract class ParticipantRestartStaticTimeIntegrationTestBase(
         SendDecision.Process
     })
 
-    val severin = participant1.parties.enable("Severin", synchronizeParticipants = Nil)
+    val severin = participant1.parties.testing.enable("Severin", synchronizeParticipants = Nil)
 
     val semaphore = new Semaphore(1)
     val totalSubmissions = 6
@@ -2155,9 +2158,11 @@ abstract class ParticipantRestartStaticTimeIntegrationTestBase(
   }
 }
 
+@UnstableTest // TODO(#19922)
 class ParticipantRestartStaticTimeIntegrationTest
     extends ParticipantRestartStaticTimeIntegrationTestBase
 
+@UnstableTest // TODO(#30408)
 class ParticipantRestartStaticTimeReassignmentIntegrationTest
     extends ParticipantRestartStaticTimeIntegrationTestBase(alphaMultiSynchronizerSupport = true)
 
@@ -2194,11 +2199,11 @@ class ParticipantRestartContractKeyIntegrationTest extends ParticipantRestartTes
 
       participants.all.dars.upload(CantonTestsDevPath)
 
-      val alice = participant1.parties.enable(
+      val alice = participant1.parties.testing.enable(
         "Alice",
         synchronizeParticipants = Seq(participant2),
       )
-      val bob = participant2.parties.enable(
+      val bob = participant2.parties.testing.enable(
         "Bob",
         synchronizeParticipants = Seq(participant1),
       )
@@ -2317,6 +2322,7 @@ class ParticipantRestartContractKeyIntegrationTest extends ParticipantRestartTes
   }
 }
 
+@UnstableTest // TODO(#21107)
 class ParticipantRestartPruningIntegrationTest extends ParticipantRestartTest {
   private val reconciliationInterval = PositiveSeconds.tryOfSeconds(2)
   private val transactionTolerance = reconciliationInterval.unwrap
@@ -2328,6 +2334,8 @@ class ParticipantRestartPruningIntegrationTest extends ParticipantRestartTest {
     EnvironmentDefinition.P2S1M1_Manual
       .addConfigTransforms(
         ConfigTransforms.useStaticTime,
+        // enabling retries to be on the safe side
+        ConfigTransforms.setPingRetries(true),
         ConfigTransforms.updatePruningBatchSize(internalPruningBatchSize),
         ConfigTransforms.updateMaxDeduplicationDurations(transactionTolerance),
       )
@@ -2403,7 +2411,7 @@ class ParticipantRestartPruningIntegrationTest extends ParticipantRestartTest {
       // Create a fresh pruning processor object so we get a fresh publication time lower bound
       val pruningProcessor = pruningProcessorFor(participant1, storageP1.some)
       val safeOffset =
-        pruningProcessor.safeToPrune(clock.now, ledgerEndOffset).futureValueUS.value.value
+        pruningProcessor.safeToPrune(clock.now, ledgerEndOffset, None).futureValueUS.value.value
       assert(safeOffset.unwrap >= pruneOffset)
     }
 

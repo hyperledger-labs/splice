@@ -106,7 +106,8 @@ class MultiHostValidatorOperatorIntegrationTest extends IntegrationTest with Wal
       }
       clue(s"Import ACS for $party") {
         bobParticipant.parties.import_party_acs(
-          importFilePath = acsFile.toString
+          importFilePath = acsFile.toString,
+          synchronizerId = synchronizerId,
         )
       }
     })

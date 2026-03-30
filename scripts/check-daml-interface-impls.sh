@@ -7,7 +7,7 @@ set -euo pipefail
 
 source "${TOOLS_LIB}/libcli.source"
 
-if rg -P '(?<!Default)Impl (?!(:|this self arg))[^=]*$' --type-add 'daml:*.daml' --type daml
+if rg -P '(?<!Default)Impl (?!(:|this self arg))[^=]*$' --type-add 'daml:*.daml' --type daml -g '!/canton/'
 then
     _error "Interface choices should always pass 'this self arg' in that order"
 fi

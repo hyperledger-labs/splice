@@ -331,6 +331,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
               // because the sequencer may cut the participant's connection before delivering the topology broadcast
               or include regex "Waiting for transaction .* to be observed"
               or (include(SyncServiceSynchronizerDisconnect.id) and include(
+                // TODO(#30534): Improve the error to explain why the threshold is not reachable.
                 "fatally disconnected because of Trust threshold 1 is no longer reachable"
               )))
           },
@@ -341,7 +342,7 @@ sealed trait SynchronizerConnectivityIntegrationTest
           entry => {
             entry.shouldBeCommandFailure(InitialOnboardingError)
             entry.commandFailureMessage should include(
-              s"${participant1.id} has previously been off-boarded and cannot onboard again"
+              s"${participant1.id} is either active on the synchronizer or has previously been offboarded"
             )
           },
         )

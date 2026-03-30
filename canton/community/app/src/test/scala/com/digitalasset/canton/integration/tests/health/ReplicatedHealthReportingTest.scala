@@ -7,6 +7,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   ComponentHealthState,
   StaticSynchronizerParameters,
 }
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.{
@@ -75,9 +76,6 @@ trait HealthReportingTestHelper
 
   protected lazy val baseEnvironmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2S1M2_Config
-      .addConfigTransforms(
-        ConfigTransforms.enableReplicatedAllNodes*
-      )
       .addConfigTransforms(
         ConfigTransforms.addMonitoringEndpointAllNodes*
       )
@@ -475,7 +473,6 @@ class HealthReportingNodeReferenceIntegrationTestPostgres
           checkServing(par)
         }
 
-        val usingConnectionPool = participant1.config.sequencerClient.useNewConnectionPool
         loggerFactory.assertLoggedWarningsAndErrorsSeq(
           {
             // Set the driver health to unhealthy
@@ -503,25 +500,13 @@ class HealthReportingNodeReferenceIntegrationTestPostgres
           },
           LogEntry.assertLogSeq(
             mustContainWithClue =
-              if (usingConnectionPool) {
-                // TODO(i28761): Subscription should warn after it is lost
-                Seq(
-                  (
-                    _.warningMessage should include("Sequencer is unhealthy"),
-                    "expected sequencer is not health",
-                  )
+              // TODO(i28761): Subscription should warn after it is lost
+              Seq(
+                (
+                  _.warningMessage should include("Sequencer is unhealthy"),
+                  "expected sequencer is not health",
                 )
-              } else
-                Seq(
-                  (
-                    _.warningMessage should include("Sequencer is unhealthy"),
-                    "expected sequencer is not health",
-                  ),
-                  (
-                    _.warningMessage should include("SEQUENCER_SUBSCRIPTION_LOST"),
-                    "expected sequencer subscription lost",
-                  ),
-                ),
+              ),
             mayContain = Seq.empty,
           ),
         )
@@ -530,6 +515,7 @@ class HealthReportingNodeReferenceIntegrationTestPostgres
   }
 }
 
+@UnstableTest // TODO(#29329)
 class HealthReportingNodeBftOrderingIntegrationTestPostgres
     extends HealthReportingIndividualNodeTest {
   registerPlugin(new UseBftSequencer(loggerFactory))

@@ -569,6 +569,7 @@ object UseLedgerApiTestTool {
             sys.env
               .get("ARTIFACTORY_PASSWORD")
               .flatMap(OptionUtil.emptyStringAsNone)
+              .orElse(sys.env.get("ARTIFACTORY_TOKEN").flatMap(OptionUtil.emptyStringAsNone))
               .orElse(credentialsFromNetrcFile._2)
               .getOrElse("")
               .toCharArray,

@@ -199,6 +199,7 @@ spec:
                 }
             {{- else if .Values.synchronizers }}
             {{- range $syncName, $sync := .Values.synchronizers }}
+            {{- if kindIs "map" $sync }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN_{{ $syncName | upper }}
               #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
@@ -246,6 +247,7 @@ spec:
                 }
             {{- end }}
             {{- end }}
+            {{- end }}
             {{- if .Values.decentralizedSynchronizerUrl }}
             - name: SPLICE_APP_SV_GLOBAL_DOMAIN_URL
               value: {{ .Values.decentralizedSynchronizerUrl | quote }}
@@ -275,8 +277,10 @@ spec:
               {{- $anyGovernanceKey = true }}
             {{- end }}
             {{- range $syncName, $sync := .Values.synchronizers }}
+              {{- if kindIs "map" $sync }}
               {{- if ($sync.cometBftConfig).externalGovernanceKey }}
                 {{- $anyGovernanceKey = true }}
+              {{- end }}
               {{- end }}
             {{- end }}
             {{- if $anyGovernanceKey }}

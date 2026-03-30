@@ -29,7 +29,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.participant.party.PartyReplicationTestInterceptorImpl
-import com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription.LostSequencerSubscription
+import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.LostSequencerSubscription
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -136,12 +136,13 @@ sealed trait OnlinePartyReplicationNetworkDisruptionsTest
       }
       .addConfigTransforms(
         (ConfigTransforms.setProtocolVersion(devProtocolVersionToRemove) ++
-          ConfigTransforms.unsafeEnableOnlinePartyReplication(
+          ConfigTransforms.enableAlphaOnlinePartyReplicationSupport(
             Map(
               // configure the test interceptor on both participants since the tests vary the source participant
               "participant1" -> (() => createSourceParticipantTestInterceptor()),
               "participant2" -> (() => createSourceParticipantTestInterceptor()),
-            )
+            ),
+            enableUnsafeSequencerChannelSupport = true,
           ))*
       )
       .withSetup { implicit env =>

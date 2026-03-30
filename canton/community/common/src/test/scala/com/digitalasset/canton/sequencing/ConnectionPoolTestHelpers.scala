@@ -119,10 +119,11 @@ trait ConnectionPoolTestHelpers {
       index: Int,
       endpointIndexO: Option[Int] = None,
       expectedSequencerIdO: Option[SequencerId] = None,
+      namePrefix: String = "test",
   ): ConnectionXConfig = {
     val endpoint = Endpoint(s"does-not-exist-${endpointIndexO.getOrElse(index)}", Port.tryCreate(0))
     ConnectionXConfig(
-      name = s"test-$index",
+      name = s"$namePrefix-$index",
       endpoint = endpoint,
       transportSecurity = false,
       customTrustCertificates = None,
@@ -137,10 +138,11 @@ trait ConnectionPoolTestHelpers {
     val config = mkDummyConnectionConfig(0)
 
     val connection = GrpcConnectionX(
-      config,
-      CommonMockMetrics.sequencerClient.connectionPool,
-      timeouts,
-      loggerFactory,
+      config = config,
+      keepAliveClientConfigO = None,
+      metrics = CommonMockMetrics.sequencerClient.connectionPool,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory,
     )
 
     val listener = new TestHealthListener(connection.health)
@@ -159,15 +161,16 @@ trait ConnectionPoolTestHelpers {
     val config = mkDummyConnectionConfig(0, expectedSequencerIdO = expectedSequencerIdO)
 
     val connection = new GrpcInternalSequencerConnectionX(
-      config,
-      clientProtocolVersions,
-      minimumProtocolVersion,
-      stubFactory,
-      CommonMockMetrics.sequencerClient.connectionPool,
-      MetricsContext.Empty,
-      futureSupervisor,
-      timeouts,
-      loggerFactory.append("connection", config.name),
+      config = config,
+      clientProtocolVersions = clientProtocolVersions,
+      minimumProtocolVersion = minimumProtocolVersion,
+      keepAliveClientConfigO = None,
+      stubFactory = stubFactory,
+      metrics = CommonMockMetrics.sequencerClient.connectionPool,
+      metricsContext = MetricsContext.Empty,
+      futureSupervisor = futureSupervisor,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory.append("connection", config.name),
     )
 
     val listener = new TestHealthListener(connection.health)
@@ -181,9 +184,14 @@ trait ConnectionPoolTestHelpers {
       trustThreshold: PositiveInt,
       expectedSynchronizerIdO: Option[PhysicalSynchronizerId] = None,
       poolDelays: SequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+      namePrefix: String = "test",
   ): SequencerConnectionXPoolConfig = {
     val configs =
-      NonEmpty.from((0 until nbConnections.unwrap).map(mkDummyConnectionConfig(_))).value
+      NonEmpty
+        .from(
+          (0 until nbConnections.unwrap).map(mkDummyConnectionConfig(_, namePrefix = namePrefix))
+        )
+        .value
 
     SequencerConnectionXPoolConfig(
       connections = configs,
@@ -191,7 +199,7 @@ trait ConnectionPoolTestHelpers {
       minRestartConnectionDelay = poolDelays.minRestartDelay,
       maxRestartConnectionDelay = poolDelays.maxRestartDelay,
       warnConnectionValidationDelay = poolDelays.warnValidationDelay,
-      expectedPSIdO = expectedSynchronizerIdO,
+      expectedPsidO = expectedSynchronizerIdO,
     )
   }
 
@@ -204,6 +212,8 @@ trait ConnectionPoolTestHelpers {
       testTimeouts: ProcessingTimeout = timeouts,
       poolDelays: SequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
       blockValidation: Int => Boolean = _ => false,
+      metrics: SequencerConnectionPoolMetrics = CommonMockMetrics.sequencerClient.connectionPool,
+      namePrefix: String = "test",
   )(
       f: (
           SequencerConnectionXPool,
@@ -217,6 +227,7 @@ trait ConnectionPoolTestHelpers {
       trustThreshold,
       expectedSynchronizerIdO,
       poolDelays,
+      namePrefix,
     )
 
     val validationBlocker = new TestValidationBlocker(blockValidation)
@@ -230,7 +241,7 @@ trait ConnectionPoolTestHelpers {
       wallClock,
       testCrypto.crypto,
       Some(seedForRandomness),
-      metrics = CommonMockMetrics.sequencerClient.connectionPool,
+      metrics = metrics,
       futureSupervisor,
       testTimeouts,
       loggerFactory,
@@ -402,8 +413,8 @@ protected object ConnectionPoolTestHelpers {
     )(implicit
         traceContext: TraceContext,
         ec: ExecutionContext,
-    ): SequencerSubscriptionX[SequencerClientSubscriptionError] =
-      new SequencerSubscriptionX(
+    ): SequencerSubscriptionXImpl[SequencerClientSubscriptionError] =
+      new SequencerSubscriptionXImpl(
         connection = connection,
         member = member,
         startingTimestampO = None,
@@ -445,6 +456,7 @@ protected object ConnectionPoolTestHelpers {
       attributesForConnection,
       responsesForConnection,
       validationBlocker,
+      metrics,
       futureSupervisor,
       timeouts,
       loggerFactory,
@@ -481,7 +493,7 @@ protected object ConnectionPoolTestHelpers {
 
     override def createFromOldConfig(
         sequencerConnections: SequencerConnections,
-        expectedPSIdO: Option[PhysicalSynchronizerId],
+        expectedPsidO: Option[PhysicalSynchronizerId],
         tracingConfig: TracingConfig,
         name: String,
     )(implicit
@@ -496,6 +508,7 @@ protected object ConnectionPoolTestHelpers {
       attributesForConnection: Int => ConnectionAttributes,
       responsesForConnection: PartialFunction[Int, TestResponses],
       validationBlocker: TestValidationBlocker,
+      metrics: SequencerConnectionPoolMetrics,
       futureSupervisor: FutureSupervisor,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
@@ -507,7 +520,8 @@ protected object ConnectionPoolTestHelpers {
         esf: ExecutionSequencerFactory,
         materializer: Materializer,
     ): InternalSequencerConnectionX = {
-      val s"test-$indexStr" = config.name: @unchecked
+      val nameRegex = raw".*-(\d+)".r
+      val nameRegex(indexStr) = config.name: @unchecked
       val index = indexStr.toInt
 
       val attributes = attributesForConnection(index)
@@ -534,15 +548,16 @@ protected object ConnectionPoolTestHelpers {
       val stubFactory = new TestSequencerConnectionXStubFactory(responses, loggerFactory)
 
       val connection = new GrpcInternalSequencerConnectionX(
-        config,
-        clientProtocolVersions,
-        minimumProtocolVersion,
-        stubFactory,
-        CommonMockMetrics.sequencerClient.connectionPool,
-        MetricsContext.Empty,
-        futureSupervisor,
-        timeouts,
-        loggerFactory.append("connection", config.name),
+        config = config,
+        clientProtocolVersions = clientProtocolVersions,
+        minimumProtocolVersion = minimumProtocolVersion,
+        keepAliveClientConfigO = None,
+        stubFactory = stubFactory,
+        metrics = metrics,
+        metricsContext = MetricsContext.Empty,
+        futureSupervisor = futureSupervisor,
+        timeouts = timeouts,
+        loggerFactory = loggerFactory.append("connection", config.name),
       )
 
       createdConnections.add(index, connection)

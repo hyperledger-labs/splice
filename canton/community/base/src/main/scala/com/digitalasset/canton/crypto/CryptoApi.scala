@@ -6,6 +6,7 @@ package com.digitalasset.canton.crypto
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.show.*
+import com.daml.metrics.ExecutorServiceMetrics
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
@@ -24,6 +25,7 @@ import com.digitalasset.canton.crypto.kms.gcp.GcpKms
 import com.digitalasset.canton.crypto.kms.{Kms, KmsFactory}
 import com.digitalasset.canton.crypto.provider.jce.{JceCrypto, JcePureCrypto}
 import com.digitalasset.canton.crypto.provider.kms.KmsPrivateCrypto
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.store.{
   CryptoPrivateStore,
   CryptoPrivateStoreError,
@@ -273,17 +275,14 @@ trait SyncCryptoApi {
     *   the hash to sign
     * @param usage
     *   restricts signing to private keys that have at least one matching usage
-    * @param approximateTimestampOverride
-    *   optional timestamp to use for signing. Should only be set for signatures that end up, for
-    *   example, in submission requests, or of encrypted view messages, where the topology is not
-    *   yet fixed, i.e., when using a topology snapshot approximation. The current local clock
-    *   reading is often a suitable value. This timestamp will be used to pick a session signing key
-    *   with a suitable validity period, if needed.
+    * @param signingTimestampOverrides
+    *   Optional overrides for selecting an approximate signing timestamp and validity end, used to
+    *   select the correct session signing key whenever session signing keys are enabled.
     */
   def sign(
       hash: Hash,
       usage: NonEmpty[Set[SigningKeyUsage]],
-      approximateTimestampOverride: Option[CantonTimestamp],
+      signingTimestampOverrides: Option[SigningTimestampOverrides],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Signature]
@@ -307,6 +306,25 @@ trait SyncCryptoApi {
       signatures: NonEmpty[Seq[Signature]],
       usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit]
+
+  /** Verifies that the signature for the given member has been created using a valid signing key
+    *
+    * Note that this does not verify the signature itself. The method itself allows to prevalidate
+    * signatures such that expensive computations don't have to be performed in sequential steps.
+    *
+    * @param signedBy
+    *   should be set to signature.signedBy
+    * @param signatureDelegation
+    *   should be set to signature.signatureDelegation
+    */
+  def verifyKeyUsage(
+      signer: Member,
+      signedBy: Fingerprint,
+      signatureDelegation: Option[SignatureDelegation],
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit]
 
   /** Verifies a list of `signatures` to be produced by active members of a `mediatorGroup`,
     * counting each member's signature only once. Returns `Right` when the `mediatorGroup`'s
@@ -372,6 +390,7 @@ object Crypto {
       batchingConfig: BatchingConfig,
       loggerFactory: NamedLoggerFactory,
       tracerProvider: TracerProvider,
+      executorServiceMetrics: ExecutorServiceMetrics,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -391,6 +410,7 @@ object Crypto {
             clock,
             loggerFactory,
             executionContext,
+            executorServiceMetrics,
           )
           .leftMap(err => s"Failed to create the KMS client: $err")
           .toEitherT[FutureUnlessShutdown]

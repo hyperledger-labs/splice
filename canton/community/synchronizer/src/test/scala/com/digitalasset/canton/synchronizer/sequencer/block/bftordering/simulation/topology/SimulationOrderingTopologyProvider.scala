@@ -13,7 +13,10 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
   TopologyActivationTime,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
+  EpochLength,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology.NodeTopologyInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   OrderingTopology,
@@ -21,46 +24,40 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.SimulationFuture
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.util.Success
 
 class SimulationOrderingTopologyProvider(
     thisNode: BftNodeId,
+    epochLength: EpochLength, // TODO(#24184) make this dynamic sequencing parameter
     getEndpointsToTopologyData: () => Map[P2PEndpoint, NodeSimulationTopologyData],
     loggerFactory: NamedLoggerFactory,
 ) extends OrderingTopologyProvider[SimulationEnv] {
 
   override def getOrderingTopologyAt(
-      activationTime: TopologyActivationTime,
+      activationTimeO: Option[TopologyActivationTime],
       checkPendingChanges: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): SimulationFuture[Option[(OrderingTopology, CryptoProvider[SimulationEnv])]] =
+  ): SimulationFuture[Option[(OrderingTopology, CryptoProvider[SimulationEnv])]] = {
+    val activationTime = activationTimeO.getOrElse(TestBootstrapTopologyActivationTime)
     SimulationFuture(s"getOrderingTopologyAt($activationTime)") { () =>
-      val activeSequencerTopologyData =
-        getEndpointsToTopologyData().view
-          .filter { case (_, topologyData) =>
-            topologyData.onboardingTime.value <= activationTime.value
-            && topologyData.offboardingTime.forall(activationTime.value <= _)
-          }
-          .map { case (endpoint, topologyData) =>
-            endpointToTestBftNodeId(endpoint) -> topologyData
-          }
-          .toMap
+      val activeSequencerTopologyData = getActiveSequencerTopologyData(activationTime)
 
       val topology =
         OrderingTopology(
           activeSequencerTopologyData.view.mapValues { simulationTopologyData =>
             NodeTopologyInfo(
-              activationTime = simulationTopologyData.onboardingTime,
               keyIds = simulationTopologyData
                 .keysForTimestamp(activationTime.value)
                 .view
                 .map(keyPair => FingerprintKeyId.toBftKeyId(keyPair.publicKey.id))
-                .toSet,
+                .toSet
             )
           }.toMap,
+          epochLength, // TODO(#24184) make this dynamic sequencing parameter
           SequencingParameters.Default,
           BaseTest.defaultMaxBytesToDecompress,
           activationTime,
@@ -79,4 +76,31 @@ class SimulationOrderingTopologyProvider(
         )
       )
     }
+  }
+
+  override def getFirstKnownAt(activationTime: TopologyActivationTime)(implicit
+      traceContext: TraceContext
+  ): SimulationFuture[Option[Map[BftNodeId, TopologyActivationTime]]] =
+    SimulationFuture(s"getFirstKnownAt($activationTime)") { () =>
+      Success(
+        Some(
+          getActiveSequencerTopologyData(activationTime).view.mapValues { simulationTopologyData =>
+            simulationTopologyData.onboardingTime
+          }.toMap
+        )
+      )
+    }
+
+  private def getActiveSequencerTopologyData(
+      activationTime: TopologyActivationTime
+  ): Map[BftNodeId, NodeSimulationTopologyData] =
+    getEndpointsToTopologyData().view
+      .filter { case (_, topologyData) =>
+        topologyData.onboardingTime.value <= activationTime.value
+        && topologyData.offboardingTime.forall(activationTime.value <= _)
+      }
+      .map { case (endpoint, topologyData) =>
+        endpointToTestBftNodeId(endpoint) -> topologyData
+      }
+      .toMap
 }

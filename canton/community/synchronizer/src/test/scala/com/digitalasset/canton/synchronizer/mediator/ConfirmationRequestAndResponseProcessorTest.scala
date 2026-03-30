@@ -42,6 +42,7 @@ import com.google.protobuf.ByteString
 import io.grpc.Status.Code
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
+import org.slf4j.event.Level
 
 import java.util
 import scala.annotation.nowarn
@@ -253,7 +254,7 @@ class ConfirmationRequestAndResponseProcessorTest
   protected lazy val decisionTime = requestIdTs.plusSeconds(120)
 
   class Fixture(syncCryptoApi: SynchronizerCryptoClient = synchronizerSyncCryptoApi) {
-    private val sequencerSend: TestSequencerClientSend = new TestSequencerClientSend
+    private val sequencerSend: TestSequencerClientSend = new TestSequencerClientSend(wallClock)
 
     def drainInterceptedBatches(): List[Batch[DefaultOpenEnvelope]] = {
       val result = new util.ArrayList[TestSequencerClientSend.Request]()
@@ -287,9 +288,14 @@ class ConfirmationRequestAndResponseProcessorTest
       syncCryptoApi,
       timeTracker,
       mediatorState,
+      // this test calls processRequest and processResponses directly,
+      // which is not affected by the asynchronous processing flag, which is handled in the enclosing scope
+      // calling these methods
+      asynchronousProcessing = true,
       loggerFactory,
       timeouts,
       BatchingConfig(),
+      Mediator.GetActiveLsuSuccessor.Never,
     )
   }
 
@@ -366,7 +372,11 @@ class ConfirmationRequestAndResponseProcessorTest
     .forOwnerAndSynchronizer(participant, synchronizerId)
     .awaitSnapshot(CantonTimestamp.Epoch)
     .futureValueUS
-    .sign(tree.tree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly, None)
+    .sign(
+      tree.tree.rootHash.unwrap,
+      SigningKeyUsage.ProtocolOnly,
+      None, // not needed for unit tests; session signing keys disabled
+    )
     .failOnShutdown
     .futureValue
 
@@ -465,12 +475,15 @@ class ConfirmationRequestAndResponseProcessorTest
               batchAlsoContainsTopologyTransaction = false,
             )
             .failOnShutdown,
-          _.shouldBeCantonError(
-            MediatorError.MalformedMessage,
-            _ should startWith(
-              s"Received a mediator confirmation request with id $requestId from $participant with an invalid signature. Rejecting request.\nDetailed error: SignatureWithWrongKey"
-            ),
-          ),
+          entry => {
+            entry.level shouldBe Level.WARN
+            entry.shouldBeCantonError(
+              MediatorError.MalformedMessage,
+              _ should startWith(
+                s"Received a mediator confirmation request with id $requestId from $participant with an invalid signature. Rejecting request.\nDetailed error: SignatureWithWrongKey"
+              ),
+            )
+          },
         )
       } yield {
         val sentResult = sut.verdictSender.sentResults.loneElement
@@ -939,7 +952,7 @@ class ConfirmationRequestAndResponseProcessorTest
               .map(party =>
                 party -> PartyInfo(
                   PositiveInt.one,
-                  Map(ParticipantId("one") -> ParticipantAttributes(Confirmation)),
+                  Map(participant -> ParticipantAttributes(Confirmation)),
                 )
               )
               .toMap
@@ -1029,8 +1042,9 @@ class ConfirmationRequestAndResponseProcessorTest
           }
           val completedView = ResponseAggregation.ViewState(
             Map(
-              submitter -> ConsortiumVotingState.withDefaultValues(approvals =
-                Set(ExampleTransactionFactory.submittingParticipant)
+              submitter -> ConsortiumVotingState.withDefaultValues(
+                hostingParticipants = Set(participant),
+                approvals = Set(ExampleTransactionFactory.submittingParticipant),
               )
             ),
             Seq(Quorum.empty),
@@ -1054,27 +1068,37 @@ class ConfirmationRequestAndResponseProcessorTest
               view1Position ->
                 ResponseAggregation.ViewState(
                   Map(
-                    submitter -> ConsortiumVotingState.withDefaultValues(approvals =
-                      Set(ExampleTransactionFactory.submittingParticipant)
+                    submitter -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant),
+                      approvals = Set(ExampleTransactionFactory.submittingParticipant),
                     ),
-                    signatory -> ConsortiumVotingState.withDefaultValues(),
+                    signatory -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant)
+                    ),
                   ),
                   Seq(signatoryQuorum),
                   Nil,
                 ),
               view10Position ->
                 ResponseAggregation.ViewState(
-                  Map(signatory -> ConsortiumVotingState.withDefaultValues()),
+                  Map(
+                    signatory -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant)
+                    )
+                  ),
                   Seq(signatoryQuorum),
                   Nil,
                 ),
               view11Position ->
                 ResponseAggregation.ViewState(
                   Map(
-                    submitter -> ConsortiumVotingState.withDefaultValues(approvals =
-                      Set(ExampleTransactionFactory.submittingParticipant)
+                    submitter -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant),
+                      approvals = Set(ExampleTransactionFactory.submittingParticipant),
                     ),
-                    signatory -> ConsortiumVotingState.withDefaultValues(),
+                    signatory -> ConsortiumVotingState.withDefaultValues(
+                      hostingParticipants = Set(participant)
+                    ),
                   ),
                   Seq(signatoryQuorum),
                   Nil,
@@ -1730,10 +1754,13 @@ class ConfirmationRequestAndResponseProcessorTest
               batchAlsoContainsTopologyTransaction = false,
             )
             .failOnShutdown,
-          _.shouldBeCantonError(
-            MediatorError.InvalidMessage,
-            _ shouldBe s"Received a mediator confirmation request with id $requestId with some informees not being hosted by an active participant: ${Set(observer, extra, signatory)}. Rejecting request...",
-          ),
+          entry => {
+            entry.level shouldBe Level.WARN
+            entry.shouldBeCantonError(
+              MediatorError.InvalidMessage,
+              _ shouldBe s"Received a mediator confirmation request with id $requestId with some informees not being hosted by an active participant: ${Set(observer, extra, signatory)}. Rejecting request...",
+            )
+          },
         )
       } yield succeed
     }

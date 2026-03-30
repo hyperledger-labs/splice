@@ -10,7 +10,7 @@ import com.daml.timer.FutureCheck.*
 import com.digitalasset.canton.LedgerParticipantId
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
-import com.digitalasset.canton.ledger.api.health.{HealthStatus, Healthy, ReportsHealth, Unhealthy}
+import com.digitalasset.canton.health.{HealthStatus, Healthy, ReportsHealth, Unhealthy}
 import com.digitalasset.canton.ledger.participant.state.{RepairUpdate, Update}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -67,6 +67,7 @@ class LedgerApiIndexer(
     indexerState: IndexerState,
     val onlyForTestingTransactionInMemoryStore: Option[OnlyForTestingTransactionInMemoryStore],
 ) extends ResourceCloseable {
+
   def withRepairIndexer(
       repairOperation: FutureQueue[RepairUpdate] => EitherT[Future, String, Unit]
   )(implicit
@@ -236,10 +237,14 @@ object LedgerApiIndexer {
       _ <- ResourceOwner.forReleasable(() => indexerState)(_.shutdown())
     } yield {
       initializationLogger.info("Ledger API Indexer started, initializing recoverable indexing.")
+
       new LedgerApiIndexer(
         indexerHealth = () => healthStatusRef.get(),
-        enqueue = IndexerQueueProxy(indexerState.withStateUnlessShutdown)
-          .andThen(IndexerState.ShutdownInProgress.transformToFUS),
+        enqueue = event => {
+          commandProgressTracker.indexingStarts(event)
+          IndexerQueueProxy(indexerState.withStateUnlessShutdown)
+            .andThen(IndexerState.ShutdownInProgress.transformToFUS)(event)
+        },
         inMemoryState = inMemoryState,
         ledgerApiStore = ledgerApiStore,
         contractStore = contractStore,

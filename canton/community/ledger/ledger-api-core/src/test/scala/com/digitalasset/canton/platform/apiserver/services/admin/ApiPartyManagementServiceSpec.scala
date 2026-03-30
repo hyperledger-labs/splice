@@ -4,7 +4,6 @@
 package com.digitalasset.canton.platform.apiserver.services.admin
 
 import cats.syntax.traverse.*
-import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.admin.party_management_service.AllocateExternalPartyRequest.SignedTransaction
 import com.daml.ledger.api.v2.admin.party_management_service.{
   AllocateExternalPartyRequest,
@@ -16,6 +15,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
 import com.daml.ledger.api.v2.crypto.SignatureFormat.SIGNATURE_FORMAT_RAW
 import com.daml.ledger.api.v2.{crypto, crypto as lapicrypto}
 import com.daml.nonempty.NonEmpty
+import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.tracing.TelemetrySpecBase.*
 import com.daml.tracing.{DefaultOpenTelemetry, NoOpTelemetry}
 import com.digitalasset.base.error.ErrorsAssertions
@@ -78,11 +78,11 @@ import com.digitalasset.canton.topology.{
   Namespace,
   ParticipantId,
   PartyId,
+  PhysicalSynchronizerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, HasExecutorService, LfPartyId}
 import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.ByteString
@@ -133,20 +133,20 @@ class ApiPartyManagementServiceSpec
   }
 
   lazy val (
-    _mockIndexTransactionsService,
     mockIdentityProviderExists,
     mockIndexPartyManagementService,
+    mockUserManagementStore,
     mockPartyRecordStore,
   ) = mockedServices()
   val partyAllocationTracker = makePartyAllocationTracker(loggerFactory)
 
   lazy val apiService = ApiPartyManagementService.createApiService(
-    mock[IndexPartyManagementService],
-    mock[UserManagementStore],
-    mock[IdentityProviderExists],
+    mockIndexPartyManagementService,
+    mockUserManagementStore,
+    mockIdentityProviderExists,
     partiesPageSize,
     NonNegativeInt.tryCreate(0),
-    mock[PartyRecordStore],
+    mockPartyRecordStore,
     TestPartySyncService(testTelemetrySetup.tracer),
     oneHour,
     createSubmissionId,
@@ -249,53 +249,58 @@ class ApiPartyManagementServiceSpec
             AllocateExternalPartyRequest,
           ] => Mutation[AllocateExternalPartyRequest],
           expectedFailure: PartyId => Option[String],
-      ) = {
-        val (publicKey, keyPair) = createSigningKey
-        val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
-        val partyId = PartyId.tryCreate("alice", cantonPublicKey.fingerprint)
-        for {
-          generatedTransactions <- apiService.generateExternalPartyTopology(
-            GenerateExternalPartyTopologyRequest(
-              synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
-              partyHint = "alice",
-              publicKey = publicKey,
-              localParticipantObservationOnly = false,
-              otherConfirmingParticipantUids =
-                Seq(DefaultTestIdentities.participant2.uid.toProtoPrimitive),
-              confirmationThreshold = 1,
-              observingParticipantUids =
-                Seq(DefaultTestIdentities.participant3.uid.toProtoPrimitive),
+      ) =
+        loggerFactory.suppress(
+          ApiPartyManagementServiceSuppressionRule
+        ) {
+          val (publicKey, keyPair) = createSigningKey
+          val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
+          val partyId = PartyId.tryCreate("alice", cantonPublicKey.fingerprint)
+          for {
+            generatedTransactions <- apiService.generateExternalPartyTopology(
+              GenerateExternalPartyTopologyRequest(
+                synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
+                partyHint = "alice",
+                publicKey = publicKey,
+                localParticipantObservationOnly = false,
+                otherConfirmingParticipantUids =
+                  Seq(DefaultTestIdentities.participant2.uid.toProtoPrimitive),
+                confirmationThreshold = 1,
+                observingParticipantUids =
+                  Seq(DefaultTestIdentities.participant3.uid.toProtoPrimitive),
+              )
             )
-          )
-          signature = sign(keyPair, generatedTransactions.multiHash, partyId.fingerprint)
-          request = AllocateExternalPartyRequest(
-            synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
-            onboardingTransactions = generatedTransactions.topologyTransactions.map(tx =>
-              AllocateExternalPartyRequest.SignedTransaction(tx, Seq.empty)
-            ),
-            multiHashSignatures = Seq(signature),
-            identityProviderId = "",
-          ).update(requestTransform)
-          result <- apiService
-            .allocateExternalParty(request)
-            .transform {
-              case Failure(e: io.grpc.StatusRuntimeException) =>
-                expectedFailure(partyId) match {
-                  case Some(value) =>
-                    e.getStatus.getCode.value() shouldBe io.grpc.Status.INVALID_ARGUMENT.getCode
-                      .value()
-                    e.getStatus.getDescription should include(value)
-                    Success(succeed)
-                  case None =>
-                    fail(s"Expected success but allocation failed with $e")
-                }
-              case Failure(other) => fail(s"expected a gRPC exception but got $other")
-              case Success(_) if expectedFailure(partyId).isDefined =>
-                fail("Expected a failure but got a success")
-              case Success(_) => Success(succeed)
-            }
-        } yield result
-      }
+            signature = sign(keyPair, generatedTransactions.multiHash, partyId.fingerprint)
+            request = AllocateExternalPartyRequest(
+              synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
+              onboardingTransactions = generatedTransactions.topologyTransactions.map(tx =>
+                AllocateExternalPartyRequest.SignedTransaction(tx, Seq.empty)
+              ),
+              multiHashSignatures = Seq(signature),
+              identityProviderId = "",
+              waitForAllocation = Some(true),
+              userId = "",
+            ).update(requestTransform)
+            result <- apiService
+              .allocateExternalParty(request)
+              .transform {
+                case Failure(e: io.grpc.StatusRuntimeException) =>
+                  expectedFailure(partyId) match {
+                    case Some(value) =>
+                      e.getStatus.getCode.value() shouldBe io.grpc.Status.INVALID_ARGUMENT.getCode
+                        .value()
+                      e.getStatus.getDescription should include(value)
+                      Success(succeed)
+                    case None =>
+                      fail(s"Expected success but allocation failed with $e")
+                  }
+                case Failure(other) => fail(s"expected a gRPC exception but got $other")
+                case Success(_) if expectedFailure(partyId).isDefined =>
+                  fail("Expected a failure but got a success")
+                case Success(_) => Success(succeed)
+              }
+          } yield result
+        }
 
       def mkDecentralizedTx(ownerSize: Int): (SignedTransaction, Namespace) = {
         val ownersKeys = Seq.fill(ownerSize)(createSigningKey).map { case (publicKey, keyPair) =>
@@ -891,7 +896,7 @@ class ApiPartyManagementServiceSpec
         val txs = response.topologyTransactions.toList
           .traverse(tx =>
             TopologyTransaction
-              .fromByteString(ProtocolVersion.latest, tx)
+              .fromByteString(testedProtocolVersion, tx)
           )
           .valueOrFail("unable to parse topology txs")
           .map(_.mapping)
@@ -1246,10 +1251,12 @@ object ApiPartyManagementServiceSpec {
       FutureUnlessShutdown.pure(state.SubmissionResult.Acknowledged)
     }
 
-    override def protocolVersionForSynchronizerId(
+    override def physicalSynchronizerIdForSynchronizerId(
         synchronizerId: SynchronizerId
-    ): Option[ProtocolVersion] =
-      Option.when(synchronizerId == DefaultTestIdentities.synchronizerId)(ProtocolVersion.latest)
+    ): Option[PhysicalSynchronizerId] =
+      Option.when(synchronizerId == DefaultTestIdentities.synchronizerId)(
+        DefaultTestIdentities.physicalSynchronizerId
+      )
 
     override def participantId: ParticipantId = DefaultTestIdentities.participant1
 

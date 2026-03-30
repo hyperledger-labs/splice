@@ -16,6 +16,14 @@ import com.daml.metrics.api.MetricQualification
 import com.daml.metrics.{HistogramDefinition, MetricsFilterConfig}
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
+import com.daml.tls.{
+  BaseServerTlsConfig,
+  ServerAuthRequirementConfig,
+  TlsClientCertificate,
+  TlsClientConfig,
+  TlsClientConfigOnlyTrustFile,
+  TlsServerConfig,
+}
 import com.digitalasset.canton.auth.{AccessLevel, AuthorizedUser}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.*
@@ -56,15 +64,13 @@ import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.config.ParticipantInitConfig.ParticipantLedgerApiInitConfig
 import com.digitalasset.canton.participant.sync.CommandProgressTrackerConfig
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
-import com.digitalasset.canton.platform.apiserver.configuration.{
-  EngineLoggingConfig,
-  RateLimitingConfig,
-}
+import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.config.{
   InteractiveSubmissionServiceConfig,
   TopologyAwarePackageSelectionConfig,
 }
 import com.digitalasset.canton.pureconfigutils.SharedConfigReaders.catchConvertError
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationTokenManagerConfig,
   AuthenticationTokenManagerExponentialBackoffConfig,
@@ -72,7 +78,7 @@ import com.digitalasset.canton.sequencing.authentication.{
 }
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.synchronizer.block.{SequencerDriver, SequencerDriverFactory}
-import com.digitalasset.canton.synchronizer.config.PublicServerConfig
+import com.digitalasset.canton.synchronizer.config.{DeclarativeSequencerConfig, PublicServerConfig}
 import com.digitalasset.canton.synchronizer.mediator.{
   DeduplicationStoreConfig,
   MediatorConfig,
@@ -101,6 +107,8 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.BytesUnit
+import com.digitalasset.daml.lf.engine.EngineLoggingConfig
+import com.digitalasset.daml.lf.transaction.NextGenContractStateMachine
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import com.typesafe.config.{
   Config,
@@ -258,6 +266,33 @@ final case class RetentionPeriodDefaults(
     mediator: config.NonNegativeFiniteDuration = config.NonNegativeFiniteDuration.ofDays(7),
 )
 
+/** Configure main execution contexts
+  *
+  * @param keepAlive
+  *   Keep alive time for fork-join pool excess threads.
+  * @param parallelism
+  *   Number of CPU cores to use for the main ec (derived automatically by default)
+  * @param mutexMaxSpins
+  *   Tweak the number of spins we want to run before parking the thread
+  */
+final case class ThreadingConfig(
+    keepAlive: config.NonNegativeFiniteDuration = ThreadingConfig.defaultKeepAliveMillis,
+    maxExtraThreads: PositiveInt = PositiveInt.tryCreate(256),
+    parallelism: Option[PositiveInt] = None,
+    corePoolSize: Option[PositiveInt] = None,
+    maxPoolSize: Option[PositiveInt] = None,
+    minRunnable: Option[PositiveInt] = None,
+    mutexMaxSpins: Option[PositiveInt] = None,
+) {
+
+  def keepAliveMillis: PositiveInt =
+    PositiveInt.create(keepAlive.underlying.toMillis.toInt).getOrElse(PositiveInt.tryCreate(60000))
+
+}
+object ThreadingConfig {
+  private val defaultKeepAliveMillis = config.NonNegativeFiniteDuration.ofSeconds(60) // fj default
+}
+
 /** Parameters for testing Canton. Use default values in a production environment.
   *
   * @param enableAdditionalConsistencyChecks
@@ -285,6 +320,8 @@ final case class RetentionPeriodDefaults(
   * @param stateRefreshInterval
   *   If configured, the config file will be reread in the given interval to allow dynamic
   *   properties to be picked up immediately
+  * @param threading
+  *   Threading configurations
   */
 final case class CantonParameters(
     clock: ClockConfig = ClockConfig.WallClock(),
@@ -304,6 +341,7 @@ final case class CantonParameters(
     ),
     enableAlphaStateViaConfig: Boolean = false,
     stateRefreshInterval: Option[config.NonNegativeFiniteDuration] = None,
+    threading: ThreadingConfig = ThreadingConfig(),
 ) {
   def getStartupParallelism(numThreads: PositiveInt): PositiveInt =
     startupParallelism.getOrElse(numThreads)
@@ -419,17 +457,22 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
         disableUpgradeValidation = participantParameters.disableUpgradeValidation,
         enableStrictDarValidation = participantParameters.enableStrictDarValidation,
         commandProgressTracking = participantParameters.commandProgressTracker,
-        unsafeOnlinePartyReplication = participantParameters.unsafeOnlinePartyReplication,
+        alphaOnlinePartyReplicationSupport =
+          participantParameters.alphaOnlinePartyReplicationSupport,
         automaticallyPerformLsu = participantParameters.automaticallyPerformLsu,
         reassignmentsConfig = participantParameters.reassignmentsConfig,
         doNotAwaitOnCheckingIncomingCommitments =
           participantParameters.doNotAwaitOnCheckingIncomingCommitments,
         disableOptionalTopologyChecks = participantConfig.topology.disableOptionalTopologyChecks,
+        commitmentAsynchronousInitialization =
+          participantParameters.commitmentAsynchronousInitialization,
         commitmentCheckpointInterval = participantParameters.commitmentCheckpointInterval,
         commitmentMismatchDebugging = participantParameters.commitmentMismatchDebugging,
         commitmentProcessorNrAcsChangesBehindToTriggerCatchUp =
           participantParameters.commitmentProcessorNrAcsChangesBehindToTriggerCatchUp,
         commitmentReduceParallelism = participantParameters.commitmentReduceParallelism,
+        commitmentUseDbSnapshotForParticipantLookup =
+          participantParameters.commitmentUseDbSnapshotForParticipantLookup,
         autoSyncProtocolFeatureFlags = participantParameters.autoSyncProtocolFeatureFlags,
         alphaMultiSynchronizerSupport = participantParameters.alphaMultiSynchronizerSupport,
       )
@@ -455,8 +498,8 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
           sequencerNodeConfig.parameters.maxConfirmationRequestsBurstFactor,
         asyncWriter = sequencerNodeConfig.parameters.asyncWriter.toParameters,
         timeAdvancingTopology = sequencerNodeConfig.parameters.timeAdvancingTopology,
-        unsafeEnableOnlinePartyReplication =
-          sequencerNodeConfig.parameters.unsafeEnableOnlinePartyReplication,
+        unsafeSequencerChannelSupport =
+          sequencerNodeConfig.parameters.unsafeSequencerChannelSupport,
         requestLimits = sequencerNodeConfig.publicApi.limits,
         maxAuthTokensPerMember = sequencerNodeConfig.publicApi.maxAuthTokensPerMember,
       )
@@ -617,6 +660,27 @@ final case class CantonConfig(
       .focus(_.mediators)
       .modify(mapWithDefaults)
   }
+
+  def mergeDynamicChanges(newConfig: CantonConfig): CantonConfig = {
+    def merge[T](cur: Map[InstanceName, T], newConfig: Map[InstanceName, T], merger: (T, T) => T) =
+      cur.map { case (name, config) =>
+        (name, newConfig.get(name).map(merger(config, _)).getOrElse(config))
+      }
+    copy(
+      participants = merge[ParticipantNodeConfig](
+        participants,
+        newConfig.participants,
+        { case (old, cur) => old.copy(alphaDynamic = cur.alphaDynamic) },
+      ),
+      sequencers = merge[SequencerNodeConfig](
+        sequencers,
+        newConfig.sequencers,
+        { case (old, cur) => old.copy(declarative = cur.declarative) },
+      ),
+    )
+
+  }
+
 }
 
 private[canton] object CantonNodeParameterConverter {
@@ -628,6 +692,7 @@ private[canton] object CantonNodeParameterConverter {
       loggingConfig = parent.monitoring.logging,
       enableAdditionalConsistencyChecks = parent.parameters.enableAdditionalConsistencyChecks,
       enablePreviewFeatures = parent.features.enablePreviewCommands,
+      enableTestingFeatures = parent.features.enableTestingCommands,
       processingTimeouts = parent.parameters.timeouts.processing,
       sequencerClient = node.sequencerClient,
       cachingConfigs = node.parameters.caching,
@@ -886,8 +951,8 @@ object CantonConfig {
 
     lazy implicit final val adminServerReader: ConfigReader[AdminServerConfig] =
       deriveReader[AdminServerConfig]
-    lazy implicit final val tlsBaseServerConfigReader: ConfigReader[TlsBaseServerConfig] =
-      deriveReader[TlsBaseServerConfig]
+    lazy implicit final val tlsBaseServerConfigReader: ConfigReader[BaseServerTlsConfig] =
+      deriveReader[BaseServerTlsConfig]
 
     lazy implicit final val clockConfigReader: ConfigReader[ClockConfig] = {
       implicit val clockConfigRemoteClockReader: ConfigReader[ClockConfig.RemoteClock] =
@@ -958,8 +1023,28 @@ object CantonConfig {
       deriveReader[JsonApiConfig]
     }
 
-    lazy implicit final val topologyConfigReader: ConfigReader[TopologyConfig] =
-      deriveReader[TopologyConfig]
+    lazy implicit final val topologyConfigReader: ConfigReader[TopologyConfig] = {
+
+      implicit val deprecatedFields: DeprecatedFieldsFor[TopologyConfig] =
+        new DeprecatedFieldsFor[TopologyConfig] {
+
+          override def deprecatePath: List[DeprecatedConfigPath[?]] =
+            List(
+              DeprecatedConfigPath(
+                "use-new-processor",
+                since = "3.5.0",
+                valueFilter = Some(false),
+              ),
+              DeprecatedConfigPath(
+                "use-new-client",
+                since = "3.5.0",
+                valueFilter = Some(false),
+              ),
+            )
+        }
+
+      deriveReader[TopologyConfig].applyDeprecations
+    }
 
     lazy implicit val databaseSequencerExclusiveStorageConfigReader
         : ConfigReader[DatabaseSequencerExclusiveStorageConfig] =
@@ -969,15 +1054,17 @@ object CantonConfig {
       deriveReader[SequencerHighAvailabilityConfig]
     lazy implicit final val sequencerConfigDatabaseReader: ConfigReader[SequencerConfig.Database] =
       deriveReader[SequencerConfig.Database]
+
     lazy implicit final val throughputCapConfigReader
-        : ConfigReader[BlockSequencerConfig.ThroughputCapConfig] =
+        : ConfigReader[BlockSequencerConfig.ThroughputCapConfig] = {
+      implicit val throughputCapByMessageTypeConfigReader
+          : ConfigReader[BlockSequencerConfig.ThroughputCapByMessageTypeConfig] = {
+        import com.digitalasset.canton.synchronizer.sequencer.BlockSequencerConfig.IndividualThroughputCapConfig.ConfigImplicits.individualCapConfigReader
+        deriveReader[BlockSequencerConfig.ThroughputCapByMessageTypeConfig]
+      }
       deriveReader[BlockSequencerConfig.ThroughputCapConfig]
-    lazy implicit final val throughputCapByMessageTypeConfigReader
-        : ConfigReader[BlockSequencerConfig.ThroughputCapByMessageTypeConfig] =
-      deriveReader[BlockSequencerConfig.ThroughputCapByMessageTypeConfig]
-    lazy implicit final val individualThroughputCapConfigReader
-        : ConfigReader[BlockSequencerConfig.IndividualThroughputCapConfig] =
-      deriveReader[BlockSequencerConfig.IndividualThroughputCapConfig]
+    }
+
     lazy implicit final val individualCircuitBreakerConfigReader
         : ConfigReader[BlockSequencerConfig.IndividualCircuitBreakerConfig] =
       deriveReader[BlockSequencerConfig.IndividualCircuitBreakerConfig]
@@ -1101,14 +1188,43 @@ object CantonConfig {
         } yield config
       }
 
+    lazy implicit final val asyncWriterConfigReader: ConfigReader[AsyncWriterConfig] = {
+      implicit val deprecatedFields: DeprecatedFieldsFor[AsyncWriterConfig] =
+        new DeprecatedFieldsFor[AsyncWriterConfig] {
+
+          override def deprecatePath: List[DeprecatedConfigPath[?]] =
+            List(
+              DeprecatedConfigPath(
+                "enabled",
+                since = "3.5.0",
+                valueFilter = Some(false),
+              )
+            )
+        }
+
+      deriveReader[AsyncWriterConfig].applyDeprecations
+    }
+
+    lazy implicit final val timeAdvancingTopologyConfigReader
+        : ConfigReader[TimeAdvancingTopologyConfig] =
+      deriveReader[TimeAdvancingTopologyConfig]
+
     lazy implicit final val sequencerNodeParametersConfigReader
         : ConfigReader[SequencerNodeParameterConfig] = {
-      implicit val asyncWriterConfigReader: ConfigReader[AsyncWriterConfig] =
-        deriveReader[AsyncWriterConfig]
-      implicit val timeAdvancingTopologyConfigReader: ConfigReader[TimeAdvancingTopologyConfig] =
-        deriveReader[TimeAdvancingTopologyConfig]
-      deriveReader[SequencerNodeParameterConfig]
+      implicit val deprecatedFields: DeprecatedFieldsFor[SequencerNodeParameterConfig] =
+        new DeprecatedFieldsFor[SequencerNodeParameterConfig] {
+          override def movedFields: List[DeprecatedConfigUtils.MovedConfigPath] = List(
+            DeprecatedConfigUtils.MovedConfigPath(
+              "unsafe-enable-online-party-replication",
+              since = "3.5.0",
+              to = Seq("unsafe-sequencer-channel-support"),
+            )
+          )
+        }
+
+      deriveReader[SequencerNodeParameterConfig].applyDeprecations
     }
+
     lazy implicit final val SequencerHealthConfigReader: ConfigReader[SequencerHealthConfig] =
       deriveReader[SequencerHealthConfig]
 
@@ -1276,8 +1392,20 @@ object CantonConfig {
               "automatically-perform-logical-synchronizer-upgrade",
               since = "3.5.0",
               to = Seq("automatically-perform-lsu"),
-            )
+            ),
+            DeprecatedConfigUtils.MovedConfigPath(
+              "unsafe-online-party-replication",
+              since = "3.5.0",
+              to = Seq("alpha-online-party-replication-support"),
+            ),
           )
+        }
+
+      implicit val modeConfigReader: ConfigReader[NextGenContractStateMachine.Mode] =
+        ConfigReader.fromString[NextGenContractStateMachine.Mode] { str =>
+          NextGenContractStateMachine.Mode
+            .fromString(str)
+            .toRight(CannotConvert(str, "Mode", "Not a valid contract state machine mode"))
         }
 
       implicit val cantonEngineConfigReader: ConfigReader[CantonEngineConfig] = {
@@ -1288,6 +1416,9 @@ object CantonConfig {
       implicit val participantStoreConfigReader: ConfigReader[ParticipantStoreConfig] = {
         implicit val journalPruningConfigReader: ConfigReader[JournalPruningConfig] =
           deriveReader[JournalPruningConfig]
+        implicit val safeToPruneCommitmentStateConfigReader
+            : ConfigReader[SafeToPruneCommitmentState] =
+          SafeToPruneCommitmentState.reader
         deriveReader[ParticipantStoreConfig]
       }
       implicit val adminWorkflowConfigReader: ConfigReader[AdminWorkflowConfig] =
@@ -1297,12 +1428,12 @@ object CantonConfig {
       implicit val packageMetadataViewConfigReader: ConfigReader[PackageMetadataViewConfig] =
         deriveReader[PackageMetadataViewConfig]
       implicit val partyReplicatorTestInterceptorReader
-          : ConfigReader[UnsafeOnlinePartyReplicationConfig.TestInterceptor] =
+          : ConfigReader[AlphaOnlinePartyReplicationConfig.TestInterceptor] =
         (_: ConfigCursor) =>
           sys.error("party replicator test interceptor cannot be created from pureconfig")
-      implicit val unsafeOnlinePartyReplicationConfig
-          : ConfigReader[UnsafeOnlinePartyReplicationConfig] =
-        deriveReader[UnsafeOnlinePartyReplicationConfig]
+      implicit val alphaOnlinePartyReplicationConfig
+          : ConfigReader[AlphaOnlinePartyReplicationConfig] =
+        deriveReader[AlphaOnlinePartyReplicationConfig]
       implicit val reassignmentsReader: ConfigReader[ReassignmentsConfig] =
         deriveReader[ReassignmentsConfig]
       deriveReader[ParticipantNodeParameterConfig].applyDeprecations
@@ -1327,8 +1458,22 @@ object CantonConfig {
     lazy implicit val authTokenManagerExponentialBackoffJitterFullConfigReader
         : ConfigReader[AuthenticationTokenManagerExponentialBackoffJitterConfig.Full.type] =
       deriveReader[AuthenticationTokenManagerExponentialBackoffJitterConfig.Full.type]
-    lazy implicit final val sequencerClientConfigReader: ConfigReader[SequencerClientConfig] =
-      deriveReader[SequencerClientConfig]
+    lazy implicit final val sequencerClientConfigReader: ConfigReader[SequencerClientConfig] = {
+
+      implicit val deprecatedFields: DeprecatedFieldsFor[SequencerClientConfig] =
+        new DeprecatedFieldsFor[SequencerClientConfig] {
+
+          override def deprecatePath: List[DeprecatedConfigPath[?]] =
+            List(
+              DeprecatedConfigPath[Boolean](
+                "use-new-connection-pool",
+                since = "3.5.0",
+              )
+            )
+        }
+
+      deriveReader[SequencerClientConfig].applyDeprecations
+    }
 
     lazy implicit final val cantonParametersReader: ConfigReader[CantonParameters] = {
       implicit val ammoniteConfigReader: ConfigReader[AmmoniteConsoleConfig] =
@@ -1342,6 +1487,8 @@ object CantonConfig {
           deriveReader[ProcessingTimeout]
         deriveReader[TimeoutSettings]
       }
+      implicit val threadingConfigReader: ConfigReader[ThreadingConfig] =
+        deriveReader[ThreadingConfig]
       deriveReader[CantonParameters]
     }
     lazy implicit final val cantonFeaturesReader: ConfigReader[CantonFeatures] =
@@ -1374,8 +1521,10 @@ object CantonConfig {
 
     implicit val publicServerConfigReader: ConfigReader[PublicServerConfig] =
       deriveReader[PublicServerConfig]
-    implicit val sequencerNodeConfigReader: ConfigReader[SequencerNodeConfig] =
+    implicit val sequencerNodeConfigReader: ConfigReader[SequencerNodeConfig] = {
+      import DeclarativeSequencerConfig.Readers.*
       deriveReader[SequencerNodeConfig]
+    }
   }
 
   private implicit def cantonConfigReader(implicit
@@ -1588,8 +1737,8 @@ object CantonConfig {
 
     lazy implicit final val adminServerConfigWriter: ConfigWriter[AdminServerConfig] =
       deriveWriter[AdminServerConfig]
-    lazy implicit final val tlsBaseServerConfigWriter: ConfigWriter[TlsBaseServerConfig] =
-      deriveWriter[TlsBaseServerConfig]
+    lazy implicit final val tlsBaseServerConfigWriter: ConfigWriter[BaseServerTlsConfig] =
+      deriveWriter[BaseServerTlsConfig]
 
     lazy implicit final val clockConfigWriter: ConfigWriter[ClockConfig] = {
       implicit val clockConfigRemoteClockWriter: ConfigWriter[ClockConfig.RemoteClock] =
@@ -1675,14 +1824,13 @@ object CantonConfig {
     lazy implicit final val sequencerConfigDatabaseWriter: ConfigWriter[SequencerConfig.Database] =
       deriveWriter[SequencerConfig.Database]
     lazy implicit final val throughputCapConfigWriter
-        : ConfigWriter[BlockSequencerConfig.ThroughputCapConfig] =
+        : ConfigWriter[BlockSequencerConfig.ThroughputCapConfig] = {
+      import BlockSequencerConfig.IndividualThroughputCapConfig.ConfigImplicits.individualCapConfigWriter
+      implicit val throughputCapByMessageTypeConfigWriter
+          : ConfigWriter[BlockSequencerConfig.ThroughputCapByMessageTypeConfig] =
+        deriveWriter[BlockSequencerConfig.ThroughputCapByMessageTypeConfig]
       deriveWriter[BlockSequencerConfig.ThroughputCapConfig]
-    lazy implicit final val throughputCapByMessageTypeConfigWriter
-        : ConfigWriter[BlockSequencerConfig.ThroughputCapByMessageTypeConfig] =
-      deriveWriter[BlockSequencerConfig.ThroughputCapByMessageTypeConfig]
-    lazy implicit final val individualThroughputCapConfigWriter
-        : ConfigWriter[BlockSequencerConfig.IndividualThroughputCapConfig] =
-      deriveWriter[BlockSequencerConfig.IndividualThroughputCapConfig]
+    }
     lazy implicit final val individualCircuitBreakerConfigWriter
         : ConfigWriter[BlockSequencerConfig.IndividualCircuitBreakerConfig] =
       deriveWriter[BlockSequencerConfig.IndividualCircuitBreakerConfig]
@@ -1951,6 +2099,10 @@ object CantonConfig {
 
     lazy implicit final val participantNodeParameterConfigWriter
         : ConfigWriter[ParticipantNodeParameterConfig] = {
+      implicit val modeConfigWriter: ConfigWriter[NextGenContractStateMachine.Mode] =
+        ConfigWriter.fromFunction[NextGenContractStateMachine.Mode](mode =>
+          ConfigWriter[String].to(mode.toString)
+        )
       implicit val cantonEngineConfigWriter: ConfigWriter[CantonEngineConfig] = {
         implicit val engineLoggingConfigWriter: ConfigWriter[EngineLoggingConfig] =
           deriveWriter[EngineLoggingConfig]
@@ -1959,6 +2111,9 @@ object CantonConfig {
       implicit val participantStoreConfigWriter: ConfigWriter[ParticipantStoreConfig] = {
         implicit val journalPruningConfigWriter: ConfigWriter[JournalPruningConfig] =
           deriveWriter[JournalPruningConfig]
+        implicit val safeToPruneCommitmentStateConfigWriter
+            : ConfigWriter[SafeToPruneCommitmentState] =
+          SafeToPruneCommitmentState.writer
         deriveWriter[ParticipantStoreConfig]
       }
       implicit val adminWorkflowConfigWriter: ConfigWriter[AdminWorkflowConfig] =
@@ -1969,11 +2124,11 @@ object CantonConfig {
       implicit val packageMetadataViewConfigWriter: ConfigWriter[PackageMetadataViewConfig] =
         deriveWriter[PackageMetadataViewConfig]
       implicit val partyReplicatorTestInterceptorWriter
-          : ConfigWriter[UnsafeOnlinePartyReplicationConfig.TestInterceptor] =
+          : ConfigWriter[AlphaOnlinePartyReplicationConfig.TestInterceptor] =
         ConfigWriter.toString(_ => "None")
-      implicit val unsafeOnlinePartyReplicationConfigWriter
-          : ConfigWriter[UnsafeOnlinePartyReplicationConfig] =
-        deriveWriter[UnsafeOnlinePartyReplicationConfig]
+      implicit val alphaOnlinePartyReplicationConfigWriter
+          : ConfigWriter[AlphaOnlinePartyReplicationConfig] =
+        deriveWriter[AlphaOnlinePartyReplicationConfig]
       implicit val reassignmentsConfigWriter: ConfigWriter[ReassignmentsConfig] =
         deriveWriter[ReassignmentsConfig]
       deriveWriter[ParticipantNodeParameterConfig]
@@ -2013,6 +2168,8 @@ object CantonConfig {
           deriveWriter[ProcessingTimeout]
         deriveWriter[TimeoutSettings]
       }
+      implicit val threadingConfigWriter: ConfigWriter[ThreadingConfig] =
+        deriveWriter[ThreadingConfig]
       deriveWriter[CantonParameters]
     }
     lazy implicit final val cantonFeaturesWriter: ConfigWriter[CantonFeatures] =
@@ -2043,8 +2200,10 @@ object CantonConfig {
     }
     implicit val mediatorNodeConfigWriter: ConfigWriter[MediatorNodeConfig] =
       deriveWriter[MediatorNodeConfig]
-    implicit val sequencerNodeConfigWriter: ConfigWriter[SequencerNodeConfig] =
+    implicit val sequencerNodeConfigWriter: ConfigWriter[SequencerNodeConfig] = {
+      import DeclarativeSequencerConfig.Writers.*
       deriveWriter[SequencerNodeConfig]
+    }
   }
 
   private def makeWriter(confidential: Boolean): ConfigWriter[CantonConfig] = {

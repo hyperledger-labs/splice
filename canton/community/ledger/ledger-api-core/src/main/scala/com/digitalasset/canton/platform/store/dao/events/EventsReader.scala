@@ -46,12 +46,13 @@ private[dao] sealed class EventsReader(
       contractId: ContractId,
       internalEventFormatO: Option[InternalEventFormat],
   )(implicit loggingContext: LoggingContextWithTrace): Future[GetEventsByContractIdResponse] = {
-    implicit val errorLoggingContext: ErrorLoggingContext = ErrorLoggingContext(logger, implicitly)
+    implicit val errorLoggingContext: ErrorLoggingContext =
+      ErrorLoggingContext(logger, loggingContext)
     (for {
       internalEventFormat <- OptionT.fromOption[Future](internalEventFormatO)
       internalContractId <- OptionT(
         contractStore
-          .lookupBatchedInternalIds(List(contractId))
+          .lookupBatchedInternalIdsNonReadThrough(List(contractId))
           .map(_.values.headOption)
       )
       (create, archiveO) <- OptionT(

@@ -373,7 +373,7 @@ object ListLsuAnnouncementResult {
 final case class ListLsuSequencerConnectionSuccessorResult(
     context: BaseResult,
     item: LsuSequencerConnectionSuccessor,
-)
+) extends TopologyResult[LsuSequencerConnectionSuccessor]
 
 object ListLsuSequencerConnectionSuccessorResult {
   def fromProtoV30(

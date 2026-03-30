@@ -4,6 +4,7 @@
 package com.digitalasset.canton.synchronizer.config
 
 import com.daml.jwt.JwtTimestampLeeway
+import com.daml.tls.{BaseServerTlsConfig, TlsClientConfigOnlyTrustFile}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
@@ -44,7 +45,7 @@ import scala.concurrent.duration.Duration
 final case class PublicServerConfig(
     override val address: String = "127.0.0.1",
     override val internalPort: Option[Port] = None,
-    tls: Option[TlsBaseServerConfig] = None,
+    tls: Option[BaseServerTlsConfig] = None,
     override val keepAliveServer: Option[BasicKeepAliveServerConfig] = Some(
       BasicKeepAliveServerConfig()
     ),
@@ -52,6 +53,8 @@ final case class PublicServerConfig(
       PublicServerConfig.defaultNonceExpirationInterval,
     maxTokenExpirationInterval: NonNegativeFiniteDuration =
       PublicServerConfig.defaultMaxTokenExpirationInterval,
+    override val maxConcurrentStreamsPerConnection: NonNegativeInt =
+      ServerConfig.defaultMaxConcurrentStreamsPerConnection,
     maxAuthTokensPerMember: PositiveInt = PublicServerConfig.defaultMaxAuthTokensPerMember,
     useExponentialRandomTokenExpiration: Boolean = false,
     overrideMaxRequestSize: Option[NonNegativeInt] = None,
@@ -78,7 +81,7 @@ final case class PublicServerConfig(
 
   override def serverCertChainFile: Option[PemFileOrString] = tls.map(_.certChainFile)
 
-  /** This setting has no effect. Therfore hardcoding it to 0.
+  /** This setting has no effect. Therefore hardcoding it to 0.
     */
   override final def maxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(0)
   def connection: String = {

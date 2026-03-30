@@ -6,6 +6,7 @@ package com.digitalasset.canton.protocol.messages
 import cats.Functor
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{
   HashPurpose,
   Signature,
@@ -14,12 +15,11 @@ import com.digitalasset.canton.crypto.{
   SyncCryptoApi,
   SyncCryptoError,
 }
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.messages.SignedProtocolMessageContent.SignedMessageContentCast
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.protocol.{v30, v31}
 import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, OpenEnvelope}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -68,15 +68,15 @@ object ProtocolMessage {
     */
   def filterSynchronizerEnvelopes[M <: ProtocolMessage](
       envelopes: Seq[OpenEnvelope[M]],
-      synchronizerId: PhysicalSynchronizerId,
+      psid: PhysicalSynchronizerId,
   )(
       onWrongSynchronizer: Seq[OpenEnvelope[M]] => Unit
   ): Seq[OpenEnvelope[M]] = {
-    val (withCorrectSynchronizerId, withWrongSynchronizerId) =
-      envelopes.partition(_.protocolMessage.psid == synchronizerId)
-    if (withWrongSynchronizerId.nonEmpty)
-      onWrongSynchronizer(withWrongSynchronizerId)
-    withCorrectSynchronizerId
+    val (withCorrectPsid, withWrongPsid) =
+      envelopes.partition(_.protocolMessage.psid == psid)
+    if (withWrongPsid.nonEmpty)
+      onWrongSynchronizer(withWrongPsid)
+    withCorrectPsid
   }
 
   trait ProtocolMessageContentCast[A <: ProtocolMessage] {
@@ -105,9 +105,16 @@ object ProtocolMessage {
     envelope.traverse(cast.toKind)
 }
 
-/** Marker trait for [[ProtocolMessage]]s that are not a [[SignedProtocolMessage]] */
+/** Marker trait for [[ProtocolMessage]]s that are not a [[SignedProtocolMessage]]
+  *
+  * Unlike [[SignedProtocolMessage]], the sequencer does not check the signature on a
+  * [[UnsignedProtocolMessage]]. The message itself can contain signatures which are then verified
+  * by the recipient(s).
+  */
 trait UnsignedProtocolMessage extends ProtocolMessage {
   protected[messages] def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent
+
+  protected[messages] def toProtoSomeEnvelopeContentV31: v31.EnvelopeContent.SomeEnvelopeContent
 }
 
 /** There can be any number of signatures. Every signature covers the serialization of the
@@ -214,32 +221,28 @@ object SignedProtocolMessage
     NonEmpty(Seq, signature, moreSignatures*),
   )
 
-  /** @param approximateTimestampOverride
-    *   optional timestamp to use for signing. Should only be set when signing submission requests,
-    *   encrypted view messages or any other times when the topology is not yet fixed, i.e., when
-    *   using a topology snapshot approximation. The current local clock reading is often a suitable
-    *   value.
+  /** @param signingTimestampOverrides
+    *   Optional overrides for selecting an approximate signing timestamp and validity end, used to
+    *   select the correct session signing key whenever session signing keys are enabled.
     */
   def signAndCreate[M <: SignedProtocolMessageContent](
       message: M,
       cryptoApi: SyncCryptoApi,
-      approximateTimestampOverride: Option[CantonTimestamp],
+      signingTimestampOverrides: Option[SigningTimestampOverrides],
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = ???
 
-  /** @param approximateTimestampOverride
-    *   optional timestamp to use for signing. Should only be set when signing submission requests,
-    *   encrypted view messages or any other times when the topology is not yet fixed, i.e., when
-    *   using a topology snapshot approximation. The current local clock reading is often a suitable
-    *   value.
+  /** @param signingTimestampOverrides
+    *   Optional overrides for selecting an approximate signing timestamp and validity end, used to
+    *   select the correct session signing key whenever session signing keys are enabled.
     */
   @VisibleForTesting
   private[canton] def mkSignature[M <: SignedProtocolMessageContent](
       typedMessage: TypedSignedProtocolMessageContent[M],
       cryptoApi: SyncCryptoApi,
-      approximateTimestampOverride: Option[CantonTimestamp],
+      signingTimestampOverrides: Option[SigningTimestampOverrides],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Signature] = {
@@ -247,18 +250,22 @@ object SignedProtocolMessage
     val serialization = typedMessage.getCryptographicEvidence
 
     val hash = cryptoApi.pureCrypto.digest(hashPurpose, serialization)
-    cryptoApi.sign(hash, SigningKeyUsage.ProtocolOnly, approximateTimestampOverride)
+    cryptoApi.sign(
+      hash,
+      SigningKeyUsage.ProtocolOnly,
+      signingTimestampOverrides,
+    )
   }
 
   def trySignAndCreate[M <: SignedProtocolMessageContent](
       message: M,
       cryptoApi: SyncCryptoApi,
-      approximateTimestampOverride: Option[CantonTimestamp],
+      signingTimestampOverrides: Option[SigningTimestampOverrides],
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[SignedProtocolMessage[M]] =
-    signAndCreate(message, cryptoApi, approximateTimestampOverride)
+    signAndCreate(message, cryptoApi, signingTimestampOverrides)
       .valueOr(err =>
         throw new IllegalStateException(s"Failed to create signed protocol message: $err")
       )
@@ -277,7 +284,6 @@ object SignedProtocolMessage
         "signatures",
         signaturesP,
       )
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
       signedMessage = SignedProtocolMessage(typedMessage, signatures)
     } yield signedMessage
   }

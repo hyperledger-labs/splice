@@ -23,6 +23,7 @@ import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
 import io.circe.Codec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import io.grpc.stub.StreamObserver
@@ -166,6 +167,7 @@ class JsStateService(
         state_service.GetActiveContractsRequest(
           activeAtOffset = req.activeAtOffset,
           eventFormat = req.eventFormat,
+          streamContinuationToken = req.streamContinuationToken,
         )
       case (None, None, _) =>
         throw RequestValidationErrors.InvalidArgument
@@ -183,6 +185,7 @@ class JsStateService(
               verbose = verbose,
             )
           ),
+          streamContinuationToken = req.streamContinuationToken,
         )
     }
 
@@ -190,6 +193,7 @@ class JsStateService(
 
 object JsStateService extends DocumentationEndpoints {
   import Endpoints.*
+  import JsSchema.JsServicesCommonCodecs.*
   import JsStateServiceCodecs.*
 
   private lazy val state = v2Endpoint.in(sttp.tapir.stringToPath("state"))
@@ -278,6 +282,7 @@ final case class JsAssignedEvent(
 final case class JsGetActiveContractsResponse(
     workflowId: String,
     contractEntry: JsContractEntry,
+    streamContinuationToken: ByteString,
 )
 
 object JsStateServiceCodecs {
@@ -323,7 +328,8 @@ object JsStateServiceCodecs {
   // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-  implicit val jsContractEntrySchema: Schema[JsContractEntry] = Schema.oneOfWrapped
+  implicit val jsContractEntrySchema: Schema[JsContractEntry] =
+    Schema.oneOfWrapped[JsContractEntry].oneOfExtension()
 
   implicit val connectedSynchronizerSchema
       : Schema[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
