@@ -19,3 +19,6 @@ resources:
     memory: "5Gi"
   limits:
     memory: "8Gi"
+
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
+enableReloader: true
