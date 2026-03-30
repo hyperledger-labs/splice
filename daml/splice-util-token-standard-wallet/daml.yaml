@@ -24,6 +24,7 @@ data-dependencies:
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
+  - -Wno-ledger-time-is-alpha
   - --target=2.1
 codegen:
   java:

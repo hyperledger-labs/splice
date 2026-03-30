@@ -54,3 +54,7 @@ Cleanup performed so far:
   may be upgraded
 - Use `authorizerHoldingCids` instead of `senderHoldingCids` in all V2 choice results that
   return holdings of the allocation authorizer
+- Add an explicit `AllocationRequest_Accept` choice to provide a standard way for wallets to signal acceptance
+  and provide replay protection for the creation of the corresponding allocations
+- Add a new `Splice.Util.TokenWallet.BatchingUtilityV2` template with choices that implement the standard
+  logic for accepting V1 and V2 requests in a V2 wallet.

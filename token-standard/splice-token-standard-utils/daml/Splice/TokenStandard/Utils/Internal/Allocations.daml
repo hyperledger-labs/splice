@@ -533,7 +533,7 @@ instance BackwardCompatible AllocationInstructionV1.AllocationInstructionResult 
   upcast (AllocationInstructionV1.AllocationInstructionResult with output, senderChangeCids, meta) =
     AllocationInstructionV2.AllocationInstructionResult with
       output = upcast output
-      senderChangeCids = map upcast senderChangeCids
+      authorizerChangeCids = map upcast senderChangeCids
       meta
 
 

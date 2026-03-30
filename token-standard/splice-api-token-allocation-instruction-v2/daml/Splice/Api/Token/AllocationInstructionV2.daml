@@ -161,8 +161,8 @@ interface AllocationFactory where
 data AllocationInstructionResult = AllocationInstructionResult with
     output : AllocationInstructionResult_Output
      -- ^ The output of the step.
-    senderChangeCids : [ContractId Holding]
-      -- ^ New holdings owned by the sender created to return "change". Can be used
+    authorizerChangeCids : [ContractId Holding]
+      -- ^ New holdings owned by the authorizer created to return "change". Can be used
       -- by callers to batch creating or updating multiple allocation instructions
       -- in a single Daml transaction.
     meta : Metadata
