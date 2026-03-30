@@ -9,6 +9,12 @@ data-dependencies:
   - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
   - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
   - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
+  - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
+  - ../../token-standard/splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
+  - ../../token-standard/splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
+  - ../../token-standard/splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
+  - ../../token-standard/splice-api-token-allocation-request-v2/.daml/dist/splice-api-token-allocation-request-v2-current.dar
+  - ../../token-standard/splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds

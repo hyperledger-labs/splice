@@ -10,6 +10,7 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   netAllocationCreditAmount,
   splitLegsByAdmin,
   splitLegsByTradingAccount,
+  filterLegsForAccount,
 
 
   -- * Allocation template implementations
@@ -90,6 +91,12 @@ import Splice.TokenStandard.Utils.Internal.Choices
 -- Allocation utilities
 ------------------------
 
+-- FIXME: comments
+filterLegsForAccount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> [AllocationV2.TransferLeg]
+filterLegsForAccount account transferLegs =
+  filter (\tl -> account == tl.sender || account == tl.receiver) transferLegs
+
+-- FIXME: rename 'TradingAccount' to 'Account'
 splitLegsByTradingAccount : [AllocationV2.TransferLeg] -> Map.Map HoldingV2.Account [AllocationV2.TransferLeg]
 splitLegsByTradingAccount legs = Map.fromListWithR (++) $ do
   leg <- legs

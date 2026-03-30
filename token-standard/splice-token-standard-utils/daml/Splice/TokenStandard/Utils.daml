@@ -43,6 +43,7 @@ module Splice.TokenStandard.Utils (
 
   -- ** Utilities for allocations
   netAllocationCreditAmount,
+  filterLegsForAccount,
   splitLegsByAdmin,
   splitLegsByTradingAccount,
 

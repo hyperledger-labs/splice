@@ -103,7 +103,6 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
     `splice-util-token-standard-wallet-test-daml`,
-    `splice-util-token-standard-wallet-test-daml`,
     `splice-util-batched-markers-daml`,
     `splice-util-batched-markers-test-daml`,
     `splitwell-daml`,
@@ -945,9 +944,7 @@ lazy val `splice-util-token-standard-wallet-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+        (`splice-token-standard-utils-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
           (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )

@@ -205,4 +205,4 @@ acceptAllocationRequestV2 registries tradingAccount actor (reqCid, req) = do
 
 filterLegsForAccount : V2.Account -> [V2.TransferLeg] -> [V2.TransferLeg]
 filterLegsForAccount account transferLegs =
-  filter (\tl -> account.owner == tl.sender.owner || account.owner == tl.receiver.owner) transferLegs
+  filter (\tl -> account == tl.sender || account == tl.receiver) transferLegs
