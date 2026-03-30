@@ -1,19 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.JsonObject
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
-  AppRewardCoupon,
-  ValidatorRewardCoupon,
-}
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{AppRewardCoupon, ValidatorRewardCoupon}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 
@@ -43,13 +40,15 @@ class ScanFrontendTimeBasedIntegrationTest
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
-
-  def compareLeaderboardTable(
-      resultRowClassName: String,
-      expected: Seq[String],
-  )(implicit webDriver: WebDriverType) = {
-    findAll(className(resultRowClassName)).toSeq.map(seleniumText) shouldBe expected
-  }
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Scan)(
+          _.copy(
+            // By default, the acs snapshot trigger processes 30sec of history per invocation,
+            // which is too slow for this test which advances time by hours or days.
+            acsSnapshotTriggerPollingInterval = Some(NonNegativeFiniteDuration.ofHours(1))
+          )
+        )(config)
+      )
 
   override protected lazy val sanityChecksIgnoredRootCreates = Seq(
     AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
@@ -225,23 +224,36 @@ class ScanFrontendTimeBasedIntegrationTest
 
     "See expected total amulet balance" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val firstRound = sv1ScanBackend
-        .getLatestOpenMiningRound(env.environment.clock.now)
-        .contract
-        .payload
-        .round
-        .number
-
-      advanceRoundsToNextRoundOpening
       aliceWalletClient.tap(100.0)
 
-      actAndCheck(
-        "Advance rounds",
-        (1 to 5).foreach(_ => advanceRoundsToNextRoundOpening),
-      )(
-        "Wait for round to close in scan",
-        _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
+      clue(
+        "Wait for backfilling to complete, as the ACS snapshot trigger is paused until then"
+      ) {
+        eventually() {
+          sv1ScanBackend.automation.updateHistory
+            .getBackfillingState()
+            .futureValue should be(BackfillingState.Complete)
+          advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)
+        }
+      }
+
+      val startTime = getLedgerTime
+
+      advanceTime(
+        java.time.Duration
+          .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
+          .plusSeconds(1L)
       )
+
+      val snapshot1 = eventually() {
+        val snapshot1 = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+          getLedgerTime,
+          migrationId,
+        )
+        snapshot1 should not be None
+        snapshot1.value.toInstant shouldBe >(startTime.toInstant)
+        snapshot1
+      }
 
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
