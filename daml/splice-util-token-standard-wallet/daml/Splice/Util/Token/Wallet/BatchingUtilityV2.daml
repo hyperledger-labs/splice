@@ -66,46 +66,47 @@ template BatchingUtility
   where
     signatory provider
 
-    -- FIXME: comment on "only call this if only V1 request interface is implemented"
+    -- | Accept an allocation request using the V1 allocation factory interface.
+    -- This MUST only be used to accept allocation requests from V1 apps.
+    --
+    -- All account references are interpreted as references to basic accounts.
     nonconsuming choice BatchingUtility_AcceptAllocationRequestV1
       : BatchingUtility_AcceptAllocationRequestV1Result
       with
-        reqCid : ContractId V1.AllocationRequest
+        reqView : V1.AllocationRequestView
         acceptedAt : Time
-        factoryCalls : [(Text, ContractId V1.AllocationFactory, ExtraArgs)] -- FIXME: define type with named fields
+        factoryCalls : TextMap.TextMap (ContractId V1.AllocationFactory, ExtraArgs) -- FIXME: define type with named fields
         inputHoldingMap : HoldingMap
         actor : Party
       controller provider
       do
         assertDeadlineExceeded "acceptedAt" acceptedAt
         -- fetch and validate request (note: no explicit acceptance for V1 requests)
-        req <- fetch reqCid
-        let reqView = view req
-        let legsV2 = [upcast_v1_v2_TransferLeg legId leg | (legId, leg) <- TextMap.toList reqView.transferLegs]
-        let relevantLegs = filter (\leg -> leg.sender.owner == actor) legsV2
-        require' ("number of relevant legs", length relevantLegs) isEqualR ("number of factory calls", length factoryCalls)
+        let relevantLegs = TextMap.filter (\leg -> leg.sender == actor) reqView.transferLegs
+        let account = basicAccount actor
+        require' ("number of relevant legs", TextMap.size relevantLegs)
+          isEqualR ("number of factory calls", TextMap.size factoryCalls)
         -- execute the factory calls with proper threading of input holdings
-        let executeCall (holdingMap, results) (leg, (legId, factoryCid, extraArgs)) = do
-              requireMatchExpected ("call legId", legId) leg.transferLegId
-              let admin = leg.instrumentId.admin
-              -- FIXME: just passing in input holdings for all instrument ids of the admin feels a bit weird
-              let (inputHoldingCids, newHoldingMap) = getHoldingsFor (admin, leg.sender) holdingMap
-              -- prudent engineering: check that the controller of the choice is equal to the actor
-              let legV1 = downcast leg
-              require' ("leg.sender", legV1.sender) isEqualR ("actor", actor)
-              result <- exercise factoryCid V1.AllocationFactory_Allocate with
-                expectedAdmin = admin
-                requestedAt = acceptedAt
-                inputHoldingCids = map downcast inputHoldingCids
-                allocation = V1.AllocationSpecification with
-                  settlement = reqView.settlement
-                  transferLegId = leg.transferLegId
-                  transferLeg = legV1
-                extraArgs
-              let changeCids = map upcast result.senderChangeCids
-              let holdingMapWithOutputs = storeHoldingsFor (admin, leg.sender) changeCids newHoldingMap
-              pure (holdingMapWithOutputs, result :: results)
-        (outputHoldingMap, allocationResultsRev) <- foldlA executeCall (inputHoldingMap, []) (zip relevantLegs factoryCalls)
+        let executeCall (holdingMap, results) (legId, leg) = do
+              case TextMap.lookup legId factoryCalls of
+                None -> fail ("No factory call provided for leg " <> show legId)
+                Some (factoryCid, extraArgs) -> do
+                  let admin = leg.instrumentId.admin
+                  -- FIXME: just passing in input holdings for all instrument ids of the admin feels a bit weird
+                  let (inputHoldingCids, newHoldingMap) = getHoldingsFor (admin, account) holdingMap
+                  result <- exercise factoryCid V1.AllocationFactory_Allocate with
+                    expectedAdmin = admin
+                    requestedAt = acceptedAt
+                    inputHoldingCids = map downcast inputHoldingCids
+                    allocation = V1.AllocationSpecification with
+                      settlement = reqView.settlement
+                      transferLegId = legId
+                      transferLeg = leg
+                    extraArgs
+                  let changeCids = map upcast result.senderChangeCids
+                  let holdingMapWithOutputs = storeHoldingsFor (admin, account) changeCids newHoldingMap
+                  pure (holdingMapWithOutputs, result :: results)
+        (outputHoldingMap, allocationResultsRev) <- foldlA executeCall (inputHoldingMap, []) (TextMap.toList relevantLegs)
         -- done: share results
         pure BatchingUtility_AcceptAllocationRequestV1Result with
           allocationResults = reverse allocationResultsRev
@@ -118,7 +119,7 @@ template BatchingUtility
         reqCid : ContractId V2.AllocationRequest
         acceptExtraArgs : ExtraArgs
         acceptedAt : Time
-        factoriesByAdmin : Map.Map Party (ContractId V2.AllocationFactory, ExtraArgs)
+        factoriesByAdmin : Map.Map Party (ContractId V2.AllocationFactory, ExtraArgs) -- FIXME: provide V1 factory
         inputHoldingMap : HoldingMap
         actor : Party
       controller provider

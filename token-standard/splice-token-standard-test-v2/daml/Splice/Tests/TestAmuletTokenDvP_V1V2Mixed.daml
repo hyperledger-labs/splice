@@ -268,9 +268,10 @@ runTest mkTest = do
    forA_ env.allParties $ \trader -> do
     if trader `elem` test.partiesWithV1Wallet
       then do
+        -- FIXME: listing in V2 wallet
         reqs <- WalletClientV1.listAllocationRequests trader
         forA_ reqs $ \req -> do
-          WalletClientV1.acceptAllocationRequest env.registryV1.dso env.registryV1 trader req
+          WalletClientV2.acceptAllocationRequestV1 env.registryV1.dso env.registryV1 trader req
       else do
         reqs <- WalletClientV2.listAllocationRequestsV2 (basicAccount trader) trader
         trace ("num requests for", trader, length reqs) $
