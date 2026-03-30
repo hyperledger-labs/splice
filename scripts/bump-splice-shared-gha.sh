@@ -23,7 +23,7 @@ git switch -c "${updated_branch}"
 git commit -m "[ci] bump $submodule_name version to the latest (auto-generated)" -s
 git push origin "${updated_branch}"
 
-pr_state=$(gh pr view "$bump_branch" --json state --jq '.state' 2>/dev/null || echo "NOT_FOUND")
+pr_state=$(gh pr view "$updated_branch" --json state --jq '.state' 2>/dev/null || echo "NOT_FOUND")
 if [ "$pr_state" == "OPEN" ]; then
   echo "PR already open. Nothing more to do."
 else
