@@ -116,6 +116,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings.updateV1ToUpdateV2
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.scan.store.bulk.AcsSnapshotBulkStorage.AcsSnapshotObjects
@@ -859,7 +860,7 @@ class HttpScanHandler(
         includeImportUpdates = false,
         extracted,
       )
-        .map(items => definitions.UpdateHistoryResponseV2(items.map(toUpdateV2)))
+        .map(items => definitions.UpdateHistoryResponseV2(items.map(updateV1ToUpdateV2)))
     }
   }
 
@@ -893,7 +894,7 @@ class HttpScanHandler(
           } yield {
             val encodedUpdateV2 = updateO
               .map(
-                ScanHttpEncodings.encodeUpdate(
+                ScanHttpEncodings.encodeUpdateV2(
                   _,
                   encoding,
                   ScanHttpEncodings.V1,
@@ -901,7 +902,6 @@ class HttpScanHandler(
                   externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
                 )
               )
-              .map(toUpdateV2)
             val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
               ScanHttpEncodings.encodeVerdict(v, views)
             }
@@ -973,7 +973,7 @@ class HttpScanHandler(
       } yield events.map { case (verdictWithViewsO, updateO) =>
         val encodedUpdateV2 = updateO
           .map(
-            ScanHttpEncodings.encodeUpdate(
+            ScanHttpEncodings.encodeUpdateV2(
               _,
               encoding,
               ScanHttpEncodings.V1,
@@ -981,7 +981,6 @@ class HttpScanHandler(
               externalTransactionHashThresholdTime = externalTransactionHashThresholdTime,
             )
           )
-          .map(toUpdateV2)
         val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
           ScanHttpEncodings.encodeVerdict(v, views)
         }
@@ -1018,28 +1017,6 @@ class HttpScanHandler(
         .map(items => definitions.EventHistoryResponse(items))
     }
   }
-
-  private def toUpdateV2(update: UpdateHistoryItem): UpdateHistoryItemV2 =
-    update match {
-      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
-        UpdateHistoryItemV2(
-          UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
-        )
-      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
-        UpdateHistoryItemV2(
-          UpdateHistoryTransactionV2(
-            updateId = t.updateId,
-            migrationId = t.migrationId,
-            workflowId = t.workflowId,
-            recordTime = t.recordTime,
-            synchronizerId = t.synchronizerId,
-            effectiveAt = t.effectiveAt,
-            rootEventIds = t.rootEventIds,
-            eventsById = SortedMap.from(t.eventsById),
-            externalTransactionHash = t.externalTransactionHash,
-          )
-        )
-    }
 
   private def confirmBackfillingIsCompleteThen[T](
       updateHistory: UpdateHistory
@@ -1924,7 +1901,7 @@ class HttpScanHandler(
           case Left(error) =>
             ScanResource.GetUpdateByIdV2Response.NotFound(error)
           case Right(update) =>
-            ScanResource.GetUpdateByIdV2Response.OK(toUpdateV2(update))
+            ScanResource.GetUpdateByIdV2Response.OK(updateV1ToUpdateV2(update))
         }
     }
   }

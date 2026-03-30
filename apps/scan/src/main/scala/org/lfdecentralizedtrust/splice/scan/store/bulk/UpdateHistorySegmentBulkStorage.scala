@@ -118,7 +118,7 @@ class UpdateHistorySegmentBulkStorage(
 
   private def encodeUpdates(updates: Seq[TreeUpdateWithMigrationId]) = {
     val encoded = updates.map(update =>
-      ScanHttpEncodings.encodeUpdate(
+      ScanHttpEncodings.encodeUpdateV2(
         update,
         definitions.DamlValueEncoding.CompactJson,
         ScanHttpEncodings.V1,
