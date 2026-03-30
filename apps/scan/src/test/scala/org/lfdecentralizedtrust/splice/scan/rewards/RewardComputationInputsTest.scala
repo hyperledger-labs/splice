@@ -118,7 +118,7 @@ object RewardComputationInputsTest {
     // --- 1. Normal traffic, cap does not bind ---
 
     // MainNet: BME = 0.8 (~95 MB traffic), cap does not bind (0.8 > 1/1.5 ≈ 0.66)
-    // ≈ 375 CC/MB ≈ $56/MB in rewards — within Simon's expected $60-90/MB range
+    // ≈ 375 CC/MB ≈ $56/MB in rewards — within expected $60-90/MB range
     TestCase(
       label = "MainNet: BME=0.8, cap does not bind",
       inputs = mainNet,
