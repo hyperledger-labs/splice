@@ -456,7 +456,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
             0L,
             Some("transfer-command-description"),
           )
-        actAndCheck()(
+        actAndCheck(timeUntilSuccess = 1.minute)(
           "Submit signed TransferCommand creation",
           aliceValidatorBackend.submitTransferPreapprovalSend(
             externalPartyOnboarding.party,
