@@ -279,7 +279,7 @@ describe('Proposal Details Content', () => {
     expect(unfeaturedAppSection).toBeInTheDocument();
 
     const rightContractId = screen.getByTestId('proposal-details-unfeature-app-label');
-    expect(rightContractId.textContent).toMatch(/Proposal ID/);
+    expect(rightContractId.textContent).toMatch(/Featured Application Contract ID/);
 
     const rightContractIdValue = screen.getByTestId('proposal-details-unfeature-app-value');
     expect(rightContractIdValue.textContent).toMatch(/rightContractId/);

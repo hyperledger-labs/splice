@@ -146,7 +146,7 @@ describe('Review Proposal Component', () => {
     expect(screen.getByTestId('effectiveDate-title').textContent).toBe('Effective Date');
     expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
 
-    expect(screen.getByTestId('grantRight-title').textContent).toBe('Provider');
+    expect(screen.getByTestId('grantRight-title').textContent).toBe('Provider Party ID');
     expect(screen.getByTestId('grantRight-field').textContent).toBe(provider);
   });
 
@@ -188,7 +188,9 @@ describe('Review Proposal Component', () => {
     expect(screen.getByTestId('revokeProviderPartyId-title').textContent).toBe('Provider Party ID');
     expect(screen.getByTestId('revokeProviderPartyId-field').textContent).toBe(providerPartyId);
 
-    expect(screen.getByTestId('revokeRight-title').textContent).toBe('Proposal ID');
+    expect(screen.getByTestId('revokeRight-title').textContent).toBe(
+      'Featured Application Contract ID'
+    );
     expect(screen.getByTestId('revokeRight-field').textContent).toBe(contractId);
   });
 

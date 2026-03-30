@@ -195,7 +195,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           />
 
           <DetailItem
-            label="Contract ID"
+            label="Vote Proposal Contract ID"
             value={
               <CopyableIdentifier
                 value={contractId}
@@ -577,9 +577,14 @@ const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
     >
       <DetailItem
         label="Provider Party ID"
-        value={provider}
+        value={
+          <CopyableIdentifier
+            value={provider}
+            size="large"
+            data-testid="proposal-details-feature-app-value"
+          />
+        }
         labelId="proposal-details-feature-app-label"
-        valueId="proposal-details-feature-app-value"
       />
     </Box>
   );
@@ -622,7 +627,7 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
         />
       )}
       <DetailItem
-        label="Proposal ID"
+        label="Featured Application Contract ID"
         value={
           <CopyableIdentifier
             value={rightContractId}

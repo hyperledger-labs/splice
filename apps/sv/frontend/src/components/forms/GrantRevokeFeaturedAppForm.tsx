@@ -43,13 +43,13 @@ export type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormF
 
 const GRANT_REVOKE_FEATURED_APP_CONFIG = {
   SRARC_GrantFeaturedAppRight: {
-    providerFieldTitle: 'Provider',
+    providerFieldTitle: 'Provider Party ID',
     testIdPrefix: 'grant-featured-app',
     reviewFormKey: 'grant-right' as const,
   },
   SRARC_RevokeFeaturedAppRight: {
     providerFieldTitle: 'Provider Party ID',
-    rightCidFieldTitle: 'Proposal ID',
+    rightCidFieldTitle: 'Featured Application Contract ID',
     testIdPrefix: 'revoke-featured-app',
     reviewFormKey: 'revoke-right' as const,
   },

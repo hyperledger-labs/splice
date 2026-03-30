@@ -69,7 +69,7 @@ describe('Grant Featured App Form', () => {
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue-title');
     expect(providerInput).toBeInTheDocument();
-    expect(providerInput.textContent).toBe('Provider');
+    expect(providerInput.textContent).toBe('Provider Party ID');
 
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
   });
@@ -386,7 +386,9 @@ describe('Revoke Featured App Form', () => {
     expect(screen.getByTestId('revokeProviderPartyId-field').textContent).toBe(
       'a-party-id::1014912492'
     );
-    expect(screen.getByTestId('revokeRight-title').textContent).toBe('Proposal ID');
+    expect(screen.getByTestId('revokeRight-title').textContent).toBe(
+      'Featured Application Contract ID'
+    );
     expect(screen.getByTestId('revokeRight-field').textContent).toBe('rightCid123');
   });
 
