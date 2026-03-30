@@ -37,37 +37,37 @@ class DbCryptoHashFunctionsTest
 
     Seq(
       HashTestCase(
-        "crypto_hash_text('hello')",
-        "crypto_hash_text('hello')",
+        "daml_crypto_hash_text('hello')",
+        "daml_crypto_hash_text('hello')",
         DamlCryptoHash.hashText("hello"),
       ),
       HashTestCase(
-        "crypto_hash_text on empty string",
-        "crypto_hash_text('')",
+        "daml_crypto_hash_text on empty string",
+        "daml_crypto_hash_text('')",
         DamlCryptoHash.hashText(""),
       ),
       HashTestCase(
-        "crypto_hash_list with two elements",
-        s"""crypto_hash_list(ARRAY[
-            crypto_hash_text('alice::provider'),
-            crypto_hash_text('10.0')
+        "daml_crypto_hash_list with two elements",
+        s"""daml_crypto_hash_list(ARRAY[
+            daml_crypto_hash_text('alice::provider'),
+            daml_crypto_hash_text('10.0')
           ]::text[])""",
         DamlCryptoHash.hashList(Seq(hAlice, h10)),
       ),
       HashTestCase(
-        "crypto_hash_list on empty array",
-        "crypto_hash_list(ARRAY[]::text[])",
+        "daml_crypto_hash_list on empty array",
+        "daml_crypto_hash_list(ARRAY[]::text[])",
         DamlCryptoHash.hashList(Seq.empty),
       ),
       HashTestCase(
-        "crypto_hash_list on single element",
-        "crypto_hash_list(ARRAY[crypto_hash_text('only')]::text[])",
+        "daml_crypto_hash_list on single element",
+        "daml_crypto_hash_list(ARRAY[daml_crypto_hash_text('only')]::text[])",
         DamlCryptoHash.hashList(Seq(hOnly)),
       ),
       HashTestCase(
-        "crypto_hash_variant with tag and one field",
-        s"""crypto_hash_variant('TestTag', ARRAY[
-            crypto_hash_text('alice::provider')
+        "daml_crypto_hash_variant with tag and one field",
+        s"""daml_crypto_hash_variant('TestTag', ARRAY[
+            daml_crypto_hash_text('alice::provider')
           ]::text[])""",
         DamlCryptoHash.hashVariant("TestTag", Seq(hAlice)),
       ),
@@ -88,12 +88,12 @@ class DbCryptoHashFunctionsTest
     Seq(
       HashTestCase(
         "golden: hashRecord [hash 1, hash 'x'] (Daml RecV1)",
-        s"crypto_hash_list(ARRAY['$h1', '$hx']::text[])",
+        s"daml_crypto_hash_list(ARRAY['$h1', '$hx']::text[])",
         "e2878cf11d8a10aa17f359e1f61f711756fdbbc256bf541baec14c21b6888f6e",
       ),
       HashTestCase(
         "golden: hashVariant 'V1' [hash 1, hash 'x'] (Daml VarV1.V1)",
-        s"crypto_hash_variant('V1', ARRAY['$h1', '$hx']::text[])",
+        s"daml_crypto_hash_variant('V1', ARRAY['$h1', '$hx']::text[])",
         "ca314e0bdf0fc327940a89334ff6df58f234b395d36328af1a0cce2339227e5c",
       ),
     )
