@@ -31,11 +31,12 @@ import com.digitalasset.canton.platform.apiserver.services.command.interactive.c
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.PreparedTransactionCodec.*
 import com.digitalasset.canton.protocol.{LfNode, LfNodeId}
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.Synchronizer
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.data.Ref.TypeConId
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
 import com.digitalasset.daml.lf.transaction.{
   CreationTime,
   FatContractInstance,
@@ -174,8 +175,9 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
         templateId: TypeConId,
         key: Value,
         packageName: Ref.PackageName,
+        hash: lf.crypto.Hash,
     ): Result[lf.transaction.GlobalKey] =
-      lf.transaction.GlobalKey.build(templateId, key, packageName).leftMap(_.msg).toResult
+      lf.transaction.GlobalKey.build(templateId, packageName, key, hash).leftMap(_.msg).toResult
 
     PartialTransformer
       .define[iscd.GlobalKey, lf.transaction.GlobalKey]
@@ -312,7 +314,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
       errorLoggingContext: ErrorLoggingContext
   ): PartialTransformer[Seq[
     Metadata.GlobalKeyMappingEntry
-  ], Map[lf.transaction.GlobalKey, Option[lf.value.Value.ContractId]]] =
+  ], Map[lf.transaction.GlobalKey, Vector[lf.value.Value.ContractId]]] =
     PartialTransformer { result =>
       result
         .traverse { case Metadata.GlobalKeyMappingEntry(keyOpt, valueOpt) =>
@@ -328,7 +330,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
                   s"Value with key $convertedValue in global key mapping was not a contract id"
                 )
             }
-          } yield convertedKey -> contractId
+          } yield convertedKey -> contractId.asCidVector
         }
         .map(_.toMap)
     }
@@ -449,9 +451,9 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
         )
         .transform
         .toFutureWithLoggedFailuresDecode("Failed to deserialize submitter info", logger)
-      synchronizerId <- Future.fromTry(
-        SynchronizerId
-          .fromProtoPrimitive(metadataProto.synchronizerId, "synchronizer_id")
+      synchronizer <- Future.fromTry(
+        Synchronizer
+          .fromLogicalOrPhysicalString(metadataProto.synchronizerId, "synchronizer_id")
           .leftMap(_.message)
           .leftMap(RequestValidationErrors.InvalidArgument.Reject(_).asGrpcError)
           .toTry
@@ -500,7 +502,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
         .transformIntoPartial[lf.transaction.VersionedTransaction]
         .toFutureWithLoggedFailuresDecode("Failed to deserialize transaction", logger)
       globalKeyMapping <- metadataProto.globalKeyMapping
-        .transformIntoPartial[Map[lf.transaction.GlobalKey, Option[lf.value.Value.ContractId]]]
+        .transformIntoPartial[Map[lf.transaction.GlobalKey, Vector[lf.value.Value.ContractId]]]
         .toFutureWithLoggedFailuresDecode("Failed to deserialize global key mapping", logger)
       inputContracts <- metadataProto.inputContracts
         .traverse(_.transformIntoPartial[ExternalInputContract])
@@ -533,7 +535,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
     } yield {
       ExecuteTransactionData(
         submitterInfo = submitterInfo,
-        synchronizerId = synchronizerId,
+        synchronizer = synchronizer,
         transactionMeta = transactionMeta,
         transaction = lf.transaction.SubmittedTransaction(transaction),
         globalKeyMapping = globalKeyMapping,

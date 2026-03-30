@@ -24,7 +24,7 @@ addCommandAlias("makeOpenDocs", "; compile; community-app/bundle; docs-open/make
 
 addCommandAlias(
   "pingTest",
-  "community-app/testOnly com.digitalasset.canton.integration.tests.SimplestPingIntegrationTestH2",
+  "community-app/testOnly com.digitalasset.canton.integration.tests.SimplestPingBftOrderingIntegrationTestH2",
 )
 
 /*
@@ -227,7 +227,7 @@ lazy val root = (project in file("."))
       (
         Seq(CommunityProjects.`performance-driver`)
           ++ testLibraries
-          ++ DamlProjects.allProjects
+          ++ Seq(DamlProjects.`bindings-java`)
           ++ ledgerTestToolLibaries
           ++ transcodeLibraries // Cannot run scaladoc 2.13 on transcode because written in Scala 3
       ).map(_.project): _*
@@ -434,7 +434,6 @@ lazy val `ledger-api-value` = DamlProjects.`ledger-api-value`
 lazy val `ledger-api-proto` = DamlProjects.`ledger-api-proto`
 lazy val `ledger-api-scala` = DamlProjects.`ledger-api-scala`
 lazy val `bindings-java` = DamlProjects.`bindings-java`
-lazy val `ledger-common` = CommunityProjects.`ledger-common`
 lazy val `ledger-common-dars` = CommunityProjects.`ledger-common-dars`
 lazy val `ledger-common-dars-lf-v2-dev` = CommunityProjects.`ledger-common-dars-lf-v2-dev`
 lazy val `ledger-common-dars-lf-v2-1` = CommunityProjects.`ledger-common-dars-lf-v2-1`
@@ -470,6 +469,12 @@ lazy val `ledger-test-tool-2-dev` = CommunityProjects.`ledger-test-tool-2-dev`
 lazy val `conformance-testing` = CommunityProjects.`conformance-testing`
 lazy val `upgrading-integration-tests` =
   CommunityProjects.`upgrading-integration-tests`
+lazy val `model-based-testing-generators` =
+  CommunityProjects.`model-based-testing-generators`
+lazy val `model-based-testing-drivers` =
+  CommunityProjects.`model-based-testing-drivers`
+lazy val `model-based-testing-integration-tests` =
+  CommunityProjects.`model-based-testing-integration-tests`
 
 lazy val `scalatest-utils` = DamlProjects.`scalatest-utils`
 lazy val `scala-utils` = DamlProjects.`scala-utils`
@@ -477,31 +482,28 @@ lazy val `nonempty` = DamlProjects.`nonempty`
 lazy val `nonempty-cats` = DamlProjects.`nonempty-cats`
 lazy val `rs-grpc-bridge` = DamlProjects.`rs-grpc-bridge`
 lazy val `rs-grpc-pekko` = DamlProjects.`rs-grpc-pekko`
+lazy val `rs-grpc-pekko-test` = DamlProjects.`rs-grpc-pekko-test`
 lazy val `logging-entries` = DamlProjects.`logging-entries`
 lazy val `contextualized-logging` = DamlProjects.`contextualized-logging`
 lazy val `daml-resources` = DamlProjects.`daml-resources`
 lazy val `resources-pekko` = DamlProjects.`resources-pekko`
 lazy val `resources-grpc` = DamlProjects.`resources-grpc`
 lazy val `ledger-resources` = DamlProjects.`ledger-resources`
-lazy val `ledger-resources-test-lib` = DamlProjects.`ledger-resources-test-lib`
 lazy val `timer-utils` = DamlProjects.`timer-utils`
 lazy val crypto = DamlProjects.crypto
 lazy val nameof = DamlProjects.nameof
 lazy val `testing-utils` = DamlProjects.`testing-utils`
-lazy val `grpc-test-utils` = DamlProjects.`grpc-test-utils`
-lazy val `rs-grpc-testing-utils` = DamlProjects.`rs-grpc-testing-utils`
 lazy val `test-evidence-tag` = DamlProjects.`test-evidence-tag`
 lazy val `test-evidence-generator` = DamlProjects.`test-evidence-generator`
 lazy val `test-evidence-scalatest` = DamlProjects.`test-evidence-scalatest`
-lazy val `sample-service` = DamlProjects.`sample-service`
 lazy val `ports` = DamlProjects.`ports`
-lazy val `http-test-utils` = DamlProjects.`http-test-utils`
 lazy val `executors` = DamlProjects.`executors`
 lazy val `observability-metrics` = DamlProjects.`observability-metrics`
 lazy val `observability-tracing` = DamlProjects.`observability-tracing`
 lazy val `daml-lf-data` = DamlProjects.`daml-lf-data`
 lazy val `daml-lf-data-scalacheck` = DamlProjects.`daml-lf-data-scalacheck`
 lazy val `daml-lf-data-tests` = DamlProjects.`daml-lf-data-tests`
+lazy val `daml-lf-data-bench` = DamlProjects.`daml-lf-data-bench`
 lazy val `daml-lf-repl` = DamlProjects.`daml-lf-repl`
 lazy val `daml-lf-ide-ledger` = DamlProjects.`daml-lf-ide-ledger`
 lazy val `daml-lf-language` = DamlProjects.`daml-lf-language`
@@ -517,6 +519,8 @@ lazy val `daml-lf-interpreter` = DamlProjects.`daml-lf-interpreter`
 lazy val `daml-lf-interpreter-bench` = DamlProjects.`daml-lf-interpreter-bench`
 lazy val `daml-lf-engine` = DamlProjects.`daml-lf-engine`
 lazy val `daml-lf-upgrades-matrix` = DamlProjects.`daml-lf-upgrades-matrix`
+lazy val `daml-lf-upgrades-matrix-integration` =
+  CommunityProjects.`daml-lf-upgrades-matrix-integration`
 lazy val `daml-lf-parser` = DamlProjects.`daml-lf-parser`
 lazy val `daml-lf-encoder` = DamlProjects.`daml-lf-encoder`
 lazy val `daml-lf-archive-encoder` = DamlProjects.`daml-lf-archive-encoder`

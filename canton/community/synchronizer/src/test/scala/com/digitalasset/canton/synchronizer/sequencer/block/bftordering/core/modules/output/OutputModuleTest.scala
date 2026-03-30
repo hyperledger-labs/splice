@@ -22,8 +22,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.memory.GenericInMemoryEpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
+  Bootstrap,
   EpochStoreReader,
-  Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.OutputModule.{
   DefaultRequestInspector,
@@ -645,7 +645,7 @@ class OutputModuleTest
             val newCryptoProvider = failingCryptoProvider[ProgrammableUnitTestEnv]
             when(
               topologyProviderMock.getOrderingTopologyAt(
-                topologyActivationTime,
+                Some(topologyActivationTime),
                 checkPendingChanges = true,
               )
             )
@@ -736,7 +736,7 @@ class OutputModuleTest
             )
 
             verify(topologyProviderMock, times(1))
-              .getOrderingTopologyAt(topologyActivationTime, checkPendingChanges = true)
+              .getOrderingTopologyAt(Some(topologyActivationTime), checkPendingChanges = true)
             // Update the last block if needed and set up the new topology
             piped3.foreach(output.receive)
 
@@ -790,12 +790,10 @@ class OutputModuleTest
         )
 
         // the behavior will always be the same across block modes, so the chosen one is irrelevant
-        val aTopologyActivationTime = TopologyActivationTime(CantonTimestamp.MinValue)
         val anOrderingTopology =
           OrderingTopology.forTesting(
             nodes = Set(BftNodeId("node1")),
             SequencingParameters.Default,
-            aTopologyActivationTime,
           )
         val aNewMembership =
           Membership(BftNodeId("node1"), anOrderingTopology, Seq(BftNodeId("node1")))
@@ -1084,7 +1082,7 @@ class OutputModuleTest
         context.runPipedMessages() shouldBe Seq.empty
 
         verify(topologyProviderSpy, never).getOrderingTopologyAt(
-          any[TopologyActivationTime],
+          any[Option[TopologyActivationTime]],
           checkPendingChanges = any[Boolean],
         )(
           any[TraceContext]
@@ -1109,33 +1107,32 @@ class OutputModuleTest
       val sequencerNodeRef = mock[ModuleRef[SequencerNode.SnapshotMessage]]
       val node1 = BftNodeId("node1")
       val node2 = BftNodeId("node2")
-      val node2TopologyInfo = nodeTopologyInfo(TopologyActivationTime(aTimestamp))
-      val node1TopologyInfo = nodeTopologyInfo(
-        TopologyActivationTime(node2TopologyInfo.activationTime.value.minusMillis(2))
-      )
+      val node1ActivationTime = TopologyActivationTime(aTimestamp.minusMillis(2))
+      val node2ActivationTime = TopologyActivationTime(aTimestamp)
       val topologyActivationTime =
-        TopologyActivationTime(node2TopologyInfo.activationTime.value.plusMillis(2))
+        TopologyActivationTime(aTimestamp.plusMillis(2))
       val previousTopologyActivationTime =
         TopologyActivationTime(topologyActivationTime.value.minusSeconds(1L))
       val topology = OrderingTopology(
         nodesTopologyInfo = Map(
-          node1 -> node1TopologyInfo,
-          node2 -> node2TopologyInfo,
-          BftNodeId("node from the future") ->
-            nodeTopologyInfo(
-              TopologyActivationTime(
-                node2TopologyInfo.activationTime.value.plusMillis(1)
-              )
-            ),
+          node1 -> nodeTopologyInfo(),
+          node2 -> nodeTopologyInfo(),
+          BftNodeId("node from the future") -> nodeTopologyInfo(),
         ),
+        DefaultEpochLength,
         SequencingParameters.Default,
         defaultMaxBytesToDecompress, // irrelevant for this test
         topologyActivationTime,
         areTherePendingCantonTopologyChanges = Some(false),
       )
+      val firstKnownAt = Map(
+        node1 -> node1ActivationTime,
+        node2 -> node2ActivationTime,
+        BftNodeId("node from the future") -> TopologyActivationTime(aTimestamp.plusMillis(1)),
+      )
 
       def bftTimeForBlockInFirstEpoch(blockNumber: Long) =
-        node2TopologyInfo.activationTime.value.minusSeconds(1).plusMillis(blockNumber)
+        node2ActivationTime.value.minusSeconds(1).plusMillis(blockNumber)
 
       // Store the "previous epoch"
       epochStore
@@ -1171,6 +1168,7 @@ class OutputModuleTest
           initialOrderingTopology = topology,
           store = store,
           epochStoreReader = epochStore,
+          orderingTopologyProvider = new FakeOrderingTopologyProvider(Some(firstKnownAt)),
           consensusRef = mock[ModuleRef[Consensus.Message[ProgrammableUnitTestEnv]]],
         )()
       output.receive(Output.Start)
@@ -1204,7 +1202,7 @@ class OutputModuleTest
             anOrderedBlockForOutput(
               epochNumber = 1L,
               blockNumber = DefaultEpochLength,
-              commitTimestamp = node2TopologyInfo.activationTime.value,
+              commitTimestamp = node2ActivationTime.value,
             ),
             batches = Seq.empty,
           )
@@ -1214,13 +1212,10 @@ class OutputModuleTest
 
       output.receive(
         Output.SequencerSnapshotMessage
-          .GetAdditionalInfo(timestamp = node2TopologyInfo.activationTime.value, sequencerNodeRef)
+          .GetAdditionalInfo(timestamp = node2ActivationTime.value, sequencerNodeRef)
       )
 
-      // run the first set of queries
-      context.runPipedMessages()
-      // run other queries and receive the return message
-      context.runPipedMessagesAndReceiveOnModule(output)
+      context.runPipedMessagesUntilNoMorePiped(output)
 
       verify(sequencerNodeRef, times(1)).asyncSend(
         eqTo(
@@ -1230,7 +1225,7 @@ class OutputModuleTest
                 node1 ->
                   v30.BftSequencerSnapshotAdditionalInfo
                     .SequencerActiveAt(
-                      timestamp = node1TopologyInfo.activationTime.value.toMicros,
+                      timestamp = node1ActivationTime.value.toMicros,
                       startEpochNumber = Some(EpochNumber.First),
                       firstBlockNumberInStartEpoch = Some(BlockNumber.First),
                       startEpochTopologyQueryTimestamp =
@@ -1243,7 +1238,7 @@ class OutputModuleTest
                 node2 ->
                   v30.BftSequencerSnapshotAdditionalInfo
                     .SequencerActiveAt(
-                      timestamp = node2TopologyInfo.activationTime.value.toMicros,
+                      timestamp = node2ActivationTime.value.toMicros,
                       startEpochNumber = Some(EpochNumber(1L)),
                       firstBlockNumberInStartEpoch = Some(BlockNumber(DefaultEpochLength)),
                       startEpochTopologyQueryTimestamp =
@@ -1353,7 +1348,7 @@ class OutputModuleTest
 
   private def createOutputModule[E <: BaseIgnoringUnitTestEnv[E]](
       initialHeight: Long = BlockNumber.First,
-      initialEpochForTopology: Long = Genesis.GenesisEpochNumber,
+      initialEpochForTopology: Long = Bootstrap.BootstrapEpochNumber,
       initialOrderingTopology: OrderingTopology = OrderingTopology.forTesting(nodes = Set.empty),
       availabilityRef: ModuleRef[Availability.Message[E]] = fakeModuleExpectingSilence,
       consensusRef: ModuleRef[Consensus.Message[E]] = fakeModuleExpectingSilence,
@@ -1456,16 +1451,22 @@ object OutputModuleTest {
       subscriptionBlocks.enqueue(Traced(block))
   }
 
-  private class FakeOrderingTopologyProvider[E <: BaseIgnoringUnitTestEnv[E]]
-      extends OrderingTopologyProvider[E] {
+  private class FakeOrderingTopologyProvider[E <: BaseIgnoringUnitTestEnv[E]](
+      firstKnownAtAnswer: Option[Map[BftNodeId, TopologyActivationTime]] = None
+  ) extends OrderingTopologyProvider[E] {
 
     override def getOrderingTopologyAt(
-        activationTime: TopologyActivationTime,
+        activationTime: Option[TopologyActivationTime],
         checkPendingChanges: Boolean,
     )(implicit
         traceContext: TraceContext
     ): E#FutureUnlessShutdownT[Option[(OrderingTopology, CryptoProvider[E])]] =
       createFuture(None)
+
+    override def getFirstKnownAt(activationTime: TopologyActivationTime)(implicit
+        traceContext: TraceContext
+    ): () => Option[Map[BftNodeId, TopologyActivationTime]] =
+      createFuture(firstKnownAtAnswer)
 
     private def createFuture[A](a: A): E#FutureUnlessShutdownT[A] =
       () => a
@@ -1482,10 +1483,9 @@ object OutputModuleTest {
   private val secondEpochNumber = EpochNumber(1L)
   private val secondBlockNumber = BlockNumber(1L)
 
-  private def nodeTopologyInfo(time: TopologyActivationTime) =
+  private def nodeTopologyInfo() =
     NodeTopologyInfo(
-      activationTime = time,
-      keyIds = Set.empty,
+      keyIds = Set.empty
     )
 
   def anOrderedBlockForOutput(

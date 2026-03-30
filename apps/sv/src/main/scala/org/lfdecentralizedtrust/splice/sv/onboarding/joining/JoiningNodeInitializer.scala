@@ -266,7 +266,7 @@ class JoiningNodeInitializer(
               packageVersionSupport,
               clock,
               retryProvider,
-              logger,
+              loggerFactory,
               config.domainMigrationId,
               config.scan,
             )
@@ -443,17 +443,18 @@ class JoiningNodeInitializer(
                   decentralizedSynchronizer
                 ),
               ).tupled
-            // Then, add the new local domain node to the DSO rules with an "onboarding" status
-            // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
-            _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
-              Some(synchronizerNodeService.nodes),
-              decentralizedSynchronizer,
-              Onboarding(participantReportedPSid.serial),
-            )
             // Finally, fully onboard the sequencer and mediator
             physicalSynchronizerId <-
               currentNode.onboardLocalSequencerIfRequired(
-                svConnection.map(_._2)
+                svConnection.map(_._2),
+                // Add the new local domain node to the DSO rules with an "onboarding" status
+                // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
+                preInit = () =>
+                  synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
+                    Some(synchronizerNodeService.nodes),
+                    decentralizedSynchronizer,
+                    Onboarding(participantReportedPSid.serial),
+                  ),
               )
             // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
             _ = if (!skipTrafficReconciliationTriggers)
@@ -855,7 +856,7 @@ class JoiningNodeInitializer(
                   packageVersionSupport,
                   clock,
                   retryProvider,
-                  logger,
+                  loggerFactory,
                   config.domainMigrationId,
                   config.scan,
                 )

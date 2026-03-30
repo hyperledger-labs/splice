@@ -4,7 +4,7 @@
 package com.digitalasset.canton.synchronizer.metrics
 
 import cats.Eval
-import com.daml.metrics.HealthMetrics
+import com.daml.metrics.api.HistogramInventory.Item
 import com.daml.metrics.api.MetricHandle.*
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.{
@@ -15,12 +15,12 @@ import com.daml.metrics.api.{
   MetricsContext,
 }
 import com.daml.metrics.grpc.{DamlGrpcServerHistograms, DamlGrpcServerMetrics}
+import com.daml.metrics.{CacheMetrics, HealthMetrics}
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.metrics.{
   ActiveRequestsMetrics,
-  CacheMetrics,
   DbStorageHistograms,
   DbStorageMetrics,
   DeclarativeApiMetrics,
@@ -86,6 +86,9 @@ class SequencerMetrics(
 
   val payloadCache: CacheMetrics =
     new CacheMetrics("payload-cache", openTelemetryMetricsFactory)
+
+  val catchupCache: CacheMetrics =
+    new CacheMetrics("catchup-payload-cache", openTelemetryMetricsFactory)
 
   val memberCache: CacheMetrics =
     new CacheMetrics("member-cache", openTelemetryMetricsFactory)
@@ -318,6 +321,7 @@ object SequencerMetrics {
       case SubmissionRequestType.ConfirmationRequest => "send-confirmation-request"
       case SubmissionRequestType.Verdict => "send-verdict"
       case SubmissionRequestType.Commitment => "send-commitment"
+      case SubmissionRequestType.LsuSequencingTest => "send-test-lsu-sequencing"
       case SubmissionRequestType.TopUp => "send-topup"
       case SubmissionRequestType.TopUpMed => "send-topup-med"
       case SubmissionRequestType.TopologyTransaction => "send-topology"
@@ -337,12 +341,25 @@ object SequencerMetrics {
 class MediatorHistograms(val parent: MetricName)(implicit
     inventory: HistogramInventory
 ) {
-
   private[metrics] val prefix = parent :+ "mediator"
   private[metrics] val sequencerClient = new SequencerClientHistograms(parent)
   private[metrics] val dbStorage = new DbStorageHistograms(parent)
 
+  private[metrics] val responseLatencies: Item = Item(
+    prefix :+ "response-latency",
+    summary = "Individual participant response latencies",
+    description =
+      """Provides the time difference between the sequencing time of the given senders response
+                    |and the first response received for a particular request..
+                    |""",
+    labelsWithDescription = Map(
+      "sender" -> "The participant who sent the response"
+    ),
+    qualification = MetricQualification.Latency,
+  )
+
 }
+
 class MediatorMetrics(
     histograms: MediatorHistograms,
     val openTelemetryMetricsFactory: LabeledMetricsFactory,
@@ -419,6 +436,36 @@ class MediatorMetrics(
     )(
       MetricsContext.Empty
     )
+
+  lazy val receivedTestingLsuSequencingMessages: Meter =
+    openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        name = histograms.parent :+ "received-lsu-sequencing-test-messages",
+        summary = "Received testing lsu sequencing messages by sender (sequencer)",
+        description =
+          """The number of received testing lsu sequencing messages by sender (sequencer)""".stripMargin,
+        qualification = MetricQualification.Debug,
+        labelsWithDescription = Map(
+          "sender" -> "The sequencer who sent the message"
+        ),
+      )
+    )(MetricsContext.Empty)
+
+  val responseLatencies: Timer =
+    openTelemetryMetricsFactory.timer(histograms.responseLatencies.info)(MetricsContext.Empty)
+
+  val timeoutNonResponsiveParticipants: Meter = openTelemetryMetricsFactory.meter(
+    MetricInfo(
+      prefix :+ "timeout-non-responsive-participants",
+      summary = "Count of participants that failed to respond for parties before timeout",
+      description =
+        """This metric tracks participant non-responsiveness during confirmation request timeouts.
+          |When a mediator times out a transaction, it increments this counter once for each party
+          |that the participant hosts (with confirmation rights) but did not respond for.
+          |The metric includes labels for both the party and the participant to enable detailed analysis.""",
+      qualification = MetricQualification.Debug,
+    )
+  )
 }
 
 object MediatorMetrics {

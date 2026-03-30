@@ -14,11 +14,11 @@ import {
   NamespacedAuth0Configs,
   fixedTokens,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
 import {
-  standardSvConfigs,
-  extraSvConfigs,
-  dsoSize,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+  standardSvConfigsBasic,
+  extraSvConfigsBasic,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigsBasic';
 
 function tokenLifetime(): number {
   return fixedTokens() ? 2592000 : 86400; // TODO(DACH-NY/canton-network-internal#2114): Move this to the cluster config? We want it to be long for fixed token clusters
@@ -382,7 +382,7 @@ function mainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Outpu
     ingressName: 'sv-2', // Ingress name of sv-1 is sv-2!
   };
 
-  const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
+  const extraSvs: svAuth0Params[] = extraSvConfigsBasic.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
     ingressName: sv.ingressName,
@@ -410,14 +410,14 @@ function nonMainNetAuth0(clusterBasename: string, dnsNames: string[]): pulumi.Ou
     clientSecret: auth0MgtClientSecret,
   });
 
-  const standardSvs: svAuth0Params[] = standardSvConfigs
+  const standardSvs: svAuth0Params[] = standardSvConfigsBasic
     .map(sv => ({
       namespace: sv.nodeName,
       description: sv.nodeName.replace(/-/g, '').toUpperCase(),
       ingressName: sv.ingressName,
     }))
     .slice(0, dsoSize);
-  const extraSvs: svAuth0Params[] = extraSvConfigs.map(sv => ({
+  const extraSvs: svAuth0Params[] = extraSvConfigsBasic.map(sv => ({
     namespace: sv.nodeName,
     description: sv.onboardingName,
     ingressName: sv.ingressName,

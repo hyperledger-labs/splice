@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration.tests.multihostedparties
 
+import com.digitalasset.canton.annotations.RollbackTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseH2, UsePostgres}
@@ -14,7 +15,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.participant.party.PartyReplicationTestInterceptorImpl
-import com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription.LostSequencerSubscription
+import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.LostSequencerSubscription
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -67,8 +68,9 @@ sealed trait OnlinePartyReplicationRecoverFromDisruptionsTest
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
       .addConfigTransforms(
-        ConfigTransforms.unsafeEnableOnlinePartyReplication(
-          Map("participant1" -> (() => createSourceParticipantTestInterceptor()))
+        ConfigTransforms.enableAlphaOnlinePartyReplicationSupport(
+          Map("participant1" -> (() => createSourceParticipantTestInterceptor())),
+          enableUnsafeSequencerChannelSupport = true,
         )*
       )
       .withSetup { implicit env =>
@@ -334,11 +336,13 @@ sealed trait OnlinePartyReplicationRecoverFromDisruptionsTest
   }
 }
 
+@RollbackTest
 class OnlinePartyReplicationRecoverFromDisruptionsTestH2
     extends OnlinePartyReplicationRecoverFromDisruptionsTest {
   registerPlugin(new UseH2(loggerFactory))
 }
 
+@RollbackTest
 class OnlinePartyReplicationRecoverFromDisruptionsTestPostgres
     extends OnlinePartyReplicationRecoverFromDisruptionsTest {
   registerPlugin(new UsePostgres(loggerFactory))

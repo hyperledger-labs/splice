@@ -20,6 +20,7 @@ import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, Pruning
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -39,6 +40,7 @@ import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  SequencerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -49,6 +51,7 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
+import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.github.blemale.scaffeine.Scaffeine
@@ -398,7 +401,7 @@ class ParticipantAdminConnection(
       ByteString.copyFrom(chunks.asJava)
     )
 
-  def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
+  def uploadAcsSnapshot(acsBytes: Seq[ByteString], synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
@@ -413,12 +416,13 @@ class ParticipantAdminConnection(
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcs(
+          .ImportAcsBytes(
             chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,
             excludedStakeholders = Set.empty,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+            synchronizerId = synchronizerId,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
@@ -792,6 +796,17 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
+
+  def performManualLsu(
+      currentPsid: PhysicalSynchronizerId,
+      successorPsid: PhysicalSynchronizerId,
+      upgradeTime: Option[CantonTimestamp],
+      sequencerSuccessors: Map[SequencerId, GrpcConnection],
+  )(implicit tc: TraceContext): Future[Unit] =
+    runCmd(
+      ParticipantAdminCommands.SynchronizerConnectivity
+        .PerformManualLsu(currentPsid, successorPsid, upgradeTime, sequencerSuccessors)
+    )
 }
 
 object ParticipantAdminConnection {

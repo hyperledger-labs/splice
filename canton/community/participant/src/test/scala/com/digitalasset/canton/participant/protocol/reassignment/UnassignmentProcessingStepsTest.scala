@@ -8,11 +8,7 @@ import cats.data.EitherT
 import cats.implicits.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{
-  DefaultProcessingTimeouts,
-  SessionEncryptionKeyCacheConfig,
-  TopologyConfig,
-}
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, SessionEncryptionKeyCacheConfig}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{
   Signature,
@@ -72,6 +68,7 @@ import com.digitalasset.canton.participant.store.{
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
@@ -180,7 +177,7 @@ final class UnassignmentProcessingStepsTest
   private lazy val logicalPersistentState =
     new InMemoryLogicalSyncPersistentState(
       IndexedSynchronizer.tryCreate(sourceSynchronizer.unwrap, 1),
-      enableAdditionalConsistencyChecks = true,
+      ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
       indexedStringStore = indexedStringStore,
       contractStore = contractStore,
       acsCounterParticipantConfigStore = mock[AcsCounterParticipantConfigStore],
@@ -188,16 +185,9 @@ final class UnassignmentProcessingStepsTest
       loggerFactory,
     )
   private lazy val physicalSyncPersistentState = new InMemoryPhysicalSyncPersistentState(
-    submittingParticipant,
-    clock,
     SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters),
     IndexedPhysicalSynchronizer.tryCreate(sourceSynchronizer.unwrap, 1),
     defaultStaticSynchronizerParameters,
-    parameters = ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
-    topologyConfig = TopologyConfig.forTesting,
-    packageMetadataView = mock[PackageMetadataView],
-    Eval.now(mock[LedgerApiStore]),
-    logicalPersistentState,
     loggerFactory,
     timeouts,
     futureSupervisor,
@@ -765,6 +755,7 @@ final class UnassignmentProcessingStepsTest
               sourceMediator,
               state,
               cryptoSnapshot,
+              _ => CantonTimestamp.MaxValue, // max sequencing time is irrelevant for this test
             )
             .valueOrFail("prepare submission failed")
       } yield succeed
@@ -789,6 +780,7 @@ final class UnassignmentProcessingStepsTest
             sourceMediator,
             state,
             cryptoSnapshot,
+            _ => CantonTimestamp.MaxValue, // max sequencing time is irrelevant for this test
           )
         )("prepare submission succeeded unexpectedly")
       } yield {
@@ -836,6 +828,7 @@ final class UnassignmentProcessingStepsTest
               sourceMediator,
               state,
               cryptoSnapshot,
+              _ => CantonTimestamp.MaxValue, // max sequencing time is irrelevant for this test
             )
         )("prepare submission succeeded unexpectedly")
       } yield {
@@ -929,7 +922,11 @@ final class UnassignmentProcessingStepsTest
         .futureValue
 
       val signature = cryptoSnapshot
-        .sign(fullUnassignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly, None)
+        .sign(
+          fullUnassignmentTree.rootHash.unwrap,
+          SigningKeyUsage.ProtocolOnly,
+          None, // not needed for unit tests; session signing keys disabled
+        )
         .value
         .onShutdown(fail("unexpected shutdown during a test"))
         .futureValue
@@ -954,6 +951,7 @@ final class UnassignmentProcessingStepsTest
             loggerFactory,
           ),
           DummyTickRequest,
+          PublishUpdateViaRecordOrderPublisher.noop,
         )
         .value
         .onShutdown(fail("unexpected shutdown during a test"))
@@ -1098,6 +1096,7 @@ final class UnassignmentProcessingStepsTest
       abortEngine = _ => (),
       engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
       DummyTickRequest,
+      PublishUpdateViaRecordOrderPublisher.noop,
     )
 
     "succeed without errors" in {
@@ -1150,7 +1149,11 @@ final class UnassignmentProcessingStepsTest
     "succeed when the signature is correct" in {
       for {
         signature <- cryptoSnapshot
-          .sign(fullUnassignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly, None)
+          .sign(
+            fullUnassignmentTree.rootHash.unwrap,
+            SigningKeyUsage.ProtocolOnly,
+            None, // not needed for unit tests; session signing keys disabled
+          )
           .failOnShutdown
 
         parsed = mkParsedRequest(
@@ -1184,7 +1187,11 @@ final class UnassignmentProcessingStepsTest
     "fail when the signature is incorrect" in {
       for {
         signature <- cryptoSnapshot
-          .sign(TestHash.digest("wrong signature"), SigningKeyUsage.ProtocolOnly, None)
+          .sign(
+            TestHash.digest("wrong signature"),
+            SigningKeyUsage.ProtocolOnly,
+            None, // not needed for unit tests; session signing keys disabled
+          )
           .valueOrFailShutdown("signing failed")
 
         parsed = mkParsedRequest(

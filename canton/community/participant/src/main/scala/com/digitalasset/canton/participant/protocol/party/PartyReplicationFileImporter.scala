@@ -8,21 +8,23 @@ import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
 import com.digitalasset.canton.participant.admin.party.{
+  PartyReplicationIndexingWorkflow,
   PartyReplicationStatus,
   PartyReplicationTestInterceptor,
 }
-import com.digitalasset.canton.participant.event.RecordOrderPublisher
+import com.digitalasset.canton.participant.config.AlphaOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.store.{
   AcsReplicationProgress,
   ParticipantNodePersistentState,
+  PartyReplicationIndexingStore,
 }
 import com.digitalasset.canton.participant.sync.ConnectedSynchronizer
 import com.digitalasset.canton.topology.processing.EffectiveTime
@@ -34,28 +36,52 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, blocking}
 
+/** The party replication file importer imports a party's active contracts on a specific
+  * synchronizer and timestamp previously exported from a source participant.
+  *
+  * @param partyId
+  *   The party that is being replicated.
+  * @param requestId
+  *   The "add party" request id that this replication is associated with.
+  * @param psid
+  *   The physical id of the synchronizer to replicate active contracts in.
+  * @param partyOnboardingAt
+  *   The timestamp immediately on which the ACS snapshot is based.
+  * @param replicationProgressState
+  *   Interface for processor to read and update ACS replication progress.
+  * @param persistsContracts
+  *   Interface to persist imported contracts to the ContractStore.
+  * @param requestTracker
+  *   Canton protocol request tracker used to persist to the ActiveContractStore and update the
+  *   in-memory request state in a consistent way.
+  * @param indexingStore
+  *   Store to insert imported contract activations for subsequent indexing.
+  * @param testOnlyInterceptorO
+  *   Test interceptor only alters behavior in integration tests.
+  */
 class PartyReplicationFileImporter(
+    partyId: PartyId,
     requestId: AddPartyRequestId,
     protected val psid: PhysicalSynchronizerId,
     partyOnboardingAt: EffectiveTime,
     protected val replicationProgressState: AcsReplicationProgress,
     persistsContracts: TargetParticipantAcsPersistence.PersistsContracts,
-    recordOrderPublisher: RecordOrderPublisher,
     requestTracker: RequestTracker,
-    pureCrypto: CryptoPureApi,
     acsReader: Iterator[ActiveContract],
+    indexingWorkflow: PartyReplicationIndexingWorkflow,
+    indexingStore: PartyReplicationIndexingStore,
     testOnlyInterceptorO: Option[PartyReplicationTestInterceptor],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val executionContext: ExecutionContext)
     extends TargetParticipantAcsPersistence(
+      partyId,
       requestId,
       psid,
       partyOnboardingAt,
       replicationProgressState,
       persistsContracts,
-      recordOrderPublisher,
       requestTracker,
-      pureCrypto,
+      indexingStore,
     ) {
 
   def importEntireAcsSnapshotInOneGo()(implicit
@@ -64,7 +90,7 @@ class PartyReplicationFileImporter(
     val numContractsImported = new AtomicInteger(0)
     for {
       _ <- MonadUtil.sequentialTraverse_(
-        acsReader.grouped(TargetParticipantAcsPersistence.contractsToRequestEachTime.unwrap)
+        acsReader.grouped(TargetParticipantAcsPersistence.contractsToRequestEachTime.unwrap).toSeq
       ) { contracts =>
         awaitTestInterceptor()
         logger.info(s"About to import contracts starting at ordinal ${numContractsImported.get}")
@@ -90,10 +116,7 @@ class PartyReplicationFileImporter(
           this,
         ),
       )
-      // Unpause the indexer
-      _ <- EitherT.right[String](
-        FutureUnlessShutdown.lift(recordOrderPublisher.publishBufferedEvents())
-      )
+      _ <- indexingWorkflow.indexAllContractBatches()
     } yield ()
   }
 
@@ -136,22 +159,41 @@ object PartyReplicationFileImporter {
       participantNodePersistentState: Eval[ParticipantNodePersistentState],
       connectedSynchronizer: ConnectedSynchronizer,
       acsReader: Iterator[ActiveContract],
+      config: AlphaOnlinePartyReplicationConfig,
+      batchingConfig: BatchingConfig,
       testOnlyInterceptorO: Option[PartyReplicationTestInterceptor],
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext) = new PartyReplicationFileImporter(
-    requestId,
-    connectedSynchronizer.psid,
-    partyOnboardingAt,
-    replicationProgressState,
-    new TargetParticipantAcsPersistence.PersistsContractsImpl(participantNodePersistentState),
-    connectedSynchronizer.ephemeral.recordOrderPublisher,
-    connectedSynchronizer.ephemeral.requestTracker,
-    connectedSynchronizer.synchronizerHandle.syncPersistentState.pureCryptoApi,
-    acsReader,
-    testOnlyInterceptorO,
-    loggerFactory
+  )(implicit executionContext: ExecutionContext) = {
+    val partyReplicationIndexingStore =
+      connectedSynchronizer.synchronizerHandle.syncPersistentState.partyReplicationIndexingStoreIfOnPREnabled
+        .getOrElse(throw new IllegalStateException("Expect store when OnPR enabled"))
+    val requestSpecificLoggerFactory = loggerFactory
       .append("psid", connectedSynchronizer.psid.toProtoPrimitive)
       .append("partyId", partyId.toProtoPrimitive)
-      .append("requestId", requestId.toHexString),
-  )
+      .append("requestId", requestId.toHexString)
+    new PartyReplicationFileImporter(
+      partyId,
+      requestId,
+      connectedSynchronizer.psid,
+      partyOnboardingAt,
+      replicationProgressState,
+      new TargetParticipantAcsPersistence.PersistsContractsImpl(participantNodePersistentState),
+      connectedSynchronizer.ephemeral.requestTracker,
+      acsReader,
+      new PartyReplicationIndexingWorkflow(
+        partyId,
+        connectedSynchronizer.psid,
+        partyReplicationIndexingStore,
+        participantNodePersistentState.map(_.contractStore),
+        connectedSynchronizer.ephemeral.recordOrderPublisher,
+        connectedSynchronizer.synchronizerHandle.syncPersistentState.pureCryptoApi,
+        config.pauseSynchronizerIndexingDuringPartyReplication,
+        batchingConfig,
+        requestSpecificLoggerFactory,
+      ),
+      partyReplicationIndexingStore,
+      testOnlyInterceptorO,
+      requestSpecificLoggerFactory,
+    )
+  }
 }

@@ -27,11 +27,11 @@ jobs:
       - name: Set up Nix (Self hosted)
         uses: ./splice-shared-gha/.github/actions/nix/setup_nix
         with:
-          cache_version: 7
+          cache_version: 8
           artifactory_user: dummy
           artifactory_password: dummy
           target: default
-      
+
       - name: Check for the latest version and create a PR to splice
         uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
         with:

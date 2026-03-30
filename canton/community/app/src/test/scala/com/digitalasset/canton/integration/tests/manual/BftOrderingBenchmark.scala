@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.integration.tests.manual
 
-import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt, PositiveNumeric}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
@@ -20,6 +20,7 @@ import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres
 import com.digitalasset.canton.integration.tests.bftsequencer.AwaitsBftSequencerAuthenticationDisseminationQuorum
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
 }
@@ -37,6 +38,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.performa
   BftBenchmarkTool,
 }
 import com.digitalasset.canton.tracing.TracingConfig
+import com.digitalasset.canton.util.BytesUnit
 import eu.rekawek.toxiproxy
 import eu.rekawek.toxiproxy.model.ToxicDirection
 import monocle.macros.syntax.lens.*
@@ -114,11 +116,25 @@ class BftOrderingBenchmark
       .map(_.toShort)
       .getOrElse(DefaultMaxBatchesPerProposal)
 
+  private val batchCacheSizeMb: Option[Long] =
+    Option(System.getProperty(s"$BFTOrderingBenchmarkPrefix.batch-cache-size-in-mb"))
+      .map(_.toLong)
+
   private val dedicatedExecutionContextDivisor: Option[Int] =
     Option(
       System.getProperty(s"$BFTOrderingBenchmarkPrefix.dedicated-execution-context-divisor")
     )
       .map(_.toInt)
+
+  private val pruningRetentionPeriod: FiniteDuration =
+    Option(System.getProperty(s"$BFTOrderingBenchmarkPrefix.pruning-retention-period"))
+      .map(Duration(_).asInstanceOf[FiniteDuration])
+      .getOrElse(5.minutes)
+
+  private val pruningMinBlocksToKeepHistory: Int =
+    Option(System.getProperty(s"$BFTOrderingBenchmarkPrefix.pruning-min-blocks-of-history"))
+      .map(_.toInt)
+      .getOrElse(500)
 
   private val useInMemoryStorageForBftOrderer: Boolean =
     Option(System.getProperty(s"$BFTOrderingBenchmarkPrefix.use-in-memory-storage"))
@@ -224,6 +240,15 @@ class BftOrderingBenchmark
           prefix = BFTOrderingBenchmarkPrefix,
         )*
       )
+      .addConfigTransform(ConfigTransforms.updateAllSequencerConfigs { case (_, config) =>
+        batchCacheSizeMb.fold(config) { batchSizeInMb =>
+          config
+            .focus(_.parameters.caching.bftOrderingBatchCache)
+            .modify(
+              _.copy(maximumMemory = PositiveNumeric.tryCreate(BytesUnit.MB(batchSizeInMb)))
+            )
+        }
+      })
       .addConfigTransforms(
         _.focus(_.monitoring.tracing.tracer).replace(
           TracingConfig.Tracer(
@@ -306,6 +331,15 @@ class BftOrderingBenchmark
       _.runningToxiproxy.controllingToxiproxyClient.getProxies.forEach(addToxics)
     )
     mediators.local.foreach(_.stop())
+    sequencers.local.foreach {
+      _.bft.pruning
+        .set_bft_schedule(
+          cron = "0 * * * * ?",
+          maxDuration = 15.seconds,
+          retention = pruningRetentionPeriod,
+          minBlocksToKeep = pruningMinBlocksToKeepHistory,
+        )
+    }
 
     // Use a high timeout to allow many nodes in performance testing environments
 

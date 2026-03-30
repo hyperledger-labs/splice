@@ -451,11 +451,18 @@ final class ProgrammableUnitTestContext[MessageT](resolveAwaits: Boolean = false
     var shouldContinue = true
     while (shouldContinue) {
       val messages = runPipedMessages()
-      if (messages.isEmpty) {
+      if (messages.isEmpty && pipedQueue.isEmpty) {
         shouldContinue = false
       }
       messages.foreach(message => module.receive(message)(this, traceContext))
     }
+  }
+
+  def runOneDelayedMessage(
+      module: Module[ProgrammableUnitTestEnv, MessageT]
+  )(implicit traceContext: TraceContext): Unit = {
+    val msg = delayedQueue.dequeue()
+    module.receive(msg)(this, traceContext)
   }
 
   def selfMessages: Seq[MessageT] = selfQueue.toSeq.map(_._1)

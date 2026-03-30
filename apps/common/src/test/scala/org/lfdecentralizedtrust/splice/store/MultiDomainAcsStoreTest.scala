@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.store
 
-import cats.syntax.parallel.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time
@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, Contrac
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv1,
@@ -149,12 +149,12 @@ abstract class MultiDomainAcsStoreTest[
         limit = HardLimit.tryCreate(expected.size.max(1)),
       )
       _ = actualList shouldBe expected_
-      _ <- expected_.parTraverse_ { c =>
+      _ <- MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(expected_) { c =>
         store
           .lookupContractById(AppRewardCoupon.COMPANION)(c.contract.contractId)
           .map(_ shouldBe Some(c))
       }
-      _ <- expected_.parTraverse_ { c =>
+      _ <- MonadUtil.parTraverseWithLimit_(PositiveInt.tryCreate(4))(expected_) { c =>
         store
           .lookupContractStateById(c.contract.contractId)
           .map(_ shouldBe Some(c.state))
@@ -1502,8 +1502,8 @@ abstract class MultiDomainAcsStoreTest[
           )
         )
 
-      filter.contains(toCreatedEvent(goodContract)) should be(true)
-      filter.contains(toCreatedEvent(badContract)) should be(false)
+      filter.contains(toCreatedEvent(goodContract), d1) should be(true)
+      filter.contains(toCreatedEvent(badContract), d1) should be(false)
 
       for {
         _ <- initWithAcs()
@@ -1556,14 +1556,16 @@ abstract class MultiDomainAcsStoreTest[
         toCreatedEvent(
           goodContract,
           implementedInterfaces = goodImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(true)
 
       filter.contains(
         toCreatedEvent(
           badContract,
           implementedInterfaces = badImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(false)
 
       for {
@@ -1628,14 +1630,16 @@ abstract class MultiDomainAcsStoreTest[
         toCreatedEvent(
           goodContract,
           implementedInterfaces = goodImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(true)
 
       filter.contains(
         toCreatedEvent(
           fakeAmuletContract,
           implementedInterfaces = fakeAmuletImplementedInterfaces,
-        )
+        ),
+        d1,
       ) should be(true) // as a Holding, it is included. But it should not be included as an Amulet.
 
       for {

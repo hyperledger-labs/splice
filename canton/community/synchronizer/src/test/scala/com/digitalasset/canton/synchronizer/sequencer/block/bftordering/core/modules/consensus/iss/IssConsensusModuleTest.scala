@@ -14,20 +14,16 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Bootstrap.{
+  BootstrapEpochNumber,
+  bootstrapEpoch,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.{
   Block,
   EpochInProgress,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.{
-  GenesisEpoch,
-  GenesisEpochInfo,
-  GenesisEpochNumber,
-}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.memory.GenericInMemoryEpochStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
-  EpochStore,
-  Genesis,
-}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions.RetransmissionsManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer.{
   CatchupDetector,
@@ -86,6 +82,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusStatus.EpochStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.dependencies.ConsensusModuleDependencies
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.TestBootstrapTopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   BftSequencerBaseTest,
   failingCryptoProvider,
@@ -150,9 +147,8 @@ class IssConsensusModuleTest
           ),
           Seq.empty,
         )
-        when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
+        when(epochStore.latestEpoch(anyBoolean)(any[TraceContext]))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
         when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
         val (context, consensus) =
@@ -198,9 +194,8 @@ class IssConsensusModuleTest
             Seq.empty,
           )
 
-          when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-            latestCompletedEpochFromStore
-          )
+          when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+            .thenReturn(() => Some(latestCompletedEpochFromStore))
           when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
           val (context, consensus) =
@@ -245,23 +240,21 @@ class IssConsensusModuleTest
         val epochStore = mock[EpochStore[ProgrammableUnitTestEnv]]
         val cryptoProvider = failingCryptoProvider[ProgrammableUnitTestEnv]
 
-        val aTopologyActivationTime = Genesis.GenesisTopologyActivationTime
         val aStartEpoch =
-          GenesisEpoch.info.next(epochLength, aTopologyActivationTime)
+          aBootstrapEpoch.info.next(epochLength, TestBootstrapTopologyActivationTime)
         val newEpochInfo =
-          aStartEpoch.next(epochLength, aTopologyActivationTime)
+          aStartEpoch.next(epochLength, TestBootstrapTopologyActivationTime)
         val membership =
           Membership(
             myId,
-            anOrderingTopology.copy(activationTime = aTopologyActivationTime),
+            anOrderingTopology.copy(activationTime = TestBootstrapTopologyActivationTime),
             allIds,
           )
         val latestCompletedEpochFromStore = EpochStore.Epoch(
-          EpochInfo(
+          EpochInfo.forTesting(
             aStartEpoch.number,
             aStartEpoch.startBlockNumber,
             aStartEpoch.length,
-            aTopologyActivationTime,
           ),
           Seq.empty,
         )
@@ -285,12 +278,10 @@ class IssConsensusModuleTest
               )
           }
 
-        when(epochStore.latestEpoch(includeInProgress = false)).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
-        when(epochStore.latestEpoch(includeInProgress = true)).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
+        when(epochStore.latestEpoch(includeInProgress = eqTo(false))(any[TraceContext]))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
+        when(epochStore.latestEpoch(includeInProgress = eqTo(true))(any[TraceContext]))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
         when(epochStore.loadEpochProgress(latestCompletedEpochFromStore.info)).thenReturn(() =>
           EpochInProgress(
             completedBlocks = completedBlocks,
@@ -337,30 +328,38 @@ class IssConsensusModuleTest
 
       "do nothing if a new epoch is already in progress" in {
         val epochStore = mock[EpochStore[ProgrammableUnitTestEnv]]
-        val aTopologyActivationTime = TopologyActivationTime(aTimestamp)
         val latestCompletedEpochFromStore = EpochStore.Epoch(
-          EpochInfo(
+          EpochInfo.forTesting(
             EpochNumber.First,
             BlockNumber.First,
             epochLength,
-            aTopologyActivationTime,
           ),
           Seq.empty,
         )
-        when(epochStore.latestEpoch(includeInProgress = false)).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
-        when(epochStore.latestEpoch(includeInProgress = true)).thenReturn(() =>
-          EpochStore.Epoch(
-            latestCompletedEpochFromStore.info
-              .next(epochLength, aTopologyActivationTime),
-            Seq.empty,
+        when(
+          epochStore.latestEpoch(includeInProgress = eqTo(false))(
+            any[TraceContext]
           )
         )
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
+        when(
+          epochStore.latestEpoch(includeInProgress = eqTo(true))(
+            any[TraceContext]
+          )
+        )
+          .thenReturn(() =>
+            Some(
+              EpochStore.Epoch(
+                latestCompletedEpochFromStore.info
+                  .next(epochLength, TestBootstrapTopologyActivationTime),
+                Seq.empty,
+              )
+            )
+          )
         val activeStartingEpochInfo =
           latestCompletedEpochFromStore.info.next(
             epochLength,
-            aTopologyActivationTime,
+            TestBootstrapTopologyActivationTime,
           )
         when(epochStore.loadEpochProgress(activeStartingEpochInfo)).thenReturn(() =>
           EpochStore.EpochInProgress(
@@ -398,9 +397,8 @@ class IssConsensusModuleTest
           ),
           Seq.empty,
         )
-        when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
+        when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
         when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
         val (context, consensus) =
@@ -409,7 +407,7 @@ class IssConsensusModuleTest
             preConfiguredInitialEpochState = Some(
               newEpochState(
                 EpochStore.Epoch(
-                  GenesisEpoch.info,
+                  aBootstrapEpoch.info,
                   Seq.empty,
                 ),
                 _,
@@ -458,9 +456,8 @@ class IssConsensusModuleTest
             Seq.empty,
           )
 
-          when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-            latestCompletedEpochFromStore
-          )
+          when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+            .thenReturn(() => Some(latestCompletedEpochFromStore))
           when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
           // emulate time advancing for the next epoch's ordering topology activation
@@ -515,9 +512,8 @@ class IssConsensusModuleTest
           Seq.empty,
         )
 
-        when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
+        when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
         when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
         val futurePbftMessageQueue
@@ -591,12 +587,11 @@ class IssConsensusModuleTest
         val epochStore = mock[EpochStore[ProgrammableUnitTestEnv]]
         val latestCompletedEpochFromStore =
           EpochStore.Epoch(
-            GenesisEpoch.info,
+            aBootstrapEpoch.info,
             Seq.empty,
           )
-        when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
+        when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
         val (context, consensus) =
           createIssConsensusModule(
             epochStore = epochStore,
@@ -684,9 +679,9 @@ class IssConsensusModuleTest
                   )
                 )
               when(epochStore.latestEpoch(includeInProgress = eqTo(false))(any[TraceContext]))
-                .thenReturn(() => latestCompletedEpochFromStore)
+                .thenReturn(() => Some(latestCompletedEpochFromStore))
               when(epochStore.latestEpoch(includeInProgress = eqTo(true))(any[TraceContext]))
-                .thenReturn(() => epoch1)
+                .thenReturn(() => Some(epoch1))
               when(epochStore.loadEpochProgress(epoch1.info)).thenReturn(() =>
                 EpochStore.EpochInProgress(
                   completedBlocks,
@@ -736,7 +731,6 @@ class IssConsensusModuleTest
           val (context, consensus) = createIssConsensusModule(
             p2pNetworkOutModuleRef = fakeRecordingModule(p2pNetworkOutputBuffer),
             outputModuleRef = fakeRecordingModule(outputBuffer),
-            epochLength = epochLength,
           )
           implicit val ctx: ContextType = context
 
@@ -827,9 +821,8 @@ class IssConsensusModuleTest
           ),
           Seq.empty,
         )
-        when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-          latestCompletedEpochFromStore
-        )
+        when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+          .thenReturn(() => Some(latestCompletedEpochFromStore))
         when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
         val (context, consensus) =
@@ -908,10 +901,11 @@ class IssConsensusModuleTest
       "start onboarding state transfer when a snapshot is provided" in {
         val segmentModuleMock = mock[ModuleRef[ConsensusSegment.Message]]
 
-        val aStartEpoch = GenesisEpoch.info.next(
-          epochLength,
-          Genesis.GenesisTopologyActivationTime,
-        )
+        val aStartEpoch =
+          aBootstrapEpoch.info.next(
+            epochLength,
+            TopologyActivationTime(CantonTimestamp.MinValue.immediateSuccessor),
+          )
         val aStartEpochNumber = aStartEpoch.number
 
         val (context, consensus) =
@@ -947,12 +941,11 @@ class IssConsensusModuleTest
         becomes should matchPattern {
           case Seq(
                 StateTransferBehavior(
-                  DefaultEpochLength,
                   `aStartEpochNumber`,
                   None, // minimum state transfer end epoch
                   `aTopologyInfo`,
                   `aStartEpoch`,
-                  GenesisEpoch,
+                  `aBootstrapEpoch`,
                 )
               ) =>
         }
@@ -1009,7 +1002,7 @@ class IssConsensusModuleTest
           verify(catchupDetectorMock, times(1))
             .updateLatestKnownNodeEpoch(allIds(1), EpochNumber.First)
           verify(catchupDetectorMock, times(1))
-            .shouldCatchUpTo(eqTo(GenesisEpochNumber))(any[TraceContext])
+            .shouldCatchUpTo(eqTo(BootstrapEpochNumber))(any[TraceContext])
           verify(retransmissionsManagerMock, never)
             .handleMessage(
               any[OrderingTopologyInfo[ProgrammableUnitTestEnv]],
@@ -1018,16 +1011,92 @@ class IssConsensusModuleTest
           context.extractBecomes() should matchPattern {
             case Seq(
                   StateTransferBehavior(
-                    `DefaultEpochLength`,
-                    `GenesisEpochNumber`,
+                    BootstrapEpochNumber,
                     `catchUpToEpochNumber`,
                     `aTopologyInfo`,
-                    GenesisEpochInfo,
-                    EpochStore.Epoch(GenesisEpochInfo, Seq()),
+                    `aBootstrapEpochInfo`,
+                    EpochStore.Epoch(`aBootstrapEpochInfo`, Seq()),
                   )
                 ) =>
           }
         }
+      }
+
+      "not start catch-up if the detector says so but we are advancing epoch" in {
+        val epochOfFutureMessage = EpochNumber(7L)
+        val futureMessageToTriggerDetector = PbftUnverifiedNetworkMessage(
+          SignedMessage(
+            PrePrepare.create( // Just to trigger the catch-up check
+              BlockMetadata.mk(epochOfFutureMessage, BlockNumber(100L)),
+              ViewNumber.First,
+              OrderingBlock(oneRequestOrderingBlock.proofs),
+              CanonicalCommitSet(Set.empty),
+              from = allIds(1),
+              actualSender = Some(allIds(1)),
+            ),
+            Signature.noSignature,
+          )
+        )
+        val currentEpochState = EpochStore.Epoch(
+          EpochInfo(
+            EpochNumber.First,
+            BlockNumber.First,
+            epochLength,
+            TopologyActivationTime(aTimestamp),
+          ),
+          Seq.empty,
+        )
+        val stateTransferManagerMock = mock[StateTransferManager[ProgrammableUnitTestEnv]]
+        val retransmissionsManagerMock = mock[RetransmissionsManager[ProgrammableUnitTestEnv]]
+        val segmentModuleMock = mock[ModuleRef[ConsensusSegment.Message]]
+        val catchupDetectorMock = mock[CatchupDetector]
+        when(catchupDetectorMock.updateLatestKnownNodeEpoch(any[BftNodeId], any[EpochNumber]))
+          .thenReturn(true)
+        val catchUpToEpochNumber = Some(EpochNumber(7))
+        when(catchupDetectorMock.shouldCatchUpTo(any[EpochNumber])(any[TraceContext]))
+          .thenReturn(catchUpToEpochNumber)
+
+        val epochStore = mock[EpochStore[ProgrammableUnitTestEnv]]
+        when(epochStore.latestEpoch(anyBoolean)(anyTraceContext))
+          .thenReturn(() => Some(currentEpochState))
+        val (context, consensus) =
+          createIssConsensusModule(
+            p2pNetworkOutModuleRef = fakeIgnoringModule,
+            preConfiguredInitialEpochState = Some { context =>
+              newEpochState(currentEpochState, context)
+            },
+            epochStore = epochStore,
+            segmentModuleFactoryFunction = _ => segmentModuleMock,
+            maybeOnboardingStateTransferManager = Some(stateTransferManagerMock),
+            maybeCatchupDetector = Some(catchupDetectorMock),
+            maybeRetransmissionsManager = Some(retransmissionsManagerMock),
+          )
+        implicit val ctx: ContextType = context
+
+        consensus.receive(Consensus.Start)
+
+        // simulate epoch completed
+        consensus.getEpochState.isClosing shouldBe false
+        consensus.receive(CompleteEpochStored(currentEpochState, Seq.empty))
+        consensus.getEpochState.isClosing shouldBe true
+        // we don't start new epoch because we are missing the next topology
+        verify(epochStore, never).startEpoch(any[EpochInfo])(any[TraceContext])
+
+        // now we get message that triggers catchupDetector (that would normally start state transfer)
+        consensus.receive(futureMessageToTriggerDetector)
+
+        verify(catchupDetectorMock, times(1))
+          .updateLatestKnownNodeEpoch(allIds(1), EpochNumber(epochOfFutureMessage))
+        verify(catchupDetectorMock, times(1))
+          .shouldCatchUpTo(eqTo(EpochNumber.First))(any[TraceContext])
+        verify(retransmissionsManagerMock, never)
+          .handleMessage(
+            any[OrderingTopologyInfo[ProgrammableUnitTestEnv]],
+            any[RetransmissionsMessage],
+          )(any[ContextType], any[TraceContext])
+
+        // but we are not doing state transfer because we are currently advancing epoch
+        context.extractBecomes() shouldBe empty
       }
 
       "drop remote PBFT messages" when {
@@ -1042,9 +1111,8 @@ class IssConsensusModuleTest
             ),
             Seq.empty,
           )
-          when(epochStore.latestEpoch(anyBoolean)(any[TraceContext])).thenReturn(() =>
-            latestCompletedEpochFromStore
-          )
+          when(epochStore.latestEpoch(anyBoolean)(any[TraceContext]))
+            .thenReturn(() => Some(latestCompletedEpochFromStore))
           when(epochStore.startEpoch(latestCompletedEpochFromStore.info)).thenReturn(() => ())
 
           val (context, consensus) =
@@ -1127,7 +1195,6 @@ class IssConsensusModuleTest
       outputModuleRef: ModuleRef[Output.Message[ProgrammableUnitTestEnv]] =
         fakeModuleExpectingSilence,
       p2pNetworkOutModuleRef: ModuleRef[P2PNetworkOut.Message] = fakeModuleExpectingSilence,
-      epochLength: EpochLength = DefaultEpochLength,
       topologyInfo: OrderingTopologyInfo[ProgrammableUnitTestEnv] = aTopologyInfo,
       epochStore: EpochStore[ProgrammableUnitTestEnv] =
         new InMemoryUnitTestEpochStore[ProgrammableUnitTestEnv],
@@ -1167,9 +1234,13 @@ class IssConsensusModuleTest
     )
 
     val latestCompletedEpochFromStore =
-      epochStore.latestEpoch(includeInProgress = false)(TraceContext.empty)()
+      epochStore
+        .latestEpoch(includeInProgress = false)(TraceContext.empty)()
+        .getOrElse(bootstrapEpoch(TestBootstrapTopologyActivationTime))
     val latestEpochFromStore =
-      epochStore.latestEpoch(includeInProgress = true)(TraceContext.empty)()
+      epochStore
+        .latestEpoch(includeInProgress = true)(TraceContext.empty)()
+        .getOrElse(bootstrapEpoch(TestBootstrapTopologyActivationTime))
 
     val metrics = SequencerMetrics.noop(getClass.getSimpleName).bftOrdering
 
@@ -1211,7 +1282,6 @@ class IssConsensusModuleTest
 
     context ->
       new IssConsensusModule(
-        epochLength,
         initialState,
         epochStore,
         clock,
@@ -1276,6 +1346,8 @@ private[iss] object IssConsensusModuleTest {
     aFakeCryptoProviderInstance1,
     allIds,
   )
+  private val aBootstrapEpoch = bootstrapEpoch(TestBootstrapTopologyActivationTime)
+  private val aBootstrapEpochInfo = aBootstrapEpoch.info
 
   def createSegmentModuleRefFactory(
       segmentModuleFactoryFunction: EpochState.Epoch => ModuleRef[ConsensusSegment.Message]

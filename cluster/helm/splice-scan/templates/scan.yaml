@@ -141,6 +141,11 @@ spec:
               name: {{ $.Values.bulkStorage.s3.secretName }}
               key: secretAccessKey
         {{- end }}
+        {{- with .Values.publicUrl }}
+        - name: ADDITIONAL_CONFIG_PUBLIC_URL
+          value: |
+            canton.scan-apps.scan-app.public-url = {{ . | quote }}
+        {{- end }}
         {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: SPLICE_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | quote }}

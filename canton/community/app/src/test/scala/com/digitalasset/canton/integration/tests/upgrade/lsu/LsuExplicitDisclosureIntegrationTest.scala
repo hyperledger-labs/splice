@@ -11,6 +11,7 @@ import com.digitalasset.canton.integration.EnvironmentDefinition
 import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.topology.Party
 
@@ -65,12 +66,13 @@ final class LsuExplicitDisclosureIntegrationTest extends LsuBase {
         clue("do LSU") {
           performSynchronizerNodesLsu(fixture)
           environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
+          transferTraffic()
           eventually() {
-            participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
+            environment.simClock.value.advance(Duration.ofSeconds(1))
+            participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe true
           }
           oldSynchronizerNodes.all.stop()
-          environment.simClock.value.advance(Duration.ofSeconds(1))
-          waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
+          waitForTargetTimeOnSequencer(sequencer2, environment.clock.now, logger)
         }
 
         clue("After LSU, verify Bob can still use Alice's contract via explicit disclosure") {

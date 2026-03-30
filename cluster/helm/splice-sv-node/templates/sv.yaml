@@ -199,12 +199,13 @@ spec:
                 }
             {{- else if .Values.synchronizers }}
             {{- range $syncName, $sync := .Values.synchronizers }}
+            {{- if kindIs "map" $sync }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN_{{ $syncName | upper }}
               #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
                 canton.sv-apps.sv.local-synchronizer-nodes.{{ $syncName }} {
                   sequencer {
-                    {{- if $sync.enableBftSequencer }}
+                    {{- if (index $sync "enableBftSequencer") }}
                     is-bft-sequencer = true
                     {{- end }}
                     admin-api {
@@ -246,6 +247,7 @@ spec:
                 }
             {{- end }}
             {{- end }}
+            {{- end }}
             {{- if .Values.decentralizedSynchronizerUrl }}
             - name: SPLICE_APP_SV_GLOBAL_DOMAIN_URL
               value: {{ .Values.decentralizedSynchronizerUrl | quote }}
@@ -275,8 +277,10 @@ spec:
               {{- $anyGovernanceKey = true }}
             {{- end }}
             {{- range $syncName, $sync := .Values.synchronizers }}
+              {{- if kindIs "map" $sync }}
               {{- if ($sync.cometBftConfig).externalGovernanceKey }}
                 {{- $anyGovernanceKey = true }}
+              {{- end }}
               {{- end }}
             {{- end }}
             {{- if $anyGovernanceKey }}
@@ -415,7 +419,7 @@ spec:
             - name: SPLICE_APP_EXPIRED_REWARD_COUPON_NUM_BATCHES
               value: {{ .Values.delegatelessAutomationExpiredRewardCouponNumBatches | quote }}
             {{- end }}
-            {{- if and .Values.domain .Values.domain.skipInitialization }}
+            {{- if and .Values.synchronizers .Values.synchronizers.skipInitialization }}
             - name: ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION
               value: canton.sv-apps.sv.skip-synchronizer-initialization = true
             {{- end }}

@@ -40,8 +40,8 @@ import java.time.Duration
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
-import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 
 class WalletIntegrationTest
     extends IntegrationTest
@@ -788,7 +788,11 @@ class WalletIntegrationTest
       actAndCheck(
         "Create duplicate TransferPreapprovalProposals directly via the ledger API", {
           val proposalCids =
-            (1 to 5).toList.parTraverse(_ => Future(createTransferPreapprovalProposal)).futureValue
+            MonadUtil
+              .parTraverseWithLimit(PositiveInt.tryCreate(5))((1 to 5).toList)(_ =>
+                Future(createTransferPreapprovalProposal)
+              )
+              .futureValue
           proposalCids.toSet.size shouldBe proposalCids.size
         },
       )(

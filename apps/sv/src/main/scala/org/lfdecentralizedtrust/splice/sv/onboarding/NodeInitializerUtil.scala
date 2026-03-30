@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   DomainMigration,
   FoundDso,
   JoinWithKey,
+  RollForwardLsu,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
@@ -319,6 +320,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                         rnd
                     }
                     setInitialRound(connection, initialRound.toLong)
+                  case _: RollForwardLsu =>
+                    sys.error("Initial round should already be set when doing an LSU")
                 }
               case None =>
                 logger.debug(

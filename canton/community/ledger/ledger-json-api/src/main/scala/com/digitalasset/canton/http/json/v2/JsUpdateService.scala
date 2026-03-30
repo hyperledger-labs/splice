@@ -31,6 +31,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsReassignment,
   JsTransaction,
   JsTransactionTree,
+  OneOfSchemaExtension,
 }
 import com.digitalasset.canton.http.json.v2.JsUpdateServiceConverters.toUpdateFormat
 import com.digitalasset.canton.http.json.v2.LegacyDTOs.toTransactionTree
@@ -85,11 +86,11 @@ class JsUpdateService(
     ),
     websocket(
       JsUpdateService.getUpdatesFlatEndpoint,
-      getFlats,
+      getUpdates,
     ),
     asList(
       JsUpdateService.getUpdatesFlatListEndpoint,
-      getFlats,
+      getUpdates,
       timeoutOpenEndedStream = (r: LegacyDTOs.GetUpdatesRequest) => r.endInclusive.isEmpty,
     ),
     websocket(
@@ -332,20 +333,6 @@ class JsUpdateService(
       implicit val tc = caller.traceContext()
       Flow[LegacyDTOs.GetUpdatesRequest].map { request =>
         toGetUpdatesRequest(request, forTrees = false)
-      } via
-        prepareSingleWsStream(
-          updateServiceClient(caller.token())(TraceContext.empty).getUpdates,
-          (r: update_service.GetUpdatesResponse) => protocolConverters.GetUpdatesResponse.toJson(r),
-        )
-    }
-
-  private def getFlats(
-      caller: CallerContext
-  ): TracedInput[Unit] => Flow[LegacyDTOs.GetUpdatesRequest, JsGetUpdatesResponse, NotUsed] =
-    _ => {
-      implicit val tc = caller.traceContext()
-      Flow[LegacyDTOs.GetUpdatesRequest].map { req =>
-        toGetUpdatesRequest(req, forTrees = false)
       } via
         prepareSingleWsStream(
           updateServiceClient(caller.token())(TraceContext.empty).getUpdates,
@@ -661,6 +648,9 @@ object JsUpdateServiceCodecs {
   implicit val jsTopologyParticipantAuthorizationRevokedRW
       : Codec[lapi.topology_transaction.ParticipantAuthorizationRevoked] =
     deriveRelaxedCodec
+  implicit val jsTopologyParticipantAuthorizationOnboardingRW
+      : Codec[lapi.topology_transaction.ParticipantAuthorizationOnboarding] =
+    deriveRelaxedCodec
   implicit val jsTopologyEventEventRW: Codec[lapi.topology_transaction.TopologyEvent.Event] =
     deriveConfiguredCodec
   implicit val jsTopologyEventParticipantAuthorizationAddedRW
@@ -671,6 +661,9 @@ object JsUpdateServiceCodecs {
     deriveRelaxedCodec
   implicit val jsParticipantAuthorizationRevokedRW
       : Codec[lapi.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationRevoked] =
+    deriveRelaxedCodec
+  implicit val jsParticipantAuthorizationOnboardingRW
+      : Codec[lapi.topology_transaction.TopologyEvent.Event.ParticipantAuthorizationOnboarding] =
     deriveRelaxedCodec
 
   implicit val jsTopologyEventRW: Codec[lapi.topology_transaction.TopologyEvent] =
@@ -683,10 +676,12 @@ object JsUpdateServiceCodecs {
     Schema.derived.name(Some(SName("JsTopologyTransaction")))
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-  implicit val jsUpdateSchema: Schema[JsUpdate.Update] = Schema.oneOfWrapped
+  implicit val jsUpdateSchema: Schema[JsUpdate.Update] =
+    Schema.oneOfWrapped[JsUpdate.Update].oneOfExtension()
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-  implicit val jsUpdateTreeSchema: Schema[JsUpdateTree.Update] = Schema.oneOfWrapped
+  implicit val jsUpdateTreeSchema: Schema[JsUpdateTree.Update] =
+    Schema.oneOfWrapped[JsUpdateTree.Update].oneOfExtension()
 
 }
 
@@ -720,7 +715,8 @@ object JsUpdateServiceConverters {
     )
 
     val transactionFormat = TransactionFormat(
-      transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+      transactionShape =
+        if (forTrees) TRANSACTION_SHAPE_LEDGER_EFFECTS else TRANSACTION_SHAPE_ACS_DELTA,
       eventFormat = Some(eventFormat),
     )
 

@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SyncCryptoApiParticipantProvider
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId.DedicatedRepresentativePackageId
 import com.digitalasset.canton.ledger.participant.state.Update.{
   ContractInfo,
@@ -58,6 +59,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source as PekkoSource}
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Implements the ACS import repair comments
@@ -221,7 +223,7 @@ final class RepairServiceContractsImporter(
                 .toRight(s"Could not find $synchronizerAlias")
             )
 
-            synchronizer <- helpers.readSynchronizerData(synchronizerId)
+            synchronizer <- helpers.readSynchronizerData(synchronizerId, repairIndexer)
 
             contractsWithOverriddenRpId <- selectRepresentativePackageIds(contracts)
               .toEitherT[FutureUnlessShutdown]
@@ -314,7 +316,7 @@ final class RepairServiceContractsImporter(
                     _ <-
                       if (nodeParameters.alphaMultiSynchronizerSupport) {
                         // Publish added contracts via the indexer to the ledger api.
-                        publishAddEvents(
+                        publishAssignedEvents(
                           synchronizer.psid.logical,
                           recordTime = synchronizer.currentRecordTime,
                           contractsToAddWithInternalIds,
@@ -326,7 +328,6 @@ final class RepairServiceContractsImporter(
                         EitherT.right[String](
                           writeContractsAddedEvents(
                             synchronizer.psid.logical,
-                            recordTime = synchronizer.currentRecordTime,
                             contractsToAddWithInternalIds,
                             workflowIds,
                             repairIndexer,
@@ -403,50 +404,60 @@ final class RepairServiceContractsImporter(
 
     val batchSize = nodeParameters.batchingConfig.maxAcsImportBatchSize.unwrap
     val parallelism = nodeParameters.batchingConfig.parallelism.unwrap
+    val droppedContractsCount = new AtomicLong(0L)
 
     helpers.withRepairIndexer { repairIndexer =>
       val indexedContractBatches: PekkoSource[(Seq[RepairContract], Long), NotUsed] =
         contracts.grouped(batchSize).zipWithIndex
 
-      val doneF = toFuture(helpers.readSynchronizerData(synchronizerId)).flatMap { synchronizer =>
-        indexedContractBatches
-          .mapAsync(parallelism) { data =>
-            toFuture(
-              validateAndPersistContracts(
-                synchronizer = synchronizer,
-                contractImportMode = contractImportMode,
-                selectRepresentativePackageIds = selectRepresentativePackageIds,
-                batchSize = batchSize,
-              )(data)
-            )
-          }
-          // Publish events to the indexer
-          .mapAsync(1) { contractsToAddWithInternalContractIds =>
-            if (nodeParameters.alphaMultiSynchronizerSupport) {
+      val doneF = toFuture(helpers.readSynchronizerData(synchronizerId, repairIndexer)).flatMap {
+        synchronizer =>
+          indexedContractBatches
+            .mapAsync(parallelism) { data =>
               toFuture(
-                publishAddEvents(
+                validateAndPersistContracts(
+                  synchronizer = synchronizer,
+                  contractImportMode = contractImportMode,
+                  selectRepresentativePackageIds = selectRepresentativePackageIds,
+                  batchSize = batchSize,
+                  droppedContractsCount = droppedContractsCount,
+                )(data)
+              )
+            }
+            // Publish events to the indexer
+            .mapAsync(1) { contractsToAddWithInternalContractIds =>
+              if (nodeParameters.alphaMultiSynchronizerSupport) {
+                toFuture(
+                  publishAssignedEvents(
+                    synchronizerId,
+                    synchronizer.currentRecordTime,
+                    contractsToAddWithInternalContractIds,
+                    workflowProvider,
+                    repairIndexer,
+                  )
+                )
+              } else {
+                writeContractsAddedEvents(
                   synchronizerId,
-                  synchronizer.currentRecordTime,
                   contractsToAddWithInternalContractIds,
                   workflowProvider,
                   repairIndexer,
-                )
-              )
-            } else {
-              writeContractsAddedEvents(
-                synchronizerId,
-                recordTime = synchronizer.currentRecordTime,
-                contractsToAddWithInternalContractIds,
-                workflowProvider,
-                repairIndexer,
-              ).failOnShutdownToAbortException("addContracts")
+                ).failOnShutdownToAbortException("addContracts")
+              }
             }
-          }
-          .toMat(Sink.ignore)(Keep.right)
-          .run()
+            .toMat(Sink.ignore)(Keep.right)
+            .run()
       }
 
-      EitherT.liftF(doneF.map(_ => ()))
+      EitherT.liftF(doneF.map { _ =>
+        val totalDropped = droppedContractsCount.get()
+        if (totalDropped > 0) {
+          logger.info(
+            s"Dropped $totalDropped contracts belonging to other synchronizers than $synchronizerId"
+          )
+        }
+//        ()
+      })
     }
   }
 
@@ -460,6 +471,7 @@ final class RepairServiceContractsImporter(
       contractImportMode: ContractImportMode,
       selectRepresentativePackageIds: SelectRepresentativePackageIds,
       batchSize: Int,
+      droppedContractsCount: AtomicLong,
   )(
       data: (Seq[RepairContract], Long)
   )(implicit traceContext: TraceContext): EitherT[
@@ -486,45 +498,48 @@ final class RepairServiceContractsImporter(
             .map(c => (c.contractId, c.reassignmentCounter))}",
       )
 
-      contractsWithWrongSynchronizer = contracts.filter(
-        _.synchronizerId != synchronizer.psid.logical
+      contractsWithExpectedSynchronizer = contracts.filter(
+        _.synchronizerId == synchronizer.psid.logical
       )
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        contractsWithWrongSynchronizer.isEmpty,
-        s"Contracts with wrong synchronizer: expected=${synchronizer.psid.logical}, actual=${contractsWithWrongSynchronizer
-            .map(c => (c.contractId, c.synchronizerId))}",
-      )
+
+      localDroppedContractsCount = contracts.size - contractsWithExpectedSynchronizer.size
+
+      _ = if (localDroppedContractsCount > 0) {
+        droppedContractsCount.addAndGet(localDroppedContractsCount.toLong).discard
+      }
 
       _ <- ContractAuthenticationImportProcessor.validate(
         loggerFactory,
         syncPersistentStateLookup,
         contractValidator,
         contractImportMode,
-      )(contracts)
+      )(contractsWithExpectedSynchronizer)
+
+      contractIds = contractsWithExpectedSynchronizer.map(_.contract.contractId)
 
       contractStates <- EitherT.right[String](
         helpers.readContractAcsStates(
           synchronizer.persistentState,
-          contracts.map(_.contract.contractId),
+          contractIds,
         )
       )
 
-      contractInstances <-
-        helpers
-          .logOnFailureWithInfoLevel(
-            contractStore.value.lookupManyUncached(contracts.map(_.contract.contractId)),
-            "Unable to lookup contracts in contract store",
-          )
-          .map(_.flatten)
+      contractInstances <- helpers
+        .logOnFailureWithInfoLevel(
+          contractStore.value.lookupManyUncached(contractIds),
+          "Unable to lookup contracts in contract store",
+        )
+        .map(_.flatten)
 
       storedContracts = contractInstances.map(c => c.contractId -> c).toMap
       filteredContracts <- EitherT.fromEither[FutureUnlessShutdown](
-        contracts.zip(contractStates).traverseFilter { case (contract, acsState) =>
-          contractToAdd(
-            repairContract = contract,
-            acsState = acsState,
-            storedContract = storedContracts.get(contract.contract.contractId),
-          )
+        contractsWithExpectedSynchronizer.zip(contractStates).traverseFilter {
+          case (contract, acsState) =>
+            contractToAdd(
+              repairContract = contract,
+              acsState = acsState,
+              storedContract = storedContracts.get(contract.contract.contractId),
+            )
         }
       )
 
@@ -674,7 +689,7 @@ final class RepairServiceContractsImporter(
         representativePackageId = DedicatedRepresentativePackageId(c.representativePackageId),
       )
     }.toMap
-    val nodeIds = LazyList.from(0).map(LfNodeId)
+    val nodeIds = LazyList.from(0).map(LfNodeId.apply)
     val txNodes = nodeIds.zip(contractsAdded.map(_._1.contract.toLf)).toMap
     Update.RepairTransactionAccepted(
       transactionMeta = TransactionMeta(
@@ -687,10 +702,12 @@ final class RepairServiceContractsImporter(
         optNodeSeeds = None,
         optByKeyNodes = None,
       ),
-      transaction = LfCommittedTransaction(
-        CantonOnly.lfVersionedTransaction(
-          nodes = txNodes,
-          roots = ImmArray.from(nodeIds.take(txNodes.size)),
+      transactionInfo = Update.TransactionAccepted.TransactionInfo(
+        LfCommittedTransaction(
+          CantonOnly.lfVersionedTransaction(
+            nodes = txNodes,
+            roots = ImmArray.from(nodeIds.take(txNodes.size)),
+          )
         )
       ),
       updateId = randomUpdateId(syncCrypto),
@@ -703,7 +720,6 @@ final class RepairServiceContractsImporter(
 
   private def writeContractsAddedEvents(
       synchronizerId: SynchronizerId,
-      recordTime: CantonTimestamp,
       contractsAdded: Seq[(TimeOfRepair, (CreationTime.CreatedAt, Seq[(ContractToAdd, Long)]))],
       workflowIds: Iterator[Option[LfWorkflowId]],
       repairIndexer: FutureQueue[RepairUpdate],
@@ -715,7 +731,7 @@ final class RepairServiceContractsImporter(
           .offer(
             prepareAddedEvents(
               synchronizerId = synchronizerId,
-              recordTime = recordTime,
+              recordTime = timeOfChange.timestamp,
               repairCounter = timeOfChange.repairCounter,
               ledgerCreateTime = timestamp,
               contractsAdded = contractsToAdd,
@@ -787,7 +803,7 @@ final class RepairServiceContractsImporter(
     })
   }
 
-  private def publishAddEvents(
+  private def publishAssignedEvents(
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
       contractsAdded: Seq[(TimeOfRepair, (CreationTime.CreatedAt, Seq[(ContractToAdd, Long)]))],

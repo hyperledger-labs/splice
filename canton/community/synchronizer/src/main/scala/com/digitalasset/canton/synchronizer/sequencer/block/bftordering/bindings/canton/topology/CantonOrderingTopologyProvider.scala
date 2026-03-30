@@ -29,7 +29,10 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.int
   OrderingTopologyProvider,
   TopologyActivationTime,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
+  EpochLength,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology.NodeTopologyInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   OrderingTopology,
@@ -45,6 +48,7 @@ import scala.concurrent.ExecutionContext
 
 private[canton] final class CantonOrderingTopologyProvider(
     cryptoApi: SynchronizerCryptoClient,
+    epochLength: EpochLength, // TODO(#24184) make this dynamic sequencing parameter
     override val loggerFactory: NamedLoggerFactory,
     metrics: BftOrderingMetrics,
 )(implicit
@@ -57,11 +61,13 @@ private[canton] final class CantonOrderingTopologyProvider(
   )
 
   override def getOrderingTopologyAt(
-      activationTime: TopologyActivationTime,
+      activationTime: Option[TopologyActivationTime],
       checkPendingChanges: Boolean,
   )(implicit
       traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[Option[(OrderingTopology, CryptoProvider[PekkoEnv])]] = {
+
+    val snapshotF = getSnapshot(activationTime)
 
     // The ordering topology for an epoch E is based on the topology snapshot queried on the instant
     //  just after the sequencing time of the last sequenced event in E-1.
@@ -78,25 +84,32 @@ private[canton] final class CantonOrderingTopologyProvider(
     //  processor after it has processed all events in E-1, and we check if it is greater than the
     //  activation time corresponding to topology snapshot being used to compute the ordering topology for E.
 
-    val maxTimestampF =
+    val areTherePendingCantonTopologyChangesF =
       if (!checkPendingChanges) {
         logger.debug("Not checking pending changes")
-        FutureUnlessShutdown.pure[Option[(SequencedTime, EffectiveTime)]](None)
+        FutureUnlessShutdown.pure[Option[Boolean]](None)
       } else {
-        logger.debug(s"Awaiting max timestamp for snapshot at activation time $activationTime")
-        // `awaitMaxTimestamp` is inclusive on its input, but `activationTime` already reflects the timestamp
-        // that needs to be observed to retrieve the correct topology snapshot.
-        cryptoApi.awaitMaxTimestamp(SequencedTime(activationTime.value.immediatePredecessor)).map {
-          maxTimestamp =>
-            logger.debug(
-              s"Max timestamp $maxTimestamp awaited successfully for snapshot at activation time $activationTime"
-            )
-            maxTimestamp
-        }
+        activationTime
+          .map(_.value)
+          .fold {
+            // If we are querying the head snapshot, then we are in the bootstrap case, so we are assured that there
+            //  are no pending topology changes.
+            FutureUnlessShutdown.pure[Option[Boolean]](Some(false))
+          } { ts =>
+            logger.debug(s"Awaiting max timestamp for snapshot at activation time $activationTime")
+            // `awaitMaxTimestamp` is inclusive on its input, but `activationTime` already reflects the timestamp
+            // that needs to be observed to retrieve the correct topology snapshot.
+            cryptoApi.awaitMaxTimestamp(SequencedTime(ts.immediatePredecessor)).flatMap {
+              maxTimestamp =>
+                logger.debug(
+                  s"Max timestamp $maxTimestamp awaited successfully for snapshot at activation time $activationTime"
+                )
+                FutureUnlessShutdown.pure(maxTimestamp.map { case (_, maxEffectiveTime) =>
+                  TopologyActivationTime.fromEffectiveTime(maxEffectiveTime).value > ts
+                })
+            }
+          }
       }
-
-    logger.debug(s"Querying topology snapshot for activation time $activationTime")
-    val snapshotF = cryptoApi.awaitSnapshot(activationTime.value)
 
     val topologyWithCryptoProvider = for {
       snapshot <- snapshotF
@@ -105,14 +118,9 @@ private[canton] final class CantonOrderingTopologyProvider(
         s"Topology snapshot queried successfully at activation time: $activationTime, snapshot timestamp: $snapshotTimestamp"
       )
 
-      maxTimestamp <- maxTimestampF
+      areTherePendingCantonTopologyChanges <- areTherePendingCantonTopologyChangesF
 
-      maybeSequencerGroup <- snapshot.ipsSnapshot.sequencerGroup()
-      _ = logger.debug(
-        s"Sequencer group queried successfully on snapshot at $snapshotTimestamp: $maybeSequencerGroup"
-      )
-
-      maybeSequencers = maybeSequencerGroup.map(_.active)
+      maybeSequencers <- activeSequencersFromSnapshot(snapshot)
       maybeSequencerKeys <-
         maybeSequencers.fold(
           FutureUnlessShutdown.pure[Map[Member, Seq[SigningPublicKey]]](Map.empty)
@@ -122,17 +130,10 @@ private[canton] final class CantonOrderingTopologyProvider(
       _ = logger.debug(
         s"Found sequencer keys ${maybeSequencerKeys.view.mapValues(_.map(_.id.toProtoPrimitive)).toSeq} on snapshot at $snapshotTimestamp"
       )
-      maybeSequencersFirstKnownAt <-
-        maybeSequencers
-          .map(computeFirstKnownAtTimestamps(_, snapshot))
-          .sequence
-      _ = logger.debug(
-        s"Sequencer \"first known at\" timestamps queried successfully on snapshot at $snapshotTimestamp: $maybeSequencersFirstKnownAt"
-      )
 
       maxRequestSize <- getMaxRequestSize(snapshot)
       _ = logger.debug(
-        "Max request time obtained from dynamic synchronizer parameters " +
+        "Max request size obtained from dynamic synchronizer parameters " +
           s"queried successfully on snapshot at $snapshotTimestamp: $maxRequestSize"
       )
 
@@ -140,32 +141,24 @@ private[canton] final class CantonOrderingTopologyProvider(
       _ = logger.debug(
         s"Dynamic sequencing parameters queried successfully on snapshot at $snapshotTimestamp: $sequencingDynamicParameters"
       )
-    } yield maybeSequencersFirstKnownAt.map { sequencersFirstKnownAt =>
-      val nodesTopologyInfo = sequencersFirstKnownAt.view.map { case (sequencerId, firstKnownAt) =>
+    } yield maybeSequencers.map { sequencers =>
+      val nodesTopologyInfo = sequencers.view.map { case sequencerId =>
         BftNodeId(SequencerNodeId.toBftNodeId(sequencerId)) -> NodeTopologyInfo(
-          activationTime =
-            // We first get all the nodes from the synchronizer client, so the default value should never be needed.
-            firstKnownAt.fold(
-              TopologyActivationTime(CantonTimestamp.MaxValue)
-            ) { case (_, effectiveTime) =>
-              TopologyActivationTime.fromEffectiveTime(effectiveTime)
-            },
           keyIds = maybeSequencerKeys
             .getOrElse(sequencerId, Seq.empty)
             .map(_.id)
             .map(FingerprintKeyId.toBftKeyId)
-            .toSet,
+            .toSet
         )
       }.toMap
       val topology =
         OrderingTopology(
           nodesTopologyInfo,
+          epochLength, // TODO(#24184) make this dynamic sequencing parameter
           sequencingDynamicParameters,
           MaxBytesToDecompress(maxRequestSize),
-          activationTime,
-          areTherePendingCantonTopologyChanges = maxTimestamp.map { case (_, maxEffectiveTime) =>
-            TopologyActivationTime.fromEffectiveTime(maxEffectiveTime).value > activationTime.value
-          },
+          TopologyActivationTime(snapshot.ipsSnapshot.timestamp),
+          areTherePendingCantonTopologyChanges,
         )
       topology -> new CantonCryptoProvider(snapshot, metrics)
     }
@@ -173,6 +166,37 @@ private[canton] final class CantonOrderingTopologyProvider(
       s"get ordering topology at activation time $activationTime",
       () => topologyWithCryptoProvider,
     )
+  }
+
+  private def getSnapshot(
+      activationTime: Option[TopologyActivationTime]
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[SynchronizerSnapshotSyncCryptoApi] = {
+
+    logger.debug(s"Querying topology snapshot for activation time $activationTime")
+    activationTime
+      .map(_.value)
+      .fold {
+        logger.debug(s"No activation time provided, querying head snapshot")
+        FutureUnlessShutdown.pure(cryptoApi.headSnapshot)
+      } { ts =>
+        cryptoApi.awaitSnapshot(ts).map { snapshot =>
+          logger.debug(s"Topology snapshot queried successfully for timestamp $ts")
+          snapshot
+        }
+      }
+  }
+
+  private def activeSequencersFromSnapshot(
+      snapshot: SynchronizerSnapshotSyncCryptoApi
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[Seq[SequencerId]]] = for {
+    maybeSequencerGroup <- snapshot.ipsSnapshot.sequencerGroup()
+    _ = logger.debug(
+      s"Sequencer group queried successfully on snapshot at ${snapshot.ipsSnapshot.timestamp}: $maybeSequencerGroup"
+    )
+  } yield {
+    maybeSequencerGroup.map(_.active)
   }
 
   private def getMaxRequestSize(
@@ -209,6 +233,43 @@ private[canton] final class CantonOrderingTopologyProvider(
         logger.debug("\"first known at\" timestamps queried successfully")
         sequencersToTimestamps.toMap
       }
+
+  override def getFirstKnownAt(activationTime: TopologyActivationTime)(implicit
+      traceContext: TraceContext
+  ): PekkoFutureUnlessShutdown[Option[Map[BftNodeId, TopologyActivationTime]]] = {
+    val future = () => {
+
+      val snapshotF = getSnapshot(Some(activationTime))
+      for {
+        snapshot <- snapshotF
+        snapshotTimestamp = snapshot.ipsSnapshot.timestamp
+        maybeSequencers <- activeSequencersFromSnapshot(snapshot)
+        maybeSequencersFirstKnownAt <-
+          maybeSequencers
+            .map(computeFirstKnownAtTimestamps(_, snapshot))
+            .sequence
+        _ = logger.debug(
+          s"Sequencer \"first known at\" timestamps queried successfully on snapshot at $snapshotTimestamp: $maybeSequencersFirstKnownAt"
+        )
+      } yield {
+        maybeSequencersFirstKnownAt.map { sequencersFirstKnownAt =>
+          sequencersFirstKnownAt.view.map { case (sequencerId, firstKnownAt) =>
+            BftNodeId(SequencerNodeId.toBftNodeId(sequencerId)) ->
+              // We first get all the nodes from the synchronizer client, so the default value should never be needed.
+              firstKnownAt.fold(
+                TopologyActivationTime(CantonTimestamp.MaxValue)
+              ) { case (_, effectiveTime) =>
+                TopologyActivationTime.fromEffectiveTime(effectiveTime)
+              }
+          }.toMap
+        }
+      }
+    }
+    PekkoFutureUnlessShutdown(
+      s"get sequencers first known, activation time $activationTime",
+      future,
+    )
+  }
 
   private def getDynamicSequencingParameters(
       snapshot: TopologySnapshot

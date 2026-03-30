@@ -80,6 +80,16 @@ class WriteThroughCacheTopologySnapshot(
       )
     )
 
+  override def wasEverOnboarded(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+    lookup(
+      uids = NonEmpty(Seq, participantId.uid),
+      types = Set(TopologyMapping.Code.SynchronizerTrustCertificate),
+      op = None,
+    )
+      .map(transactionsByUid => transactionsByUid.get(participantId.uid).exists(_.nonEmpty))
+
   protected def findTransactionsInStore(
       types: Seq[TopologyMapping.Code],
       filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
@@ -96,10 +106,14 @@ class WriteThroughCacheTopologySnapshot(
         filterNamespace = None,
       )
 
-  private def lookup(uids: NonEmpty[Seq[UniqueIdentifier]], types: Set[TopologyMapping.Code])(
-      implicit traceContext: TraceContext
+  private def lookup(
+      uids: NonEmpty[Seq[UniqueIdentifier]],
+      types: Set[TopologyMapping.Code],
+      op: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
+  )(implicit
+      traceContext: TraceContext
   ): FutureUnlessShutdown[Map[UniqueIdentifier, Seq[GenericStoredTopologyTransaction]]] =
-    stateLookup.lookupForUids(EffectiveTime(timestamp), asOfInclusive = false, uids, types)
+    stateLookup.lookupForUids(EffectiveTime(timestamp), asOfInclusive = false, uids, types, op)
 
   // ===============================================
   // actual implementations specific to the
@@ -114,7 +128,7 @@ class WriteThroughCacheTopologySnapshot(
         stateLookup
           .lookupHistoryForUid(
             EffectiveTime(timestamp),
-            asOfInclusive = false,
+            asOfInclusive = true,
             uid,
             TopologyMapping.Code.SynchronizerTrustCertificate,
           )
@@ -125,7 +139,7 @@ class WriteThroughCacheTopologySnapshot(
         stateLookup
           .lookupHistoryForUid(
             EffectiveTime(timestamp),
-            asOfInclusive = false,
+            asOfInclusive = true,
             psid.uid,
             TopologyMapping.Code.MediatorSynchronizerState,
           )
@@ -140,7 +154,7 @@ class WriteThroughCacheTopologySnapshot(
         stateLookup
           .lookupHistoryForUid(
             EffectiveTime(timestamp),
-            asOfInclusive = false,
+            asOfInclusive = true,
             psid.uid,
             TopologyMapping.Code.SequencerSynchronizerState,
           )
@@ -163,26 +177,30 @@ class WriteThroughCacheTopologySnapshot(
   ): FutureUnlessShutdown[Seq[DynamicSynchronizerParametersWithValidity]] =
     stateLookup
       .lookupHistoryForUid(
-        EffectiveTime(timestamp),
-        asOfInclusive = false,
+        EffectiveTime(timestamp), // validFrom <= timestamp
+        asOfInclusive = true,
         psid.uid,
         TopologyMapping.Code.SynchronizerParametersState,
       )
-      .map(_.flatMap(_.selectMapping[SynchronizerParametersState]).map { storedTx =>
-        val dps = storedTx.mapping
-        DynamicSynchronizerParametersWithValidity(
-          dps.parameters,
-          storedTx.validFrom.value,
-          storedTx.validUntil.map(_.value),
-        )
-      })
+      .map { txs =>
+        StoredTopologyTransactions(
+          txs.flatMap(_.selectMapping[SynchronizerParametersState])
+        ).asSnapshotAtMaxEffectiveTime.result.map { storedTx =>
+          val dps = storedTx.mapping
+          DynamicSynchronizerParametersWithValidity(
+            dps.parameters,
+            storedTx.validFrom.value,
+            storedTx.validUntil.map(_.value),
+          )
+        }
+      }
 
   @deprecated(
     message =
       "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
     since = "3.5.0",
   )
-  override def allMembers()(implicit
+  override def knownMembers()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]] =
     findTransactionsInStore(
@@ -202,7 +220,7 @@ class WriteThroughCacheTopologySnapshot(
       }.toSet
     }
 
-  override def sequencerConnectionSuccessors()(implicit
+  override def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[SequencerId, LsuSequencerConnectionSuccessor]] =
     // since the state lookup cannot look at the state just based on the type,
@@ -235,7 +253,10 @@ class WriteThroughCacheTopologySnapshot(
       .collectOfMapping[LsuSequencerConnectionSuccessor]
       .result
       .view
-      .map(stored => stored.mapping.sequencerId -> stored.mapping)
+      .collect {
+        case stored if stored.mapping.successorPsid == successorPsid =>
+          stored.mapping.sequencerId -> stored.mapping
+      }
       .toMap
 
   // ===============================================

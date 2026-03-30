@@ -40,13 +40,13 @@ lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-adjustable-clock` = BuildCommon.`canton-daml-adjustable-clock`
 lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
-lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
 lazy val `canton-base-errors` = BuildCommon.`canton-base-errors`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
+lazy val `canton-observability-metrics-testing` = BuildCommon.`canton-observability-metrics-testing`
 
 lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
@@ -103,7 +103,6 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
     `splice-util-token-standard-wallet-test-daml`,
-    `splice-util-token-standard-wallet-test-daml`,
     `splice-util-batched-markers-daml`,
     `splice-util-batched-markers-test-daml`,
     `splitwell-daml`,
@@ -138,6 +137,7 @@ lazy val root: Project = (project in file("."))
     `canton-ledger-api-core`,
     `canton-ledger-api-value`,
     `canton-google-common-protos-scala`,
+    `canton-observability-metrics-testing`,
     pulumi,
     `load-tester`,
     tools,
@@ -189,7 +189,7 @@ lazy val `build-tools-dar-lock-checker` = project
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.better_files,
-      Dependencies.daml_lf_archive_reader,
+      CantonDependencies.daml_lf_archive_reader,
     ),
     Headers.ApacheDAHeaderSettings,
   )
@@ -1979,7 +1979,7 @@ lazy val `apps-dar-resources-generator` =
       Headers.ApacheDAHeaderSettings,
       libraryDependencies ++= Seq(
         Dependencies.better_files,
-        Dependencies.daml_lf_archive_reader,
+        CantonDependencies.daml_lf_archive_reader,
         CantonDependencies.cats,
       ),
     )
@@ -2112,6 +2112,8 @@ updateTestConfigForParallelRuns := {
     name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
   def isLSUTest(name: String): Boolean =
     name contains "LogicalSynchronizerUpgradeIntegrationTest"
+  def isLSURollForwardTest(name: String): Boolean =
+    name contains "RollForwardLsu"
 
   val allTestNames =
     definedTests
@@ -2241,6 +2243,11 @@ updateTestConfigForParallelRuns := {
       "tests to check logical sync upgrade",
       "test-full-class-names-lsu.log",
       (t: String) => isLSUTest(t),
+    ),
+    (
+      "tests to check logical sync roll-forward upgrade",
+      "test-full-class-names-roll-forward-lsu.log",
+      (t: String) => isLSURollForwardTest(t),
     ),
     (
       "tests with wall clock time",

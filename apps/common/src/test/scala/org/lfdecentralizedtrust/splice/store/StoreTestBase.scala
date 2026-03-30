@@ -254,13 +254,18 @@ abstract class StoreTestBase
 
   protected val holdingFee = BigDecimal(1.0)
 
-  protected def openMiningRound(dso: PartyId, round: Long, amuletPrice: Double) = {
+  protected def openMiningRound(
+      dso: PartyId,
+      round: Long,
+      amuletPrice: Double,
+      opensAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
+  ) = {
     val template = new roundCodegen.OpenMiningRound(
       dso.toProtoPrimitive,
       new Round(round),
       numeric(amuletPrice),
-      Instant.now().truncatedTo(ChronoUnit.MICROS),
-      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
+      opensAt,
+      opensAt.plusSeconds(600),
       new RelTime(1_000_000),
       SpliceUtil.defaultTransferConfig(10, holdingFee),
       SpliceUtil.issuanceConfig(10.0, 10.0, 10.0),
@@ -935,6 +940,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -947,6 +953,7 @@ abstract class StoreTestBase
     recordTime,
     createdEventObservers,
     updateId,
+    externalTxnHash,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -961,6 +968,7 @@ abstract class StoreTestBase
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
+      externalTxnHash: ByteString = ByteString.EMPTY,
   ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
@@ -977,6 +985,7 @@ abstract class StoreTestBase
     workflowId,
     recordTime = recordTime,
     updateId = updateId,
+    externalTransactionHash = externalTxnHash,
   )
 
   protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {
@@ -1309,6 +1318,7 @@ abstract class StoreTestBase
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
       updateId: String = nextUpdateId(),
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
@@ -1323,7 +1333,7 @@ abstract class StoreTestBase
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
-      ByteString.EMPTY,
+      externalTransactionHash,
     )
   }
 
@@ -1333,6 +1343,7 @@ abstract class StoreTestBase
       children: Seq[Event],
       synchronizerId: SynchronizerId,
       effectiveAt: Instant = defaultEffectiveAt,
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val updateId = nextUpdateId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
@@ -1358,7 +1369,7 @@ abstract class StoreTestBase
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
-      ByteString.EMPTY,
+      externalTransactionHash,
     )
   }
 

@@ -81,6 +81,7 @@ import org.lfdecentralizedtrust.splice.sv.metrics.SvAppMetrics
 import org.lfdecentralizedtrust.splice.sv.migration.DomainDataSnapshotGenerator
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
+import org.lfdecentralizedtrust.splice.sv.onboarding.lsu.RollForwardLsuInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
@@ -381,6 +382,23 @@ class SvApp(
               config.dsoAcsStoreDescriptorUserVersion,
             ).migrateDomain()
           }
+        case Some(rollForwardLsuConfig: SvOnboardingConfig.RollForwardLsu) =>
+          appInitStep("Roll forward LSU") {
+            new RollForwardLsuInitializer(
+              synchronizerNodeService,
+              config,
+              ledgerClient,
+              participantAdminConnection,
+              clock,
+              domainTimeAutomationService.domainTimeSync,
+              domainParamsAutomationService.domainUnpausedSync,
+              storage,
+              loggerFactory,
+              retryProvider,
+              config.spliceInstanceNames,
+              newJoiningNodeInitializer,
+            ).rollForward()
+          }
         case None =>
           newJoiningNodeInitializer(None).joinDsoAndOnboardNodes()
       }
@@ -517,7 +535,6 @@ class SvApp(
         synchronizerNodeService,
         retryProvider,
         new DsoPartyMigration(
-          svAutomation,
           dsoAutomation,
           participantAdminConnection,
           retryProvider,

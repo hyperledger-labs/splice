@@ -60,7 +60,7 @@ class AvailabilityModuleOutputFetchTest
           outputFetchProtocolState.localOutputMissingBatches.addOne(
             ABatchMissingBatchStatusNode1And2AcksWithNoAttemptsLeft
           )
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(
@@ -87,7 +87,7 @@ class AvailabilityModuleOutputFetchTest
             implicit val context
                 : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
               new ProgrammableUnitTestContext
-            val availability = createAvailability[ProgrammableUnitTestEnv](
+            val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
               outputFetchProtocolState = outputFetchProtocolState,
               cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
               p2pNetworkOut = fakeCellModule(p2pNetworkOutCell),
@@ -127,7 +127,7 @@ class AvailabilityModuleOutputFetchTest
           val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
           outputFetchProtocolState.incomingBatchRequests.addOne(ABatchId -> Set(Node1))
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(RemoteOutputFetch.FetchRemoteBatchData.create(ABatchId, Node2))
@@ -148,7 +148,7 @@ class AvailabilityModuleOutputFetchTest
             val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
             val availabilityStore = spy(new FakeAvailabilityStore[IgnoringUnitTestEnv])
-            val availability = createAvailability[IgnoringUnitTestEnv](
+            val availability = createAndStartAvailability[IgnoringUnitTestEnv](
               outputFetchProtocolState = outputFetchProtocolState,
               availabilityStore = availabilityStore,
             )
@@ -168,7 +168,7 @@ class AvailabilityModuleOutputFetchTest
         "do nothing" in {
           val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(LocalOutputFetch.AttemptedBatchDataLoadForNode(ABatchId, None))
@@ -185,7 +185,7 @@ class AvailabilityModuleOutputFetchTest
         "do nothing" in {
           val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(
@@ -210,7 +210,7 @@ class AvailabilityModuleOutputFetchTest
                 : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
               new ProgrammableUnitTestContext
             outputFetchProtocolState.incomingBatchRequests.addOne(ABatchId -> Set(Node1))
-            val availability = createAvailability[ProgrammableUnitTestEnv](
+            val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
               outputFetchProtocolState = outputFetchProtocolState,
               p2pNetworkOut = fakeCellModule(p2pNetworkOutCell),
               cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
@@ -250,7 +250,7 @@ class AvailabilityModuleOutputFetchTest
               : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
             new ProgrammableUnitTestContext
           outputFetchProtocolState.incomingBatchRequests.addOne(ABatchId -> Set(Node1))
-          val availability = createAvailability[ProgrammableUnitTestEnv](
+          val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState,
             p2pNetworkOut = fakeCellModule(p2pNetworkOutCell),
             cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
@@ -275,7 +275,7 @@ class AvailabilityModuleOutputFetchTest
         "do nothing" in {
           val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(
@@ -297,7 +297,7 @@ class AvailabilityModuleOutputFetchTest
           outputFetchProtocolState.localOutputMissingBatches.addOne(
             ABatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
           )
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState,
             availabilityStore = availabilityStore,
           )
@@ -317,7 +317,7 @@ class AvailabilityModuleOutputFetchTest
         "do nothing" in {
           val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(LocalOutputFetch.FetchedBatchStored(ABatchId))
@@ -337,7 +337,7 @@ class AvailabilityModuleOutputFetchTest
         outputFetchProtocolState.localOutputMissingBatches.addOne(
           otherBatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
         )
-        val availability = createAvailability[IgnoringUnitTestEnv](
+        val availability = createAndStartAvailability[IgnoringUnitTestEnv](
           outputFetchProtocolState = outputFetchProtocolState,
           availabilityStore = availabilityStore,
         )
@@ -366,7 +366,7 @@ class AvailabilityModuleOutputFetchTest
         outputFetchProtocolState.localOutputMissingBatches.addOne(
           ABatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
         )
-        val availability = createAvailability[IgnoringUnitTestEnv](
+        val availability = createAndStartAvailability[IgnoringUnitTestEnv](
           outputFetchProtocolState = outputFetchProtocolState,
           availabilityStore = availabilityStore,
           maxRequestsInBatch = 0,
@@ -398,7 +398,7 @@ class AvailabilityModuleOutputFetchTest
           outputFetchProtocolState.localOutputMissingBatches.addOne(
             ABatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
           )
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(LocalOutputFetch.FetchedBatchStored(ABatchId))
@@ -414,7 +414,7 @@ class AvailabilityModuleOutputFetchTest
         "do nothing" in {
           val outputFetchProtocolState = new MainOutputFetchProtocolState()
 
-          val availability = createAvailability[IgnoringUnitTestEnv](
+          val availability = createAndStartAvailability[IgnoringUnitTestEnv](
             outputFetchProtocolState = outputFetchProtocolState
           )
           availability.receive(LocalOutputFetch.FetchRemoteBatchDataTimeout(ABatchId))
@@ -441,7 +441,7 @@ class AvailabilityModuleOutputFetchTest
             implicit val context
                 : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
               new ProgrammableUnitTestContext
-            val availability = createAvailability[ProgrammableUnitTestEnv](
+            val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
               otherNodes = AMissingBatchStatusNode1And2AcksWithNode1ToTry.remainingNodesToTry.toSet,
               outputFetchProtocolState = outputFetchProtocolState,
               cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
@@ -520,7 +520,7 @@ class AvailabilityModuleOutputFetchTest
               implicit val context
                   : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
                 new ProgrammableUnitTestContext
-              val availability = createAvailability[ProgrammableUnitTestEnv](
+              val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
                 otherNodes = otherNodes,
                 outputFetchProtocolState = outputFetchProtocolState,
                 cryptoProvider = cryptoProvider,
@@ -584,7 +584,7 @@ class AvailabilityModuleOutputFetchTest
                   Node0,
                 ),
                 Availability.LocalDissemination
-                  .RemoteBatchStored(ABatchId, anEpochNumber, Node0),
+                  .RemoteBatchStored(ABatchId, anEpochNumber, Node0, true),
               ),
               (
                 Availability.RemoteOutputFetch.RemoteBatchDataFetched.create(
@@ -611,7 +611,7 @@ class AvailabilityModuleOutputFetchTest
             implicit val context
                 : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
               new ProgrammableUnitTestContext
-            val availability = createAvailability[ProgrammableUnitTestEnv](
+            val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
               outputFetchProtocolState = outputFetchProtocolState,
               availabilityStore = new FakeAvailabilityStore[ProgrammableUnitTestEnv](storage),
             )
@@ -640,7 +640,7 @@ class AvailabilityModuleOutputFetchTest
               ),
               (
                 Availability.LocalDissemination
-                  .RemoteBatchStored(ABatchId, anEpochNumber, Node0),
+                  .RemoteBatchStored(ABatchId, anEpochNumber, Node0, true),
                 Availability.LocalDissemination
                   .RemoteBatchStoredSigned(ABatchId, Node0, Signature.noSignature),
                 "availability-sign-remote-batchId",
@@ -651,7 +651,7 @@ class AvailabilityModuleOutputFetchTest
                 : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
               new ProgrammableUnitTestContext
             val cryptoProvider = spy(ProgrammableUnitTestEnv.noSignatureCryptoProvider)
-            val availability = createAvailability[ProgrammableUnitTestEnv](
+            val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
               cryptoProvider = cryptoProvider
             )
 
@@ -672,13 +672,14 @@ class AvailabilityModuleOutputFetchTest
               Table[Msg](
                 "message",
                 Availability.LocalDissemination
-                  .RemoteBatchStoredSigned(ABatchId, Node0, Signature.noSignature),
+                  .RemoteBatchStored(ABatchId, anEpochNumber, Node0, true),
                 Availability.LocalOutputFetch.FetchedBatchStored(ABatchId),
               )
             ) { message =>
               val singleBatchMissingRequest = new BatchesRequest(
                 AnOrderedBlockForOutput,
                 missingBatches = mutable.SortedSet(ABatchId),
+                traceContext,
               )
 
               val outputFetchProtocolState = new MainOutputFetchProtocolState()
@@ -698,7 +699,7 @@ class AvailabilityModuleOutputFetchTest
                 new ProgrammableUnitTestContext
 
               val availabilityStore = spy(new FakeAvailabilityStore[ProgrammableUnitTestEnv]())
-              val availability = createAvailability[ProgrammableUnitTestEnv](
+              val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
                 availabilityStore = availabilityStore,
                 outputFetchProtocolState = outputFetchProtocolState,
                 cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
@@ -723,13 +724,14 @@ class AvailabilityModuleOutputFetchTest
               Table[Msg](
                 "message",
                 Availability.LocalDissemination
-                  .RemoteBatchStoredSigned(ABatchId, Node0, Signature.noSignature),
+                  .RemoteBatchStored(ABatchId, anEpochNumber, Node0, true),
                 Availability.LocalOutputFetch.FetchedBatchStored(ABatchId),
               )
             ) { message =>
               val multipleBatchMissingRequest = new BatchesRequest(
                 AnotherOrderedBlockForOutput,
                 missingBatches = mutable.SortedSet(ABatchId, AnotherBatchId),
+                traceContext,
               )
 
               val outputFetchProtocolState = new MainOutputFetchProtocolState()
@@ -749,7 +751,7 @@ class AvailabilityModuleOutputFetchTest
                 new ProgrammableUnitTestContext
 
               val availabilityStore = spy(new FakeAvailabilityStore[ProgrammableUnitTestEnv]())
-              val availability = createAvailability[ProgrammableUnitTestEnv](
+              val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
                 availabilityStore = availabilityStore,
                 outputFetchProtocolState = outputFetchProtocolState,
                 cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
@@ -784,11 +786,12 @@ class AvailabilityModuleOutputFetchTest
           Availability.Message[FakePipeToSelfCellUnitTestEnv]
         ] =
           FakePipeToSelfCellUnitTestContext(cellContextFake)
-        val availability = createAvailability(
+        val availability = createAndStartAvailability(
           availabilityStore = availabilityStore,
           output = fakeCellModule(expectedOutputCell),
         )
-        val request = new BatchesRequest(AnOrderedBlockForOutput, mutable.SortedSet(ABatchId))
+        val request =
+          new BatchesRequest(AnOrderedBlockForOutput, mutable.SortedSet(ABatchId), traceContext)
 
         availability.receive(
           Availability.LocalOutputFetch.FetchedBlockDataFromStorage(
@@ -821,7 +824,7 @@ class AvailabilityModuleOutputFetchTest
           implicit val context
               : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
             new ProgrammableUnitTestContext
-          val availability = createAvailability(
+          val availability = createAndStartAvailability(
             otherNodes = Set(Node3),
             availabilityStore = availabilityStore,
             outputFetchProtocolState = outputFetchProtocolState,
@@ -842,6 +845,7 @@ class AvailabilityModuleOutputFetchTest
               mode = blockMode,
             ),
             mutable.SortedSet(ABatchId),
+            traceContext,
           )
           outputFetchProtocolState.pendingBatchesRequests.addOne(request)
 
@@ -876,6 +880,43 @@ class AvailabilityModuleOutputFetchTest
       }
     }
 
+    "it receives OutputFetch.FetchedBlockDataFromStorage and there are missing batches that are pending storage" should {
+      "not ask other nodes for missing batches" in {
+        implicit val context
+            : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
+          new ProgrammableUnitTestContext
+        val outputFetchProtocolState = new MainOutputFetchProtocolState()
+        val expectedMessageCell = new AtomicReference[Option[P2PNetworkOut.Message]](None)
+        val cellNetwork = fakeCellModule(expectedMessageCell)
+        val availability = createAndStartAvailability[ProgrammableUnitTestEnv](
+          outputFetchProtocolState = outputFetchProtocolState,
+          p2pNetworkOut = cellNetwork,
+        )
+        outputFetchProtocolState.pendingRemoteBatchIdsToStore.add(ABatchId)
+        val singleBatchMissingRequest = new BatchesRequest(
+          AnOrderedBlockForOutput,
+          missingBatches = mutable.SortedSet(ABatchId),
+          traceContext,
+        )
+        assertLogs(
+          availability.receive(
+            Availability.LocalOutputFetch.FetchedBlockDataFromStorage(
+              singleBatchMissingRequest,
+              AvailabilityStore.MissingBatches(Set(ABatchId)),
+            )
+          ),
+          log => {
+            log.level shouldBe Level.DEBUG
+            log.message should include(
+              s"Missing batch $ABatchId is actually in the process of being stored"
+            )
+          },
+        )
+        context.runPipedMessagesAndReceiveOnModule(availability)
+        expectedMessageCell.get() shouldBe None
+      }
+    }
+
     "it receives OutputFetch.LoadBatchData and the batch is present" should {
 
       "reply to local availability with the batch" in {
@@ -890,7 +931,7 @@ class AvailabilityModuleOutputFetchTest
           Availability.Message[FakePipeToSelfCellUnitTestEnv]
         ] =
           FakePipeToSelfCellUnitTestContext(cellContextFake)
-        val availability = createAvailability(
+        val availability = createAndStartAvailability(
           availabilityStore = availabilityStore
         )
 
@@ -919,7 +960,7 @@ class AvailabilityModuleOutputFetchTest
           Availability.Message[FakePipeToSelfCellUnitTestEnv]
         ] =
           FakePipeToSelfCellUnitTestContext(cellContextFake)
-        val availability = createAvailability(
+        val availability = createAndStartAvailability(
           availabilityStore = availabilityStore
         )
 

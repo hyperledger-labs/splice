@@ -20,7 +20,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.daml.lf.archive.{ArchivePayload, Dar, DarReader}
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
+import com.digitalasset.daml.lf.data.Ref.{PackageId, QualifiedName}
 import com.digitalasset.daml.lf.typesig
 import com.github.benmanes.caffeine.cache.Caffeine
 import io.circe.Json
@@ -94,9 +94,8 @@ class ResourceTemplateDecoder(
       PackageId.assertFromString(companion.getTemplateIdWithPackageId.getPackageId)
     )
       .interfaces(
-        QualifiedName(
-          ModuleName.assertFromString(companion.getTemplateIdWithPackageId.getModuleName),
-          DottedName.assertFromString(companion.getTemplateIdWithPackageId.getEntityName),
+        QualifiedName.assertFromString(
+          s"${companion.getTemplateIdWithPackageId.getModuleName}:${companion.getTemplateIdWithPackageId.getEntityName}"
         )
       )
       .viewType

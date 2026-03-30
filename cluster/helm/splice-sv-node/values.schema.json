@@ -234,6 +234,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "skipInitialization": {
+              "type": "boolean"
+            },
             "current": {
               "type": "object",
               "required": [
@@ -264,9 +267,6 @@
                       "type": "string"
                     }
                   }
-                },
-                "skipInitialization": {
-                  "type": "boolean"
                 },
                 "enableBftSequencer": {
                   "type": "boolean"
@@ -319,9 +319,6 @@
                     }
                   }
                 },
-                "skipInitialization": {
-                  "type": "boolean"
-                },
                 "enableBftSequencer": {
                   "type": "boolean"
                 },
@@ -372,9 +369,6 @@
                       "type": "string"
                     }
                   }
-                },
-                "skipInitialization": {
-                  "type": "boolean"
                 },
                 "enableBftSequencer": {
                   "type": "boolean"

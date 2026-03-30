@@ -15,11 +15,26 @@ Template for a bigger topic
 #### Specific Changes
 #### Impact and Migration
 
+### Sequencer Inspection Service
+A new service is available on the Admin API of the sequencer.
+It provides an RPC that allows to query for traffic summaries of sequenced events.
+Refer to the [traffic documentation](https://docs.digitalasset.com/subnet/3.4/howtos/operate/traffic.html) for more details.
 
 ### Protocol Changes
 
 #### Protocol Version 35
 
+##### Time to Live (TTL) and Hashing Algorithm Update
+
+- A new hashing scheme version `HASHING_SCHEME_VERSION_V3` has been introduced that includes the TTL in the hash computation.
+- See the [hashing algorithm documentation](https://docs.digitalasset-staging.com/build/3.5/explanations/external-signing/external_signing_hashing_algorithm) for the updated version.
+- The `TTL` is now enforced at confirmation time by all confirming participants.
+
+##### SynchronizerId field update in Externally signed transactions
+- In Protocol version 35, the `synchronizer_id` field in externally signed prepared transaction metadata
+  will be populated with the physical synchronizer ID of the synchronizer on which the transaction will be processed,
+  instead of the logical synchronizer ID, as is the case in PV 34.
+  Applications must ensure they do not rely on the format of the `synchronizer_id` value.
 
 #### Dev Protocol
 
@@ -82,15 +97,15 @@ For parties with signing keys both in `PartyToParticipant` and `PartyToKeyMappin
   ```
 - On Ledger API interface subscriptions, the `CreatedEvent.interface_views` now returns the ID of the package containing
   the interface implementation that was used to compute the specific interface view as `InterfaceView.implementation_package_id`.
-- *BREAKING* The Postgres configuration of the indexer is separated from the Postgres configuration of the lapi server
+- The Postgres connection tuning configuration of the indexer is now separated from the configuration of the Ledger API server
   (`canton.participants.<participant>.ledger-api.postgres-data-source`).
-  The new parameter `canton.participants.<participant>.parameters.ledger-api-server.indexer.postgres-data-source` should
-  be used instead.
-- Added network timeout and client_connection_check_interval for db operations in the lapi server and indexer to avoid
+  The new configuration section `canton.participants.<participant>.parameters.ledger-api-server.indexer.postgres-data-source` should
+  be used instead to tune the indexer's Postgres connections.
+- Added network timeout and client_connection_check_interval for db operations in the Ledger API server and indexer to avoid
   hanging connections for Postgres (see PostgresDataSourceConfig). The defaults are 60 seconds network timeout and
-  5 seconds client_connection_check_interval for the lapi server, and 20 seconds network timeout and
+  5 seconds client_connection_check_interval for the Ledger API server, and 20 seconds network timeout and
   5 seconds client_connection_check_interval for the indexer. These values can be configured via the new configuration parameters
-  `canton.participants.<participant>.ledger-api.postgres-data-source.network-timeout` for network timeout of the lapi
+  `canton.participants.<participant>.ledger-api.postgres-data-source.network-timeout` for network timeout of the Ledger API
   server and `canton.participants.<participant>.parameters.ledger-api-server.indexer.postgres-data-source.client-connection-check-interval`
   for the client_connection_check_interval of the indexer.
 - We have changed the way that OffsetCheckpoints are populated to always generate at least one when an open-ended
@@ -105,16 +120,49 @@ For parties with signing keys both in `PartyToParticipant` and `PartyToKeyMappin
 - Additional metrics for the ACS commitment processor: `daml.participant.sync.commitments.last-incoming-received`, `daml.participant.sync.commitments.last-incoming-processed`, `daml.participant.sync.commitments.last-locally-completed`, and `daml.participant.sync.commitments.last-locally-checkpointed`.
 - *BREAKING* Removed the `LastErrorsAppender` along with the Admin API endpoints `StatusService.GetLastErrors` and `StatusServiceGetLastErrorTrace`, as
   well as the corresponding console commands `last_errors` and `last_error_trace`.
-
+- Changed the `CompressedBatch` structure in the sequencer protocol for protocol version 35 to separately keep recipients and envelopes (from `gzip(Seq((recp1, payload1), (recp2, payload2)))` to `gzip(Seq(recp1, recp2)), Seq(gzip(payload1), gzip(payload2)))`).
+- The configuration parameters `topology.use-new-processor` and `topology.use-new-client` have been deprecated and now default to true. Configuring those parameters to false will be ignored.
+- Functionality for managing internal and external parties has been improved, removing previous asymmetry:
+  - User rights can now be assigned to an external party during allocation.
+  - External parties can be allocated by the user themselves in the self-administration mode.
+  Please note that users in self-administration mode can allocate up to N parties, depending on a setting of the parameter
+  ```
+  canton.participants.<participant-id>.ledger-api.party-management-service.max-self-allocated-parties
+  ```
+  By default the value of this parameter is 0.
+- An IDP administrator can now only allocate parties confined to their own IDP perimeter.
+- The Ledger API and Ledger JSON API prepare `InteractiveSubmissionService` has been modified to support a such that
+- `PrepareSubmissionRequest.hashing_scheme_version` can now be populated with the desired hashing version to be
+   used for the transaction. The default hashing scheme is `HASHING_SCHEME_VERSION_V2` but integrators are encouraged to move to `HASHING_SCHEME_VERSION_V3` for
+  synchronizers using protocol version 35.
+- Topology-Aware Package Selection (TAPS) refinement for handling inconsistent vetting states:
+  - The algorithm now considers a party's package vetting state only for packages required by that party in the interpreted transaction.
+    It starts with a minimal set of restrictions derived from the command's root nodes and progressively accumulates more restrictions over a configurable number of passes.
+    This iterative process increases the likelihood of finding a valid package selection set for the routing of the transaction.
+  - The maximum number of TAPS passes can be set at the request-level via the optional `taps_max_passes` field in `Commands` or `PrepareSubmissionRequest` messages.
+    If not specified, the default value is taken from the participant configuration via `participants.participant.ledger-api.topology-aware-package-selection.max-passes-default` (defaults to `3`).
+    A hard limit is enforced by `participants.participant.ledger-api.topology-aware-package-selection.max-passes-limit` (defaults to `4`).
+- Deprecated: removed the feature flag `canton.sequencers.<node>.parameters.async-writer.enabled`, as async writing is now
+  the only supported mode.
+- Added a field `MaxConcurrentStreamsPerConnection` and corresponding default
+`defaultMaxConcurrentStreamsPerConnection` (set to 500) to `ServerConfig`.
+This corresponds to `max-concurrent-streams-per-connection` in the app configs, e.g.,
+`docker/canton/images/canton-sequencer/app.conf` and can be changed there. At present
+the value for sequencers is  configured to be 500 for the public API and 100 for the Admin API.
 ### Preview Features
 - preview feature
 
-## Bugfixes
+### Bugfixes
+- Switched the gRPC service `SequencerService.subscribe` and `SequencerService.downloadTopologyStateForInit` to manual
+  control flow, so that the sequencer doesn't crash with an `OutOfMemoryError` when responding to slow clients.
 
 - Fixed a bug preventing automatic synchronization of protocol feature flags.
-Automatic synchronization can be disabled by setting `parameters.auto-sync-protocol-feature-flags = false` in the participant's configuration object.
+  Automatic synchronization can be disabled by setting `parameters.auto-sync-protocol-feature-flags = false` in the participant's configuration object.
+
 - Fixed a bug where the Ledger API `PackageService.ListVettedPackages` used to return a potentially not yet
   effective state of the vetted packages. Now it returns the state of vetted packages effective at the time of the request.
+
+- Sequencer health status used to incorrectly return the synchronizer uid instead of the sequencer uid.
 
 ### (YY-nnn, Severity): Title
 
@@ -137,6 +185,10 @@ Automatic synchronization can be disabled by setting `parameters.auto-sync-proto
 
 ## Other changes
 
+### Removal of the old sequencer connection transports
+The old sequencer connections tranports have been removed, and only the new sequencer connection pool remains.
+Consequently, the configuration `<node>.sequencer-client.use-new-connection-pool` has been deprecated and no longer has any effect.
+
 ### Changes from NonNegativeLong to Long
 Some console commands using a NonNegativeLong for the offset are changed to accept a Long instead.
 Similarly, some console commands returning an offset now return a Long instead of a NonNegativeLong.
@@ -153,13 +205,31 @@ The ability to recompute contract ids upon ACS import has been removed.
 
 ### Online party replication
 
-Added the file-based online party replication command `participant.parties.add_party_with_acs_async` to
+- Added the file-based online party replication command `participant.parties.add_party_with_acs_async` to
 be used along with `participant.parties.export_party_acs` and instead of the sequencer-channel-based
 `add_party_async` command.
-
-The online party replication status command now returns status in a very different, "vector-status" format
+- The online party replication status command now returns status in a very different, "vector-status" format
 rather than the old "oneof" style. This impacts the `participant.parties.get_add_party_status` command and
 `com.digitalasset.canton.admin.participant.v30.PartyManagementService.GetAddPartyStatus` gRPC response type.
+- The participant configuration to enable online party replication has been renamed to
+`alpha-online-party-replication-support` from `unsafe-online-party-replication` for consistency with other
+alpha features and to reflect that the default file-based mode is more secure not relying on sequencer
+channels.
+- The sequencer configuration to enable sequencer channels for online party replication has been renamed to
+`unsafe-sequencer-channel-support` from `unsafe-enable-online-party-replication` for consistency and to
+refer specifically to sequencer channels.
+
+### Offline party replication
+
+Concluding an offline party replication by clearing the onboarding flag now includes two major updates:
+- Added crash resilience for ongoing clearances.
+- Automatic scheduling for clearances when a participant (re)connects to the synchronizer.
+
+These changes apply only to the `participant.parties.import_party_acs` and
+`participant.parties.clear_party_onboarding_flag` endpoints.
+
+Note: The replicated party ID must be included in the party ACS import call to enable automatic
+scheduling.
 
 ### Alpha Multi-Synchronizer Support
 
@@ -174,6 +244,20 @@ Note: Multi-synchronizer support is currently in Alpha; most Ledger API consumer
 Assign/Unassign events. Only enable this if your application specifically requires non-zero reassignment counters
 and can process these event types.
 
+### Removal of legacy party replication repair console macros
+
+The original party replication method, which relied on a silent synchronizer, has been superseded by the offline party
+replication process. Consequently, the obsolete repair console macros associated with the legacy approach have
+been removed.
+
+Specifically, the following macros are no longer available:
+- `step1_hold_and_store_acs`
+- `step2_import_acs`
+
+If you previously relied on the _Silent synchronizer replication procedure_, you will need to transition to the
+current offline party replication process. For details, please consult the
+[Offline Party Replication documentation](https://docs.digitalasset.com/operate/3.5/howtos/operate/parties/party_replication.html#offline-party-replication)
+
 ### Only PackageName is accepted on Ledger API
 
 - *BREAKING* Usage of package id for ledger queries was deprecated and now the validation will fail if used.
@@ -187,11 +271,133 @@ and can process these event types.
     - SubmitAndWaitForReassignmentRequest
     - ExecuteSubmissionAndWaitForTransactionRequest
 
-### Party replication repair console macro removal
+### Party replication onboarding topology event is exposed on Ledger API
 
-The original party replication, which relied on a silent synchronizer, has been superseded by the offline party
-replication process. As a result, the obsolete repair console macros associated with the old approach have
-been removed.
+The `PartyToParticipant` topology "onboarding" state used in the process of replicating a party with existing
+contracts is now visible via the Ledger API when a party onboards on a synchronizer on protocol version 35 or higher.
+Starting with PV=35, the newly introduced `ParticipantAuthorizationOnboarding` Ledger API topology event signals
+the beginning of party replication and transitions to `ParticipantAuthorizationAdded` once the party's ACS is fully
+visible on the Ledger API.
+
+### ACS stream continuation
+
+The `GetActiveContracts` stream request has been extended with an optional `stream_continuation_token` field that allows
+clients to continue an interrupted ACS stream from the last element which made through. The field can be populated with
+the `stream_continuation_token` field of the last response element received before the interruption, and the stream will
+continue from the next element after that.
+
+### Removal of deprecated, legacy ACS export and import endpoints
+
+The legacy repair endpoints for the ACS export and import have been removed:
+- Console command `participant.repair.export_acs_old`
+- Console command `pariticpant.repair.import_acs_old`
+- gRPC rpc `ParticipantRepairService.ExportAcsOld`
+- gRPC rpc `ParticipantRepairService.ImportAcsOld`
+
+#### Migration advice
+
+Use repair endpoints without the 'old' suffix:
+- Migrate to `participant.repair.export_acs` from `participant.repair.export_acs_old`
+- Migrate to `participant.repair.import_acs` from `participant.repair.import_acs_old`
+- Migrate to `ParticipantRepairService.ExportAcs` from `ParticipantRepairService.ExportAcsOld`
+- Migrate to `ParticipantRepairService.ImportAcs` from `ParticipantRepairService.ImportAcsOld`
+
+Note that previously created ACS snapshots with the legacy endpoints cannot not be imported with the current endpoints
+as the underlying data format has completely changed.
+
+##### Migrating to export_acs
+The most significant change is the removal of the `timestamp` parameter, which has been replaced by a mandatory
+`ledgerOffset` parameter.
+
+Parameter changes:
+- New mandatory parameter: `ledgerOffset (Long)`, you must now specify the exact ledger offset for the snapshot
+  instead of a `timestamp`.
+- Removed parameters: `partiesOffboarding`, `timestamp` (replaced by `ledgerOffset`), `force`
+- Renamed parameters: `outputFile` is now `exportFilePath` (default is `"canton-acs-export.gz"`), `filterSynchronizerId`
+  is now `synchronizerId`.
+- New optional parameters: `excludedStakeholders` allows you to omit contracts that have one or more of these parties
+  as a stakeholder parties; `contractSynchronizerRenames` allows mapping contracts from one synchronizer to another
+  during export.
+
+Parameters changes are analogous for the gRPC RPC endpoint `ParticipantRepairService.ExportAcs`.
+
+##### Migrating to import_acs
+The import command remains largely the same in basic usage, but introduces new optional parameters for advanced
+validation and overrides.
+
+Parameter changes:
+- Renamed parameter: `inputFile` is now `importFilePath` (default is `"canton-acs-export.gz"`).
+- New optional parameters: `contractImportMode` governs contract validation upon import, defaults to
+  `ContractImportMode.Validation`; `representativePackageIdOverride` allows overriding representative package IDs
+  during import; `excludedStakeholders` allows omitting specific parties' contracts during import.
+
+Parameters changes are analogous for the gRPC RPC endpoint `ParticipantRepairService.ImportAcs`.
+
+### Improvements for `repair.add` and migration advice
+
+The `participant.repair.add` admin command has been revised to use the new `ImportAcsV2` backend, bringing significant
+memory performance improvements, stricter default safety validations, and several new parameters.
+
+#### Important behavioral change: strict `Validation` by default
+
+Previously, `repair.add` implicitly accepted all injected contracts without re-evaluating their cryptographic hashes.
+To prevent accidental data corruption, the command now defaults to **Validation** mode
+(`contractImportMode = ContractImportMode.Validation`).
+
+- **Impact:** If you have existing scripts or recovery procedures that inject manually modified, synthetic, or
+  inconsistent contracts (where the payload does not strictly match the `ContractId` hash), they will now fail with
+  a `"Failed to authenticate contract with id"` error.
+- **Migration:** To bypass this cryptographic validation and restore the legacy behavior, explicitly pass the `Accept`
+  mode in your command call:
+    ```scala
+    participant.repair.add(
+      synchronizerId = mySynchronizer,
+      protocolVersion = myProtocolVersion,
+      contracts = myContracts,
+      contractImportMode = ContractImportMode.Accept // Bypasses strict validation
+    )
+    ```
+
+#### New parameters
+
+The command signature has been expanded to support several optional parameters for complex recovery scenarios:
+- `workflowIdPrefix`: Allows you to set a custom prefix for the generated workflow ID to easily track the repair
+  transactions (defaults to `import-<UUID>`).
+- `contractImportMode`: Choose between `Validation` (default, validates that contract IDs comply with the scheme
+  associated to the synchronizer where the contracts are assigned), or `Accept` the contracts as they are (if you know
+  what you are doing).
+- `representativePackageIdOverride`: Allows you to remap or override the representative package IDs of the contracts
+  as they are imported.
+- `excludedStakeholders`: When defined, any contract that has one or more of these parties as a stakeholder will not be
+  added.
+
+### Improved party and repair ACS imports
+
+We have completely overhauled the ACS import endpoints for both party replication and participant repair to be
+memory-efficient endpoints:
+- Console command `participant.parties.import_party_acs`
+- Console command `participant.repair.import_acs`
+- gRPC RPC `PartyManagementService.ImportPartyAcs`
+- gRPC RPC `ParticipantRepairService.ImportAcs`
+
+This resolves previous memory limitations, as these endpoints no longer load the entire ACS snapshot into memory at
+once.
+
+#### Action required: Breaking API change
+The `synchronizerId` is now a **mandatory** first parameter for both the `import_party_acs` and `import_acs` console
+commands as well as their analogous gRPC endpoints. You will need to update any existing scripts.
+
+**For `import_party_acs`:**
+- **Old usage:** `participant.parties.import_party_acs("canton-acs-export.gz")`
+- **New usage:** `participant.parties.import_party_acs(mySynchronizerId, importFilePath = "canton-acs-export.gz")`
+
+**For `import_acs`:**
+- **Old usage:** `participant.repair.import_acs("canton-acs-export.gz")`
+- **New usage:** `participant.repair.import_acs(mySynchronizerId, importFilePath = "canton-acs-export.gz")`
+
+Because of the mandatory `synchronizerId` parameter, to import a multi-synchronizer ACS snapshot, you must now call the
+endpoint sequentially for each synchronizer your participant is connected to, using the exact same snapshot file.
+The import process will ignore any contracts in the snapshot that belong to a different synchronizer.
 
 ### update to GRPC 1.77.0
 

@@ -143,4 +143,8 @@ Timeout 10 seconds expired, but readers are still active. Shutting down forcibly
 
 # Warnings in s3Mock log (which we redirect to our logs), that we don't care about
 \[s3Mock\].*Ignoring option --illegal-access=warn
+
+# SV-4 is the late-joining SV in this test. Ignoring here as otherwise we would need to suppress logs during the whole
+# SV-4 initialization.
+Not publishing sequencer successor as we are past upgrade time.*LsuNodeInitializer:LogicalSynchronizerUpgradeIntegrationTest.*SV=sv4
 Ryuk has been disabled

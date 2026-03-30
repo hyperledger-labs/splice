@@ -18,6 +18,7 @@ import com.digitalasset.canton.logging.SuppressionRule.FullSuppression
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.protocol.ProtocolObjectTestUtils.assertSequencedEventEquals
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.synchronizer.metrics.{SequencerHistograms, SequencerMetrics}
 import com.digitalasset.canton.synchronizer.sequencer.SynchronizerSequencingTestUtils.*
@@ -51,8 +52,8 @@ import org.scalatest.wordspec.FixtureAsyncWordSpec
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.immutable.SortedSet
+import scala.concurrent.Promise
 import scala.concurrent.duration.*
-import scala.concurrent.{Future, Promise}
 
 class SequencerReaderTest
     extends FixtureAsyncWordSpec
@@ -110,9 +111,7 @@ class SequencerReaderTest
 
     override protected def logger: TracedLogger = SequencerReaderTest.this.logger
 
-    override def notifyOfLocalWrite(notification: WriteNotification)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] = Future.unit
+    override def notifyOfLocalWrite(notification: WriteNotification): Unit = ()
   }
 
   class Env extends FlagCloseableAsync {
@@ -154,7 +153,7 @@ class SequencerReaderTest
       cryptoD,
       eventSignaller,
       topologyClientMember,
-      sequencingTimeBoundExclusiveO = None,
+      lsuSequencingBounds = None,
       sequencerMetrics,
       timeouts,
       loggerFactory,
@@ -214,9 +213,7 @@ class SequencerReaderTest
       )
 
       val source = Source
-        .future(
-          subscribeF
-        )
+        .future(subscribeF)
         .flatMapConcat(identity)
         .map {
           case Right(event) => event
@@ -758,7 +755,7 @@ class SequencerReaderTest
           )
           batch = Batch.fromClosed(
             testedProtocolVersion,
-            ClosedEnvelope.create(
+            ClosedUncompressedEnvelope.create(
               ByteString.copyFromUtf8("test envelope"),
               Recipients.cc(alice, bob),
               Seq.empty,
@@ -813,6 +810,7 @@ class SequencerReaderTest
                       _traceContext,
                       _trafficReceiptO,
                     ),
+                    _,
                   ),
                 ),
                 _idx,
@@ -830,6 +828,7 @@ class SequencerReaderTest
 
       "read by the sender into deliver errors" in { env =>
         import env.*
+
         setup(env).flatMap {
           case (topologyTimestampTolerance, batch, delivers, previousTimestamps) =>
             for {
@@ -871,7 +870,11 @@ class SequencerReaderTest
                         ),
                         Option.empty[TrafficReceipt],
                       )
-                  delivered.signedEvent.content shouldBe expectedSequencedEvent
+                  assertSequencedEventEquals(
+                    actual = delivered.signedEvent.content,
+                    expected = expectedSequencedEvent,
+                    testedProtocolVersion = testedProtocolVersion,
+                  )
               }
             }
         }
@@ -918,7 +921,12 @@ class SequencerReaderTest
                         None,
                         Option.empty[TrafficReceipt],
                       )
-                  delivered.signedEvent.content shouldBe expectedSequencedEvent
+
+                  assertSequencedEventEquals(
+                    actual = delivered.signedEvent.content,
+                    expected = expectedSequencedEvent,
+                    testedProtocolVersion = testedProtocolVersion,
+                  )
               }
             }
         }

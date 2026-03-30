@@ -8,6 +8,7 @@ import cats.syntax.functorFilter.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{CantonConfig, DefaultProcessingTimeouts, ProcessingTimeout}
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -31,14 +32,15 @@ import com.digitalasset.canton.protocol.messages.{
 }
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
+import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
+import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.External
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerAdminStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
-import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.LsuSequencerError
 import com.digitalasset.canton.synchronizer.sequencer.errors.{
   CreateSubscriptionError,
   SequencerAdministrationError,
@@ -58,6 +60,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{FutureUtil, MonadUtil}
+import io.grpc.ServerServiceDefinition
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.stream.KillSwitches
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
@@ -107,9 +110,8 @@ class ProgrammableSequencer(
 
   override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
       traceContext: com.digitalasset.canton.tracing.TraceContext
-  ): FutureUnlessShutdown[
-    SequencerTrafficStatus
-  ] = baseSequencer.trafficStatus(members, selector)
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, SequencerTrafficStatus] =
+    baseSequencer.trafficStatus(members, selector)
 
   override def sequencingTime(implicit
       traceContext: TraceContext
@@ -432,6 +434,8 @@ class ProgrammableSequencer(
 
   override def adminStatus: SequencerAdminStatus = baseSequencer.adminStatus
 
+  override def adminServices: Seq[ServerServiceDefinition] = baseSequencer.adminServices
+
   override def isEnabled(member: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
@@ -454,15 +458,25 @@ class ProgrammableSequencer(
 
   override private[canton] def orderer: Option[BlockOrderer] = baseSequencer.orderer
 
+  override def getTrafficSummaries(timestamps: Seq[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, Seq[TrafficSummary]] =
+    baseSequencer.getTrafficSummaries(timestamps)
+
   override def getLsuTrafficControlState(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, LsuSequencerError, LsuTrafficState] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, LsuTrafficState] =
     baseSequencer.getLsuTrafficControlState
 
   override def setLsuTrafficControlState(state: LsuTrafficState)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, LsuSequencerError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
     baseSequencer.setLsuTrafficControlState(state)
+
+  override def performLsuSequencingTest(mediatorGroupRecipient: MediatorGroupRecipient)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
+    baseSequencer.performLsuSequencingTest(mediatorGroupRecipient)
 }
 
 /** Utilities for using the [[ProgrammableSequencer]] from tests */
@@ -488,7 +502,7 @@ trait HasProgrammableSequencer {
   def signModifiedSubmissionRequest(
       request: SubmissionRequest,
       syncCrypto: SynchronizerCryptoClient,
-      approximateTimestampOverride: Option[CantonTimestamp],
+      approximateTimestampForSigning: Option[CantonTimestamp],
   )(implicit executionContext: ExecutionContext): SignedContent[SubmissionRequest] =
     SignedContent
       .create(
@@ -496,7 +510,8 @@ trait HasProgrammableSequencer {
         syncCrypto.currentSnapshotApproximation.futureValueUS,
         request,
         None,
-        approximateTimestampOverride,
+        SigningTimestampOverrides
+          .createOption(approximateTimestampForSigning, Some(request.maxSequencingTime)),
         HashPurpose.SubmissionRequestSignature,
         testedProtocolVersion,
       )
@@ -534,10 +549,10 @@ object ProgrammableSequencer {
 
           val localVerdicts = submissionRequest.batch.envelopes
             .flatMap(
-              _.closeEnvelope
-                .openEnvelope(participant.crypto.pureCrypto, BaseTest.testedProtocolVersion)
-                .value
-                .protocolMessage match {
+              _.toOpenEnvelope(
+                participant.crypto.pureCrypto,
+                BaseTest.testedProtocolVersion,
+              ).value.protocolMessage match {
                 case SignedProtocolMessage(
                       TypedSignedProtocolMessageContent(confirmations: ConfirmationResponses),
                       _,

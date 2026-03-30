@@ -20,7 +20,6 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanCacheConfig,
   ScanSynchronizerConfig,
   ScanSynchronizerNodesConfig,
-  SequencerTrafficIngestionConfig,
   CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
@@ -475,9 +474,6 @@ object SpliceConfig {
       deriveReader[BulkStorageConfig]
     implicit val S3ConfigReader: ConfigReader[S3Config] =
       deriveReader[S3Config]
-    implicit val sequencerTrafficIngestionConfigReader
-        : ConfigReader[SequencerTrafficIngestionConfig] =
-      deriveReader[SequencerTrafficIngestionConfig]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
       deriveReader[SpliceCacheConfig]
     implicit val scanSynchronizerNodes: ConfigReader[ScanSynchronizerNodesConfig] =
@@ -543,6 +539,8 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationReader
         : ConfigReader[SvOnboardingConfig.DomainMigration] =
       deriveReader[SvOnboardingConfig.DomainMigration]
+    implicit val svOnboardingRollForwardLsuReader: ConfigReader[SvOnboardingConfig.RollForwardLsu] =
+      deriveReader[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
       deriveReader[SvOnboardingConfig]
     implicit val expectedValidatorOnboardingConfigReader
@@ -621,6 +619,7 @@ object SpliceConfig {
             case foundDso: SvOnboardingConfig.FoundDso => check(conf, foundDso)
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
+            case _: SvOnboardingConfig.RollForwardLsu => true
           }
         // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
         val sv1NodeHasNoSequencerUrl =
@@ -932,9 +931,6 @@ object SpliceConfig {
       deriveWriter[BulkStorageConfig]
     implicit val S3ConfigWriter: ConfigWriter[S3Config] =
       confidentialWriter[S3Config](S3Config.hideConfidential)
-    implicit val sequencerTrafficIngestionConfigWriter
-        : ConfigWriter[SequencerTrafficIngestionConfig] =
-      deriveWriter[SequencerTrafficIngestionConfig]
     implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
       deriveWriter[SpliceCacheConfig]
 
@@ -992,6 +988,8 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationWriter
         : ConfigWriter[SvOnboardingConfig.DomainMigration] =
       deriveWriter[SvOnboardingConfig.DomainMigration]
+    implicit val svOnboardingRollForwardLsuWriter: ConfigWriter[SvOnboardingConfig.RollForwardLsu] =
+      deriveWriter[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =
       confidentialWriter[SvOnboardingConfig](SvOnboardingConfig.hideConfidential)
 

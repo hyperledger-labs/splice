@@ -50,7 +50,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import slick.jdbc.canton.SQLActionBuilder
-import slick.jdbc.{GetResult, TransactionIsolation}
+import slick.jdbc.{GetResult, SetParameter, TransactionIsolation}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
@@ -87,30 +87,31 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       case Profile.Postgres(_) => false
     }
 
-    // TODO(#29400) try out whether the array based unnesting provides another win
-    /*
+    import cats.syntax.foldable.*
     val (codes, nss, ids, validUntils) = items.foldMap { stateKeyFetch =>
       val id = stateKeyFetch.identifier.map(_.str).getOrElse("")
       (
-        Seq(stateKeyFetch.code.code),
+        Seq(stateKeyFetch.code.dbInt),
         Seq(stateKeyFetch.namespace.unwrap),
         Seq(id),
-        Seq(stateKeyFetch.validUntilCutoff.value),
+        Seq(stateKeyFetch.validUntilCutoff.value.toMicros),
       )
     }
-    sql"unnest(${codes.toArray}, ${nss.toArray}, ${ids.toArray}, ${validUntils.toArray}) criteria(tx_type, ns, ident, v_until) "
-     */
+    import DbStorage.Implicits.BuilderChain.*
 
-    val criteriaSql = {
-      val criteria = items
-        .map { stateKeyFetch =>
-          val id = stateKeyFetch.identifier.map(_.str).getOrElse("")
-          sql"(${stateKeyFetch.code}, ${stateKeyFetch.namespace}, $id, ${stateKeyFetch.validUntilCutoff.value})"
-        }
-        .intercalate(sql",")
-        .toActionBuilder
-      (sql"(VALUES" ++ criteria ++ sql") AS criteria(tx_type, ns, ident, v_until) ").toActionBuilder
-    }
+    // No idea why but without this the compiler remained unhappy
+    implicit val setParameterArrayString: SetParameter[Array[String]] =
+      com.digitalasset.canton.resource.DbStorage.Implicits.setParameterArrayString
+
+    val codesA = codes.toArray
+    val nssA = nss.toArray
+    val idsA = ids.toArray
+    val validUntilsA = validUntils.toArray
+
+    // this construct allows us to use prepared statements
+    val criteriaSql =
+      sql"unnest($codesA, $nssA, $idsA, $validUntilsA) as criteria(tx_type, ns, ident, v_until) "
+
     val query =
       sql"SELECT t.instance, t.sequenced, t.valid_from, t.valid_until, t.rejection_reason FROM " ++
         criteriaSql ++
@@ -317,17 +318,17 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       errorLoggingContext: ErrorLoggingContext,
   ): FutureUnlessShutdown[Unit] = {
     implicit val tc = errorLoggingContext.traceContext
-    val targetPSId = ev(storeId).psid
-    val sourcePSId = sourceStore.storeId.psid
+    val targetPsid = ev(storeId).psid
+    val sourcePsid = sourceStore.storeId.psid
 
     for {
       _ <- ErrorUtil.requireArgumentAsyncShutdown(
-        targetPSId.logical == sourcePSId.logical,
-        s"unexpected logical synchronizer id: expected=${targetPSId.logical}, actual=${sourcePSId.logical}",
+        targetPsid.logical == sourcePsid.logical,
+        s"unexpected logical synchronizer id: expected=${targetPsid.logical}, actual=${sourcePsid.logical}",
       )
       _ <- ErrorUtil.requireArgumentAsyncShutdown(
-        sourcePSId < targetPSId,
-        s"source synchronizer [$targetPSId] is not a predecessor of the target synchronizer [$targetPSId]",
+        sourcePsid < targetPsid,
+        s"source synchronizer [$targetPsid] is not a predecessor of the target synchronizer [$targetPsid]",
       )
       sourceDbStore <- sourceStore match {
         case dbStore: DbTopologyStore[SynchronizerStore] => FutureUnlessShutdown.pure(dbStore)
@@ -354,7 +355,7 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
         sql" ON CONFLICT DO NOTHING" // idempotency-"conflict" based on common_topology_transactions unique constraint
       numInserted <- storage.update(insert.asUpdate, functionFullName)
     } yield {
-      logger.info(s"Transferred $numInserted topology transactions from $sourcePSId to $targetPSId")
+      logger.info(s"Transferred $numInserted topology transactions from $sourcePsid to $targetPsid")
     }
   }
 
@@ -615,6 +616,28 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       TopologyChangeOp.Remove.some,
       pagination,
     ).map(_.collectOfType[TopologyChangeOp.Remove])
+
+  override def findAllTransactions(
+      asOf: CantonTimestamp,
+      asOfInclusive: Boolean,
+      isProposal: Boolean,
+      types: Seq[TopologyMapping.Code],
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      pagination: Option[(Option[UniqueIdentifier], Int)] = None,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[StoredTopologyTransactions[TopologyChangeOp, TopologyMapping]] =
+    findTransactionsBatchingUidFilter(
+      asOf,
+      asOfInclusive,
+      isProposal,
+      types.toSet,
+      filterUid,
+      filterNamespace,
+      None,
+      pagination,
+    )
 
   override def findFirstSequencerStateForSequencer(sequencerId: SequencerId)(implicit
       traceContext: TraceContext
@@ -1004,13 +1027,19 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       asOfInclusive: Boolean,
       isProposal: Boolean,
       types: Set[TopologyMapping.Code],
-      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
-      filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      filterUidIn: Option[NonEmpty[Seq[UniqueIdentifier]]],
+      filterNamespaceIn: Option[NonEmpty[Seq[Namespace]]],
       filterOp: Option[TopologyChangeOp],
       pagination: Option[(Option[UniqueIdentifier], Int)],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[GenericStoredTopologyTransactions] = {
+
+    // we need to use distinct here as otherwise, due to the chunking, we could end up
+    // in separate batches which then again could cause the same tx being picked up multiple times
+    val filterUid = filterUidIn.map(_.distinct)
+    val filterNamespace = filterNamespaceIn.map(_.distinct)
+
     def forwardBatch(
         filterUidsNew: Option[NonEmpty[Seq[UniqueIdentifier]]],
         filterNamespaceNew: Option[NonEmpty[Seq[Namespace]]],
@@ -1029,7 +1058,9 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
     // Optimization: remove uid-filters made redundant by namespace filters
     val explicitUidFilters = filterUid
       .flatMap(uids =>
-        NonEmpty.from(uids.filterNot(uid => filterNamespace.exists(_.contains(uid.namespace))))
+        NonEmpty.from(
+          uids.distinct.filterNot(uid => filterNamespaceIn.exists(_.contains(uid.namespace)))
+        )
       )
 
     // if both filters are empty, we can simply run a single batch
@@ -1069,7 +1100,9 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
             batchedNamespaceFilters,
           ).map(_.result)
         }
-        .map(chunkedResult => StoredTopologyTransactions(chunkedResult.flatten))
+        .map { chunkedResult =>
+          StoredTopologyTransactions(chunkedResult.flatten)
+        }
     }
   }
 

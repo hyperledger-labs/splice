@@ -16,7 +16,6 @@ import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccept
 import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, Reassignment, Update}
 import com.digitalasset.canton.metrics.{IndexerMetrics, LedgerApiServerMetrics}
 import com.digitalasset.canton.platform.*
-import com.digitalasset.canton.platform.indexer.TransactionTraversalUtils
 import com.digitalasset.canton.platform.indexer.TransactionTraversalUtils.NodeInfo
 import com.digitalasset.canton.platform.store.backend.Conversions.{
   authorizationEventInt,
@@ -44,8 +43,9 @@ object UpdateToDbDto {
       compressionStrategy: CompressionStrategy,
       metrics: LedgerApiServerMetrics,
   )(implicit mc: MetricsContext): Offset => Update => Iterator[DbDto] = { offset => tracedUpdate =>
-    val serializedTraceContext =
-      SerializableTraceContext(tracedUpdate.traceContext).toDamlProto.toByteArray
+    val serializedTraceContext = SerializableTraceContext(
+      tracedUpdate.traceContext
+    ).toSerializedDamlProto
     tracedUpdate match {
       case u: CommandRejected =>
         commandRejectedToDbDto(
@@ -53,6 +53,7 @@ object UpdateToDbDto {
           offset = offset,
           serializedTraceContext = serializedTraceContext,
           commandRejected = u,
+          isTransaction = u.isTransaction,
         )
 
       case u: TopologyTransactionEffective =>
@@ -99,6 +100,7 @@ object UpdateToDbDto {
       offset: Offset,
       serializedTraceContext: Array[Byte],
       commandRejected: CommandRejected,
+      isTransaction: Boolean,
   )(implicit mc: MetricsContext): Iterator[DbDto] = {
     withExtraMetricLabels(
       IndexerMetrics.Labels.grpcCode -> Status
@@ -126,8 +128,7 @@ object UpdateToDbDto {
         synchronizerId = commandRejected.synchronizerId,
         messageUuid = messageUuid,
         serializedTraceContext = serializedTraceContext,
-        isTransaction =
-          true, // please note from usage point of view (deduplication) rejections are always used both for transactions and reassignments at the moment.
+        isTransaction = isTransaction,
       ).copy(
         rejection_status_code = Some(commandRejected.reasonTemplate.code),
         rejection_status_message = Some(commandRejected.reasonTemplate.message),
@@ -233,11 +234,7 @@ object UpdateToDbDto {
       event_sequential_id_last = 0, // this is filled later
     )
 
-    val events: Iterator[DbDto] = TransactionTraversalUtils
-      .executionOrderTraversalForIngestion(
-        transactionAccepted.transaction.transaction
-      )
-      .iterator
+    val events: Iterator[DbDto] = transactionAccepted.transactionInfo.executionOrder.iterator
       .flatMap {
         case NodeInfo(nodeId, create: Create, _) =>
           createNodeToDbDto(
@@ -316,7 +313,8 @@ object UpdateToDbDto {
           ) =>
         representativePackageId
     }
-    val witnesses = transactionAccepted.blindingInfo.disclosure.getOrElse(nodeId, Set.empty)
+    val witnesses =
+      transactionAccepted.transactionInfo.blindingInfo.disclosure.getOrElse(nodeId, Set.empty)
     val internal_contract_id = contractInfo.internalContractId
 
     if (transactionAccepted.isAcsDelta(create.coid)) {
@@ -378,7 +376,8 @@ object UpdateToDbDto {
     val (exerciseArgument, exerciseResult, _) =
       translation.serialize(exercise)
     val templateId = templateIdWithPackageName(exercise)
-    val witnesses = transactionAccepted.blindingInfo.disclosure.getOrElse(nodeId, Set.empty)
+    val witnesses =
+      transactionAccepted.transactionInfo.blindingInfo.disclosure.getOrElse(nodeId, Set.empty)
     if (exercise.consuming && transactionAccepted.isAcsDelta(exercise.targetCoid)) {
       val additional_witnesses = witnesses.diff(exercise.stakeholders)
       DbDto.consumingExerciseDbDtos(
@@ -580,6 +579,7 @@ object UpdateToDbDto {
       representative_package_id = assign.createNode.templateId.packageId,
       notPersistedContractId = assign.createNode.coid,
       internal_contract_id = assign.internalContractId,
+      create_key_hash = assign.createNode.keyOpt.map(_.globalKey.hash.bytes.toHexString),
     )(
       stakeholders = assign.createNode.stakeholders,
       template_id = templateIdWithPackageName(assign),

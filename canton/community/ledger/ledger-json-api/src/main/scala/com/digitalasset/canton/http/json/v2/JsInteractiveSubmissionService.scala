@@ -20,6 +20,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsCantonError,
   JsTransaction,
+  OneOfSchemaExtension,
   stringDecoderForEnum,
   stringEncoderForEnum,
   stringSchemaForEnum,
@@ -192,10 +193,13 @@ final case class JsPrepareSubmissionRequest(
     prefetchContractKeys: Seq[js.PrefetchContractKey] = Seq.empty,
     maxRecordTime: Option[com.google.protobuf.timestamp.Timestamp],
     estimateTrafficCost: Option[interactive_submission_service.CostEstimationHints] = None,
+    tapsMaxPasses: Option[Int] = None,
+    hashingSchemeVersion: interactive_submission_service.HashingSchemeVersion =
+      interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
 )
 
 final case class JsPrepareSubmissionResponse(
-    preparedTransaction: Option[protobuf.ByteString],
+    preparedTransaction: protobuf.ByteString,
     preparedTransactionHash: protobuf.ByteString,
     hashingSchemeVersion: interactive_submission_service.HashingSchemeVersion,
     hashingDetails: Option[String],
@@ -460,11 +464,13 @@ object JsInteractiveSubmissionServiceCodecs {
     stringSchemaForEnum()
 
   implicit val timeSchema: Schema[interactive_submission_service.MinLedgerTime.Time] =
-    Schema.oneOfWrapped
+    Schema.oneOfWrapped[interactive_submission_service.MinLedgerTime.Time].oneOfExtension()
 
   implicit val esrDeduplicationPeriodSchema
       : Schema[interactive_submission_service.ExecuteSubmissionRequest.DeduplicationPeriod] =
-    Schema.oneOfWrapped
+    Schema
+      .oneOfWrapped[interactive_submission_service.ExecuteSubmissionRequest.DeduplicationPeriod]
+      .oneOfExtension()
 
   implicit val hashingSchemeVersionSchema
       : Schema[interactive_submission_service.HashingSchemeVersion] =

@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -76,8 +76,10 @@ import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.*
 import com.digitalasset.canton.participant.util.DAMLe.{ContractEnricher, TransactionEnricher}
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
+import com.digitalasset.canton.platform.store.cache.OnlyForTestingTransactionInMemoryStore
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ContractIdAbsolutizer.ContractIdAbsolutizationDataV1
+import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.WellFormedTransaction.{
   WithSuffixesAndMerged,
   WithoutSuffixes,
@@ -88,7 +90,7 @@ import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.{ConfirmationRequestSessionKeyStore, SessionKeyStore}
-import com.digitalasset.canton.time.SynchronizerTimeTracker
+import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
@@ -105,6 +107,7 @@ import com.digitalasset.canton.{
   WorkflowId,
   checked,
 }
+import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
 import com.digitalasset.daml.lf.transaction.CreationTime
 import monocle.PLens
 
@@ -126,6 +129,7 @@ class TransactionProcessingSteps(
     staticSynchronizerParameters: StaticSynchronizerParameters,
     crypto: SynchronizerCryptoClient,
     metrics: TransactionProcessingMetrics,
+    clock: Clock,
     transactionEnricher: TransactionEnricher,
     createNodeEnricher: ContractEnricher,
     authorizationValidator: AuthorizationValidator,
@@ -134,6 +138,7 @@ class TransactionProcessingSteps(
     protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     messagePayloadLoggingEnabled: Boolean,
+    onlyForTestingTransactionInMemoryStore: Option[OnlyForTestingTransactionInMemoryStore],
 )(implicit val ec: ExecutionContext)
     extends ProcessingSteps[
       SubmissionParam,
@@ -191,6 +196,7 @@ class TransactionProcessingSteps(
       mediator: MediatorGroupRecipient,
       ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      generateMaxSequencingTime: CantonTimestamp => CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -206,18 +212,48 @@ class TransactionProcessingSteps(
       disclosedContracts,
     ) = submissionParam
 
-    val tracked = new TrackedTransactionSubmission(
-      submitterInfo,
-      transactionMeta,
-      keyResolver,
-      wfTransaction,
-      mediator,
-      recentSnapshot,
-      ephemeralState.contractLookup,
-      disclosedContracts,
-    )
-
-    EitherT.rightT[FutureUnlessShutdown, TransactionSubmissionError]((tracked, None))
+    val now = clock.now
+    for {
+      maxSequencingTime <-
+        EitherT.right(
+          recentSnapshot.ipsSnapshot
+            .findDynamicSynchronizerParametersOrDefault(protocolVersion)
+            .map { synchronizerParameters =>
+              val maxSequencingTimeFromLET = CantonTimestamp(transactionMeta.ledgerEffectiveTime)
+                .add(synchronizerParameters.ledgerTimeRecordTimeTolerance.unwrap)
+              // For PV34 we didn't want to change the protocol so used adjusted the max sequencing time
+              // not to exceed the max record time if provided. For PV35 onwards we do this checking in phase 3
+              // so we restore the pre-existing.
+              if (protocolVersion >= ProtocolVersion.v35) {
+                maxSequencingTimeFromLET
+              } else {
+                submitterInfo.externallySignedSubmission
+                  .flatMap(_.maxRecordTime)
+                  .map(CantonTimestamp.apply)
+                  .map(_.min(maxSequencingTimeFromLET))
+                  .getOrElse(maxSequencingTimeFromLET)
+              }
+            }
+        )
+      tracked = new TrackedTransactionSubmission(
+        submitterInfo,
+        transactionMeta,
+        keyResolver,
+        wfTransaction,
+        mediator,
+        recentSnapshot,
+        ephemeralState.contractLookup,
+        disclosedContracts,
+        now,
+        maxSequencingTime,
+      )
+      submission <- EitherT.rightT[FutureUnlessShutdown, TransactionSubmissionError](
+        (
+          tracked,
+          None,
+        )
+      )
+    } yield submission
   }
 
   override def embedNoMediatorError(error: NoMediatorError): TransactionSubmissionError =
@@ -237,6 +273,8 @@ class TransactionProcessingSteps(
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
       contractLookup: ContractLookup { type ContractsCreatedAtTime <: CreationTime.CreatedAt },
       disclosedContracts: Map[LfContractId, ContractInstance],
+      override val approximateTimestampForSigning: CantonTimestamp,
+      override val maxSequencingTime: CantonTimestamp,
   )(implicit traceContext: TraceContext)
       extends TrackedSubmission {
 
@@ -307,28 +345,9 @@ class TransactionProcessingSteps(
 
     override def submissionId: Option[LedgerSubmissionId] = submitterInfo.submissionId
 
-    override def maxSequencingTimeO: OptionT[FutureUnlessShutdown, CantonTimestamp] = OptionT.liftF(
-      recentSnapshot.ipsSnapshot.findDynamicSynchronizerParametersOrDefault(protocolVersion).map {
-        synchronizerParameters =>
-          val maxSequencingTimeFromLET = CantonTimestamp(transactionMeta.ledgerEffectiveTime)
-            .add(synchronizerParameters.ledgerTimeRecordTimeTolerance.unwrap)
-          // For PV34 we didn't want to change the protocol so used adjusted the max sequencing time
-          // not to exceed the max record time if provided. For PV35 onwards we do this checking in phase 3
-          // so we restore the pre-existing.
-          if (protocolVersion >= ProtocolVersion.v35) {
-            maxSequencingTimeFromLET
-          } else {
-            submitterInfo.externallySignedSubmission
-              .flatMap(_.maxRecordTime)
-              .map(CantonTimestamp.apply)
-              .map(_.min(maxSequencingTimeFromLET))
-              .getOrElse(maxSequencingTimeFromLET)
-          }
-      }
-    )
-
     override def prepareBatch(
         actualDeduplicationOffset: DeduplicationPeriod.DeduplicationOffset,
+        approximateTimestampForSigning: CantonTimestamp,
         maxSequencingTime: CantonTimestamp,
         sessionKeyStore: SessionKeyStore,
     ): EitherT[FutureUnlessShutdown, SubmissionTrackingData, PreparedBatch] = {
@@ -365,6 +384,7 @@ class TransactionProcessingSteps(
               keyResolver,
               mediator,
               recentSnapshot,
+              approximateTimestampForSigning,
               sessionKeyStore,
               TransactionProcessingSteps
                 .lookupContractsWithDisclosed(disclosedContracts, contractLookup),
@@ -391,6 +411,7 @@ class TransactionProcessingSteps(
         val batchSize = batch.toProtoVersioned.serializedSize
         val numRecipients = batch.allRecipients.size
         val numEnvelopes = batch.envelopesCount
+
         tracker
           .findHandle(
             submitterInfoWithDedupPeriod.commandId,
@@ -398,7 +419,7 @@ class TransactionProcessingSteps(
             submitterInfoWithDedupPeriod.actAs,
             submitterInfoWithDedupPeriod.submissionId,
           )
-          .recordEnvelopeSizes(batchSize, numRecipients, numEnvelopes)
+          .recordEnvelopeSizes(request.rootHash, batchSize, numRecipients, numEnvelopes)
 
         metrics.protocolMessages.confirmationRequestSize.update(batchSize)(MetricsContext.Empty)
 
@@ -700,6 +721,7 @@ class TransactionProcessingSteps(
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -707,7 +729,6 @@ class TransactionProcessingSteps(
     TransactionProcessorError,
     StorePendingDataAndSendResponseAndCreateTimeout,
   ] = {
-
     val ParsedTransactionRequest(
       rc,
       requestTimestamp,
@@ -751,6 +772,7 @@ class TransactionProcessingSteps(
                   ledgerTime,
                   parsedRequest.preparationTime,
                   () => engineController.abortStatus,
+                  snapshot.ipsSnapshot,
                 )
             }
           }
@@ -941,6 +963,7 @@ class TransactionProcessingSteps(
             freshOwnTimelyTx,
             engineController,
             decisionTimeTickRequest,
+            publishUpdate,
           )
         StorePendingDataAndSendResponseAndCreateTimeout(
           pendingTransaction,
@@ -978,7 +1001,7 @@ class TransactionProcessingSteps(
       error: TransactionError,
   )(implicit
       traceContext: TraceContext
-  ): (Option[SequencedUpdate], Option[PendingSubmissionId]) = {
+  ): (Option[SequencedEventUpdate], Option[PendingSubmissionId]) = {
     val rejection = Update.CommandRejected.FinalReason(error.rpcStatus())
     completionInfoFromSubmitterMetadataO(submitterMetadata, freshOwnTimelyTx).map {
       completionInfo =>
@@ -987,6 +1010,7 @@ class TransactionProcessingSteps(
           rejection,
           psid.logical,
           ts,
+          isTransaction = true,
         )
     } -> None // Transaction processing doesn't use pending submissions
   }
@@ -1000,7 +1024,7 @@ class TransactionProcessingSteps(
 
   override def createRejectionEvent(rejectionArgs: TransactionProcessingSteps.RejectionArgs)(
       implicit traceContext: TraceContext
-  ): Either[TransactionProcessorError, Option[SequencedUpdate]] = {
+  ): Either[TransactionProcessorError, Option[SequencedEventUpdate]] = {
     val RejectionArgs(pendingTransaction, errorDetails) = rejectionArgs
 
     val PendingTransaction(
@@ -1014,6 +1038,7 @@ class TransactionProcessingSteps(
       _engineController,
       _abortedF,
       _decisionTimeTickRequest,
+      _publishUpdate,
     ) = pendingTransaction
     val submitterMetaO = transactionValidationResult.submitterMetadataO
     val completionInfoO =
@@ -1030,6 +1055,7 @@ class TransactionProcessingSteps(
         rejection,
         psid.logical,
         requestTime,
+        isTransaction = true,
       )
     )
     Right(updateO)
@@ -1060,6 +1086,7 @@ class TransactionProcessingSteps(
       freshOwnTimelyTx: Boolean,
       engineController: EngineController,
       decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
+      publishUpdate: PublishUpdateViaRecordOrderPublisher[SequencedEventUpdate],
   )(implicit
       traceContext: TraceContext
   ): PendingTransaction = {
@@ -1085,6 +1112,7 @@ class TransactionProcessingSteps(
       engineController.abort,
       engineAbortStatusF,
       decisionTimeTickRequest,
+      publishUpdate,
     )
   }
 
@@ -1144,7 +1172,14 @@ class TransactionProcessingSteps(
 
     val acceptedEvent =
       (acsChangeFactory: AcsChangeFactory) =>
-        (internalContractIds: Map[LfContractId, Long]) =>
+        (internalContractIds: Map[LfContractId, Long]) => {
+          val transaction = LfCommittedTransaction(lfTx.unwrap)
+          onlyForTestingTransactionInMemoryStore.foreach(
+            _.put(
+              updateId = updateId.toHexString,
+              lfVersionedTransaction = transaction,
+            )
+          )
           Update.SequencedTransactionAccepted(
             completionInfoO = completionInfoO,
             transactionMeta = TransactionMeta(
@@ -1159,7 +1194,7 @@ class TransactionProcessingSteps(
               optNodeSeeds = None, // optNodeSeeds is unused by the indexer
               optByKeyNodes = None, // optByKeyNodes is unused by the indexer
             ),
-            transaction = LfCommittedTransaction(lfTx.unwrap),
+            transactionInfo = Update.TransactionAccepted.TransactionInfo(transaction),
             updateId = updateId,
             synchronizerId = psid.logical,
             recordTime = requestTime,
@@ -1182,6 +1217,7 @@ class TransactionProcessingSteps(
                 )
               },
           )
+        }
     CommitAndStoreContractsAndPublishEvent(
       Some(commitSetF),
       contractsToBeStored,
@@ -1524,7 +1560,7 @@ object TransactionProcessingSteps {
   def keyResolverFor(
       rootView: TransactionView
   )(implicit loggingContext: NamedLoggingContext): LfKeyResolver =
-    rootView.globalKeyInputs.fmap(_.unversioned.resolution)
+    rootView.globalKeyInputs.fmap(_.unversioned.resolution.asCidVector)
 
   /** @throws java.lang.IllegalArgumentException
     *   if `receivedViewTrees` contains views with different transaction root hashes

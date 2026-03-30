@@ -5,10 +5,11 @@ package com.digitalasset.canton.ledger.runner.common
 
 import com.daml.jwt.JwtTimestampLeeway
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, Port}
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
-import com.digitalasset.canton.platform.config.{IdentityProviderManagementConfig, *}
+import com.digitalasset.canton.platform.config.*
 import com.digitalasset.canton.platform.indexer.IndexerConfig
+import com.digitalasset.canton.platform.indexer.IndexerConfig.AchsConfig
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.DbSupport.DataSourceProperties
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
@@ -16,7 +17,7 @@ import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSou
 import com.digitalasset.daml.lf.VersionRange
 import com.digitalasset.daml.lf.interpretation.Limits
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode
+import com.digitalasset.daml.lf.transaction.NextGenContractStateMachine as ContractStateMachine
 import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth
 import org.scalacheck.Gen
 
@@ -28,6 +29,9 @@ object ArbitraryConfig {
 
   val nonNegativeIntGen: Gen[NonNegativeInt] =
     Gen.chooseNum(0, Int.MaxValue).map(NonNegativeInt.tryCreate)
+
+  val nonNegativeLongGen: Gen[NonNegativeLong] =
+    Gen.chooseNum(0, Long.MaxValue).map(NonNegativeLong.tryCreate)
 
   val duration: Gen[Duration] = for {
     value <- Gen.chooseNum(0, Int.MaxValue)
@@ -66,8 +70,11 @@ object ArbitraryConfig {
     transactionInputContracts,
   )
 
-  val contractKeyUniquenessMode: Gen[ContractKeyUniquenessMode] =
-    Gen.oneOf(ContractKeyUniquenessMode.Strict, ContractKeyUniquenessMode.Off)
+  val contractKeyUniquenessMode: Gen[ContractStateMachine.Mode] =
+    Gen.oneOf(
+      ContractStateMachine.Mode.NoKey,
+      ContractStateMachine.Mode.NUCK,
+    )
 
   val inetSocketAddress = for {
     host <- Gen.alphaStr
@@ -142,6 +149,14 @@ object ArbitraryConfig {
     networkTimeout = Some(networkTimeout),
   )
 
+  val achsConfig: Gen[AchsConfig] = for {
+    validAtDistanceTarget <- nonNegativeLongGen
+    lastPopulatedDistanceTarget <- nonNegativeLongGen
+  } yield AchsConfig(
+    validAtDistanceTarget = validAtDistanceTarget,
+    lastPopulatedDistanceTarget = lastPopulatedDistanceTarget,
+  )
+
   val dataSourceProperties = for {
     connectionPool <- connectionPoolConfig
     postgres <- postgresDataSourceConfig
@@ -169,6 +184,7 @@ object ArbitraryConfig {
     maxInputBufferSize <- nonNegativeIntGen
     restartDelay <- nonNegativeFiniteDurationGen
     submissionBatchSize <- Gen.long
+    achsConfig <- Gen.option(achsConfig)
   } yield IndexerConfig(
     batchingParallelism = batchingParallelism,
     enableCompression = enableCompression,
@@ -177,6 +193,7 @@ object ArbitraryConfig {
     maxInputBufferSize = maxInputBufferSize,
     restartDelay = restartDelay,
     submissionBatchSize = submissionBatchSize,
+    achsConfig = achsConfig,
   )
 
   def genActiveContractsServiceStreamConfig: Gen[ActiveContractsServiceStreamsConfig] =

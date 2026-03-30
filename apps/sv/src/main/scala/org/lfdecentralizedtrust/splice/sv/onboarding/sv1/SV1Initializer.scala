@@ -348,7 +348,7 @@ class SV1Initializer(
           packageVersionSupport,
           clock,
           retryProvider,
-          logger,
+          loggerFactory,
           config.domainMigrationId,
           config.scan,
         ),
@@ -640,10 +640,10 @@ class SV1Initializer(
       config.legacyMigrationId,
       clock = clock,
       retryProvider = retryProvider,
-      logger = logger,
       versionSupport = packageVersionSupport,
       migrationId = config.domainMigrationId,
       scanConfig = config.scan,
+      loggerFactory = loggerFactory,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly

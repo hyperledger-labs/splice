@@ -17,12 +17,12 @@ import com.digitalasset.canton.sequencing.client.SequencerSubscription
 import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.SequencedEventError
 import com.digitalasset.canton.sequencing.client.transports.ServerSubscriptionCloseReason
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
+import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError.EventsUnavailableForTimestamp
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
-import io.grpc.stub.ServerCallStreamObserver
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -64,7 +64,7 @@ private[service] class GrpcManagedSubscription[T](
       CreateSubscriptionError,
       SequencerSubscription[SequencedEventError],
     ],
-    observer: ServerCallStreamObserver[T],
+    grpcObserverHandle: GrpcObserverHandle[T],
     val member: Member,
     val expireAt: Option[CantonTimestamp],
     override protected val timeouts: ProcessingTimeout,
@@ -100,14 +100,9 @@ private[service] class GrpcManagedSubscription[T](
   private val handler: SequencedEventOrErrorHandler[SequencedEventError] = {
     case Right(event) =>
       implicit val traceContext: TraceContext = event.traceContext
-      FutureUnlessShutdown
-        .outcomeF {
-          Future {
-            Right(synchronizeWithClosingSync("grpc-managed-subscription-handler") {
-              observer.onNext(toSubscriptionResponse(event))
-            }.onShutdown(()))
-          }
-        }
+      unlessClosing(
+        grpcObserverHandle.onNext(toSubscriptionResponse(event)).map(Right(_))
+      )
         .recover { case NonFatal(e) =>
           logger.warn(
             "Unexpected error was thrown while publishing a sequencer event to GRPC subscriber",
@@ -140,7 +135,15 @@ private[service] class GrpcManagedSubscription[T](
             logger.warn("Creating sequencer subscription failed", exception)
             signalAndClose(ErrorSignal(exception))
           case Success(UnlessShutdown.Outcome(Left(err))) =>
-            logger.warn(s"Creating sequencer subscription returned error: $err")
+            val message = s"Creating sequencer subscription returned error: $err"
+            err match {
+              case _: EventsUnavailableForTimestamp =>
+                // Logging at INFO level because this can happen during normal operations for a decentralized synchronizer
+                // where a participant updates its sequencer connection config before it has caught up to the point
+                // where the sequencer was actually onboarded.
+                logger.info(message)
+              case _ => logger.warn(message)
+            }
             signalAndClose(
               ErrorSignal(Status.FAILED_PRECONDITION.withDescription(err.toString).asException())
             )
@@ -178,13 +181,13 @@ private[service] class GrpcManagedSubscription[T](
           .fold(logger.debug("Closing but underlying subscription has not been created"))(_.close())
 
         closeSignal match {
-          case CompleteSignal => observer.onCompleted()
-          case ErrorSignal(cause) => observer.onError(cause)
+          case CompleteSignal => grpcObserverHandle.onCompleted()
+          case ErrorSignal(cause) => grpcObserverHandle.onError(cause)
         }
       } finally notifyClosed()
   }
 
-  override def isCancelled: Boolean = observer.isCancelled
+  override def isCancelled: Boolean = grpcObserverHandle.isCancelled
 }
 
 private object GrpcManagedSubscription {

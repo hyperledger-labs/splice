@@ -7,6 +7,7 @@ import cats.implicits.{catsSyntaxParallelTraverse1, toTraverseOps}
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionRequest,
+  HashingSchemeVersion,
   PrepareSubmissionRequest,
   PrepareSubmissionResponse,
   PreparedTransaction,
@@ -955,6 +956,7 @@ class ProtocolConverters(
           lapi.state_service.GetActiveContractsResponse(
             workflowId = v.workflowId,
             contractEntry = ce,
+            streamContinuationToken = v.streamContinuationToken,
           )
         )
   }
@@ -1228,10 +1230,15 @@ class ProtocolConverters(
         )
       transcodedCommands <- SeqCommands.toJson(commandsWithTranscodingPackageIds)
       prefetchContractKeys <- lapiObj.prefetchContractKeys.map(PrefetchContractKey.toJson).sequence
+
     } yield lapiObj
       .into[JsPrepareSubmissionRequest]
       .withFieldConst(_.commands, transcodedCommands)
       .withFieldConst(_.prefetchContractKeys, prefetchContractKeys)
+      .withFieldComputed(
+        _.hashingSchemeVersion,
+        _.hashingSchemeVersion.getOrElse(HashingSchemeVersion.HASHING_SCHEME_VERSION_V2),
+      )
       .transform
   }
 
@@ -1250,7 +1257,12 @@ class ProtocolConverters(
       Future.successful(
         obj
           .into[JsPrepareSubmissionResponse]
-          .withFieldConst(_.preparedTransaction, obj.preparedTransaction.map(_.toByteString))
+          .withFieldConst(
+            _.preparedTransaction,
+            obj.preparedTransaction
+              .map(_.toByteString)
+              .getOrElse(jsFail("preparedTransaction is required")),
+          )
           .transform
       )
 
@@ -1262,7 +1274,7 @@ class ProtocolConverters(
           .into[PrepareSubmissionResponse]
           .withFieldConst(
             _.preparedTransaction,
-            jsObj.preparedTransaction.map(_.toByteArray).map(PreparedTransaction.parseFrom),
+            Some(PreparedTransaction.parseFrom(jsObj.preparedTransaction.toByteArray)),
           )
           .transform
       )

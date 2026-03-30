@@ -7,13 +7,14 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.crypto.{SymmetricKey, TestHash}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.participant.GeneratorsParticipant
-import com.digitalasset.canton.participant.admin.data.ActiveContractOld
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus
 import com.digitalasset.canton.participant.protocol.party.{
+  OnboardingClearanceOperation,
   PartyReplicationSourceParticipantMessage,
   PartyReplicationTargetParticipantMessage,
 }
 import com.digitalasset.canton.participant.protocol.submission.SubmissionTrackingData
+import com.digitalasset.canton.participant.synchronizer.PendingHandshakeWithLsuSuccessor
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
@@ -72,7 +73,7 @@ final class SerializationDeserializationTest
         generators.protocol,
       )
     val participantGenerators =
-      new GeneratorsParticipant(generators.topology, generators.lf, generators.protocol, version)
+      new GeneratorsParticipant(generators.topology, generators.lf, version)
 
     import com.digitalasset.canton.crypto.GeneratorsCrypto.*
     import generators.data.*
@@ -96,6 +97,11 @@ final class SerializationDeserializationTest
         test(DynamicSequencingParameters, version)
 
         test(AcsCommitment, version)
+        if (version >= ProtocolVersion.v35) {
+          testContext(AcsCommitmentProtocolMessage, version, version)
+        }
+        testContext(LsuSequencingTestMessage, version, version)
+        test(LsuSequencingTestMessageContent, version)
         test(Verdict, version)
         test(ConfirmationResponses, version)
         testContext(
@@ -112,10 +118,14 @@ final class SerializationDeserializationTest
           version,
         )
         test(ConfirmationResultMessage, version)
+        test(PendingHandshakeWithLsuSuccessor, version)
+        test(OnboardingClearanceOperation, version)
 
         test(AcknowledgeRequest, version)
         test(AggregationRule, version)
-        test(ClosedEnvelope, version)
+        if (version < ProtocolVersion.v35) {
+          test(ClosedUncompressedEnvelope, version)
+        }
         test(SequencingSubmissionCost, version)
         testVersioned(ContractMetadata, version)(
           generators.protocol.contractMetadataArb(canHaveEmptyKey = true)
@@ -166,11 +176,7 @@ final class SerializationDeserializationTest
         // the generated recipient trees can be quite big, even they are already limited
         testContext(Batch, defaultMaxBytesToDecompress, version)
         test(SetTrafficPurchasedMessage, version)
-        testContext(
-          SubmissionRequest,
-          defaultMaxBytesToDecompress,
-          version,
-        )
+        testContext(SubmissionRequest, defaultMaxBytesToDecompress, version)
         testVersioned(SequencerConnections, version)
         testVersioned(CounterParticipantIntervalsBehind, version)
         test(GetTrafficStateForMemberRequest, version)
@@ -192,7 +198,6 @@ final class SerializationDeserializationTest
           test(PartyReplicationSourceParticipantMessage, version)
           test(PartyReplicationTargetParticipantMessage, version)
         }
-        test(ActiveContractOld, version)
 
         // Generated sequenced events get quite big because each batched envelope has recipient trees
         // of quadratic size breadth * depth, so this test takes longer than other tests.

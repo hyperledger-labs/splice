@@ -17,15 +17,20 @@ import com.digitalasset.canton.integration.plugins.{
   UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors
 import com.digitalasset.canton.protocol.LocalRejectError
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.{
   HasProgrammableSequencer,
   ProgrammableSequencerPolicies,
   SendDecision,
 }
+import org.scalatest.Assertion
 
+import java.time.Duration
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
@@ -92,8 +97,8 @@ final class LsuTimeoutInFlightIntegrationTest extends LsuBase with HasProgrammab
       val alice = participant1.parties.enable("alice")
       val bob = participant2.parties.enable("bob")
 
-      val iou1 = IouSyntax.createIou(participant1)(alice, bob)
-      val iou2 = IouSyntax.createIou(participant2)(bob, alice)
+      val iou1 = IouSyntax.createIou(participant1)(alice, bob, 1.0)
+      val iou2 = IouSyntax.createIou(participant2)(bob, alice, 2.0)
 
       getProgrammableSequencer(sequencer1.name).setPolicy_("drop some messages") {
         submissionRequest =>
@@ -121,38 +126,42 @@ final class LsuTimeoutInFlightIntegrationTest extends LsuBase with HasProgrammab
           .submit(Seq(bob), iou2.id.exerciseArchive().commands().asScala.toSeq)
       }
 
-      val checkedLogEntries = LogEntry.assertLogSeq(
+      val checkedLogEntries: Seq[(LogEntryOptionality, LogEntry => Assertion)] =
         Seq(
           // p1 confirmation request dropped
           (
+            LogEntryOptionality.Required,
             _.warningMessage should include("Submission timed out at"),
-            "participant confirmation request timed out",
           ),
           // rejection of iou1 archival
           (
+            LogEntryOptionality.Required,
             _.errorMessage should include(
               "Transaction was not sequenced within the pre-defined max sequencing time and has therefore timed out"
             ),
-            "command 1 submission fails",
           ),
           // p2 confirmation response dropped
           (
+            LogEntryOptionality.Required,
             _.warningMessage should (include("Response message for request") and include(
               "timed out at"
             )),
-            "participant confirmation response timed out",
           ),
           // rejection of iou2 archival
           (
+            LogEntryOptionality.Required,
             _.errorMessage should include(
               "Rejected transaction due to a participant determined timeout"
             ),
-            "command 2 submission fails",
+          ),
+          // sequencers are not ready to serve LSU traffic state
+          (
+            LogEntryOptionality.OptionalMany,
+            _.shouldBeCantonErrorCode(SequencerError.NotAtUpgradeTimeOrBeyond),
           ),
         )
-      )(_)
 
-      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+      loggerFactory.assertLogsUnorderedOptional(
         {
           eventually() {
             // Request 1 is considered as unsequenced
@@ -175,15 +184,21 @@ final class LsuTimeoutInFlightIntegrationTest extends LsuBase with HasProgrammab
           performSynchronizerNodesLsu(fixture)
 
           fetchTime(sequencer1) should be < upgradeTime
-          environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
 
-          // We don't want the old mediator to interact with the sequencer
+          /*
+           To prevent the old mediator from sending a verdict (participants should do local timeout), we stop it.
+           We stop it before ugprade time is reached (so that it does not infer that the transactions have time out).
+           */
           mediator1.stop()
 
+          environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
+          transferTraffic(suppressLogs = false)
+
           eventually() {
-            participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
+            environment.simClock.value.advance(Duration.ofSeconds(1))
+            participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe true
           }
-          waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
+          waitForTargetTimeOnSequencer(sequencer2, environment.clock.now, logger)
 
           archive2F.failed.futureValue shouldBe a[Throwable]
           participant2.ledger_api.completions
@@ -206,12 +221,12 @@ final class LsuTimeoutInFlightIntegrationTest extends LsuBase with HasProgrammab
           }
 
           // Check that time offsetting after upgrade works on old synchronizer
-          fetchTime(sequencer1) should be > (upgradeTime + decisionTimeout.toInternal)
+          fetchTime(sequencer1) should be >= (upgradeTime + decisionTimeout.toInternal)
 
           // And also after a restart
           sequencer1.stop()
           sequencer1.start()
-          fetchTime(sequencer1) should be > (upgradeTime + decisionTimeout.toInternal)
+          fetchTime(sequencer1) should be >= (upgradeTime + decisionTimeout.toInternal)
 
           // TODO(#27349) Without this ping, the fetch_time allowing to timeout request 1 is never done
           participant1.health.ping(participant1)
@@ -231,9 +246,8 @@ final class LsuTimeoutInFlightIntegrationTest extends LsuBase with HasProgrammab
             .message should include(SubmissionErrors.TimeoutError.Error().cause)
 
           archive1F.failed.futureValue
-
         },
-        checkedLogEntries,
+        checkedLogEntries*
       )
     }
   }

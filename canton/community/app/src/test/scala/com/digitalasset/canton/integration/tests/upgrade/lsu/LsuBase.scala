@@ -11,18 +11,18 @@ import com.digitalasset.canton.admin.api.client.data.{
   SynchronizerConnectionConfig,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   InstanceReference,
+  LocalSequencerReference,
   ParticipantReference,
   SequencerReference,
 }
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UsePostgres
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.tests.TrafficBalanceSupport
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
 import com.digitalasset.canton.integration.tests.upgrade.lsu.LsuBase.Fixture
 import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
@@ -33,11 +33,13 @@ import com.digitalasset.canton.{SequencerAlias, config}
   * improve readability of each tests by focusing on the behavior we want to test and make it easier
   * to write new tests.
   */
-trait LsuBase
+private[lsu] trait LsuBase
     extends CommunityIntegrationTest
     with SharedEnvironment
     with EntitySyntax
-    with LogicalUpgradeUtils {
+    with LogicalUpgradeUtils
+    with TrafficBalanceSupport
+    with LsuTrafficManagement {
 
   registerPlugin(new UsePostgres(loggerFactory))
 
@@ -50,18 +52,16 @@ trait LsuBase
 
   protected def upgradeTime: CantonTimestamp
 
-  protected def configTransforms: List[ConfigTransform] = newOldSequencers.keySet
-    .map(sequencerName =>
-      ConfigTransforms
-        .updateSequencerConfig(sequencerName)(
-          _.focus(_.parameters.sequencingTimeLowerBoundExclusive).replace(Some(upgradeTime))
-        )
-    )
-    .toList
-    ++ List(
-      ConfigTransforms.disableAutoInit(newOldNodesResolution.keySet),
-      ConfigTransforms.useStaticTime,
-    ) ++ ConfigTransforms.enableAlphaVersionSupport
+  protected val useStaticTime: Boolean = true
+
+  protected def configTransforms: Seq[ConfigTransform] = List(
+    ConfigTransforms.disableAutoInit(newOldNodesResolution.keySet)
+  ) ++ ConfigTransforms.enableAlphaVersionSupport
+    ++ ConfigTransforms.setTopologyTransactionRegistrationTimeout(
+      // As we advance the clock quite a bit, we need to bump this parameter to avoid sequencing timeouts.
+      config.NonNegativeFiniteDuration.ofHours(1)
+    ) ++
+    (if (useStaticTime) Seq(ConfigTransforms.useStaticTime) else Seq.empty)
 
   /** Prepare the environment for LSU with default values.
     *   - Connect `participants.all` (except if override is used) to synchronizer and upload dar
@@ -69,32 +69,101 @@ trait LsuBase
     *   - Set reconciliation interval to 1s
     */
   protected def defaultEnvironmentSetup(
-      participantsOverride: Option[Seq[ParticipantReference]] = None
+      participantsOverride: Option[Seq[ParticipantReference]] = None,
+      hasTrafficControl: Boolean = true,
+      changeDynamicSynchronizerParameters: Boolean = true,
+      connectParticipants: Boolean = true,
   )(implicit env: TestConsoleEnvironment): Unit = {
     import env.{participants as _, *}
 
-    val participants = participantsOverride.getOrElse(env.participants.all)
+    if (connectParticipants) {
+      val participants = participantsOverride.getOrElse(env.participants.all)
 
-    participants.synchronizers.connect(
-      SynchronizerConnectionConfig(
-        synchronizerAlias = daName,
-        sequencerConnections = sequencer1,
-        timeTracker =
-          SynchronizerTimeTrackerConfig(observationLatency = config.NonNegativeFiniteDuration.Zero),
-      )
-    )
+      participants.synchronizers.connect(defaultSynchronizerConnectionConfig())
+      participants.dars.upload(CantonExamplesPath)
+    }
 
-    participants.dars.upload(CantonExamplesPath)
-
-    synchronizerOwners1.foreach(
-      _.topology.synchronizer_parameters.propose_update(
+    if (changeDynamicSynchronizerParameters)
+      setDefaultsDynamicSynchronizerParameters(
         daId,
-        _.copy(reconciliationInterval = config.PositiveDurationSeconds.ofSeconds(1)),
+        synchronizerOwners1,
+        hasTrafficControl = hasTrafficControl,
+      )
+
+    oldSynchronizerNodes =
+      SynchronizerNodes(newOldSequencers.values.toSeq.map(ls), newOldMediators.values.toSeq.map(lm))
+    newSynchronizerNodes =
+      SynchronizerNodes(newOldSequencers.keySet.toSeq.map(ls), newOldMediators.keySet.toSeq.map(lm))
+  }
+
+  protected def setDefaultsDynamicSynchronizerParameters(
+      psid: PhysicalSynchronizerId,
+      synchronizerOwners: Set[InstanceReference],
+      hasTrafficControl: Boolean = true,
+  ): Unit = {
+    val reconciliationInterval = config.PositiveDurationSeconds.ofSeconds(1)
+
+    synchronizerOwners.foreach(
+      _.topology.synchronizer_parameters.propose_update(
+        psid,
+        _.copy(
+          // Enable traffic control
+          trafficControl = Option.when(hasTrafficControl)(generousTrafficControlParameters),
+          // Ensure we have frequent ACS commitments exchange to increase the likelihood of catching issues
+          reconciliationInterval = reconciliationInterval,
+        ),
       )
     )
 
-    oldSynchronizerNodes = SynchronizerNodes(Seq(sequencer1), Seq(mediator1))
-    newSynchronizerNodes = SynchronizerNodes(Seq(sequencer2), Seq(mediator2))
+    eventually() {
+      synchronizerOwners.foreach(
+        _.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(psid)
+          .reconciliationInterval shouldBe reconciliationInterval
+      )
+    }
+  }
+
+  /** Transfer traffic from old sequencers to new ones.
+    *
+    * Prerequisite:
+    *   - Time is after upgrade time
+    *
+    * @param fixtureOverride
+    *   If defined, use the provided fixture instead of oldSynchronizerNodes and
+    *   newSynchronizerNodes.
+    * @param suppressLogs
+    *   Whether errors in the log (NotAtUpgradeTimeOrBeyond) should be suppressed. Use false if the
+    *   call to transferTraffic is already in a suppression logger block (since those cannot be
+    *   nested).
+    */
+  protected def transferTraffic(
+      fixtureOverride: Option[Fixture] = None,
+      suppressLogs: Boolean = true,
+  ): Unit = {
+
+    val oldSequencers: Seq[LocalSequencerReference] =
+      fixtureOverride.fold(oldSynchronizerNodes.sequencers)(_.oldSynchronizerNodes.sequencers)
+
+    val newSequencers: Seq[LocalSequencerReference] =
+      fixtureOverride.fold(newSynchronizerNodes.sequencers)(_.newSynchronizerNodes.sequencers)
+
+    transferTraffic(
+      oldSequencers = oldSequencers,
+      newSequencers = newSequencers,
+      suppressLogs = suppressLogs,
+    )
+  }
+
+  protected def defaultSynchronizerConnectionConfig()(implicit
+      env: TestConsoleEnvironment
+  ): SynchronizerConnectionConfig = {
+    import env.*
+
+    SynchronizerConnectionConfig(
+      synchronizerAlias = daName,
+      sequencerConnections = sequencer1,
+    )
   }
 
   protected def synchronizerConnectionConfig(
@@ -105,8 +174,6 @@ trait LsuBase
     SynchronizerConnectionConfig(
       synchronizerAlias = daName,
       sequencerConnections = seq,
-      timeTracker =
-        SynchronizerTimeTrackerConfig(observationLatency = config.NonNegativeFiniteDuration.Zero),
     )
   }
 
@@ -126,8 +193,6 @@ trait LsuBase
         submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
         sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
       ),
-      timeTracker =
-        SynchronizerTimeTrackerConfig(observationLatency = config.NonNegativeFiniteDuration.Zero),
     )
   }
 
@@ -138,10 +203,10 @@ trait LsuBase
   )(implicit
       env: TestConsoleEnvironment
   ): Fixture = {
-    val currentPSId = env.daId
+    val currentPsid = env.daId
 
     Fixture(
-      currentPSId = currentPSId,
+      currentPsid = currentPsid,
       upgradeTime = upgradeTime,
       oldSynchronizerNodes = oldSynchronizerNodes,
       newSynchronizerNodes = newSynchronizerNodes,
@@ -149,7 +214,7 @@ trait LsuBase
       oldSynchronizerOwners = env.synchronizerOwners1,
       newPV = newPVOverride.getOrElse(ProtocolVersion.dev),
       // increasing the serial as well, so that the test also works when running with PV=dev
-      newSerial = newSerialOverride.getOrElse(currentPSId.serial.increment.toNonNegative),
+      newSerial = newSerialOverride.getOrElse(currentPsid.serial.increment.toNonNegative),
     )
   }
 
@@ -160,31 +225,34 @@ trait LsuBase
     *   - Sequencer successors announcements
     */
   protected def performSynchronizerNodesLsu(
-      fixture: Fixture
+      fixture: Fixture,
+      announceSequencerSuccessors: Boolean = true,
   )(implicit consoleEnvironment: ConsoleEnvironment): Unit = {
     fixture.oldSynchronizerOwners.foreach(
-      _.topology.lsu.announcement.propose(fixture.newPSId, fixture.upgradeTime)
+      _.topology.lsu.announcement.propose(fixture.newPsid, fixture.upgradeTime)
     )
 
     // Ensure all nodes see the announcement
     eventually() {
       forAll(fixture.oldSynchronizerNodes.all)(
         _.topology.lsu.announcement
-          .list(store = Some(fixture.currentPSId))
-          .filter(_.item.successorSynchronizerId == fixture.newPSId)
+          .list(store = Some(fixture.currentPsid))
+          .filter(_.item.successorSynchronizerId == fixture.newPsid)
           .loneElement
       )
     }
 
     migrateSynchronizerNodes(fixture)
 
-    fixture.oldSynchronizerNodes.sequencers.zip(fixture.newSynchronizerNodes.sequencers).foreach {
-      case (oldSequencer, newSequencer) =>
-        oldSequencer.topology.lsu.sequencer_successors.propose_successor(
-          sequencerId = oldSequencer.id,
-          endpoints = newSequencer.sequencerConnection.endpoints.map(_.toURI(useTls = false)),
-          synchronizerId = fixture.currentPSId,
-        )
+    if (announceSequencerSuccessors) {
+      fixture.oldSynchronizerNodes.sequencers.zip(fixture.newSynchronizerNodes.sequencers).foreach {
+        case (oldSequencer, newSequencer) =>
+          oldSequencer.topology.lsu.sequencer_successors.propose_successor(
+            sequencerId = oldSequencer.id,
+            endpoints = newSequencer.sequencerConnection.endpoints.map(_.toURI(useTls = false)),
+            successorSynchronizerId = fixture.newPsid,
+          )
+      }
     }
   }
 
@@ -192,14 +260,15 @@ trait LsuBase
     * state.
     */
   protected def migrateSynchronizerNodes(
-      fixture: Fixture
+      fixture: Fixture,
+      ignorePsidCheck: Boolean = false,
   )(implicit consoleEnvironment: ConsoleEnvironment): Unit = {
     val exportDirectory = exportNodesData(
       SynchronizerNodes(
         sequencers = fixture.oldSynchronizerNodes.sequencers,
         mediators = fixture.oldSynchronizerNodes.mediators,
       ),
-      successorPSId = fixture.newPSId,
+      successorPsid = fixture.newPsid,
     )
 
     // Migrate nodes preserving their data (and IDs)
@@ -207,10 +276,11 @@ trait LsuBase
       migrateNode(
         migratedNode = newNode,
         newStaticSynchronizerParameters = fixture.newStaticSynchronizerParameters,
-        synchronizerId = fixture.currentPSId,
+        synchronizerId = fixture.currentPsid,
         newSequencers = fixture.newSynchronizerNodes.sequencers,
         exportDirectory = exportDirectory,
         newNodeToOldNodeName = fixture.newOldNodesResolution,
+        ignorePsidCheck = ignorePsidCheck,
       )
     }
   }
@@ -218,7 +288,7 @@ trait LsuBase
 
 private[lsu] object LsuBase {
   final case class Fixture(
-      currentPSId: PhysicalSynchronizerId,
+      currentPsid: PhysicalSynchronizerId,
       upgradeTime: CantonTimestamp,
       oldSynchronizerNodes: SynchronizerNodes,
       newSynchronizerNodes: SynchronizerNodes,
@@ -226,6 +296,7 @@ private[lsu] object LsuBase {
       oldSynchronizerOwners: Set[InstanceReference],
       newPV: ProtocolVersion,
       newSerial: NonNegativeInt,
+      overridePsid: Option[PhysicalSynchronizerId] = None,
   ) {
     val newStaticSynchronizerParameters: StaticSynchronizerParameters =
       StaticSynchronizerParameters.defaultsWithoutKMS(
@@ -234,9 +305,11 @@ private[lsu] object LsuBase {
         topologyChangeDelay = config.NonNegativeFiniteDuration.Zero,
       )
 
-    val newPSId: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(currentPSId.logical, newStaticSynchronizerParameters.toInternal)
+    val newPsid: PhysicalSynchronizerId =
+      overridePsid.getOrElse(
+        PhysicalSynchronizerId(currentPsid.logical, newStaticSynchronizerParameters.toInternal)
+      )
 
-    val synchronizerSuccessor: SynchronizerSuccessor = SynchronizerSuccessor(newPSId, upgradeTime)
+    val synchronizerSuccessor: SynchronizerSuccessor = SynchronizerSuccessor(newPsid, upgradeTime)
   }
 }

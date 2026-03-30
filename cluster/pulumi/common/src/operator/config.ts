@@ -74,7 +74,7 @@ export const OperatorDeploymentConfigSchema = z.object({
     .object({
       projectsToDeploy: z.array(ProjectFilterSchema).transform(arr => new Set(arr)),
     })
-    .default({
+    .prefault({
       projectsToDeploy: [...iterateDefaultProjectFilters()],
     }),
 });

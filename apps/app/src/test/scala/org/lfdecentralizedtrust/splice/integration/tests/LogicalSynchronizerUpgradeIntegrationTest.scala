@@ -13,7 +13,6 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.util.HexString
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
@@ -32,7 +31,11 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeSequencingTestTrigger
+import org.lfdecentralizedtrust.splice.sv.lsu.{
+  LogicalSynchronizerUpgradeSequencingTestTrigger,
+  LogicalSynchronizerUpgradeTrigger,
+}
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
@@ -54,6 +57,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     with StandaloneCanton
     with HasExecutionContext
     with SynchronizerFeesTestUtil
+    with LsuTestUtil
     with TryValues {
 
   override protected def runEventHistorySanityCheck: Boolean = false
@@ -270,6 +274,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
     val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
+    val lateJoiningNode = sv4Nodes
+    lateJoiningNode.par.foreach(_.stop())
     val topologyFreezeTime = CantonTimestamp.now()
     // We need to give enough time for the new Canton instance to startup
     // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
@@ -300,7 +306,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         .size
 
       clue("new nodes are initialized") {
-        allBackends.map { backend =>
+        Seq(sv1Backend, sv2Backend, sv3Backend).map { backend =>
           val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
           val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
@@ -327,28 +333,48 @@ class LogicalSynchronizerUpgradeIntegrationTest
         Threading.sleep(Duration.between(Instant.now(), upgradeTime.toInstant).toMillis.abs)
       }
 
-      val newSequencerUrls = allBackends.map { backend =>
-        backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
-          .stripPrefix("http://")
-      }
-
       def participantIsConnectedToNewSynchronizer(
-          clientWithAdminToken: ParticipantClientReference
+          clientWithAdminToken: ParticipantClientReference,
+          isSv4Connected: Boolean,
       ) = {
+        val newSequencerUrls =
+          (if (isSv4Connected) allBackends else allBackends.filter(_.name != sv4Backend.name)).map {
+            backend =>
+              backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
+                .stripPrefix("http://")
+          }
+
         clientWithAdminToken.synchronizers
           .list_connected()
           .loneElement
           .physicalSynchronizerId shouldBe successorPsid
-        val sequencerUrlSet = getSequencerUrlSet(
+        val sequencerUrlSet = getSequencerUrlsConfiguredForTheSync(
           clientWithAdminToken,
           decentralizedSynchronizerAlias,
         )
-        sequencerUrlSet should have size 4
         sequencerUrlSet should contain theSameElementsAs newSequencerUrls.toSet
         clientWithAdminToken.topology.transactions
           .list(store = Synchronizer(decentralizedSynchronizerId))
           .result
           .size should be >= topologyTransactionsOnTheSync
+      }
+
+      clue("Validator connects to the new sequencers and sync topology") {
+        eventually(60.seconds) {
+          val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
+          participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = false)
+        }
+      }
+
+      clue("SVs connect to the new sequencers and sync topology") {
+        allBackends.par.map { backend =>
+          eventually() {
+            participantIsConnectedToNewSynchronizer(
+              backend.participantClientWithAdminToken,
+              isSv4Connected = false,
+            )
+          }
+        }
       }
 
       clue("physical synchronizers configs are set") {
@@ -378,29 +404,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
             "http://localhost:27108",
             "http://localhost:27208",
             "http://localhost:27308",
-            "http://localhost:27408",
           )
-        }
-      }
-
-      clue("Validator connects to the new sequencers and sync topology") {
-        eventually(60.seconds) {
-          val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-          participantIsConnectedToNewSynchronizer(clientWithAdminToken)
-        }
-      }
-
-      clue("SVs connect to the new sequencers and sync topology") {
-        allBackends.par.map { backend =>
-          eventually() {
-            participantIsConnectedToNewSynchronizer(backend.participantClientWithAdminToken)
-          }
         }
       }
 
       clue("Scan reports active physical synchronizer serial 1 after upgrade") {
         eventually() {
-          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
+          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend).foreach { scan =>
             scan.getActivePhysicalSynchronizerSerial() shouldBe newSynchronizerSerial
           }
         }
@@ -411,18 +421,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
           inside(sv1ScanBackend.listDsoSequencers()) {
             case Seq(DomainSequencers(synchronizerId, sequencers)) =>
               synchronizerId shouldBe decentralizedSynchronizerId
-              sequencers should have size 12
+              sequencers should have size 11
               sequencers.groupBy(_.svName).foreach { case (sv, sequencers) =>
                 clue(s"check sequencers for $sv") {
-                  sequencers.size shouldBe 3
                   forExactly(1, sequencers) { sequencer =>
                     sequencer.serial.value shouldBe 0
                     sequencer.migrationId shouldBe -1
                   }
-                  forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
-                    sequencer.migrationId shouldBe -1
-                  }
+                  if (sv != sv4Backend.config.onboarding.value.name)
+                    forExactly(1, sequencers) { sequencer =>
+                      sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
+                      sequencer.migrationId shouldBe -1
+                    }
                   forExactly(1, sequencers) { sequencer =>
                     sequencer.serial should be(empty)
                     sequencer.migrationId shouldBe 0
@@ -446,7 +456,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
             0L,
             Some("transfer-command-description"),
           )
-        actAndCheck()(
+        actAndCheck(timeUntilSuccess = 1.minute)(
           "Submit signed TransferCommand creation",
           aliceValidatorBackend.submitTransferPreapprovalSend(
             externalPartyOnboarding.party,
@@ -530,6 +540,22 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
+      clue("sv4 upgrades") {
+        loggerFactory.suppress(
+          SuppressionRule.forLogger[LogicalSynchronizerUpgradeTrigger] && SuppressionRule.Level(
+            org.slf4j.event.Level.WARN
+          )
+        ) {
+          lateJoiningNode.par.foreach(_.startSync())
+          clue("Validator also connects to the sv-4 sequencer") {
+            eventually(60.seconds) {
+              val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
+              participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = true)
+            }
+          }
+        }
+      }
+
       clue("sv and scan app can be restarted") {
         sv1Backend.stop()
         sv1ScanBackend.stop()
@@ -546,23 +572,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
         allBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
       }
     }
-  }
-
-  private def scheduleLsu(
-      topologyFreezeTime: CantonTimestamp,
-      upgradeTime: CantonTimestamp,
-      serial: Long,
-  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    scheduleLogicalSynchronizerUpgrade(
-      sv1Backend,
-      Seq(sv2Backend, sv3Backend),
-      new LogicalSynchronizerUpgradeSchedule(
-        topologyFreezeTime.toInstant,
-        upgradeTime.toInstant,
-        serial,
-        sv1Backend.config.localSynchronizerNodes.current.protocolVersion.toString,
-      ),
-    )
   }
 
   private def waitForLsuAnnouncement()(implicit env: SpliceTestConsoleEnvironment): Unit = {
@@ -608,7 +617,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     scan.listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
   }
 
-  private def getSequencerUrlSet(
+  private def getSequencerUrlsConfiguredForTheSync(
       participantConnection: ParticipantClientReference,
       synchronizerAlias: SynchronizerAlias,
   ): Set[String] = {

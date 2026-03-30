@@ -219,7 +219,7 @@ tmux_cmd_canton() {
      LOG_LEVEL_API_REQUEST=DEBUG \
      CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
-      --log-level-canton=INFO \
+      --log-level-canton=DEBUG \
       --log-encoder json \
       --log-file-name $mainLogFile \
       --bootstrap $bootstrapScriptPath \

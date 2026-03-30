@@ -9,7 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
-import com.digitalasset.canton.ledger.api.health.HealthStatus
+import com.digitalasset.canton.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{
   EnrichedVettedPackages,
   ListVettedPackagesOpts,
@@ -32,6 +32,7 @@ import com.digitalasset.canton.protocol.{
   LfSubmittedTransaction,
   LfVersionedTransaction,
 }
+import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.topology.{
   ExternalPartyOnboardingDetails,
@@ -41,7 +42,6 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfKeyResolver, LfPartyId}
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -136,10 +136,11 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   override def prune(
       pruneUpToInclusive: Offset,
       submissionId: Ref.SubmissionId,
+      safeToPruneCommitmentState: Option[SafeToPruneCommitmentState],
   ): Future[PruningResult] =
     Timed.future(
       metrics.services.write.prune,
-      delegate.prune(pruneUpToInclusive, submissionId),
+      delegate.prune(pruneUpToInclusive, submissionId, safeToPruneCommitmentState),
     )
 
   override def currentHealth(): HealthStatus =
@@ -323,9 +324,10 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       costHints,
     )
 
-  override def protocolVersionForSynchronizerId(
+  override def physicalSynchronizerIdForSynchronizerId(
       synchronizerId: SynchronizerId
-  ): Option[ProtocolVersion] = delegate.protocolVersionForSynchronizerId(synchronizerId)
+  ): Option[PhysicalSynchronizerId] =
+    delegate.physicalSynchronizerIdForSynchronizerId(synchronizerId)
 
   override def hashOps: HashOps = delegate.hashOps
 
