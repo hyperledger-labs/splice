@@ -533,7 +533,7 @@ class DbScanAppRewardsStoreTest
       // totalIssuance = 0.5, unclaimed = 0 → thresholded = 0.5 - 0 - 0.5 = 0
       RewardTotalsTests.TestCase(
         description = "threshold boundary (exactly at threshold is included)",
-        activities = Seq(Activity.aliceBoundary),
+        activities = Seq(Activity.alice250K),
         params = RewardIssuanceParams(
           issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
           threshold_CC = Threshold.Half,
@@ -775,7 +775,7 @@ object DbScanAppRewardsStoreTest {
   object Activity {
     val alice5M = AppActivityPartyTotalT(0L, roundNumber, 5000000L, 0, "alice::provider")
     val bob150K = AppActivityPartyTotalT(0L, roundNumber, 150000L, 1, "bob::provider")
-    val aliceBoundary = AppActivityPartyTotalT(0L, roundNumber, 250000L, 0, "alice::provider")
+    val alice250K = AppActivityPartyTotalT(0L, roundNumber, 250000L, 0, "alice::provider")
     val aliceDecimal = AppActivityPartyTotalT(0L, roundNumber, 3333333L, 0, "alice::provider")
     val alice1M = AppActivityPartyTotalT(0L, roundNumber, 1000000L, 0, "alice::provider")
     val alice100K = AppActivityPartyTotalT(0L, roundNumber, 100000L, 0, "alice::provider")
