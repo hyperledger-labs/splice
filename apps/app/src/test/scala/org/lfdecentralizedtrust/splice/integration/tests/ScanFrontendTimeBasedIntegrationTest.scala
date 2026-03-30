@@ -245,14 +245,13 @@ class ScanFrontendTimeBasedIntegrationTest
           .plusSeconds(1L)
       )
 
-      val snapshot1 = eventually() {
-        val snapshot1 = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+      eventually() {
+        val snapshot = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
           getLedgerTime,
           migrationId,
         )
-        snapshot1 should not be None
-        snapshot1.value.toInstant shouldBe >(startTime.toInstant)
-        snapshot1
+        snapshot should not be None
+        snapshot.value.toInstant shouldBe >(startTime.toInstant)
       }
 
       withFrontEnd("scan-ui") { implicit webDriver =>
