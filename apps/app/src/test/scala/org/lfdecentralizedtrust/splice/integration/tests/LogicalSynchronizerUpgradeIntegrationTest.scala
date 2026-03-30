@@ -599,10 +599,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue("bob validator local upgrades after upgrade and can tap") {
         runBobValidatorWithStandaloneParticipant("after-upgrade") {
-          eventuallySucceeds(2.minute) {
+          eventually(60.seconds) {
             participantIsConnectedToNewSynchronizer(
               bobValidatorLocal.participantClientWithAdminToken,
-              isSv4Connected = true,
+              isSv4Connected = false,
             )
           }
           onboardUserAndTapAmulet(
@@ -613,6 +613,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
             20,
             70 to 70,
           )
+          eventually(60.seconds) {
+            participantIsConnectedToNewSynchronizer(
+              bobValidatorLocal.participantClientWithAdminToken,
+              isSv4Connected = true,
+            )
+          }
         }
       }
 
