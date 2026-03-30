@@ -20,7 +20,8 @@ export type GitFluxRef = {
 export type StackFromRef = { project: string; stack: string };
 
 // Trim non-splitwell DARs to avoid blowing the hardcoded operator size limit of 50mb
-const repoIgnore = '**/daml/dars\n!**/daml/dars/splitwell*';
+// also trim token standard paths which might include test data
+const repoIgnore = '**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard';
 
 function expandGitReference(gitReference: string): { name: string } | { commit: string } {
   if (gitReference.startsWith('refs/')) {
