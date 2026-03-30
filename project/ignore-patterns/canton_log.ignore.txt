@@ -170,4 +170,7 @@ Submission timed out at
 # SV that joins late as part of the LSU test
 Missing successor information for the following sequencers.*sv4
 
+# We don't use the onboarding flag clearance atm.
+Skipping insertion of pending onboarding flag clearance operation as no party ID was provided
+
 # Make sure to have a trailing newline
