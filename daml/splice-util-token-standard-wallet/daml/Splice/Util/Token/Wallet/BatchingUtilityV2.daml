@@ -37,7 +37,7 @@ splitLegsByAdminV1 legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentI
 
 
 data HoldingMap = HoldingMap with
-    byAdminAndAccount : Map.Map (Party, V2.Account) [ContractId V2.Holding]
+    byAdminAndAccount : Map.Map (Party, V2.Account) [ContractId V2.Holding] -- FIXME: define type with named fields for tuple; or provide maps by account
   deriving (Eq, Show)
 
 getHoldingsFor : (Party, V2.Account) -> HoldingMap -> ([ContractId V2.Holding], HoldingMap)
@@ -72,7 +72,7 @@ template BatchingUtility
       with
         reqCid : ContractId V1.AllocationRequest
         acceptedAt : Time
-        factoryCalls : [(Text, ContractId V1.AllocationFactory, ExtraArgs)]
+        factoryCalls : [(Text, ContractId V1.AllocationFactory, ExtraArgs)] -- FIXME: define type with named fields
         inputHoldingMap : HoldingMap
         actor : Party
       controller provider
@@ -88,6 +88,7 @@ template BatchingUtility
         let executeCall (holdingMap, results) (leg, (legId, factoryCid, extraArgs)) = do
               requireMatchExpected ("call legId", legId) leg.transferLegId
               let admin = leg.instrumentId.admin
+              -- FIXME: just passing in input holdings for all instrument ids of the admin feels a bit weird
               let (inputHoldingCids, newHoldingMap) = getHoldingsFor (admin, leg.sender) holdingMap
               -- prudent engineering: check that the controller of the choice is equal to the actor
               let legV1 = downcast leg
@@ -126,6 +127,7 @@ template BatchingUtility
         -- fetch and validate request
         req <- fetch reqCid
         let reqView = view req
+        -- FIXME: consider adding back multiple authorizers to support different accounts controlled by the same actor
         let authorizer = reqView.authorizer
         require' ("actor", actor) isMemberR ("accountParties authorizer", accountParties authorizer)
         -- signal request acceptance to app
@@ -133,8 +135,7 @@ template BatchingUtility
           actors = [actor]
           extraArgs = acceptExtraArgs
         -- create allocations for each admin
-        let relevantLegs = filterLegsForAccount authorizer reqView.transferLegs
-        let legsByAdmin = splitLegsByAdmin relevantLegs
+        let legsByAdmin = splitLegsByAdmin reqView.transferLegs
         let executeCall (holdingMap, results) (admin, legs) = do
               case Map.lookup admin factoriesByAdmin of
                 None -> fail ("No factory provided for admin " <> show admin)

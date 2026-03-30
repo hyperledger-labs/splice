@@ -34,6 +34,8 @@ data-dependencies:
   - ../splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
 
   - ../splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
+  # FIXME: consider how to resolve the naming inconsistency
+  - ../../daml/splice-util-token-standard-wallet/.daml/dist/splice-util-token-standard-wallet-current.dar
 
   - ../../daml/splice-util/.daml/dist/splice-util-current.dar
   - ../../daml/splice-amulet/.daml/dist/splice-amulet-current.dar

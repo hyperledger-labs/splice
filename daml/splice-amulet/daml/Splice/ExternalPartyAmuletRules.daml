@@ -439,7 +439,7 @@ amulet_allocationFactoryV2_allocateImpl externalAmuletRules _self arg = do
     dso = externalAmuletRules.dso
     expiresAt
   pure V2.AllocationInstructionResult with
-    senderChangeCids = map upcast senderChangeCids
+    authorizerChangeCids = map upcast senderChangeCids
     output = V2.AllocationInstructionResult_Completed with allocationCid
     meta
 

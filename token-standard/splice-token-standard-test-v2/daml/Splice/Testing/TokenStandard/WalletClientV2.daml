@@ -29,22 +29,26 @@ module Splice.Testing.TokenStandard.WalletClientV2
     listAllocationRequestsV2,
     listAllocationsV2,
 
+    createBatchingUtility,
     acceptAllocationRequestV2,
 
   ) where
 
 import DA.Action (unless)
 import DA.Foldable (foldMap, forA_)
+import DA.List (dedupSort)
 import DA.Map qualified as Map
 import DA.Optional (isSome, isNone)
 
+import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.AllocationInstructionV2 qualified as V2
 import Splice.Api.Token.AllocationRequestV2 qualified as V2
 import Splice.Api.Token.AllocationV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
-import Splice.TokenStandard.Utils (netAllocationCreditAmount)
+import Splice.TokenStandard.Utils qualified as TokenStandard.Utils
+import Splice.Util.Token.Wallet.BatchingUtilityV2 qualified as BatchingUtilityV2
 
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
 import Splice.Testing.UtilsV2 qualified as V2
@@ -61,6 +65,7 @@ listHoldings p instrumentId = do
         guard (holding.account.owner == p)
         pure (cid, holding)
   pure instrumentHoldings
+
 
 listLockedHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listLockedHoldings p instrumentId =
@@ -165,44 +170,55 @@ splitLegsByInstrumentId legs = Map.fromListWithR (++) $ map (\leg -> (leg.instru
 
 -- | Accept the allocation request by authorizing the transfer of all its requested legs.
 acceptAllocationRequestV2
-  :  V2.MultiRegistry -> V2.Account -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script ()
-acceptAllocationRequestV2 registries tradingAccount actor (reqCid, req) = do
-  unless (tradingAccount == req.authorizer) $
-    fail $ "Trading account " <> show tradingAccount <> " is not an authorizer for this allocation request."
-  let relevantLegs = filterLegsForAccount tradingAccount req.transferLegs
-  -- TODO(#4515): move away from splitting by instrument id, as we want to allocate across instrumens from the same admin
-  let legsByInstrument = splitLegsByInstrumentId relevantLegs
+  :  V2.MultiRegistry -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script ()
+acceptAllocationRequestV2 registries actor (reqCid, req) = do
+  now <- getTime
+  let legsByAdmin = TokenStandard.Utils.splitLegsByAdmin req.transferLegs
   -- Allocate the legs grouped by instrument.
-  choices <- forA (Map.toList legsByInstrument) $ \(instrumentId, legs) -> do
-    let allocation = V2.AllocationSpecification with
-          authorizer = tradingAccount
+  factoriesByAdminWithD <- forA (Map.toList legsByAdmin) $ \(admin, legs) -> do
+    registry <- V2.getRegistryFor registries admin
+    enrichedChoice <- V2.getAllocationFactory registry V2.AllocationFactory_Allocate with
+      inputHoldingCids = []
+      allocation = V2.AllocationSpecification with
+          authorizer = req.authorizer
           settlement = req.settlement
           transferLegs = legs
-    registry <- V2.getRegistryFor' registries instrumentId
-    inputHoldingCids <-
-      if netAllocationCreditAmount tradingAccount legs > 0.0
-        then pure []
-        else listUnlockedHoldingCidsFor tradingAccount actor instrumentId
-    now <- getTime
-    V2.getAllocationFactory registry V2.AllocationFactory_Allocate with
-      allocation
-      inputHoldingCids
       requestedAt = now
       extraArgs = V2.emptyExtraArgs
       actors = [actor]
+    pure ((admin, (enrichedChoice.factoryCid, enrichedChoice.arg.extraArgs)), enrichedChoice.disclosures)
+
+  -- Get holdings for relevant admins
+  inputHoldingMap <- getHoldingMap actor [(req.authorizer, leg.instrumentId) | legs <- Map.values legsByAdmin, leg <- legs]
+
+  -- find batching utility for actor
+  [(batchingUtilityCid, _)] <- queryFilter @BatchingUtilityV2.BatchingUtility actor (\u -> u.provider == actor)
 
   -- Create all the allocations in a single transaction together with accepting the allocation request
   -- to ensure deduplication via the requests' consumption.
-  V2.submitWithDisclosures' actor (foldMap (.disclosures) choices) $
-    ( exerciseCmd reqCid V2.AllocationRequest_Accept with
-        actors = [actor]
-        extraArgs = V2.emptyExtraArgs
-    ) *>
-    forA_ choices (\ch -> do exerciseCmd ch.factoryCid ch.arg)
+  let disclosures = foldMap snd factoriesByAdminWithD
+  let factoriesByAdmin = Map.fromList $ map fst factoriesByAdminWithD
+  V2.submitWithDisclosures' actor disclosures $
+    exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_AcceptAllocationRequestV2 with
+        reqCid
+        acceptExtraArgs = V2.emptyExtraArgs
+        acceptedAt = now
+        factoriesByAdmin
+        inputHoldingMap
+        actor
 
   pure ()
 
+-- FIXME: move
+createBatchingUtility : Party -> Script (ContractId BatchingUtilityV2.BatchingUtility)
+createBatchingUtility p = do
+  submit p $ createCmd BatchingUtilityV2.BatchingUtility with provider = p
 
-filterLegsForAccount : V2.Account -> [V2.TransferLeg] -> [V2.TransferLeg]
-filterLegsForAccount account transferLegs =
-  filter (\tl -> account == tl.sender || account == tl.receiver) transferLegs
+-- | Get a map of unlocked holding cids for the given accounts and instruments.
+getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
+getHoldingMap actor accountAndInstruments0 = do
+  taggedHoldings <- forA (dedupSort accountAndInstruments0) $ \(account, instrumentId) -> do
+    holdings <- listHoldings actor instrumentId
+    pure [ ((instrumentId.admin, account), [holdingCid])
+         | (holdingCid, holding) <- holdings, holding.account == account, isNone holding.lock ]
+  pure $ BatchingUtilityV2.HoldingMap $ Map.fromListWithR (++) (concat taggedHoldings)

@@ -213,6 +213,8 @@ dvpWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
 
 -- TODO(#4517): test that duplicate allocations of the same leg cannot be settled
 
+-- TODO(#4515): test allocation workflow with different accounts for cash and security leg
+
 
 -- Test exececution infrastructure
 -----------------------------------
@@ -273,8 +275,7 @@ runTest mkTest = do
         reqs <- WalletClientV2.listAllocationRequestsV2 (basicAccount trader) trader
         trace ("num requests for", trader, length reqs) $
          forA_ reqs $ \req -> do
-          WalletClientV2.acceptAllocationRequestV2 (AmuletRegistryV2.amuletToMultiRegistry env.registryV2)
-            (basicAccount trader) trader req
+          WalletClientV2.acceptAllocationRequestV2 (AmuletRegistryV2.amuletToMultiRegistry env.registryV2) trader req
 
   -- check locked holdings
   checkHoldings env "holdings after allocation" test.expectedHoldingsAfterAllocation
@@ -338,8 +339,10 @@ runTest mkTest = do
 
 setupTestEnvironment : Script TestEnvironment
 setupTestEnvironment = do
-  allParties <- forA ["venue","alice", "bob", "charlie", "dora"] \p ->
-    allocatePartyExact p
+  allParties <- forA ["venue","alice", "bob", "charlie", "dora"] \n -> do
+    p <- allocatePartyExact n
+    WalletClientV2.createBatchingUtility p
+    pure p
   let [venue, alice, bob, charlie, dora] = allParties
   registryV2 <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
   let amuletId = registryV2.instrumentId
