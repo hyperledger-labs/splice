@@ -293,10 +293,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
 
+    val bobValidatorLocal = v("bobValidatorLocal")
     clue("Start bob validator local, onboard and tap before upgrade") {
       runBobValidatorWithStandaloneParticipant("before-upgrade")(
         onboardUserAndTapAmulet(
-          v("bobValidatorLocal"),
+          bobValidatorLocal,
           wc(
             "bobValidatorWalletLocal"
           ),
@@ -594,16 +595,20 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
 
       clue("bob validator local upgrades after restart and can tap") {
-        runBobValidatorWithStandaloneParticipant("after-upgrade")(
+        runBobValidatorWithStandaloneParticipant("after-upgrade") {
+          participantIsConnectedToNewSynchronizer(
+            bobValidatorLocal.participantClientWithAdminToken,
+            isSv4Connected = true,
+          )
           onboardUserAndTapAmulet(
-            v("bobValidatorLocal"),
+            bobValidatorLocal,
             wc(
               "bobValidatorWalletLocal"
             ),
             20,
             70 to 70,
           )
-        )
+        }
       }
 
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
