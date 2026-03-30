@@ -775,7 +775,7 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-community-common", file("canton/community/common"))
-      .enablePlugins(BuildInfoPlugin, DamlPlugin)
+      .enablePlugins(DamlPlugin)
       .dependsOn(
         `canton-blake2b`,
         `canton-pekko-fork` % "compile->compile;test->test",
