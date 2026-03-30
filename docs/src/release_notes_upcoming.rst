@@ -9,6 +9,13 @@
 
 .. release-notes:: Upcoming
 
+    - Deployment
+
+        - We've added support for `reloader annotation <https://github.com/stakater/reloader>`, which performs a rolling
+          restart of our apps on secret/configmap change. The integration is enabled by
+          default. You can disable it by setting enableReloader to false in your values.yaml file.
+          Please note that reloader needs to be installed separately.
+
    - Scan UI
 
      - The following tabs and features have been removed from Scan UI.
@@ -24,3 +31,4 @@
          - Completely removed
       - Validators
          - Completely removed
+

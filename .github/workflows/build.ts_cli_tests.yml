@@ -41,6 +41,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
+          cache_version: 7
           test_name: ts_cli
           target: 'oss'
 

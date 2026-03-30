@@ -111,7 +111,7 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
           logger.info(s"Reconciling tasks: $tasks")
         }
         MonadUtil
-          .parTraverseWithLimit(PositiveInt.tryCreate(10))(tasks)(task =>
+          .parTraverseWithLimit(PositiveInt.tryCreate(16))(tasks)(task =>
             withSpan("reconcile_task") { implicit tc => _ =>
               reconciler.reconcileTask(task)
             }
