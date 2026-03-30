@@ -73,7 +73,7 @@ data TokenStandardAction
   | TSA_TransferInstruction_AcceptV1 (ChoiceCall V1.TransferInstruction_Accept)
   deriving (Eq, Show)
 
-  -- FIXME: add all other actions
+  -- QUESTION: what actions to add? just take the plunge and add all choices on token standard interfaces?
 
 
 -- | The result of a token standard action.
@@ -134,10 +134,10 @@ template BatchingUtility
                 -- `TextMap [ContractId Holding]` instead of `[ContractId Holding]`, where
                 -- the map keys are `instrumentId.id`s, so that
                 -- chaining at the Daml level can properly disambiguate holdings of different instrument ids?
-
+                --
                 -- It seems that we actually have to given that
                 --
-                --  1. otherwise implementations need to fetch al Holdings to figure out which ones to actually use
+                --  1. otherwise implementations need to fetch all Holdings to figure out which ones to actually use
                 --  2. V1 implementations are likely picky about only being given instrumentIds that match the allocation or transfer
 
                 let (inputHoldingCids, newHoldingMap) = getHoldingsFor (actor, account) holdingMap
