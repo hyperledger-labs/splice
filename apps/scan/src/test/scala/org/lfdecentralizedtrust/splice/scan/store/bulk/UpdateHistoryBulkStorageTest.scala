@@ -447,7 +447,8 @@ class UpdateHistoryBulkStorageTest
           None,
         )
         .futureValue
-      res4.objects.map(_.key) should contain theSameElementsInOrderAs Seq(d21u0, d21u1, d22u0, d22u1)
+      res4.objects
+        .map(_.key) should contain theSameElementsInOrderAs Seq(d21u0, d21u1, d22u0, d22u1)
       res4.nextPageTokenO shouldBe None
 
       // limit too low for first folder
