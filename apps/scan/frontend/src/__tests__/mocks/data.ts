@@ -177,6 +177,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
         featuredAppActivityMarkerAmount: null,
         optDevelopmentFundManager: null,
         externalPartyConfigStateTickDuration: null,
+        rewardConfig: null,
       },
       futureValues: [],
     },
