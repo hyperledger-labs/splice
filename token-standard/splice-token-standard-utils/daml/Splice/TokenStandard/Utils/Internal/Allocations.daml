@@ -25,6 +25,9 @@ module Splice.TokenStandard.Utils.Internal.Allocations (
   -- ** Available actions
   allocationV1_availableActionsDefault,
   allocationV2_availableActionsDefault,
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_TransferLeg,
   upcast_v1_v2_Allocation,
 
   -- ** Choice implementations
@@ -102,6 +105,7 @@ splitLegsByTradingAccount legs = Map.fromListWithR (++) $ do
   leg <- legs
   [(leg.sender, [leg]), (leg.receiver, [leg])]
 
+-- FIXME: V2 suffix
 splitLegsByAdmin : [AllocationV2.TransferLeg] -> Map.Map Party [AllocationV2.TransferLeg]
 splitLegsByAdmin legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentId.admin, [leg])) legs
 
@@ -684,6 +688,7 @@ instance ForwardCompatible AllocationRequestV1.AllocationRequestView AllocationR
       settlement = downcast settlement
       transferLegs = TextMap.fromList [ (leg.transferLegId, downcast leg) | leg <- transferLegs ]
       meta
+      -- FIXME: encode authorizer in metadata
 
 
 -- Allocation factories

@@ -59,6 +59,9 @@ module Splice.TokenStandard.Utils (
   -- *** Available actions
   allocationV1_availableActionsDefault,
   allocationV2_availableActionsDefault,
+
+  -- ** Non-standard conversions
+  upcast_v1_v2_TransferLeg,
   upcast_v1_v2_Allocation,
 
   -- *** Choices
