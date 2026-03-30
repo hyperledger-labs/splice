@@ -13,7 +13,8 @@ object CantonDependencies {
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
-  val daml_java_codegen_version = version
+  // TODO(DACH-NY/canton#31699) Remove overwrite when java codegen is fixed
+  val daml_java_codegen_version = "3.5.0-snapshot.20260203.14554.0.v07f81520"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
