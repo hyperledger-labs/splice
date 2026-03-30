@@ -1128,6 +1128,7 @@ lazy val `apps-scan` =
     .in(file("apps/scan"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
+      `canton-ledger-api-core` % "test->test",
       `splice-dso-governance-daml`,
     )
     .settings(
