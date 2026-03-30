@@ -2,17 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useAmuletPriceVotes } from './useAmuletPriceVotes';
 import { useDsoInfos } from './useDsoInfos';
-import { useListVoteRequestResult, useListDsoRulesVoteRequests } from './useListVoteRequests';
-import { useListVotes } from './useListVotes';
-import { useValidatorLicenses } from './useValidatorLicenses';
-import { useVoteRequest } from './useVoteRequest';
+import { useListDsoRulesVoteRequests } from './useListVoteRequests';
 
 export {
   useDsoInfos,
-  useListVoteRequestResult,
   useListDsoRulesVoteRequests,
-  useListVotes,
   useAmuletPriceVotes,
-  useVoteRequest,
-  useValidatorLicenses,
 };

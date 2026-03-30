@@ -1,66 +1,28 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
-
-import { Tab, Tabs, Typography, Box, Grid } from '@mui/material';
+import { Typography, Stack, Box, Container } from '@mui/material';
 
 import Layout from '../components/Layout';
 import NetworkInfo from '../components/NetworkInfo';
 import TotalAmuletBalance from '../components/TotalAmuletBalance';
 
 const Root: React.FC = () => {
-  const navLinks = [
-    { name: 'Recent Activity', path: 'recent-activity' },
-    { name: 'App Leaderboard', path: 'app-leaderboard' },
-    { name: 'Validator Leaderboard', path: 'validator-leaderboard' },
-    { name: 'Synchronizer Fees Leaderboard', path: 'synchronizer-fees-leaderboard' },
-    { name: 'Validator Liveness Leaderboard', path: 'validator-faucets-leaderboard' },
-  ];
-  // Unfortunately, NavLink from react-router doesn't realize that 'recent-activity' is the index at '/',
-  // so we need to set it as active manually.
-  const currentPath = useLocation().pathname;
-  const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
-
   return (
     <Layout>
-      <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>
-        <Grid size={{ xs: 8 }}>
-          <Typography variant="h5">
-            Explore, search and find answers to current network configuration details.
-          </Typography>
-        </Grid>
+      <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>
+        <Container maxWidth="lg" sx={{ marginTop: 2 }}>
+          <Stack mt={4} spacing={2} direction="column" justifyContent="center">
+            <Typography variant="h5">
+              Explore, search and find answers to current network configuration details.
+            </Typography>
 
-        <Grid size={{ xs: 12, lg: 6 }} data-testid="circulating-supply-container">
-          <TotalAmuletBalance />
-        </Grid>
+            <TotalAmuletBalance />
 
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Box mb={0}>
-            <Tabs value={selected}>
-              {navLinks.map(navLink => {
-                return (
-                  <Tab
-                    key={navLink.path}
-                    to={navLink.path}
-                    label={navLink.name}
-                    value={navLink}
-                    component={NavLink}
-                  />
-                );
-              })}
-            </Tabs>
-          </Box>
-          <Outlet />
-        </Grid>
-
-        {/** spacer element to separate NetworkInfo from tables on large screen widths */}
-        <Grid size={{ xs: 0, lg: 1 }} />
-
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <NetworkInfo />
-        </Grid>
-      </Grid>
+            <NetworkInfo />
+          </Stack>
+        </Container>
+      </Box>
     </Layout>
   );
 };
