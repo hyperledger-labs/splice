@@ -17,7 +17,6 @@ fi
 git add -u
 echo "$submodule_name version is not up to date. Creating a PR..."
 
-git add "$submodule_name"
 updated_branch="$submodule_name-bump-$(date +%Y-%m)"
 git switch -c "${updated_branch}"
 git commit -m "[ci] bump $submodule_name version to the latest (auto-generated)" -s
