@@ -31,10 +31,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.{
-  LogicalSynchronizerUpgradeSequencingTestTrigger,
-  LogicalSynchronizerUpgradeTrigger,
-}
+import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
 import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
@@ -110,14 +107,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
-        ConfigTransforms
-          .bumpCantonSyncSuccessorPortsBy(22_000)
-          .andThen(
-            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
-              // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
-              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
-            )
-          )(config)
+        ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000)(config)
       )
       .withAmuletPrice(walletAmuletPrice)
 
