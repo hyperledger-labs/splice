@@ -1862,7 +1862,7 @@ runShellcheck := {
 lazy val syncpackCheck = taskKey[Unit]("Check all apps' package.json dependency versions match")
 syncpackCheck := {
   val log = streams.value.log
-  runCommand(Seq("npx", "syncpack", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
+  runCommand(Seq("npx", "--yes", "syncpack@10.1.0", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
 }
 
 lazy val illegalDamlReferencesCheck =
