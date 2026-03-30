@@ -720,6 +720,7 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-observability-metrics-testing", file("canton/base/observability/metrics"))
+      .disablePlugins(WartRemover)
       .settings(
         sharedCantonSettings,
         sharedSettings,
@@ -731,7 +732,7 @@ object BuildCommon {
         Compile / unmanagedSourceDirectories := Seq(
           baseDirectory.value / "src/test/scala",
         ),
-        Compile / unmanagedSources / includeFilter := "InMemoryMetricsFactory.scala",
+        Compile / unmanagedSources / includeFilter := "InMemoryMetricsFactory.scala" || "MetricValues.scala",
         Test / unmanagedSourceDirectories := Seq.empty,
         scalacOptions += "-Wconf:msg=unused value of type:s"
       )

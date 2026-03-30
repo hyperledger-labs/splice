@@ -106,7 +106,7 @@ class ParticipantPartyMigrator(
         case None =>
           logger.info(s"Importing ACS for party ids $partiesToMigrateFinal from scan")
           for {
-            _ <- importAcs(partiesToMigrateFinal.parties, getAcsSnapshot)
+            _ <- importAcs(synchronizerId, partiesToMigrateFinal.parties, getAcsSnapshot)
             _ <- configProvider.clearPartiesToMigrate()
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
           } yield ()
@@ -382,6 +382,7 @@ class ParticipantPartyMigrator(
   }
 
   private def importAcs(
+    synchronizerId: SynchronizerId,
       partyIds: Set[PartyId],
       getAcsSnapshot: PartyId => Future[ByteString],
   ): Future[Unit] = {
@@ -391,7 +392,7 @@ class ParticipantPartyMigrator(
       _ <- MonadUtil.sequentialTraverse(partyIds.toSeq) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
-          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot))
+          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(acsSnapshot), synchronizerId)
         } yield ()
       }
       _ <- participantAdminConnection.reconnectAllDomains()

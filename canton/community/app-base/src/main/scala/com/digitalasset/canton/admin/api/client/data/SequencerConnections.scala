@@ -259,7 +259,7 @@ final case class SubmissionRequestAmplification(
     paramIfDefined("confirmationResponsePatience", _.confirmationResponsePatienceO),
   )
 
-  private[canton] def toInternal: SubmissionRequestAmplificationInternal =
+  def toInternal: SubmissionRequestAmplificationInternal =
     this.transformInto[SubmissionRequestAmplificationInternal]
 }
 
