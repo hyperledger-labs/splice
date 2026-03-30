@@ -43,9 +43,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
   UpdateHistoryItem,
-  UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
-  UpdateHistoryTransactionV2,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -125,8 +123,6 @@ import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyT
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
-
-import scala.collection.immutable.SortedMap
 
 class HttpScanHandler(
     svParty: PartyId,
