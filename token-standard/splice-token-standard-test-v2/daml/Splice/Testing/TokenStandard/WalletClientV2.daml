@@ -11,6 +11,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
     listHoldings,
     listHoldingCids,
     listLockedHoldings,
+    listUnlockedHoldingCidsFor,
 
     checkHoldingWithAmountExists,
     checkBalanceBounds,
@@ -26,6 +27,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
     -- * Managing allocations
     listRequestedAllocationsForAdmin,
     listAllocationRequestsV2,
+    listAllocationsV2,
 
     acceptAllocationRequestV2,
 
@@ -146,6 +148,12 @@ listRequestedAllocationsForAdmin admin tradingAccount actor = do
           settlement = req.settlement
           transferLegs
   pure amuletAllocs
+
+listAllocationsV2 : V2.Account -> Party -> Script [(ContractId V2.Allocation, V2.AllocationView)]
+listAllocationsV2 tradingAccount actor = do
+  allocs <- queryInterface @V2.Allocation actor
+  pure [ (allocCid, allocView) | (allocCid, Some allocView) <- allocs, tradingAccount == allocView.allocation.authorizer ]
+
 
 listAllocationRequestsV2 : V2.Account -> Party -> Script [(ContractId V2.AllocationRequest, V2.AllocationRequestView)]
 listAllocationRequestsV2 tradingAccount actor = do

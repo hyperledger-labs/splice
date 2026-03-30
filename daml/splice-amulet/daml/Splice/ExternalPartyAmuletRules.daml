@@ -491,7 +491,7 @@ amulet_allocationFactoryV2_allocateImplCore externalAmuletRules arg fundingAmoun
       -- transferLeg.amount
       require "Transfer amount must be positive" (transferLeg.amount > 0.0)
       -- transferLeg.instrumentId
-      require "Instrument-id must match the factory" (transferLeg.instrumentId == upcast (amuletInstrumentId dso))
+      require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentIdV2 dso)
       -- transferLeg.meta: check no redundant account information
       ensureNoAccountMeta "transferLeg" "sender" transferLeg.meta
       ensureNoAccountMeta "transferLeg" "receiver" transferLeg.meta
