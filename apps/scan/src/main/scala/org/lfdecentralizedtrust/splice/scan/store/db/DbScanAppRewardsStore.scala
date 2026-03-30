@@ -585,16 +585,16 @@ class DbScanAppRewardsStore(
       (sql"""with computed as (
                select history_id, round_number, app_provider_party_seq_num,
                       (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
-                        * $issuance as reward_amount
+                        * $issuance as total_app_reward_amount
                from #${Tables.appActivityPartyTotals}
                where history_id = $historyId and round_number = $roundNumber
              ),
              inserted_parties as (
                insert into #${Tables.appRewardPartyTotals}
                  (history_id, round_number, app_provider_party_seq_num, total_app_reward_amount)
-               select history_id, round_number, app_provider_party_seq_num, reward_amount
+               select history_id, round_number, app_provider_party_seq_num, total_app_reward_amount
                from computed
-               where reward_amount >= $threshold
+               where total_app_reward_amount >= $threshold
                returning total_app_reward_amount
              )
              insert into #${Tables.appRewardRoundTotals}
