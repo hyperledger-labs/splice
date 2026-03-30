@@ -65,7 +65,7 @@ jobs:
           cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
 
       - name: Push metrics to Prometheus Pushgateway
-        if: ${{ always() }}
+        if: ${{ success() }}
         run: |
           python3 scripts/performance/push_store_ingestion_perf_metrics.py
 

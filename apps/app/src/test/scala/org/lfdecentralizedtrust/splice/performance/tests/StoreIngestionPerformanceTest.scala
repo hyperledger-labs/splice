@@ -23,6 +23,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodi
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 
+import io.circe.Json
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -75,17 +76,7 @@ abstract class StoreIngestionPerformanceTest(
             )
           }
           _ = writeMetricsFile(metrics, success = true)
-        } yield ()).recoverWith { case ex =>
-          writeMetricsFile(
-            StoreIngestionPerfMetrics(
-              totalItems = 0,
-              totalBatches = 0,
-              totalTimeNs = BigDecimal(0),
-            ),
-            success = false,
-          )
-          Future.failed(ex)
-        }
+        } yield ())
       }
   }
 
@@ -192,18 +183,38 @@ abstract class StoreIngestionPerformanceTest(
     val completionEpochSec = java.time.Instant.now().getEpochSecond
     val successInt = if (success) 1 else 0
     val jobName = "splice_perf_ingestion"
-    val json =
-      s"""{
-         |  "test_name": "$testName",
-         |  "metrics": [
-         |    {"name": "${jobName}_avg_item_time_ns", "description": "Average nanoseconds per ingested item","value": ${metrics.avgItemTimeNs}},
-         |    {"name": "${jobName}_total_items","description": "Total number of items ingested","value": ${metrics.totalItems}},
-         |    {"name": "${jobName}_total_time_ns","description": "Total ingestion time in nanoseconds","value": ${metrics.totalTimeNs}},
-         |    {"name": "${jobName}_total_batches","description": "Total number of batches ingested","value": ${metrics.totalBatches}},
-         |    {"name": "${jobName}_completion_timestamp_seconds","description": "Epoch seconds when the test run completed","value": $completionEpochSec},
-         |    {"name": "${jobName}_success","description": "Test run succeeded (1) or failed (0)","value": $successInt}
-         |  ]
-         |}""".stripMargin
+
+    def metric(metricName: String, description: String, value: BigDecimal): Json = Json.obj(
+      "name" -> Json.fromString(s"${jobName}_$metricName"),
+      "description" -> Json.fromString(description),
+      "value" -> Json.fromBigDecimal(value),
+    )
+
+    val json = Json
+      .obj(
+        "test_name" -> Json.fromString(testName),
+        "metrics" -> Json.arr(
+          metric(
+            "avg_item_time_ns",
+            "Average nanoseconds per ingested item",
+            metrics.avgItemTimeNs,
+          ),
+          metric("total_items", "Total number of items ingested", BigDecimal(metrics.totalItems)),
+          metric("total_time_ns", "Total ingestion time in nanoseconds", metrics.totalTimeNs),
+          metric(
+            "total_batches",
+            "Total number of batches ingested",
+            BigDecimal(metrics.totalBatches),
+          ),
+          metric(
+            "completion_timestamp_seconds",
+            "Epoch seconds when the test run completed",
+            BigDecimal(completionEpochSec),
+          ),
+          metric("success", "Test run succeeded (1) or failed (0)", BigDecimal(successInt)),
+        ),
+      )
+      .spaces2
 
     println(s"Ingestion metrics for $testName:\n$json")
 
