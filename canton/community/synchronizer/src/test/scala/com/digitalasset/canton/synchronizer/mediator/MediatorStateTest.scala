@@ -150,7 +150,10 @@ class MediatorStateTest
         loggerFactory,
       )
       sut.initialize(CantonTimestamp.MinValue).futureValueUS
-      sut.add(currentVersion).futureValueUS
+      sut.registerTimeoutForRequest(requestId, requestId.unwrap.plusSeconds(30))
+      currentVersion
+        .asFinalized(testedProtocolVersion)
+        .fold(sut.registerPendingRequest(currentVersion))(sut.add(_).futureValueUS)
       sut
     }
 
@@ -165,7 +168,10 @@ class MediatorStateTest
       }
       "have no more unfinalized after finalization" in {
         for {
-          _ <- sut.replace(currentVersion, currentVersion.timeout())
+          _ <- sut.replace(
+            currentVersion,
+            currentVersion.timeout(sut.metrics.timeoutNonResponsiveParticipants),
+          )
         } yield {
           sut.pendingRequestIdsBefore(CantonTimestamp.MaxValue) shouldBe empty
         }

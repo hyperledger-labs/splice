@@ -16,7 +16,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.messages.{EnvelopeContent, UnsignedProtocolMessage}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.protocol.{v30, v31}
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.sequencing.SequencedSerializedEvent
 import com.digitalasset.canton.sequencing.client.RequestSigner
@@ -135,7 +135,7 @@ class SequencerTest
         DefaultProcessingTimeouts.testing,
         storage,
         sequencerStore,
-        sequencingTimeLowerBoundExclusive = None,
+        lsuSequencingBounds = None,
         clock,
         topologyClientMember,
         crypto,
@@ -203,6 +203,9 @@ class SequencerTest
     override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
       v30.EnvelopeContent.SomeEnvelopeContent.Empty
 
+    override def toProtoSomeEnvelopeContentV31: v31.EnvelopeContent.SomeEnvelopeContent =
+      v31.EnvelopeContent.SomeEnvelopeContent.Empty
+
     override def productElement(n: Int): Any = fail("shouldn't be used")
     override def productArity: Int = fail("shouldn't be used")
     override def canEqual(that: Any): Boolean = fail("shouldn't be used")
@@ -244,12 +247,12 @@ class SequencerTest
         )(
           "member registration"
         )
-        signedSubmission <- RequestSigner(aliceCrypto, testedProtocolVersion, loggerFactory)
+        signedSubmission <- RequestSigner(aliceCrypto, loggerFactory)
           .signRequest(
             submission,
             HashPurpose.SubmissionRequestSignature,
             aliceCrypto.currentSnapshotApproximation.futureValueUS,
-            Some(clock.now),
+            None, // not needed for unit tests; session signing keys disabled
           )
           .valueOrFail("sign request")
         _ <- sequencer.sendAsyncSigned(signedSubmission).valueOrFail("send")
@@ -267,11 +270,15 @@ class SequencerTest
         aliceDeliverEvent.batch.envelopes shouldBe empty // as we didn't send a message to ourself
 
         bobDeliverEvent.messageIdO shouldBe None
-        bobDeliverEvent.batch.envelopes.map(_.bytes) should contain only
+        bobDeliverEvent.batch.envelopes.map(
+          _.toClosedUncompressedEnvelopeUnsafe.bytes
+        ) should contain only
           EnvelopeContent(message1, testedProtocolVersion).toByteString
 
         caroleDeliverEvent.messageIdO shouldBe None
-        caroleDeliverEvent.batch.envelopes.map(_.bytes) should contain only
+        caroleDeliverEvent.batch.envelopes.map(
+          _.toClosedUncompressedEnvelopeUnsafe.bytes
+        ) should contain only
           EnvelopeContent(message2, testedProtocolVersion).toByteString
       }
     }

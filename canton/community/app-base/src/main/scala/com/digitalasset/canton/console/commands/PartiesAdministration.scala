@@ -19,7 +19,11 @@ import com.digitalasset.canton.admin.api.client.data.{ListPartiesResult, PartyOn
 import com.digitalasset.canton.admin.participant.v30.ExportPartyAcsResponse
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.commands.TopologyTxFiltering.{AddedFilter, RevokedFilter}
+import com.digitalasset.canton.console.commands.TopologyTxFiltering.{
+  AddedFilter,
+  OnboardingFilter,
+  RevokedFilter,
+}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   ConsoleCommandResult,
@@ -44,7 +48,6 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LedgerParticipantId, SynchronizerAlias, config}
 import com.google.common.annotations.VisibleForTesting
-import com.google.protobuf.ByteString
 import io.grpc.Context
 
 import java.time.Instant
@@ -219,6 +222,37 @@ class ParticipantPartiesAdministrationGroup(
       loggerFactory,
     )
 
+    @Help.Summary("List parties hosted by this participant")
+    @Help.Description(
+      """Inspect the parties hosted by this participant as used for synchronisation.
+        |The response is built from the timestamped topology transactions of each synchronizer,
+        |excluding the authorized store of the given node. The search will include all hosted
+        |parties and is equivalent to running the `list` method using the participant id of the
+        |invoking participant.
+        |
+        |Parameters:
+        |- filterParty: Filter by parties starting with the given string.
+        |- filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
+        |- asOf: Optional timestamp to inspect the topology state at a given point in time.
+        |- limit: How many items to return (defaults to canton.parameters.console.default-limit)
+        |
+        |Example: participant1.parties.hosted(filterParty="alice")
+      """
+    )
+    def hosted(
+        filterParty: String = "",
+        synchronizerIds: Set[SynchronizerId] = Set.empty,
+        asOf: Option[Instant] = None,
+        limit: PositiveInt = defaultLimit,
+    )(implicit partyKind: PartyKind): Seq[ListPartiesResult] =
+      this.list(
+        filterParty,
+        filterParticipant = participantId.filterString,
+        synchronizerIds = synchronizerIds,
+        asOf = asOf,
+        limit = limit,
+      )
+
     @Help.Summary("Find a party from a filter string")
     @Help.Description(
       """Will search for all parties that match this filter string. If it finds exactly one party, it
@@ -265,7 +299,7 @@ class ParticipantPartiesAdministrationGroup(
       case PartyKind.Local =>
         reference.parties
           .list(filterParty, filterParticipant, synchronizerIds, asOf, limit)
-      case PartyKind.External =>
+      case PartyKind.External(_) =>
         external.list(
           filterParty,
           filterParticipant,
@@ -298,13 +332,13 @@ class ParticipantPartiesAdministrationGroup(
           synchronizeParticipants = synchronizeParticipants,
           synchronize = synchronize,
         )
-      case PartyKind.External =>
+      case PartyKind.External(preferredHashingSchemeVersion) =>
         external.enable(
           name,
           synchronizer = synchronizer,
           synchronizeParticipants = synchronizeParticipants,
           synchronize = synchronize,
-        )
+        )(preferredHashingSchemeVersion)
     }
 
     /** Enable an existing party hosted on `reference`. Unlike `enable`, this command assumes the
@@ -533,6 +567,7 @@ class ParticipantPartiesAdministrationGroup(
       |- partyId: The party to find activations for.
       |- participantId: The participant hosting the new party.
       |- synchronizerId: The synchronizer sequencing the activations.
+      |- onboarding: Whether to find the offset for an onboarding versus an added party.
       |- validFrom: The activation's effective time (default: None).
       |- beginOffsetExclusive: Starting ledger offset (default: 0).
       |- endOffsetInclusive: Ending ledger offset (default: None = trailing search).
@@ -544,6 +579,7 @@ class ParticipantPartiesAdministrationGroup(
       partyId: PartyId,
       participantId: ParticipantId,
       synchronizerId: SynchronizerId,
+      onboarding: Boolean,
       validFrom: Option[Instant] = None,
       beginOffsetExclusive: Long = 0L,
       endOffsetInclusive: Option[Long] = None,
@@ -555,7 +591,7 @@ class ParticipantPartiesAdministrationGroup(
       participantId,
       synchronizerId,
       validFrom,
-      AddedFilter,
+      if (onboarding) OnboardingFilter else AddedFilter,
     )(consoleEnvironment)
 
     findTopologyOffset(
@@ -708,29 +744,33 @@ class ParticipantPartiesAdministrationGroup(
     """This command exports the current Active Contract Set (ACS) for a given party to
       |facilitate its replication from a source to a target participant.
       |
-      |It uses the party's most recent activation on the target participant to determine the
-      |precise historical state of the ACS to export from the source participant.
+      |It uses the party's most recent activation on the target participant to determine
+      |the precise state of the ACS to export from the source participant.
       |
       |"Activation" on the target participant means the new hosting arrangement has been
-      |authorized by both the party itself and the target participant via party-to-participant
-      |topology transactions.
+      |authorized by both the party itself and the target participant via
+      |party-to-participant topology transactions.
       |
-      |This command will fail if the party has not yet been activated on the target participant.
+      |This command will fail if the party has not yet been activated on the target
+      |participant.
       |
-      |Upon successful completion, the command writes a GZIP-compressed ACS snapshot file. This
-      |file should then be imported into the target participant's ACS using the
-      |`import_party_acs` command.
+      |Upon successful completion, the command writes a GZIP-compressed ACS snapshot
+      |file. While designed to work in tandem with the `import_party_acs` command, the
+      |resulting file is a standard ACS snapshot that can also be used with other
+      |compatible commands (such as `repair.import_acs`).
       |
       |Parameters:
-      |- party: The party being replicated, it must already be active on the target participant.
+      |- party: The party being replicated, it must already be active on the target
+      |  participant.
       |- synchronizerId: Restricts the export to the given synchronizer.
-      |- targetParticipantId: Unique identifier of the target participant where the party will
-      |  be replicated.
-      |- beginOffsetExclusive: Exclusive ledger offset used as starting point fo find the
-      |  party's activation on the target participant.
-      |- exportFilePath: The path denoting the file where the ACS snapshot will be stored.
-      |- waitForActivationTimeout: The maximum duration the service will wait to find the
-      |  topology transaction that activates the party on the target participant.
+      |- targetParticipantId: Unique identifier of the target participant where the
+      |  party will be replicated.
+      |- beginOffsetExclusive: Exclusive ledger offset used as a starting point to find
+      |  the party's activation on the target participant.
+      |- exportFilePath: The path denoting the file where the ACS snapshot will be
+      |  stored. Defaults to "canton-acs-export.gz" when undefined.
+      |- waitForActivationTimeout: The maximum duration the service will wait to find
+      |  the topology transaction that activates the party on the target participant.
       |- timeout: A timeout for this operation to complete.
       """
   )
@@ -770,28 +810,47 @@ class ParticipantPartiesAdministrationGroup(
       )
     }
 
-  @Help.Summary(
-    "Import active contracts from a snapshot file to replicate a party"
-  )
+  @Help.Summary("Import active contracts from a snapshot file to replicate a party")
   @Help.Description(
-    """This command imports contracts from an Active Contract Set (ACS) snapshot
-      |file into the participant's ACS. It expects the given ACS snapshot file to
-      |be the result of a previous `export_party_acs` command invocation.
+    """This command imports contracts from an Active Contract Set (ACS) snapshot file
+      |into the participant's ACS. While designed to work in tandem with the
+      |`export_party_acs`, it can also process any compatible ACS snapshot (such as one
+      |generated by the `repair.export_acs` command).
+      |
+      |The contract IDs of the imported contracts may be checked ahead of starting the
+      |process. If any contract ID doesn't match the contract ID scheme associated to
+      |the synchronizer where the contract is assigned to, the whole import process
+      |fails depending on the value of `contractImportMode`.
+      |
+      |By default `contractImportMode` is set to `ContractImportMode.Validation`.
+      |
+      |Expert only: As validation of contract IDs may lengthen the import significantly,
+      |you have the option to simply accept the contract IDs as they are using the
+      |`ContractImportMode.Accept` mode.
       |
       |Parameters:
-      |- importFilePath: The path denoting the file from where the ACS snapshot will be read.
-      |  Defaults to "canton-acs-export.gz" when undefined.
-      |- workflowIdPrefix: Sets a custom prefix for the workflow ID to easily identify all
-      |  transactions generated by this import. Defaults to "import-<random_UUID>" when
-      |  unspecified.
-      |- contractImportMode: Governs contract authentication processing on import. Options
-      |  include Validation (default), [Accept].
+      |- synchronizerId: The identifier of the synchronizer managing the contracts to
+      |  be imported. Any contracts in the snapshot associated with a different
+      |  synchronizer will not be imported (ignored).
+      |- party: The party being replicated. When present, this will schedule the
+      |  onboarding flag clearance once the participant (re)connects with the
+      |  synchronizer.
+      |- importFilePath: The path denoting the file from where the ACS snapshot will
+      |  be read. Defaults to "canton-acs-export.gz" when undefined.
+      |- workflowIdPrefix: Sets a custom prefix for the workflow ID to easily identify
+      |  all transactions generated by this import. Defaults to "import-<random_UUID>"
+      |  when unspecified.
+      |- contractImportMode: Choose between `Validation` (default, validates that
+      |  contract IDs comply with the scheme associated to the synchronizer where the
+      |  contracts are assigned), or `Accept` the contracts as they are (if you know
+      |  what you are doing).
       |- representativePackageIdOverride: Defines override mappings for assigning
-      |  representative package IDs to contracts upon ACS import. Defaults to NoOverride when
-      |  undefined.
-   """
+      |  representative package IDs to contracts upon ACS import.
+      """
   )
   def import_party_acs(
+      synchronizerId: SynchronizerId,
+      party: Option[PartyId] = None,
       importFilePath: String = "canton-acs-export.gz",
       workflowIdPrefix: String = "",
       contractImportMode: ContractImportMode = ContractImportMode.Validation,
@@ -801,53 +860,12 @@ class ParticipantPartiesAdministrationGroup(
     consoleEnvironment.run {
       reference.adminCommand(
         ParticipantAdminCommands.PartyManagement.ImportPartyAcs(
-          ByteString.copyFrom(File(importFilePath).loadBytes),
+          new java.io.File(importFilePath),
+          synchronizerId,
           if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
           contractImportMode,
           representativePackageIdOverride,
-        )
-      )
-    }
-
-  @Help.Summary("Import active contracts from a snapshot file to replicate a party")
-  @Help.Description(
-    """This command imports contracts from an Active Contract Set (ACS) snapshot
-      |file into the participant's ACS. It expects the given ACS snapshot file to
-      |be the result of a previous `export_party_acs` command invocation.
-      |
-      |Unlike `import_party_acs` above it does not read the full snapshot into memory.
-      |
-      |The argument is:
-      |- importFilePath: The path denoting the file from where the ACS snapshot will be read.
-      |                  Defaults to "canton-acs-export.gz" when undefined.
-      |- synchronizerId: The identifier of the synchronizer managing the contract to be
-      |                  imported. If a contract has a different synchronizer, import will fail.
-      |- workflowIdPrefix: Sets a custom prefix for the workflow ID to easily identify all
-      |                  transactions generated by this import.
-      |                  Defaults to "import-<random_UUID>" when unspecified.
-      |- contractImportMode: Governs contract authentication processing on import. Options
-      |                      include Validation (default), [Accept].
-      |- representativePackageIdOverride: Defines override mappings for assigning representative
-      |                                   package IDs to contracts upon ACS import.
-      |                                   Defaults to NoOverride when undefined.
-   """
-  )
-  def import_party_acsV2(
-      importFilePath: String = "canton-acs-export.gz",
-      synchronizerId: SynchronizerId,
-      workflowIdPrefix: String = "",
-      contractImportMode: ContractImportMode = ContractImportMode.Validation,
-      representativePackageIdOverride: RepresentativePackageIdOverride =
-        RepresentativePackageIdOverride.NoOverride,
-  ): Unit =
-    consoleEnvironment.run {
-      reference.adminCommand(
-        ParticipantAdminCommands.PartyManagement.ImportPartyAcsV2(
-          new java.io.File(importFilePath),
-          synchronizerId,
-          workflowIdPrefix = workflowIdPrefix,
-          contractImportMode,
-          representativePackageIdOverride,
+          party,
         )
       )
     }
@@ -867,6 +885,9 @@ class ParticipantPartiesAdministrationGroup(
       |This safe time (the "latest decision deadline") is computed from the
       |synchronizer's parameter history to ensure all prior in-flight
       |transactions are finalized.
+      |
+      |Additionally, this command records the clearance operation as pending, ensuring
+      |it can automatically resume following a node restart or synchronizer reconnection.
       |
       |The command is idempotent and designed to be polled. You can re-run
       |it safely to check the status.
@@ -989,6 +1010,7 @@ private[canton] object PartiesAdministration {
 private object TopologyTxFiltering {
   sealed trait AuthorizationFilterKind
   case object AddedFilter extends AuthorizationFilterKind
+  case object OnboardingFilter extends AuthorizationFilterKind
   case object RevokedFilter extends AuthorizationFilterKind
 
   def getTopologyFilter(
@@ -1025,6 +1047,9 @@ private object TopologyTxFiltering {
               case AddedFilter =>
                 val added = tx.getParticipantAuthorizationAdded
                 added.partyId == partyId.toLf && added.participantId == participantId.toLf
+              case OnboardingFilter =>
+                val onboarding = tx.getParticipantAuthorizationOnboarding
+                onboarding.partyId == partyId.toLf && onboarding.participantId == participantId.toLf
               case RevokedFilter =>
                 val revoked = tx.getParticipantAuthorizationRevoked
                 revoked.partyId == partyId.toLf && revoked.participantId == participantId.toLf

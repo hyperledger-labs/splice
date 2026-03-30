@@ -18,7 +18,7 @@ import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.admin.v30 as adminProtoV30
 import com.digitalasset.canton.topology.admin.v30.Synchronizer.Kind
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.canton.{LedgerParticipantId, LfPartyId, ProtoDeserializationError}
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
@@ -157,6 +157,8 @@ sealed trait Synchronizer
 
   def logical: SynchronizerId
 
+  def toProtoPrimitive: String
+
   def isCompatibleWith(other: Synchronizer): Boolean = (this, other) match {
     case (a: PhysicalSynchronizerId, b: PhysicalSynchronizerId) => a == b
     case (a, b) => a.logical == b.logical
@@ -182,6 +184,24 @@ object Synchronizer {
       case Kind.Id(lsidP) => SynchronizerId.fromProtoPrimitive(lsidP, "id")
       case Kind.PhysicalId(psidP) => PhysicalSynchronizerId.fromProtoPrimitive(psidP, "physical_id")
     }
+
+  /** Parses a string protobuf field to either a logical or physical synchronizer ID. Fails if the
+    * string can't be parsed to either.
+    * @param value
+    *   value to parse
+    * @param fieldName
+    *   name of the proto field
+    */
+  def fromLogicalOrPhysicalString(
+      value: String,
+      fieldName: String,
+  ): Either[ProtoDeserializationError, Synchronizer] =
+    SynchronizerId
+      .fromProtoPrimitive(value, fieldName)
+      .orElse(
+        PhysicalSynchronizerId
+          .fromProtoPrimitive(value, fieldName)
+      )
 }
 
 final case class SynchronizerId(uid: UniqueIdentifier) extends Synchronizer with Identity {
@@ -239,17 +259,27 @@ final case class PhysicalSynchronizerId(
       s"${logical.toLengthLimitedString}${PhysicalSynchronizerId.primaryDelimiter}$suffix"
     )
 
-  def toProtoPrimitive: String = toLengthLimitedString.unwrap
+  /** Synchronizer identifier to use for the computation of the external signing hash
+    */
+  def forExternalTransactionHashing: Synchronizer =
+    if (protocolVersion <= ProtocolVersion.v34) logical
+    // TODO(i30737): From PV35, we use the physical synchronizer ID to maintain deduplication guarantees during LSU.
+    // This will likely be revised when the mediator transaction data is migrated during LSUs
+    else this
+
+  override def toProtoPrimitive: String = toLengthLimitedString.unwrap
 
   override protected def pretty: Pretty[PhysicalSynchronizerId] =
     prettyOfString(_ =>
       logical.show ++ PhysicalSynchronizerId.primaryDelimiter ++ protocolVersion.show ++
         PhysicalSynchronizerId.secondaryDelimiter ++ serial.show
     )
+
+  def incrementSerial: PhysicalSynchronizerId = this.copy(serial = serial.increment.toNonNegative)
 }
 
 object PhysicalSynchronizerId {
-  private val primaryDelimiter: String = "::" // Between LSId and suffix
+  private val primaryDelimiter: String = "::" // Between lsid and suffix
   private val secondaryDelimiter: String = "-" // Between components of the suffix
 
   def apply(
@@ -391,6 +421,7 @@ final case class ExternalParty private (
     partyId: PartyId,
     signingFingerprints: NonEmpty[Seq[Fingerprint]],
     signingThreshold: PositiveInt,
+    preferredHashingSchemeVersion: HashingSchemeVersion,
 ) extends Party {
   override def uid: UniqueIdentifier = partyId.uid
 
@@ -401,8 +432,9 @@ final case class ExternalParty private (
       partyId: PartyId = partyId,
       signingFingerprints: NonEmpty[Seq[Fingerprint]] = signingFingerprints,
       signingThreshold: PositiveInt = signingThreshold,
+      preferredHashingSchemeVersion: HashingSchemeVersion = preferredHashingSchemeVersion,
   ): ExternalParty =
-    new ExternalParty(partyId, signingFingerprints, signingThreshold)
+    new ExternalParty(partyId, signingFingerprints, signingThreshold, preferredHashingSchemeVersion)
 }
 
 object ExternalParty {
@@ -414,7 +446,9 @@ object ExternalParty {
       partyId: PartyId,
       signingFingerprints: NonEmpty[Seq[Fingerprint]],
       signingThreshold: PositiveInt,
-  ) = new ExternalParty(partyId, signingFingerprints, signingThreshold)
+      preferredHashingSchemeVersion: HashingSchemeVersion,
+  ) =
+    new ExternalParty(partyId, signingFingerprints, signingThreshold, preferredHashingSchemeVersion)
 }
 
 /** A party identifier based on a unique identifier

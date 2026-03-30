@@ -7,28 +7,20 @@ import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
-  SynchronizerConnectionConfig,
 }
-import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.{DbConfig, SynchronizerTimeTrackerConfig}
 import com.digitalasset.canton.console.{MediatorReference, SequencerReference}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.EnvironmentDefinition.S1M1
 import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.{
-  MultiSynchronizer,
-  SequencerSynchronizerGroups,
-}
-import com.digitalasset.canton.integration.plugins.{
-  UseBftSequencer,
-  UsePostgres,
-  UseReferenceBlockSequencer,
-}
+import com.digitalasset.canton.integration.plugins.UseBftSequencer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.util.OnboardsNewSequencerNode
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.topology.{ForceFlag, PhysicalSynchronizerId}
 
 import java.time.Duration
@@ -37,30 +29,30 @@ import java.time.Duration
 This class tests that we can successfully run an LSU in the case of a topology where synchronizer nodes are
 added to the synchronizer after initialization. Steps are:
  * bootstrap with s1, m1
+ * connect p1 to s1
  * add s2, m2
+ * connect p1 to s1 and s2
  * do lsu
  * add s5, m5
+ * connect p2 to s5
  */
-abstract class LsuAddSynchronizerNodesIntegrationTest extends LsuBase {
+final class LsuAddSynchronizerNodesIntegrationTest extends LsuBase with OnboardsNewSequencerNode {
 
   override protected def testName: String = "lsu-add-synchronizer-nodes"
 
-  registerPlugin(new UsePostgres(loggerFactory))
-
-  protected def useDaBft: Boolean
-  private def sequencerPluginFactory(groups: SequencerSynchronizerGroups) =
-    if (useDaBft) new UseBftSequencer(loggerFactory, groups)
-    else new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory, groups)
-
-  registerPlugin(
-    sequencerPluginFactory(
-      MultiSynchronizer.tryCreate(
-        Set("sequencer1", "sequencer2"),
-        // s3 is the successor of s1, s4 is the successor of s2
-        Set("sequencer3", "sequencer4", "sequencer5"),
+  override protected val bftSequencerPlugin: Option[UseBftSequencer] =
+    Some(
+      new UseBftSequencer(
+        loggerFactory,
+        MultiSynchronizer.tryCreate(
+          Set("sequencer1", "sequencer2"),
+          // s3 is the successor of s1, s4 is the successor of s2
+          Set("sequencer3", "sequencer4", "sequencer5"),
+        ),
       )
     )
-  )
+
+  bftSequencerPlugin.foreach(registerPlugin)
 
   override protected lazy val newOldSequencers: Map[String, String] =
     Map("sequencer3" -> "sequencer1", "sequencer4" -> "sequencer2")
@@ -69,7 +61,7 @@ abstract class LsuAddSynchronizerNodesIntegrationTest extends LsuBase {
   override protected lazy val upgradeTime: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(30)
 
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P1S5M5_Config
+    EnvironmentDefinition.P2S5M5_Config
       .withNetworkBootstrap { implicit env =>
         new NetworkBootstrapper(S1M1)
       }
@@ -77,24 +69,10 @@ abstract class LsuAddSynchronizerNodesIntegrationTest extends LsuBase {
       .withSetup { implicit env =>
         import env.*
 
-        participants.all.synchronizers.connect(
-          SynchronizerConnectionConfig(
-            synchronizerAlias = daName,
-            sequencerConnections = sequencer1,
-            timeTracker = SynchronizerTimeTrackerConfig(observationLatency =
-              config.NonNegativeFiniteDuration.Zero
-            ),
-          )
-        )
+        participant1.synchronizers.connect_by_config(defaultSynchronizerConnectionConfig())
+        participant1.dars.upload(CantonExamplesPath)
 
-        participants.all.dars.upload(CantonExamplesPath)
-
-        synchronizerOwners1.foreach(
-          _.topology.synchronizer_parameters.propose_update(
-            daId,
-            _.copy(reconciliationInterval = config.PositiveDurationSeconds.ofSeconds(1)),
-          )
-        )
+        setDefaultsDynamicSynchronizerParameters(daId, synchronizerOwners1)
       }
 
   private def addNewSV(
@@ -105,12 +83,11 @@ abstract class LsuAddSynchronizerNodesIntegrationTest extends LsuBase {
   )(implicit env: TestConsoleEnvironment): Unit = {
     import env.*
 
-    bootstrap.onboard_new_sequencer(
+    onboardNewSequencer(
       synchronizerId = psid,
       newSequencer = newSequencer,
       existingSequencer = existingSequencer,
       synchronizerOwners = Set(existingSequencer),
-      isBftSequencer = useDaBft,
     )
 
     existingSequencer.topology.transactions.load(
@@ -178,38 +155,30 @@ abstract class LsuAddSynchronizerNodesIntegrationTest extends LsuBase {
       val fixture = fixtureWithDefaults()
       performSynchronizerNodesLsu(fixture)
       environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
+      transferTraffic()
       eventually() {
-        participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
-        participants.all.forall(_.synchronizers.is_connected(fixture.currentPSId)) shouldBe false
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+        participant1.synchronizers.is_connected(fixture.newPsid) shouldBe true
+        participant1.synchronizers.is_connected(fixture.currentPsid) shouldBe false
       }
       oldSynchronizerNodes.all.stop()
-      waitForTargetTimeOnSequencer(sequencer3, environment.clock.now)
-
-      environment.simClock.value.advance(Duration.ofSeconds(1))
+      waitForTargetTimeOnSequencer(sequencer3, environment.clock.now, logger)
 
       IouSyntax.createIou(participant1)(bank, alice, amount = 3.0).discard
 
       addNewSV(
-        psid = fixture.newPSId,
+        psid = fixture.newPsid,
         newSequencer = sequencer5,
         newMediator = mediator5,
         existingSequencer = sequencer3,
       )
 
       participant1.health.ping(participant1)
+
+      participant2.synchronizers.list_registered() shouldBe empty
+      participant2.synchronizers.connect_by_config(synchronizerConnectionConfig(sequencer5))
+
+      participant1.health.ping(participant2)
     }
   }
 }
-
-final class LsuAddSynchronizerNodesReferenceIntegrationTest
-    extends LsuAddSynchronizerNodesIntegrationTest {
-  override protected def useDaBft: Boolean = false
-}
-
-// TODO(#30360) Enable this test
-/*
-final class LSUAddSynchronizerNodesBftOrderingIntegrationTest
-    extends LSUAddSynchronizerNodesIntegrationTest {
-  override protected def useDaBft: Boolean = true
-}
- */

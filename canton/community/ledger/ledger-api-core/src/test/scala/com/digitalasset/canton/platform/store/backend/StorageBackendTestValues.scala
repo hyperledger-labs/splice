@@ -98,7 +98,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
 
   val testTraceContext = TraceContext.withNewTraceContext("test trace context")(identity)
   val serializableTraceContext: Array[Byte] =
-    SerializableTraceContext(testTraceContext).toDamlProto.toByteArray
+    SerializableTraceContext(testTraceContext).toSerializedDamlProto
   val someExternalTransactionHash: CantonHash =
     CantonHash
       .digest(HashPurpose.PreparedSubmission, ByteString.copyFromUtf8("mock_hash"), Sha256)
@@ -196,6 +196,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       // contract related columns
       notPersistedContractId: ContractId = hashCid("c1"),
       internal_contract_id: Long = 10,
+      create_key_hash: Option[String] = Some("keyhash"),
   )(
       stakeholders: Set[Party] = Set("stakeholder1", "stakeholder2").map(Party.assertFromString),
       template_id: NameTypeConRef = NameTypeConRef.assertFromString("#tem:pl:ate"),
@@ -217,6 +218,7 @@ private[store] object StorageBackendTestValues extends OptionValues {
       representative_package_id = representative_package_id,
       notPersistedContractId = notPersistedContractId,
       internal_contract_id = internal_contract_id,
+      create_key_hash = create_key_hash,
     )(
       stakeholders = stakeholders,
       template_id = template_id,

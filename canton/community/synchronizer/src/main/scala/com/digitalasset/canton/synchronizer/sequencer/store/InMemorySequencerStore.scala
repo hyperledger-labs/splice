@@ -108,6 +108,18 @@ class InMemorySequencerStore(
       }.toMap
     )
 
+  override def allRegisteredMembers(registeredAtBeforeInclusive: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[Member]] =
+    FutureUnlessShutdown.pure(
+      memberMap
+        .filter { case (_, registeredMember) =>
+          registeredMember.registeredFrom <= registeredAtBeforeInclusive
+        }
+        .map { case (member, _) => member }
+        .toSet
+    )
+
   override def savePayloads(
       payloadsToInsert: NonEmpty[Seq[BytesPayload]],
       instanceDiscriminator: UUID,
@@ -238,7 +250,7 @@ class InMemorySequencerStore(
                 }
               case other => other
             }
-            Sequenced(entry.getKey, event)
+            Sequenced(entry.getKey, event, fromStore = true)
           }
           .toList
 
@@ -249,8 +261,8 @@ class InMemorySequencerStore(
     }
   }
 
-  override def readPayloads(payloadIds: Seq[IdOrPayload], member: Member)(implicit
-      traceContext: TraceContext
+  override def readPayloads(payloadIds: Seq[IdOrPayload], member: Member, recentEvents: Boolean)(
+      implicit traceContext: TraceContext
   ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] =
     FutureUnlessShutdown.pure(
       payloadIds.flatMap {
@@ -265,6 +277,25 @@ class InMemorySequencerStore(
           List(
             payload.id -> payload.decodeBatchAndTrim(protocolVersion, member)
           )
+      }.toMap
+    )
+
+  override def readPayloadsByIdWithoutCacheLoading(
+      payloadIds: Seq[IdOrPayload]
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]] =
+    FutureUnlessShutdown.pure(
+      payloadIds.flatMap {
+        case id: PayloadId =>
+          Option(payloads.get(id.unwrap))
+            .map(storedPayload =>
+              id -> BytesPayload(id, storedPayload.content)
+                .decodeBatch(protocolVersion)
+            )
+            .toList
+        case payload: BytesPayload =>
+          List(payload.id -> payload.decodeBatch(protocolVersion))
       }.toMap
     )
 

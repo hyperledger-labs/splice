@@ -30,6 +30,7 @@ final class SegmentClosingBehaviour[E <: Env[E]](
     private val waitingForFutureIds: mutable.Set[FutureId],
     actionName: String,
     parent: ModuleRef[Consensus.Message[E]],
+    traceContextOfParent: TraceContext,
     firstBlockNumber: BlockNumber,
     epochNumber: EpochNumber,
     messageToSendParent: Consensus.Message[E],
@@ -62,6 +63,11 @@ final class SegmentClosingBehaviour[E <: Env[E]](
       case ConsensusSegment.Internal.BlockInactivityTimeout =>
         ignoreMessage(message)
 
+      case _: ConsensusSegment.ConsensusMessage.CancelEpoch =>
+        // This can still be received while already closing due `PreIssConsensusModule` processing postponed messages
+        //  that trigger the catch-up detector
+        ignoreMessage(message)
+
       case _ =>
         logger.error(
           s"Segment module $firstBlockNumber $actionName epoch $epochNumber but got unexpected message: $message"
@@ -76,18 +82,17 @@ final class SegmentClosingBehaviour[E <: Env[E]](
     )
 
   private def stopIfWeShould()(implicit
-      context: E#ActorContextT[ConsensusSegment.Message],
-      traceContext: TraceContext,
+      context: E#ActorContextT[ConsensusSegment.Message]
   ): Unit =
     if (waitingForFutureIds.isEmpty && haveReceivedStartModuleClosingBehaviourMessage) {
       stop()
     }
 
   private def stop()(implicit
-      context: E#ActorContextT[ConsensusSegment.Message],
-      traceContext: TraceContext,
+      context: E#ActorContextT[ConsensusSegment.Message]
   ): Unit =
     context.stop { () =>
+      implicit val traceContext: TraceContext = traceContextOfParent
       logger.info(
         s"Segment module $firstBlockNumber $actionName epoch $epochNumber"
       )

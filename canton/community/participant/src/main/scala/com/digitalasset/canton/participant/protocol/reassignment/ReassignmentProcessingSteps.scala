@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -25,7 +25,11 @@ import com.digitalasset.canton.data.{
   ViewPosition,
 }
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, SequencedUpdate, Update}
+import com.digitalasset.canton.ledger.participant.state.{
+  CompletionInfo,
+  SequencedEventUpdate,
+  Update,
+}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
@@ -325,7 +329,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       error: TransactionError,
   )(implicit
       traceContext: TraceContext
-  ): (Option[SequencedUpdate], Option[PendingSubmissionId]) = {
+  ): (Option[SequencedEventUpdate], Option[PendingSubmissionId]) = {
     val rejection = Update.CommandRejected.FinalReason(error.rpcStatus())
     val isSubmittingParticipant = submitterMetadata.submittingParticipant == participantId
 
@@ -342,6 +346,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
         rejection,
         psid.unwrap.logical,
         ts,
+        isTransaction = false,
       )
     )
     (updateO, rootHash.some)
@@ -349,7 +354,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
 
   override def createRejectionEvent(rejectionArgs: RejectionArgs)(implicit
       traceContext: TraceContext
-  ): Either[ReassignmentProcessorError, Option[SequencedUpdate]] = {
+  ): Either[ReassignmentProcessorError, Option[SequencedEventUpdate]] = {
 
     val RejectionArgs(pendingReassignment, errorDetails) = rejectionArgs
     val isSubmittingParticipant =
@@ -372,6 +377,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
         rejection,
         psid.unwrap.logical,
         pendingReassignment.requestId.unwrap,
+        isTransaction = false,
       )
     )
     Right(updateO)
@@ -383,9 +389,9 @@ private[reassignment] trait ReassignmentProcessingSteps[
   case class ReassignmentsSubmission(
       override val batch: Batch[DefaultOpenEnvelope],
       override val pendingSubmissionId: PendingSubmissionId,
+      override val approximateTimestampForSigning: CantonTimestamp,
+      override val maxSequencingTime: CantonTimestamp,
   ) extends UntrackedSubmission {
-
-    override def maxSequencingTimeO: OptionT[FutureUnlessShutdown, CantonTimestamp] = OptionT.none
 
     override def embedSubmissionError(
         err: ProtocolProcessor.SubmissionProcessingError
@@ -625,8 +631,6 @@ object ReassignmentProcessingSteps {
     def requestSequencerCounter: SequencerCounter
 
     def submitterMetadata: ReassignmentSubmitterMetadata
-
-    override def isCleanReplay: Boolean = false
   }
 
   final case class RejectionArgs[T <: PendingReassignment](

@@ -22,7 +22,6 @@ import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.store.*
-import com.digitalasset.canton.participant.store.memory.PackageMetadataView
 import com.digitalasset.canton.participant.synchronizer.{
   SynchronizerAliasResolution,
   SynchronizerRegistryError,
@@ -68,7 +67,7 @@ trait SyncPersistentStateLookup {
       .mapValues(_.maxBy1(_.psid))
       .toMap
 
-  def latestKnownPSId(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId]
+  def latestKnownPsid(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId]
   def latestKnownProtocolVersion(synchronizerId: SynchronizerId): Option[ProtocolVersion]
 
   def topologyFactoryFor(psid: PhysicalSynchronizerId): Option[TopologyComponentFactory]
@@ -89,7 +88,7 @@ trait SyncPersistentStateLookup {
       synchronizerAlias: SynchronizerAlias
   ): Option[NonEmpty[Set[PhysicalSynchronizerId]]]
 
-  def allKnownLSIds: Set[SynchronizerId] = getAll.keySet.map(_.logical)
+  def allKnownLsids: Set[SynchronizerId] = getAll.keySet.map(_.logical)
 
   def synchronizerIdForAlias(synchronizerAlias: SynchronizerAlias): Option[SynchronizerId] =
     synchronizerIdsForAlias(synchronizerAlias).map(_.head1.logical)
@@ -121,7 +120,7 @@ trait SyncPersistentStateLookup {
 class SyncPersistentStateManager(
     participantId: ParticipantId,
     aliasResolution: SynchronizerAliasResolution,
-    storage: Storage,
+    val storage: Storage,
     val indexedStringStore: IndexedStringStore,
     acsCounterParticipantConfigStore: AcsCounterParticipantConfigStore,
     parameters: ParticipantNodeParameters,
@@ -129,7 +128,6 @@ class SyncPersistentStateManager(
     synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
     synchronizerCryptoFactory: StaticSynchronizerParameters => SynchronizerCrypto,
     clock: Clock,
-    packageMetadataView: PackageMetadataView,
     ledgerApiStore: Eval[LedgerApiStore],
     val contractStore: Eval[ContractStore],
     participantMetrics: ParticipantMetrics,
@@ -166,8 +164,7 @@ class SyncPersistentStateManager(
         )
 
     def initializePhysicalPersistentState(
-        psid: PhysicalSynchronizerId,
-        logical: LogicalSyncPersistentState,
+        psid: PhysicalSynchronizerId
     ): EitherT[FutureUnlessShutdown, String, Unit] =
       for {
 
@@ -184,7 +181,6 @@ class SyncPersistentStateManager(
           psidIndexed,
           indexedTopologyStoreId,
           staticSynchronizerParameters,
-          logical,
         )
         _ = logger.debug(s"Discovered existing state for $psid")
       } yield {
@@ -201,28 +197,28 @@ class SyncPersistentStateManager(
       for {
         // first create the logical store
         synchronizerIdIndexed <- IndexedSynchronizer.indexed(indexedStringStore)(lsid)
-        logical = logicalPersistentStates
+        _ = logicalPersistentStates
           .getOrElseUpdate(lsid, createLogicalPersistentState(synchronizerIdIndexed))
-        // then create all corresponding physical stores, reusing the shared logical stores
+        // then create all corresponding physical stores
         _ <- MonadUtil.sequentialTraverse_(aliasResolution.physicalSynchronizerIds(lsid)) { psid =>
-          initializePhysicalPersistentState(psid, logical)
+          initializePhysicalPersistentState(psid)
             .valueOr(error => logger.debug(s"No state for $psid discovered: $error"))
         }
       } yield ()
     }
   }
 
-  def getSynchronizerIdx(
+  private def getSynchronizerIdx(
       synchronizerId: SynchronizerId
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[IndexedSynchronizer] =
     IndexedSynchronizer.indexed(this.indexedStringStore)(synchronizerId)
 
-  def getPhysicalSynchronizerIdx(
+  private def getPhysicalSynchronizerIdx(
       synchronizerId: PhysicalSynchronizerId
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[IndexedPhysicalSynchronizer] =
     IndexedPhysicalSynchronizer.indexed(this.indexedStringStore)(synchronizerId)
 
-  def getSynchronizerTopologyStoreId(synchronizerId: PhysicalSynchronizerId)(implicit
+  private def getSynchronizerTopologyStoreId(synchronizerId: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[IndexedTopologyStoreId] =
     IndexedTopologyStoreId.indexed(indexedStringStore)(
@@ -263,7 +259,6 @@ class SyncPersistentStateManager(
               physicalSynchronizerIdx,
               indexedTopologyStoreId,
               synchronizerParameters,
-              logical,
             ),
           )
         }
@@ -300,13 +295,11 @@ class SyncPersistentStateManager(
       physicalSynchronizerIdx: IndexedPhysicalSynchronizer,
       indexedTopologyStoreId: IndexedTopologyStoreId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
-      logicalSyncPersistentState: LogicalSyncPersistentState,
   )(implicit writeLockHandle: lock.WriteLockHandle): PhysicalSyncPersistentState =
     mkPhysicalPersistentState(
       physicalSynchronizerIdx,
       indexedTopologyStoreId,
       staticSynchronizerParameters,
-      logicalSyncPersistentState,
     )
 
   private def checkAndUpdateSynchronizerParameters(
@@ -351,7 +344,7 @@ class SyncPersistentStateManager(
   ): Option[StaticSynchronizerParameters] =
     get(synchronizerId).map(_.staticSynchronizerParameters)
 
-  override def latestKnownPSId(
+  override def latestKnownPsid(
       synchronizerId: SynchronizerId
   ): Option[PhysicalSynchronizerId] =
     getAll.keySet.filter(_.logical == synchronizerId).maxOption
@@ -381,7 +374,7 @@ class SyncPersistentStateManager(
       val psidToState = for {
         lsid <- logicalPersistentStates.keys
         state <- getAllFor(lsid)
-      } yield (state.psid -> state)
+      } yield state.psid -> state
       psidToState.toMap
     }
 
@@ -435,22 +428,15 @@ class SyncPersistentStateManager(
       physicalSynchronizerIdx: IndexedPhysicalSynchronizer,
       indexedTopologyStoreId: IndexedTopologyStoreId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
-      logicalSyncPersistentState: LogicalSyncPersistentState,
   )(implicit @unused writeLockHandle: lock.WriteLockHandle): PhysicalSyncPersistentState =
     PhysicalSyncPersistentState
       .create(
-        participantId,
         storage,
         physicalSynchronizerIdx,
         indexedTopologyStoreId,
         staticSynchronizerParameters,
-        clock,
         synchronizerCryptoFactory(staticSynchronizerParameters),
         parameters,
-        topologyConfig,
-        packageMetadataView,
-        ledgerApiStore,
-        logicalSyncPersistentState,
         psidLoggerFactory(physicalSynchronizerIdx.psid),
         futureSupervisor,
       )
@@ -466,10 +452,11 @@ class SyncPersistentStateManager(
         parameters.processingTimeouts,
         futureSupervisor,
         parameters.cachingConfigs,
+        parameters.enableAdditionalConsistencyChecks,
         parameters.batchingConfig,
         topologyConfig,
         participantId,
-        parameters.unsafeOnlinePartyReplication,
+        parameters.alphaOnlinePartyReplicationSupport,
         exitOnFatalFailures = parameters.exitOnFatalFailures,
         state.topologyStore,
         topologyCacheMetrics = participantMetrics.topologyCache,

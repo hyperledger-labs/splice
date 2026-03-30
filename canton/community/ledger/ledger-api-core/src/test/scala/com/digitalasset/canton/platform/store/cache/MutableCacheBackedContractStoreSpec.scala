@@ -13,6 +13,7 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.participant.store.memory.InMemoryContractStore
 import com.digitalasset.canton.platform.*
+import com.digitalasset.canton.platform.store.backend.ContractStorageBackend
 import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStoreSpec.*
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
@@ -24,6 +25,7 @@ import com.digitalasset.canton.platform.store.{LedgerApiContractStore, LedgerApi
 import com.digitalasset.canton.protocol.ExampleContractFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasExecutionContext, TestEssentials}
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Ref, Time}
 import com.digitalasset.daml.lf.transaction.CreationTime
@@ -52,6 +54,7 @@ class MutableCacheBackedContractStoreSpec
         contractStateCaches = contractStateCaches,
         loggerFactory = loggerFactory,
         contractStore = mock[LedgerApiContractStore],
+        ledgerEndCache = MutableLedgerEndCache(),
       )
 
       val event1 = ContractStateEvent.Archived(
@@ -309,6 +312,7 @@ object MutableCacheBackedContractStoreSpec {
         .build(startIndexExclusive, cachesSize, cachesSize, metrics, loggerFactory),
       loggerFactory = loggerFactory,
       contractStore = inMemoryContractStore(loggerFactory),
+      ledgerEndCache = MutableLedgerEndCache(),
     )
 
     Resource.successful(contractStore)
@@ -349,6 +353,16 @@ object MutableCacheBackedContractStoreSpec {
           result
         case _ => Future.successful(Option.empty)
       }
+
+    override def lookupNonUniqueKey(
+        key: Key,
+        validAtEventSeqId: Long,
+        nextPageToken: Option[Long],
+        limit: Int,
+    )(implicit
+        loggingContext: LoggingContextWithTrace
+    ): Future[ContractStorageBackend.KeysPageResult] =
+      ??? // not used in this test
   }
 
   def inMemoryContractStore(
@@ -392,7 +406,8 @@ object MutableCacheBackedContractStoreSpec {
   private def globalKey(desc: String): Key =
     Key.assertBuild(
       Identifier.assertFromString("some:template:name"),
-      ValueText(desc),
       Ref.PackageName.assertFromString("pkg-name"),
+      ValueText(desc),
+      crypto.Hash.hashPrivateKey(desc),
     )
 }

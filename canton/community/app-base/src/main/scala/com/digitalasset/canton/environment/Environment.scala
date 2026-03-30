@@ -7,8 +7,8 @@ import better.files.File
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
 import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
 import com.digitalasset.canton.concurrent.*
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.{
@@ -135,6 +135,11 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     loggerFactory,
   )
 
+  lazy val executorServiceMetrics: ExecutorServiceMetrics =
+    new ExecutorServiceMetrics(
+      metricsRegistry.generateMetricsFactory(MetricsContext.Empty)
+    )
+
   @VisibleForTesting
   protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
@@ -177,18 +182,23 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   installJavaUtilLoggingBridge()
   logger.debug(config.portDescription)
 
-  private val numThreads = Threading.detectNumberOfThreads(noTracingLogger)
-  implicit val executionContext: ExecutionContextIdlenessExecutorService =
+  private val numThreads = config.parameters.threading.parallelism
+    .getOrElse(Threading.detectNumberOfThreads(noTracingLogger))
+  implicit lazy val executionContext: ExecutionContextIdlenessExecutorService =
     Threading.newExecutionContext(
       loggerFactory.threadName + "-env-ec",
       noTracingLogger,
-      Some(
-        new ExecutorServiceMetrics(
-          metricsRegistry.generateMetricsFactory(MetricsContext.Empty)
-        )
-      ),
-      numThreads,
+      parallelism = numThreads,
+      executorServiceMetrics = executorServiceMetrics,
+      maxExtraThreads = config.parameters.threading.maxExtraThreads,
+      keepAliveMillis = config.parameters.threading.keepAliveMillis,
+      corePoolSize = config.parameters.threading.corePoolSize,
+      maxPoolSize = config.parameters.threading.maxPoolSize,
+      minRunnable = config.parameters.threading.minRunnable,
     )
+  config.parameters.threading.mutexMaxSpins.foreach { maxSpins =>
+    Mutex.MaxSpins.set(maxSpins.value)
+  }
 
   private val deadlockConfig = config.monitoring.deadlockDetection
   protected def timeouts: ProcessingTimeout = config.parameters.timeouts.processing
@@ -200,7 +210,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
       new FutureSupervisor.Impl(timeouts.slowFutureWarn, loggerFactory)
     else FutureSupervisor.Noop
 
-  private val monitorO = if (deadlockConfig.enabled) {
+  private lazy val monitorO = if (deadlockConfig.enabled) {
     val mon = new ExecutionContextMonitor(
       loggerFactory,
       deadlockConfig.interval.toInternal,
@@ -297,6 +307,8 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     timeouts,
     config.sequencersByString,
     config.sequencerNodeParametersByString,
+    apiName => GrpcAdminCommandRunner(this, apiName),
+    config.parameters.enableAlphaStateViaConfig,
     loggerFactory,
   )
 
@@ -482,6 +494,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
           config.sequencerNodeParametersByString(name),
           createClock(Some(SequencerNodeBootstrap.LoggerFactoryKeyName -> name)),
           metricsRegistry.forSequencer(name),
+          executorServiceMetrics,
           testingConfig,
           futureSupervisor,
           loggerFactory.append(SequencerNodeBootstrap.LoggerFactoryKeyName, name),
@@ -505,6 +518,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
         config.mediatorNodeParametersByString(name),
         createClock(Some(MediatorNodeBootstrap.LoggerFactoryKeyName -> name)),
         metricsRegistry.forMediator(name),
+        executorServiceMetrics,
         testingConfig,
         futureSupervisor,
         loggerFactory.append(MediatorNodeBootstrap.LoggerFactoryKeyName, name),
@@ -530,6 +544,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
           config.participantNodeParametersByString(name),
           createClock(Some(ParticipantNodeBootstrap.LoggerFactoryKeyName -> name)),
           metricsRegistry.forParticipant(name),
+          executorServiceMetrics,
           testingConfig,
           futureSupervisor,
           loggerFactory.append(ParticipantNodeBootstrap.LoggerFactoryKeyName, name),

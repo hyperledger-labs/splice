@@ -32,6 +32,7 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
+          cache_version: 8
           test_name: daml_test
           target: 'oss'
 

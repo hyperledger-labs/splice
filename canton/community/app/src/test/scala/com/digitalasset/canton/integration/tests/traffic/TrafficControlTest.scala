@@ -40,7 +40,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.sequencing.TrafficControlParameters as InternalTrafficControlParameters
-import com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription.LostSequencerSubscription
+import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.LostSequencerSubscription
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors.OutdatedTrafficCost
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.{
@@ -77,6 +77,7 @@ trait TrafficControlTest
     setBalanceRequestSubmissionWindowSize = config.PositiveFiniteDuration.ofMinutes(5L),
     enforceRateLimiting = true,
     baseEventCost = NonNegativeLong.tryCreate(baseEventCost),
+    freeConfirmationResponses = true,
   )
 
   protected val pruningWindow = config.NonNegativeFiniteDuration.ofSeconds(5)
@@ -427,8 +428,8 @@ trait TrafficControlTest
 
       onboardNewSequencer(
         daId,
-        newSequencerReference = sequencer2,
-        existingSequencerReference = sequencer1,
+        newSequencer = sequencer2,
+        existingSequencer = sequencer1,
         synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
       )
 

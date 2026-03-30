@@ -10,6 +10,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnections,
   SubmissionRequestAmplification,
 }
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
@@ -76,11 +77,10 @@ sealed trait BftSequencerConnectionsIntegrationTest
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2S4M1_Config
       .addConfigTransforms(
-        ConfigTransforms.setConnectionPool(true),
         // Increase the acknowledgement interval to avoid flakes with failing acknowledgements log messages
         ConfigTransforms.updateSequencerClientAcknowledgementInterval(
           NonNegativeFiniteDuration.tryOfMinutes(60)
-        ),
+        )
       )
       .withManualStart
       .withSetup { implicit env =>
@@ -251,6 +251,7 @@ sealed trait BftSequencerConnectionsIntegrationTest
   }
 }
 
+@UnstableTest // TODO(#27384)
 class BftSequencerConnectionsIntegrationTestDefault extends BftSequencerConnectionsIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))

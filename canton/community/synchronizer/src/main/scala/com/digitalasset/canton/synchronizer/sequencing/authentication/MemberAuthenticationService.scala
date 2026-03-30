@@ -4,7 +4,6 @@
 package com.digitalasset.canton.synchronizer.sequencing.authentication
 
 import cats.data.EitherT
-import cats.instances.future.*
 import cats.syntax.bifunctor.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
@@ -18,14 +17,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.*
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.sequencing.authentication.{AuthenticationToken, MemberAuthentication}
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.*
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 
 import java.time.Duration
 import scala.concurrent.ExecutionContext
@@ -55,7 +54,7 @@ class MemberAuthenticationService(
     store: MemberAuthenticationStore,
     clock: Clock,
     nonceExpirationInterval: Duration,
-    maxTokenExpirationInterval: Duration,
+    val maxTokenExpirationInterval: Duration,
     useExponentialRandomTokenExpiration: Boolean,
     invalidateMemberCallback: Traced[Member] => Unit,
     isTopologyInitialized: FutureUnlessShutdown[Unit],
@@ -119,13 +118,23 @@ class MemberAuthenticationService(
     for {
       _ <- EitherT.right(waitForInitialized)
       _ <- isActive(member)
-      value <- EitherT
-        .fromEither(
-          ignoreExpired(store.fetchAndRemoveNonce(member, providedNonce))
+
+      storedNonce <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          store
+            .fetchAndRemoveNonce(member, providedNonce)
             .toRight(MissingNonce(member): AuthenticationError)
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
-      StoredNonce(_, nonce, generatedAt, _expireAt) = value
+      StoredNonce(_, nonce, generatedAt, expireAt) = storedNonce
+
+      _ <- {
+        val now = clock.now
+        EitherTUtil.condUnitET[FutureUnlessShutdown](
+          expireAt > now,
+          ExpiredNonce(member, expireAt, now, generatedAt),
+        )
+      }
+
       authentication <- EitherT.fromEither[FutureUnlessShutdown](MemberAuthentication(member))
       hash = authentication.hashSynchronizerNonce(nonce, synchronizerId, cryptoApi.pureCrypto)
       snapshot <- EitherT.liftF(cryptoApi.currentSnapshotApproximation)
@@ -163,6 +172,24 @@ class MemberAuthenticationService(
       AuthenticationTokenWithExpiry(token, tokenExpiry)
     }
 
+  /** Generates a token for test purposes for the given member. This token does NOT need to be
+    * signed by the member. This should ONLY be used for testing and troubleshooting purposes.
+    */
+  def generateAuthenticationToken(member: Member, expiresIn: Option[NonNegativeFiniteDuration])(
+      implicit traceContext: TraceContext
+  ): StoredAuthenticationToken = {
+    val tokenDuration = expiresIn
+      .map(_.duration)
+      .filter(_.toMillis <= maxTokenExpirationInterval.toMillis)
+      .getOrElse(maxTokenExpirationInterval)
+    val tokenExpiry = clock.now.add(tokenDuration)
+    logger.info(s"Generating authentication token for member $member expiring at $tokenExpiry")
+    val token = AuthenticationToken.generate(cryptoApi.pureCrypto)
+    val storedToken = StoredAuthenticationToken(member, tokenExpiry, token)
+    store.saveToken(storedToken)
+    storedToken
+  }
+
   /** synchronizer checks if the token given by the participant is the one previously assigned to it
     * for authentication. The participant also provides the synchronizer id for which they think
     * they are connecting to. If this id does not match this synchronizer's id, it means the
@@ -198,9 +225,6 @@ class MemberAuthenticationService(
       }
     } yield res
 
-  private def ignoreExpired[A <: HasExpiry](itemO: Option[A]): Option[A] =
-    itemO.filter(_.expireAt > clock.now)
-
   private def scheduleExpirations(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): Unit = {
@@ -231,6 +255,13 @@ class MemberAuthenticationService(
           Either.cond(_, (), MemberAccessDisabled(sequencer))
         })
     }
+
+  // public wrapper method around isActive for use by the GrpcSequencerService
+  // to check active state immediately next to creation of subscription
+  def isMemberCurrentlyActive(member: Member)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Boolean] =
+    isActive(member).isRight
 
   private def correctSynchronizer(
       member: Member,
@@ -275,7 +306,7 @@ class MemberAuthenticationService(
   )(memberId: T)(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     isActiveCheck(memberId).map { isActive =>
       if (!isActive) {
-        logger.debug(s"Expiring all auth-tokens of $memberId")
+        logger.info(s"Expiring all auth-tokens of $memberId")
         // first, remove all auth tokens
         store.invalidateMember(memberId)
         // second, ensure the sequencer client gets disconnected

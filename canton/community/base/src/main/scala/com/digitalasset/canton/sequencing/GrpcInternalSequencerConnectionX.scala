@@ -10,7 +10,7 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{KeepAliveClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{AtomicHealthElement, CompositeHealthElement, HealthListener}
@@ -35,10 +35,7 @@ import com.digitalasset.canton.sequencing.InternalSequencerConnectionX.{
 }
 import com.digitalasset.canton.sequencing.SequencerConnectionXStub.SequencerConnectionXStubError
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
-import com.digitalasset.canton.sequencing.client.transports.{
-  GrpcClientTransportHelpers,
-  GrpcSequencerClientAuth,
-}
+import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth
 import com.digitalasset.canton.sequencing.protocol.HandshakeResponse
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.Member
@@ -58,6 +55,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
     override val config: ConnectionXConfig,
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
+    keepAliveClientConfigO: Option[KeepAliveClientConfig],
     stubFactory: SequencerConnectionXStubFactory,
     metrics: SequencerConnectionPoolMetrics,
     metricsContext: MetricsContext,
@@ -66,13 +64,12 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
     protected override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor, esf: ExecutionSequencerFactory, materializer: Materializer)
     extends InternalSequencerConnectionX
-    with PrettyPrinting
-    with GrpcClientTransportHelpers {
+    with PrettyPrinting {
   import GrpcInternalSequencerConnectionX.*
 
   private val lock = Mutex()
   private val connection: GrpcConnectionX =
-    GrpcConnectionX(config, metrics, timeouts, loggerFactory)
+    GrpcConnectionX(config, keepAliveClientConfigO, metrics, timeouts, loggerFactory)
   private val connectionMetricsContext: MetricsContext = metricsContext.withExtraLabels(
     "connection" -> connection.config.name
   )
@@ -313,11 +310,17 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
           logPolicy = CantonGrpcUtil.SilentLogPolicy,
         )
         .leftMap(SequencerConnectionXInternalError.StubError.apply)
+
       handshakePV <- EitherT
         .fromEither[FutureUnlessShutdown](handshakeResponse match {
           case success: HandshakeResponse.Success =>
             Right(success.serverProtocolVersion)
-          case _ => Left(SequencerConnectionXInternalError.ValidationError(s"Failed handshake"))
+          case failure: HandshakeResponse.Failure =>
+            Left(
+              SequencerConnectionXInternalError.ValidationError(
+                s"Failed handshake: ${failure.reason}"
+              )
+            )
         })
       _ = logger.debug(s"Handshake successful with PV $handshakePV")
 
@@ -336,8 +339,7 @@ class GrpcInternalSequencerConnectionX private[sequencing] (
         config.expectedSequencerIdO.forall(_ == sequencerId),
         (),
         SequencerConnectionXInternalError.ValidationError(
-          s"Connection is not on expected sequencer:" +
-            s" expected ${config.expectedSequencerIdO}, got $sequencerId"
+          s"Connection is not on expected sequencer: expected ${config.expectedSequencerIdO}, got $sequencerId"
         ),
       )
 
@@ -499,6 +501,7 @@ object GrpcInternalSequencerConnectionX {
 class GrpcInternalSequencerConnectionXFactory(
     clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
     minimumProtocolVersion: Option[ProtocolVersion],
+    keepAliveClientConfigO: Option[KeepAliveClientConfig],
     metrics: SequencerConnectionPoolMetrics,
     metricsContext: MetricsContext,
     futureSupervisor: FutureSupervisor,
@@ -514,6 +517,7 @@ class GrpcInternalSequencerConnectionXFactory(
       config,
       clientProtocolVersions,
       minimumProtocolVersion,
+      keepAliveClientConfigO,
       stubFactory = new SequencerConnectionXStubFactoryImpl(loggerFactory),
       metrics,
       metricsContext,

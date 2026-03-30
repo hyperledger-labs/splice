@@ -4,6 +4,8 @@
 package com.digitalasset.canton.integration.plugins
 
 import cats.syntax.parallel.*
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -68,10 +70,13 @@ import scala.util.{Random, Success}
   *   to the db name
   * @param dropDatabaseAfterTest
   *   default true, otherwise preserve the database after the test
+  * @param nodeDbMapping
+  *   Allow nodes to share the DB: if `node1` maps to `node2`, then `node1` will use `node2` DB.
   */
 class UsePostgres(
     protected val loggerFactory: NamedLoggerFactory,
     customDbNames: Option[(String => String, String)] = None,
+    nodeDbMapping: String => String = identity,
     customMaxConnectionsByNode: Option[String => Option[PositiveInt]] = None,
     forceTestContainer: Boolean = false,
     dropDatabaseAfterTest: Boolean = true,
@@ -85,6 +90,7 @@ class UsePostgres(
     Threading.newExecutionContext(
       loggerFactory.threadName + "-db-execution-context",
       noTracingLogger,
+      new ExecutorServiceMetrics(NoOpMetricsFactory),
     )
 
   private[plugins] def dbSetupExecutionContext: ExecutionContext = dbSetupExecutorService
@@ -95,10 +101,11 @@ class UsePostgres(
 
   lazy val applicationName: String = loggerFactory.name
 
-  def generateDbName(nodeName: String): String = customDbNames match {
-    case Some((dbNames, suffix)) => dbNames(nodeName) + suffix
-    case None => s"${dbPrefix}_$nodeName"
-  }
+  def generateDbName(nodeName: String): String =
+    customDbNames match {
+      case Some((dbNames, suffix)) => dbNames(nodeName) + suffix
+      case None => s"${dbPrefix}_${nodeDbMapping(nodeName)}"
+    }
 
   // we have to keep the storage instance alive for the duration of the test as this could be
   // managing an external docker container and other resources

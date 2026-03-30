@@ -44,11 +44,14 @@ trait ParticipantNodeBootstrapFactory {
     enableLfDev = arguments.parameterConfig.alphaVersionSupport,
     enableLfBeta = arguments.parameterConfig.betaVersionSupport,
     enableStackTraces = arguments.parameterConfig.engine.enableEngineStackTraces,
-    profileDir = arguments.config.features.profileDir,
-    snapshotDir = arguments.config.features.snapshotDir,
+    profileDir = arguments.config.parameters.engine.profileDir,
+    snapshotDir = arguments.config.parameters.engine.snapshotDir,
     iterationsBetweenInterruptions =
       arguments.parameterConfig.engine.iterationsBetweenInterruptions,
     paranoidMode = arguments.parameterConfig.engine.enableAdditionalConsistencyChecks,
+    submissionPhaseLogging = arguments.parameterConfig.engine.submissionPhaseLogging,
+    validationPhaseLogging = arguments.parameterConfig.engine.validationPhaseLogging,
+    loggerFactory = arguments.loggerFactory,
   )
 
   protected def createResourceService(
@@ -133,10 +136,9 @@ object ParticipantNodeBootstrapFactoryImpl extends ParticipantNodeBootstrapFacto
       arguments.config.storage,
       exitOnFatalFailures = arguments.parameters.exitOnFatalFailures,
       arguments.config.replication,
-      () =>
-        replicaManager
-          .setActive(),
-      () => replicaManager.setPassive(),
+      _ => replicaManager.setActive(),
+      _ => replicaManager.setPassive(),
+      mustStayActive = false,
       DbLockCounters.PARTICIPANT_WRITE,
       DbLockCounters.PARTICIPANT_WRITERS,
       arguments.futureSupervisor,

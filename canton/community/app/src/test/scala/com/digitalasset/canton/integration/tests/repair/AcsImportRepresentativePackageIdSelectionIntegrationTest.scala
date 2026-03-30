@@ -4,8 +4,8 @@
 package com.digitalasset.canton.integration.tests.repair
 
 import better.files.File
-import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.{state_service, transaction_filter, value as apiValue}
+import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.digitalasset.canton
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -470,6 +470,7 @@ abstract class AcsImportRepresentativePackageIdSelectionIntegrationTest
       .GetActiveContractsRequest(
         activeAtOffset = ledgerEndOffset,
         eventFormat = Some(queryEventFormat),
+        streamContinuationToken = None,
       )
       .asJson
       .toString()
@@ -584,7 +585,7 @@ trait WithRepairServiceImportAcs {
       synchronizerId: SynchronizerId,
   ): Unit =
     importParticipant.repair
-      .import_acsV2(
+      .import_acs(
         importFilePath = file.canonicalPath,
         synchronizerId = synchronizerId,
         representativePackageIdOverride = RepresentativePackageIdOverride(
@@ -608,18 +609,22 @@ trait WithImportPartyAcs {
       contractImportMode: ContractImportMode,
       file: File,
       synchronizerId: SynchronizerId,
-  ): Unit = importParticipant.parties
-    .import_party_acsV2(
-      importFilePath = file.canonicalPath,
-      synchronizerId = synchronizerId,
-      representativePackageIdOverride = RepresentativePackageIdOverride(
-        contractOverride = contractRpIdOverride,
-        packageIdOverride = packageIdOverride,
-        packageNameOverride = packageNameOverride,
-      ),
-      contractImportMode = contractImportMode,
-    )
-    .discard
+  ): Unit =
+    // Using the repair import ACS endpoing as the offline party replication specific
+    // behaviour of the parties.import_party_acs is irrelevant for the representative
+    // PackageId selection test.
+    importParticipant.repair
+      .import_acs(
+        importFilePath = file.canonicalPath,
+        synchronizerId = synchronizerId,
+        representativePackageIdOverride = RepresentativePackageIdOverride(
+          contractOverride = contractRpIdOverride,
+          packageIdOverride = packageIdOverride,
+          packageNameOverride = packageNameOverride,
+        ),
+        contractImportMode = contractImportMode,
+      )
+      .discard
 }
 
 // TODO(#25385): This test should be a variation in the conformance test suites

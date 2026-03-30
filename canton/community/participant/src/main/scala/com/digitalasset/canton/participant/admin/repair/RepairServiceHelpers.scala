@@ -35,6 +35,7 @@ import com.google.common.annotations.VisibleForTesting
 import org.slf4j.event.Level
 
 import scala.Ordered.orderingToOrdered
+import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Common helpers to [[RepairService]] and [[RepairServiceContractsImporter]]
@@ -82,14 +83,16 @@ private[repair] final class RepairServiceHelpers(
     * before the repair request.
     */
   def readSynchronizerData(
-      synchronizerId: SynchronizerId
+      synchronizerId: SynchronizerId,
+      @unused // ensure called in scope of repair indexer for correct synchronizer index lookup
+      repairIndexer: FutureQueue[RepairUpdate],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, RepairRequest.SynchronizerData] =
     for {
       psid <- EitherT.fromEither[FutureUnlessShutdown](
         syncPersistentStateLookup
-          .latestKnownPSId(synchronizerId)
+          .latestKnownPsid(synchronizerId)
           .toRight(s"Unable to resolve $synchronizerId to a physical synchronizer id")
       )
 
@@ -144,10 +147,11 @@ private[repair] final class RepairServiceHelpers(
     */
   def initRepairRequestAndVerifyPreconditions(
       synchronizerId: SynchronizerId,
+      repairIndexer: FutureQueue[RepairUpdate],
       repairCountersToAllocate: PositiveInt = PositiveInt.one,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, RepairRequest] =
     for {
-      synchronizerData <- readSynchronizerData(synchronizerId)
+      synchronizerData <- readSynchronizerData(synchronizerId, repairIndexer)
       repairRequest <- initRepairRequestAndVerifyPreconditions(
         synchronizerData,
         repairCountersToAllocate,

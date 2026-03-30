@@ -4,19 +4,14 @@
 package com.digitalasset.canton.platform.store.dao
 
 import com.daml.executors.InstrumentedExecutors
-import com.daml.executors.executors.{
-  NamedExecutor,
-  QueueAwareExecutionContextExecutorService,
-  QueueAwareExecutor,
-}
+import com.daml.executors.executors.NamedExecutionContextExecutorService
 import com.daml.ledger.resources.ResourceOwner
 import com.daml.logging.entries.LoggingEntry
 import com.daml.metrics.api.MetricHandle.Timer
 import com.daml.metrics.api.MetricName
 import com.daml.metrics.{DatabaseMetrics, Timed}
 import com.digitalasset.canton.concurrent.DirectExecutionContext
-import com.digitalasset.canton.health.ComponentHealthState
-import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
+import com.digitalasset.canton.health.{ComponentHealthState, HealthStatus, ReportsHealth}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   implicitExtractTraceContext,
@@ -45,7 +40,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 private[canton] trait DbDispatcher {
-  val executor: Option[QueueAwareExecutor with NamedExecutor]
 
   /** consider using executeSqlUS if possible */
   def executeSql[T](databaseMetrics: DatabaseMetrics)(sql: Connection => T)(implicit
@@ -59,7 +53,7 @@ private[canton] trait DbDispatcher {
 
 private[dao] final class DbDispatcherImpl private[dao] (
     connectionProvider: JdbcConnectionProvider,
-    executorService: QueueAwareExecutionContextExecutorService,
+    executorService: NamedExecutionContextExecutorService,
     overallWaitTimer: Timer,
     overallExecutionTimer: Timer,
     val loggerFactory: NamedLoggerFactory,
@@ -106,8 +100,6 @@ private[dao] final class DbDispatcherImpl private[dao] (
       sql: Connection => T
   )(implicit loggingContext: LoggingContextWithTrace): FutureUnlessShutdown[T] =
     FutureUnlessShutdown.outcomeF(executeSql(databaseMetrics)(sql))(executionContext)
-
-  override val executor: Option[QueueAwareExecutor with NamedExecutor] = Some(executorService)
 }
 
 private[dao] final class DbDispatcherOfStorage(
@@ -119,8 +111,6 @@ private[dao] final class DbDispatcherOfStorage(
     with ReportsHealth
     with NamedLogging {
   private implicit val directEc: ExecutionContext = DirectExecutionContext(logger)
-
-  override val executor: Option[QueueAwareExecutor with NamedExecutor] = None
 
   /** consider using executeSqlUS if possible */
   override def executeSql[T](databaseMetrics: DatabaseMetrics)(

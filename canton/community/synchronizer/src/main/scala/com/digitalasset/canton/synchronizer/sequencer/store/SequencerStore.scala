@@ -125,11 +125,17 @@ final case class BytesPayload(id: PayloadId, content: ByteString) extends Payloa
       protocolVersion: ProtocolVersion,
       member: Member,
   ): Batch[ClosedEnvelope] = {
+    val fullBatch = decodeBatch(protocolVersion)
+    Batch.trimForMember(fullBatch, member)
+  }
+
+  def decodeBatch(
+      protocolVersion: ProtocolVersion
+  ): Batch[ClosedEnvelope] = {
     val noLimitFromStore = MaxBytesToDecompress.MaxValueUnsafe
-    val fullBatch = Batch
+    Batch
       .fromByteString(ProtocolVersionValidation.PV(protocolVersion), noLimitFromStore, content)
       .valueOr(err => throw new DbDeserializationException(err.toString))
-    Batch.trimForMember(fullBatch, member)
   }
 }
 
@@ -141,7 +147,7 @@ sealed trait StoreEvent[+PayloadReference] extends HasTraceContext {
   val sender: SequencerMemberId
 
   /** Who gets notified of the event once it is successfully sequenced */
-  val notifies: WriteNotification
+  def notifies: NonEmpty[Set[SequencerMemberId]]
 
   /** Description of the event to be used in logs */
   val description: String
@@ -175,7 +181,7 @@ final case class ReceiptStoreEvent(
     override val traceContext: TraceContext,
     override val trafficReceiptO: Option[TrafficReceipt],
 ) extends StoreEvent[Nothing] {
-  override val notifies: WriteNotification = WriteNotification.Members(SortedSet(sender))
+  override def notifies: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
 
   override val description: String = show"receipt[message-id:$messageId]"
 
@@ -203,7 +209,7 @@ final case class DeliverStoreEvent[P](
     override val traceContext: TraceContext,
     override val trafficReceiptO: Option[TrafficReceipt],
 ) extends StoreEvent[P] {
-  override lazy val notifies: WriteNotification = WriteNotification.Members(members)
+  override def notifies: NonEmpty[Set[SequencerMemberId]] = members
 
   override val description: String = show"deliver[message-id:$messageId]"
 
@@ -250,7 +256,7 @@ final case class DeliverErrorStoreEvent(
     override val traceContext: TraceContext,
     override val trafficReceiptO: Option[TrafficReceipt],
 ) extends StoreEvent[Nothing] {
-  override val notifies: WriteNotification = WriteNotification.Members(SortedSet(sender))
+  override def notifies: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
   override val description: String = show"deliver-error[message-id:$messageId]"
   override val members: NonEmpty[Set[SequencerMemberId]] = NonEmpty(Set, sender)
   override def map[P](f: Nothing => P): StoreEvent[P] = this
@@ -337,9 +343,16 @@ object Presequenced {
 /** Wrapper to assign a timestamp to a event. Useful to structure this way as events are only
   * timestamped right before they are persisted (this is effectively the "sequencing" step). Before
   * this point the sequencer component is free to reorder incoming events.
+  *
+  * @param fromStore
+  *   flag to indicate whether the data item has been read from store (or whether it is coming from
+  *   the in memory ring buffer. used to optimize payload caching strategy).
   */
-final case class Sequenced[+P](timestamp: CantonTimestamp, event: StoreEvent[P])
-    extends HasTraceContext {
+final case class Sequenced[+P](
+    timestamp: CantonTimestamp,
+    event: StoreEvent[P],
+    fromStore: Boolean = false,
+) extends HasTraceContext {
   override def traceContext: TraceContext = event.traceContext
 
   def map[A](fn: P => A): Sequenced[A] = copy(event = event.map(fn))
@@ -416,7 +429,7 @@ private[canton] final case class SequencerStoreRecordCounts(
   )
 }
 
-trait ReadEvents {
+sealed trait ReadEvents {
   def nextTimestamp: Option[CantonTimestamp]
   def events: Seq[Sequenced[IdOrPayload]]
 }
@@ -555,6 +568,13 @@ trait SequencerStore
         .toMap
     )
 
+  /** Lists all known sequencer members. This method is uncached, so don't use this method in
+    * performance sensitive contexts like events processing.
+    */
+  def allRegisteredMembers(registeredAtBeforeInclusive: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[Member]]
+
   /** Save a series of payloads to the store. Is up to the caller to determine a reasonable batch
     * size and no batching is done within the store.
     * @param payloads
@@ -687,6 +707,16 @@ trait SequencerStore
   def readPayloads(
       payloadIds: Seq[IdOrPayload],
       member: Member,
+      recentEvents: Boolean,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]]
+
+  /** Read payloads from their ID. IMPORTANTLY, payloads not in the cache are retrieved from the DB
+    * but are NOT added to the cache.
+    */
+  def readPayloadsByIdWithoutCacheLoading(
+      payloadIds: Seq[IdOrPayload]
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[PayloadId, Batch[ClosedEnvelope]]]
@@ -773,7 +803,7 @@ trait SequencerStore
               // Note that if fromExclusive > cache.lastOption.timestamp, we keep the watermark unchanged
               // not to move it backwards and potentially read events twice
               FutureUnlessShutdown.pure(
-                SafeWatermark(cache.lastOption.map(_.timestamp) max Some(fromExclusive))
+                SafeWatermark(cache.lastOption.map(_.timestamp).max(Some(fromExclusive)))
               )
             }
           case _ =>

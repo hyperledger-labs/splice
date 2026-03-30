@@ -207,7 +207,7 @@ abstract class BaseSynchronizerRestartTest
     import storage.api.*
 
     val res = for {
-      headStateO <- blockStore.readHead
+      headStateO <- blockStore.readHeadUnbounded()
       headState = headStateO.value
       query =
         sqlu"""delete from seq_block_height where height = ${headState.latestBlock.height}"""
@@ -371,6 +371,7 @@ class SequencerRestartTest
     setBalanceRequestSubmissionWindowSize = config.PositiveFiniteDuration.ofMinutes(5L),
     enforceRateLimiting = true,
     baseEventCost = NonNegativeLong.tryCreate(baseEventCost),
+    freeConfirmationResponses = true,
   )
 
   "sequencer operates normally after restarting and participants reconnect to it automatically" in {

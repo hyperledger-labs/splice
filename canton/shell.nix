@@ -11,29 +11,26 @@ in
 pkgs.mkShell {
   packages = with pkgs; [
     (ammonite_2_13.override { inherit jre; })
-    awscli
+    awscli2
     azure-storage-azcopy
     bashInteractive
     buf
     circleci-cli
     curl
     dpm
-    entr
     (flyway.override { jre_headless = jre; })
-    gitAndTools.gh
-    gitAndTools.hub
+    gh
+    hub
     gitMinimal
     glibcLocales
     gnugrep
     gnupg
-    go
-    go-jsonnet
     google-cloud-sdk
+    grpcurl
     haproxy
     jo
     jq
     jre
-    jsonnet-bundler
     lnav
     locale
     nodejs
@@ -41,7 +38,7 @@ pkgs.mkShell {
     oras
     pigz
     postgresql_17
-    (python3.withPackages (pkgs: [ pkgs.datadog pkgs.sphinx pkgs.sphinx_rtd_theme pkgs.sphinx-togglebutton pkgs.sphinx-copybutton pkgs.sphinx-tabs pkgs.pip pkgs.setuptools pkgs.cryptography pkgs.grpcio-tools pkgs.protobuf pkgs.pandas pkgs.dash pkgs.plotly ]))
+    (python3.withPackages (pkgs: [ pkgs.datadog pkgs.sphinx pkgs.sphinx-rtd-theme pkgs.sphinx-togglebutton pkgs.sphinx-copybutton pkgs.sphinx-tabs pkgs.sphinxcontrib-mermaid pkgs.pip pkgs.setuptools pkgs.cryptography pkgs.grpcio-tools pkgs.protobuf pkgs.pandas pkgs.dash pkgs.plotly pkgs.roman ]))
     ripgrep
     toxiproxy
     unzip
@@ -70,6 +67,9 @@ pkgs.mkShell {
     #   'build configuration file' (conf.py) with that value, e.g. instead of 'Copyright 2023, Digital Asset.' we get
     #   'Copyright 1980, Digital Asset.' in the resulting documentation
     unset SOURCE_DATE_EPOCH
+
+    # exposes the z3 dynamic libraries to the dynamic linker
+    export LD_LIBRARY_PATH="target/z3''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export DYLD_LIBRARY_PATH="target/z3''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
   '';
 }
-

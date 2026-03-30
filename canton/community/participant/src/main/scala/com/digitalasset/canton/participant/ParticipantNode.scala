@@ -26,6 +26,7 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
+import com.digitalasset.canton.error.FatalError
 import com.digitalasset.canton.health.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -51,7 +52,6 @@ import com.digitalasset.canton.participant.pruning.{AcsCommitmentProcessor, Prun
 import com.digitalasset.canton.participant.replica.ParticipantReplicaManager
 import com.digitalasset.canton.participant.scheduler.ParticipantPruningScheduler
 import com.digitalasset.canton.participant.store.*
-import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.Active
 import com.digitalasset.canton.participant.store.memory.MutablePackageMetadataViewImpl
 import com.digitalasset.canton.participant.sync.*
 import com.digitalasset.canton.participant.sync.ConnectedSynchronizer.SubmissionReady
@@ -71,10 +71,10 @@ import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.time.admin.v30.SynchronizerTimeServiceGrpc
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
+import com.digitalasset.canton.topology.admin.grpc.PsidLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
+import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, SynchronizerStore}
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.HostingParticipant
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
@@ -134,21 +134,22 @@ class ParticipantNodeBootstrap(
       .map(_.topologyStore)
 
   override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] =
-    cantonSyncService.get.toList
-      .flatMap(_.syncPersistentStateManager.getAll.values)
-      .map(_.topologyManager)
+    sequencedTopologyStores.flatMap(store =>
+      cantonSyncService.get.toList.flatMap(_.lookupTopologyManager(store.storeId.psid))
+    )
 
   override protected def lookupTopologyClient(
-      storeId: TopologyStoreId
+      psid: PhysicalSynchronizerId
   ): Option[SynchronizerTopologyClient] =
-    storeId match {
-      case SynchronizerStore(synchronizerId) =>
-        cantonSyncService.get.flatMap(_.lookupTopologyClient(synchronizerId))
-      case _ => None
-    }
+    cantonSyncService.get.flatMap(_.lookupTopologyClient(psid))
 
-  override protected lazy val lookupActivePSId: PSIdLookup =
-    synchronizerId => cantonSyncService.get.flatMap(_.activePSIdForLSId(synchronizerId))
+  override protected def lookupSynchronizerTimeTracker(
+      psid: PhysicalSynchronizerId
+  ): Option[SynchronizerTimeTracker] =
+    cantonSyncService.get.flatMap(_.lookupSynchronizerTimeTracker(psid).toOption)
+
+  override protected lazy val lookupActivePsid: PsidLookup =
+    synchronizerId => cantonSyncService.get.flatMap(_.activePsidForLsid(synchronizerId))
 
   override protected def customNodeStages(
       storage: Storage,
@@ -244,7 +245,7 @@ class ParticipantNodeBootstrap(
           currentlyVettedPackages,
           nextPackageIds,
           packageMetadataView,
-          dryRunSnapshot,
+          dryRunSnapshot.getOrElse(PackageMetadata()),
           forceFlags,
           disableUpgradeValidation = parameters.disableUpgradeValidation,
         )
@@ -326,7 +327,10 @@ class ParticipantNodeBootstrap(
         topologyManager,
       ).map { participantServices =>
         if (cantonSyncService.putIfAbsent(participantServices.cantonSyncService).nonEmpty) {
-          sys.error("should not happen")
+          FatalError.exitOnFatalError(
+            "Canton sync service was already initialized, this should not happen",
+            logger,
+          )
         }
         val node = new ParticipantNode(
           participantId,
@@ -354,12 +358,16 @@ class ParticipantNodeBootstrap(
         participantId = participantId,
         stateManager = manager,
         topologyLookup = new TopologyLookup(
-          lookupTopologyManagerByPsid = psid =>
-            cantonSyncService.get
-              .flatMap(_.syncPersistentStateManager.get(psid))
-              .map(_.topologyManager),
-          lookupActivePsidByLsid = lookupActivePSId,
-          lookupTopologyClientByPsid = psId => lookupTopologyClient(SynchronizerStore(psId)),
+          clock = clock,
+          topologyConfig = config.topology,
+          timeouts = timeouts,
+          futureSupervisor = futureSupervisor,
+          topologyManagerO = psid => cantonSyncService.get.flatMap(_.lookupTopologyManager(psid)),
+          psidLookup = lookupActivePsid,
+          topologyClientO = psid => cantonSyncService.get.flatMap(_.lookupTopologyClient(psid)),
+          syncPersistentStateO = psid =>
+            cantonSyncService.get.flatMap(_.syncPersistentStateManager.get(psid)),
+          loggerFactory = loggerFactory,
         ),
         initialProtocolVersion = ProtocolVersion.latest,
         loggerFactory = ParticipantNodeBootstrap.this.loggerFactory,
@@ -454,7 +462,6 @@ class ParticipantNodeBootstrap(
           (staticSynchronizerParameters: StaticSynchronizerParameters) =>
             SynchronizerCrypto(crypto, staticSynchronizerParameters),
           clock,
-          mutablePackageMetadataView,
           persistentState.map(_.ledgerApiStore),
           persistentState.map(_.contractStore),
           arguments.metrics,
@@ -466,6 +473,8 @@ class ParticipantNodeBootstrap(
           authorizedTopologyManager,
           participantId,
           syncPersistentStateManager,
+          topologyManagerLookup = psid =>
+            cantonSyncService.get.flatMap(_.lookupTopologyManager(psid)),
           config.topology,
           crypto,
           clock,
@@ -495,7 +504,12 @@ class ParticipantNodeBootstrap(
 
         commandProgressTracker =
           if (parameters.commandProgressTracking.enabled)
-            new CommandProgressTrackerImpl(parameters.commandProgressTracking, clock, loggerFactory)
+            new CommandProgressTrackerImpl(
+              parameters.commandProgressTracking,
+              clock,
+              metrics.phase,
+              loggerFactory,
+            )
           else CommandProgressTracker.NoOp
 
         connectedSynchronizersLookupContainer = new ConnectedSynchronizersLookupContainer
@@ -591,7 +605,6 @@ class ParticipantNodeBootstrap(
           replaySequencerConfig,
           mutablePackageMetadataView,
           arguments.metrics.connectedSynchronizerMetrics,
-          sequencerInfoLoader,
           futureSupervisor,
           loggerFactory,
         )
@@ -657,19 +670,6 @@ class ParticipantNodeBootstrap(
             )
             .mapK(FutureUnlessShutdown.outcomeK)
 
-        /*
-        Returns the topology manager corresponding to an active configuration. Restricting to active is fine since
-        the topology manager is used for party allocation which would fail for inactive configurations.
-         */
-        activeTopologyManagerGetter = (id: PhysicalSynchronizerId) =>
-          synchronizerConnectionConfigStore
-            .get(id)
-            .toOption
-            .filter(_.status == Active)
-            .flatMap(_.configuredPSId.toOption)
-            .flatMap(syncPersistentStateManager.get)
-            .map(_.topologyManager)
-
         // Sync Service
         sync = CantonSyncService.create(
           participantId,
@@ -681,7 +681,6 @@ class ParticipantNodeBootstrap(
           syncPersistentStateManager,
           replicaManager,
           packageService,
-          new PartyOps(activeTopologyManagerGetter, loggerFactory),
           topologyDispatcher,
           syncCryptoSignerWithSessionKeys,
           engine,
@@ -701,6 +700,11 @@ class ParticipantNodeBootstrap(
           connectedSynchronizersLookupContainer,
           () => triggerDeclarativeChange(),
         )
+
+        _ <-
+          if (sync.isActive()) sync.finishLSUs() else EitherT.pure[FutureUnlessShutdown, String](())
+
+        _ = if (sync.isActive()) sync.attemptPendingHandshakesSuccessors()
 
         _ = {
           connectedSynchronizerHealth.set(sync.connectedSynchronizerHealth)
@@ -731,6 +735,7 @@ class ParticipantNodeBootstrap(
                 participantId = participantId.toLf,
                 participantNodePersistentState = persistentState,
                 sync = sync,
+                pruningConfig = parameters.stores,
                 tracerProvider = tracerProvider,
               )
             ),

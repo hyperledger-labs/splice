@@ -42,14 +42,15 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.{
 import com.digitalasset.canton.protocol.hash.HashTracer
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.util.{ContractValidator, ErrorUtil, RoseTree}
-import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
+import com.digitalasset.canton.version.HashingSchemeVersion
 import com.digitalasset.canton.{LfKeyResolver, LfPartyId, checked}
 import com.digitalasset.daml.lf.data.Ref.{CommandId, PackageId, PackageName}
+import com.digitalasset.daml.lf.transaction.BackwardsCompatibilityImplicits.*
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -207,13 +208,19 @@ class ModelConformanceChecker(
   }
 
   private def buildPackageNameMap(
-      packageIds: Set[PackageId]
+      packageIds: Set[PackageId],
+      topologySnapshot: TopologySnapshot,
+      ledgerTime: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, Map[PackageName, PackageId]] =
     EitherT(for {
       resolvedE <- packageIds.toSeq.parTraverse(pId =>
-        packageResolver(pId)(traceContext)
+        packageResolver
+          .resolve(
+            pId,
+            PackageResolver.crashOnMissingPackage(topologySnapshot, participantId, ledgerTime),
+          )
           .map {
             case None => Left(pId)
             case Some(ast) => Right((pId, ast.metadata.name))
@@ -239,6 +246,7 @@ class ModelConformanceChecker(
       ledgerTime: CantonTimestamp,
       preparationTime: CantonTimestamp,
       getEngineAbortStatus: GetEngineAbortStatus,
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, ConformanceReInterpretationResult] = {
@@ -255,7 +263,7 @@ class ModelConformanceChecker(
 
     for {
 
-      packagePreference <- buildPackageNameMap(packageIdPreference)
+      packagePreference <- buildPackageNameMap(packageIdPreference, topologySnapshot, ledgerTime)
 
       lfTxAndMetadata <- reinterpreter
         .reinterpret(
@@ -263,6 +271,7 @@ class ModelConformanceChecker(
           contractValidator.authenticateHash,
           authorizers,
           cmd,
+          topologySnapshot,
           ledgerTime,
           preparationTime,
           seed,
@@ -313,6 +322,7 @@ class ModelConformanceChecker(
             ledgerTime,
             preparationTime,
             getEngineAbortStatus,
+            topologySnapshot,
           )
         )
 
@@ -361,7 +371,7 @@ class ModelConformanceChecker(
           transactionUuid = transactionUuid,
           topologySnapshot = topologySnapshot,
           contractOfId = TransactionTreeFactory.contractInstanceLookup(contractAndKeyLookup),
-          keyResolver = resolverFromReinterpretation,
+          keyResolver = resolverFromReinterpretation.asCidOptionMap,
           absolutizer = absolutizer,
         )
       ).leftMap(err => TransactionTreeError(err, view.viewHash))
@@ -405,7 +415,7 @@ class ModelConformanceChecker(
 object ModelConformanceChecker {
 
   def apply(
-      damlE: DAMLe,
+      reinterpreter: HasReinterpret,
       transactionTreeFactory: TransactionTreeFactory,
       contractValidator: ContractValidator,
       participantId: ParticipantId,
@@ -414,7 +424,7 @@ object ModelConformanceChecker {
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): ModelConformanceChecker =
     new ModelConformanceChecker(
-      damlE,
+      reinterpreter,
       transactionTreeFactory,
       participantId,
       contractValidator,
@@ -447,9 +457,8 @@ object ModelConformanceChecker {
         commandId: CommandId,
         transactionUUID: UUID,
         mediatorGroup: Int,
-        synchronizerId: SynchronizerId,
+        physicalSynchronizerId: PhysicalSynchronizerId,
         maxRecordTime: Option[CantonTimestamp],
-        protocolVersion: ProtocolVersion,
         transactionEnricher: TransactionEnricher,
         contractEnricher: ContractEnricher,
         hashTracer: HashTracer,
@@ -487,14 +496,14 @@ object ModelConformanceChecker {
                 commandId = commandId,
                 transactionUUID = transactionUUID,
                 mediatorGroup = mediatorGroup,
-                synchronizerId = synchronizerId,
+                synchronizer = physicalSynchronizerId.forExternalTransactionHashing,
                 timeBoundaries = reInterpretationResult.timeBoundaries,
                 preparationTime = reInterpretationResult.metadata.preparationTime.toLf,
                 maxRecordTime = maxRecordTime.map(_.toLf),
                 disclosedContracts = enrichedInputContracts,
               ),
               reInterpretationResult.metadata.seeds,
-              protocolVersion,
+              physicalSynchronizerId.protocolVersion,
               hashTracer = hashTracer,
             )
             .leftMap(_.message)

@@ -11,6 +11,7 @@ import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
@@ -19,7 +20,7 @@ import scala.jdk.CollectionConverters.*
  * This test is used to test the logical synchronizer upgrade.
  * It uses 3 participants, 2 sequencers and 2 mediators.
  */
-final class LsuEndToEndIntegrationTest extends LsuBase {
+sealed trait LsuEndToEndIntegrationTest extends LsuBase {
 
   override protected def testName: String = "lsu-end-to-end"
 
@@ -34,7 +35,11 @@ final class LsuEndToEndIntegrationTest extends LsuBase {
   override protected lazy val newOldSequencers: Map[String, String] =
     Map("sequencer2" -> "sequencer1")
   override protected lazy val newOldMediators: Map[String, String] = Map("mediator2" -> "mediator1")
-  override protected lazy val upgradeTime: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(30)
+  override protected lazy val upgradeTime: CantonTimestamp = if (useStaticTime) {
+    CantonTimestamp.Epoch.plusSeconds(30)
+  } else {
+    CantonTimestamp.now().plusSeconds(5)
+  }
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3S2M2_Config
@@ -50,27 +55,26 @@ final class LsuEndToEndIntegrationTest extends LsuBase {
     "work end-to-end" in { implicit env =>
       import env.*
 
-      val fixture = fixtureWithDefaults()
-
       participant1.health.ping(participant2)
 
       val alice = participant1.parties.enable("Alice")
       val bank = participant2.parties.enable("Bank")
       IouSyntax.createIou(participant2)(bank, alice).discard
 
+      val fixture = fixtureWithDefaults()
       performSynchronizerNodesLsu(fixture)
 
-      environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
+      environment.simClock.foreach(_.advanceTo(upgradeTime.immediateSuccessor))
+      transferTraffic()
 
       eventually() {
-        participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
-        participants.all.forall(_.synchronizers.is_connected(fixture.currentPSId)) shouldBe false
+        environment.simClock.foreach(_.advance(Duration.ofSeconds(1)))
+        participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe true
+        participants.all.forall(_.synchronizers.is_connected(fixture.currentPsid)) shouldBe false
       }
 
       oldSynchronizerNodes.all.stop()
-
-      environment.simClock.value.advance(Duration.ofSeconds(1))
-      waitForTargetTimeOnSequencer(sequencer2, environment.clock.now)
+      waitForTargetTimeOnSequencer(sequencer2, upgradeTime.immediateSuccessor, logger)
 
       /*
       We do several ping, disconnect, reconnect because reconnect comes with crash-recovery
@@ -105,9 +109,15 @@ final class LsuEndToEndIntegrationTest extends LsuBase {
 
       // Subsequent call should be successful
       participant1.underlying.value.sync
-        .upgradeSynchronizerTo(daId, fixture.synchronizerSuccessor)
+        .performLsu(daId, fixture.synchronizerSuccessor)
         .futureValueUS
         .value shouldBe ()
     }
   }
+}
+
+final class LsuEndToEndSimClockIntegrationTest extends LsuEndToEndIntegrationTest
+
+final class LsuEndToEndWallClockIntegrationTest extends LsuEndToEndIntegrationTest {
+  override protected val useStaticTime: Boolean = false
 }

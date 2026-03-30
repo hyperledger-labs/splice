@@ -7,10 +7,8 @@ import cats.data.EitherT
 import cats.implicits.showInterpolator
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.digitalasset.canton.LedgerSubmissionId
 import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -31,10 +29,8 @@ import scala.util.chaining.*
 
 private[sync] class PartyAllocation(
     participantId: ParticipantId,
-    partyOps: PartyOps,
     isActive: () => Boolean,
     connectedSynchronizersLookup: ConnectedSynchronizersLookup,
-    timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, val tracer: Tracer)
     extends Spanning
@@ -77,9 +73,8 @@ private[sync] class PartyAllocation(
         )
         // Allow party allocation via ledger API only if the participant is connected to the synchronizer.
         // Otherwise the gRPC call will just timeout without a meaningful error message
-        _ <- EitherT.cond[FutureUnlessShutdown](
-          connectedSynchronizersLookup.isConnected(synchronizerId),
-          (),
+        connectedSynchronizer <- EitherT.fromOption[FutureUnlessShutdown](
+          connectedSynchronizersLookup.get(synchronizerId),
           SubmissionResult.SynchronousError(
             SyncServiceInjectionError.NotConnectedToSynchronizer
               .Error(synchronizerId.toProtoPrimitive)
@@ -88,8 +83,19 @@ private[sync] class PartyAllocation(
         )
         _ <- (externalPartyOnboardingDetails match {
           case Some(details) =>
-            partyOps.allocateExternalParty(participantId, details, synchronizerId)
-          case None => partyOps.allocateParty(partyId, participantId, synchronizerId)
+            PartyOps.allocateExternalParty(
+              participantId,
+              details,
+              synchronizerId,
+              connectedSynchronizer.topologyManager,
+            )
+          case None =>
+            PartyOps.allocateParty(
+              partyId,
+              participantId,
+              synchronizerId,
+              connectedSynchronizer.topologyManager,
+            )
         })
           .leftMap[SubmissionResult] {
             case IdentityManagerParentError(e) if e.code == MappingAlreadyExists =>
@@ -101,33 +107,6 @@ private[sync] class PartyAllocation(
             case IdentityManagerParentError(e) => reject(e.cause, e.code.category.grpcCode)
             case e => reject(e.cause, e.code.category.grpcCode)
           }
-        // TODO(i25076) remove this waiting logic once topology events are published on the ledger api
-        // wait for parties to be available on the specified connected synchronizers
-        waitingSuccessful <- EitherT
-          .right[SubmissionResult](
-            if (externalPartyOnboardingDetails.forall(_.fullyAllocatesParty)) {
-              connectedSynchronizersLookup.get(synchronizerId).traverse { connectedSynchronizer =>
-                connectedSynchronizer.topologyClient
-                  .awaitUS(
-                    _.inspectKnownParties(
-                      partyId.filterString,
-                      participantId.filterString,
-                      limit = 1,
-                    )
-                      .map(_.nonEmpty),
-                    timeouts.network.duration,
-                  )
-                  .map(synchronizerId -> _)
-              }
-            } else FutureUnlessShutdown.pure(None)
-          )
-        _ = waitingSuccessful.foreach { case (synchronizerId, successful) =>
-          if (!successful)
-            logger.warn(
-              s"Waiting for allocation of $partyId on synchronizer $synchronizerId timed out."
-            )
-        }
-
       } yield SubmissionResult.Acknowledged
 
     result.fold(

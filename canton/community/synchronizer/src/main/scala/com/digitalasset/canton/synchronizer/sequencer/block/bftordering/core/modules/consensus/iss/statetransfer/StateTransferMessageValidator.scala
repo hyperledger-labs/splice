@@ -10,7 +10,7 @@ import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider.AuthenticatedMessageType
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModuleMetrics.emitNonCompliance
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Bootstrap
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.statetransfer.StateTransferMessageValidator.StateTransferValidationResult.{
   DropResult,
   InvalidResult,
@@ -27,6 +27,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.CommitCertificate
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   Membership,
   OrderingTopologyInfo,
@@ -117,7 +118,7 @@ final class StateTransferMessageValidator[E <: Env[E]](
   ): Either[String, Unit] =
     for {
       _ <- Either.cond(
-        request.epoch > Genesis.GenesisEpochNumber,
+        request.epoch > Bootstrap.BootstrapEpochNumber,
         (),
         s"state transfer is supported only after genesis, but start epoch ${request.epoch} received",
       )
@@ -214,13 +215,18 @@ final class StateTransferMessageValidator[E <: Env[E]](
       commitCertificate: CommitCertificate,
       from: BftNodeId,
       orderingTopologyInfo: OrderingTopologyInfo[E],
+      currentEpochInfo: EpochInfo,
   )(implicit context: E#ActorContextT[Consensus.Message[E]], traceContext: TraceContext): Unit =
     context.pipeToSelf(
       signatureVerifier.verifyConsensusCertificate(commitCertificate, orderingTopologyInfo)
     ) {
       case Success(Right(())) =>
         Some(
-          StateTransferMessage.BlockVerified(commitCertificate, from)
+          StateTransferMessage.BlockVerified(
+            commitCertificate,
+            currentEpochInfo,
+            from,
+          )
         )
       case Success(Left(errors)) =>
         val blockMetadata = commitCertificate.prePrepare.message.blockMetadata

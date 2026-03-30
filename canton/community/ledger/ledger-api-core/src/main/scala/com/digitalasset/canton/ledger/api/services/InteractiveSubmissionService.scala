@@ -33,6 +33,7 @@ object InteractiveSubmissionService {
       verboseHashing: Boolean,
       maxRecordTime: Option[LfTimestamp],
       costEstimationHints: Option[CostEstimationHints],
+      hashingSchemeVersion: HashingSchemeVersion,
   )
 
   final case class ExecuteRequest(
@@ -42,7 +43,6 @@ object InteractiveSubmissionService {
       signatures: Map[PartyId, Seq[Signature]],
       preparedTransaction: PreparedTransaction,
       serializationVersion: HashingSchemeVersion,
-      synchronizerId: SynchronizerId,
       tentativeLedgerEffectiveTime: LfTimestamp,
   )
 }

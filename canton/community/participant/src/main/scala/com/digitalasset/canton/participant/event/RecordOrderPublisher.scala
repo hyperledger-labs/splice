@@ -23,21 +23,21 @@ import com.digitalasset.canton.ledger.participant.state.{
   FloatingUpdate,
   SequencedUpdate,
   SynchronizerUpdate,
-  Update,
 }
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
+import com.digitalasset.canton.participant.sync.SynchronizerConnectionsManager.PerformLsuHandler
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
+import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
 
-import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import scala.concurrent.ExecutionContext
 import scala.util.chaining.*
 import scala.util.{Failure, Success}
 
@@ -88,6 +88,7 @@ class RecordOrderPublisher private (
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     clock: Clock,
+    lsuHandler: PerformLsuHandler,
 )(implicit val executionContextForPublishing: ExecutionContext)
     extends PublishesOnlinePartyReplicationEvents
     with NamedLogging
@@ -114,21 +115,9 @@ class RecordOrderPublisher private (
   private val synchronizerSuccessor: AtomicReference[Option[SynchronizerSuccessor]] =
     new AtomicReference(None)
 
-  def getSynchronizerSuccessor: Option[SynchronizerSuccessor] = synchronizerSuccessor.get()
+  private val lsuAutomaticAttemptAlreadyDone: AtomicBoolean = new AtomicBoolean(false)
 
-  private def onlyForTestingRecordAcceptedTransactions(event: SequencedUpdate): Unit =
-    for {
-      store <- ledgerApiIndexer.onlyForTestingTransactionInMemoryStore
-      transactionAccepted <- event match {
-        case txAccepted: Update.TransactionAccepted => Some(txAccepted)
-        case _ => None
-      }
-    } {
-      store.put(
-        updateId = transactionAccepted.updateId.toHexString,
-        lfVersionedTransaction = transactionAccepted.transaction,
-      )
-    }
+  def getSynchronizerSuccessor: Option[SynchronizerSuccessor] = synchronizerSuccessor.get()
 
   /** Schedules the given `eventO` to be published on the `eventLog`, and schedules the causal
     * "tick" defined by `clock`. Tick must be called exactly once for all sequencer counters higher
@@ -141,34 +130,42 @@ class RecordOrderPublisher private (
     * @param rcO
     *   The optional request counter for logging as RCs are more human-readable than timestamps.
     */
-  def tick(event: SequencedUpdate, sequencerCounter: SequencerCounter, rcO: Option[RequestCounter])(
-      implicit traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] =
-    synchronizeWithClosingF(functionFullName) {
-      if (event.recordTime > initTimestamp) {
-        rcO
-          .foreach(requestCounter =>
-            logger.debug(s"Schedule publication for request counter $requestCounter")
-          )
-        onlyForTestingRecordAcceptedTransactions(event)
-        taskScheduler.scheduleTask(EventPublicationTask(event, sequencerCounter))
+  def tick(
+      event: SequencedUpdate,
+      sequencerCounter: SequencerCounter,
+      rcO: Option[RequestCounter],
+  )(implicit
+      traceContext: TraceContext
+  ): UnlessShutdown[Unit] =
+    synchronizeWithClosingSync(functionFullName) {
+      val recordTime = event.recordTime
+      if (recordTime > initTimestamp) {
+        rcO.foreach { requestCounter =>
+          logger.debug(s"Schedule publication for request counter $requestCounter")
+        }
         logger.debug(
-          s"Observing time ${event.recordTime} for sequencer counter $sequencerCounter for publishing (with event:$event, requestCounterO:$rcO)"
+          s"Publishing event for record time ${event.recordTime} and sequencer counter $sequencerCounter. (event:$event, requestCounterO:$rcO)"
         )
-        taskScheduler.addTick(sequencerCounter, event.recordTime)
-        // this adds backpressure from indexer queue to protocol processing:
-        //   indexer pekko source queue back-pressures via offer Future,
-        //   this propagates via in RecoveringQueue,
-        //   which propagates here in the taskScheduler's SimpleExecutionQueue,
-        //   which bubble up exactly here: waiting for all the possible event enqueueing to happen after the tick.
-        taskScheduler.flush()
+        taskScheduler.scheduleTask(EventPublicationTask(event, sequencerCounter))
+        taskScheduler.addTick(sequencerCounter, recordTime)
       } else {
         logger.debug(
-          s"Skipping tick at sequencerCounter:$sequencerCounter timestamp:${event.recordTime} (publication of event $event)"
+          s"Skipping tick at sequencerCounter:$sequencerCounter timestamp:$recordTime"
         )
-        Future.unit
       }
     }
+
+  /** Add backpressure from the indexer queue to protocol processing. The returned future completes
+    * if all currently possible publication tasks have completed.
+    *
+    * In detail:
+    *   - The indexer pekko source queue back-pressures via the offer Future
+    *   - This propagates via in [[com.digitalasset.canton.util.PekkoUtil.RecoveringQueue]]
+    *   - This propagates in the `taskScheduler`'s
+    *     [[com.digitalasset.canton.util.SimpleExecutionQueue]].
+    */
+  def backpressure(): FutureUnlessShutdown[Unit] =
+    FutureUnlessShutdown.outcomeF(taskScheduler.flush())
 
   /** Schedule a floating event, if the current synchronizer time is earlier than timestamp.
     * @param timestamp
@@ -309,17 +306,18 @@ class RecordOrderPublisher private (
   )(implicit traceContext: TraceContext): UnlessShutdown[Unit] =
     scheduleBufferingEventTaskImmediately { timestamp =>
       logger.debug(s"Publish add contracts at $timestamp")
-      ledgerApiIndexerBuffer.get() match {
+      val (event, log) = ledgerApiIndexerBuffer.get() match {
         case None =>
-          throw new IllegalStateException(
-            "Buffering of LedgerApiIndexer events should be started before adding contracts"
-          )
+          (buildEventAtRecordTime(timestamp), /* no details to log: */ "")
         case Some(buffer) =>
-          val event = buffer.markEventsWithRecordTime(buildEventAtRecordTime)
-
-          logger.debug(s"Publishing contract add $event")
-          publishLedgerApiIndexerEvent(event)
+          (
+            buffer.markEventsWithRecordTime(buildEventAtRecordTime),
+            " with synchronizer indexing paused",
+          )
       }
+
+      logger.debug(s"Publishing contract add $event$log")
+      publishLedgerApiIndexerEvent(event)
     }
 
   /** Schedules flushing of events that were buffered during Online Party Replication as soon as
@@ -344,8 +342,16 @@ class RecordOrderPublisher private (
       }
     }
 
-  def setSuccessor(successor: Option[SynchronizerSuccessor]): Unit =
+  def setSuccessor(successor: Option[SynchronizerSuccessor]): Unit = {
     synchronizerSuccessor.set(successor)
+    successor.foreach { successor =>
+      if (successor.upgradeTime <= initTimestamp) {
+        lsuAutomaticAttemptAlreadyDone.set(true)
+        // Upon node restart past the upgrade time, we attempt an automatic LSU
+        scheduleLsu(successor)(TraceContext.createNew("startup-automatic-lsu"))
+      }
+    }
+  }
 
   private def scheduleBufferingEventTaskImmediately(
       perform: CantonTimestamp => FutureUnlessShutdown[Unit]
@@ -383,7 +389,7 @@ class RecordOrderPublisher private (
   )(implicit val traceContext: TraceContext)
       extends SequencedPublicationTask {
 
-    override val timestamp: CantonTimestamp = event.recordTime
+    override def timestamp: CantonTimestamp = event.recordTime
 
     override def perform(): FutureUnlessShutdown[Unit] =
       publishOrBuffer(event, s"event with synchronizer index ${event.synchronizerIndex}")
@@ -494,6 +500,14 @@ class RecordOrderPublisher private (
           if !LogicalUpgradeTime.canProcessKnowingSuccessor(successorO, event.recordTime) =>
         event match {
           case synchronizerUpdate: SynchronizerUpdate =>
+            if (lsuAutomaticAttemptAlreadyDone.compareAndSet(false, true)) {
+              scheduleLsu(successor)
+            } else {
+              logger.debug(
+                s"LSU has been already scheduled for upgrade to ${successor.psid}, skipping automatic LSU for $event"
+              )
+            }
+
             val upgradeTimeReached = LsuTimeReached(
               synchronizerUpdate.synchronizerId,
               successor.upgradeTime,
@@ -502,8 +516,7 @@ class RecordOrderPublisher private (
               s"Not publishing event whose record time ${event.recordTime} is greater than upgrade time ${successor.upgradeTime} $event but publishing $upgradeTimeReached instead"
             )
 
-            ledgerApiIndexer.enqueue(upgradeTimeReached).map(_ => ())
-
+            ledgerApiIndexer.enqueue(upgradeTimeReached)
           case other =>
             logger.debug(
               s"Not publishing event whose record time ${other.recordTime} is greater than upgrade time ${successor.upgradeTime}: $other"
@@ -514,6 +527,26 @@ class RecordOrderPublisher private (
 
       case _ => ledgerApiIndexer.enqueue(event).map(_ => ())
     }
+  }
+
+  private def scheduleLsu(
+      successor: SynchronizerSuccessor
+  )(implicit traceContext: TraceContext): Unit = {
+    val performLsuResultFUS = lsuHandler
+      .performLsu(psid, successor)
+      .value
+      .map { lsuResult =>
+        lsuResult.fold(
+          err => logger.error(s"""Upgrade to ${successor.psid} failed: $err
+               |Consult the documentation to perform manual upgrade.
+               |""".stripMargin),
+          _ => (),
+        )
+      }
+    FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
+      performLsuResultFUS,
+      s"Failed to upgrade to ${successor.psid}",
+    )
   }
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
@@ -545,6 +578,7 @@ object RecordOrderPublisher {
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
       clock: Clock,
+      performLsu: PerformLsuHandler,
   )(implicit executionContextForPublishing: ExecutionContext): RecordOrderPublisher =
     new RecordOrderPublisher(
       psid,
@@ -557,5 +591,6 @@ object RecordOrderPublisher {
       loggerFactory,
       futureSupervisor,
       clock,
+      performLsu,
     ).tap(_.setSuccessor(synchronizerSuccessor))
 }

@@ -10,7 +10,10 @@ import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective
 import com.digitalasset.canton.ledger.participant.state.{SynchronizerIndex, Update}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
+import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{
+  AchsLastPointers,
+  LedgerEnd,
+}
 import com.digitalasset.canton.platform.store.backend.{
   DbDto,
   IngestionStorageBackend,
@@ -19,10 +22,10 @@ import com.digitalasset.canton.platform.store.backend.{
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.dao.SequentialWriteDaoSpec.*
 import com.digitalasset.canton.platform.store.interning.{
-  DomainStringIterators,
   InternizingStringInterningView,
   StringInterning,
   StringInterningDomain,
+  StringInterningProvider,
 }
 import com.digitalasset.canton.protocol.TestUpdateId
 import com.digitalasset.canton.topology.SynchronizerId
@@ -55,7 +58,6 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
       updateToDbDtos = updateToDbDtoFixture,
       ledgerEndCache = ledgerEndCache,
       stringInterningView = stringInterningViewFixture,
-      dbDtosToStringsForInterning = dbDtoToStringsForInterningFixture,
     )
     testee.store(someConnection, offset(2L), singlePartyFixture)
     ledgerEndCache().map(_.lastOffset) shouldBe Some(offset(2L))
@@ -134,7 +136,6 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
       updateToDbDtos = updateToDbDtoFixture,
       ledgerEndCache = ledgerEndCache,
       stringInterningView = stringInterningViewFixture,
-      dbDtosToStringsForInterning = dbDtoToStringsForInterningFixture,
     )
     testee.store(someConnection, offset(3L), None)
     ledgerEndCache().map(_.lastOffset) shouldBe Some(offset(3L))
@@ -242,13 +243,32 @@ class SequentialWriteDaoSpec extends AnyFlatSpec with Matchers {
 
     override def postProcessingEnd(connection: Connection): Option[Offset] =
       throw new UnsupportedOperationException
+
+    override def fetchACHSState(connection: Connection): Option[ParameterStorageBackend.AchsState] =
+      throw new UnsupportedOperationException
+
+    override def insertACHSState(achsState: ParameterStorageBackend.AchsState)(
+        connection: Connection
+    ): Unit = throw new UnsupportedOperationException
+
+    override def updateACHSValidAt(validAt: Long)(connection: Connection): Unit =
+      throw new UnsupportedOperationException
+
+    override def updateACHSLastPointers(lastPointers: AchsLastPointers)(
+        connection: Connection
+    ): Unit =
+      throw new UnsupportedOperationException
+
+    override def clearACHSState(connection: Connection): Unit =
+      throw new UnsupportedOperationException
+
   }
 }
 
 object SequentialWriteDaoSpec {
 
   private val serializableTraceContext =
-    SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
+    SerializableTraceContext(TraceContext.empty).toSerializedDamlProto
 
   private val externalTransactionHash =
     Hash
@@ -392,31 +412,6 @@ object SequentialWriteDaoSpec {
       case _ => throw new Exception
     }
 
-  private val dbDtoToStringsForInterningFixture: Iterable[DbDto] => DomainStringIterators = {
-    case iterable if iterable.sizeIs == 5 =>
-      new DomainStringIterators(
-        parties = Iterator.empty,
-        templateIds = Iterator.single("#p:m:1").map(Ref.NameTypeConRef.assertFromString),
-        synchronizerIds = Iterator.empty,
-        packageIds = Iterator.single("2").map(Ref.PackageId.assertFromString),
-        userIds = Iterator.empty,
-        participantIds = Iterator.empty,
-        choiceNames = Iterator.empty,
-        interfaceIds = Iterator.empty,
-      )
-    case _ =>
-      new DomainStringIterators(
-        parties = Iterator.empty,
-        templateIds = Iterator.empty,
-        synchronizerIds = Iterator.empty,
-        packageIds = Iterator.empty,
-        userIds = Iterator.empty,
-        participantIds = Iterator.empty,
-        choiceNames = Iterator.empty,
-        interfaceIds = Iterator.empty,
-      )
-  }
-
   private val stringInterningViewFixture: StringInterning with InternizingStringInterningView =
     new StringInterning with InternizingStringInterningView {
       override def templateId: StringInterningDomain[NameTypeConRef] =
@@ -441,12 +436,22 @@ object SequentialWriteDaoSpec {
       override def interfaceId: StringInterningDomain[Ref.Identifier] =
         ???
 
-      override def internize(
-          domainStringIterators: DomainStringIterators
-      ): Iterable[(Int, String)] =
-        if (domainStringIterators.templateIds.isEmpty) Nil
-        else List(1 -> "a", 2 -> "b")
+      override private[platform] def distinctNewRawStrings(
+          interningProviders: Iterable[StringInterningProvider]
+      ): Iterable[String] =
+        Nil
 
+      /** @return
+        *   If some of the entries were not part of the view: they will be added, and these will be
+        *   returned as a interned-id and raw, prefixed string pairs.
+        * @note
+        *   This method is thread-safe. This method should be called from Indexer, which maintains
+        *   consistency between StringInterning view and persistence.
+        */
+      override private[platform] def internize(
+          distinctRawStrings: Iterable[String]
+      ): Iterable[(Int, String)] =
+        Iterator.iterate(1)(_ + 1).zip(distinctRawStrings).toVector
     }
 
   private val someConnection = mock[Connection]

@@ -16,6 +16,10 @@ import com.digitalasset.canton.platform.store.backend.Conversions.{
   timestampFromMicros,
 }
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.*
+import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.{
+  AchsAddActivationsParams,
+  AchsRemoveDeactivatedParams,
+}
 import com.digitalasset.canton.platform.store.backend.RowDef.*
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
@@ -30,7 +34,7 @@ import com.digitalasset.canton.platform.store.backend.{
   RowDef,
 }
 import com.digitalasset.canton.platform.store.cache.LedgerEndCache
-import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.PaginationInput
+import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPageQuery
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.platform.{ContractId, Party}
 import com.digitalasset.canton.protocol.ReassignmentId
@@ -366,7 +370,7 @@ object EventStorageBackendTemplate {
         authorizationEventParser("participant_permission", "participant_authorization_event"),
         recordTime,
         synchronizerId(stringInterning).map(_.toProtoPrimitive),
-        traceContext.?,
+        traceContext,
       ).mapN(
         RawParticipantAuthorization.apply
       )
@@ -755,6 +759,40 @@ abstract class EventStorageBackendTemplate(
         """
       .asVectorOf(long("event_sequential_id"))(connection)
 
+  def addActivationsToACHS(
+      params: AchsAddActivationsParams
+  )(connection: Connection): Unit =
+    SQL"""
+      INSERT INTO lapi_filter_achs_stakeholder
+      SELECT *
+      FROM lapi_filter_activate_stakeholder filters
+      WHERE
+        filters.event_sequential_id > ${params.startExclusive}
+        AND filters.event_sequential_id <= ${params.endInclusive}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM lapi_events_deactivate_contract deactivate_evs
+          WHERE
+            filters.event_sequential_id = deactivate_evs.deactivated_event_sequential_id
+            AND deactivate_evs.event_sequential_id <= ${params.activeAt}
+        )
+    """.execute()(connection).discard
+
+  def removeDeactivatedFromACHS(
+      params: AchsRemoveDeactivatedParams
+  )(connection: Connection): Unit =
+    SQL"""
+      DELETE FROM lapi_filter_achs_stakeholder
+      WHERE EXISTS (
+        SELECT 1
+        FROM lapi_events_deactivate_contract deactivate_evs
+        WHERE
+          lapi_filter_achs_stakeholder.event_sequential_id = deactivate_evs.deactivated_event_sequential_id
+          AND deactivate_evs.event_sequential_id <= ${params.endInclusive}
+          AND deactivate_evs.event_sequential_id > ${params.startExclusive}
+      )
+    """.execute()(connection).discard
+
   override def firstSynchronizerOffsetAfterOrAt(
       synchronizerId: SynchronizerId,
       afterOrAtRecordTimeInclusive: Timestamp,
@@ -881,10 +919,50 @@ abstract class EventStorageBackendTemplate(
 
     logger.debug(s"lapi_update_meta query result: $metaQueryResult")
 
-    List(completionQueryResult, metaQueryResult).flatten
-      .sortBy(_.offset)
-      .reverse
-      .headOption
+    List(completionQueryResult, metaQueryResult).flatten.maxByOption(_.offset)
+
+  }
+
+  def lastRecordTimeBeforeOrAtSynchronizerOffset(
+      synchronizerId: SynchronizerId,
+      beforeOrAtOffsetInclusive: Offset,
+  )(connection: Connection): Option[CantonTimestamp] = {
+    val ledgerEndOffset = ledgerEndCache().map(_.lastOffset)
+    val safeBeforeOrAtOffset =
+      if (Option(beforeOrAtOffsetInclusive) > ledgerEndOffset) ledgerEndOffset
+      else Some(beforeOrAtOffsetInclusive)
+    val synchronizerIdFilter =
+      cSQL"synchronizer_id = ${stringInterning.synchronizerId.internalize(synchronizerId)} AND"
+    val synchronizerIdOrdering = cSQL"synchronizer_id,"
+    val completionQueryResult = RowDefs
+      .completionSynchronizerOffsetParser(stringInterning)
+      .querySingleOptRow(columns => SQL"""
+          SELECT $columns
+          FROM lapi_command_completions
+          WHERE
+            $synchronizerIdFilter
+            ${QueryStrategy.offsetIsLessOrEqual("completion_offset", safeBeforeOrAtOffset)}
+          ORDER BY $synchronizerIdOrdering completion_offset DESC, record_time DESC
+          ${QueryStrategy.limitClause(Some(1))}
+          """)(connection)
+    val metaQueryResult = RowDefs
+      .metaSynchronizerOffsetParser(stringInterning)
+      .querySingleOptRow(columns => SQL"""
+          SELECT $columns
+          FROM lapi_update_meta
+          WHERE
+            $synchronizerIdFilter
+            ${QueryStrategy.offsetIsLessOrEqual("event_offset", safeBeforeOrAtOffset)}
+          ORDER BY $synchronizerIdOrdering event_offset DESC, record_time DESC
+          ${QueryStrategy.limitClause(Some(1))}
+          """)(connection)
+    List(
+      completionQueryResult,
+      metaQueryResult,
+    ).flatten
+      .maxByOption(_.recordTime)
+      .map(_.recordTime)
+      .map(CantonTimestamp(_))
   }
 
   override def synchronizerOffset(offset: Offset)(
@@ -1013,15 +1091,14 @@ abstract class EventStorageBackendTemplate(
 
   override def fetchTopologyPartyEventIds(
       party: Option[Party]
-  )(connection: Connection): PaginationInput => Vector[Long] =
+  ): IdPageQuery =
     UpdateStreamingQueries.fetchEventIds(
       tableName = "lapi_events_party_to_participant",
       witnessO = party,
       templateIdO = None,
-      idFilter = None,
       stringInterning = stringInterning,
       hasFirstPerSequentialId = false,
-    )(connection)
+    )
 
   override def topologyPartyEventBatch(
       eventSequentialIds: SequentialIdBatch

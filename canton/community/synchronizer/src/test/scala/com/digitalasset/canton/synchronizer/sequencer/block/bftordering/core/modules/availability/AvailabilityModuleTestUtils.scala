@@ -5,12 +5,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.crypto.{Fingerprint, Hash, Signature, SignatureFormat}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.block.BlockFormat
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.AvailabilityModule.quorum
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.memory.GenericInMemoryAvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.{
@@ -75,9 +73,11 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   protected val Node2 = node(2)
   protected val Node3 = node(3)
   protected val Node1And2 = (1 to 2).map(node).toSet
+  protected val Node2And3 = (2 to 3).map(node).toSet
   protected val Node0To3 = (0 to 3).map(node).toSet
   protected val Node1To3 = (1 to 3).map(node).toSet
   protected val Node1To6 = (1 to 6).map(node).toSet
+  protected val Node4To6 = (4 to 6).map(node).toSet
   protected val AnotherBatchId = BatchId.createForTesting("AnotherBatchId")
   protected val anEpochNumber = EpochNumber.First
   protected val anOrderingRequest: Traced[OrderingRequest] = Traced(
@@ -104,8 +104,18 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   protected val ABatchId = BatchId.from(ABatch)
   protected val ANonEmptyBatchId = BatchId.from(ANonEmptyBatch)
   protected val ABatchIdWithInvalidTags = BatchId.from(ABatchWithInvalidTags)
+  protected val OrderingTopologyNode0 = OrderingTopology.forTesting(Set(Node0))
+  protected val MembershipNode0 = Membership.forTesting(Node0, OrderingTopologyNode0)
+  protected val Node0Ack = AvailabilityAck(from = Node0, Signature.noSignature)
+  protected val Node0Acks = Set(Node0Ack)
   protected val AnInProgressBatchMetadata =
-    InProgressBatchMetadata(Traced(ABatchId), anEpochNumber, ABatch.stats)
+    DisseminationStatus.InProgress(
+      membership = Membership.forTesting(Node0, OrderingTopologyNode0),
+      Traced(ABatchId),
+      acks = Node0Acks,
+      epochNumber = anEpochNumber,
+      stats = ABatch.stats,
+    )
   protected val WrongBatchId = BatchId.createForTesting("Wrong BatchId")
   protected val ABlockMetadata: BlockMetadata =
     BlockMetadata.mk(
@@ -141,8 +151,6 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     AnOrderedBlockForOutput,
     Seq(ABatchId -> ABatch),
   )
-  protected val Node0Ack = AvailabilityAck(from = Node0, Signature.noSignature)
-  protected val Node0Acks = Set(Node0Ack)
   protected val Node0And1Acks = Seq(
     AvailabilityAck(from = Node0, Signature.noSignature),
     AvailabilityAck(from = Node1, Signature.noSignature),
@@ -165,38 +173,35 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     AvailabilityAck(from = Node1, Signature.noSignature),
     AvailabilityAck(from = Node2, Signature.noSignature),
   )
-  protected val OrderingTopologyNode0 = OrderingTopology.forTesting(Set(Node0))
-  protected val ADisseminationProgressNode0WithNode0Vote =
-    DisseminationProgress(
-      OrderingTopologyNode0,
-      AnInProgressBatchMetadata,
-      acks = Node0Acks,
-    )
+  protected val ADisseminationProgressNode0WithNode0Vote = AnInProgressBatchMetadata
   protected val OrderingTopologyNodes0And1 = OrderingTopology.forTesting(Set(Node0, Node1))
+  protected val MembershipNodes0And1 = Membership.forTesting(Node0, OrderingTopologyNodes0And1)
 
   protected val ADisseminationProgressNode0And1WithNode0Vote =
     ADisseminationProgressNode0WithNode0Vote.copy(
-      orderingTopology = OrderingTopologyNodes0And1
+      membership = Membership.forTesting(Node0, OrderingTopologyNodes0And1)
     )
   protected val ADisseminationProgressNode0And1WithNode0And1Votes =
-    DisseminationProgress(
-      OrderingTopologyNodes0And1,
-      AnInProgressBatchMetadata,
+    AnInProgressBatchMetadata.copy(
+      membership = Membership.forTesting(Node0, OrderingTopologyNodes0And1),
       acks = Node0And1Acks.toSet,
     )
   protected val OrderingTopologyNodes0To3 = OrderingTopology.forTesting(Node0To3)
+  protected val MembershipNodes0To3 = Membership.forTesting(Node0, Node0To3)
+  protected val Node0To6 = (0 to 6).map(node).toSet
+  protected val OrderingTopologyNodes0To6 = OrderingTopology.forTesting(Node0To6)
+  protected val MembershipNodes0To6 = Membership.forTesting(Node0, Node0To6)
   protected val ADisseminationProgressNode0To3WithNode0Vote =
     ADisseminationProgressNode0WithNode0Vote.copy(
-      orderingTopology = OrderingTopologyNodes0To3
+      membership = Membership.forTesting(Node0, OrderingTopologyNodes0To3)
     )
-  protected val OrderingTopologyWithNode0To6 = OrderingTopology.forTesting(Node1To6 + Node0)
   protected val ADisseminationProgressNode0To6WithNode0Vote =
     ADisseminationProgressNode0WithNode0Vote.copy(
-      orderingTopology = OrderingTopologyWithNode0To6
+      membership = Membership.forTesting(Node0, OrderingTopologyNodes0To6)
     )
   protected val ADisseminationProgressNode0To6WithNode0And1Vote =
     ADisseminationProgressNode0And1WithNode0And1Votes.copy(
-      orderingTopology = OrderingTopologyWithNode0To6
+      membership = Membership.forTesting(Node0, OrderingTopologyNodes0To6)
     )
   protected val QuorumAcksForNode0To3 =
     (0 until quorum(numberOfNodes = 4)).map { idx =>
@@ -214,6 +219,14 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     )
   protected val ABatchDisseminationProgressNode0And1WithNode0Vote =
     ABatchId -> ADisseminationProgressNode0And1WithNode0Vote
+  protected val ANonEmptyBatchIdDisseminationProgressNode0And1WithNode0Vote =
+    ANonEmptyBatchId -> DisseminationStatus.InProgress(
+      membership = Membership.forTesting(Node0, OrderingTopologyNodes0And1),
+      Traced(ANonEmptyBatchId),
+      acks = Node0Acks,
+      epochNumber = anEpochNumber,
+      stats = ANonEmptyBatch.stats,
+    )
   protected val ABatchDisseminationProgressNode0To3WithNode0Vote =
     ABatchId -> ADisseminationProgressNode0To3WithNode0Vote
   protected val ABatchDisseminationProgressNode0To6WithNode0Vote =
@@ -238,11 +251,17 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     anEpochNumber,
   )
   protected val BatchReadyForOrderingNode0Vote =
-    ABatchId -> InProgressBatchMetadata(
-      Traced(ABatchId),
-      anEpochNumber,
-      ABatch.stats,
-    ).complete(ProofOfAvailabilityNode0AckNode0InTopology.acks)
+    ABatchId -> DisseminationStatus
+      .InProgress(
+        Membership.forTesting(Node0, OrderingTopologyNode0),
+        Traced(ABatchId),
+        acks = ProofOfAvailabilityNode0AckNode0InTopology.acks.toSet,
+        epochNumber = anEpochNumber,
+        stats = ABatch.stats,
+      )
+      .update()
+      .toEither
+      .getOrElse(fail())
   protected val ABatchProposalNode0VoteNode0InTopology =
     Consensus.LocalAvailability.ProposalCreated(
       BlockNumber.First,
@@ -273,14 +292,41 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     anEpochNumber,
   )
   protected val BatchReadyForOrderingNode0And1Votes =
-    ABatchId -> InProgressBatchMetadata(Traced(ABatchId), anEpochNumber, ABatch.stats)
-      .complete(ProofOfAvailabilityNode0And1VotesNodes0And1InTopology.acks)
+    ABatchId -> DisseminationStatus
+      .InProgress(
+        Membership.forTesting(Node0, OrderingTopologyNodes0And1),
+        Traced(ABatchId),
+        acks = ProofOfAvailabilityNode0And1VotesNodes0And1InTopology.acks.toSet,
+        epochNumber = anEpochNumber,
+        stats = ABatch.stats,
+      )
+      .update()
+      .toEither
+      .getOrElse(fail())
   protected val BatchReadyForOrdering4NodesQuorumVotes =
-    ABatchId -> InProgressBatchMetadata(Traced(ABatchId), anEpochNumber, ABatch.stats)
-      .complete(ProofOfAvailability4NodesQuorumVotesNodes0To3InTopology.acks)
+    ABatchId -> DisseminationStatus
+      .InProgress(
+        Membership.forTesting(Node0, OrderingTopologyNodes0To3),
+        Traced(ABatchId),
+        acks = ProofOfAvailability4NodesQuorumVotesNodes0To3InTopology.acks.toSet,
+        epochNumber = anEpochNumber,
+        stats = ABatch.stats,
+      )
+      .update()
+      .toEither
+      .getOrElse(fail())
   protected val AnotherBatchReadyForOrdering6NodesQuorumNodes0And4To6Votes =
-    AnotherBatchId -> InProgressBatchMetadata(Traced(AnotherBatchId), anEpochNumber, ABatch.stats)
-      .complete(ProofOfAvailability6NodesQuorumVotesNodes0And4To6InTopology.acks)
+    AnotherBatchId -> DisseminationStatus
+      .InProgress(
+        Membership.forTesting(Node0, OrderingTopologyNodes0To6),
+        Traced(AnotherBatchId),
+        acks = ProofOfAvailability6NodesQuorumVotesNodes0And4To6InTopology.acks.toSet,
+        epochNumber = anEpochNumber,
+        stats = ABatch.stats,
+      )
+      .update()
+      .toEither
+      .getOrElse(fail())
   protected val ABatchProposalNode0And1Votes = Consensus.LocalAvailability.ProposalCreated(
     BlockNumber.First,
     OrderingBlock(
@@ -320,8 +366,6 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       BlockNumber.First,
       Some(BftBlockOrdererConfig.DefaultMaxBatchesPerProposal),
     )
-  protected val Node0To6 = (0 to 6).map(node).toSet
-  protected val OrderingTopologyNodes0To6 = OrderingTopology.forTesting(Node0To6)
 
   protected implicit val fakeTimerIgnoringUnitTestContext
       : IgnoringUnitTestContext[Availability.Message[IgnoringUnitTestEnv]] =
@@ -334,7 +378,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     override def close(): Unit = ()
   }
 
-  protected def createAvailability[E <: BaseIgnoringUnitTestEnv[E]](
+  protected def createAndStartAvailability[E <: BaseIgnoringUnitTestEnv[E]](
       myId: BftNodeId = Node0,
       otherNodes: Set[BftNodeId] = Set.empty,
       otherNodesCustomKeys: Map[BftNodeId, BftKeyId] = Map.empty,
@@ -372,7 +416,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
           myId,
           otherNodes,
           nodesTopologyInfos = otherNodesCustomKeys.map { case (nodeId, keyId) =>
-            nodeId -> NodeTopologyInfo(TopologyActivationTime(CantonTimestamp.MinValue), Set(keyId))
+            nodeId -> NodeTopologyInfo(Set(keyId))
           },
         )
       )

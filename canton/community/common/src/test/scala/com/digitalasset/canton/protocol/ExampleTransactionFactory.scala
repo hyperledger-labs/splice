@@ -180,7 +180,12 @@ object ExampleTransactionFactory {
   ): Versioned[LfGlobalKey] =
     LfVersioned(
       serializationVersion,
-      LfGlobalKey.assertBuild(templateId, value, packageName),
+      LfGlobalKey.assertBuild(
+        templateId,
+        packageName,
+        value,
+        com.digitalasset.daml.lf.crypto.Hash.hashPrivateKey(value.toString),
+      ),
     )
 
   def globalKeyWithMaintainers(
@@ -1193,7 +1198,9 @@ class ExampleTransactionFactory(
       mkMetadata(nodeSeed.fold(Map.empty[LfNodeId, LfHash])(seed => Map(nodeId -> seed)))
 
     override def keyResolver: LfKeyResolver =
-      node.gkeyOpt.fold(Map.empty: LfKeyResolver)(k => Map(k -> LfTransactionUtil.contractId(node)))
+      node.gkeyOpt.fold(Map.empty: LfKeyResolver)(k =>
+        Map(k -> LfTransactionUtil.contractIds(node))
+      )
 
     override lazy val versionedUnsuffixedTransaction: LfVersionedTransaction =
       transaction(Seq(0), lfNode)

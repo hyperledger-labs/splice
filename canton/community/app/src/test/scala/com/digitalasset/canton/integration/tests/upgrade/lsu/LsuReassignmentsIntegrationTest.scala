@@ -10,14 +10,18 @@ import com.digitalasset.canton.integration.bootstrap.NetworkBootstrapper
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
-import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.tests.upgrade.lsu.LogicalUpgradeUtils.SynchronizerNodes
+import com.digitalasset.canton.integration.util.TestUtils.waitForTargetTimeOnSequencer
 import com.digitalasset.canton.protocol.LfContractId
+
+import java.time.Duration
 
 /** The goal of this test is to ensure that LSU can happen between unassign and assign:
   *   - Two IOUs are created: one on da and the other on acme
   *   - Unassignments are submitted (to the other synchronizer)
   *   - Synchronizer da is upgraded
   *   - Assignments are done
+  *   - One final reassignment is done
   *
   * Nodes:
   *   - Old da: sequencer1, mediator1
@@ -52,6 +56,8 @@ final class LsuReassignmentsIntegrationTest extends LsuBase {
       }
       .withSetup { implicit env =>
         import env.*
+
+        setDefaultsDynamicSynchronizerParameters(daId, synchronizerOwners1)
 
         participants.all.synchronizers.connect_local(sequencer2, acmeName)
 
@@ -102,7 +108,7 @@ final class LsuReassignmentsIntegrationTest extends LsuBase {
         .value
         .reassignmentStore
 
-      val iou1ReassignmentTargetPSId = {
+      val iou1ReassignmentTargetPsid = {
         // Only reassignment of iou1 is in this store
         val (_, reassignmentId, _) = reassignmentStore
           .findEarliestIncomplete()
@@ -115,19 +121,21 @@ final class LsuReassignmentsIntegrationTest extends LsuBase {
           .value
           .unassignmentData
           .value
-          .targetPSId
+          .targetPsid
           .unwrap
       }
 
       // Initial target should be the old synchronizer
-      iou1ReassignmentTargetPSId shouldBe fixture.currentPSId
+      iou1ReassignmentTargetPsid shouldBe fixture.currentPsid
 
       environment.simClock.value.advanceTo(upgradeTime.immediateSuccessor)
-
+      transferTraffic()
       eventually() {
-        participants.all.forall(_.synchronizers.is_connected(fixture.newPSId)) shouldBe true
+        environment.simClock.value.advance(Duration.ofSeconds(1))
+        participants.all.forall(_.synchronizers.is_connected(fixture.newPsid)) shouldBe true
       }
-      waitForTargetTimeOnSequencer(sequencer3, environment.clock.now)
+      oldSynchronizerNodes.all.stop()
+      waitForTargetTimeOnSequencer(sequencer3, environment.clock.now, logger)
 
       participant1.ledger_api.commands
         .submit_assign(alice, reassignment1Id, acmeId, daId)
@@ -145,7 +153,8 @@ final class LsuReassignmentsIntegrationTest extends LsuBase {
       assignationsFinal.get(iou1.id.contractId).value shouldBe daId.logical
       assignationsFinal.get(iou2.id.contractId).value shouldBe acmeId.logical
 
-      oldSynchronizerNodes.all.stop()
+      // Final reassignment
+      participant1.ledger_api.commands.submit_reassign(bank, Seq(iou1Cid), daId, acmeId)
     }
   }
 }

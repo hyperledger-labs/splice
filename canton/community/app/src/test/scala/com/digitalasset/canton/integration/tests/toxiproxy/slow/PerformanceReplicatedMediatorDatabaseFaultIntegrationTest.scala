@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration.tests.toxiproxy.slow
 
+import com.digitalasset.canton.annotations.UnstableTest
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -42,6 +43,7 @@ import scala.concurrent.duration.*
   *   - above synchronizer is bootstrapped and p1 is connected to it
   *   - performance runner is run against p1
   */
+@UnstableTest // TODO(#19034)
 class PerformanceReplicatedMediatorDatabaseFaultIntegrationTest
     extends ReliabilityPerformanceIntegrationTest
     with ReplicatedNodeHelper
@@ -141,7 +143,6 @@ class PerformanceReplicatedMediatorDatabaseFaultIntegrationTest
     new UseConfigTransforms(
       Seq(
         ConfigTransforms.setStorageQueueSize(10000),
-        ConfigTransforms.enableReplicatedMediators(),
         ConfigTransforms.setPassiveCheckPeriodMediators(config.PositiveFiniteDuration.ofSeconds(3)),
       ),
       loggerFactory,
