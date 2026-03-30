@@ -337,7 +337,7 @@ trait SharedEnvironment[C <: SharedCantonConfig[C], E <: Environment[C]] extends
       sharedEnvironment.foreach(destroyEnvironment(None, _))
     } finally super.afterAll()
 
-  override def provideEnvironment: TestConsoleEnvironment[C, E] =
+  override def provideEnvironment(testName: String): TestConsoleEnvironment[C, E] =
     sharedEnvironment.getOrElse(
       sys.error("beforeAll should have run before providing a shared environment")
     )

@@ -714,6 +714,29 @@ object BuildCommon {
       )
   }
 
+  // Canton publishes observability-testing but not the test code.
+  // However, community-integration-testing depends on the InMemoryMetricsFactory which is in the test code.
+  lazy val `canton-observability-metrics-testing` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-observability-metrics-testing", file("canton/base/observability/metrics"))
+      .settings(
+        sharedCantonSettings,
+        sharedSettings,
+        libraryDependencies ++= Seq(
+          canton_observability_metrics,
+          daml_testing_utils,
+          scalatest,
+        ),
+        Compile / unmanagedSourceDirectories := Seq(
+          baseDirectory.value / "src/test/scala",
+        ),
+        Compile / unmanagedSources / includeFilter := "InMemoryMetricsFactory.scala",
+        Test / unmanagedSourceDirectories := Seq.empty,
+        scalacOptions += "-Wconf:msg=unused value of type:s"
+      )
+  }
+
   lazy val `canton-community-integration-testing` = {
     import CantonDependencies._
     sbt.Project
@@ -723,6 +746,7 @@ object BuildCommon {
         `canton-community-app-base`,
         `canton-community-testing`,
         `canton-community-reference-driver`,
+        `canton-observability-metrics-testing`,
       )
       .settings(
         excludeTranscodeConflictingDependencies,
