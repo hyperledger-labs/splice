@@ -67,7 +67,7 @@ jobs:
       - name: Push metrics to Prometheus Pushgateway
         if: ${{ always() }}
         run: |
-          python3 apps/app/src/test/resources/performance/push_store_ingestion_perf_metrics.py
+          python3 scripts/performance/push_store_ingestion_perf_metrics.py
 
       # sanity check
       - name: Check logs for errors
