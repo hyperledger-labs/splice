@@ -14,9 +14,7 @@ import org.lfdecentralizedtrust.splice.util.SvTestUtil
 
 import scala.jdk.CollectionConverters.*
 
-class CopyVotesIntegrationTest
-    extends IntegrationTestWithIsolatedEnvironment
-    with SvTestUtil {
+class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment with SvTestUtil {
 
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
@@ -155,6 +153,42 @@ class CopyVotesIntegrationTest
         sv2Vote.accept shouldBe false
         sv2Vote.reason.body should include("Copied from Digital-Asset-2")
         sv2Vote.reason.body should include("I disagree")
+      },
+    )
+
+    actAndCheck(
+      "sv1 changes its vote to accept",
+      sv1Backend.castVote(
+        getTrackingId(voteRequest),
+        true,
+        "new-url",
+        "I changed my mind",
+      ),
+    )(
+      "sv1's updated vote is recorded",
+      _ => {
+        val vr = sv2Backend.listVoteRequests().loneElement
+        val votes = vr.payload.votes.asScala
+        votes should have size 3
+        votes("Digital-Asset-2").accept shouldBe true
+      },
+    )
+
+    actAndCheck(
+      "run CopyVotesTrigger on sv2 again to copy the updated vote", {
+        runTriggerOnSv2
+      },
+    )(
+      "sv2 updates its copied vote to match sv1",
+      _ => {
+        val vr = sv2Backend.listVoteRequests().loneElement
+        val votes = vr.payload.votes.asScala
+        votes should have size 3
+        val sv2Vote = votes("Digital-Asset-Eng-2")
+        sv2Vote.accept shouldBe true
+        sv2Vote.reason.url shouldBe "new-url"
+        sv2Vote.reason.body should include("Copied from Digital-Asset-2")
+        sv2Vote.reason.body should include("I changed my mind")
       },
     )
   }

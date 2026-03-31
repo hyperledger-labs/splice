@@ -51,6 +51,19 @@ class CopyVotesTrigger(
   private def getThisSvName(svs: java.util.Map[String, SvInfo]): Option[String] =
     svs.asScala.get(thisSvParty).map(_.name)
 
+  private def copiedReason(sourceVote: Vote): Reason =
+    new Reason(
+      sourceVote.reason.url,
+      s"Copied from $sourceSvName: ${sourceVote.reason.body}",
+    )
+
+  private def shouldCopyVote(sourceVote: Vote, currentVote: Option[Vote]): Boolean =
+    currentVote.forall { vote =>
+      vote.accept != sourceVote.accept ||
+      vote.reason.url != sourceVote.reason.url ||
+      vote.reason.body != copiedReason(sourceVote).body
+    }
+
   override def completeTask(
       task: AssignedContract[VoteRequest.ContractId, VoteRequest]
   )(implicit tc: TraceContext): Future[TaskOutcome] =
@@ -72,17 +85,14 @@ class CopyVotesTrigger(
         case (true, Some(myName)) =>
           val votes = task.payload.votes.asScala
           val sourceVoteOpt = votes.get(sourceSvName)
-          val thisSvHasVoted = votes.contains(myName)
+          val thisSvVote = votes.get(myName)
           sourceVoteOpt match {
-            case Some(sourceVote) if !thisSvHasVoted =>
+            case Some(sourceVote) if shouldCopyVote(sourceVote, thisSvVote) =>
               val trackingCid = task.payload.trackingCid.toScala
                 .getOrElse(task.contractId)
               for {
                 resolvedVoteRequest <- store.getVoteRequest(trackingCid)
-                reason = new Reason(
-                  sourceVote.reason.url,
-                  s"Copied from $sourceSvName: ${sourceVote.reason.body}",
-                )
+                reason = copiedReason(sourceVote)
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_CastVote(
                     resolvedVoteRequest.contractId,
