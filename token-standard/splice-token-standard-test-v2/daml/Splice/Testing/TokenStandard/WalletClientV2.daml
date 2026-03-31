@@ -57,6 +57,7 @@ import Splice.Util.Token.Wallet.BatchingUtilityV2 qualified as BatchingUtilityV2
 
 import Splice.Testing.TokenStandard.RegistryApi qualified as V1
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.Utils qualified as V1
 import Splice.Testing.UtilsV2 qualified as V2
 
@@ -225,23 +226,27 @@ acceptAllocationRequestV1 admin registry actor req = do
 
 -- | Accept the allocation request by authorizing the transfer of all its requested legs.
 acceptAllocationRequestV2
-  :  V2.MultiRegistry -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script ()
+  :  MultiRegistry.MultiRegistry -> Party -> (ContractId V2.AllocationRequest, V2.AllocationRequestView) -> Script ()
 acceptAllocationRequestV2 registries actor (reqCid, req) = do
   now <- getTime
   let legsByAdmin = TokenStandard.Utils.splitLegsByAdmin req.transferLegs
   -- Allocate the legs grouped by instrument.
   factoriesByAdminWithD <- forA (Map.toList legsByAdmin) $ \(admin, legs) -> do
-    registry <- V2.getRegistryFor registries admin
-    enrichedChoice <- V2.getAllocationFactory registry V2.AllocationFactory_Allocate with
-      inputHoldingCids = []
-      allocation = V2.AllocationSpecification with
-          authorizer = req.authorizer
-          settlement = req.settlement
-          transferLegs = legs
-      requestedAt = now
-      extraArgs = V2.emptyExtraArgs
-      actors = [actor]
-    pure ((admin, (enrichedChoice.factoryCid, enrichedChoice.arg.extraArgs)), enrichedChoice.disclosures)
+    apis <- MultiRegistry.getRegistryApis registries admin
+    case apis.v2Api of
+      Some registryV2 -> do
+        enrichedChoice <- V2.getAllocationFactory registryV2 V2.AllocationFactory_Allocate with
+          inputHoldingCids = []
+          allocation = V2.AllocationSpecification with
+              authorizer = req.authorizer
+              settlement = req.settlement
+              transferLegs = legs
+          requestedAt = now
+          extraArgs = V2.emptyExtraArgs
+          actors = [actor]
+        pure ((admin, (enrichedChoice.factoryCid, enrichedChoice.arg.extraArgs)), enrichedChoice.disclosures)
+
+      None -> fail $ "Registry with admin " <> show admin <> " does not support V2 token standard"
 
   -- Get holdings for relevant admins
   inputHoldingMap <- getHoldingMap actor [(req.authorizer, leg.instrumentId) | legs <- Map.values legsByAdmin, leg <- legs]

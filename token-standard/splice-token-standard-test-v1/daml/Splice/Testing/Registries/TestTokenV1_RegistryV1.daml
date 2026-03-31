@@ -1,0 +1,114 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | V1 registry for the TestTokenV1.
+module Splice.Testing.Registries.TestTokenV1_RegistryV1
+  (
+    -- * Setup
+    TestTokenV1RegistryConfig(..)
+  , defaultTestTokenV1RegistryConfig
+
+  , TestTokenV1Registry(..)
+  , initialize
+
+  , mint
+  ) where
+
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as V1
+
+import Splice.Testing.Tokens.TestTokenV1 as TestTokenV1
+import Splice.Testing.TokenStandard.RegistryApi
+import Splice.Testing.Utils
+
+import Daml.Script
+
+
+-- Registry representation
+--------------------------
+
+-- | A reference to a mock amulet registry.
+data TestTokenV1Registry = TestTokenV1Registry with
+    admin : Party
+  deriving (Eq, Ord, Show)
+
+instance RegistryApi TestTokenV1Registry where
+  getTransferFactory = registryApi_getFactory
+  getAllocationFactory = registryApi_getFactory
+  getAllocation_TransferContext = registryApi_getEmptyContext
+  getAllocation_WithdrawContext = registryApi_getEmptyContext
+  getAllocation_CancelContext = registryApi_getEmptyContext
+  getTransferInstruction_AcceptContext = registryApi_getEmptyContext
+  getTransferInstruction_RejectContext = registryApi_getEmptyContext
+  getTransferInstruction_WithdrawContext = registryApi_getEmptyContext
+
+
+-- Registry initialization
+--------------------------
+data TestTokenV1RegistryConfig = TestTokenV1RegistryConfig
+  with
+    adminPartyName : Text
+  deriving (Eq, Show)
+
+defaultTestTokenV1RegistryConfig : TestTokenV1RegistryConfig
+defaultTestTokenV1RegistryConfig = TestTokenV1RegistryConfig with
+  adminPartyName = "adminTT1"
+
+-- | Initialize the test token v1 registry.
+initialize : TestTokenV1RegistryConfig -> Script TestTokenV1Registry
+initialize config = do
+  admin <- allocateParty config.adminPartyName
+  submit admin $ createCmd TestTokenV1.TokenRules with admin
+  pure TestTokenV1Registry with admin
+
+-- | Mint test token instrument
+mint : TestTokenV1Registry -> Party -> Text -> Decimal -> Script (ContractId V1.Holding)
+mint registry user intrumentName amount = do
+  tokenCid <- submitMulti [user, registry.admin] [] $ createCmd TestTokenV1.Token with
+    holding = V1.HoldingView with
+      owner = user
+      amount = amount
+      lock = None
+      meta = emptyMetadata
+      instrumentId = V1.InstrumentId with
+        id = intrumentName
+        admin = registry.admin
+  return $ toInterfaceContractId tokenCid
+
+
+-- Token standard registry implementation
+-----------------------------------------
+
+registryApi_getFactory : TestTokenV1Registry -> arg -> Script (EnrichedFactoryChoice factory arg)
+registryApi_getFactory registry arg = do
+  (tokenRulesCid, tokenRulesD) <- getTokenRulesWithDisclosures registry
+  pure EnrichedFactoryChoice with
+    factoryCid = coerceContractId tokenRulesCid
+    arg -- no choice context required for TestTokenV1
+    disclosures = tokenRulesD
+
+-- registryApi_getEmptyContext : arg -> Script (Disclosures', ChoiceContext)
+registryApi_getEmptyContext : Action a => TestTokenV1Registry -> ContractId t -> Metadata -> a OpenApiChoiceContext
+registryApi_getEmptyContext _registry _workflowCid _meta =
+  pure OpenApiChoiceContext with
+    disclosures = mempty
+    choiceContext = emptyChoiceContext
+
+getTokenRules : TestTokenV1Registry -> Script (ContractId TestTokenV1.TokenRules, TestTokenV1.TokenRules)
+getTokenRules registry = getTokenRules' registry.admin
+
+getTokenRules' : Party -> Script (ContractId TestTokenV1.TokenRules, TestTokenV1.TokenRules)
+getTokenRules' admin = do
+  rules <- query @TestTokenV1.TokenRules admin
+  case rules of
+    [rule] -> return rule
+    [] -> fail $ "No TestTokenV1Rules found: did you initialize the TestTokenV1 registry?"
+    _ -> fail "Multiple TestTokenV1Rules found: are you initializing the TestTokenV1 registry multiple times?"
+
+getTokenRulesWithDisclosures
+  : TestTokenV1Registry -> Script (ContractId TestTokenV1.TokenRules, Disclosures')
+getTokenRulesWithDisclosures registry = do
+  (tokenRulesCid, _) <- getTokenRules registry
+  tokenRulesD <- queryDisclosure' @TestTokenV1.TokenRules registry.admin tokenRulesCid
+  pure (tokenRulesCid, tokenRulesD)

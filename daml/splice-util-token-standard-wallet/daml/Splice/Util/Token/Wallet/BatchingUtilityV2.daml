@@ -203,7 +203,7 @@ template BatchingUtility
 
 
     -- | Accept an allocation request using the V1 allocation factory interface.
-    -- Use this to accept rquests from V1 apps; and to accept requests for V1 assets that only support V1 interfaces.
+    -- Use this to accept V1 requests.
     --
     -- All account references are interpreted as references to basic accounts.
     nonconsuming choice BatchingUtility_AcceptAllocationRequestV1
@@ -256,11 +256,7 @@ template BatchingUtility
 
     -- | Accept an allocation request using the V2 allocation factory interface for the assets that support it.
     --
-    -- To accept allocation requests that require the allocation of both V1 and V2 assets,
-    -- call both `BatchingUtility_AcceptAllocationRequestV1` and
-    -- `BatchingUtility_AcceptAllocationRequestV2` in the same batch execution
-    -- with appropriate factory calls provided to ensure that each leg is
-    -- allocated exactly once.
+    -- Use this to accept V2 requests for V2 assets.
     --
     -- QUESTION: @bame-da wdyt about this split of responsibility between the two choices?
 

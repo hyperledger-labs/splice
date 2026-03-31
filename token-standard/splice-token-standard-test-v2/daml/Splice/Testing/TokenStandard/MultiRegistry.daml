@@ -1,0 +1,53 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Tooling to simulate the lookup of the registry API and its version support
+-- based on the admin party of the instrument, for testing multi-registry and
+-- multi-version scenarios.
+module Splice.Testing.TokenStandard.MultiRegistry
+  (
+    MultiRegistry
+  , RegistryApis(..)
+  , getRegistryApis
+
+  , mkRegistryApisV1
+  , mkRegistryApisV1V2
+  ) where
+
+import DA.Map qualified as Map
+
+import Splice.Testing.TokenStandard.RegistryApi qualified as V1
+import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
+
+
+import Daml.Script
+
+
+-- Multi-registry support
+-------------------------
+
+-- | Type alias for a map of registries, keyed by the party that administers them.
+type MultiRegistry = Map.Map Party RegistryApis
+
+-- | A handle to the APIs of a registry, which may support V1, V2 or both versions of the token standard.
+data RegistryApis = RegistryApis with
+  v1Api : Optional V1.GenericRegistry
+  v2Api : Optional V2.GenericRegistry
+
+-- | Lookup the registry APIs for a given admin party.
+getRegistryApis : MultiRegistry -> Party -> Script RegistryApis
+getRegistryApis registries admin = do
+  case Map.lookup admin registries of
+    None -> fail $ "Registry with admin " <> show admin <> " not found"
+    Some apis -> return apis
+
+
+mkRegistryApisV1 : V1.RegistryApi registry => registry -> RegistryApis
+mkRegistryApisV1 v1Api = RegistryApis with
+  v1Api = Some (V1.mkGenericRegistry v1Api)
+  v2Api = None
+
+mkRegistryApisV1V2 : (V1.RegistryApi v1, V2.RegistryApi v2) => v1 -> v2 -> RegistryApis
+mkRegistryApisV1V2 v1Api v2Api = RegistryApis with
+  v1Api = Some (V1.mkGenericRegistry v1Api)
+  v2Api = Some (V2.mkGenericRegistry v2Api)

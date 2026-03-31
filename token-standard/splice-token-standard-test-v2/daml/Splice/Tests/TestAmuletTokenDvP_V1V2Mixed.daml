@@ -40,6 +40,7 @@ import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistryV1
+import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 
 
 -- Tests definitions
@@ -55,9 +56,9 @@ data TestEnvironment = TestEnvironment
     allParties : [Party]
     registryV2 : AmuletRegistryV2.AmuletRegistry
     registryV1 : AmuletRegistryV1.AmuletRegistry
+    registries : MultiRegistry.MultiRegistry
     amuletId : V2.InstrumentId
     -- TODO(#4515): add the registry for the private asset
-  deriving (Show, Eq)
 
 data TestHolding = TestHolding with
     owner : Party
@@ -214,6 +215,8 @@ dvpWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
 
 -- TODO(#4515): test allocation workflow with different accounts for cash and security leg
 
+-- TODO(#4515): test V2 wallet accepting allocation request from a V1 app using mix of V1 and V2 assets
+
 
 -- Test exececution infrastructure
 -----------------------------------
@@ -275,7 +278,7 @@ runTest mkTest = do
         reqs <- WalletClientV2.listAllocationRequestsV2 (basicAccount trader) trader
         trace ("num requests for", trader, length reqs) $
          forA_ reqs $ \req -> do
-          WalletClientV2.acceptAllocationRequestV2 (AmuletRegistryV2.amuletToMultiRegistry env.registryV2) trader req
+          WalletClientV2.acceptAllocationRequestV2 env.registries trader req
 
   -- check locked holdings
   checkHoldings env "holdings after allocation" test.expectedHoldingsAfterAllocation
@@ -349,6 +352,9 @@ setupTestEnvironment = do
   let registryV1 = AmuletRegistryV1.AmuletRegistry with
         dso = registryV2.dso
         instrumentId = downcast amuletId
+  let registries = Map.fromList
+        [ (registryV2.dso, MultiRegistry.mkRegistryApisV1V2 registryV1 registryV2)
+        ]
   pure TestEnvironment with ..
 
 
