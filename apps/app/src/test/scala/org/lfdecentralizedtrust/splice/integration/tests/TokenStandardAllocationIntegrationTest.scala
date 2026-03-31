@@ -75,59 +75,6 @@ class TokenStandardAllocationIntegrationTest
   val feesReserveMultiplier = 1.1 // fee reserves are 4 x the fees required for the transfer
   val feesUpperBound = walletUsdToAmulet(1.15)
 
-  def createAllocationCommand(
-      participantClient: ParticipantClientReference,
-      request: allocationrequestv1.AllocationRequestView,
-      legId: String,
-  )(implicit
-      env: SpliceTestConsoleEnvironment
-  ): FactoryChoiceWithDisclosures[
-    allocationinstructionv1.AllocationFactory.ContractId,
-    allocationinstructionv1.AllocationFactory_Allocate,
-  ] = {
-    val leg = request.transferLegs.get(legId)
-    clue(
-      s"Creating command to request allocation for leg $legId to transfer ${leg.amount} amulets from ${leg.sender} to ${leg.receiver}"
-    ) {
-      val sender = PartyId.tryFromProtoPrimitive(leg.sender)
-      val senderHoldings =
-        participantClient.ledger_api.state.acs.of_party(
-          party = sender,
-          filterInterfaces = Seq(holdingv1.Holding.TEMPLATE_ID).map(templateId =>
-            TemplateId(
-              templateId.getPackageId,
-              templateId.getModuleName,
-              templateId.getEntityName,
-            )
-          ),
-          includeCreatedEventBlob = true,
-        )
-      val allocation = new allocationv1.AllocationSpecification(
-        request.settlement,
-        legId,
-        leg,
-      )
-      val now = env.environment.clock.now.toInstant
-      val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
-        dsoParty.toProtoPrimitive,
-        allocation,
-        /*requestedAt =*/ now,
-        senderHoldings
-          .map(senderHolding => new holdingv1.Holding.ContractId(senderHolding.contractId))
-          .asJava,
-        new metadatav1.ExtraArgs(
-          new metadatav1.ChoiceContext(
-            java.util.Map.of()
-          ),
-          new metadatav1.Metadata(java.util.Map.of()),
-        ),
-      )
-      val factoryChoice0 = sv1ScanBackend.getAllocationFactory(choiceArgs)
-      aliceValidatorBackend.scanProxy.getAllocationFactory(choiceArgs) shouldBe factoryChoice0
-      factoryChoice0.copy(disclosedContracts = factoryChoice0.disclosedContracts)
-    }
-  }
-
   def createAllocation(
       walletClient: WalletAppClientReference,
       request: allocationrequestv1.AllocationRequestView,
