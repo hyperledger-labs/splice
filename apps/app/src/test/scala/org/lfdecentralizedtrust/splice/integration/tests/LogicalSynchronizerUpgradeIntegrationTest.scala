@@ -132,11 +132,9 @@ class LogicalSynchronizerUpgradeIntegrationTest
             }
           ),
         )
-        ConfigTransforms
-          .bumpSomeWalletClientPortsBy(21_900, Seq("bobValidatorWalletLocal"))
-          .andThen(
-            ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(21_900, Seq("bobValidatorLocal"))
-          )(updatedConfig)
+        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(21_900, Seq("bobValidatorLocal"))(
+          updatedConfig
+        )
       })
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart
