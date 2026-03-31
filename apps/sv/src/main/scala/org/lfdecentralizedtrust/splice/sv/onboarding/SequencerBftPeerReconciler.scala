@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
+import cats.implicits.catsSyntaxApplicativeError
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
@@ -27,7 +28,13 @@ abstract class SequencerBftPeerReconciler(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
     for {
-      sequencerInitialized <- sequencerAdminConnection.isNodeInitialized()
+      sequencerInitialized <- sequencerAdminConnection
+        .isNodeInitialized()
+        .attemptT
+        .valueOr(error => {
+          logger.info("Failed to read sequencer init status, skipping", error)
+          false
+        })
       result <-
         if (!sequencerInitialized) Future.successful(Seq.empty)
         else
