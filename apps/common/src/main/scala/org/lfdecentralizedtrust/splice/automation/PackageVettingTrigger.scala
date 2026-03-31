@@ -81,7 +81,7 @@ abstract class PackageVettingTrigger(
         latestPackagesOnly,
         additionalPackagesToUnvet,
       )
-      // Unvet unsupported packages only if they are currently vetted to avoid Canton failing conformance checks
+      // Unvet unsupported packages only if they are currently vetted
       resolvedUnsupportedPackages = resolvePackagesToUnvetFromVettingState(
         vettedPackageIds,
         unsupportedPackages.map(_.packageId).map(PackageId.assertFromString),
@@ -118,6 +118,6 @@ abstract class PackageVettingTrigger(
       unsupportedPackagesIds: Seq[PackageId],
   ): Seq[DarResource] =
     unsupportedPackagesIds
-      .filter(vettedPackageIds.toSet)
+      .filter(vettedPackageIds.contains(_))
       .flatMap(DarResources.pkgIdToDarResource.get)
 }

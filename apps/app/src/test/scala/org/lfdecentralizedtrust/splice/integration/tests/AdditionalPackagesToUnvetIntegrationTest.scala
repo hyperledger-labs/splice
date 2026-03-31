@@ -16,8 +16,8 @@ abstract class AdditionalPackagesToUnvetIntegrationTestBase
     extends IntegrationTest
     with PackageUnvettingUtil {
 
-  protected val additionalPackagesToUnvet1: Seq[DarResource]
-  protected val additionalPackagesToUnvet2: Seq[DarResource] = Seq.empty
+  protected val additionalPackagesToUnvetSv1: Seq[DarResource]
+  protected val additionalPackagesToUnvetSv1Local: Seq[DarResource] = Seq.empty
 
   protected def supportedPackagesToUnvet(
       packages: Seq[DarResource]
@@ -36,13 +36,13 @@ abstract class AdditionalPackagesToUnvetIntegrationTestBase
               config
                 .validatorApps(InstanceName.tryCreate(s"sv1Validator"))
                 .copy(
-                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvet1)
+                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvetSv1)
                 )) +
             (InstanceName.tryCreate("sv1ValidatorLocal") ->
               config
                 .validatorApps(InstanceName.tryCreate(s"sv1Validator"))
                 .copy(
-                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvet2)
+                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvetSv1Local)
                 ))
         )
       })
@@ -53,19 +53,22 @@ abstract class AdditionalPackagesToUnvetIntegrationTestBase
               config
                 .svApps(InstanceName.tryCreate(s"sv1"))
                 .copy(
-                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvet1)
+                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvetSv1)
                 )) +
             (InstanceName.tryCreate("sv1Local") ->
               config
                 .svApps(InstanceName.tryCreate(s"sv1"))
                 .copy(
-                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvet2)
+                  additionalPackagesToUnvet = supportedPackagesToUnvet(additionalPackagesToUnvetSv1Local)
                 ))
         )
       })
       .withManualStart
 }
 
+/**
+ * This test verifies that an SV cannot unvet packages that still have dependencies, but can unvet them if the dependencies are unvetted as well
+ */
 class DependentAdditionalPackagesToUnvetIntegrationTest
     extends AdditionalPackagesToUnvetIntegrationTestBase {
 
@@ -73,12 +76,10 @@ class DependentAdditionalPackagesToUnvetIntegrationTest
   private val problematicDar = DarResources.walletPayments_0_1_15
   private val darsWithMissingDependency = Seq(
     DarResources.wallet_0_1_16,
-    DarResources.amuletNameService_0_1_16,
-    DarResources.dsoGovernance_0_1_21,
   ) :+ problematicDar
 
-  override val additionalPackagesToUnvet1: Seq[DarResource] = darsWithMissingDependency
-  override val additionalPackagesToUnvet2: Seq[DarResource] =
+  override val additionalPackagesToUnvetSv1: Seq[DarResource] = darsWithMissingDependency
+  override val additionalPackagesToUnvetSv1Local: Seq[DarResource] =
     darsWithMissingDependency :+ missingDependency
 
   "sv1 cannot unvet packages that still have dependencies" in { implicit env =>
@@ -92,7 +93,7 @@ class DependentAdditionalPackagesToUnvetIntegrationTest
     val synchronizerId =
       sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
 
-    clue(s"sv1 cannot unvet a dar if a dependency to it remains, additionalPackagesToUnvet: ${additionalPackagesToUnvet1
+    clue(s"sv1 cannot unvet a dar if a dependency to it remains, additionalPackagesToUnvet: ${additionalPackagesToUnvetSv1
         .map(pkg => pkg.metadata.name -> pkg.metadata.version)}") {
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         within = {},
@@ -114,7 +115,7 @@ class DependentAdditionalPackagesToUnvetIntegrationTest
     }
 
     clue(
-      s"sv1 can unvet a dar if all dependency to it are unvetted as well, additionalPackagesToUnvet: ${additionalPackagesToUnvet2
+      s"sv1 can unvet a dar if all dependency to it are unvetted as well, additionalPackagesToUnvet: ${additionalPackagesToUnvetSv1Local
           .map(pkg => pkg.metadata.name -> pkg.metadata.version)}"
     ) {
       startAllSync(
@@ -136,6 +137,9 @@ class DependentAdditionalPackagesToUnvetIntegrationTest
   }
 }
 
+/**
+ * This test verifies that an SV can unvet packages that were previously vetted as part of an upgrade
+ */
 class UpgradeAdditionalPackagesToUnvetIntegrationTest
     extends AdditionalPackagesToUnvetIntegrationTestBase {
 
@@ -147,8 +151,8 @@ class UpgradeAdditionalPackagesToUnvetIntegrationTest
     DarResources.amulet_0_1_17,
   )
 
-  override val additionalPackagesToUnvet1: Seq[DarResource] = darsFromAnUpgrade
-  override val additionalPackagesToUnvet2: Seq[DarResource] = Seq(DarResources.wallet_0_1_15)
+  override val additionalPackagesToUnvetSv1: Seq[DarResource] = darsFromAnUpgrade
+  override val additionalPackagesToUnvetSv1Local: Seq[DarResource] = Seq(DarResources.wallet_0_1_15)
 
   "sv1 can unvet an upgrade and vet it again along new ignore packages" in { implicit env =>
     import env.executionContext
@@ -161,7 +165,7 @@ class UpgradeAdditionalPackagesToUnvetIntegrationTest
     val synchronizerId =
       sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
 
-    clue(s"sv1 does not vet packages from additionalPackagesToUnvet: ${additionalPackagesToUnvet1
+    clue(s"sv1 does not vet packages from additionalPackagesToUnvet: ${additionalPackagesToUnvetSv1
         .map(pkg => pkg.metadata.name -> pkg.metadata.version)}") {
       eventually() {
         getVettedPackageIds(
@@ -176,7 +180,7 @@ class UpgradeAdditionalPackagesToUnvetIntegrationTest
     }
 
     clue(
-      s"sv1 restarts, vets the packages previously ignored and does not vet the packages from additionalPackagesToUnvet: ${additionalPackagesToUnvet2
+      s"sv1 restarts, vets the packages previously ignored and does not vet the packages from additionalPackagesToUnvet: ${additionalPackagesToUnvetSv1Local
           .map(pkg => pkg.metadata.name -> pkg.metadata.version)}"
     ) {
       startAllSync(
@@ -189,7 +193,7 @@ class UpgradeAdditionalPackagesToUnvetIntegrationTest
           synchronizerId,
         )
         vettedPackageIds should contain allElementsOf darsFromAnUpgrade.map(_.packageId)
-        vettedPackageIds should contain noElementsOf additionalPackagesToUnvet2.map(_.packageId)
+        vettedPackageIds should contain noElementsOf additionalPackagesToUnvetSv1Local.map(_.packageId)
       }
       stopAllAsync(
         sv1LocalBackend,
@@ -199,15 +203,61 @@ class UpgradeAdditionalPackagesToUnvetIntegrationTest
   }
 }
 
+/**
+ * This test verifies that an SV can unvet packages that were previously vetted as part of an upgrade, even if they have missing dependencies
+ */
+class DowngradeWalletAdditionalPackagesToUnvetIntegrationTest
+  extends AdditionalPackagesToUnvetIntegrationTestBase {
+
+  private val darsWithMissingDependency = Seq(
+    DarResources.wallet_0_1_16,
+  )
+
+  override val additionalPackagesToUnvetSv1: Seq[DarResource] = darsWithMissingDependency
+
+  "sv1 can unvet wallet_0_1_16" in { implicit env =>
+    import env.executionContext
+
+    startAllSync(
+      sv1Backend,
+      sv1ScanBackend,
+      sv1ValidatorBackend,
+    )
+    val synchronizerId =
+      sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
+
+    clue(
+      s"sv1 can unvet a dar if all dependency to it are unvetted as well, additionalPackagesToUnvet: ${additionalPackagesToUnvetSv1Local
+        .map(pkg => pkg.metadata.name -> pkg.metadata.version)}"
+    ) {
+      eventually() {
+        val vettedPackageIds = getVettedPackageIds(
+          sv1Backend.appState.participantAdminConnection,
+          synchronizerId,
+        )
+        vettedPackageIds should contain noElementsOf darsWithMissingDependency
+      }
+      stopAllAsync(
+        sv1Backend,
+        sv1ValidatorBackend,
+      ).futureValue
+    }
+  }
+}
+
+/**
+ * This test verifies that an SV can unvet all supported packages that are above the minimum initialization version,
+ * but not the ones equal to the minimum initialization version,.
+ */
 class MinimumRequiredAdditionalPackagesToUnvetIntegrationTest
     extends AdditionalPackagesToUnvetIntegrationTestBase {
 
   private val minimalPackageVersions = DarResourcesUtil.minimalPackageVersions
   private val nonMinimalSupportedPackageVersions =
-    DarResourcesUtil.supportedPackageVersions.filterNot(minimalPackageVersions.toSet)
+    DarResourcesUtil.supportedPackageVersions.filterNot(minimalPackageVersions.contains(_))
 
-  override val additionalPackagesToUnvet1: Seq[DarResource] = nonMinimalSupportedPackageVersions
-  override val additionalPackagesToUnvet2: Seq[DarResource] =
+  override val additionalPackagesToUnvetSv1: Seq[DarResource] = nonMinimalSupportedPackageVersions
+  override val additionalPackagesToUnvetSv1Local: Seq[DarResource] =
     nonMinimalSupportedPackageVersions ++ minimalPackageVersions
 
   "sv1 cannot unvet all vetted and supported packages" in { implicit env =>
@@ -221,7 +271,7 @@ class MinimumRequiredAdditionalPackagesToUnvetIntegrationTest
     val synchronizerId =
       sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
 
-    clue(s"sv1 succeeds to unvets all packages but the minimal supported ones: ${additionalPackagesToUnvet1
+    clue(s"sv1 succeeds to unvets all packages but the minimal supported ones: ${additionalPackagesToUnvetSv1
         .map(pkg => pkg.metadata.name -> pkg.metadata.version)}") {
       eventually() {
         val vettedPackageIds = getVettedPackageIds(
@@ -239,7 +289,7 @@ class MinimumRequiredAdditionalPackagesToUnvetIntegrationTest
     }
 
     clue(
-      s"sv1 fails to unvet all supported packages: ${additionalPackagesToUnvet2
+      s"sv1 fails to unvet all supported packages: ${additionalPackagesToUnvetSv1Local
           .map(pkg => pkg.metadata.name -> pkg.metadata.version)}"
     ) {
       startAllSync(

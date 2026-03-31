@@ -97,7 +97,7 @@ object DarResourcesUtil extends NamedLogging {
         )
         .map(_.packageId)
     vettedPackageIds
-      .filterNot(allSupportedVersionsPackageIds.toSet)
+      .filterNot(allSupportedVersionsPackageIds.contains(_))
       .flatMap(pkg => pkgIdToDarResource.get(pkg))
   }
 
