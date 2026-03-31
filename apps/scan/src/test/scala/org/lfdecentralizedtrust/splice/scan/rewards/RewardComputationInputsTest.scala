@@ -146,6 +146,19 @@ object RewardComputationInputsTest {
         unclaimedAppRewardAmount = BigDecimal("0E-10"),
       ),
     ),
+    // Simple: double traffic (2 MB) → half the issuance per featured app activity
+    // issuancePerCoupon = 0.45/2.0 = 0.225 (half of 0.45 from 1 MB case)
+    TestCase(
+      label = "simple: double traffic halves issuance per featured app activity",
+      inputs = simpleArithmetic,
+      totalRoundAppActivityWeight = 2000000L,
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.225"),
+        threshold_CC = BigDecimal("0.5"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
+        unclaimedAppRewardAmount = BigDecimal("0"),
+      ),
+    ),
     // Simple: 10 MB traffic dilutes issuance per MB
     // issuancePerCoupon = 0.45/10.0 = 0.045
     TestCase(
