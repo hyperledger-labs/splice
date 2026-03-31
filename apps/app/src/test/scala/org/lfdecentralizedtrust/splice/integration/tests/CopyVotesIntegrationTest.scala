@@ -78,7 +78,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         votes should have size 2
         val sv2Vote = votes("Digital-Asset-Eng-2")
         sv2Vote.accept shouldBe true
-        sv2Vote.reason.body should include("Copied from Digital-Asset-2")
+        sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
       },
     )
 
@@ -151,7 +151,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         votes should have size 3
         val sv2Vote = votes("Digital-Asset-Eng-2")
         sv2Vote.accept shouldBe false
-        sv2Vote.reason.body should include("Copied from Digital-Asset-2")
+        sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
         sv2Vote.reason.body should include("I disagree")
       },
     )
@@ -187,7 +187,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         val sv2Vote = votes("Digital-Asset-Eng-2")
         sv2Vote.accept shouldBe true
         sv2Vote.reason.url shouldBe "new-url"
-        sv2Vote.reason.body should include("Copied from Digital-Asset-2")
+        sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
         sv2Vote.reason.body should include("I changed my mind")
       },
     )

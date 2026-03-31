@@ -54,7 +54,7 @@ class CopyVotesTrigger(
   private def copiedReason(sourceVote: Vote): Reason =
     new Reason(
       sourceVote.reason.url,
-      s"Copied from $sourceSvName: ${sourceVote.reason.body}",
+      s"Automatically Copied from $sourceSvName: ${sourceVote.reason.body}",
     )
 
   private def shouldCopyVote(sourceVote: Vote, currentVote: Option[Vote]): Boolean =
