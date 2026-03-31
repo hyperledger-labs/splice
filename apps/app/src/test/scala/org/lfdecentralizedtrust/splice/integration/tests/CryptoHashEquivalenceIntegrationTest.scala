@@ -40,6 +40,9 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .withAdditionalSetup { implicit env =>
+        sv1Backend.participantClient.upload_dar_unless_exists(darPath)
+      }
       .withManualStart
 
   "Three-way CryptoHash equivalence (Daml, SQL, Scala)" should {
@@ -50,8 +53,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       )
       svParty = sv1Backend.getDsoInfo().svParty
 
-      clue("Upload dar and create CryptoHashProxy") {
-        sv1Backend.participantClient.upload_dar_unless_exists(darPath)
+      clue("Create CryptoHashProxy") {
         val createArgs = new DamlRecord(
           java.util.List.of(
             new DamlRecord.Field("owner", new Party(svParty.toProtoPrimitive))
