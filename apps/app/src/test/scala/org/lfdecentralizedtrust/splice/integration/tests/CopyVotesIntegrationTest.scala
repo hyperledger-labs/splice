@@ -37,11 +37,18 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
 
   "CopyVotesTrigger mirrors source votes across accept, reject, update, and no-op cases" in {
     implicit env =>
-      def runTriggerOnSv2 =
-        sv2Backend.dsoAutomation
-          .trigger[CopyVotesTrigger]
-          .runOnce()
-          .futureValue
+      val _ = env
+
+      def copyVotesTrigger = sv2Backend.dsoAutomation.trigger[CopyVotesTrigger]
+
+      def resumeTriggerAndCheck(assertion: => org.scalatest.compatible.Assertion) = {
+        copyVotesTrigger.resume()
+        try
+          eventually() {
+            assertion
+          }
+        finally copyVotesTrigger.pause().futureValue
+      }
 
       def voteRequestOnSv2(
           trackingId: org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest.ContractId
@@ -83,29 +90,31 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       val acceptTrackingId = getTrackingId(acceptVoteRequest)
 
       actAndCheck(
-        "run CopyVotesTrigger on sv2 for the initial accept vote",
-        runTriggerOnSv2,
+        "resume CopyVotesTrigger on sv2 for the initial accept vote",
+        (),
       )(
         "sv2 copies sv1's accept vote",
-        _ => {
-          val vr = voteRequestOnSv2(acceptTrackingId)
-          val votes = vr.payload.votes.asScala
-          votes should have size 2
-          val sv2Vote = votes("Digital-Asset-Eng-2")
-          sv2Vote.accept shouldBe true
-          sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
-        },
+        _ =>
+          resumeTriggerAndCheck {
+            val vr = voteRequestOnSv2(acceptTrackingId)
+            val votes = vr.payload.votes.asScala
+            votes should have size 2
+            val sv2Vote = votes("Digital-Asset-Eng-2")
+            sv2Vote.accept shouldBe true
+            sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
+          },
       )
 
       actAndCheck(
-        "run CopyVotesTrigger again on sv2 for the same vote",
-        runTriggerOnSv2,
+        "resume CopyVotesTrigger again on sv2 for the same vote",
+        (),
       )(
         "sv2 does not create a duplicate vote",
-        _ => {
-          val vr = voteRequestOnSv2(acceptTrackingId)
-          vr.payload.votes.asScala should have size 2
-        },
+        _ =>
+          resumeTriggerAndCheck {
+            val vr = voteRequestOnSv2(acceptTrackingId)
+            vr.payload.votes.asScala should have size 2
+          },
       )
 
       val (_, rejectVoteRequest) = actAndCheck(
@@ -145,19 +154,20 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )
 
       actAndCheck(
-        "run CopyVotesTrigger on sv2 for the reject vote",
-        runTriggerOnSv2,
+        "resume CopyVotesTrigger on sv2 for the reject vote",
+        (),
       )(
         "sv2 copies sv1's reject vote",
-        _ => {
-          val vr = voteRequestOnSv2(rejectTrackingId)
-          val votes = vr.payload.votes.asScala
-          votes should have size 3
-          val sv2Vote = votes("Digital-Asset-Eng-2")
-          sv2Vote.accept shouldBe false
-          sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
-          sv2Vote.reason.body should include("I disagree")
-        },
+        _ =>
+          resumeTriggerAndCheck {
+            val vr = voteRequestOnSv2(rejectTrackingId)
+            val votes = vr.payload.votes.asScala
+            votes should have size 3
+            val sv2Vote = votes("Digital-Asset-Eng-2")
+            sv2Vote.accept shouldBe false
+            sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
+            sv2Vote.reason.body should include("I disagree")
+          },
       )
 
       actAndCheck(
@@ -179,20 +189,21 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )
 
       actAndCheck(
-        "run CopyVotesTrigger on sv2 again for the updated vote",
-        runTriggerOnSv2,
+        "resume CopyVotesTrigger on sv2 again for the updated vote",
+        (),
       )(
         "sv2 updates its copied vote to match sv1",
-        _ => {
-          val vr = voteRequestOnSv2(rejectTrackingId)
-          val votes = vr.payload.votes.asScala
-          votes should have size 3
-          val sv2Vote = votes("Digital-Asset-Eng-2")
-          sv2Vote.accept shouldBe true
-          sv2Vote.reason.url shouldBe "new-url"
-          sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
-          sv2Vote.reason.body should include("I changed my mind")
-        },
+        _ =>
+          resumeTriggerAndCheck {
+            val vr = voteRequestOnSv2(rejectTrackingId)
+            val votes = vr.payload.votes.asScala
+            votes should have size 3
+            val sv2Vote = votes("Digital-Asset-Eng-2")
+            sv2Vote.accept shouldBe true
+            sv2Vote.reason.url shouldBe "new-url"
+            sv2Vote.reason.body should include("Automatically Copied from Digital-Asset-2")
+            sv2Vote.reason.body should include("I changed my mind")
+          },
       )
 
       val (_, noVoteRequest) = actAndCheck(
@@ -216,15 +227,16 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       val noVoteTrackingId = getTrackingId(noVoteRequest)
 
       actAndCheck(
-        "run CopyVotesTrigger on sv2 when sv1 has not voted",
-        runTriggerOnSv2,
+        "resume CopyVotesTrigger on sv2 when sv1 has not voted",
+        (),
       )(
         "sv2 does not create a vote for the third request",
-        _ => {
-          val vr = voteRequestOnSv2(noVoteTrackingId)
-          vr.payload.votes.asScala should have size 1
-          vr.payload.votes.asScala.contains("Digital-Asset-Eng-2") shouldBe false
-        },
+        _ =>
+          resumeTriggerAndCheck {
+            val vr = voteRequestOnSv2(noVoteTrackingId)
+            vr.payload.votes.asScala should have size 1
+            vr.payload.votes.asScala.contains("Digital-Asset-Eng-2") shouldBe false
+          },
       )
   }
 }
