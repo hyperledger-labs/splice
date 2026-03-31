@@ -604,10 +604,11 @@ class LogicalSynchronizerUpgradeIntegrationTest
       clue("bob validator local upgrades after upgrade and can tap") {
         runBobValidatorWithStandaloneParticipant("after-upgrade") {
           eventually(60.seconds) {
-            participantIsConnectedToNewSynchronizer(
-              bobValidatorLocal.participantClientWithAdminToken,
-              isSv4Connected = true,
-            )
+            bobValidatorLocal.participantClientWithAdminToken.synchronizers
+              .list_connected()
+              .loneElement
+              .physicalSynchronizerId
+              .serial shouldBe newSynchronizerSerial
           }
           bobValidatorWalletLocal.tap(20)
           checkWallet(
@@ -615,6 +616,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
             bobValidatorWalletLocal,
             Seq((70, 70)),
           )
+          // TODO(DACH-NY/canton-network-internal#4426) move check before tap
+          eventually(60.seconds) {
+            participantIsConnectedToNewSynchronizer(
+              bobValidatorLocal.participantClientWithAdminToken,
+              isSv4Connected = true,
+            )
+          }
         }
       }
 
