@@ -314,8 +314,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
     val topologyFreezeTime = CantonTimestamp.now()
     // We need to give enough time for the new Canton instance to startup
     // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
-    val upgradeTime = CantonTimestamp.now().plusSeconds(120)
-    clue("Schedule logical synchronizer upgrade") {
+    val upgradeTime = CantonTimestamp.now().plusSeconds(150)
+    clue(s"Schedule logical synchronizer upgrade at $upgradeTime") {
       scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
