@@ -109,9 +109,6 @@
              an transfer input. These calls can be made directly against the Ledger API, or indirectly
              via custom Daml code deployed to the validator node.
 
-        Apps whose ultimate beneficiaries are different from the app provider party (e.g., decentralized apps) can use the
-        :ref:`Reward Assignment API <reward_assignment_api>` to assign the rewards to their ultimate beneficiaries.
-
       - Add a new field ``rewardConfig`` to the ``AmuletConfig`` for configuring whether rounds should use
         traffic-based app rewards or on-ledger reward accounting, and whether traffic-based app reward coupon creation
         should be simulated in a dry-run mode. See the
