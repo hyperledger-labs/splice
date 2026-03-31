@@ -1,10 +1,10 @@
-module Coin.Allocation.Instruction where
+module Splice.Testing.Tokens.TestTokenV1.Allocation.Instruction where
 
 import Splice.Api.Token.AllocationInstructionV1 qualified as AllocInstr
 import Splice.Api.Token.MetadataV1 qualified as Meta
 import DA.Map qualified as Map
-import Coin.Util qualified as Util
-import Coin.Allocation.Allocation
+import Splice.Testing.Tokens.TestTokenV1.Util qualified as Util
+import Splice.Testing.Tokens.TestTokenV1.Allocation.Allocation
 import Splice.Api.Token.AllocationV1 qualified as Alloc
 import DA.List qualified as List
 import Splice.Api.Token.HoldingV1 qualified as Holding

@@ -1,7 +1,7 @@
-module Coin.Util where
+module Splice.Testing.Tokens.TestTokenV1.Util where
 
 import Splice.Api.Token.HoldingV1 qualified as Holding
-import Coin.Holding
+import Splice.Testing.Tokens.TestTokenV1.Holding
 
 assertExpectedAdmin : (CanAssert m) => Party -> Party -> m ()
 assertExpectedAdmin admin expectedAdmin = assertMsg "Expected admin does not match" (admin == expectedAdmin)

@@ -1,7 +1,7 @@
-module Coin.Holding where
+module Splice.Testing.Tokens.TestTokenV1.Holding where
 
 import Splice.Api.Token.HoldingV1 qualified as Holding
-import Coin.Metadata
+import Splice.Testing.Tokens.TestTokenV1.Metadata
 import DA.Text qualified as Text
 
 template CoinToken

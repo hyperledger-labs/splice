@@ -1,4 +1,4 @@
-module Coin.Allocation.Request where
+module Splice.Testing.Tokens.TestTokenV1.Allocation.Request where
 
 import Splice.Api.Token.AllocationRequestV1 qualified as AllReq
 import Splice.Api.Token.AllocationV1 qualified as Alloc

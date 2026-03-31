@@ -1,10 +1,10 @@
-module Coin.Transfer where
+module Splice.Testing.Tokens.TestTokenV1.Transfer where
 
-import Coin.Holding
+import Splice.Testing.Tokens.TestTokenV1.Holding
 import Splice.Api.Token.MetadataV1 qualified as Meta
 import Splice.Api.Token.TransferInstructionV1 qualified as Transfer
 import DA.List qualified as List
-import Coin.Util qualified as Util
+import Splice.Testing.Tokens.TestTokenV1.Util qualified as Util
 
 -- UTILS
 

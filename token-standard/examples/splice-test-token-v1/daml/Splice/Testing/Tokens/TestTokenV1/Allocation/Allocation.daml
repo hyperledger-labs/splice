@@ -1,10 +1,10 @@
-module Coin.Allocation.Allocation where
+module Splice.Testing.Tokens.TestTokenV1.Allocation.Allocation where
 
 import Splice.Api.Token.AllocationV1 qualified as Alloc
 import Splice.Api.Token.MetadataV1 qualified as Meta
-import Coin.Holding
+import Splice.Testing.Tokens.TestTokenV1.Holding
 import Splice.Api.Token.HoldingV1 qualified as Holding
-import Coin.Util qualified as Util
+import Splice.Testing.Tokens.TestTokenV1.Util qualified as Util
 import DA.Foldable qualified as Foldable
 
 template CoinAllocation

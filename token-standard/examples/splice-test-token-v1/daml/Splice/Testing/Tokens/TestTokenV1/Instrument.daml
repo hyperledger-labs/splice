@@ -1,4 +1,4 @@
-module Coin.Instrument where
+module Splice.Testing.Tokens.TestTokenV1.Instrument where
 
 import Splice.Api.Token.MetadataV1 qualified as Meta
 
