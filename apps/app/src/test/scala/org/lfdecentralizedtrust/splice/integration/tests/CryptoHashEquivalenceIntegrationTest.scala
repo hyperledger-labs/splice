@@ -49,29 +49,23 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       )
       svParty = sv1Backend.getDsoInfo().svParty
 
-      val (cid, _) = actAndCheck(
-        "Upload dar and create CryptoHashProxy", {
-          sv1Backend.participantClientWithAdminToken.dars.upload(darPath)
-          val createArgs = new DamlRecord(
-            java.util.List.of(
-              new DamlRecord.Field("owner", new Party(svParty.toProtoPrimitive))
-            )
+      clue("Upload dar and create CryptoHashProxy") {
+        sv1Backend.participantClientWithAdminToken.dars.upload(darPath)
+        val createArgs = new DamlRecord(
+          java.util.List.of(
+            new DamlRecord.Field("owner", new Party(svParty.toProtoPrimitive))
           )
-          val createTx =
-            sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-              .submitJava(
-                actAs = Seq(svParty),
-                commands = Seq(new CreateCommand(templateId, createArgs)),
-              )
-          createTx.getEvents.asScala
-            .collectFirst { case ce: CreatedEvent => ce.getContractId }
-            .getOrElse(fail("No CreatedEvent from CryptoHashProxy create"))
-        },
-      )(
-        "CryptoHashProxy contract is created",
-        contractId => contractId should not be empty,
-      )
-      proxyContractId = cid
+        )
+        val createTx =
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              actAs = Seq(svParty),
+              commands = Seq(new CreateCommand(templateId, createArgs)),
+            )
+        proxyContractId = createTx.getEvents.asScala
+          .collectFirst { case ce: CreatedEvent => ce.getContractId }
+          .getOrElse(fail("No CreatedEvent from CryptoHashProxy create"))
+      }
       scanDb = sv1ScanBackend.appState.storage match {
         case db: DbStorage => db
         case s => fail(s"non-DB storage configured: ${s.getClass}")
@@ -84,32 +78,24 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
 
         clue(s"Daml vs Scala for ${tc.description}") {
           val (choiceName, choiceArg) = toDamlChoiceAndArg(tc.op)
-          actAndCheck(
-            s"Exercise Daml ${tc.description}", {
-              val cmd =
-                new ExerciseCommand(templateId, proxyContractId, choiceName, choiceArg)
-              sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-                .submitJava(
-                  actAs = Seq(svParty),
-                  commands = Seq(cmd),
-                )
-            },
-          )(
-            "Daml result matches Scala oracle",
-            tx => {
-              val damlHash = tx.getEventsById.values.asScala
-                .collectFirst { case ex: ExercisedEvent =>
-                  ex.getExerciseResult match {
-                    case t: Text => t.getValue
-                    case other =>
-                      fail(s"Expected Text result but got ${other.getClass.getSimpleName}")
-                  }
-                }
-                .getOrElse(fail(s"No ExercisedEvent in transaction"))
+          val cmd =
+            new ExerciseCommand(templateId, proxyContractId, choiceName, choiceArg)
+          val tx = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              actAs = Seq(svParty),
+              commands = Seq(cmd),
+            )
+          val damlHash = tx.getEventsById.values.asScala
+            .collectFirst { case ex: ExercisedEvent =>
+              ex.getExerciseResult match {
+                case t: Text => t.getValue
+                case other =>
+                  fail(s"Expected Text result but got ${other.getClass.getSimpleName}")
+              }
+            }
+            .getOrElse(fail(s"No ExercisedEvent in transaction"))
 
-              damlHash shouldBe scalaHash
-            },
-          )
+          damlHash shouldBe scalaHash
         }
 
         clue(s"SQL vs Scala for ${tc.description}") {
