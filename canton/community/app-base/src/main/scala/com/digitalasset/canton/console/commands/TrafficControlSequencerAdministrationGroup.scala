@@ -181,7 +181,7 @@ class TrafficControlSequencerAdministrationGroup(
   )
   def get_lsu_state(): ByteString =
     consoleEnvironment.run(
-      runner.adminCommand(SequencerAdminCommands.GetLsuTrafficControlState)
+      runner.adminCommand(SequencerAdminCommands.GetLsuTrafficControlState(None))
     )
 
   @Help.Summary(

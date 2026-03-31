@@ -397,6 +397,7 @@ class SvApp(
               retryProvider,
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
+              rollForwardLsuConfig,
             ).rollForward()
           }
         case None =>

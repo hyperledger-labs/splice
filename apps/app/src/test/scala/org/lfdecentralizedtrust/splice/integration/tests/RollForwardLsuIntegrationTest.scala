@@ -107,6 +107,8 @@ class RollForwardLsuIntegrationTest
                           c.value.name,
                           NonNegativeInt.tryCreate(2),
                           ProtocolVersion.v34,
+                          // TODO(#4784) Test these with non-None values.
+                          exportTimes = None,
                         )
                         .some
                     )

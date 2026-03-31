@@ -16,6 +16,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
@@ -224,10 +225,17 @@ object SvOnboardingConfig {
     }
   }
 
-  case class RollForwardLsu(
+  final case class RollForwardLsuTimestampConfig(
+      topologyExportTime: CantonTimestamp,
+      trafficExportTime: CantonTimestamp,
+  )
+
+  final case class RollForwardLsu(
       name: String,
       newPhysicalSynchronizerSerial: NonNegativeInt,
-      newPhysicalSynchronizerprotocolVersion: ProtocolVersion,
+      newPhysicalSynchronizerProtocolVersion: ProtocolVersion,
+      // If unset, we assume there is an LsuAnnouncement.
+      exportTimes: Option[RollForwardLsuTimestampConfig],
   ) extends SvOnboardingConfig
 }
 
