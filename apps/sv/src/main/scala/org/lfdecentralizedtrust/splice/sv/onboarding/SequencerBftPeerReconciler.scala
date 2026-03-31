@@ -32,7 +32,7 @@ abstract class SequencerBftPeerReconciler(
         .isNodeInitialized()
         .attemptT
         .valueOr(error => {
-          logger.info("Failed to read sequencer init status, skipping", error)
+          logger.warn("Failed to read sequencer init status, skipping", error)
           false
         })
       result <-
