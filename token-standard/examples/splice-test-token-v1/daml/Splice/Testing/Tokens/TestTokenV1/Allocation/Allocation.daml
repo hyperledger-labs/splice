@@ -37,7 +37,7 @@ template CoinAllocation
         assertMsg "Insufficient funds: sender did not provide enough resources" (senderChangeAmount >= 0.0)
 
         senderChangeHoldingCids <- if senderChangeAmount > 0.0 then do
-          testCid <- create CoinToken with
+          testCid <- create Token with
             owner = transferLeg.sender
             admin = settlement.executor
             amount = senderChangeAmount
@@ -47,7 +47,7 @@ template CoinAllocation
           else pure []
 
         -- create receiver holding token
-        receiverHoldingCid <- create CoinToken with
+        receiverHoldingCid <- create Token with
           admin = settlement.executor
           owner = transferLeg.receiver
           amount = transferLeg.amount

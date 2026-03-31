@@ -1,10 +1,10 @@
 module Splice.Testing.Tokens.TestTokenV1.Holding where
 
+import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Holding
-import Splice.Testing.Tokens.TestTokenV1.Metadata
 import DA.Text qualified as Text
 
-template CoinToken
+template Token
   with
     admin : Party
     owner : Party
@@ -14,7 +14,7 @@ template CoinToken
     signatory admin
     observer owner
 
-    interface instance Holding.Holding for CoinToken where
+    interface instance Holding.Holding for Token where
       view = Holding.HoldingView with
         owner
         instrumentId = Holding.InstrumentId
@@ -23,4 +23,4 @@ template CoinToken
             id = Text.sha256 $ show createdAt <> show owner
         amount
         lock = None
-        meta = testMeta
+        meta = emptyMetadata

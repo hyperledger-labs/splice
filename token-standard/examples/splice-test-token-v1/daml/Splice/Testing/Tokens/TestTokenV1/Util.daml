@@ -14,5 +14,5 @@ calculateSenderChange holdingCids amountToSend = do
   let senderInputAmountSum : Decimal = sum senderInputAmounts
   pure (senderInputAmountSum - amountToSend)
 
-testTokenToHoldingCid : HasToInterface CoinToken Holding.Holding => ContractId CoinToken -> ContractId Holding.Holding
+testTokenToHoldingCid : HasToInterface Token Holding.Holding => ContractId Token -> ContractId Holding.Holding
 testTokenToHoldingCid testTokenCid = toInterfaceContractId @Holding.Holding testTokenCid
