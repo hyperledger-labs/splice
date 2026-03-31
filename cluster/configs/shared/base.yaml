@@ -218,12 +218,6 @@ svs:
           memory: '2Gi'
         limits:
           memory: '4Gi'
-    svApp:
-      additionalEnvVars:
-        #TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
-        - name: ADDITIONAL_CONFIG_PAUSED_LSU_HEALTH_TRIGGER
-          value: |
-            canton.sv-apps.sv.automation.paused-triggers += "org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeIntegrationTest"
 validators:
   validator-runbook:
     namespace: validator

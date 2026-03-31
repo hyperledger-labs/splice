@@ -19,8 +19,9 @@ export type GitFluxRef = {
 };
 export type StackFromRef = { project: string; stack: string };
 
-// Trim non-splitwell DARs to avoid blowing the hardcoded operator size limit of 50mb
-const repoIgnore = '**/splice/canton\n**/daml/dars\n!**/daml/dars/splitwell*';
+// Trim some files to avoid blowing the hardcoded operator size limit of 100mb
+const repoIgnore =
+  '**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard';
 
 function expandGitReference(gitReference: string): { name: string } | { commit: string } {
   if (gitReference.startsWith('refs/')) {
