@@ -39,9 +39,14 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .withManualStart
 
   "Three-way CryptoHash equivalence (Daml, SQL, Scala)" should {
     "set up CryptoHashProxy" in { implicit env =>
+      startAllSync(
+        sv1Backend,
+        sv1ScanBackend,
+      )
       svParty = sv1Backend.getDsoInfo().svParty
 
       val (cid, _) = actAndCheck(
