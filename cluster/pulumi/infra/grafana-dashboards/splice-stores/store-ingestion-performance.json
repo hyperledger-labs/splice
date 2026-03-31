@@ -299,8 +299,8 @@
     }
   ],
   "preload": false,
-  "schemaVersion": 40,
-  "tags": ["performance", "testing"],
+  "schemaVersion": 42,
+  "tags": [],
   "templating": { "list": [] },
   "time": { "from": "now-30d", "to": "now" },
   "timepicker": {},
