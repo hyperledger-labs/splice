@@ -5,6 +5,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.rewards.RewardIssuanceParams
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
   DbScanAppRewardsStore,
@@ -25,10 +26,9 @@ class DbScanAppRewardsStoreTest
     with HasExecutionContext
     with SplicePostgresTest {
 
-  import DbScanAppRewardsStoreTest.DecimalSamples
+  import DbScanAppRewardsStoreTest.{Activity, DecimalSamples, IssuanceRate, Threshold, roundNumber}
 
   private val migrationId = 0L
-  private val roundNumber = 42L
 
   "DbScanAppRewardsStore" should {
 
@@ -483,6 +483,137 @@ class DbScanAppRewardsStoreTest
         result.value shouldBe 5L
       }
     }
+
+    // -- computeRewardTotals tests -------------------------------------------
+
+    val rewardTotalsTestCases = Seq(
+      // 5_000_000 / 1_000_000 * 2.0 = 10.0
+      // totalIssuance = 10.0, unclaimed = 0 → thresholded = 10.0 - 0 - 10.0 = 0
+      RewardTotalsTests.TestCase(
+        description = "golden-value test",
+        activities = Seq(Activity.alice5M),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("10.0"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          headPartySeqNum = Some(0),
+          headRewardAmount = Some(BigDecimal("10.0000000000")),
+          mintingAllowance = Some(BigDecimal("10.0000000000")),
+          thresholded = Some(BigDecimal("0E-10")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(1L),
+        ),
+      ),
+      // alice: 5_000_000/1M * 2.0 = 10.0 (above 0.5)
+      // bob: 150_000/1M * 2.0 = 0.3 (below 0.5)
+      // totalIssuance = 10.3, unclaimed = 0 → thresholded = 10.3 - 0 - 10.0 = 0.3
+      RewardTotalsTests.TestCase(
+        description = "below-threshold exclusion",
+        activities = Seq(Activity.alice5M, Activity.bob150K),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("10.3"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          headPartySeqNum = Some(0),
+          mintingAllowance = Some(BigDecimal("10.0000000000")),
+          thresholded = Some(BigDecimal("0.3000000000")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(1L),
+        ),
+      ),
+      // 250_000 / 1M * 2.0 = 0.5, exactly at threshold
+      // totalIssuance = 0.5, unclaimed = 0 → thresholded = 0.5 - 0 - 0.5 = 0
+      RewardTotalsTests.TestCase(
+        description = "threshold boundary (exactly at threshold is included)",
+        activities = Seq(Activity.alice250K),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("0.5"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          headRewardAmount = Some(BigDecimal("0.5000000000")),
+          mintingAllowance = Some(BigDecimal("0.5000000000")),
+          thresholded = Some(BigDecimal("0E-10")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(1L),
+        ),
+      ),
+      // 3_333_333 / 1_000_000.0 * 2.0 = 6.666666
+      // totalIssuance = 6.666666, unclaimed = 0
+      RewardTotalsTests.TestCase(
+        description = "decimal precision",
+        activities = Seq(Activity.aliceDecimal),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.Zero,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("6.666666"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          headRewardAmount = Some(
+            (BigDecimal("3333333") / BigDecimal("1000000") * BigDecimal("2.0")).setScale(10)
+          ),
+        ),
+      ),
+      // 1M / 1M * 2.0 = 2.0
+      // totalIssuance = 2.0, unclaimed = 0 → thresholded = 2.0 - 0 - 2.0 = 0
+      RewardTotalsTests.TestCase(
+        description = "single party above threshold, round totals correct",
+        activities = Seq(Activity.alice1M),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("2.0"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          mintingAllowance = Some(BigDecimal("2.0000000000")),
+          thresholded = Some(BigDecimal("0E-10")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(1L),
+        ),
+      ),
+      // alice: 100_000/1M * 2.0 = 0.2 (below 1.0)
+      // bob: 50_000/1M * 2.0 = 0.1 (below 1.0)
+      // totalIssuance = 0.3, unclaimed = 0 → thresholded = 0.3 - 0 - 0 = 0.3
+      RewardTotalsTests.TestCase(
+        description = "all parties below threshold",
+        activities = Seq(Activity.alice100K, Activity.bob50K),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.One,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("0.3"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 0,
+          mintingAllowance = Some(BigDecimal("0E-10")),
+          thresholded = Some(BigDecimal("0.3000000000")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(0L),
+        ),
+      ),
+    )
+
+    rewardTotalsTestCases.foreach { tc =>
+      s"computeRewardTotals — ${tc.description}" in {
+        RewardTotalsTests.run(tc)
+      }
+    }
+
   }
 
   private val verdictCounter = new java.util.concurrent.atomic.AtomicLong(1)
@@ -570,9 +701,96 @@ class DbScanAppRewardsStoreTest
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
     resetAllAppTables(storage)
+
+  private object RewardTotalsTests {
+    case class TestCase(
+        description: String,
+        activities: Seq[AppActivityPartyTotalT],
+        params: RewardIssuanceParams,
+        expected: Expected,
+    )
+
+    case class Expected(
+        partyTotalCount: Int,
+        headPartySeqNum: Option[Int] = None,
+        headRewardAmount: Option[BigDecimal] = None,
+        mintingAllowance: Option[BigDecimal] = None,
+        thresholded: Option[BigDecimal] = None,
+        unclaimed: Option[BigDecimal] = None,
+        rewardedCount: Option[Long] = None,
+    )
+
+    def run(tc: TestCase): Future[org.scalatest.Assertion] =
+      for {
+        (partyTotals, roundTotal) <- computeRewards(
+          tc.activities,
+          tc.params,
+        )
+      } yield check(partyTotals, roundTotal, tc.expected)
+
+    private def computeRewards(
+        activities: Seq[AppActivityPartyTotalT],
+        params: RewardIssuanceParams,
+    ): Future[(Seq[AppRewardPartyTotalT], Option[AppRewardRoundTotalT])] =
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppActivityPartyTotals(activities.map(_.copy(historyId = historyId)))
+        _ <- store.computeRewardTotals(roundNumber, params)
+        partyTotals <- store.getAppRewardPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppRewardRoundTotalByRound(roundNumber)
+      } yield (partyTotals, roundTotal)
+
+    private def check(
+        partyTotals: Seq[AppRewardPartyTotalT],
+        roundTotal: Option[AppRewardRoundTotalT],
+        expected: Expected,
+    ): org.scalatest.Assertion = {
+      partyTotals should have size expected.partyTotalCount.toLong
+      expected.headPartySeqNum.foreach { seqNum =>
+        partyTotals.head.appProviderPartySeqNum shouldBe seqNum
+      }
+      expected.headRewardAmount.foreach { amount =>
+        partyTotals.head.totalAppRewardAmount shouldBe amount
+      }
+      expected.mintingAllowance.foreach { v =>
+        roundTotal.value.totalAppRewardMintingAllowance shouldBe v
+      }
+      expected.thresholded.foreach { v =>
+        roundTotal.value.totalAppRewardThresholded shouldBe v
+      }
+      expected.unclaimed.foreach { v =>
+        roundTotal.value.totalAppRewardUnclaimed shouldBe v
+      }
+      expected.rewardedCount.foreach { v =>
+        roundTotal.value.rewardedAppProviderPartiesCount shouldBe v
+      }
+      succeed
+    }
+  }
 }
 
 object DbScanAppRewardsStoreTest {
+  private val roundNumber = 42L
+
+  object Activity {
+    val alice5M = AppActivityPartyTotalT(0L, roundNumber, 5000000L, 0, "alice::provider")
+    val bob150K = AppActivityPartyTotalT(0L, roundNumber, 150000L, 1, "bob::provider")
+    val alice250K = AppActivityPartyTotalT(0L, roundNumber, 250000L, 0, "alice::provider")
+    val aliceDecimal = AppActivityPartyTotalT(0L, roundNumber, 3333333L, 0, "alice::provider")
+    val alice1M = AppActivityPartyTotalT(0L, roundNumber, 1000000L, 0, "alice::provider")
+    val alice100K = AppActivityPartyTotalT(0L, roundNumber, 100000L, 0, "alice::provider")
+    val bob50K = AppActivityPartyTotalT(0L, roundNumber, 50000L, 1, "bob::provider")
+  }
+
+  object IssuanceRate {
+    val Two: BigDecimal = BigDecimal("2.0")
+  }
+
+  object Threshold {
+    val Zero: BigDecimal = BigDecimal("0.0")
+    val Half: BigDecimal = BigDecimal("0.5")
+    val One: BigDecimal = BigDecimal("1.0")
+  }
   object DecimalSamples {
     val Zero: BigDecimal = BigDecimal("0")
     val One: BigDecimal = BigDecimal("1")
