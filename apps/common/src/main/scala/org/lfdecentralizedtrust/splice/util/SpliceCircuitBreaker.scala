@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.base.error.ErrorCategory
 import com.digitalasset.base.error.ErrorCategory.{
-  ContentionOnSharedResources,
   InvalidGivenCurrentSystemStateOther,
   InvalidGivenCurrentSystemStateResourceExists,
   InvalidGivenCurrentSystemStateResourceMissing,
@@ -15,6 +14,7 @@ import com.digitalasset.base.error.ErrorCategory.{
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.LockedContracts
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
@@ -44,7 +44,7 @@ class SpliceCircuitBreaker(
     InvalidGivenCurrentSystemStateResourceExists,
     InvalidGivenCurrentSystemStateResourceMissing,
     InvalidGivenCurrentSystemStateSeekAfterEnd,
-    ContentionOnSharedResources,
+    LockedContracts,
   )
 
   val underlying = new CircuitBreaker(
