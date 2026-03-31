@@ -1103,6 +1103,24 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         }
       }
 
+      "return ClosedMiningRounds ordered by ingestion order when limited" in {
+        // Create 5 archivable closed rounds; ingestion order = round 1, 2, 3, 4, 5
+        val allRounds = (1 to 5).map(n => closedMiningRound(dsoParty, n.toLong))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(allRounds)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          // Query with limit=3: should return the 3 oldest by ingestion order (rounds 1, 2, 3)
+          result <- store.listArchivableClosedMiningRounds(limit = PageLimit.tryCreate(3))
+        } yield {
+          result.map(_.value.contract.payload.round.number) should be(
+            Seq(1L, 2L, 3L)
+          )
+        }
+      }
+
     }
 
     "lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset" should {
