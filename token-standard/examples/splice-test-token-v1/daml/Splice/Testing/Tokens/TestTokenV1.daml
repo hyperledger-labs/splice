@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | A mock implementation of a test token for the purpose of testing V1 token standard workflows.
-module Splice.Testing.Tokens.TestTokenV1.Token where
+module Splice.Testing.Tokens.TestTokenV1 where
 
 import DA.Assert
 import DA.Optional

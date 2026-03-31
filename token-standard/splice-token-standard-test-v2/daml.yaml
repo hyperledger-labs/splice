@@ -42,6 +42,7 @@ data-dependencies:
 
   - ../splice-token-standard-test-v1/.daml/dist/splice-token-standard-test-v1-current.dar
   - ../examples/splice-token-test-trading-app-v2/.daml/dist/splice-token-test-trading-app-v2-current.dar
+  - ../examples/splice-test-token-v1/.daml/dist/splice-test-token-v1-current.dar
 
 build-options:
   - --target=2.1
