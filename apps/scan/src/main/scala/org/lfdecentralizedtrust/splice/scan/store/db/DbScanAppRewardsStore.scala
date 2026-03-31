@@ -608,6 +608,8 @@ class DbScanAppRewardsStore(
                count(*)
              from inserted_parties""").asUpdate
 
+    // TODO(#4747): assert totalAppRewardAmount <= totalIssuance (with small tolerance)
+    //              and prevent writes if the assertion fails.
     runUpdate(
       insertRewardTotals
         .map(_ =>
