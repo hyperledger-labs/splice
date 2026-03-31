@@ -32,6 +32,7 @@ import scala.jdk.CollectionConverters.*
   * Uses a shared environment so the dar is uploaded and proxy created once,
   * then each hash function gets its own test.
   */
+@org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   import CryptoHashEquivalenceIntegrationTest.*
@@ -50,7 +51,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       svParty = sv1Backend.getDsoInfo().svParty
 
       clue("Upload dar and create CryptoHashProxy") {
-        sv1Backend.participantClientWithAdminToken.dars.upload(darPath)
+        sv1Backend.participantClient.upload_dar_unless_exists(darPath)
         val createArgs = new DamlRecord(
           java.util.List.of(
             new DamlRecord.Field("owner", new Party(svParty.toProtoPrimitive))
