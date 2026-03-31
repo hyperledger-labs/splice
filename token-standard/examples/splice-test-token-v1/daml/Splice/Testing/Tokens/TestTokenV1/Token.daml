@@ -1,0 +1,190 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | A mock implementation of a test token for the purpose of testing V1 token standard workflows.
+module Splice.Testing.Tokens.TestTokenV1.Token where
+
+import DA.Assert
+import DA.Optional
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as V1
+import Splice.Api.Token.AllocationV1 qualified as V1
+import Splice.Api.Token.AllocationInstructionV1 qualified as V1
+import Splice.TokenStandard.Utils
+
+
+template Token with
+     holding : V1.HoldingView
+  where
+    signatory holding.owner, holding.instrumentId.admin
+
+    ensure
+      holding.amount > 0.0 && -- positive amounts
+      isNone holding.lock -- no locked holdings
+
+    interface instance V1.Holding for Token where
+      view = holding
+
+
+template TokenAllocation with
+    allocation : V1.AllocationSpecification
+  where
+    signatory allocation.transferLeg.sender, allocation.transferLeg.instrumentId.admin
+    observer allocation.settlement.executor
+
+    -- Here we use the shortcut to make the allocation itself a Holding. This is
+    -- not recommended for production code, as withdrawing the allocation will fail
+    -- if the counter-party unvets the token .dar file.
+    interface instance V1.Holding for TokenAllocation where
+      view = allocationHoldingView allocation
+
+    interface instance V1.Allocation for TokenAllocation where
+      view = V1.AllocationView with
+        -- This highlights another shortcoming of making the allocation a
+        -- holding: wallets will have to understand this special construction to
+        -- properly correlate the allocation to the holding.
+        --
+        -- Furthermore, the wallets must ensure to filter the holdings they see to
+        -- only the ones where the wallet user party is the owner.
+        allocation
+        holdingCids = []
+        meta = emptyMetadata
+
+      allocation_withdrawImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (allocationHoldingView allocation) with lock = None
+        pure V1.Allocation_WithdrawResult with
+          senderHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      allocation_cancelImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (allocationHoldingView allocation) with lock = None
+        pure V1.Allocation_CancelResult with
+          senderHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+      allocation_executeTransferImpl _self _arg = do
+        tokenCid <- create Token with
+          holding = (allocationHoldingView allocation) with
+            owner = allocation.transferLeg.receiver
+            lock = None
+        pure V1.Allocation_ExecuteTransferResult with
+          senderHoldingCids = []
+          receiverHoldingCids = [toInterfaceContractId tokenCid]
+          meta = emptyMetadata
+
+
+allocationHoldingView : V1.AllocationSpecification -> V1.HoldingView
+allocationHoldingView (V1.AllocationSpecification with settlement, transferLeg) =
+    V1.HoldingView with
+      owner = transferLeg.sender
+      amount = transferLeg.amount
+      instrumentId = transferLeg.instrumentId
+      lock = Some V1.Lock with
+        holders = [transferLeg.sender, transferLeg.instrumentId.admin]
+        expiresAt = Some settlement.settleBefore
+        expiresAfter = None
+        context = Some $ "allocation for settlement of " <> settlement.settlementRef.id
+      meta = emptyMetadata
+
+
+
+-- | Template providing all the rules for how the tokens can be changed.
+--
+-- For this test token, they are given by the ones of the V1 token standard factories.
+template TokenRules with
+    admin : Party
+  where
+    signatory admin
+
+    interface instance V1.AllocationFactory for TokenRules where
+      view = V1.AllocationFactoryView with
+        admin
+        meta = emptyMetadata
+
+      allocationFactory_publicFetchImpl _self _arg = pure V1.AllocationFactoryView with
+        admin
+        meta = emptyMetadata
+
+      allocationFactory_allocateImpl _self arg = do
+        requireMatchExpected ("expectedAdmin", arg.expectedAdmin) admin
+        let V1.AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids, extraArgs} = arg
+
+        -- == validate each field of the requested allocation
+        let settlement = allocation.settlement
+        let transferLeg = allocation.transferLeg
+
+        -- settlement.executor: no check
+        -- settlement.settlementRef: no check
+        -- settlement.requestedAt:
+        assertDeadlineExceeded "Allocation.settlement.requestedAt" settlement.requestedAt
+        -- settlement.allocateBefore:
+        assertWithinDeadline "Allocation.settlement.allocateBefore" settlement.allocateBefore
+        -- settlement.settleBefore:
+        require "Allocation.settlement.allocateBefore <= Allocation.settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
+
+        -- transferLegId: no check
+
+        -- transferLeg.sender: no check
+        -- transferLeg.receiver: nothing to check
+        -- transferLeg.amount
+        require "Transfer amount must be positive" (transferLeg.amount > 0.0)
+        -- transferLeg.instrumentId
+        require "Instrument-admin must match the factory" (transferLeg.instrumentId.admin == admin)
+        -- transferLeg.meta: no check
+
+        -- requestedAt (of the allocation instruction itself):
+        assertDeadlineExceeded "requestedAt" requestedAt
+
+        -- inputHoldingCids:
+        require "At least one input holding must be provided" (not $ null inputHoldingCids)
+
+        -- split off the required amount and create allocation
+        optSenderChangeCid <- consumeHoldingAmount transferLeg.sender inputHoldingCids transferLeg.amount transferLeg.instrumentId
+        allocationCid <- toInterfaceContractId <$> create TokenAllocation with
+          allocation = arg.allocation
+
+        -- done: return the result
+        pure V1.AllocationInstructionResult with
+          senderChangeCids = optionalToList (toInterfaceContractId <$> optSenderChangeCid)
+          output = V1.AllocationInstructionResult_Completed with allocationCid
+          meta = emptyMetadata
+
+
+consumeHoldingAmount : Party ->[ContractId V1.Holding] -> Decimal -> V1.InstrumentId -> Update (Optional (ContractId V1.Holding))
+consumeHoldingAmount sender inputCids amount instrumentId = do
+  inputAmounts <- forA inputCids $ \cid -> do
+    holding <- fetch cid
+    let holdingView = view holding
+    require' ("holding owner", holdingView.owner) isEqualR ("transfer.sender", sender)
+    require' ("holding.instrumentId", holdingView.instrumentId) isEqualR ("transfer.instrumentId", instrumentId)
+    pure holdingView.amount
+  let totalAmount = sum inputAmounts
+  require' ("input amount", totalAmount) isGreaterOrEqualR ("transfer.amount", amount)
+  let remainder = totalAmount - amount
+  if remainder == 0.0
+    then pure None
+    else (Some . toInterfaceContractId)<$> create Token with
+      holding = V1.HoldingView with
+        owner = sender
+        amount = remainder
+        instrumentId
+        lock = None
+        meta = emptyMetadata
+
+
+
+
+-- FIXME: remove the need for this by moving the right parts to token-standard-utils
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
+
+-- | Predicate to check >=.
+isGreaterOrEqualR : Ord a => (Text, a -> a -> Bool)
+isGreaterOrEqualR = ("is less than", (>=))

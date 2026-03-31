@@ -511,9 +511,9 @@ lazy val `splice-api-token-burn-mint-v1-daml` =
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
     )
 
-lazy val `splice-test-token-v1-daml` =
+lazy val `splice-test-token-v0-daml` =
   project
-    .in(file("token-standard/examples/splice-test-token-v1"))
+    .in(file("token-standard/examples/splice-test-token-v0"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
