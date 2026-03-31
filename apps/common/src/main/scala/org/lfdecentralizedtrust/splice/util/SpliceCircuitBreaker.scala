@@ -114,7 +114,7 @@ class SpliceCircuitBreaker(
       case ex: StatusRuntimeException =>
         ErrorDetails
           .from(ex)
-          .exists {
+          .collect {
             case ErrorDetails.ErrorInfoDetail(errorCodeId, metadata)
                 if metadata.contains("category") =>
               val categoryIgnored = metadata
@@ -125,6 +125,7 @@ class SpliceCircuitBreaker(
               val codeIgnored = errorCodesToIgnore.exists(_.id == errorCodeId)
               categoryIgnored || codeIgnored
           }
+          .exists(identity)
       case _ => false
     }
   }
