@@ -50,15 +50,16 @@ object RewardComputationInputsTest {
     *   featuredAppRewardCap = 100, developmentFundPercentage = 0
     *   trafficPrice = 60 $/MB, amuletPrice = 0.15 $/CC
     *
-    * Derived: amuletsToIssueInRound ≈ 47564.69, rewardsToIssue ≈ 35673.52
-    *          trafficPriceInCCperMB = 400, threshold_CC ≈ 3.33
+    * Derived: amuletsToIssueInRound ≈ 47564.69
+    *          adjustedAmuletsToIssueInRound ≈ 45186.45 (after 5% devfund)
+    *          rewardsToIssue ≈ 33889.84, trafficPriceInCCperMB = 400, threshold_CC ≈ 3.33
     */
   val mainNet = RewardComputationInputs(
     amuletToIssuePerYear = n(BigDecimal("2500000000")),
     appRewardPercentage = n(BigDecimal("0.75")),
     featuredAppRewardCap = n(BigDecimal("100")),
     unfeaturedAppRewardCap = n(BigDecimal("0.6")),
-    developmentFundPercentage = n(BigDecimal("0")),
+    developmentFundPercentage = n(BigDecimal("0.05")),
     tickDurationMicros = tickDurationMicros,
     amuletPrice = n(BigDecimal("0.15")),
     trafficPrice = n(BigDecimal("60")),
@@ -101,16 +102,16 @@ object RewardComputationInputsTest {
     // --- 1. Normal traffic, cap does not bind ---
 
     // MainNet: BME = 0.8 (~95 MB traffic), cap does not bind (0.8 > 1/1.5 ≈ 0.66)
-    // ≈ 375 CC/MB ≈ $56/MB in rewards — within expected $60-90/MB range
+    // ≈ 356 CC/MB ≈ $53/MB in rewards — within expected $60-90/MB range
     TestCase(
       label = "MainNet: BME=0.8, cap does not bind",
       inputs = mainNet,
       totalRoundAppActivityWeight = 95129376L,
       expected = RewardIssuanceParams(
-        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("374.9999998"),
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("356.2499998"),
         threshold_CC = BigDecimal("3.3333333333"),
-        totalIssuanceForFeaturedAppRewards = BigDecimal("35673.5159817352"),
-        unclaimedAppRewardAmount = BigDecimal("0.0000007611"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("33889.8401826484"),
+        unclaimedAppRewardAmount = BigDecimal("0.0000016743"),
       ),
     ),
     // Simple: 1 MB traffic, no cap binding
@@ -135,9 +136,9 @@ object RewardComputationInputsTest {
       inputs = mainNet.copy(trafficPrice = n(BigDecimal("120"))),
       totalRoundAppActivityWeight = 95129376L,
       expected = RewardIssuanceParams(
-        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("374.99999984"),
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("356.2499998400"),
         threshold_CC = BigDecimal("3.3333333333"),
-        totalIssuanceForFeaturedAppRewards = BigDecimal("35673.5159817352"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("33889.8401826484"),
         unclaimedAppRewardAmount = BigDecimal("0E-10"),
       ),
     ),
@@ -159,12 +160,12 @@ object RewardComputationInputsTest {
 
     // MainNet: very low traffic so cap binds.
     // Cap binds when rewardsToIssue / totalCoupons_CC > featuredAppRewardCap (100).
-    // That requires totalCoupons_CC < 35673.52 / 100 = 356.74 CC,
-    // i.e., traffic < 356.74 / 400 ≈ 0.89 MB.
+    // That requires totalCoupons_CC < 33889.84 / 100 = 338.90 CC,
+    // i.e., traffic < 338.90 / 400 ≈ 0.85 MB.
     // Using 0.5 MB = 500000 bytes:
     //   totalCoupons_CC = 0.5 * 400 = 200
-    //   issuancePerCoupon = min(35673.52/200, 100) = 100 (cap binds)
-    //   unclaimed = 35673.52 - 100 * 200 = 15673.52
+    //   issuancePerCoupon = min(33889.84/200, 100) = 100 (cap binds)
+    //   unclaimed = 33889.84 - 100 * 200 = 13889.84
     TestCase(
       label = "MainNet: very low traffic, cap binds, unclaimed rewards",
       inputs = mainNet,
@@ -172,8 +173,8 @@ object RewardComputationInputsTest {
       expected = RewardIssuanceParams(
         issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("40000"),
         threshold_CC = BigDecimal("3.3333333333"),
-        totalIssuanceForFeaturedAppRewards = BigDecimal("35673.5159817352"),
-        unclaimedAppRewardAmount = BigDecimal("15673.5159817352"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("33889.8401826484"),
+        unclaimedAppRewardAmount = BigDecimal("13889.8401826484"),
       ),
     ),
     // Simple: cap = 0.1, 1 MB → cap binds, unclaimed = 0.35
@@ -213,9 +214,9 @@ object RewardComputationInputsTest {
       inputs = mainNet.copy(amuletPrice = n(BigDecimal("1.00"))),
       totalRoundAppActivityWeight = 95129376L,
       expected = RewardIssuanceParams(
-        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("374.999999808"),
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("356.2499998200"),
         threshold_CC = BigDecimal("0.5"),
-        totalIssuanceForFeaturedAppRewards = BigDecimal("35673.5159817352"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("33889.8401826484"),
         unclaimedAppRewardAmount = BigDecimal("0E-10"),
       ),
     ),
@@ -242,8 +243,8 @@ object RewardComputationInputsTest {
       expected = RewardIssuanceParams(
         issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("40000"),
         threshold_CC = BigDecimal("3.3333333333"),
-        totalIssuanceForFeaturedAppRewards = BigDecimal("35673.5159817352"),
-        unclaimedAppRewardAmount = BigDecimal("35673.5159817352"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("33889.8401826484"),
+        unclaimedAppRewardAmount = BigDecimal("33889.8401826484"),
       ),
     ),
     // Simple: rate = 1.0 * 100 = 100, all 0.45 unclaimed
