@@ -8,9 +8,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
+  TriggerEnabledSynchronization,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as installCodegen
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.environment.{RetryFor, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
@@ -23,7 +24,7 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 
 class WalletAppInstallTrigger(
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
     walletManager: UserWalletManager,
     connection: SpliceLedgerConnection,
 )(implicit
@@ -37,6 +38,10 @@ class WalletAppInstallTrigger(
       walletManager.store,
       installCodegen.WalletAppInstall.COMPANION,
     ) {
+
+  // it modified in memory state so it's not affected by the sync lag
+  override protected lazy val context: TriggerContext =
+    baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
   override def completeTask(
       install: AssignedContract[
