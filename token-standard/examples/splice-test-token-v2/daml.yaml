@@ -1,5 +1,5 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
-name: splice-test-token-v1
+name: splice-test-token-v2
 source: daml
 version: 1.0.0
 dependencies:
@@ -11,6 +11,10 @@ data-dependencies:
   - ../../splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
   - ../../splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
   - ../../splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
+  - ../../splice-api-token-holding-v2/.daml/dist/splice-api-token-holding-v2-current.dar
+  - ../../splice-api-token-transfer-instruction-v2/.daml/dist/splice-api-token-transfer-instruction-v2-current.dar
+  - ../../splice-api-token-allocation-v2/.daml/dist/splice-api-token-allocation-v2-current.dar
+  - ../../splice-api-token-allocation-instruction-v2/.daml/dist/splice-api-token-allocation-instruction-v2-current.dar
   - ../../splice-token-standard-utils/.daml/dist/splice-token-standard-utils-current.dar
 
 build-options:
@@ -21,5 +25,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceTestTokenV1
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceTestTokenV2
     output-directory: target/daml-codegen-java

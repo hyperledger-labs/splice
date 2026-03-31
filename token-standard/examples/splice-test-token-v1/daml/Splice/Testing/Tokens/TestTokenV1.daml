@@ -32,6 +32,7 @@ template TokenAllocation with
   where
     signatory allocation.transferLeg.sender, allocation.transferLeg.instrumentId.admin
     observer allocation.settlement.executor
+    ensure isValidAllocationSpecificationV1 allocation
 
     -- Here we use the shortcut to make the allocation itself a Holding. This is
     -- not recommended for production code, as withdrawing the allocation will fail
@@ -159,6 +160,7 @@ consumeHoldingAmount : Party ->[ContractId V1.Holding] -> Decimal -> V1.Instrume
 consumeHoldingAmount sender inputCids amount instrumentId = do
   inputAmounts <- forA inputCids $ \cid -> do
     holding <- fetch cid
+    archive cid
     let holdingView = view holding
     require' ("holding owner", holdingView.owner) isEqualR ("transfer.sender", sender)
     require' ("holding.instrumentId", holdingView.instrumentId) isEqualR ("transfer.instrumentId", instrumentId)
