@@ -110,6 +110,8 @@ splitLegsByAdmin : [AllocationV2.TransferLeg] -> Map.Map Party [AllocationV2.Tra
 splitLegsByAdmin legs = Map.fromListWithR (++) $ map (\leg -> (leg.instrumentId.admin, [leg])) legs
 
 -- | Net credit of an allocation. Positive for a credit and negative for a debit.
+
+-- FIXME: adjust to actually compute net credit per instrumentId
 netAllocationCreditAmount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> Decimal
 netAllocationCreditAmount authorizer transferLegs =
     sum $ map legAmount transferLegs

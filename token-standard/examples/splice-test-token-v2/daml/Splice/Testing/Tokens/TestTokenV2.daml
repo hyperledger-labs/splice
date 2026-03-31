@@ -5,7 +5,9 @@
 module Splice.Testing.Tokens.TestTokenV2 where
 
 import DA.Assert
+import DA.Foldable (forA_)
 import DA.Optional
+import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as V1
@@ -20,7 +22,9 @@ import Splice.TokenStandard.Utils
 template Token with
      holding : V2.HoldingView
   where
-    signatory holding.owner, holding.instrumentId.admin
+    -- We model a token that is jointly maintained by the account parties and the instrument admin
+    -- to test that the authorization rules work our for that as well.
+    signatory accountParties holding.account, holding.instrumentId.admin
 
     ensure
       holding.amount > 0.0 -- positive amounts
@@ -30,141 +34,110 @@ template Token with
 
 
 template TokenAllocation with
-    lockedToken : Optional (ContractId Token)
+    lockedTokens : [ContractId Token]
     allocation : V2.AllocationSpecification
     admin : Party
   where
-    signatory allocation.transferLeg.sender, allocation.transferLeg.instrumentId.admin
-    observer allocation.settlement.executor
     ensure isValidAllocationSpecificationV2 (\instrumentId -> instrumentId.admin == admin) allocation
+    signatory accountParties allocation.authorizer, allocationAdmin allocation
+    observer allocation.settlement.executors
 
-    -- Note: in a production implementation we would also want to add a choice
-    -- for the `admin` to expire the allocation. We don't need it for testing though.
-{-
     interface instance V2.Allocation for TokenAllocation where
       view = V2.AllocationView with
+        expiresAt = None
+          -- Note: in a production implementation we would also want to add a choice
+          -- for the `admin` to expire the allocation. We don't need it for testing though.
         allocation
-        holdingCids = optionalToList lockedToken
+        holdingCids = map toInterfaceContractId lockedTokens
+        extraSettlementAuthorizers = []
+        availableActions = allocationV2_availableActionsDefault allocation []
         meta = emptyMetadata
 
-      allocation_withdrawImpl _self _arg = do
-        tokenCid <- create Token with
-          holding = (allocationHoldingView allocation) with lock = None
-        pure V2.Allocation_WithdrawResult with
-          authorizerHoldingCids = [toInterfaceContractId tokenCid]
-          meta = emptyMetadata
-
-      allocation_cancelImpl _self _arg = do
-        tokenCid <- create Token with
-          holding = (allocationHoldingView allocation) with lock = None
-        pure V2.Allocation_CancelResult with
-          authorizerHoldingCids = [toInterfaceContractId tokenCid]
-          meta = emptyMetadata
--}
-
-    interface instance V1.Allocation for TokenAllocation where
-      view = V1.AllocationView with
-        allocation
-        holdingCids = [toInterfaceContractId lockedToken]
-        meta = emptyMetadata
-
-      allocation_executeTransferImpl _self V1.Allocation_ExecuteTransfer{..} =
-        transferTokenAllocation this extraArgs
-
-      allocation_withdrawImpl _self V1.Allocation_Withdraw{..} = do
-        senderHoldingCids <- unlockTokenAllocation this extraArgs
-        pure V1.Allocation_WithdrawResult
-          with
-            senderHoldingCids
-            meta = emptyMetadata
-
-      allocation_cancelImpl _self V1.Allocation_Cancel{..} = do
-        senderHoldingCids <- unlockTokenAllocation this extraArgs
-        pure V1.Allocation_CancelResult
-          with
-            senderHoldingCids
-            meta = emptyMetadata
-
-    interface instance V2.Allocation for TokenAllocation where
-      view = upcast (view (toInterface @V1.Allocation this))
-
-      -- executors are required actors on the settle choice, and thus do not have to be added as extra observers for settle
+      -- No extra observers required, as the choice bodies do not introduce further informees.
+      -- Note that the executors are controllers on these two choices.
       allocation_settleExtraObservers _arg = []
+      allocation_cancelExtraObservers _arg = []
 
-      -- add the executor as an extra observer on the choices below, as they otherwise only see the V1 choice by default
-      allocation_cancelExtraObservers _arg = [allocation.settlement.executor]
-      allocation_withdrawExtraObservers _arg = [allocation.settlement.executor]
+      -- Add executors as extra observers so there is no extra view for the archival of the holding
+      allocation_withdrawExtraObservers _arg = allocation.settlement.executors
 
-      allocation_withdrawImpl = allocationV2_withdrawDefaultImplUsingV1 (toInterface this)
-      allocation_cancelImpl = allocationV2_cancelDefaultImplUsingV1 (toInterface this)
-      allocation_settleImpl = allocationV2_settleDefaultImplUsingV1 (toInterface this)
+      allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
+        archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
+          -- FIXME: enable different account authorization configurations
+        authorizerHoldingCids <- unlockTokenAllocation this extraArgs
+        pure V2.Allocation_WithdrawResult
+          with
+            authorizerHoldingCids
+            meta = emptyMetadata
 
+      allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
+        archiveAndCheckActors self arg.actors [allocation.settlement.executors]
+        authorizerHoldingCids <- unlockTokenAllocation this extraArgs
+        pure V2.Allocation_CancelResult
+          with
+            authorizerHoldingCids
+            meta = emptyMetadata
 
-transferTokenAllocation : TokenAllocation -> ExtraArgs -> Update V1.Allocation_ExecuteTransferResult
-transferTokenAllocation allocation extraArgs = do
-  case allocation.lockedToken of
-    None -> fail "unexpected: V1 a"
-      -- no locked token, just create the output token directly
-      tokenCid <- create Token with
-        holding = (allocationHoldingView allocation.allocation) with
-          owner = allocation.allocation.transferLeg.receiver
-          lock = None
-      pure V1.Allocation_ExecuteTransferResult with
-        senderHoldingCids = []
-        receiverHoldingCids = [toInterfaceContractId tokenCid]
-        meta = emptyMetadata
-    Some lockedTokenCid -> do
-      -- we have a locked token, we need to unlock it first and then transfer it to the receiver
-      unlockResult <- exercise lockedTokenCid V2.Holding_UnlockV2 with extraArgs
-      let unlockedTokenCid = unlockResult.holdingCid
+      allocation_settleImpl self arg@(V2.Allocation_Settle{..}) = do
+        -- check actors and deadline
+        archiveAndCheckActors self arg.actors [admin :: allocation.settlement.executors]
+        forA_ allocation.settlement.settlementDeadline $ \deadline ->
+          assertWithinDeadline "allocation.settlement.settlementDeadline" deadline
 
-      -- transfer the unlocked token to the receiver by exercising a choice on it that changes the owner
-      transferredTokenCid <- exercise unlockedTokenCid Token_Transfer with newOwner = allocation.allocation.transferLeg.receiver
+        -- archive the locked tokens
+        debits <- fmap (Map.fromListWithR (+)) $ forA lockedTokens $ \cid -> do
+          token <- fetch cid
+          let holding = token.holding
+          archive cid
+          require' ("lockedToken", holding.account) isEqualR ("allocation.authorizer", allocation.authorizer)
+          pure (holding.instrumentId, holding.amount)
 
-      pure V1.Allocation_ExecuteTransferResult with
-        senderHoldingCids = []
-        receiverHoldingCids = [toInterfaceContractId transferredTokenCid]
-        meta = emptyMetadata
-  tokenCid <- create Token with
-    holding = (allocationHoldingView allocation) with
-      owner = allocation.transferLeg.receiver
-      lock = None
-  pure V1.Allocation_ExecuteTransferResult with
-    senderHoldingCids = []
-    receiverHoldingCids = [toInterfaceContractId tokenCid]
-    meta = emptyMetadata
+        -- compute net funds to move
+        let netAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
+        authorizerHoldingCids <- forA (Map.toList netAmounts) $ \(instrumentId, netAmount) ->
+          case Map.lookup instrumentId debits of
+            None
+              | netAmount > 0.0 -> do
+                  -- Net credit of Token ==> create the holding
+                  newHoldingCid <- create Token with
+                    holding = V2.HoldingView with
+                      account = allocation.authorizer
+                      amount = netAmount
+                      instrumentId
+                      lock = None
+                      meta = emptyMetadata
+                  pure (instrumentId, [toInterfaceContractId newHoldingCid])
+              | netAmount == 0.0 ->
+                  -- No holding change ==> no tx history metadata
+                  pure (instrumentId, [])
+              | otherwise ->
+                  fail $ "unexpected: no locked instrument archived for net negative amount " <> show netAmount <>
+                    " of " <> show instrumentId
+            Some debitAmount
+              | netAmount == debitAmount -> do
+                  -- Net debit of Token and token was archived
+                  pure (instrumentId, [])
+              | otherwise ->
+                  fail $ "unexpected: locked instrument archived for net amount " <> show netAmount <>
+                    " does not match expected debit amount " <> show debitAmount <> " for " <> show instrumentId
 
-{-
-      allocation_settleImpl _self _arg = do
-        tokenCid <- create Token with
-          holding = (allocationHoldingView allocation) with
-            owner = allocation.transferLeg.receiver
-            lock = None
         pure V2.Allocation_SettleResult with
-          authorizerHoldingCids = []
-          receiverHoldingCids = [toInterfaceContractId tokenCid]
+          authorizerHoldingCids = concatMap snd authorizerHoldingCids
           meta = emptyMetadata
--}
+            -- Note: for V1 tx history we would need create extra choices for
+            -- the creation, as this choice here cannot express the creation and
+            -- archival of multiple holdings for different instrument-ids.
 
-{-
-transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update V1.Allocation_ExecuteTransferResult
-transferAmuletAllocation amuletAllocation extraArgs = do
-  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
-  (senderHoldingCids, receiverHoldingCids, meta) <-
-    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
-  pure V1.Allocation_ExecuteTransferResult
-    with
-      senderHoldingCids
-      receiverHoldingCids
-      meta
-
-unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update [ContractId V1.Holding]
-unlockAmuletAllocation amuletAllocation extraArgs = do
-  let lockExpiresAt = amuletAllocation.allocation.settlement.settleBefore
-  abortTwoStepTransfer lockExpiresAt amuletAllocation.lockedAmulet extraArgs
-
--}
-
+unlockTokenAllocation : TokenAllocation -> ExtraArgs -> Update [ContractId V2.Holding]
+unlockTokenAllocation tokenAllocation _extraArgs = do
+  forA tokenAllocation.lockedTokens $ \lockedCid -> do
+    token <- fetch lockedCid
+    archive lockedCid
+    let holding = token.holding
+    require' ("lockedToken", holding.account) isEqualR ("allocation.authorizer", tokenAllocation.allocation.authorizer)
+    unlockedCid <- create Token with
+      holding = holding with lock = None
+    pure $ toInterfaceContractId unlockedCid
 
 
 
@@ -291,3 +264,19 @@ isGreaterOrEqualR : Ord a => (Text, a -> a -> Bool)
 isGreaterOrEqualR = ("is less than", (>=))
 
 -}
+
+netAllocationCreditAmounts : V2.Account -> [V2.TransferLeg] -> Map.Map V2.InstrumentId Decimal
+netAllocationCreditAmounts authorizer transferLegs =
+    Map.fromListWithR (+) $ map legAmount transferLegs
+  where
+    legAmount leg =
+      ( leg.instrumentId
+      , (if leg.sender == authorizer then negate leg.amount else 0.0) +
+        (if leg.receiver == authorizer then leg.amount else 0.0)
+      )
+
+allocationAdmin : V2.AllocationSpecification -> Party
+allocationAdmin V2.AllocationSpecification{..} =
+  case transferLegs of
+    [] -> error "No transfer legs in allocation"
+    (leg ::_) -> leg.instrumentId.admin
