@@ -37,3 +37,10 @@
    - Scan
 
         - Improve CPU usage of update and event history.
+
+    - Scan
+
+        - Scan is now ingesting and serving app activity records for traffic-based rewards (CIP-104).
+          The responses from the ``/v0/events`` and ``/v0/events/{update_id}`` endpoints now
+          include the ``traffic_summary`` and ``app_activity_records`` fields.
+          This change to the scan API is experimental, however we don't expect it to change in the future.
