@@ -710,7 +710,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -740,7 +740,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.mock.yaml",
