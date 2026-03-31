@@ -15,3 +15,6 @@
           restart of our apps on secret/configmap change. The integration is enabled by
           default. You can disable it by setting enableReloader to false in your values.yaml file.
           Please note that reloader needs to be installed separately.
+
+        - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
+          from another named SV, which can help operators keep votes in sync when they run multiple SV nodes.
