@@ -5,7 +5,7 @@ module Splice.Testing.CryptoHashProxy where
 
 import DA.Text (intercalate, sha256)
 
--- TODO(#3964): When Splice.Amulet.CryptoHash is merged, remove these
+-- TODO(#4749): When Splice.Amulet.CryptoHash is merged, remove these
 -- test-only copies and import from the real module instead.
 
 -- | Hash a text scalar: sha256(value).
