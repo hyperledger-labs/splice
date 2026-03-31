@@ -16,3 +16,20 @@
           default. You can disable it by setting enableReloader to false in your values.yaml file.
           Please note that reloader needs to be installed separately for the integration to work.
           If you don't have reloader installed this annotation will be ignored.
+
+   - Scan UI
+
+     - The following tabs and features have been removed from Scan UI.
+       Their corresponding API endpoints are still available, yet deprecated, and will be removed soon.
+       Users are strongly advised to migrate to non-deprecated API endpoints as soon as possible.
+
+      - Canton Coin Activity
+         - Recent activity list, and all leaderboards
+         - Total app & validator rewards
+         - The round as-of which the content has been computed (no round-based data is listed any more)
+         - The tab has been renamed "Canton Coin Configuration"
+      - Governance
+         - Completely removed
+      - Validators
+         - Completely removed
+
