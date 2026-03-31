@@ -380,7 +380,8 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       metricsFactory.counter(
         MetricInfo(
           name = bulkStoragePrefix :+ "updates-count",
-          summary = "The number of updates processed for bulk storage since the last application restart",
+          summary =
+            "The number of updates processed for bulk storage since the last application restart",
           Traffic,
         )
       )(metricsContext)
@@ -389,7 +390,8 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       metricsFactory.counter(
         MetricInfo(
           name = bulkStoragePrefix :+ "contracts-count",
-          summary = "The number of active contracts processed for bulk storage since the last application restart",
+          summary =
+            "The number of active contracts processed for bulk storage since the last application restart",
           Traffic,
         )
       )(metricsContext)
