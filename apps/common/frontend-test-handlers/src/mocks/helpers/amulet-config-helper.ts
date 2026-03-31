@@ -227,6 +227,7 @@ export function getAmuletRulesConfig(
     featuredAppActivityMarkerAmount: null,
     optDevelopmentFundManager: null,
     externalPartyConfigStateTickDuration: null,
+    rewardConfig: null,
   };
 }
 
