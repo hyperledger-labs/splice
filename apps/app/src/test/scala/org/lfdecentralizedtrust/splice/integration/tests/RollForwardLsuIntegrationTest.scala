@@ -26,7 +26,6 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeSequencingTestTrigger
 import org.lfdecentralizedtrust.splice.util.*
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
@@ -129,13 +128,7 @@ class RollForwardLsuIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms
           // This bumps current but not legacy
-          .bumpCantonSyncPortsBy(22_000, name => name.contains("Local"))
-          .andThen(
-            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
-              // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
-              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
-            )
-          )(config)
+          .bumpCantonSyncPortsBy(22_000, name => name.contains("Local"))(config)
       )
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart

@@ -373,9 +373,6 @@ svs:
           cpu: '1'
           memory: '2Gi'
     svApp:
-      additionalEnvVars:
-        - name: 'ADDITIONAL_CONFIG_PAUSED_LSU_HEALTH_TRIGGER'
-          value: "canton.sv-apps.sv.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeIntegrationTest\"\n"
       resources:
         limits:
           cpu: '3'
