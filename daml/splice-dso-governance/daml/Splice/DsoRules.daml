@@ -18,6 +18,7 @@ import qualified DA.Text as T
 import DA.Time
 
 import Splice.Amulet
+import Splice.Amulet.RewardAccountingV2 qualified as RewardAccountingV2
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
 
@@ -92,6 +93,8 @@ data AmuletRules_ActionRequiringConfirmation
     -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to update a config schedule in the `AmuletRules`.
   | CRARC_SetConfig AmuletRules_SetConfig
     -- ^ Voted action to change the `AmuletConfig`. Not idempotent.
+  | CRARC_StartProcessingRewardsV2 AmuletRules_StartProcessingRewardsV2
+    -- ^ Automated action to start the processing of rewards where the minting allowances were computed off-ledger.
   deriving (Eq, Show)
 
 data DsoRules_ActionRequiringConfirmation
@@ -260,6 +263,21 @@ data DsoRules_ReceiveSvRewardCouponResult = DsoRules_ReceiveSvRewardCouponResult
 
 data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult with
     unclaimedReward: Optional (ContractId UnclaimedReward)
+
+data DsoRules_ClaimExpiredRewardsV2Result = DsoRules_ClaimExpiredRewardsV2Result with
+    result : AmuletRules_ClaimExpiredRewardsV2Result
+
+data DsoRules_StartProcessingRewardsV2Result = DsoRules_StartProcessingRewardsV2Result with
+    result : AmuletRules_StartProcessingRewardsV2Result
+
+data DsoRules_ProcessRewardsV2_ProcessBatchResult = DsoRules_ProcessRewardsV2_ProcessBatchResult with
+    result : RewardAccountingV2.ProcessRewardsV2_ProcessBatchResult
+
+data DsoRules_UnhideRewardCouponsV2Result = DsoRules_UnhideRewardCouponsV2Result with
+    result : AmuletRules_UnhideRewardCouponsV2Result
+
+data DsoRules_ArchiveDryRunRewardAccountingV2Result = DsoRules_ArchiveDryRunRewardAccountingV2Result with
+    result : AmuletRules_ArchiveDryRunRewardAccountingV2Result
 
 data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
     unclaimedReward: ContractId UnclaimedReward
@@ -1307,6 +1325,8 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
+        _ <- getAndValidateSvParty this sv
+
         -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
         -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
         let AmuletRules_ClaimExpiredRewards{..} = choiceArg
@@ -1359,6 +1379,56 @@ template DsoRules with
               else Some <$> create UnclaimedReward with dso; amount
         return DsoRules_ClaimExpiredRewardsResult with
           unclaimedReward = unclaimedRewardCid
+
+    nonconsuming choice DsoRules_ClaimExpiredRewardsV2 : DsoRules_ClaimExpiredRewardsV2Result
+      with
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_ClaimExpiredRewardsV2
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid choiceArg
+        return DsoRules_ClaimExpiredRewardsV2Result with
+          result
+
+    nonconsuming choice DsoRules_ProcessRewardsV2_ProcessBatch : DsoRules_ProcessRewardsV2_ProcessBatchResult
+      with
+        processRewardsCid : ContractId RewardAccountingV2.ProcessRewardsV2
+        choiceArg : RewardAccountingV2.ProcessRewardsV2_ProcessBatch
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise processRewardsCid choiceArg
+        return DsoRules_ProcessRewardsV2_ProcessBatchResult with
+          result
+
+    nonconsuming choice DsoRules_UnhideRewardCouponsV2 : DsoRules_UnhideRewardCouponsV2Result
+      with
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_UnhideRewardCouponsV2
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid choiceArg
+        return DsoRules_UnhideRewardCouponsV2Result with
+          result
+
+    -- Choice to cleanup the state of stuck dry-runs in case getting them unstuck is too expensive.
+    nonconsuming choice DsoRules_ArchiveDryRunRewardAccountingV2 : DsoRules_ArchiveDryRunRewardAccountingV2Result
+      with
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_ArchiveDryRunRewardAccountingV2
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid choiceArg
+        return DsoRules_ArchiveDryRunRewardAccountingV2Result with
+          result
+
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice DsoRules_MergeUnclaimedRewards : DsoRules_MergeUnclaimedRewardsResult
@@ -1638,6 +1708,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
           CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_StartProcessingRewardsV2 choiceArg -> void $ exercise amuletRulesCid choiceArg
   ARC_DsoRules with .. -> do
     void $ fetchChecked (ForDso with dso) dsoRulesCid
     case dsoAction of
@@ -1704,6 +1775,7 @@ actionRequiringConfirmationEffectiveAt action =
         CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
         CRARC_MiningRound_Archive _ -> None
         CRARC_MiningRound_StartIssuing _ -> None
+        CRARC_StartProcessingRewardsV2 _ -> None
     ARC_DsoRules with .. -> None
     ARC_AnsEntryContext with .. -> None
     ExtActionRequiringConformation _dummyUnitField ->

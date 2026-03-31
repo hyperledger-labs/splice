@@ -1,0 +1,368 @@
+-- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.Amulet.CryptoHash where
+
+import Daml.Script
+import DA.Assert
+import Splice.Amulet.CryptoHash
+
+--------------------------------------------------------------------------------
+-- Record Types
+--------------------------------------------------------------------------------
+
+data RecV1 = RecV1
+  with
+    a : Int
+    b : Text
+  deriving (Eq, Show)
+
+data RecV1' = RecV1'
+  with
+    a : Int
+  deriving (Eq, Show)
+
+data RecV2 = RecV2
+  with
+    a : Int
+    b : Text
+    c : Optional Int
+  deriving (Eq, Show)
+
+data RecV3 = RecV3
+  with
+    a : Int
+    b : Text
+    c : Optional Int
+    d : Optional Int
+  deriving (Eq, Show)
+
+instance Hashable RecV1 where
+  hash r = hashRecord [hash r.a , hash r.b]
+
+instance Hashable RecV1' where
+  hash r = hashRecord [hash r.a]
+
+
+instance Hashable RecV2 where
+  hash r =
+    hashUpgradedRecord
+      [ hash r.a
+      , hash r.b    ]
+      [ fmap hash r.c ]
+
+instance Hashable RecV3 where
+  hash r =
+    hashUpgradedRecord
+      [ hash r.a
+      , hash r.b
+      ]
+      [ fmap hash r.c
+      , fmap hash r.d
+      ]
+
+
+--------------------------------------------------------------------------------
+-- Variant Payload Type (shared argument type)
+--------------------------------------------------------------------------------
+
+data Payload = Payload
+  with
+    x : Int
+    y : Text
+  deriving (Eq, Show)
+
+
+--------------------------------------------------------------------------------
+-- Variant Types (same argument type via `with`)
+--------------------------------------------------------------------------------
+
+data VarV1
+  = V1 with payload : Payload
+  | V2 with payload : Payload
+  deriving (Eq, Show)
+
+instance Hashable VarV1 where
+  hash v =
+    case v of
+      V1 with payload ->
+        hashVariant
+          "V1"
+          [ hash payload.x
+          , hash payload.y
+          ]
+
+      V2 with payload ->
+        hashVariant
+          "V2"
+          [ hash payload.x
+          , hash payload.y
+          ]
+
+
+data VarV2
+  = V1V2
+      with
+        payload : Payload
+        c : Optional Int
+        d : Optional Int
+  | V2V2
+      with
+        payload : Payload
+        c : Optional Int
+        d : Optional Int
+  deriving (Eq, Show)
+
+instance Hashable VarV2 where
+  hash v =
+    case v of
+      V1V2 with payload; c; d ->
+        hashUpgradedVariant
+          "V1"
+          [ hash payload.x
+          , hash payload.y
+          ]
+          [ fmap hash c
+          , fmap hash d
+          ]
+
+      V2V2 with payload; c; d ->
+        hashUpgradedVariant
+          "V2"
+          [ hash payload.x
+          , hash payload.y
+          ]
+          [ fmap hash c
+          , fmap hash d
+          ]
+
+
+--------------------------------------------------------------------------------
+-- Structural Behavior Tests
+--------------------------------------------------------------------------------
+
+test_emptyListDifferent : Script ()
+test_emptyListDifferent = script do
+  hash ([] : [Int]) =/= hash ([1] : [Int])
+
+test_listLengthMatters : Script ()
+test_listLengthMatters = script do
+  hash ([1,2] : [Int]) =/= hash ([1,2,3] : [Int])
+
+
+test_listStructureMatters : Script ()
+test_listStructureMatters = script do
+  hash ([[1],[2]] : [[Int]]) =/= hash ([1,2] : [Int])
+
+
+test_recordFieldCountMatters : Script ()
+test_recordFieldCountMatters = script do
+  let r = RecV1 with a = 1; b = "x"
+  let r' = RecV1' with a = 1
+  hash r =/= hash r'
+
+
+--------------------------------------------------------------------------------
+-- Variant Separation
+--------------------------------------------------------------------------------
+
+test_variantTagMatters : Script ()
+test_variantTagMatters = script do
+  let payload = Payload with x = 1; y = "x"
+  let v1 = V1 with payload
+  let v2 = V2 with payload
+  hash v1 =/= hash v2
+
+
+test_variantValueMatters : Script ()
+test_variantValueMatters = script do
+  let p1 = Payload with x = 1; y = "x"
+  let p2 = Payload with x = 2; y = "x"
+  let v1 = V1 with payload = p1
+  let v2 = V1 with payload = p2
+  hash v1 =/= hash v2
+
+
+--------------------------------------------------------------------------------
+-- Optional Semantics
+--------------------------------------------------------------------------------
+
+test_optionalNoneVsSome : Script ()
+test_optionalNoneVsSome = script do
+  hash (None : Optional Int) =/= hash (Some 1)
+
+
+--------------------------------------------------------------------------------
+-- Record Upgrade Compatibility (Multiple Optionals)
+--------------------------------------------------------------------------------
+
+test_recordUpgrade_allUnset : Script ()
+test_recordUpgrade_allUnset = script do
+  let r1 = RecV1 with a = 1; b = "abc"
+  let r2 =
+        RecV3
+          with
+            a = 1
+            b = "abc"
+            c = None
+            d = None
+  hash r1 === hash r2
+
+
+test_recordUpgrade_firstSet : Script ()
+test_recordUpgrade_firstSet = script do
+  let r1 = RecV1 with a = 1; b = "abc"
+  let r2 =
+        RecV3
+          with
+            a = 1
+            b = "abc"
+            c = Some 1
+            d = None
+  hash r1 =/= hash r2
+
+
+test_recordUpgrade_secondSet : Script ()
+test_recordUpgrade_secondSet = script do
+  let r1 = RecV1 with a = 1; b = "abc"
+  let r2 =
+        RecV3
+          with
+            a = 1
+            b = "abc"
+            c = None
+            d = Some 1
+  hash r1 =/= hash r2
+
+
+test_recordUpgrade_bothSet : Script ()
+test_recordUpgrade_bothSet = script do
+  let r1 = RecV1 with a = 1; b = "abc"
+  let r2 =
+        RecV3
+          with
+            a = 1
+            b = "abc"
+            c = Some 1
+            d = Some 1
+  hash r1 =/= hash r2
+
+test_recordUpgradeOrderOfOptionalsDoesNotMatter : Script ()
+test_recordUpgradeOrderOfOptionalsDoesNotMatter = script do
+  let r1' = RecV2 with
+        a = 1
+        b = "abc"
+        c = Some 1
+  let r1 = RecV3 with
+        a = 1
+        b = "abc"
+        c = Some 1
+        d = None
+  let r2 = RecV3 with
+        a = 1
+        b = "abc"
+        c = None
+        d = Some 1
+  hash r1 === hash r1'
+  hash r1 =/= hash r2
+
+
+--------------------------------------------------------------------------------
+-- Variant Upgrade Compatibility (Multiple Optionals)
+--------------------------------------------------------------------------------
+
+test_variantUpgrade_allUnset : Script ()
+test_variantUpgrade_allUnset = script do
+  let payload = Payload with x = 5; y = "x"
+
+  let v1 = V1 with payload
+
+  let v2 =
+        V1V2
+          with
+            payload
+            c = None
+            d = None
+
+  assertEq (hash v1) (hash v2)
+
+
+test_variantUpgrade_firstSet : Script ()
+test_variantUpgrade_firstSet = script do
+  let payload = Payload with x = 5; y = "x"
+
+  let v1 = V1 with payload
+
+  let v2 =
+        V1V2
+          with
+            payload
+            c = Some 9
+            d = None
+
+  hash v1 =/= hash v2
+
+
+test_variantUpgrade_secondSet : Script ()
+test_variantUpgrade_secondSet = script do
+  let payload = Payload with x = 5; y = "x"
+
+  let v1 = V1 with payload
+
+  let v2 =
+        V1V2
+          with
+            payload
+            c = None
+            d = Some 1
+
+  hash v1 =/= hash v2
+
+
+test_variantUpgrade_bothSet : Script ()
+test_variantUpgrade_bothSet = script do
+  let payload = Payload with x = 5; y = "x"
+
+  let v1 = V1 with payload
+
+  let v2 =
+        V1V2
+          with
+            payload
+            c = Some 1
+            d = Some 1
+
+  hash v1 =/= hash v2
+
+
+test_variantUpgrade_constructorSeparationStillHolds : Script ()
+test_variantUpgrade_constructorSeparationStillHolds = script do
+  let payload = Payload with x = 5; y = "x"
+
+  let v1 = V1V2 with payload; c = None; d = None
+  let v2 = V2V2 with payload; c = None; d = None
+
+  hash v1 =/= hash v2
+
+
+--------------------------------------------------------------------------------
+-- Golden Structural Stability
+--------------------------------------------------------------------------------
+
+test_golden_recordEncoding : Script ()
+test_golden_recordEncoding = script do
+  let r = RecV1 with a = 1; b = "x"
+
+  let expected = "e2878cf11d8a10aa17f359e1f61f711756fdbbc256bf541baec14c21b6888f6e"
+
+  assertEq (hash r).value expected
+
+
+test_golden_variantEncoding : Script ()
+test_golden_variantEncoding = script do
+  let payload = Payload with x = 1; y = "x"
+  let v = V1 with payload
+
+  let expected = "ca314e0bdf0fc327940a89334ff6df58f234b395d36328af1a0cce2339227e5c"
+
+  assertEq (hash v).value expected
