@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.base.error.ErrorCategory
 import com.digitalasset.base.error.ErrorCategory.{
+  ContentionOnSharedResources,
   InvalidGivenCurrentSystemStateOther,
   InvalidGivenCurrentSystemStateResourceExists,
   InvalidGivenCurrentSystemStateResourceMissing,
@@ -43,6 +44,7 @@ class SpliceCircuitBreaker(
     InvalidGivenCurrentSystemStateResourceExists,
     InvalidGivenCurrentSystemStateResourceMissing,
     InvalidGivenCurrentSystemStateSeekAfterEnd,
+    ContentionOnSharedResources,
   )
 
   val underlying = new CircuitBreaker(
