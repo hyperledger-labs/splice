@@ -606,7 +606,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
           eventually(60.seconds) {
             participantIsConnectedToNewSynchronizer(
               bobValidatorLocal.participantClientWithAdminToken,
-              isSv4Connected = false,
+              isSv4Connected = true,
             )
           }
           bobValidatorWalletLocal.tap(20)
@@ -615,12 +615,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
             bobValidatorWalletLocal,
             Seq((70, 70)),
           )
-          eventually(60.seconds) {
-            participantIsConnectedToNewSynchronizer(
-              bobValidatorLocal.participantClientWithAdminToken,
-              isSv4Connected = true,
-            )
-          }
         }
       }
 
