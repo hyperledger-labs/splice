@@ -649,6 +649,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       s"lsu-bob-validator-$hint",
       "EXTRA_PARTICIPANT_ADMIN_USER" -> bobValidatorLocal.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> s"participant_extra_$dbsSuffix",
+      ProcessTestUtil.javaToolOptionsKey -> "-Xms3g -Xmx3g",
     ) {
       bobValidatorLocal.startSync()
       run
