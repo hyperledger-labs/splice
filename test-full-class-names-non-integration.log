@@ -14,7 +14,6 @@ org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
 org.lfdecentralizedtrust.splice.scan.automation.RewardComputationTriggerTest
 org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigTest
 org.lfdecentralizedtrust.splice.scan.rewards.RewardComputationInputsTest
-org.lfdecentralizedtrust.splice.scan.store.CryptoHashEquivalenceTest
 org.lfdecentralizedtrust.splice.scan.store.DbAppActivityRecordStoreTest
 org.lfdecentralizedtrust.splice.scan.store.DbScanAppRewardsStoreTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
