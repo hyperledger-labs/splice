@@ -785,12 +785,11 @@ object BuildCommon {
       )
       .settings(
         removeTestSources,
-        // We only need a few files out of a lot of test files so add them explicitly
+        // We only need 3 files out of a lot of test files so add them explicitly
         Test / managedSources := Seq(
           (Test / sourceDirectory).value / "scala/com/digitalasset/canton/HasActorSystem.scala",
           (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbTest.scala",
           (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbStorageIdempotency.scala",
-          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/crypto/TestSalt.scala",
         ),
         disableTests,
         sharedCantonSettings,
@@ -1266,10 +1265,6 @@ object BuildCommon {
       ) // to accommodate different daml repo coding style
       .settings(
         removeTestSources,
-        // Re-add TestEngine so Splice tests can run Daml code in-memory
-        Test / unmanagedSources := Seq(
-          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/util/TestEngine.scala"
-        ),
         sharedCantonSettings,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
