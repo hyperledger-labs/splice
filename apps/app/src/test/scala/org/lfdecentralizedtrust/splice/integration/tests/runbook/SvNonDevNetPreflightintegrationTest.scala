@@ -90,7 +90,9 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
       go to scanUrl
       import scala.concurrent.duration.*
       eventually(3.minutes) {
-        findAll(className("open-mining-round-row")).length should be >= 2
+        findAll(
+          className("open-mining-round-row")
+        ).length should be >= 2 withClue "open round table rows"
       }
     }
   }

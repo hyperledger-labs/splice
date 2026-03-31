@@ -196,7 +196,9 @@ abstract class RunbookSvPreflightIntegrationTestBase
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
       eventually(3.minutes) {
-        findAll(className("open-mining-round-row")).length should be >= 2
+        findAll(
+          className("open-mining-round-row")
+        ).length should be >= 2 withClue "open round table rows"
       }
     }
   }
