@@ -25,8 +25,6 @@ import DA.Text qualified as T
 data Hash = Hash with value : Text
   deriving (Eq, Show)
 
--- FIXME: add unit tests for all hash functions
-
 -- | Compute the hash of a record.
 hashRecord : [Hash] -> Hash
 hashRecord = hashListInternal . map (.value)
