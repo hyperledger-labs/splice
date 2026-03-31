@@ -24,33 +24,6 @@ Canton Network Token Standard APIs (CIP-0056)
 Refer to the :ref:`Token Standard documentation section <token_standard>`.
 
 
-.. _reward_assignment_api:
-
-Reward Assignment API (CIP-0104)
---------------------------------
-
-As part of implementing `CIP-0104 <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md>`__
-the following Daml API was introduced:
-
-   .. toctree::
-      :maxdepth: 1
-
-      ../api/splice-api-reward-assignment-v1/index
-
-The API is meant for apps whose ultimate beneficiaries of rewards are different from
-the app provider party (e.g., decentralized apps).
-The API allows them to assign the rewards they receive for their app to their ultimate beneficiaries.
-
-The API is based on a Daml interface, so that apps can use it from their Daml
-code without incurring a static dependency on ``splice-amulet`` and the
-corresponding upgrading challenges. The reward assignment choice can also
-be called directly from the Ledger API for apps that don't use custom Daml code.
-
-Note that the coupons always specify the original app provider party for whose activity
-the reward coupon was created.
-Thereby allowing consistent attribution of rewards collected to the app provider party.
-
-
 .. _featured_app_activity_markers_api:
 
 Featured App Activity Markers API (CIP-0047)
