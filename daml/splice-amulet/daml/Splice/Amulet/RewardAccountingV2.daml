@@ -26,9 +26,13 @@ import Splice.Util
 template CalculateRewardsV2 with
     dso : Party
     round : Round
-    rewardCouponTimeToLive : RelTime -- ^ The duration after which the rewards for this round should expire.
-    -- FIXME: doubl-check whether still required
-    dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessRewardsV2 contracts.
+    rewardCouponTimeToLive : RelTime
+      -- ^ Time to live for reward coupons that are created.
+      --
+      -- We store this as part of requesting the calculation of rewards to avoid reading
+      -- the AmuletConfig later again, which could lead to inconsistencies in case of config changes.
+    dryRun : Bool
+      -- ^ Whether to only simulate the confirmation without creating any RewardCouponV2 contracts.
   where
     signatory dso
 
@@ -52,7 +56,7 @@ data ProcessRewardsV2_ProcessBatchResult = ProcessRewardsV2_ProcessBatchResult {
 template ProcessRewardsV2 with
     dso : Party
     round : Round
-    dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
+    dryRun : Bool -- ^ Whether to only simulate the processing without creating any RewardCouponV2 contracts.
     rewardCouponTimeToLive : RelTime
     batchHash : CryptoHash.Hash
   where
