@@ -74,7 +74,7 @@ Follow these conventions:
 
 * **Title (first line):** A concise summary of the change, written in imperative mood (e.g., "Add external transaction hash to Scan API", not "Added …" or "Adds …"). GitHub defaults the title to the PR title, so make sure the PR title is descriptive.
 * **Body:** GitHub auto-populates the body with the list of individual commit messages. Clean this up before merging:
-  - Remove noise such as "fixes", "address review comments", "wip", etc.
+  - Remove noise such as "address review comments", "fixes", "format", "refactor", etc.
   - Keep a brief summary of *what* the change does and *why*. A few bullet points are fine.
   - Reference the related GitHub issue, e.g., `Fixes #1234` or `Part of #1234`.
   - Example of a good squash commit message:
@@ -89,7 +89,7 @@ Follow these conventions:
 
     Signed-off-by: Git-Hygienic-Dev <ghd@example.com>
     ```
-* **CI tags:** If the final squash commit message needs CI tags (e.g., `[ci]`, `[static]`), include them in the **PR title** so they survive the squash. See [Testing](TESTING.md) for the full list of supported tags.
+* **CI tags:** If the final squash commit message needs CI tags (e.g., `[ci]`, `[static]`), post-fix them at the end of the **PR title** so they survive the squash (e.g., `Add feature X [ci]`). See [Testing](TESTING.md) for the full list of supported tags.
 * **Sign-off:** The squash commit must include a valid `Signed-off-by` line. Ensure it is present in the commit message body.
 
 ## TODO Comments
