@@ -195,7 +195,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
   "The Scan UI is working" in { _ =>
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
-      // TODO(tech-debt): Consider checking something here or just remove that check
+    // TODO(tech-debt): Consider checking something here or just remove that check
     }
   }
 

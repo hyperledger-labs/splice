@@ -88,7 +88,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
 
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
-      // TODO(tech-debt): Consider checking something here or just remove that check
+    // TODO(tech-debt): Consider checking something here or just remove that check
     }
   }
 
