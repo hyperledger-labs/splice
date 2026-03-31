@@ -135,6 +135,8 @@ class RollForwardLsuInitializer(
               // Upgrade time is used to publish the sequencer sucessor which we don't care about for roll-forward LSUs.
               upgradeTime = None,
             )
+            trafficState <- legacyNode.sequencerAdminConnection.getLsuTrafficControlState()
+            _ <- currentNode.sequencerAdminConnection.setLsuTrafficControlState(trafficState)
           } yield ()
         }
       sequencerId <- currentNode.sequencerAdminConnection.getSequencerId
