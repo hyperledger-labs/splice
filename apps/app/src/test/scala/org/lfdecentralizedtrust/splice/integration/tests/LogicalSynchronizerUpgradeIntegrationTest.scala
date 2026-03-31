@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.util.HexString
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
@@ -39,6 +39,7 @@ import org.lfdecentralizedtrust.splice.sv.lsu.{
 }
 import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
@@ -116,22 +117,30 @@ class LogicalSynchronizerUpgradeIntegrationTest
       )
       // use the standalone participant
       .addConfigTransforms((_, config) => {
-        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(21_900, Seq("bobValidatorLocal"))(
-          config.copy(
-            validatorApps = config.validatorApps + (
-              InstanceName.tryCreate("bobValidatorLocal") -> {
-                val bobValidatorConfig = config
-                  .validatorApps(InstanceName.tryCreate("bobValidator"))
-                bobValidatorConfig
-              }
-            ),
-            walletAppClients = config.walletAppClients + (
-              InstanceName.tryCreate("bobValidatorWalletLocal") -> {
-                config.walletAppClients(InstanceName.tryCreate("bobValidatorWallet"))
-              }
-            ),
-          )
+        val bobValidatorConfig = config
+          .validatorApps(InstanceName.tryCreate("bobValidator"))
+        val updatedConfig = config.copy(
+          validatorApps = config.validatorApps + (
+            InstanceName.tryCreate("bobValidatorLocal") -> {
+              bobValidatorConfig
+            }
+          ),
+          walletAppClients = config.walletAppClients + (
+            InstanceName.tryCreate("bobValidatorWalletLocal") -> {
+              WalletAppClientConfig(
+                adminApi = NetworkAppClientConfig(
+                  s"http://${bobValidatorConfig.adminApi.clientConfig.endpointAsString}"
+                ),
+                ledgerApiUser = bobValidatorConfig.validatorWalletUsers.head,
+              )
+            }
+          ),
         )
+        ConfigTransforms
+          .bumpSomeWalletClientPortsBy(21_900, Seq("bobValidatorWalletLocal"))
+          .andThen(
+            ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(21_900, Seq("bobValidatorLocal"))
+          )(updatedConfig)
       })
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart
