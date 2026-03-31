@@ -126,7 +126,13 @@ trait ScanConnection
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def getFeaturedAppRight(contractId: String)(implicit
+  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+
+  def lookupFeaturedAppRightByContractId(contractId: String)(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,

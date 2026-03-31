@@ -454,21 +454,48 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetFeaturedAppRight(contractId: String)
+  case class ListFeaturedAppRightsByProvider(providerPartyId: PartyId)
       extends InternalBaseCommand[
-        http.GetFeaturedAppRightResponse,
+        http.ListFeaturedAppRightsByProviderResponse,
+        Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListFeaturedAppRightsByProviderResponse] =
+      client.listFeaturedAppRightsByProvider(providerPartyId.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListFeaturedAppRightsByProviderResponse.OK(response) =>
+      response.featuredApps
+        .traverse(co => Contract.fromHttp(FeaturedAppRight.COMPANION)(co))
+        .leftMap(_.toString)
+    }
+  }
+
+  case class LookupFeaturedAppRightByContractId(contractId: String)
+      extends InternalBaseCommand[
+        http.LookupFeaturedAppRightByContractIdResponse,
         Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
       ] {
 
     override def submitRequest(
         client: ScanClient,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetFeaturedAppRightResponse] =
-      client.getFeaturedAppRight(contractId, headers)
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.LookupFeaturedAppRightByContractIdResponse] =
+      client.lookupFeaturedAppRightByContractId(contractId, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetFeaturedAppRightResponse.OK(response) =>
+    ) = { case http.LookupFeaturedAppRightByContractIdResponse.OK(response) =>
       response.featuredAppRight
         .traverse(co => Contract.fromHttp(FeaturedAppRight.COMPANION)(co))
         .leftMap(_.toString)

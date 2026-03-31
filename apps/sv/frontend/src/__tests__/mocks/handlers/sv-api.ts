@@ -9,11 +9,11 @@ import { rest, RestHandler } from 'msw';
 import { FeatureSupportResponse, SuccessStatusResponse } from '@lfdecentralizedtrust/scan-openapi';
 import {
   ErrorResponse,
-  GetFeaturedAppRightResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListFeaturedAppRightsByProviderResponse,
   ListOngoingValidatorOnboardingsResponse,
+  LookupFeaturedAppRightByContractIdResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
 } from '@lfdecentralizedtrust/sv-openapi';
@@ -271,7 +271,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
           : undefined;
 
       return res(
-        ctx.json<GetFeaturedAppRightResponse>({
+        ctx.json<LookupFeaturedAppRightByContractIdResponse>({
           featured_app_right: featuredAppRight,
         })
       );

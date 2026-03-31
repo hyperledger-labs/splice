@@ -268,12 +268,20 @@ class BftScanConnection(
     bftCall(_.lookupFeaturedAppRight(providerPartyId))
   }
 
-  override def getFeaturedAppRight(contractId: String)(implicit
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    bftCall(_.listFeaturedAppRightsByProvider(providerPartyId))
+  }
+
+  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    bftCall(_.getFeaturedAppRight(contractId))
+    bftCall(_.lookupFeaturedAppRightByContractId(contractId))
   }
 
   override def listFeaturedAppRights()(implicit

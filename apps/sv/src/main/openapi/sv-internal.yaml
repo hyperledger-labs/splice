@@ -630,7 +630,7 @@ paths:
     get:
       tags: [sv]
       x-jvm-package: sv_operator
-      operationId: "getFeaturedAppRight"
+      operationId: "lookupFeaturedAppRightByContractId"
       description: |
         Look up a `FeaturedAppRight` contract by its contract ID.
       parameters:
@@ -645,7 +645,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetFeaturedAppRightResponse"
+                $ref: "#/components/schemas/LookupFeaturedAppRightByContractIdResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
@@ -1242,7 +1242,7 @@ components:
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
 
-    GetFeaturedAppRightResponse:
+    LookupFeaturedAppRightByContractIdResponse:
       description: |
         A `Splice.Amulet.FeaturedAppRight` contract looked up by contract ID, if it exists.
       type: object

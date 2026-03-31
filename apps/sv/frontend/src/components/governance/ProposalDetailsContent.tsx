@@ -599,7 +599,7 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
   const providerQuery = useQuery({
     queryKey: ['featuredAppRightProvider', rightContractId],
     queryFn: async () => {
-      const response = await svAdminClient.getFeaturedAppRight(rightContractId);
+      const response = await svAdminClient.lookupFeaturedAppRightByContractId(rightContractId);
       const contract = response.featured_app_right;
       return (contract?.payload as { provider?: string } | undefined)?.provider ?? null;
     },

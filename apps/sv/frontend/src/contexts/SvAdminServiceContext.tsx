@@ -18,8 +18,8 @@ import {
   ListOpenMiningRoundsResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
-  GetFeaturedAppRightResponse,
   ListFeaturedAppRightsByProviderResponse,
+  LookupFeaturedAppRightByContractIdResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
@@ -90,7 +90,9 @@ export interface SvAdminClient {
   listFeaturedAppRightsByProvider: (
     providerPartyId: string
   ) => Promise<ListFeaturedAppRightsByProviderResponse>;
-  getFeaturedAppRight: (contractId: string) => Promise<GetFeaturedAppRightResponse>;
+  lookupFeaturedAppRightByContractId: (
+    contractId: string
+  ) => Promise<LookupFeaturedAppRightByContractIdResponse>;
 }
 
 class ApiMiddleware
@@ -227,8 +229,10 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       ): Promise<ListFeaturedAppRightsByProviderResponse> => {
         return await svAdminClient.listFeaturedAppRightsByProvider(providerPartyId);
       },
-      getFeaturedAppRight: async (contractId: string): Promise<GetFeaturedAppRightResponse> => {
-        return await svAdminClient.getFeaturedAppRight(contractId);
+      lookupFeaturedAppRightByContractId: async (
+        contractId: string
+      ): Promise<LookupFeaturedAppRightByContractIdResponse> => {
+        return await svAdminClient.lookupFeaturedAppRightByContractId(contractId);
       },
     };
   }, [url, userAccessToken]);

@@ -454,13 +454,32 @@ class HttpScanHandler(
     }
   }
 
-  def getFeaturedAppRight(
-      response: v0.ScanResource.GetFeaturedAppRightResponse.type
-  )(contractId: String)(extracted: TraceContext): Future[
-    v0.ScanResource.GetFeaturedAppRightResponse
+  def listFeaturedAppRightsByProvider(
+      response: v0.ScanResource.ListFeaturedAppRightsByProviderResponse.type
+  )(providerPartyId: String)(extracted: TraceContext): Future[
+    v0.ScanResource.ListFeaturedAppRightsByProviderResponse
   ] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getFeaturedAppRight") { _ => _ =>
+    withSpan(s"$workflowId.listFeaturedAppRightsByProvider") { _ => _ =>
+      for {
+        rights <- store.listFeaturedAppRightsByProvider(
+          PartyId.tryFromProtoPrimitive(providerPartyId)
+        )
+      } yield {
+        definitions.ListFeaturedAppRightsResponse(
+          rights.toVector.map(_.contract.toHttp)
+        )
+      }
+    }
+  }
+
+  def lookupFeaturedAppRightByContractId(
+      response: v0.ScanResource.LookupFeaturedAppRightByContractIdResponse.type
+  )(contractId: String)(extracted: TraceContext): Future[
+    v0.ScanResource.LookupFeaturedAppRightByContractIdResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupFeaturedAppRightByContractId") { _ => _ =>
       for {
         right <- store.multiDomainAcsStore.lookupContractById(
           amulet.FeaturedAppRight.COMPANION

@@ -319,12 +319,26 @@ class SingleScanConnection private[client] (
     runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
-  override def getFeaturedAppRight(contractId: String)(implicit
+  override def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListFeaturedAppRightsByProvider(providerPartyId),
+    )
+  }
+
+  override def lookupFeaturedAppRightByContractId(contractId: String)(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetFeaturedAppRight(contractId))
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupFeaturedAppRightByContractId(contractId),
+    )
   }
 
   override def listFeaturedAppRights()(implicit
