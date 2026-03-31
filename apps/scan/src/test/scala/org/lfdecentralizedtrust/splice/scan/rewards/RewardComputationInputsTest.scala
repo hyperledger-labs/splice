@@ -4,9 +4,10 @@
 package org.lfdecentralizedtrust.splice.scan.rewards
 
 import com.digitalasset.canton.BaseTest
+import org.lfdecentralizedtrust.splice.util.BigDecimalMatchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class RewardComputationInputsTest extends AnyWordSpec with BaseTest {
+class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDecimalMatchers {
 
   import RewardComputationInputsTest.*
 
@@ -15,40 +16,22 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest {
     cases.foreach { tc =>
       tc.label in {
         val result = tc.inputs.deriveIssuanceParams(tc.totalRoundAppActivityWeight)
-        assertClose(
-          "issuancePerFeaturedAppTraffic_CCperMB",
-          result.issuancePerFeaturedAppTraffic_CCperMB,
+        result.issuancePerFeaturedAppTraffic_CCperMB should beEqualUpTo(
           tc.expected.issuancePerFeaturedAppTraffic_CCperMB,
+          10,
         )
-        assertClose(
-          "threshold_CC",
-          result.threshold_CC,
-          tc.expected.threshold_CC,
-        )
-        assertClose(
-          "totalIssuanceForFeaturedAppRewards",
-          result.totalIssuanceForFeaturedAppRewards,
+        result.threshold_CC should beEqualUpTo(tc.expected.threshold_CC, 10)
+        result.totalIssuanceForFeaturedAppRewards should beEqualUpTo(
           tc.expected.totalIssuanceForFeaturedAppRewards,
+          10,
         )
-        assertClose(
-          "unclaimedAppRewardAmount",
-          result.unclaimedAppRewardAmount,
+        result.unclaimedAppRewardAmount should beEqualUpTo(
           tc.expected.unclaimedAppRewardAmount,
+          10,
         )
       }
     }
   }
-
-  private def assertClose(
-      label: String,
-      actual: BigDecimal,
-      expected: BigDecimal,
-      tolerance: BigDecimal = BigDecimal("1e-10"),
-  ): Unit =
-    assert(
-      (actual - expected).abs < tolerance,
-      s"$label: expected $expected but got $actual (diff ${(actual - expected).abs})",
-    )
 }
 
 object RewardComputationInputsTest {
