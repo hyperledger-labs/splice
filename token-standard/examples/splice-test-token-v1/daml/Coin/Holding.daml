@@ -1,0 +1,26 @@
+module Coin.Holding where
+
+import Splice.Api.Token.HoldingV1 qualified as Holding
+import Coin.Metadata
+import DA.Text qualified as Text
+
+template CoinToken
+  with
+    admin : Party
+    owner : Party
+    amount : Decimal
+    createdAt : Time
+  where
+    signatory admin
+    observer owner
+
+    interface instance Holding.Holding for CoinToken where
+      view = Holding.HoldingView with
+        owner
+        instrumentId = Holding.InstrumentId
+          with
+            admin
+            id = Text.sha256 $ show createdAt <> show owner
+        amount
+        lock = None
+        meta = testMeta

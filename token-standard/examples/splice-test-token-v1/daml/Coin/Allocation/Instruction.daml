@@ -1,0 +1,98 @@
+module Coin.Allocation.Instruction where
+
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocInstr
+import Splice.Api.Token.MetadataV1 qualified as Meta
+import DA.Map qualified as Map
+import Coin.Util qualified as Util
+import Coin.Allocation.Allocation
+import Splice.Api.Token.AllocationV1 qualified as Alloc
+import DA.List qualified as List
+import Splice.Api.Token.HoldingV1 qualified as Holding
+import DA.Optional qualified as Optional
+
+template CoinAllocationInstructionFactory
+  with
+    admin : Party
+    senders : Optional [Party]
+  where
+    signatory admin
+    observer Optional.fromOptional []senders
+
+    -- without exercising it with sender as the observer we won't enable them to exercise the Allocation choice
+    choice AddObserver : ContractId CoinAllocationInstructionFactory
+      with
+        newSenders : [Party]
+      controller admin
+      do
+        create this with senders = Some (Optional.fromOptional newSenders senders ++ newSenders)
+
+    interface instance AllocInstr.AllocationFactory for CoinAllocationInstructionFactory where
+      view = AllocInstr.AllocationFactoryView with
+        admin
+        meta = Meta.emptyMetadata
+
+      allocationFactory_allocateImpl this allocateRequest = do
+        assertMsg "Expected admin does not match" (allocateRequest.expectedAdmin == admin)
+        Util.assertExpectedAdmin admin allocateRequest.expectedAdmin
+
+        testAllocInstructionCid <- create CoinAllocationInstruction with
+          admin
+          allocation = allocateRequest.allocation
+          requestedAt = allocateRequest.requestedAt
+          inputHoldingCids = allocateRequest.inputHoldingCids
+
+        let allocationInstructionCid = toInterfaceContractId @AllocInstr.AllocationInstruction testAllocInstructionCid
+
+        pure AllocInstr.AllocationInstructionResult with
+          output = AllocInstr.AllocationInstructionResult_Pending with
+            allocationInstructionCid
+          senderChangeCids = [] -- we calculate it at later stages
+          meta = Meta.emptyMetadata
+
+      allocationFactory_publicFetchImpl this fetchRequest = do
+        assertMsg "Expected admin does not match" (fetchRequest.expectedAdmin == admin)
+        pure AllocInstr.AllocationFactoryView with
+          admin
+          meta = Meta.emptyMetadata
+
+template CoinAllocationInstruction
+  with
+    admin : Party
+    allocation : Alloc.AllocationSpecification
+    requestedAt : Time
+    inputHoldingCids : [ContractId Holding.Holding]
+  where
+    signatory admin, allocation.transferLeg.sender
+    observer allocation.settlement.executor, allocation.transferLeg.receiver
+
+    interface instance AllocInstr.AllocationInstruction for CoinAllocationInstruction where
+      view = AllocInstr.AllocationInstructionView with
+        allocation
+        requestedAt
+        inputHoldingCids
+        meta = Meta.emptyMetadata
+        pendingActions = Map.fromList [(admin, "Needs to accept the instruction in order to create an allocation")]
+        originalInstructionCid = None
+
+      allocationInstruction_withdrawImpl this withdrawRequest = do
+        pure AllocInstr.AllocationInstructionResult with
+          output = AllocInstr.AllocationInstructionResult_Failed
+          senderChangeCids = []
+          meta = Meta.emptyMetadata
+
+      allocationInstruction_updateImpl this updateRequest = do
+        assertMsg "Only executor with sender can exercise this choice" (List.sort updateRequest.extraActors == List.sort [allocation.settlement.executor, allocation.transferLeg.sender])
+
+        testAllocationCid <- create CoinAllocation with
+          settlement = allocation.settlement
+          transferLeg = allocation.transferLeg
+          transferLegId = allocation.transferLegId
+          senderHoldingCids = inputHoldingCids
+          admin
+        let allocationCid = toInterfaceContractId @Alloc.Allocation testAllocationCid
+
+        pure AllocInstr.AllocationInstructionResult with
+          output = AllocInstr.AllocationInstructionResult_Completed with
+            allocationCid
+          senderChangeCids = []
+          meta = Meta.emptyMetadata

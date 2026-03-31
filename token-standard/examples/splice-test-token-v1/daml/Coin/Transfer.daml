@@ -1,0 +1,128 @@
+module Coin.Transfer where
+
+import Coin.Holding
+import Splice.Api.Token.MetadataV1 qualified as Meta
+import Splice.Api.Token.TransferInstructionV1 qualified as Transfer
+import DA.List qualified as List
+import Coin.Util qualified as Util
+
+-- UTILS
+
+assertTransferStatus : Transfer.TransferInstructionStatus -> Update ()
+assertTransferStatus status = do
+  assertMsg "Transfer instruction must be pending receiver acceptance" (status == Transfer.TransferPendingReceiverAcceptance)
+
+-- TEMPLATES
+
+template CoinTransferFactory
+  with
+    admin : Party
+  where
+    signatory admin
+
+    interface instance Transfer.TransferFactory for CoinTransferFactory where
+      view = Transfer.TransferFactoryView with
+        admin
+        meta = Meta.emptyMetadata
+
+      transferFactory_transferImpl self transferRequest = do
+        Util.assertExpectedAdmin admin transferRequest.expectedAdmin
+        assertMsg "executeBefore must be after requestedAt" (transferRequest.transfer.executeBefore > transferRequest.transfer.requestedAt)
+
+        concreteTransferInstructionCid <- create CoinTransferInstruction with
+          transfer = transferRequest.transfer
+          status = Transfer.TransferPendingReceiverAcceptance
+
+        let transferInstructionCid = toInterfaceContractId @Transfer.TransferInstruction concreteTransferInstructionCid
+
+        -- check if the sender sends too much
+        senderChange <- Util.calculateSenderChange transferRequest.transfer.inputHoldingCids transferRequest.transfer.amount
+
+        now <- getTime
+
+        -- create change for sender (if needed)
+        senderChangeCids <- if senderChange > 0.0 then do
+          concreteChangeCid <- create CoinToken with
+            admin
+            owner = transferRequest.transfer.sender
+            amount = senderChange
+            createdAt = now
+          let changeHoldingCid = Util.testTokenToHoldingCid concreteChangeCid
+          pure [changeHoldingCid]
+          else pure []
+
+        pure Transfer.TransferInstructionResult with
+          output = Transfer.TransferInstructionResult_Pending with
+            transferInstructionCid
+          senderChangeCids
+          meta = Meta.emptyMetadata
+
+      transferFactory_publicFetchImpl self fetchRequest = do
+        assertMsg "Expected admin does not match" (fetchRequest.expectedAdmin == admin)
+        pure Transfer.TransferFactoryView with
+          admin
+          meta = Meta.emptyMetadata
+
+template CoinTransferInstruction
+  with
+    transfer : Transfer.Transfer
+    status : Transfer.TransferInstructionStatus
+  where
+    signatory transfer.instrumentId.admin, transfer.sender
+    observer transfer.receiver
+
+    interface instance Transfer.TransferInstruction for CoinTransferInstruction where
+      view = Transfer.TransferInstructionView with
+        transfer
+        status
+        originalInstructionCid = None
+        meta = Meta.emptyMetadata
+
+      transferInstruction_acceptImpl self _ = do
+        -- Status must be set to 'TransferPendingReceiverAcceptance' before a transfer can be executed
+        assertTransferStatus status
+
+        -- Check transfer hasn't expired
+        now <- getTime
+        assertMsg "Transfer has expired" (transfer.executeBefore > now)
+
+        let senderTokenCid = List.head transfer.inputHoldingCids
+
+        -- Fetch the sender's token
+        senderTokenView <- view <$> fetch senderTokenCid
+
+        -- Create the CoinToken for the receiver
+        concreteReceiverTokenCid <- create CoinToken with
+          admin = transfer.instrumentId.admin
+          owner = transfer.receiver
+          amount = transfer.amount
+          createdAt = now
+
+        let receiverTokenCid = Util.testTokenToHoldingCid concreteReceiverTokenCid
+
+        -- Archive sender's token
+        archive senderTokenCid
+
+        pure Transfer.TransferInstructionResult with
+          output = Transfer.TransferInstructionResult_Completed with
+            receiverHoldingCids = [receiverTokenCid]
+          senderChangeCids = []
+          meta = Meta.emptyMetadata
+
+      transferInstruction_rejectImpl self _ = do
+        -- Status must be set to 'TransferPendingReceiverAcceptance' before a transfer can be executed
+        assertTransferStatus status
+
+        pure Transfer.TransferInstructionResult with
+          output = Transfer.TransferInstructionResult_Failed
+          senderChangeCids = []
+          meta = Meta.emptyMetadata
+
+      transferInstruction_withdrawImpl self withdraw = do
+        pure Transfer.TransferInstructionResult with
+          output = Transfer.TransferInstructionResult_Failed
+          senderChangeCids = []
+          meta = Meta.emptyMetadata
+
+      transferInstruction_updateImpl self update = do
+        abort "Cannot update a transfer instruction"

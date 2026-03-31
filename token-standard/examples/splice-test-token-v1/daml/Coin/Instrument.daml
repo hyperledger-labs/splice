@@ -1,0 +1,13 @@
+module Coin.Instrument where
+
+import Splice.Api.Token.MetadataV1 qualified as Meta
+
+template CoinInstrument
+  with
+    admin : Party
+    name : Text
+  where
+    signatory admin
+
+    interface instance Meta.AnyContract for CoinInstrument where
+      view = Meta.AnyContractView with {}

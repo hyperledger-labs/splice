@@ -1,0 +1,18 @@
+module Coin.Util where
+
+import Splice.Api.Token.HoldingV1 qualified as Holding
+import Coin.Holding
+
+assertExpectedAdmin : (CanAssert m) => Party -> Party -> m ()
+assertExpectedAdmin admin expectedAdmin = assertMsg "Expected admin does not match" (admin == expectedAdmin)
+
+calculateSenderChange : [ContractId Holding.Holding] -> Decimal -> Update Decimal
+calculateSenderChange holdingCids amountToSend = do
+  senderInputAmounts <- mapA (\holdingCid -> do
+    holdingView <- view <$> fetch holdingCid
+    pure holdingView.amount) holdingCids
+  let senderInputAmountSum : Decimal = sum senderInputAmounts
+  pure (senderInputAmountSum - amountToSend)
+
+testTokenToHoldingCid : HasToInterface CoinToken Holding.Holding => ContractId CoinToken -> ContractId Holding.Holding
+testTokenToHoldingCid testTokenCid = toInterfaceContractId @Holding.Holding testTokenCid
