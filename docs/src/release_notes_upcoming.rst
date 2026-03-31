@@ -62,9 +62,8 @@
       (see `SV Longterm Operations Schedule <https://docs.google.com/document/d/1QhLL5bL0u8temBL86y957VbWDtZJhH9udH-_C7nBlvc/edit?tab=t.0#heading=h.ripdn5ydglli>`__ for dates for the different networks).
       Otherwise, CC transfers and reward collection will stop working for parties on your node until you upgrade.
 
-      **Action recommended for app devs:**
-
-      **App devs whose app's Daml code statically depends on** ``splice-amulet`` should recompile their Daml code
+      **Action recommended for app devs:** app's with Daml code that statically depends on ``splice-amulet``
+      should recompile their Daml code
       to link against the new version of ``splice-amulet`` listed below. Otherwise, code involving CC transfers
       will stop working as both ``OpenMiningRound`` and ``AmuletRules`` include newly introduced config fields.
 
