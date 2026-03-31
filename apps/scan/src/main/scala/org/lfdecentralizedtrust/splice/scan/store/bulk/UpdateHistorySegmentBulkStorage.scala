@@ -118,13 +118,17 @@ class UpdateHistorySegmentBulkStorage(
 
   private def encodeUpdates(updates: Seq[TreeUpdateWithMigrationId]) = {
     val encoded = updates.map(update =>
-      ScanHttpEncodings.encodeUpdate(
+      ScanHttpEncodings.encodeUpdateV2(
         update,
         definitions.DamlValueEncoding.CompactJson,
         ScanHttpEncodings.V1,
       )
     )
-    val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
+    /* When we add new fields, we make them optional, and they will be None until a coordinated switching point.
+     * We therefore want to drop null values from the JSON, to avoid emitting a lot of "fieldX: null" in the dumps until the switching point,
+     * otherwise we'll break BFT guarantees when SVs adopt a version with the optional field asynchronously.
+     */
+    val updatesStr = encoded.map(_.asJson.dropNullValues.noSpacesSortKeys).mkString("\n") + "\n"
     val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
     logger.debug(
       s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption

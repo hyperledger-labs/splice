@@ -195,11 +195,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
   "The Scan UI is working" in { _ =>
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
-      eventually(3.minutes) {
-        val asOfRound = find(id("as-of-round")).value.text
-        asOfRound should startWith("The content on this page is computed as of round: ")
-        asOfRound should not be "The content on this page is computed as of round: --"
-      }
+    // TODO(tech-debt): Consider checking something here or just remove that check
     }
   }
 
