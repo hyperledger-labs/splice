@@ -23,11 +23,10 @@ import java.io.File
 import java.security.MessageDigest
 import scala.jdk.CollectionConverters.*
 
-/** Three-way integration test: Daml (real participant) == SQL (scan Postgres) == Scala oracle.
+/** Three-way equivalence test: Daml (real participant) == SQL (scan Postgres) == Scala oracle.
   *
-  * This complements the store-level CryptoHashEquivalenceTest (which uses
-  * Canton's in-memory TestEngine) by validating against a real ledger and
-  * the actual scan database.
+  * Validates that the plpgsql hash functions (V065) produce identical results
+  * to the Daml CryptoHash module, using a Scala oracle as the common reference.
   *
   * Uses a shared environment so the dar is uploaded and proxy created once,
   * then each hash function gets its own test.
