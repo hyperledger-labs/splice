@@ -148,9 +148,7 @@ class UpdateHistorySegmentBulkStorage(
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .map(chunk => {
-        if (chunk.numUpdates > 0) {
-          historyMetrics.BulkStorage.incUpdatesCount(chunk.numUpdates)
-        }
+        historyMetrics.BulkStorage.incUpdatesCount(chunk.numUpdates)
         chunk.updateBytes
       })
       .via(
