@@ -33,11 +33,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.{
-  LogicalSynchronizerUpgradeSequencingTestTrigger,
-  LogicalSynchronizerUpgradeTrigger,
-}
-import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.sv.lsu.{LogicalSynchronizerUpgradeTrigger}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
