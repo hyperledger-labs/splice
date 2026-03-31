@@ -90,6 +90,8 @@ allocationHoldingView (V1.AllocationSpecification with settlement, transferLeg) 
       meta = emptyMetadata
 
 
+-- FIXME: add InstrumentConfig that allows the admin to suspend any asset movements on that instrument, as a demo of information that needs to be provided off-ledger
+
 
 -- | Template providing all the rules for how the tokens can be changed.
 --
@@ -110,7 +112,7 @@ template TokenRules with
 
       allocationFactory_allocateImpl _self arg = do
         requireMatchExpected ("expectedAdmin", arg.expectedAdmin) admin
-        let V1.AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids, extraArgs} = arg
+        let V1.AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids} = arg
 
         -- == validate each field of the requested allocation
         let settlement = allocation.settlement
