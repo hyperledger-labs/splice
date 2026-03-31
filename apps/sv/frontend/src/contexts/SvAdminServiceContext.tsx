@@ -18,8 +18,8 @@ import {
   ListOpenMiningRoundsResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  GetFeaturedAppRightResponse,
   ListFeaturedAppRightsByProviderResponse,
-  ListFeaturedAppRightsResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
@@ -90,7 +90,7 @@ export interface SvAdminClient {
   listFeaturedAppRightsByProvider: (
     providerPartyId: string
   ) => Promise<ListFeaturedAppRightsByProviderResponse>;
-  listAllFeaturedAppRights: () => Promise<ListFeaturedAppRightsResponse>;
+  getFeaturedAppRight: (contractId: string) => Promise<GetFeaturedAppRightResponse>;
 }
 
 class ApiMiddleware
@@ -227,8 +227,8 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       ): Promise<ListFeaturedAppRightsByProviderResponse> => {
         return await svAdminClient.listFeaturedAppRightsByProvider(providerPartyId);
       },
-      listAllFeaturedAppRights: async (): Promise<ListFeaturedAppRightsResponse> => {
-        return await svAdminClient.listFeaturedAppRights();
+      getFeaturedAppRight: async (contractId: string): Promise<GetFeaturedAppRightResponse> => {
+        return await svAdminClient.getFeaturedAppRight(contractId);
       },
     };
   }, [url, userAccessToken]);

@@ -454,6 +454,27 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetFeaturedAppRight(contractId: String)
+      extends InternalBaseCommand[
+        http.GetFeaturedAppRightResponse,
+        Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetFeaturedAppRightResponse] =
+      client.getFeaturedAppRight(contractId, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetFeaturedAppRightResponse.OK(response) =>
+      response.featuredAppRight
+        .traverse(co => Contract.fromHttp(FeaturedAppRight.COMPANION)(co))
+        .leftMap(_.toString)
+    }
+  }
+
   case class ListAnsEntries(
       namePrefix: Option[String],
       pageSize: Int,

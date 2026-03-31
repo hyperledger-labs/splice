@@ -9,6 +9,7 @@ import { rest, RestHandler } from 'msw';
 import { FeatureSupportResponse, SuccessStatusResponse } from '@lfdecentralizedtrust/scan-openapi';
 import {
   ErrorResponse,
+  GetFeaturedAppRightResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListFeaturedAppRightsByProviderResponse,
@@ -229,25 +230,51 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
     }
   }),
 
-  rest.get(`${svUrl}/v0/admin/sv/featured-app-rights/:providerPartyId`, (req, res, ctx) => {
-    const providerPartyId = decodeURIComponent(String(req.params.providerPartyId));
-    const featuredAppRights =
-      providerPartyId === 'a-party-id::1014912492'
-        ? [
-            {
+  rest.get(
+    `${svUrl}/v0/admin/sv/featured-app-rights/by-provider/:providerPartyId`,
+    (req, res, ctx) => {
+      const providerPartyId = decodeURIComponent(String(req.params.providerPartyId));
+      const featuredAppRights =
+        providerPartyId === 'a-party-id::1014912492'
+          ? [
+              {
+                template_id: 'featured-app-right-template-id',
+                contract_id: 'rightCid123',
+                payload: {},
+                created_event_blob: '',
+                created_at: '2026-02-26T13:00:00.000000Z',
+              },
+            ]
+          : [];
+
+      return res(
+        ctx.json<ListFeaturedAppRightsByProviderResponse>({
+          featured_app_rights: featuredAppRights,
+        })
+      );
+    }
+  ),
+
+  rest.get(
+    `${svUrl}/v0/admin/sv/featured-app-rights/by-contract-id/:contractId`,
+    (req, res, ctx) => {
+      const contractId = decodeURIComponent(String(req.params.contractId));
+      const featuredAppRight =
+        contractId === 'rightCid123'
+          ? {
               template_id: 'featured-app-right-template-id',
               contract_id: 'rightCid123',
-              payload: {},
+              payload: { provider: 'a-party-id::1014912492' },
               created_event_blob: '',
               created_at: '2026-02-26T13:00:00.000000Z',
-            },
-          ]
-        : [];
+            }
+          : undefined;
 
-    return res(
-      ctx.json<ListFeaturedAppRightsByProviderResponse>({
-        featured_app_rights: featuredAppRights,
-      })
-    );
-  }),
+      return res(
+        ctx.json<GetFeaturedAppRightResponse>({
+          featured_app_right: featuredAppRight,
+        })
+      );
+    }
+  ),
 ];

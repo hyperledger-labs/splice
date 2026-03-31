@@ -454,6 +454,23 @@ class HttpScanHandler(
     }
   }
 
+  def getFeaturedAppRight(
+      response: v0.ScanResource.GetFeaturedAppRightResponse.type
+  )(contractId: String)(extracted: TraceContext): Future[
+    v0.ScanResource.GetFeaturedAppRightResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getFeaturedAppRight") { _ => _ =>
+      for {
+        right <- store.multiDomainAcsStore.lookupContractById(
+          amulet.FeaturedAppRight.COMPANION
+        )(new amulet.FeaturedAppRight.ContractId(contractId))
+      } yield {
+        definitions.LookupFeaturedAppRightResponse(right.map(_.contract.toHttp))
+      }
+    }
+  }
+
   def getAmuletConfigForRound(
       response: v0.ScanResource.GetAmuletConfigForRoundResponse.type
   )(

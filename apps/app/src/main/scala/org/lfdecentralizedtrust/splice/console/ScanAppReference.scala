@@ -257,6 +257,14 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
+  @Help.Summary("Get a featured app right by contract ID")
+  def getFeaturedAppRight(
+      contractId: String
+  ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetFeaturedAppRight(contractId))
+    }
+
   @Help.Summary("Get the Amulet config parameters for a given round")
   def getAmuletConfigForRound(
       round: Long

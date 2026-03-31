@@ -626,22 +626,30 @@ paths:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
 
-  /v0/admin/sv/featured-app-rights:
+  /v0/admin/sv/featured-app-rights/by-contract-id/{contract_id}:
     get:
       tags: [sv]
       x-jvm-package: sv_operator
-      operationId: "listFeaturedAppRights"
+      operationId: "getFeaturedAppRight"
       description: |
-        List all `FeaturedAppRight` contracts.
+        Look up a `FeaturedAppRight` contract by its contract ID.
+      parameters:
+        - name: "contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: All featured app rights
+          description: Featured app right, if found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListFeaturedAppRightsResponse"
+                $ref: "#/components/schemas/GetFeaturedAppRightResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
-  /v0/admin/sv/featured-app-rights/{provider_party_id}:
+  /v0/admin/sv/featured-app-rights/by-provider/{provider_party_id}:
     get:
       tags: [sv]
       x-jvm-package: sv_operator
@@ -1234,17 +1242,13 @@ components:
         participant_users:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
 
-    ListFeaturedAppRightsResponse:
+    GetFeaturedAppRightResponse:
       description: |
-        All contracts of Daml template `Splice.Amulet.FeaturedAppRight`.
+        A `Splice.Amulet.FeaturedAppRight` contract looked up by contract ID, if it exists.
       type: object
-      required:
-        - featured_app_rights
       properties:
-        featured_app_rights:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        featured_app_right:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListFeaturedAppRightsByProviderResponse:
       description: |
