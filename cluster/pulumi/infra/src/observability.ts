@@ -935,6 +935,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 };
               })
             ),
+            'traffic_based_rewards_alerts.yaml': readGrafanaAlertingFile(
+              'traffic_based_rewards_alerts.yaml'
+            ),
           },
         }).map(([k, v]) => [k, defaultAlertSubstitutions(v)])
       ),
