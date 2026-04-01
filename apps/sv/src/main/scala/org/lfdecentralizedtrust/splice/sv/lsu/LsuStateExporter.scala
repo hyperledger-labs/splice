@@ -28,16 +28,18 @@ class LsuStateExporter(
   private val mediatorIdentityStore =
     new NodeIdentitiesStore(mediatorAdminConnection, None, loggerFactory)
 
-  def exportLSUState(upgradesAt: CantonTimestamp)(implicit tc: TraceContext): Future[LsuState] = {
-    logger.info(s"Exporting LSU state for upgrade at $upgradesAt")
+  def exportLSUState(topologyExportTime: Option[CantonTimestamp])(implicit
+      tc: TraceContext
+  ): Future[LsuState] = {
+    logger.info(s"Exporting LSU state for upgrade at ${topologyExportTime
+        .fold("export time from LsuAnnouncement")(ts => s"at $ts")}")
     for {
-      _ <- sequencerAdminConnection.getLsuState(lsuStatePath)
+      _ <- sequencerAdminConnection.getLsuState(lsuStatePath, ts = topologyExportTime)
       sequencerIdentityDump <- sequencerIdentityStore.getNodeIdentitiesDump()
       mediatorIdentityDump <- mediatorIdentityStore.getNodeIdentitiesDump()
     } yield {
-      logger.info(s"Finished exporting LSU state for upgrade at $upgradesAt")
+      logger.info(s"Finished exporting LSU state")
       LsuState(
-        upgradesAt.toInstant,
         SynchronizerNodeIdentities(
           sequencerIdentityDump,
           mediatorIdentityDump,
