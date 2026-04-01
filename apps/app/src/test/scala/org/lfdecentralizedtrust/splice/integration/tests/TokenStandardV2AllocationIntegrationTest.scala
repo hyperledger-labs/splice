@@ -37,7 +37,7 @@ import scala.util.Random
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class TokenStandardV2AllocationIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
-    with TokenStandardV2Test
+    with TokenStandardV2TestUtil
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil

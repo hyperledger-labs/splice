@@ -24,7 +24,7 @@ class AmuletAllocationsIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil
-    with TokenStandardV2Test {
+    with TokenStandardV2TestUtil {
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
