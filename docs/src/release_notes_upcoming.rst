@@ -9,6 +9,12 @@
 
 .. release-notes:: Upcoming
 
+    - SV App
+
+       - A new optional configuration map `additionalPackagesToUnvet` to unvet additional supported packages was added in the SV app configuration.
+         This is only aimed as a security measure to add the ability to downgrade to previous versions in case of major issues or to prevent
+         corrupted and unsecured packages from being used. More information about this new configuration can be found in the :ref:`Unvet unsecure package versions <sv-unvet_unsercure_package_versions>` guide.
+
     - Deployment
 
         - We've added support for the `Stakater Reloader <https://github.com/stakater/Reloader>`_ annotation,

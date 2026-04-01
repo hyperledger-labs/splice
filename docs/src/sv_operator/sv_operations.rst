@@ -846,3 +846,21 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
       # Example to trigger re-ingestion of the TxLog store for the second time
       persistence:
         txLogStoreDescriptorUserVersion: 2
+
+.. _sv-unvet_unsercure_package_versions:
+
+Unvet unsecure package versions
+-------------------------------
+
+This is mainly used to downgrade to previous versions in case of major issues.
+Do not use it if not advised to do so; unvetting a package changes the vetting state for all SVs.
+
+In order to unvet supported packages, you should set the following:
+
+  .. code-block:: yaml
+
+     additionalEnvVars:
+       - name: ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET
+         value: |
+           canton.sv-apps.sv.additional-packages-to-unvet.splice-package-1 = ["0.1.16"]
+           canton.sv-apps.sv.additional-packages-to-unvet.splice-package-2 = ["0.1.18", "0.1.19"]
