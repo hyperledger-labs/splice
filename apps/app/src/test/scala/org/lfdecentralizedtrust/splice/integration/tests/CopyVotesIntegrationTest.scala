@@ -68,7 +68,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       def addSvAction(index: Int) = new ARC_DsoRules(
         new SRARC_AddSv(
           new DsoRules_AddSv(
-            s"copy-vote-host-$index",
+            s"copy-vote-host-$index:1234",
             s"Copy Vote Candidate $index",
             1000L + index,
             s"copy-vote-participant-$index",
