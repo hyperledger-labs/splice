@@ -26,8 +26,10 @@ import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.scanStream.ScanStreamResource
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
-import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
-import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
+import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationV1Resource
+import org.lfdecentralizedtrust.tokenstandard.allocation.v2.Resource as TokenStandardAllocationV2Resource
+import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionV1Resource
+import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v2.Resource as TokenStandardAllocationInstructionV2Resource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
@@ -504,17 +506,25 @@ class ScanApp(
                 tokenStandardTransferInstructionHandler,
                 buildRouteForOperation(_, "token_standard_transfer_instruction"),
               ),
-              TokenStandardAllocationInstructionResource.routes(
+              TokenStandardAllocationInstructionV1Resource.routes(
+                  tokenStandardAllocationInstructionHandler,
+                  buildRouteForOperation(_, "token_standard_allocation_instruction_v1"),
+                ),
+                TokenStandardAllocationInstructionV2Resource.routes(
                 tokenStandardAllocationInstructionHandler,
-                buildRouteForOperation(_, "token_standard_allocation_instruction"),
+                buildRouteForOperation(_, "token_standard_allocation_instruction_v2"),
               ),
               TokenStandardMetadataResource.routes(
                 tokenStandardMetadataHandler,
                 buildRouteForOperation(_, "token_standard_metadata"),
               ),
-              TokenStandardAllocationResource.routes(
+              TokenStandardAllocationV1Resource.routes(
+                  tokenStandardAllocationHandler,
+                  buildRouteForOperation(_, "token_standard_allocation_v1"),
+                ),
+                TokenStandardAllocationV2Resource.routes(
                 tokenStandardAllocationHandler,
-                buildRouteForOperation(_, "token_standard_allocation"),
+                buildRouteForOperation(_, "token_standard_allocation_v2"),
               ),
             )
           }

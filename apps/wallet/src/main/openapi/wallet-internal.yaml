@@ -835,6 +835,57 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v2/allocations: # skipping v1 on purpose to mirror Token Standard version
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "allocateAmuletV2"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AllocateAmuletV2Request"
+      responses:
+        "200":
+          description: The AmuletAllocation has been created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllocateAmuletV2Response"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "404":
+          description: |
+            The submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "409":
+          description:
+            A transfer with the same tracking id has been created.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A transfer with the same tracking id is currently being processed,
+            which may or may not succeed. Retry submitting the request with exponential
+            back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/allocations/{contract_id}/withdraw:
     post:
       tags: [ wallet ]
@@ -1732,7 +1783,88 @@ components:
               additionalProperties:
                 type: string
 
+    AllocateAmuletV2Request:
+      type: object
+      required:
+        - settlement
+        - transfer_legs
+      properties:
+        settlement:
+          type: object
+          required:
+            - executors
+            - settlement_ref
+            - requested_at
+            - settle_at
+          properties:
+            executors:
+              type: array
+              items:
+                type: string
+            settlement_ref:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                cid:
+                  type: string
+            requested_at:
+              type: integer
+              format: int64
+            settle_at:
+              type: integer
+              format: int64
+            settlement_deadline:
+              type: integer
+              format: int64
+            meta:
+              type: object
+              additionalProperties:
+                type: string
+        transfer_legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransferLegV2"
+
+    TransferLegV2:
+      type: object
+      required:
+        - transfer_leg_id
+        - receiver
+        - amount
+      properties:
+        transfer_leg_id:
+          type: string
+        receiver:
+          type: string
+        amount:
+          type: string
+        meta:
+          type: object
+          additionalProperties:
+            type: string
+
     AllocateAmuletResponse:
+      type: object
+      required:
+        - output
+        - sender_change_cids
+        - meta
+      properties:
+        output:
+          "$ref": "#/components/schemas/AllocationInstructionResultOutput"
+        sender_change_cids:
+          type: array
+          items:
+            type: string
+        meta:
+          type: object
+          additionalProperties:
+            type: string
+
+    AllocateAmuletV2Response:
       type: object
       required:
         - output
@@ -1781,7 +1913,8 @@ components:
     ListAllocationsResponse:
       type: object
       description:
-        Includes all Allocation views where the user is a sender of one of the transferLegs and where
+        Includes all Allocation views (for both Token Standard v1 and v2)
+        where the user is a sender of one of the transferLegs and where
         the involved instrument's admin is the DSO party.
       required:
         - allocations

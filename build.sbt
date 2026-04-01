@@ -1093,6 +1093,7 @@ lazy val `apps-common` =
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
+      `splice-token-test-trading-app-v2-daml`,
       `splice-featured-app-api-v1-daml`,
       `splice-featured-app-api-v2-daml`,
       `splice-util-batched-markers-daml`,
