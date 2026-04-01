@@ -88,7 +88,12 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
 
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
-    // TODO(tech-debt): Consider checking something here or just remove that check
+      import scala.concurrent.duration.*
+      eventually(3.minutes) {
+        findAll(
+          className("open-mining-round-row")
+        ).length should be >= 2 withClue "open round table rows"
+      }
     }
   }
 

@@ -2,6 +2,7 @@
 
 - [Contributing to the Splice repository](#contributing-to-the-splice-repository)
   - [Testing](#testing)
+  - [Git Hygiene](#git-hygiene)
   - [Branch Naming](#branch-naming)
   - [TODO Comments](#todo-comments)
   - [DB Migrations](#db-migrations)
@@ -49,7 +50,9 @@ Every contribution must be tested in an automated test! For further details see 
 Also note that the splice CI [enforces](https://github.com/cncf/dco2) that all commits on a pull request contain a valid `Signed-off-by: Your Name <your@email.com>` line,
 to confirm adherence to the [DCO](https://developercertificate.org/) requirements.
 
-## Branch Naming
+## Git Hygiene
+
+### Branch Naming
 
 If you are a Splice Contributor and therefore have write permissions to the Splice repo directly,
 please prefix branch names by your name, followed by a slash and a descriptive name:
@@ -59,6 +62,35 @@ please prefix branch names by your name, followed by a slash and a descriptive n
 For example, if Bob is working on issue 4242 to "fix FooTest", he could name his branch:
 
 `bob/fix-footest/4242`.
+
+### Merge Strategy
+
+PRs are merged into `main` using **squash and merge**. This collapses all commits in the PR into a single commit on `main`, keeping the history clean and linear.
+
+### Squash-and-Merge Commit Messages
+
+Because the squash commit is the only record of the change on `main`, its message matters.
+Follow these conventions:
+
+* **Title (first line):** A concise summary of the change, written in imperative mood (e.g., "Add external transaction hash to Scan API", not "Added …" or "Adds …"). GitHub defaults the title to the PR title, so make sure the PR title is descriptive.
+* **Body:** GitHub auto-populates the body with the list of individual commit messages. Clean this up before merging:
+  - Remove noise such as "address review comments", "fixes", "format", "refactor", etc.
+  - Keep a brief summary of *what* the change does and *why*. A few bullet points are fine.
+  - Reference the related GitHub issue, e.g., `Fixes #1234` or `Part of #1234`.
+  - Example of a good squash commit message:
+    ```
+    Add external transaction hash to Scan API (#1234)
+
+    - Store the external transaction hash from the ledger API in the
+      update_history_transactions table.
+    - Expose the hash through the v2/updates and v2/updates/{update_id}
+      Scan endpoints.
+    - Gate hash inclusion behind a configurable threshold date for BFT-safety.
+
+    Signed-off-by: Git-Hygienic-Dev <ghd@example.com>
+    ```
+* **CI tags:** Post-merge process ignores CI tags (e.g., `[ci]`, `[static]`), so always remove them.
+* **Sign-off:** The squash commit must include a valid `Signed-off-by` line. Ensure it is present in the commit message body.
 
 ## TODO Comments
 
