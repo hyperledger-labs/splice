@@ -218,16 +218,16 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getExternalPartyConfigStateContext registry
-  let isSelfTransfer = arg.transfer.sender.owner == arg.transfer.receiver.owner
-  (optPreapproval, preapprovalC) <-
-    if isSelfTransfer
-      then pure (None, emptyOpenApiChoiceContext)
-      else lookupPreapprovalWithContext registry arg.transfer.receiver.owner
-  featuredAppRightC <- case optPreapproval of
-    None -> pure emptyOpenApiChoiceContext
-    Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
+  preapprovalCs <- forA arg.transfers $ \transfer -> do
+    let isSelfTransfer = arg.sender.owner == transfer.receiver.owner
+    (_optPreapproval, preapprovalC) <-
+      if isSelfTransfer
+        then pure (None, emptyOpenApiChoiceContext)
+        else lookupPreapprovalWithContext registry transfer.receiver.owner
+    -- Note: no support for featured app markers in token standard V2
+    pure (preapprovalC)
   let fullContext = withExtraDisclosures extAmuletRulesD
-        (transferC <> preapprovalC <> featuredAppRightC)
+        (transferC <> mconcat preapprovalCs)
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @TransferFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
@@ -391,7 +391,7 @@ lookupPreapprovalWithContext registry receiver = do
         , OpenApiChoiceContext with
           disclosures = preapprovalD
           choiceContext = mkAmuletContext $
-            TextMap.fromList [(transferPreapprovalContextKey, AV_ContractId (coerceContractId preapprovalCid))]
+            TextMap.fromList [(perPartyTransferPreapprovalContextKey receiver, AV_ContractId (coerceContractId preapprovalCid))]
         )
 
 getFeaturedAppRightContext : AmuletRegistry -> Party -> Script OpenApiChoiceContext

@@ -708,18 +708,24 @@ instance ForwardCompatible AllocationRequestV1.AllocationRequestView AllocationR
 -- | For public assets the settlement executors should be observers of the
 -- allocation choice itself so there's no extra view for communicating the
 -- created allocation.
+--
+-- Additionally we make the account provider an extra observer, so there's not extra
+-- view to communicate the archival of the input holdings.
 allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
 allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl arg =
-  arg.allocation.settlement.executors
+  arg.allocation.settlement.executors <> accountParties arg.allocation.authorizer
 
 -- | Default for private assets, where the settlement executors are only be
 -- observers of the allocation choice itself if no funding is required.
+--
+-- Additionally we make the account provider an extra observer, so there's not extra
+-- view to communicate the archival of the input holdings.
 allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
 allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl arg
   -- FIXME: net credit per instrument
   | netAllocationCreditAmount allocation.authorizer allocation.transferLegs >= 0.0 =
-      allocation.settlement.executors
-  | otherwise = []
+      allocation.settlement.executors <> accountParties allocation.authorizer
+  | otherwise = accountParties allocation.authorizer
   where
     allocation = arg.allocation
 

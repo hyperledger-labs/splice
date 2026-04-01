@@ -12,17 +12,12 @@ import Splice.Api.Token.HoldingV2
 
 -- | A specification of a transfer of holdings between two accounts.
 data Transfer = Transfer with
-    sender : Account
-      -- ^ The sender of the transfer.
     receiver : Account
       -- ^ The receiver of the transfer.
     amount : Decimal
       -- ^ The amount to transfer.
     instrumentId : InstrumentId
       -- ^ The instrument identifier.
-    requestedAt : Time
-      -- ^ Wallet provided timestamp when the transfer was requested.
-      -- MUST be in the past when instructing the transfer.
     executeBefore : Time
       -- ^ Until when (exclusive) the transfer may be executed. MUST be in the
       -- future when instructing the transfer.
@@ -33,16 +28,6 @@ data Transfer = Transfer with
       -- Registries MAY limit the duration between `requestedAt` and
       -- `executeBefore` to limit the resources spent on tracking active
       -- transfer instructions.
-    inputHoldingCids : [ContractId Holding]
-      -- ^ The holding contracts that should be used to fund the transfer.
-      --
-      -- MAY be empty if the registry supports automatic selection of holdings for transfers
-      -- or does not represent holdings on-ledger.
-      --
-      -- If specified, then the transfer MUST archive all of these holdings, so
-      -- that the execution of the transfer conflicts with any other transfers
-      -- using these holdings. Thereby allowing that the sender can use
-      -- deliberate contention on holdings to prevent duplicate transfers.
     meta : Metadata
       -- ^ Metadata.
   deriving (Show, Eq)
@@ -108,8 +93,20 @@ data TransferInstructionView = TransferInstructionView with
       -- Used by the wallet to track the lineage of transfer instructions through multiple steps.
       --
       -- Only set if the registry evolved the transfer instruction in multiple steps.
+    sender : Account
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
+    requestedAt : Time
+      -- ^ Wallet provided timestamp when the transfer was requested.
+      -- MUST be in the past when instructing the transfer.
+    holdingCids : [ContractId Holding]
+      -- ^ The holding contracts that are backing this transfer.
+      --
+      -- Provided so that that wallets can correlate the allocation with the
+      -- holdings.
+      --
+      -- MAY be empty if the registry supports automatic selection of holdings for transfers
+      -- or does not represent holdings on-ledger.
     availableActions : Map.Map [Party] [TransferInstructionAction]
       -- ^ The actions that the wallet can present to the user to advance the transfer instruction.
       --
@@ -200,17 +197,28 @@ interface TransferInstruction where
 interface TransferFactory where
   viewtype TransferFactoryView
 
-  transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferInstructionResult
+  transferFactory_transferExtraObservers : TransferFactory_Transfer -> [Party]
+
+  transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferFactory_TransferResult
   transferFactory_publicFetchImpl : ContractId TransferFactory -> TransferFactory_PublicFetch -> Update TransferFactoryView
 
-  nonconsuming choice TransferFactory_Transfer : TransferInstructionResult
+  -- FIXME: consider adjusting to `_TransferMany`
+  nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
     -- ^ Instruct the registry to execute a transfer.
     -- Implementations MUST ensure that this choice fails if `transfer.executeBefore` is in the past.
     with
-      transfer : Transfer
-        -- ^ The transfer to execute.
+      sender : Account
+        -- ^ The sender of the transfers
+      transfers : [Transfer]
+        -- ^ The transfers to execute.
         --
         -- Implementations MUST validate that the admin of the instrument matches the admin of the factory.
+      requestedAt : Time
+        -- ^ The time at which the allocation was requested.
+      inputHoldingCids : [ContractId Holding]
+        -- ^ The holdings that SHOULD be used to fund the allocation.
+        --
+        -- FIXME adjust comment once we know what to do for allocations wrt inputHoldingCids
       actors : [Party]
         -- ^ The parties instructing the transfer, if different from the owner of the source account
         --
@@ -220,6 +228,7 @@ interface TransferFactory where
         -- account to call this choice.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
+    observer transferFactory_transferExtraObservers this arg
     controller actors
     do transferFactory_transferImpl this self arg
 
@@ -239,4 +248,18 @@ data TransferFactoryView = TransferFactoryView
       -- which this transfer factory can be used.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer factory, used for extensibility.
+  deriving (Show, Eq)
+
+data TransferFactory_TransferResult = TransferFactory_TransferResult with
+    instructionResults : [TransferInstructionResult]
+      -- ^ The results of instructing the transfers.
+      -- There is one result per transfer in the same order.
+    senderChangeCids : [ContractId Holding]
+      -- ^ New holdings owned by the sender created to return "change". Can be used
+      -- by actors to batch creating or updating multiple transfer instructions
+      -- in a single Daml transaction.
+      --
+      -- FIXME: align with decision on `TextMap [ContractId Holding]` for allocation
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
   deriving (Show, Eq)

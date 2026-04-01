@@ -82,6 +82,7 @@ data TokenStandardActionResult
   | TSAR_AcceptAllocationRequestV2Result BatchingUtility_AcceptAllocationRequestV2Result
   | TSAR_TransferInstructionResultV1 V1.TransferInstructionResult
   | TSAR_TransferInstructionResultV2 V2.TransferInstructionResult
+  | TSAR_TransferFactory_TransferResultV2 V2.TransferFactory_TransferResult
   deriving (Eq, Show)
 
 -- | The result of execution a batch of token standard actions.
@@ -168,16 +169,14 @@ template BatchingUtility
 
               TSA_TransferFactory_TransferV2 (ChoiceCall with cid; arg) -> do
                 require' ("arg.actors", arg.actors) isEqualR ("actor", [actor]) -- FIXME: actors pattern?
-                let account = basicAccount actor
-                -- FIXME: this lookup can return holdings of the wrong instrument id, which is not allowed in V2
+                let account = arg.sender
                 let (inputHoldingCids, newHoldingMap) = getHoldingsFor (actor, account) holdingMap
                 let cid' = coerceContractId cid : ContractId V2.TransferFactory
-                let transfer' = arg.transfer with inputHoldingCids
-                let arg' = arg with transfer = transfer'
+                let arg' = arg with inputHoldingCids
                 result <- exercise cid' arg'
                 let changeCids = result.senderChangeCids
                 let holdingMapWithOutputs = storeHoldingsFor (actor, account) changeCids newHoldingMap
-                let result' = TSAR_TransferInstructionResultV2 result
+                let result' = TSAR_TransferFactory_TransferResultV2 result
                 pure (holdingMapWithOutputs, result' :: results)
 
               TSA_TransferInstruction_AcceptV2 (ChoiceCall with cid; arg) -> do

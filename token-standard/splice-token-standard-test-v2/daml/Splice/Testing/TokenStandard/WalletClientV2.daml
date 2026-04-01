@@ -145,7 +145,7 @@ listTransferOffers p instrumentId = do
         (cid, Some instr) <- instrs
         guard (instr.transfer.instrumentId == instrumentId)
         guard ([p] `Map.member` instr.availableActions)
-        guard (p == instr.transfer.sender.owner || p == instr.transfer.receiver.owner)
+        guard (p == instr.sender.owner || p == instr.transfer.receiver.owner)
         pure (cid, instr)
   pure pendingOffers
 

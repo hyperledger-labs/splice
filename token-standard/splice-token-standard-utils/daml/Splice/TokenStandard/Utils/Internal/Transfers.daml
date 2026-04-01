@@ -11,8 +11,15 @@ module Splice.TokenStandard.Utils.Internal.Transfers (
   transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
 
   transferFactory_v2_senderActor_transferImpl,
+
+  -- * TransferFactory extra observers
+  transferFactoryV2_publicAsset_transferExtraObserverDefaultImpl,
+  transferFactoryV2_privateAsset_transferExtraObserverDefaultImpl,
 ) where
 
+import DA.Action (foldlA)
+
+import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
 import Splice.TokenStandard.Utils.Internal.Conversions
@@ -29,6 +36,7 @@ instance ForwardCompatible (ContractId TransferInstructionV1.TransferInstruction
 instance BackwardCompatible (ContractId TransferInstructionV1.TransferInstruction) (ContractId TransferInstructionV2.TransferInstruction) where
   upcast = coerceInterfaceContractId
 
+{-
 instance ForwardCompatible TransferInstructionV1.Transfer TransferInstructionV2.Transfer where
   downcast v2 = TransferInstructionV1.Transfer with
     sender = v2.sender.owner
@@ -56,6 +64,7 @@ instance BackwardCompatible TransferInstructionV1.Transfer TransferInstructionV2
       dropAccountMeta "sender" $
       dropAccountMeta "receiver" $
       v1.meta
+-}
 
 instance ForwardCompatible TransferInstructionV1.TransferInstructionResult_Output TransferInstructionV2.TransferInstructionResult_Output where
   downcast tio = case tio of
@@ -153,12 +162,48 @@ instance ForwardCompatible (ContractId TransferInstructionV1.TransferFactory) (C
 transferFactory_v2_senderActor_transferImpl
   :  ContractId TransferInstructionV2.TransferFactory
   -> TransferInstructionV2.TransferFactory_Transfer
-  -> Update TransferInstructionV2.TransferInstructionResult
+  -> Update TransferInstructionV2.TransferFactory_TransferResult
 transferFactory_v2_senderActor_transferImpl self arg = do
-  ensureNoAccountMeta "transfer." "sender" arg.transfer.meta
-  ensureNoAccountMeta "transfer." "receiver" arg.transfer.meta
-  checkActors arg.actors [[arg.transfer.sender.owner]]
-  upcast <$> exercise (downcast @(ContractId TransferInstructionV1.TransferFactory) self) TransferInstructionV1.TransferFactory_Transfer with
-    expectedAdmin = arg.transfer.instrumentId.admin
-    transfer = downcast arg.transfer
-    extraArgs = arg.extraArgs
+  checkActors arg.actors [[arg.sender.owner]]
+  let v1FactoryCid = downcast @(ContractId TransferInstructionV1.TransferFactory) self
+  let executeTransfer (holdingCids, results) transferV2 = do
+        ensureNoAccountMeta "transfer." "sender" transferV2.meta
+        ensureNoAccountMeta "transfer." "receiver" transferV2.meta
+        let transferV1 = TransferInstructionV1.Transfer with
+              sender = arg.sender.owner
+              receiver = transferV2.receiver.owner
+              amount = transferV2.amount
+              instrumentId = downcast transferV2.instrumentId
+              requestedAt = arg.requestedAt
+              executeBefore = transferV2.executeBefore
+              inputHoldingCids = map downcast holdingCids -- FIXME: filter to the ones of the right instrument
+              meta =
+                accountToMeta "sender" arg.sender $
+                accountToMeta "receiver" transferV2.receiver $
+                transferV2.meta
+        result <- exercise v1FactoryCid TransferInstructionV1.TransferFactory_Transfer with
+          expectedAdmin = transferV2.instrumentId.admin
+          transfer = transferV1
+          extraArgs = arg.extraArgs
+        let newHoldings = map upcast result.senderChangeCids
+        -- FIXME: consider accumulating metadata
+        pure (newHoldings, result :: results)
+
+  (outputHoldings, resultRev) <- foldlA executeTransfer (arg.inputHoldingCids, []) arg.transfers
+
+  pure TransferInstructionV2.TransferFactory_TransferResult with
+    instructionResults = map upcast $ reverse resultRev
+    senderChangeCids = outputHoldings
+    meta = emptyMetadata
+
+
+-- | For public assets the receivers should be observers as well.
+transferFactoryV2_publicAsset_transferExtraObserverDefaultImpl : TransferInstructionV2.TransferFactory_Transfer -> [Party]
+transferFactoryV2_publicAsset_transferExtraObserverDefaultImpl arg =
+  accountParties arg.sender <> concat [ accountParties transfer.receiver | transfer <- arg.transfers ]
+
+-- | Default for private assets, where the only observers are the account
+-- parties of the sender.
+transferFactoryV2_privateAsset_transferExtraObserverDefaultImpl : TransferInstructionV2.TransferFactory_Transfer -> [Party]
+transferFactoryV2_privateAsset_transferExtraObserverDefaultImpl arg =
+  accountParties arg.sender

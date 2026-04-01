@@ -114,6 +114,8 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
+      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserverDefaultImpl
+
       transferFactory_transferImpl = transferFactory_v2_senderActor_transferImpl
       transferFactory_publicFetchImpl = publicFetchDefaultImpl this
 
@@ -335,7 +337,12 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- == validate each field of the transfer specification ==
   -- sender: nothing to validate
   -- receiver: validate preapproval if given
-  optPreapprovalCid <- lookupFromContextU @(ContractId TransferPreapproval) extraArgs.context transferPreapprovalContextKey
+  optPerPartyPreapprovalCid <- lookupFromContextU @(ContractId TransferPreapproval) extraArgs.context (perPartyTransferPreapprovalContextKey transfer.receiver)
+  -- prefer the V2 preapproval reference if it exists, and fallback to the V1 preapproval if it doesn't
+  optPreapprovalCid <- case optPerPartyPreapprovalCid of
+    Some preapprovalCid -> pure (Some preapprovalCid)
+    None ->
+      lookupFromContextU @(ContractId TransferPreapproval) extraArgs.context transferPreapprovalContextKey
   forA_ optPreapprovalCid \preapprovalCid ->
     fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
   -- instrumentId:

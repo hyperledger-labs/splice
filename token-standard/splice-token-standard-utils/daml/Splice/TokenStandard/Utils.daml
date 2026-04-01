@@ -112,6 +112,10 @@ module Splice.TokenStandard.Utils (
   transferInstruction_v2_senderActor_withdrawDefaultImplUsingV1,
 
   transferFactory_v2_senderActor_transferImpl,
+
+  -- ** TransferFactory extra observers
+  transferFactoryV2_publicAsset_transferExtraObserverDefaultImpl,
+  transferFactoryV2_privateAsset_transferExtraObserverDefaultImpl,
 ) where
 
 

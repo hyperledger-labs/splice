@@ -60,6 +60,11 @@ instance Semigroup OpenApiChoiceContext where
             values = ctx1.choiceContext.values <> ctx2.choiceContext.values
           disclosures = ctx1.disclosures <> ctx2.disclosures
 
+instance Monoid OpenApiChoiceContext where
+  mempty = OpenApiChoiceContext with
+    choiceContext = ChoiceContext with values = TextMap.empty
+    disclosures = mempty
+
 -- | A choice on a factory contract enriched with an appropriate choice-context and disclosures.
 data EnrichedFactoryChoice t ch = EnrichedFactoryChoice with
   factoryCid : ContractId t
