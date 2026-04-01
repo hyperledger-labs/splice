@@ -195,7 +195,11 @@ abstract class RunbookSvPreflightIntegrationTestBase
   "The Scan UI is working" in { _ =>
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
-    // TODO(tech-debt): Consider checking something here or just remove that check
+      eventually(3.minutes) {
+        findAll(
+          className("open-mining-round-row")
+        ).length should be >= 2 withClue "open round table rows"
+      }
     }
   }
 

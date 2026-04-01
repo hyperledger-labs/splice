@@ -11,11 +11,12 @@
 
     - Deployment
 
-        - We've added support for `reloader annotation <https://github.com/stakater/reloader>`, which performs a rolling
-          restart of our apps on secret/configmap change. The integration is enabled by
-          default. You can disable it by setting enableReloader to false in your values.yaml file.
-          Please note that reloader needs to be installed separately for the integration to work.
-          If you don't have reloader installed this annotation will be ignored.
+        - We've added support for the `Stakater Reloader <https://github.com/stakater/Reloader>`_ annotation,
+          which performs a rolling restart of pods when their referenced Secrets or ConfigMaps change.
+          The annotation is included by default in all Splice Helm charts.
+          You can disable it by setting ``enableReloader`` to ``false`` in your Helm values file.
+          Reloader must be installed separately; if it is not present, the annotation is harmless and will be ignored.
+          See also the new deployment tips in the :ref:`Validator <helm-validator-install>` and :ref:`SV <helm-sv-install>` Helm guides.
 
         - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
           from another named SV, which can help operators keep votes in sync when they run multiple SV nodes.
@@ -35,3 +36,7 @@
           - Completely removed
         - Validators
           - Completely removed
+
+    - Scan
+
+        - Improve CPU usage of update and event history.
