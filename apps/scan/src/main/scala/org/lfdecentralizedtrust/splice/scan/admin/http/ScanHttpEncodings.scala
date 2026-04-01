@@ -216,6 +216,28 @@ sealed trait ScanHttpEncodings {
       )
   }
 
+  def javaToHttpActiveContract(createdEvent: javaApi.CreatedEvent)(implicit
+      elc: ErrorLoggingContext
+  ): httpApi.ActiveContract = {
+    createdEvent.getContractKey.toScala.foreach { _ =>
+      throw new IllegalStateException(
+        "Contract keys are unexpected in UpdateHistory http encoded events"
+      )
+    }
+    httpApi
+      .ActiveContract(
+        None, // FIXME
+        createdEvent.getContractId,
+        templateIdString(createdEvent.getTemplateId),
+        createdEvent.getPackageName,
+        encodeContractPayload(createdEvent),
+        createdEvent.getCreatedAt.atOffset(ZoneOffset.UTC),
+        createdEvent.getSignatories.asScala.toVector.sorted,
+        createdEvent.getObservers.asScala.toVector.sorted,
+      )
+
+  }
+
   def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2): TreeUpdateWithMigrationId = http match {
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(httpTransaction) =>
       httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2

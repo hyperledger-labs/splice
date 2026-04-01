@@ -573,7 +573,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcsResponse"
+                $ref: "#/components/schemas/AcsResponseV1"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -2642,6 +2642,56 @@ components:
           type: array
           items:
             type: string
+    ActiveContract:
+      type: object
+      required:
+        - contract_id
+        - template_id
+        - package_name
+        - create_arguments
+        - created_at
+        - signatories
+        - observers
+      properties:
+        created_in_update_id:
+          description: |
+            The id of the update in which this contract was created.
+            Optional and will be absent for contracts created in prior migration IDs.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        create_arguments:
+          description: |
+            The arguments that have been used to create the contract, in the
+            form of JSON representation of a Daml record.
+          type: object
+        created_at:
+          description: |
+            Ledger effective time of the transaction that created the contract.
+          type: string
+          format: date-time
+        signatories:
+          description: |
+            Signatories to the contract, in the form of party IDs.
+          type: array
+          items:
+            type: string
+        observers:
+          description: |
+            Observers to the contract, in the form of party IDs.
+          type: array
+          items:
+            type: string
     ExercisedEvent:
       type: object
       required:
@@ -2906,6 +2956,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreatedEvent"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as `after`
+            to the `AcsRequest` or `HoldingsStateRequest`.
+            Will be absent when there are no more pages.
+
+    AcsResponseV1:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - created_events
+      properties:
+        record_time:
+          description: The same `record_time` as in the request.
+          type: string
+          format: date-time
+        migration_id:
+          description: The same `migration_id` as in the request.
+          type: integer
+          format: int64
+        created_events:
+          description: |
+            Up to `page_size` contracts in the ACS.
+            `create_arguments` are always encoded as `compact_json`.
+          type: array
+          items:
+            $ref: "#/components/schemas/ActiveContract"
         next_page_token:
           type: integer
           format: int64
