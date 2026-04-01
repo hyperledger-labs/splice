@@ -3886,7 +3886,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * The Canton Coin Scan app is now being deployed as part of the SV node in our runbook.
     See instructions for deploying the ``cn-scan`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
     and two new required ingress rules in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
-    Section :ref:`Using the Canton Coin Scan UI <helm-scan-web-ui>` explains the UI.
+    Section "Using the Canton Coin Scan UI" explains the UI.
     Note that not all fields in the Scan UI are hooked up to fetch data in the backend yet.
     Ones that should work at this point are the as-of round in the top-right corner, and the Validator and App leaderboards.
 

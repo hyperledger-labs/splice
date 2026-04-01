@@ -7,11 +7,33 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
-- Scan
+.. release-notes:: Upcoming
 
-   - Added a new ``GET /v2/updates/hash/{hash}`` endpoint that returns the update associated with a given external transaction hash of a prepared transaction.
-     This endpoint is not always BFT safe: for transactions committed before a scan instance started indexing hashes, the instance will return a 404 error.
-     For transactions committed around the time different scans started indexing hashes, some scan instances might return a 404 while others return the matching update.
-     This is in contrast to the ``GET /v2/updates`` and ``GET /v2/updates/{update_id}`` endpoints, which are guaranteed to be always BFT safe.
+    - Deployment
 
-.. .. release-notes:: Upcoming
+        - We've added support for `reloader annotation <https://github.com/stakater/reloader>`, which performs a rolling
+          restart of our apps on secret/configmap change. The integration is enabled by
+          default. You can disable it by setting enableReloader to false in your values.yaml file.
+          Please note that reloader needs to be installed separately for the integration to work.
+          If you don't have reloader installed this annotation will be ignored.
+
+   - Scan
+        - Added a new ``GET /v2/updates/hash/{hash}`` endpoint that returns the update associated with a given external transaction hash of a prepared transaction.
+          This endpoint is not always BFT safe, see the Scan OpenAPI documentation for details.
+
+   - Scan UI
+
+     - The following tabs and features have been removed from Scan UI.
+       Their corresponding API endpoints are still available, yet deprecated, and will be removed soon.
+       Users are strongly advised to migrate to non-deprecated API endpoints as soon as possible.
+
+      - Canton Coin Activity
+         - Recent activity list, and all leaderboards
+         - Total app & validator rewards
+         - The round as-of which the content has been computed (no round-based data is listed any more)
+         - The tab has been renamed "Canton Coin Configuration"
+      - Governance
+         - Completely removed
+      - Validators
+         - Completely removed
+

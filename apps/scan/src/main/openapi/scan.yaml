@@ -1719,6 +1719,36 @@ paths:
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
 
+  /v0/history/bulk/updates:
+    post:
+      tags: [ pre-alpha, scan ]
+      x-jvm-package: scan
+      operationId: "listBulkUpdateHistoryObjects"
+      description: |
+        **Under Development, do not use in production yet** Get download URLs and metadata for update history objects available for bulk download, between two record times.
+        Note that the returned objects may include also updates outside of the requested record time range (since only full objects are served from storage), but guaranteed
+        to include all updates in the requested range.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListBulkUpdateHistoryObjectsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListBulkUpdateHistoryObjectsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
+
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -4122,6 +4152,53 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BulkStorageObjectRef"
+
+    ListBulkUpdateHistoryObjectsRequest:
+      type: object
+      required:
+        - start_record_time
+        - end_record_time
+        - page_size
+      properties:
+        start_record_time:
+          description: |
+            The returned objects must include all updates with record time greater than start_record_time (but may also include updates before it).
+          type: string
+          format: date-time
+        end_record_time:
+          description: |
+            The returned objects must include all updates with record time at most end_record_time (but may also include updates after it).
+          type: string
+          format: date-time
+        next_page_token:
+          type: string
+          description: |
+            The pagination token returned from a previous call to this endpoint with the same arguments.
+        page_size:
+          description: |
+            The maximum number of objects returned for this request.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1000
+
+    ListBulkUpdateHistoryObjectsResponse:
+      type: object
+      required:
+        - object_refs
+      properties:
+        object_refs:
+          description: |
+            The list of references to the bulk storage objects containing the updates.
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkStorageObjectRef"
+        next_page_token:
+          type: string
+          description: |
+            When requesting the next page of results, pass this as `after`
+            to the next `ListBulkUpdateHistoryObjectsRequest` invocation.
+            Will be absent when there are no more pages.
 
     BulkStorageObjectRef:
       type: object

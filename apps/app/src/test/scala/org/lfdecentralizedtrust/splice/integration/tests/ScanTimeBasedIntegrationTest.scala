@@ -644,17 +644,28 @@ class ScanTimeBasedIntegrationTest
         recordTime <= CantonTimestamp.assertFromInstant(lastMidnight)
       }
 
-      val updateObjs = allS3Objs.filter(_.key().contains("/updates"))
-      val updatesFromS3 = updateObjs
-        .flatMap { obj =>
+      val updateObjsResponse = sv1ScanBackend.getBulkUpdateHistory(
+        startTime,
+        CantonTimestamp.assertFromInstant(lastMidnight),
+        None,
+        100,
+      )
+      val updateObjsUrls = updateObjsResponse.objectRefs.map(_.url)
+      val updateObjsKeys = updateObjsUrls.map(url =>
+        URLDecoder.decode(
+          url.stripPrefix("http://foo.bar.com/api/scan/v0/history/bulk/download/"),
+          StandardCharsets.UTF_8,
+        )
+      )
+      val updatesFromS3 = updateObjsKeys
+        .flatMap { key =>
           val out = new ByteArrayOutputStream()
-          sv1ScanBackend.bulkStorageDownload(obj.key(), out).futureValue
+          sv1ScanBackend.bulkStorageDownload(key, out).futureValue
           uncompressAndDecode(
             ByteString(out.toByteArray),
             io.circe.parser.decode[definitions.UpdateHistoryItemV2],
           )
         }
-        .filter(isInTimeRange)
       val updatesFromScan = sv1ScanBackend
         .getUpdateHistory(1000, None, CompactJson)
         .filter(isInTimeRange)

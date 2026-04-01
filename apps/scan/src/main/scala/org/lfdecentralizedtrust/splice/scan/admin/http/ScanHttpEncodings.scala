@@ -15,7 +15,12 @@ import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  UpdateHistoryItem,
+  UpdateHistoryItemV2,
+  UpdateHistoryTransactionV2,
+  ValidatorReceivedFaucets,
+}
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
@@ -31,6 +36,7 @@ import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOff
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
+import scala.collection.immutable.SortedMap
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -618,6 +624,48 @@ object ScanHttpEncodings {
       },
     )
   }
+
+  def updateV1ToUpdateV2(update: UpdateHistoryItem): UpdateHistoryItemV2 =
+    update match {
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV2(
+          UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
+        )
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV2(
+          UpdateHistoryTransactionV2(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash,
+          )
+        )
+    }
+
+  def encodeUpdateV2(
+      update: TreeUpdateWithMigrationId,
+      encoding: definitions.DamlValueEncoding,
+      version: ApiVersion,
+      hashInclusionPolicy: ExternalHashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+      externalTransactionHashThresholdTime: Option[Instant] =
+        ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.UpdateHistoryItemV2 =
+    updateV1ToUpdateV2(
+      encodeUpdate(
+        update,
+        encoding,
+        version,
+        hashInclusionPolicy,
+        externalTransactionHashThresholdTime,
+      )
+    )
 
   /** Returns a copy of the input, modified such that the result is consistent across different SVs:
     * - Offsets are replaced by empty strings

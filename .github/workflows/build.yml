@@ -198,7 +198,7 @@ jobs:
       parallelism: 11
       test_name: wall-clock-time
       with_gcp_creds: true
-      skip_if_regex: "\\[bft\\]"
+      skip_if_commit_tag: "bft"
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}
@@ -300,7 +300,7 @@ jobs:
       parallelism: 1
       test_name: app-upgrade
       pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
-      skip_if_regex: "\\[breaking\\]"
+      skip_if_commit_tag: "breaking"
       skip_if_files_changed: "nix/canton-sources.json"
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}

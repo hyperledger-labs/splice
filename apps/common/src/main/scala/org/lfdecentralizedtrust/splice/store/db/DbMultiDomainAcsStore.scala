@@ -394,7 +394,7 @@ final class DbMultiDomainAcsStore[TXE](
           domainMigrationId,
           companion,
           additionalWhere = sql"""and assigned_domain = $domain""",
-          orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
         "listContractsOnDomain",
       )
