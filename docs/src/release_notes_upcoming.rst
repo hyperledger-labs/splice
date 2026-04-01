@@ -33,3 +33,6 @@
       - Validators
          - Completely removed
 
+   - Scan
+
+        - Improve CPU usage of update and event history.
