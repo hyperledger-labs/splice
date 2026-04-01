@@ -133,6 +133,7 @@ data TokenStandardActionResult
   | TSAR_TransferInstructionResultV1 V1.TransferInstructionResult
   | TSAR_TransferInstructionResultV2 V2.TransferInstructionResult
   | TSAR_AllocationRequestV2_AcceptResult V2.AllocationRequest_AcceptResult
+  | TSAR_TransferFactory_TransferResultV2 V2.TransferFactory_TransferResult
   deriving (Eq, Show)
 
 -- | The result of execution a batch of token standard actions.
@@ -251,6 +252,21 @@ executeTokenStandardAction actor (holdingMap, results) action = case action of
          result <- exercise cid arg with transfer = transfer'
          pure (holdingMapFromTransferV2 transfer' result, TSAR_TransferInstructionResultV2 result)
       )
+
+{- FIXME
+              TSA_TransferFactory_TransferV2 (ChoiceCall with cid; arg) -> do
+                require' ("arg.actors", arg.actors) isEqualR ("actor", [actor]) -- FIXME: actors pattern?
+                let account = arg.sender
+                let (inputHoldingCids, newHoldingMap) = getHoldingsFor (actor, account) holdingMap
+                let cid' = coerceContractId cid : ContractId V2.TransferFactory
+                let arg' = arg with inputHoldingCids
+                result <- exercise cid' arg'
+                let changeCids = result.senderChangeCids
+                let holdingMapWithOutputs = storeHoldingsFor (actor, account) changeCids newHoldingMap
+                let result' = TSAR_TransferFactory_TransferResultV2 result
+                pure (holdingMapWithOutputs, result' :: results)
+
+-}
 
 
 callChoiceV1

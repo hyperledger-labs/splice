@@ -50,9 +50,18 @@ template AmuletTransferInstruction
         abortAmuletTransferInstruction this arg.extraArgs
 
     interface instance Api.TransferInstructionV2.TransferInstruction for AmuletTransferInstruction where
+      -- FIXME: check whether we can share some of that code
       view = Api.TransferInstructionV2.TransferInstructionView with
         originalInstructionCid = None
-        transfer = upcast transfer
+        sender = basicAccount transfer.sender
+        requestedAt = transfer.requestedAt
+        holdingCids = map upcast transfer.inputHoldingCids
+        transfer = Api.TransferInstructionV2.Transfer with
+          receiver = basicAccount transfer.receiver
+          amount = transfer.amount
+          instrumentId = upcast transfer.instrumentId
+          executeBefore = transfer.executeBefore
+          meta = transfer.meta
         availableActions = Map.fromList
           [ ([transfer.sender], [Api.TransferInstructionV2.TIA_Withdraw])
           , ([transfer.receiver], [Api.TransferInstructionV2.TIA_Accept, Api.TransferInstructionV2.TIA_Reject])
