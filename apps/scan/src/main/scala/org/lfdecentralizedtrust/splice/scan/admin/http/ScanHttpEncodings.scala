@@ -216,7 +216,7 @@ sealed trait ScanHttpEncodings {
       )
   }
 
-  def javaToHttpActiveContract(createdEvent: javaApi.CreatedEvent)(implicit
+  def javaToHttpActiveContract(eventId: String, createdEvent: javaApi.CreatedEvent)(implicit
       elc: ErrorLoggingContext
   ): httpApi.ActiveContract = {
     createdEvent.getContractKey.toScala.foreach { _ =>
@@ -226,7 +226,12 @@ sealed trait ScanHttpEncodings {
     }
     httpApi
       .ActiveContract(
-        None, // FIXME
+        if (CantonTimestamp.tryFromInstant(createdEvent.getCreatedAt) == CantonTimestamp.MinValue) {
+          // Created at record time MinValue is reserved for import updates. For these, we don't have the actual update ID persisted
+          None
+        } else {
+          Some(eventId.split(":")(0))
+        },
         createdEvent.getContractId,
         templateIdString(createdEvent.getTemplateId),
         createdEvent.getPackageName,

@@ -1658,6 +1658,7 @@ class HttpScanHandler(
           result.createdEventsInPage
             .map(event =>
               CompactJsonScanHttpEncodings().javaToHttpActiveContract(
+                event.eventId,
                 event.event
               )
             ),
