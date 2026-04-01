@@ -22,3 +22,6 @@ Sequencing result message timed out
 Could not send a time-advancing message
 
 Request failed for sequencer.* Is the server running.*Causes: finishConnect.*
+
+#Todo(DACH-NY/cn-test-failures/7808)
+The synchronizer Synchronizer 'global' failed the following topology transactions
