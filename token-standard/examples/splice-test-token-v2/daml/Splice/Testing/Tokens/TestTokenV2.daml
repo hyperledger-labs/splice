@@ -4,10 +4,11 @@
 -- | A mock implementation of a test token for the purpose of testing V2 token standard workflows.
 module Splice.Testing.Tokens.TestTokenV2 where
 
+import DA.Action (when)
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.Optional
 import DA.Map qualified as Map
+import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
@@ -63,7 +64,7 @@ template TokenAllocationV2 with
       allocation_withdrawImpl self arg@(V2.Allocation_Withdraw{..}) = do
         archiveAndCheckActors self arg.actors [[allocation.authorizer.owner]]
           -- FIXME: enable different account authorization configurations
-        authorizerHoldingCids <- unlockTokenAllocation this extraArgs
+        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
         pure V2.Allocation_WithdrawResult
           with
             authorizerHoldingCids
@@ -71,7 +72,7 @@ template TokenAllocationV2 with
 
       allocation_cancelImpl self arg@(V2.Allocation_Cancel{..}) = do
         archiveAndCheckActors self arg.actors [allocation.settlement.executors]
-        authorizerHoldingCids <- unlockTokenAllocation this extraArgs
+        authorizerHoldingCids <- unlockTokenAllocationV2 this extraArgs
         pure V2.Allocation_CancelResult
           with
             authorizerHoldingCids
@@ -90,6 +91,8 @@ template TokenAllocationV2 with
           archive cid
           require' ("lockedToken", holding.account) isEqualR ("allocation.authorizer", allocation.authorizer)
           pure (holding.instrumentId, holding.amount)
+
+        -- FIXME: use the same Map.merge trick as for allocaiton to be on the safe side
 
         -- compute net funds to move
         let netAmounts = netAllocationCreditAmounts allocation.authorizer allocation.transferLegs
@@ -165,7 +168,7 @@ template TokenRules with
           settlementFactoryV2_settleBatchDefaultImpl createReceiptAllocation this self arg
 
       -- no extra observers to avoid leaking the settlement of different allocations to the other authorizers
-      settlementFactory_settleBatchExtraObservers arg = []
+      settlementFactory_settleBatchExtraObservers _arg = []
 
       settlementFactory_publicFetchImpl = publicFetchDefaultImpl this
 
@@ -187,14 +190,15 @@ token_allocationFactoryV2_allocateImpl
   -> ContractId V2.AllocationFactory
   -> V2.AllocationFactory_Allocate
   -> Update V2.AllocationInstructionResult
-token_allocationFactoryV2_allocateImpl externalTokenRules _self arg = do
+token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
 
-  let authorizer = arg.allocation.authorizer.owner
+  let authorizer = arg.allocation.authorizer
 
   -- debit all input amounts
-  fundingAmounts <- fmap (Map.fromListWithR (+)) $ forA inputHoldingCids $ \cid -> do
-    token <- fetch cid
-    archive cid
+  inputAmounts <- fmap (Map.fromListWithR (+)) $ forA arg.inputHoldingCids $ \cid -> do
+    let tokenCid = coerceContractId cid : ContractId Token
+    token <- fetch tokenCid
+    archive tokenCid
     let holding = token.holding
     require' ("inputHolding.account", holding.account) isEqualR ("allocation.authorizer", authorizer)
     pure (holding.instrumentId, holding.amount)
@@ -202,17 +206,17 @@ token_allocationFactoryV2_allocateImpl externalTokenRules _self arg = do
   -- create locked tokens and change for the sender
   let creditAmounts = netAllocationCreditAmounts authorizer arg.allocation.transferLegs
   let combinedAmounts = Map.merge
-        (\_ fundingAmount -> (fundingAmount, 0.0))
-        (\_ creditAmount -> (0.0, creditAmount))
-        (\_ fundingAmount creditAmount -> (fundingAmount, creditAmount))
-        fundingAmounts
+        (\_ inputAmount -> Some (inputAmount, 0.0))
+        (\_ creditAmount -> Some (0.0, creditAmount))
+        (\_ inputAmount creditAmount -> Some (inputAmount, creditAmount))
+        inputAmounts
         creditAmounts
-  locksAndChange <- forA (Map.toList combinedAmounts) $ \(instrumentId, (fundingAmount, creditAmount)) -> do
-    let netAmount = min 0.0 creditAmount + fundingAmount
+  locksAndChange <- forA (Map.toList combinedAmounts) $ \(instrumentId, (inputAmount, creditAmount)) -> do
+    let netAmount = min 0.0 creditAmount + inputAmount
     when (netAmount < 0.0) $
       fail $ T.unlines
         [ "Net debit of " <> show netAmount <> " for " <> show instrumentId <> " is not allowed"
-        , "Funding amount: " <> show fundingAmount  -- FIXME: renaming "funding" to "input"
+        , "Input amount: " <> show inputAmount
         , "Credit amount: " <> show creditAmount
         ]
 
@@ -227,9 +231,9 @@ token_allocationFactoryV2_allocateImpl externalTokenRules _self arg = do
               holders = instrumentId.admin :: accountParties authorizer
               expiresAt = Some arg.allocation.settlement.settleAt
               expiresAfter = None
-              context = Some $ TokenAllocationV1.mkAllocationLockContext (downcast arg.allocation.settlement.settlementRef)
+              context = Some $ "allocation for settlement of " <> arg.allocation.settlement.settlementRef.id
             meta = emptyMetadata
-        pure [toInterfaceContractId cid]
+        pure [cid]
 
     changeTokens <-
       if netAmount <= 0.0 then pure [] else do
@@ -247,224 +251,20 @@ token_allocationFactoryV2_allocateImpl externalTokenRules _self arg = do
   let lockedTokens = concatMap fst locksAndChange
   let authorizerChangeCids = concatMap snd locksAndChange
 
-  allocCid <- toInterfaceContractId <$> create TokenAllocationV2 with
-    allocation = arg.allocation
+  allocationCid <- toInterfaceContractId <$> create TokenAllocationV2 with
     lockedTokens
-    admin
+    allocation = arg.allocation
+    admin = tokenRules.admin
 
   pure V2.AllocationInstructionResult with
     authorizerChangeCids
-
-
-
-
-
-
-
-{-
-
--- | Core of the V2 allocation creation, which is used for both V1 and V2 factories.
-token_allocationFactoryV2_allocateImplCore
-  : TokenRules
-  -> V2.AllocationFactory_Allocate
-  -> Decimal
-  -> Update (Optional (ContractId LockedToken), [ContractId V1.Holding], Time, Metadata)
-token_allocationFactoryV2_allocateImplCore externalTokenRules arg fundingAmount = do
-  let dso = externalTokenRules.dso
-  let (V2.AllocationFactory_Allocate with allocation, requestedAt, inputHoldingCids, extraArgs, actors) = arg
-
-  -- We are using an unfeatured payment context, as the locking to self should not be featured.
-  paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-
-  -- check actors
-  ensureBasicAccount "allocation.authorizer" allocation.authorizer
-  let authorizer = allocation.authorizer.owner
-  checkActors actors [[authorizer]]
-
-  -- == validate each field of the requested allocation
-  let settlement = allocation.settlement
-  let transferLegs = allocation.transferLegs
-
-  -- settlement.executors: no check
-  -- settlement.settlementRef: no check
-  -- settlement.requestedAt:
-  assertDeadlineExceeded "Allocation.settlement.requestedAt" settlement.requestedAt
-  -- settlement.settlementDeadline:
-  whenSome settlement.settlementDeadline \d -> do
-      assertWithinDeadline "Allocation.settlement.settlementDeadline" d
-
-  let
-    -- TODO(#4665): make max duration configurable; and also implement for transfer instructions
-    latestExpiresAt = requestedAt `addRelTime` days 90
-    expiresAt = optional latestExpiresAt (min latestExpiresAt) allocation.settlement.settlementDeadline
-  require "Allocation.settlement.settleAt <= Allocation.expiresAt"
-    (settlement.settleAt <= expiresAt)
-
-  -- transferLegs:
-  requireUnique "allocation.transferLegs" transferLegs
-  forA_ transferLegs $ \transferLeg -> do
-      -- transferLegId: no check
-      -- transferLeg.sender
-      ensureBasicAccount "transferLeg.sender" transferLeg.sender
-      -- transferLeg.receiver
-      ensureBasicAccount "transferLeg.receiver" transferLeg.receiver
-      -- transferLeg.amount
-      require "Transfer amount must be positive" (transferLeg.amount > 0.0)
-      -- transferLeg.instrumentId
-      require "Instrument-id must match the factory" (transferLeg.instrumentId == tokenInstrumentIdV2 dso)
-      -- transferLeg.meta: check no redundant account information
-      ensureNoAccountMeta "transferLeg" "sender" transferLeg.meta
-      ensureNoAccountMeta "transferLeg" "receiver" transferLeg.meta
-
-  -- requestedAt (of the allocation instruction itself):
-  assertDeadlineExceeded "requestedAt" requestedAt
-
-  -- create locked token if required
-  if fundingAmount <= 0.0
-  then do
-    require "Must not provide holding cids for allocations that do not require funding" (null inputHoldingCids)
-    return (None, [], expiresAt, emptyMetadata)
-  else do
-    require "At least one input holding must be provided for allocations that require funding" (not (null inputHoldingCids))
-    -- lock the funds
-    let twoStepTransfer = TwoStepTransfer with
-          dso
-          sender = authorizer
-          amount = fundingAmount
-          -- TODO(#4550): consider storing a contract-id in the v2 lock context for better correlation on V2
-          lockContext = TokenAllocationV1.mkAllocationLockContext (downcast settlement.settlementRef)
-          transferBefore = expiresAt
-          transferBeforeDeadline = "allocation.expiresAt"
-          -- Minor hack: we use the authorizer for receiver and provider as these fields are irrlevant
-          -- for preparing the two-step transfer .
-          receiver = authorizer
-          provider = authorizer
-          allowFeaturing = False
-    (la, cids, meta) <- prepareTwoStepTransfer twoStepTransfer arg.requestedAt (map downcast inputHoldingCids) paymentContext
-    return (Some la, cids, expiresAt, meta)
-
+    meta = emptyMetadata
+    output = V2.AllocationInstructionResult_Completed with allocationCid
 
 
 
 -- Utilities
 ------------
-
-requireExpectedAdminMatch : Party -> Party -> Update ()
-requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
-
-
-{-
-    -- allocationFactoryV1
-    -- settlementFactoryV2
-
-    interface instance V2.AllocationFactory for TokenRules where
-      view = V2.AllocationFactoryView with
-        admin
-        meta = emptyMetadata
-
-      allocationFactory_publicFetchImpl _self _arg = pure V2.AllocationFactoryView with
-        admin
-        meta = emptyMetadata
-
-      allocationFactory_allocateImpl _self arg = do
-        requireMatchExpected ("expectedAdmin", arg.expectedAdmin) admin
-        let V2.AllocationFactory_Allocate {allocation, requestedAt, inputHoldingCids} = arg
-
-        -- == validate each field of the requested allocation
-        let settlement = allocation.settlement
-        let transferLeg = allocation.transferLeg
-
-        -- settlement.executor: no check
-        -- settlement.settlementRef: no check
-        -- settlement.requestedAt:
-        assertDeadlineExceeded "Allocation.settlement.requestedAt" settlement.requestedAt
-        -- settlement.allocateBefore:
-        assertWithinDeadline "Allocation.settlement.allocateBefore" settlement.allocateBefore
-        -- settlement.settleBefore:
-        require "Allocation.settlement.allocateBefore <= Allocation.settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
-
-        -- transferLegId: no check
-
-        -- transferLeg.sender: no check
-        -- transferLeg.receiver: nothing to check
-        -- transferLeg.amount
-        require "Transfer amount must be positive" (transferLeg.amount > 0.0)
-        -- transferLeg.instrumentId
-        require "Instrument-admin must match the factory" (transferLeg.instrumentId.admin == admin)
-        -- transferLeg.meta: no check
-
-        -- requestedAt (of the allocation instruction itself):
-        assertDeadlineExceeded "requestedAt" requestedAt
-
-        -- inputHoldingCids:
-        require "At least one input holding must be provided" (not $ null inputHoldingCids)
-
-        -- split off the required amount and create allocation
-        let fundingAmount = netAllocationCreditAmount allocation
-
-        (lockedToken, optSenderChangeCid <- consumeHoldingAmount transferLeg.sender inputHoldingCids transferLeg.amount transferLeg.instrumentId
-        allocationCid <- toInterfaceContractId <$> create TokenAllocation with
-          allocation = arg.allocation
-
-        -- done: return the result
-        pure V2.AllocationInstructionResult with
-          authorizerChangeCids = optionalToList (toInterfaceContractId <$> optSenderChangeCid)
-          output = V2.AllocationInstructionResult_Completed with allocationCid
-          meta = emptyMetadata
-
-
-lockHoldingAmount
-  : V2.Account -> [ContractId V2.Holding] -> Decimal -> V2.InstrumentId -> Time -> Text
-  -> Update (ContractId V2.Holding, Optional (ContractId V2.Holding))
-lockHoldingAmount sender inputCids amount instrumentId expiresAt reason = do
-  inputAmounts <- forA inputCids $ \cid -> do
-    holding <- fetch cid
-    archive cid
-    let holdingView = view holding
-    require' ("holding account", holdingView.account) isEqualR ("transfer.sender", sender)
-    require' ("holding.instrumentId", holdingView.instrumentId) isEqualR ("transfer.instrumentId", instrumentId)
-    pure holdingView.amount
-  let totalAmount = sum inputAmounts
-  require' ("input amount", totalAmount) isGreaterOrEqualR ("transfer.amount", amount)
-  lockedToken <- toInterfaceContractId <$> create Token with
-    holding = V2.HoldingView with
-      account = sender
-      amount = amount
-      instrumentId
-      lock = Some $ V2.Lock with
-        holders = instrumentId.admin :: accountParties sender
-        expiresAt = Some expiresAt
-        expiresAfter = None
-        context = Some reason
-      meta = emptyMetadata
-  let remainder = totalAmount - amount
-  senderChangeCid <-
-    if remainder == 0.0
-      then pure (lockedToken, None)
-      else (Some . toInterfaceContractId)<$> create Token with
-        holding = V2.HoldingView with
-          account = sender
-          amount = remainder
-          instrumentId
-          lock = None
-          meta = emptyMetadata
-  pure (lockedToken, senderChangeCid)
-
-
-
--- FIXME: remove the need for this by moving the right parts to token-standard-utils
-
--- | Check whether a required condition is true. If it's not, abort the
--- transaction with a message saying that the requirement was not met.
-require : CanAssert m => Text -> Bool -> m ()
-require msg invariant =
-  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
-
--- | Predicate to check >=.
-isGreaterOrEqualR : Ord a => (Text, a -> a -> Bool)
-isGreaterOrEqualR = ("is less than", (>=))
-
--}
 
 netAllocationCreditAmounts : V2.Account -> [V2.TransferLeg] -> Map.Map V2.InstrumentId Decimal
 netAllocationCreditAmounts authorizer transferLegs =

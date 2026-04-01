@@ -92,7 +92,7 @@ timeFromMeta field meta =
 --------------------------
 
 basicAccount : Party -> HoldingV2.Account
-basicAccount p = HoldingV2.Account None None p
+basicAccount p = HoldingV2.Account p None None
 
 -- | True if the account is a basic account.
 isBasicAccount : HoldingV2.Account -> Bool

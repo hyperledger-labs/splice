@@ -8,6 +8,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
   (
     -- * Reading/checking holdings
     listHoldings,
+    listHoldings',
     listHoldingCids,
     listLockedHoldings,
     listUnlockedHoldingCidsFor,
@@ -66,14 +67,17 @@ import Daml.Script
 -- | List the holdings of a party of a specific instrument.
 listHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listHoldings p instrumentId = do
+  filter (\(_, holding) -> holding.instrumentId == instrumentId) <$> listHoldings' p
+
+-- | List the holdings of a party of a specific instrument.
+listHoldings' : Party -> Script [(ContractId V2.Holding, V2.HoldingView)]
+listHoldings' p = do
   holdings <- queryInterface @V2.Holding p
   let instrumentHoldings = do
         (cid, Some holding) <- holdings
-        guard (holding.instrumentId == instrumentId)
         guard (holding.account.owner == p)
         pure (cid, holding)
   pure instrumentHoldings
-
 
 listLockedHoldings : Party -> V2.InstrumentId -> Script [(ContractId V2.Holding, V2.HoldingView)]
 listLockedHoldings p instrumentId =

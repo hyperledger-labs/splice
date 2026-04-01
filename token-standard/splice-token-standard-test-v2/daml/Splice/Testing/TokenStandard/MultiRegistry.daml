@@ -11,6 +11,7 @@ module Splice.Testing.TokenStandard.MultiRegistry
   , getRegistryApis
 
   , mkRegistryApisV1
+  , mkRegistryApisV2
   , mkRegistryApisV1V2
   ) where
 
@@ -46,6 +47,11 @@ mkRegistryApisV1 : V1.RegistryApi registry => registry -> RegistryApis
 mkRegistryApisV1 v1Api = RegistryApis with
   v1Api = Some (V1.mkGenericRegistry v1Api)
   v2Api = None
+
+mkRegistryApisV2 : V2.RegistryApi registry => registry -> RegistryApis
+mkRegistryApisV2 v2Api = RegistryApis with
+  v1Api = None
+  v2Api = Some (V2.mkGenericRegistry v2Api)
 
 mkRegistryApisV1V2 : (V1.RegistryApi v1, V2.RegistryApi v2) => v1 -> v2 -> RegistryApis
 mkRegistryApisV1V2 v1Api v2Api = RegistryApis with

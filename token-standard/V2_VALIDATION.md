@@ -58,3 +58,4 @@ Cleanup performed so far:
   and provide replay protection for the creation of the corresponding allocations
 - Add a new `Splice.Util.TokenWallet.BatchingUtilityV2` template with choices that implement the standard
   logic for accepting V1 and V2 requests in a V2 wallet.
+- Reordered the `HoldingV2.Account` fields to put `owner` first for improved readability of debug output

@@ -36,6 +36,7 @@ import Splice.Amulet (LockedAmulet, LockedAmulet_OwnerExpireLockV2(..))
 import Splice.Testing.Apps.TradingAppV2 hiding (require)
 import Splice.Testing.UtilsV2
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.Registries.TestTokenV2_RegistryV2 qualified as TestTokenV2_RegistryV2
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as RegistryApiV2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 
@@ -56,22 +57,30 @@ data TestEnvironment = TestEnvironment
     allParties : [Party]
     registryV2 : AmuletRegistryV2.AmuletRegistry
     registryV1 : AmuletRegistryV1.AmuletRegistry
+    tty2Registry : TestTokenV2_RegistryV2.TestTokenV2Registry
     registries : MultiRegistry.MultiRegistry
     amuletId : V2.InstrumentId
     -- TODO(#4515): add the registry for the private asset
+
+data TestInstrumentId = AM | TT2
+  deriving (Eq, Show)
+
+
 
 data TestHolding = TestHolding with
     owner : Party
     amount : Decimal
     locked : Bool
+    instrumentId : TestInstrumentId
     -- TODO(#4517): add instrument-id, test funding from locked holdings, and expired locked holdings
   deriving (Eq, Show)
 
-mkH : Party -> Decimal -> TestHolding
-mkH owner amount = TestHolding owner amount False
+mkH : TestInstrumentId -> Party -> Decimal -> TestHolding
+mkH instrumentId owner amount = TestHolding owner amount False instrumentId
 
-mkLH : Party -> Decimal -> TestHolding
-mkLH owner amount = TestHolding owner amount True
+mkLH : TestInstrumentId -> Party -> Decimal -> TestHolding
+mkLH instrumentId owner amount = TestHolding owner amount True instrumentId
+
 
 data TestLeg = TestLeg with
     sender : Party
@@ -111,13 +120,13 @@ singleTransferTest TestEnvironment{..} =
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
     partiesWithAutoReceipt = []
-    initialHoldings = [mkH alice 100.0]
+    initialHoldings = [mkH AM alice 100.0]
     transferLegs = [aliceToBob]
     expectedNumRequests = 2
     expectedNumAllocations = 2
-    expectedHoldingsAfterAllocation = [mkLH alice 1.0, mkH alice 99.0]
+    expectedHoldingsAfterAllocation = [mkLH AM alice 1.0, mkH AM alice 99.0]
     testWorkflow = SettleTrade
-    expectedFinalHoldings = [mkH bob 1.0, mkH alice 99.0]
+    expectedFinalHoldings = [mkH AM bob 1.0, mkH AM alice 99.0]
   where
     aliceToBob = TestLeg with
         sender = alice
@@ -146,7 +155,7 @@ singleTransferTest_allV2_cancel = runTest $ \env@TestEnvironment{..} ->
     testWorkflow = WithdrawAndCancel with
       withdrawers = [alice]
       locksToExpireBeforeWithdrawal = []
-    expectedFinalHoldings = [mkH alice 99.0, mkH alice 1.0]
+    expectedFinalHoldings = [mkH AM alice 99.0, mkH AM alice 1.0]
 
 -- TODO(#4517): expand coverage of cancellation and withdrawal tests
 
@@ -160,13 +169,20 @@ dvpWithFeeTest TestEnvironment{..} =
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
     partiesWithAutoReceipt = []
-    initialHoldings = [mkH alice 100.0, mkH bob 100.0]
+    initialHoldings = [mkH AM alice 100.0, mkH AM bob 100.0, mkH TT2 bob 20.0]
     transferLegs = [aliceToBob, bobToVenue]
     expectedNumRequests = 3
     expectedNumAllocations = 3
-    expectedHoldingsAfterAllocation = [mkLH alice 20.0, mkH alice 80.0, mkH bob 100.0]
+    expectedHoldingsAfterAllocation =
+      [ mkLH AM alice 20.0, mkH AM alice 80.0
+      , mkH AM bob 100.0, mkH TT2 bob 20.0
+      ]
     testWorkflow = SettleTrade
-    expectedFinalHoldings = [mkH alice 80.0, mkH bob 100.0, mkH bob 19.0, mkH venue 1.0]
+    expectedFinalHoldings =
+      [ mkH AM alice 80.0
+      , mkH AM bob 100.0, mkH AM bob 19.0, mkH TT2 bob 20.0
+      , mkH AM venue 1.0
+      ]
   where
     aliceToBob = TestLeg with
         sender = alice
@@ -198,8 +214,8 @@ dvpWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
   (dvpWithFeeTest env) with
     testWorkflow = WithdrawAndCancel with
       withdrawers = []
-      locksToExpireBeforeWithdrawal = [mkLH alice 20.0]
-    expectedFinalHoldings = [mkH alice 80.0, mkH alice 20.0, mkH bob 100.0]
+      locksToExpireBeforeWithdrawal = [mkLH AM alice 20.0]
+    expectedFinalHoldings = [mkH AM alice 80.0, mkH AM alice 20.0, mkH AM bob 100.0, mkH TT2 bob 20.0]
 
 -- TODO(#4517): test withdrawal with an expired and one unexpired lock
 
@@ -228,7 +244,11 @@ runTest mkTest = do
 
   -- setup initial funds
   forA_ test.initialHoldings $ \TestHolding{..} -> do
-    AmuletRegistryV2.tapFaucet env.registryV2 owner amount
+    case instrumentId of
+      AM -> AmuletRegistryV2.tapFaucet env.registryV2 owner amount
+      TT2 ->  do
+        let instrumentName = "TT2"
+        TestTokenV2_RegistryV2.mint env.tty2Registry (basicAccount owner) instrumentName amount
 
   checkHoldings env "initial holdings" test.initialHoldings
 
@@ -347,30 +367,43 @@ setupTestEnvironment = do
     WalletClientV2.createBatchingUtility p
     pure p
   let [venue, alice, bob, charlie, dora] = allParties
+
+  -- amulet registry setup
   registryV2 <- AmuletRegistryV2.initialize AmuletRegistryV2.defaultAmuletRegistryConfig
   let amuletId = registryV2.instrumentId
   let registryV1 = AmuletRegistryV1.AmuletRegistry with
         dso = registryV2.dso
         instrumentId = downcast amuletId
+
+  -- test token v2 registry setup
+  tty2Registry <- TestTokenV2_RegistryV2.initialize TestTokenV2_RegistryV2.defaultTestTokenV2RegistryConfig
+
   let registries = Map.fromList
         [ (registryV2.dso, MultiRegistry.mkRegistryApisV1V2 registryV1 registryV2)
+        , (tty2Registry.admin, MultiRegistry.mkRegistryApisV2 tty2Registry )
         ]
   pure TestEnvironment with ..
 
+mkInstrumentId : TestEnvironment -> TestInstrumentId -> V2.InstrumentId
+mkInstrumentId env = \case
+  AM -> env.amuletId
+  TT2 -> V2.InstrumentId with
+    id = "TT2"
+    admin = env.tty2Registry.admin
 
 checkHoldings : TestEnvironment -> Text -> [TestHolding] -> Script ()
 checkHoldings env description expectedHoldings = do
   let holdingsByOwner = Map.fromListWithR (++) $ do
         TestHolding{..} <- expectedHoldings
-        pure (owner, [(amount, locked)])
+        pure (owner, [(amount, locked, mkInstrumentId env instrumentId)])
   forA_ env.allParties $ \owner -> do
-    actualHoldings <- WalletClientV2.listHoldings owner env.amuletId
+    actualHoldings <- WalletClientV2.listHoldings' owner
     case Map.lookup owner holdingsByOwner of
       None -> unless (Prelude.null actualHoldings) $
         fail $ T.unlines $
           description <> ": expected no holdings for " <> show owner <> ", but got: " :: map (show . snd) actualHoldings
       Some expectedAmountAndLocks -> do
-        let actualAmounts = dedupSort [ (h.amount, isSome h.lock) | (_, h) <- actualHoldings ]
+        let actualAmounts = dedupSort [ (h.amount, isSome h.lock, h.instrumentId) | (_, h) <- actualHoldings ]
         let expectedAmounts = dedupSort expectedAmountAndLocks
         unless (actualAmounts == expectedAmounts) $
           fail $ T.unlines $
