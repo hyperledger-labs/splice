@@ -388,8 +388,11 @@ template AmuletRules
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let trafficPrice = Some configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
         let rewardConfig = configUsd.rewardConfig
+        let trafficPrice =
+              if isSome rewardConfig
+                then Some configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
+                else None -- Keep OpenMiningRound downgradable to prior versions for as long as possible
         let nr0 = fromOptional 0 initialRound
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
