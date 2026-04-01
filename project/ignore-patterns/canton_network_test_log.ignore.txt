@@ -148,6 +148,6 @@ Timeout 10 seconds expired, but readers are still active. Shutting down forcibly
 # SV-4 initialization.
 Not publishing sequencer successor as we are past upgrade time.*LsuNodeInitializer:LogicalSynchronizerUpgradeIntegrationTest.*SV=sv4
 #LSU test, apps start before the upgrade nodes are able to start
-Failed to read sequencer init status, skipping.*LogicalSynchronizerUpgradeIntegrationTest
+Failed to read sequencer init status, skipping.*(LogicalSynchronizerUpgradeIntegrationTest|DecentralizedSynchronizerMigrationIntegrationTest)
 
 Ryuk has been disabled
