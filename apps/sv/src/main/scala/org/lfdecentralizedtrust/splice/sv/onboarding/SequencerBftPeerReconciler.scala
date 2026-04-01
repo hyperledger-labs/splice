@@ -3,12 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import cats.implicits.catsSyntaxApplicativeError
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  RetryFor,
+  RetryProvider,
+  SequencerAdminConnection,
+}
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.DsoRulesTopologyStateReconciler
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
@@ -21,6 +24,7 @@ import scala.util.control.NonFatal
 abstract class SequencerBftPeerReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
     scanConnection: AggregatingScanConnection,
+    retryProvider: RetryProvider,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
 
@@ -28,13 +32,14 @@ abstract class SequencerBftPeerReconciler(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[BftPeerDifference]] = {
     for {
-      sequencerInitialized <- sequencerAdminConnection
-        .isNodeInitialized()
-        .attemptT
-        .valueOr(error => {
-          logger.warn("Failed to read sequencer init status, skipping", error)
-          false
-        })
+      sequencerInitialized <- retryProvider.retry(
+        RetryFor.Automation,
+        "sequencer_init_status",
+        "Check if sequencer is initialized",
+        sequencerAdminConnection
+          .isNodeInitialized(),
+        logger,
+      )
       result <-
         if (!sequencerInitialized) Future.successful(Seq.empty)
         else
