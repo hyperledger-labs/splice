@@ -216,12 +216,15 @@ sealed trait ScanHttpEncodings {
       )
   }
 
-  def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2WithHash): TreeUpdateWithMigrationId = http match {
-    case httpApi.UpdateHistoryItemV2WithHash.members.UpdateHistoryTransactionV2WithHash(httpTransaction) =>
-      httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2
-    case httpApi.UpdateHistoryItemV2WithHash.members.UpdateHistoryReassignment(httpReassignment) =>
-      httpToLapiReassignment(httpReassignment)
-  }
+  def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2WithHash): TreeUpdateWithMigrationId =
+    http match {
+      case httpApi.UpdateHistoryItemV2WithHash.members
+            .UpdateHistoryTransactionV2WithHash(httpTransaction) =>
+        httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2
+      case httpApi.UpdateHistoryItemV2WithHash.members
+            .UpdateHistoryReassignment(httpReassignment) =>
+        httpToLapiReassignment(httpReassignment)
+    }
 
   def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2): TreeUpdateWithMigrationId = http match {
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(httpTransaction) =>

@@ -1019,7 +1019,7 @@ class HttpScanHandler(
     }
   }
 
-  private def toUpdateV3(update: UpdateHistoryItem): UpdateHistoryItemV2WithHash =
+  private def toUpdateV2WithHash(update: UpdateHistoryItem): UpdateHistoryItemV2WithHash =
     update match {
       case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
         UpdateHistoryItemV2WithHash(
@@ -1934,7 +1934,6 @@ class HttpScanHandler(
   def getUpdateByHash(
       hash: String,
       encoding: DamlValueEncoding,
-      consistentResponses: Boolean,
       extracted: TraceContext,
   ): Future[Either[ErrorResponse, UpdateHistoryItem]] = {
     implicit val tc = extracted
@@ -1950,7 +1949,7 @@ class HttpScanHandler(
           ScanHttpEncodings.encodeUpdate(
             txWithMigration,
             encoding = encoding,
-            version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+            version = ScanHttpEncodings.V1,
             hashInclusionPolicy = ExternalHashInclusionPolicy.AlwaysInclude,
             None,
           )
@@ -1968,14 +1967,13 @@ class HttpScanHandler(
       getUpdateByHash(
         hash = hash,
         encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
-        consistentResponses = true,
         extracted,
       )
         .map {
           case Left(error) =>
             ScanResource.GetUpdateByHashResponse.NotFound(error)
           case Right(update) =>
-            ScanResource.GetUpdateByHashResponse.OK(toUpdateV3(update))
+            ScanResource.GetUpdateByHashResponse.OK(toUpdateV2WithHash(update))
         }
     }
   }

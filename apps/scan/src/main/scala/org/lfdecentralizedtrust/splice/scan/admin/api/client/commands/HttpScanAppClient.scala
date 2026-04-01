@@ -1425,7 +1425,10 @@ object HttpScanAppClient {
   case class GetUpdateByHash(
       extTxnHash: String,
       damlValueEncoding: definitions.DamlValueEncoding,
-  ) extends InternalBaseCommand[http.GetUpdateByHashResponse, definitions.UpdateHistoryItemV2WithHash] {
+  ) extends InternalBaseCommand[
+        http.GetUpdateByHashResponse,
+        definitions.UpdateHistoryItemV2WithHash,
+      ] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
