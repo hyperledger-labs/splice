@@ -3,9 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_AddSv
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
@@ -64,18 +65,29 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
           .find(_.payload.reason.body == body)
           .value
 
-      val sv4Party = sv4Backend.getDsoInfo().svParty.toProtoPrimitive
-      val action = new ARC_DsoRules(
-        new SRARC_OffboardSv(new DsoRules_OffboardSv(sv4Party))
+      def addSvAction(index: Int) = new ARC_DsoRules(
+        new SRARC_AddSv(
+          new DsoRules_AddSv(
+            s"copy-vote-host-$index",
+            s"Copy Vote Candidate $index",
+            1000L + index,
+            s"copy-vote-participant-$index",
+            new Round(100L + index),
+          )
+        )
       )
 
+      val acceptAction = addSvAction(1)
+      val rejectAction = addSvAction(2)
+      val noVoteAction = addSvAction(3)
+
       val (_, acceptVoteRequest) = actAndCheck(
-        "sv1 creates a vote request to offboard sv4",
+        "sv1 creates the first vote request",
         sv1Backend.createVoteRequest(
           sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
-          action,
+          acceptAction,
           "url",
-          "offboard sv4",
+          "copy vote request 1",
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           None,
         ),
@@ -118,19 +130,19 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )
 
       val (_, rejectVoteRequest) = actAndCheck(
-        "sv3 creates another vote request to offboard sv4",
+        "sv3 creates a second vote request",
         sv3Backend.createVoteRequest(
           sv3Backend.getDsoInfo().svParty.toProtoPrimitive,
-          action,
+          rejectAction,
           "url",
-          "offboard sv4 again",
+          "copy vote request 2",
           sv3Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           None,
         ),
       )(
         "the second vote request is visible to sv2",
         _ => {
-          val vr = voteRequestOnSv2ByBody("offboard sv4 again")
+          val vr = voteRequestOnSv2ByBody("copy vote request 2")
           vr.payload.votes.asScala should have size 1
           vr
         },
@@ -210,16 +222,16 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         "sv3 creates a third vote request that sv1 has not voted on",
         sv3Backend.createVoteRequest(
           sv3Backend.getDsoInfo().svParty.toProtoPrimitive,
-          action,
+          noVoteAction,
           "url",
-          "offboard sv4 once more",
+          "copy vote request 3",
           sv3Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           None,
         ),
       )(
         "the third vote request is visible to sv2",
         _ => {
-          val vr = voteRequestOnSv2ByBody("offboard sv4 once more")
+          val vr = voteRequestOnSv2ByBody("copy vote request 3")
           vr.payload.votes.asScala should have size 1
           vr
         },
