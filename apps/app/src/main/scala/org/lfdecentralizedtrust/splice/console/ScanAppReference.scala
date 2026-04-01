@@ -55,6 +55,7 @@ import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
+  allocationv2,
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
@@ -675,6 +676,17 @@ abstract class ScanAppReference(
   ): ChoiceContextWithDisclosures = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetAllocationTransferContext(allocationId))
+    }
+  }
+
+  def getSettlementFactoryV2(
+      choiceArgs: allocationv2.SettlementFactory_SettleBatch
+  ): FactoryChoiceWithDisclosures[
+    allocationv2.SettlementFactory.ContractId,
+    allocationv2.SettlementFactory_SettleBatch,
+  ] = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetSettlementFactoryV2(choiceArgs))
     }
   }
 

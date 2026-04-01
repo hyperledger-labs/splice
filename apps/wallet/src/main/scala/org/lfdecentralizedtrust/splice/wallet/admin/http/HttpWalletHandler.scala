@@ -61,17 +61,18 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1.allocationinstructionresult_output.{
-  AllocationInstructionResult_Completed,
-  AllocationInstructionResult_Failed,
-  AllocationInstructionResult_Pending,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1.allocationinstructionresult_output as instructionresultv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2.allocationinstructionresult_output as instructionresultv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
+  allocationinstructionv2,
   allocationrequestv1,
+//  allocationrequestv2,
   allocationv1,
+  allocationv2,
   holdingv1,
+  holdingv2,
   metadatav1,
   transferinstructionv1,
 }
@@ -82,6 +83,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletRequest,
+  AllocateAmuletV2Request,
   AllocateDevelopmentFundCouponRequest,
   AllocateDevelopmentFundCouponResponse,
   CreateTokenStandardTransferRequest,
@@ -991,7 +993,7 @@ class HttpWalletHandler(
   override def allocateAmulet(respond: WalletResource.AllocateAmuletResponse.type)(
       body: AllocateAmuletRequest
   )(extracted: WalletUserRequest): Future[WalletResource.AllocateAmuletResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    implicit val WalletUserRequest(_, userWallet, traceContext) = extracted
     withSpan(s"$workflowId.allocateAmulet") { _ => _ =>
       val now = walletManager.clock.now.toInstant
       val sender = userWallet.store.key.endUserParty
@@ -1040,18 +1042,105 @@ class HttpWalletHandler(
     }
   }
 
+  override def allocateAmuletV2(respond: WalletResource.AllocateAmuletV2Response.type)(
+      body: AllocateAmuletV2Request
+  )(extracted: WalletUserRequest): Future[WalletResource.AllocateAmuletV2Response] = {
+    implicit val WalletUserRequest(_, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.allocateAmuletV2") { _ => _ =>
+      val now = walletManager.clock.now.toInstant
+      val sender = userWallet.store.key.endUserParty
+      val commandId = CommandId(
+        "org.lfdecentralizedtrust.splice.wallet.allocateAmulet",
+        Seq(sender),
+        Seq( // TODO: revisit this
+          body.settlement.settlementRef.id,
+          body.settlement.settlementRef.cid.getOrElse(""),
+        ) ++ body.settlement.executors,
+      )
+      val specification = new allocationv2.AllocationSpecification(
+        new allocationv2.SettlementInfo(
+          body.settlement.executors.asJava,
+          new allocationv2.Reference(
+            body.settlement.settlementRef.id,
+            body.settlement.settlementRef.cid.map(cid => new AnyContract.ContractId(cid)).toJava,
+          ),
+          Codec.tryDecode(Codec.Timestamp)(body.settlement.requestedAt).toInstant,
+          Codec.tryDecode(Codec.Timestamp)(body.settlement.settleAt).toInstant,
+          body.settlement.settlementDeadline
+            .map(Codec.tryDecode(Codec.Timestamp))
+            .map(_.toInstant)
+            .toJava,
+          new metadatav1.Metadata(body.settlement.meta.getOrElse(Map.empty).asJava),
+        ),
+        body.transferLegs.map { leg =>
+          new allocationv2.TransferLeg(
+            leg.transferLegId,
+            new holdingv2.Account(
+              java.util.Optional.empty,
+              java.util.Optional.empty,
+              sender.toProtoPrimitive,
+            ),
+            new holdingv2.Account(java.util.Optional.empty, java.util.Optional.empty, leg.receiver),
+            Codec.tryDecode(Codec.JavaBigDecimal)(leg.amount),
+            new holdingv2.InstrumentId(userWallet.store.key.dsoParty.toProtoPrimitive, "Amulet"),
+            new metadatav1.Metadata(leg.meta.getOrElse(Map.empty).asJava),
+          )
+        }.asJava,
+        /*authorizer=*/ new holdingv2.Account(
+          java.util.Optional.empty,
+          java.util.Optional.empty,
+          sender.toProtoPrimitive,
+        ),
+      )
+      val dedupConfig = AmuletOperationDedupConfig(
+        commandId,
+        dedupDuration,
+      )
+      for {
+        result <- userWallet.treasury.enqueueAmuletAllocationOperation(
+          specification,
+          requestedAt = now,
+          dedup = Some(dedupConfig),
+        )
+      } yield WalletResource.AllocateAmuletV2Response.OK(allocationResultToResponse(result))
+    }
+  }
+
   private def allocationResultToResponse(
       result: allocationinstructionv1.AllocationInstructionResult
   ): d0.AllocateAmuletResponse = {
     d0.AllocateAmuletResponse(
       result.output match {
-        case completed: AllocationInstructionResult_Completed =>
+        case completed: instructionresultv1.AllocationInstructionResult_Completed =>
           d0.AllocationInstructionResultCompleted(allocationCid =
             completed.allocationCid.contractId
           )
-        case _: AllocationInstructionResult_Failed =>
+        case _: instructionresultv1.AllocationInstructionResult_Failed =>
           d0.AllocationInstructionResultFailed()
-        case pending: AllocationInstructionResult_Pending =>
+        case pending: instructionresultv1.AllocationInstructionResult_Pending =>
+          d0.AllocationInstructionResultPending(allocationInstructionCid =
+            pending.allocationInstructionCid.contractId
+          )
+        case x =>
+          throw new IllegalArgumentException(s"Unexpected AllocationInstructionResult: $x")
+      },
+      result.senderChangeCids.asScala.map(_.contractId).toVector,
+      result.meta.values.asScala.toMap,
+    )
+  }
+
+  private def allocationResultToResponse(
+      result: allocationinstructionv2.AllocationInstructionResult
+  ): d0.AllocateAmuletV2Response = {
+    d0.AllocateAmuletV2Response(
+      result.output match {
+        case completed: instructionresultv2.AllocationInstructionResult_Completed =>
+          d0.AllocationInstructionResultCompleted(allocationCid =
+            completed.allocationCid.contractId
+          )
+        case _: instructionresultv2.AllocationInstructionResult_Failed =>
+          d0.AllocationInstructionResultFailed()
+        case pending: instructionresultv2.AllocationInstructionResult_Pending =>
           d0.AllocationInstructionResultPending(allocationInstructionCid =
             pending.allocationInstructionCid.contractId
           )

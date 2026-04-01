@@ -88,8 +88,9 @@ import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -571,7 +572,7 @@ class BftScanConnection(
     bftCall(_.listInstruments(pageSize, pageToken))
 
   def getAllocationTransferContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -606,7 +607,7 @@ class BftScanConnection(
     bftCall(_.getAllocationWithdrawContextRaw(allocationId, body))
 
   def getAllocationCancelContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -614,7 +615,7 @@ class BftScanConnection(
     bftCall(_.getAllocationCancelContext(allocationCid))
 
   def getAllocationWithdrawContext(
-      allocationCid: Allocation.ContractId
+      allocationCid: allocationv1.Allocation.ContractId
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -631,6 +632,18 @@ class BftScanConnection(
     ]
   ] =
     bftCall(_.getAllocationFactory(choiceArgs))
+
+
+  def getAllocationFactoryV2(choiceArgs: allocationinstructionv2.AllocationFactory_Allocate)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    FactoryChoiceWithDisclosures[
+      allocationinstructionv2.AllocationFactory.ContractId,
+      allocationinstructionv2.AllocationFactory_Allocate,
+    ]
+  ] =
+    bftCall(_.getAllocationFactoryV2(choiceArgs))
 
   def getAllocationFactoryRaw(arg: allocationinstruction.v1.definitions.GetFactoryRequest)(implicit
       ec: ExecutionContext,

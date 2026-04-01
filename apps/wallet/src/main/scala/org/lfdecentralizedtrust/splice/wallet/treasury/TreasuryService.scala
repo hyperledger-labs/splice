@@ -86,8 +86,11 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
+  allocationinstructionv2,
   allocationv1,
+  allocationv2,
   holdingv1,
+  holdingv2,
   metadatav1,
   transferinstructionv1,
 }
@@ -142,6 +145,8 @@ class TreasuryService(
             BatchWithOneOperation
           case _: EnqueuedAmuletAllocationOperation =>
             BatchWithOneOperation
+          case _: EnqueuedAmuletAllocationV2Operation =>
+            BatchWithOneOperation
         },
         {
           case amuletOp: EnqueuedAmuletOperation =>
@@ -150,6 +155,8 @@ class TreasuryService(
             TokenStandardOperationBatch(tsOp)
           case allOp: EnqueuedAmuletAllocationOperation =>
             AmuletAllocationOperationBatch(allOp)
+          case allOp: EnqueuedAmuletAllocationV2Operation =>
+            AmuletAllocationV2OperationBatch(allOp)
         },
       ) {
         case (batch: AmuletOperationBatch, operation: EnqueuedAmuletOperation) =>
@@ -170,6 +177,8 @@ class TreasuryService(
           executeTokenStandardTransferOperation(operation)
         case AmuletAllocationOperationBatch(operation) =>
           executeAmuletAllocationOperation(operation)
+        case AmuletAllocationV2OperationBatch(operation) =>
+          executeAmuletAllocationV2Operation(operation)
       }
       .toMat(
         Sink.onComplete(result0 => {
@@ -259,6 +268,15 @@ class TreasuryService(
   )(implicit tc: TraceContext): Future[allocationinstructionv1.AllocationInstructionResult] = {
     val p = Promise[allocationinstructionv1.AllocationInstructionResult]()
     enqueue(EnqueuedAmuletAllocationOperation(specification, requestedAt, p, tc, dedup))
+  }
+
+  def enqueueAmuletAllocationOperation(
+      specification: allocationv2.AllocationSpecification,
+      requestedAt: Instant,
+      dedup: Option[AmuletOperationDedupConfig],
+  )(implicit tc: TraceContext): Future[allocationinstructionv2.AllocationInstructionResult] = {
+    val p = Promise[allocationinstructionv2.AllocationInstructionResult]()
+    enqueue(EnqueuedAmuletAllocationV2Operation(specification, requestedAt, p, tc, dedup))
   }
 
   private def enqueue(
@@ -525,7 +543,10 @@ class TreasuryService(
       logger.debug(s"Executing token standard operation $operation")
       val sender = userStore.key.endUserParty
       val dso = userStore.key.dsoParty.toProtoPrimitive
-      exerciseTokenStandardChoice(operation) { holdings =>
+      exerciseTokenStandardChoice(operation)(
+        _.toInterface(holdingv1.Holding.INTERFACE),
+        _.toInterface(holdingv1.Holding.INTERFACE),
+      ) { holdings =>
         val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
           dso,
           new transferinstructionv1.Transfer(
@@ -556,7 +577,10 @@ class TreasuryService(
   private def executeAmuletAllocationOperation(operation: EnqueuedAmuletAllocationOperation) = {
     TraceContext.withNewTraceContext("executeAmuletAllocationOperation")(implicit tc => {
       logger.debug(s"Executing Amulet Allocation operation $operation")
-      exerciseTokenStandardChoice(operation) { holdings =>
+      exerciseTokenStandardChoice(operation)(
+        _.toInterface(holdingv1.Holding.INTERFACE),
+        _.toInterface(holdingv1.Holding.INTERFACE),
+      ) { holdings =>
         val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
           userStore.key.dsoParty.toProtoPrimitive,
           operation.specification,
@@ -573,14 +597,40 @@ class TreasuryService(
     })
   }
 
-  private def exerciseTokenStandardChoice(operation: EnqueuedOperation)(
-      exerciseFromHoldings: java.util.List[holdingv1.Holding.ContractId] => Future[
+  private def executeAmuletAllocationV2Operation(operation: EnqueuedAmuletAllocationV2Operation) = {
+    TraceContext.withNewTraceContext("executeAmuletAllocationV2Operation")(implicit tc => {
+      logger.debug(s"Executing Amulet Allocation V2 operation $operation")
+      exerciseTokenStandardChoice(operation)(
+        _.toInterface(holdingv2.Holding.INTERFACE),
+        _.toInterface(holdingv2.Holding.INTERFACE),
+      ) { holdings =>
+        val choiceArgs = new allocationinstructionv2.AllocationFactory_Allocate(
+          operation.specification,
+          operation.requestedAt,
+          holdings,
+          emptyExtraArgs,
+          List(operation.specification.authorizer.owner).asJava,
+        )
+        scanConnection.getAllocationFactoryV2(choiceArgs).map { allocationFactory =>
+          allocationFactory.factoryId.exerciseAllocationFactory_Allocate(
+            allocationFactory.args
+          ) -> allocationFactory.disclosedContracts
+        }
+      }
+    })
+  }
+
+  private def exerciseTokenStandardChoice[HoldingCid](operation: EnqueuedOperation)(
+      amuletToHolding: amuletCodegen.Amulet.ContractId => HoldingCid,
+      lockedAmuletToHolding: amuletCodegen.LockedAmulet.ContractId => HoldingCid,
+  )(
+      exerciseFromHoldings: java.util.List[HoldingCid] => Future[
         (Update[Exercised[operation.Result]], Seq[CommandsOuterClass.DisclosedContract])
       ]
   )(implicit tc: TraceContext) = {
     val now = clock.now.toInstant
     (for {
-      holdings <- getHoldings(now)
+      holdings <- getHoldings(now, amuletToHolding, lockedAmuletToHolding)
       (exercise, disclosedContracts) <- exerciseFromHoldings(holdings)
       synchronizerId <- scanConnection.getAmuletRulesDomain()(tc)
       baseSubmission = connection
@@ -611,16 +661,22 @@ class TreasuryService(
     }
   }
 
-  private def getHoldings(now: Instant)(implicit tc: TraceContext) = {
+  private def getHoldings[HoldingCid](
+      now: Instant,
+      amuletToHolding: amuletCodegen.Amulet.ContractId => HoldingCid,
+      lockedAmuletToHolding: amuletCodegen.LockedAmulet.ContractId => HoldingCid,
+  )(implicit tc: TraceContext): Future[java.util.List[HoldingCid]] = {
     for {
       amulets <- userStore.multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
       lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
         amuletCodegen.LockedAmulet.COMPANION
       )
       expiredLockedAmulets = lockedAmulets.filter(_.payload.lock.expiresAt.isBefore(now))
-    } yield (amulets ++ expiredLockedAmulets)
-      .map(holding => new holdingv1.Holding.ContractId(holding.contractId.contractId))
-      .asJava
+    } yield {
+      val amuletHoldings = amulets.map(c => amuletToHolding(c.contractId))
+      val lockedAmuletHoldings = expiredLockedAmulets.map(c => lockedAmuletToHolding(c.contractId))
+      (amuletHoldings ++ lockedAmuletHoldings).asJava
+    }
   }
 
   private def waitForAmuletBatchIngestion(
@@ -1172,6 +1228,16 @@ object TreasuryService {
     )
   }
 
+  // Only one item per batch supported
+  private case class AmuletAllocationV2OperationBatch(
+      operation: EnqueuedAmuletAllocationV2Operation
+  ) extends OperationBatch
+      with PrettyPrinting {
+    override def pretty: Pretty[AmuletAllocationV2OperationBatch.this.type] = prettyOfClass(
+      param("operation", _.operation)
+    )
+  }
+
   private sealed trait EnqueuedOperation extends PrettyPrinting {
     type Result
     val outcomePromise: Promise[Result]
@@ -1210,6 +1276,22 @@ object TreasuryService {
     override type Result = allocationinstructionv1.AllocationInstructionResult
 
     override def pretty: Pretty[EnqueuedAmuletAllocationOperation.this.type] =
+      prettyNode(
+        "AmuletAllocationOperation",
+        param("specification", _.specification),
+      )
+  }
+
+  private case class EnqueuedAmuletAllocationV2Operation(
+      specification: allocationv2.AllocationSpecification,
+      requestedAt: Instant,
+      outcomePromise: Promise[allocationinstructionv2.AllocationInstructionResult],
+      submittedFrom: TraceContext,
+      dedup: Option[AmuletOperationDedupConfig],
+  ) extends EnqueuedOperation {
+    override type Result = allocationinstructionv2.AllocationInstructionResult
+
+    override def pretty: Pretty[EnqueuedAmuletAllocationV2Operation.this.type] =
       prettyNode(
         "AmuletAllocationOperation",
         param("specification", _.specification),
