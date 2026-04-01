@@ -19,72 +19,136 @@
   "links": [],
   "panels": [
     {
-      "title": "$test",
-      "description": "Store ingestion performance metrics. Left axis: time (ms, s). Right axis: counts (items, batches).",
-      "type": "timeseries",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
       "repeat": "test",
-      "repeatDirection": "v",
+      "repeatDirection": "h",
+      "title": "$test",
+      "type": "row"
+    },
+    {
+      "title": "Total Items",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "green" },
           "custom": {
-            "axisBorderShow": false,
-            "axisPlacement": "auto",
             "drawStyle": "line",
-            "fillOpacity": 5,
-            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 6,
             "showPoints": "always",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "fillOpacity": 5,
+            "spanNulls": false
           }
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Avg Item Time (ms)" },
-            "properties": [
-              { "id": "custom.axisPlacement", "value": "left" },
-              { "id": "unit", "value": "ms" },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Total Time (s)" },
-            "properties": [
-              { "id": "custom.axisPlacement", "value": "left" },
-              { "id": "unit", "value": "s" },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Total Items" },
-            "properties": [
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "unit", "value": "short" },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Total Batches" },
-            "properties": [
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "unit", "value": "short" },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_total_items{test=\"${test}\"}",
+          "legendFormat": "Total Items",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Total Batches",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_total_batches{test=\"${test}\"}",
+          "legendFormat": "Total Batches",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Total Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "splice_perf_ingestion_total_time_ns{test=\"${test}\"} / 1e9",
+          "legendFormat": "Total Time (s)",
+          "range": true, "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Avg Item Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always",
+            "fillOpacity": 5,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
       },
       "targets": [
         {
@@ -92,24 +156,6 @@
           "expr": "splice_perf_ingestion_avg_item_time_ns{test=\"${test}\"} / 1e6",
           "legendFormat": "Avg Item Time (ms)",
           "range": true, "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_total_time_ns{test=\"${test}\"} / 1e9",
-          "legendFormat": "Total Time (s)",
-          "range": true, "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_total_items{test=\"${test}\"}",
-          "legendFormat": "Total Items",
-          "range": true, "refId": "C"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "splice_perf_ingestion_total_batches{test=\"${test}\"}",
-          "legendFormat": "Total Batches",
-          "range": true, "refId": "D"
         }
       ]
     }
@@ -120,14 +166,8 @@
   "templating": {
     "list": [
       {
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
+        "current": { "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
         "definition": "label_values(splice_perf_ingestion_total_items, test)",
         "hide": 2,
         "includeAll": true,
