@@ -9,6 +9,8 @@ module Splice.Testing.TokenStandard.MultiRegistry
     MultiRegistry
   , RegistryApis(..)
   , getRegistryApis
+  , getRegistryApiV1
+  , getRegistryApiV2
 
   , mkRegistryApisV1
   , mkRegistryApisV2
@@ -42,6 +44,19 @@ getRegistryApis registries admin = do
     None -> fail $ "Registry with admin " <> show admin <> " not found"
     Some apis -> return apis
 
+getRegistryApiV1 : MultiRegistry -> Party -> Script V1.GenericRegistry
+getRegistryApiV1 registries admin = do
+  apis <- getRegistryApis registries admin
+  case apis.v1Api of
+    None -> fail $ "Registry with admin " <> show admin <> " does not support V1 API"
+    Some api -> return api
+
+getRegistryApiV2 : MultiRegistry -> Party -> Script V2.GenericRegistry
+getRegistryApiV2 registries admin = do
+  apis <- getRegistryApis registries admin
+  case apis.v2Api of
+    None -> fail $ "Registry with admin " <> show admin <> " does not support V2 API"
+    Some api -> return api
 
 mkRegistryApisV1 : V1.RegistryApi registry => registry -> RegistryApis
 mkRegistryApisV1 v1Api = RegistryApis with

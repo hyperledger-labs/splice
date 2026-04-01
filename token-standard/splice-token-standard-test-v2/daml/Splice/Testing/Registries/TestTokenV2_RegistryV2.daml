@@ -14,9 +14,11 @@ module Splice.Testing.Registries.TestTokenV2_RegistryV2
   , mint
   ) where
 
+import DA.Text qualified as T
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.AllocationV2 qualified as V2
 
 import Splice.TokenStandard.Utils
 
@@ -38,9 +40,9 @@ data TestTokenV2Registry = TestTokenV2Registry with
 instance RegistryApi TestTokenV2Registry where
   getTransferFactory = registryApi_getFactory
   getAllocationFactory = registryApi_getFactory
-  getSettlementFactory = registryApi_getFactory
+  getSettlementFactory = registryApi_getSettlementFactory
   getAllocation_WithdrawContext = registryApi_getEmptyContext
-  getAllocation_CancelContext = registryApi_getEmptyContext
+  getAllocation_CancelContext = registryApi_getCancelContext
   getTransferInstruction_AcceptContext = registryApi_getEmptyContext
   getTransferInstruction_RejectContext = registryApi_getEmptyContext
   getTransferInstruction_WithdrawContext = registryApi_getEmptyContext
@@ -90,12 +92,37 @@ registryApi_getFactory registry arg = do
     arg -- no choice context required for TestTokenV2
     disclosures = tokenRulesD
 
+registryApi_getSettlementFactory
+  : TestTokenV2Registry
+  -> V2.SettlementFactory_SettleBatch
+  -> Script (EnrichedFactoryChoice V2.SettlementFactory V2.SettlementFactory_SettleBatch)
+registryApi_getSettlementFactory registry arg = do
+  (tokenRulesCid, tokenRulesD) <- getTokenRulesWithDisclosures registry
+  lockedDs <- forA arg.allocationCids $ \allocCid -> do
+    getLockedTokensForAllocationsD registry allocCid
+  pure EnrichedFactoryChoice with
+    factoryCid = coerceContractId tokenRulesCid
+    arg -- no choice context required for TestTokenV2
+    disclosures = tokenRulesD <> mconcat lockedDs
+
 -- registryApi_getEmptyContext : arg -> Script (Disclosures', ChoiceContext)
 registryApi_getEmptyContext : Action a => TestTokenV2Registry -> ContractId t -> Metadata -> a OpenApiChoiceContext
 registryApi_getEmptyContext _registry _workflowCid _meta =
   pure OpenApiChoiceContext with
     disclosures = mempty
     choiceContext = emptyChoiceContext
+
+registryApi_getCancelContext
+  : TestTokenV2Registry
+  -> ContractId V2.Allocation
+  -> Metadata
+  -> Script OpenApiChoiceContext
+registryApi_getCancelContext registry cid _meta = do
+  lockedTokensD <- getLockedTokensForAllocationsD registry cid
+  pure OpenApiChoiceContext with
+    disclosures = lockedTokensD
+    choiceContext = emptyChoiceContext
+
 
 getTokenRules : TestTokenV2Registry -> Script (ContractId TestTokenV2.TokenRules, TestTokenV2.TokenRules)
 getTokenRules registry = getTokenRules' registry.admin
@@ -114,3 +141,18 @@ getTokenRulesWithDisclosures registry = do
   (tokenRulesCid, _) <- getTokenRules registry
   tokenRulesD <- queryDisclosure' @TestTokenV2.TokenRules registry.admin tokenRulesCid
   pure (tokenRulesCid, tokenRulesD)
+
+lookupLockedTokenOfAllocation : TestTokenV2Registry -> ContractId V2.Allocation -> Script (Optional (ContractId Token))
+lookupLockedTokenOfAllocation registry allocCid = do
+  Some allocView <- queryInterfaceContractId @V2.Allocation registry.admin allocCid
+  case allocView.holdingCids of
+    [] -> pure None
+    [holdingCid] -> pure (Some (coerceContractId holdingCid))
+    _ -> fail $ T.unlines ["unexpected: multiple holding cids for allocation:", show allocView]
+
+getLockedTokensForAllocationsD : TestTokenV2Registry -> ContractId V2.Allocation -> Script Disclosures'
+getLockedTokensForAllocationsD registry allocCid = do
+  optLockedTokenCid <- lookupLockedTokenOfAllocation registry allocCid
+  case optLockedTokenCid of
+    None -> return mempty
+    Some la -> queryDisclosure' @Token registry.admin la

@@ -116,10 +116,11 @@ template TokenAllocationV2 with
                   fail $ "unexpected: no locked instrument archived for net negative amount " <> show netAmount <>
                     " of " <> show instrumentId
             Some debitAmount
-              | netAmount == debitAmount -> do
+              | negate netAmount == debitAmount -> do
                   -- Net debit of Token and token was archived
                   pure (instrumentId, [])
               | otherwise ->
+                  -- FIXME: adjust wording
                   fail $ "unexpected: locked instrument archived for net amount " <> show netAmount <>
                     " does not match expected debit amount " <> show debitAmount <> " for " <> show instrumentId
 
@@ -178,7 +179,7 @@ template TokenRules with
         admin
         meta = emptyMetadata
 
-      allocationFactory_allocateExtraObservers = allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl
+      allocationFactory_allocateExtraObservers = allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl
 
       allocationFactory_allocateImpl self arg = token_allocationFactoryV2_allocateImpl this self arg
       allocationFactory_publicFetchImpl = publicFetchDefaultImpl this
@@ -225,7 +226,7 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
         cid <- create Token with
           holding = V2.HoldingView with
             account = authorizer
-            amount = netAmount
+            amount = negate creditAmount
             instrumentId
             lock = Some $ V2.Lock with
               holders = instrumentId.admin :: accountParties authorizer
@@ -266,6 +267,7 @@ token_allocationFactoryV2_allocateImpl tokenRules _self arg = do
 -- Utilities
 ------------
 
+-- FIXME: move to utils
 netAllocationCreditAmounts : V2.Account -> [V2.TransferLeg] -> Map.Map V2.InstrumentId Decimal
 netAllocationCreditAmounts authorizer transferLegs =
     Map.fromListWithR (+) $ map legAmount transferLegs
@@ -275,9 +277,3 @@ netAllocationCreditAmounts authorizer transferLegs =
       , (if leg.sender == authorizer then negate leg.amount else 0.0) +
         (if leg.receiver == authorizer then leg.amount else 0.0)
       )
-
-allocationAdmin : V2.AllocationSpecification -> Party
-allocationAdmin V2.AllocationSpecification{..} =
-  case transferLegs of
-    [] -> error "No transfer legs in allocation"
-    (leg ::_) -> leg.instrumentId.admin

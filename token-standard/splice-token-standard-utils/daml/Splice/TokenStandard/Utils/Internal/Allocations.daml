@@ -7,6 +7,7 @@
 module Splice.TokenStandard.Utils.Internal.Allocations (
 
   -- * Allocation utilities
+  allocationAdmin,
   netAllocationCreditAmount,
   splitLegsByAdmin,
   splitLegsByTradingAccount,
@@ -93,6 +94,12 @@ import Splice.TokenStandard.Utils.Internal.Choices
 
 -- Allocation utilities
 ------------------------
+
+allocationAdmin : AllocationV2.AllocationSpecification -> Party
+allocationAdmin AllocationV2.AllocationSpecification{..} =
+  case transferLegs of
+    [] -> error "No transfer legs in allocation"
+    (leg ::_) -> leg.instrumentId.admin
 
 -- FIXME: comments
 filterLegsForAccount : HoldingV2.Account -> [AllocationV2.TransferLeg] -> [AllocationV2.TransferLeg]
@@ -709,6 +716,7 @@ allocationFactoryV2_publicAsset_allocateExtraObserverDefaultImpl arg =
 -- observers of the allocation choice itself if no funding is required.
 allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl : AllocationInstructionV2.AllocationFactory_Allocate -> [Party]
 allocationFactoryV2_privateAsset_allocateExtraObserverDefaultImpl arg
+  -- FIXME: net credit per instrument
   | netAllocationCreditAmount allocation.authorizer allocation.transferLegs >= 0.0 =
       allocation.settlement.executors
   | otherwise = []
