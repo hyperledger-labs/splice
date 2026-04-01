@@ -89,7 +89,7 @@ Follow these conventions:
 
     Signed-off-by: Git-Hygienic-Dev <ghd@example.com>
     ```
-* **CI tags:** If the final squash commit message needs CI tags (e.g., `[ci]`, `[static]`), post-fix them at the end of the **PR title** so they survive the squash (e.g., `Add feature X [ci]`). See [Testing](TESTING.md) for the full list of supported tags.
+* **CI tags:** Post-merge process ignores CI tags (e.g., `[ci]`, `[static]`), so always remove them.
 * **Sign-off:** The squash commit must include a valid `Signed-off-by` line. Ensure it is present in the commit message body.
 
 ## TODO Comments
