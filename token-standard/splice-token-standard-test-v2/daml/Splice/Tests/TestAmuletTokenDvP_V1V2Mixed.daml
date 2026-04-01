@@ -62,7 +62,7 @@ data TestEnvironment = TestEnvironment
     amuletId : V2.InstrumentId
     -- TODO(#4515): add the registry for the private asset
 
-data TestInstrumentId = AM | TT2
+data TestInstrumentId = AM | XT | YT | ZT
   deriving (Eq, Show)
 
 
@@ -171,18 +171,18 @@ dvpWithFeeTest TestEnvironment{..} =
     partiesWithV1Wallet = []
     partiesWithSettlementAgreements = []
     partiesWithAutoReceipt = []
-    initialHoldings = [mkH AM alice 100.0, mkH AM bob 100.0, mkH TT2 bob 20.0]
-    transferLegs = [aliceToBob, bobToVenue, bobToAlice]
+    initialHoldings = [mkH AM alice 100.0, mkH AM bob 100.0, mkH XT bob 20.0, mkH YT bob 3.0]
+    transferLegs = [aliceToBob, bobToVenue, bobToAliceX, bobToAliceY]
     expectedNumRequests = 3
     expectedNumAllocations = 5
     expectedHoldingsAfterAllocation =
       [ mkLH AM alice 20.0, mkH AM alice 80.0
-      , mkH AM bob 100.0, mkH TT2 bob 15.0, mkLH TT2 bob 5.0
+      , mkH AM bob 100.0, mkH XT bob 15.0, mkLH XT bob 5.0, mkLH YT bob 0.3, mkH YT bob 2.7
       ]
     testWorkflow = SettleTrade
     expectedFinalHoldings =
-      [ mkH AM alice 80.0, mkH TT2 alice 5.0
-      , mkH AM bob 100.0, mkH AM bob 19.0, mkH TT2 bob 15.0
+      [ mkH AM alice 80.0, mkH XT alice 5.0, mkH YT alice 0.3
+      , mkH AM bob 100.0, mkH AM bob 19.0, mkH XT bob 15.0, mkH YT bob 2.7
       , mkH AM venue 1.0
       ]
   where
@@ -191,11 +191,16 @@ dvpWithFeeTest TestEnvironment{..} =
         receiver = bob
         amount = 20.0
         instrumentId = AM
-    bobToAlice = TestLeg with
+    bobToAliceX = TestLeg with
         sender = bob
         receiver = alice
         amount = 5.0
-        instrumentId = TT2
+        instrumentId = XT
+    bobToAliceY = TestLeg with
+        sender = bob
+        receiver = alice
+        amount = 0.3
+        instrumentId = YT
     bobToVenue = TestLeg with
         sender = bob
         receiver = venue
@@ -226,7 +231,7 @@ dvpWithFeeTest_onlyV2_cancel = runTest $ \env@TestEnvironment{..} ->
       locksToExpireBeforeWithdrawal = [mkLH AM alice 20.0]
     expectedFinalHoldings =
       [ mkH AM alice 80.0, mkH AM alice 20.0
-      , mkH AM bob 100.0, mkH TT2 bob 15.0, mkH TT2 bob 5.0
+      , mkH AM bob 100.0, mkH XT bob 15.0, mkH XT bob 5.0, mkH YT bob 0.3, mkH YT bob 2.7
       ]
 
 -- TODO(#4517): test withdrawal with an expired and one unexpired lock
@@ -260,8 +265,8 @@ runTest mkTest = do
   forA_ test.initialHoldings $ \TestHolding{..} -> do
     case instrumentId of
       AM -> AmuletRegistryV2.tapFaucet env.registryV2 owner amount
-      TT2 ->  do
-        let instrumentName = "TT2"
+      tt ->  do
+        let instrumentName = show tt
         TestTokenV2_RegistryV2.mint env.tty2Registry (basicAccount owner) instrumentName amount
 
   checkHoldings env "initial holdings" test.initialHoldings
@@ -403,8 +408,14 @@ setupTestEnvironment = do
 mkInstrumentId : TestEnvironment -> TestInstrumentId -> V2.InstrumentId
 mkInstrumentId env = \case
   AM -> env.amuletId
-  TT2 -> V2.InstrumentId with
-    id = "TT2"
+  XT -> V2.InstrumentId with
+    id = "XT"
+    admin = env.tty2Registry.admin
+  YT -> V2.InstrumentId with
+    id = "YT"
+    admin = env.tty2Registry.admin
+  ZT -> V2.InstrumentId with
+    id = "ZT"
     admin = env.tty2Registry.admin
 
 checkHoldings : TestEnvironment -> Text -> [TestHolding] -> Script ()

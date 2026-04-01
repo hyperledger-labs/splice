@@ -142,17 +142,10 @@ getTokenRulesWithDisclosures registry = do
   tokenRulesD <- queryDisclosure' @TestTokenV2.TokenRules registry.admin tokenRulesCid
   pure (tokenRulesCid, tokenRulesD)
 
-lookupLockedTokenOfAllocation : TestTokenV2Registry -> ContractId V2.Allocation -> Script (Optional (ContractId Token))
-lookupLockedTokenOfAllocation registry allocCid = do
-  Some allocView <- queryInterfaceContractId @V2.Allocation registry.admin allocCid
-  case allocView.holdingCids of
-    [] -> pure None
-    [holdingCid] -> pure (Some (coerceContractId holdingCid))
-    _ -> fail $ T.unlines ["unexpected: multiple holding cids for allocation:", show allocView]
-
 getLockedTokensForAllocationsD : TestTokenV2Registry -> ContractId V2.Allocation -> Script Disclosures'
 getLockedTokensForAllocationsD registry allocCid = do
-  optLockedTokenCid <- lookupLockedTokenOfAllocation registry allocCid
-  case optLockedTokenCid of
-    None -> return mempty
-    Some la -> queryDisclosure' @Token registry.admin la
+  Some allocView <- queryInterfaceContractId @V2.Allocation registry.admin allocCid
+  discs <- forA allocView.holdingCids $ \holdingCid -> do
+    let tokenCid = coerceContractId holdingCid : ContractId Token
+    queryDisclosure' @Token registry.admin tokenCid
+  pure $ mconcat discs
