@@ -120,9 +120,8 @@ public final class Transaction {
                 event ->
                     new Node(
                         event.getNodeId(),
-                        event.toProtoEvent().hasExercised()
-                            ? event.toProtoEvent().getExercised().getLastDescendantNodeId()
-                            : event.getNodeId()))
+                        (event instanceof ExercisedEvent)
+                            ? ((ExercisedEvent) event).getLastDescendantNodeId() : event.getNodeId()))
             .collect(Collectors.toCollection(LinkedList::new));
 
     this.nodesById =
