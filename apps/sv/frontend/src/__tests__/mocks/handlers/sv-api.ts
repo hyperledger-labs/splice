@@ -117,25 +117,35 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
           })
         );
       } else {
+        const allResults = voteResultsAmuletRules.dso_rules_vote_results
+          .concat(voteResultsDsoRules.dso_rules_vote_results)
+          .filter(r => {
+            const acceptedMatch =
+              data.accepted === undefined || data.accepted === null
+                ? true
+                : data.accepted
+                  ? r.outcome.tag === 'VRO_Accepted'
+                  : r.outcome.tag === 'VRO_Rejected';
+            const effectiveToMatch = data.effectiveTo
+              ? r.outcome.value
+                ? dayjs(r.outcome.value.effectiveAt).isBefore(dayjs(data.effectiveTo))
+                : dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+              : true;
+            const effectiveFromMatch = data.effectiveFrom
+              ? r.outcome.value
+                ? dayjs(r.outcome.value.effectiveAt).isAfter(dayjs(data.effectiveFrom))
+                : dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
+              : true;
+            return acceptedMatch && effectiveToMatch && effectiveFromMatch;
+          });
+        const offset = data.pageToken || 0;
+        const paged = allResults.slice(offset, offset + (data.limit || 10));
         return res(
           ctx.json<ListDsoRulesVoteResultsResponse>({
-            dso_rules_vote_results: voteResultsAmuletRules.dso_rules_vote_results
-              .concat(voteResultsDsoRules.dso_rules_vote_results)
-              .filter(r =>
-                data.accepted
-                  ? r.outcome.tag === 'VRO_Accepted'
-                  : r.outcome.tag === 'VRO_Rejected' &&
-                    (data.effectiveTo
-                      ? r.outcome.value
-                        ? dayjs(r.outcome.value.effectiveAt).isBefore(dayjs(data.effectiveTo))
-                        : dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
-                      : true) &&
-                    (data.effectiveFrom
-                      ? r.outcome.value
-                        ? dayjs(r.outcome.value.effectiveAt).isAfter(dayjs(data.effectiveFrom))
-                        : dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
-                      : true)
-              ),
+            dso_rules_vote_results: paged,
+            ...(offset + paged.length < allResults.length
+              ? { next_page_token: offset + paged.length }
+              : {}),
           })
         );
       }

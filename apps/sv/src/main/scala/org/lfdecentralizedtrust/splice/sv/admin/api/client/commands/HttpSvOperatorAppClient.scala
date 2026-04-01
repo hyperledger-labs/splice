@@ -250,6 +250,7 @@ object HttpSvOperatorAppClient {
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
+      pageToken: Option[BigInt] = None,
   ) extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
         DsoRules_CloseVoteRequestResult
       ]] {
@@ -266,6 +267,7 @@ object HttpSvOperatorAppClient {
           effectiveFrom,
           effectiveTo,
           limit,
+          pageToken,
         ),
         headers = headers,
       )

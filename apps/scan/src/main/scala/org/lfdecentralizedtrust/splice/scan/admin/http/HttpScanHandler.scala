@@ -2268,6 +2268,8 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.ListVoteRequestResultsResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.listDsoRulesVoteResults") { _ => _ =>
+      val limit = PageLimit.tryCreate(body.limit.intValue)
+      val offset = body.pageToken.map(_.intValue)
       for {
         voteResults <- votesStore.listVoteRequestResults(
           body.actionName,
@@ -2275,9 +2277,14 @@ class HttpScanHandler(
           body.requester,
           body.effectiveFrom,
           body.effectiveTo,
-          PageLimit.tryCreate(body.limit.intValue),
+          limit,
+          offset,
         )
       } yield {
+        val nextPageToken =
+          if (voteResults.size >= body.limit.intValue)
+            Some(BigInt(offset.getOrElse(0) + voteResults.size))
+          else None
         ScanResource.ListVoteRequestResultsResponse.OK(
           definitions.ListDsoRulesVoteResultsResponse(
             voteResults
@@ -2292,7 +2299,8 @@ class HttpScanHandler(
                     ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
                   )
               })
-              .toVector
+              .toVector,
+            nextPageToken,
           )
         )
       }

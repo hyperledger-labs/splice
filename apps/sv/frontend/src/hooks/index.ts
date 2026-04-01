@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useAmuletPriceVotes } from './useAmuletPriceVotes';
 import { useCometBftDebug } from './useCometBftDebug';
+import { useInfiniteVoteRequestResults } from './useInfiniteVoteRequestResults';
 import { useListVoteRequestResult, useListDsoRulesVoteRequests } from './useListVoteRequests';
 import { useListVotes } from './useListVotes';
 import { useMediatorStatus } from './useMediatorStatus';
@@ -15,6 +16,7 @@ import { useVoteRequest } from './useVoteRequest';
 export {
   useAmuletPriceVotes,
   useCometBftDebug,
+  useInfiniteVoteRequestResults,
   useListDsoRulesVoteRequests,
   useListVoteRequestResult,
   useListVotes,

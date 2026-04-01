@@ -27,6 +27,7 @@ import {
 import { SupportedActionTag, ProposalListingData } from '../utils/types';
 import { Link as RouterLink } from 'react-router';
 import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
+import { useInfiniteVoteRequestResults } from '../hooks';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -39,8 +40,6 @@ function getAction(action: ActionRequiringConfirmation): string {
   }
 }
 
-const QUERY_LIMIT = 50;
-
 export const Governance: React.FC = () => {
   const svConfig = useSvConfig();
   const amuletName = svConfig.spliceInstanceNames.amuletName;
@@ -48,17 +47,7 @@ export const Governance: React.FC = () => {
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
   const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
-  const voteResultsWithAcceptedQuery = (accepted: boolean) =>
-    votesHooks.useListVoteRequestResult(
-      QUERY_LIMIT,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      accepted
-    );
-  const acceptedResultsQuery = voteResultsWithAcceptedQuery(true);
-  const notAcceptedResultsQuery = voteResultsWithAcceptedQuery(false);
+  const voteResultsInfiniteQuery = useInfiniteVoteRequestResults();
 
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.payload.trackingCid || v.contractId)
@@ -76,8 +65,7 @@ export const Governance: React.FC = () => {
     dsoInfosQuery.isPending ||
     listVoteRequestsQuery.isPending ||
     votesQuery.isPending ||
-    acceptedResultsQuery.isPending ||
-    notAcceptedResultsQuery.isPending
+    voteResultsInfiniteQuery.isPending
   ) {
     return <Loading />;
   }
@@ -86,8 +74,7 @@ export const Governance: React.FC = () => {
     dsoInfosQuery.isError ||
     listVoteRequestsQuery.isError ||
     votesQuery.isError ||
-    acceptedResultsQuery.isError ||
-    notAcceptedResultsQuery.isError
+    voteResultsInfiniteQuery.isError
   ) {
     return <ErrorStateSection />;
   }
@@ -132,17 +119,17 @@ export const Governance: React.FC = () => {
       } as ProposalListingData;
     });
 
-  const acceptedRequests = acceptedResultsQuery.data.filter(
-    vr => vr.outcome.tag === 'VRO_Accepted' && dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())
+  const allVoteResults = voteResultsInfiniteQuery.data.pages.flatMap(page => page.results);
+
+  const filteredVoteResults = allVoteResults.filter(
+    vr =>
+      (vr.outcome.tag === 'VRO_Accepted' &&
+        dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())) ||
+      vr.outcome.tag === 'VRO_Expired' ||
+      vr.outcome.tag === 'VRO_Rejected'
   );
 
-  const notAcceptedRequests = notAcceptedResultsQuery.data.filter(
-    vr => vr.outcome.tag === 'VRO_Expired' || vr.outcome.tag === 'VRO_Rejected'
-  );
-
-  const allRequests = [...acceptedRequests, ...notAcceptedRequests];
-
-  const voteHistory = allRequests.map(vr => {
+  const voteHistory = filteredVoteResults.map(vr => {
     const votes = vr.request.votes.entriesArray().map(e => e[1]);
 
     return {
@@ -204,6 +191,9 @@ export const Governance: React.FC = () => {
             showStatus
             showVoteStats
             sortOrder="effectiveAtDesc"
+            fetchNextPage={voteResultsInfiniteQuery.fetchNextPage}
+            hasNextPage={voteResultsInfiniteQuery.hasNextPage}
+            isFetchingNextPage={voteResultsInfiniteQuery.isFetchingNextPage}
           />
         </>
       )}
