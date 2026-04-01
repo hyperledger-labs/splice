@@ -601,63 +601,61 @@ class SvApp(
           .withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { implicit traceContext =>
-          requestLogger(traceContext) {
-            val errorHandler = new HttpErrorHandler(loggerFactory)
-            def buildOperation(service: String, operation: String) = {
-              metrics.httpServerMetrics
-                .withMetrics(service)(operation)(traceContext)
-                .tflatMap(_ => {
-                  httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
-                    config.parameters.customTimeouts.get(operation) match {
-                      case Some(customTimeout) =>
-                        withRequestTimeout(
-                          customTimeout.duration,
-                          errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
-                        )
-                      case None => Directive.Empty
-                    }
+          val errorHandler = new HttpErrorHandler(loggerFactory)
+          def buildOperation(service: String, operation: String) = {
+            metrics.httpServerMetrics
+              .withMetrics(service)(operation)(traceContext)
+              .tflatMap(_ => {
+                httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
+                  config.parameters.customTimeouts.get(operation) match {
+                    case Some(customTimeout) =>
+                      withRequestTimeout(
+                        customTimeout.duration,
+                        errorHandler.timeoutHandler(customTimeout.duration, _)(traceContext),
+                      )
+                    case None => Directive.Empty
                   }
-                })
-            }
+                }
+              })
+          }
 
-            errorHandler.directive(traceContext) {
-              concat(
-                SvPublicResource.routes(
-                  publicHandler,
-                  operation =>
-                    buildOperation("svPublic", operation)
-                      .tflatMap(_ => provide(traceContext)),
-                ),
-                SvOperatorResource.routes(
-                  operatorHandler,
-                  operation =>
-                    buildOperation("svOperator", operation)
-                      .tflatMap(_ =>
-                        ActAsKnownPartyAuthExtractor(
-                          verifier,
-                          userRightsProvider,
-                          svStore.key.svParty,
-                          loggerFactory,
-                          "splice sv realm",
-                        )(traceContext)(operation)
-                      ),
-                ),
-                SvAdminResource.routes(
-                  adminHandler,
-                  operation =>
-                    buildOperation("svAdmin", operation)
-                      .tflatMap(_ =>
-                        AdminAuthExtractor(
-                          verifier,
-                          svStore.key.svParty,
-                          userRightsProvider,
-                          loggerFactory,
-                          "splice sv admin realm",
-                        )(traceContext)(operation)
-                      ),
-                ),
-              )
-            }
+          errorHandler.directive(traceContext) {
+            concat(
+              SvPublicResource.routes(
+                publicHandler,
+                operation =>
+                  buildOperation("svPublic", operation)
+                    .tflatMap(_ => provide(traceContext)),
+              ),
+              SvOperatorResource.routes(
+                operatorHandler,
+                operation =>
+                  buildOperation("svOperator", operation)
+                    .tflatMap(_ =>
+                      ActAsKnownPartyAuthExtractor(
+                        verifier,
+                        userRightsProvider,
+                        svStore.key.svParty,
+                        loggerFactory,
+                        "splice sv realm",
+                      )(traceContext)(operation)
+                    ),
+              ),
+              SvAdminResource.routes(
+                adminHandler,
+                operation =>
+                  buildOperation("svAdmin", operation)
+                    .tflatMap(_ =>
+                      AdminAuthExtractor(
+                        verifier,
+                        svStore.key.svParty,
+                        userRightsProvider,
+                        loggerFactory,
+                        "splice sv admin realm",
+                      )(traceContext)(operation)
+                    ),
+              ),
+            )
           }
         }
 

@@ -9,54 +9,62 @@
 
 .. release-notes:: Upcoming
 
-    - SVs
+    - Deployment
 
-      .. important::
+        - We've added support for `reloader annotation <https://github.com/stakater/reloader>`, which performs a rolling
+          restart of our apps on secret/configmap change. The integration is enabled by
+          default. You can disable it by setting enableReloader to false in your values.yaml file.
+          Please note that reloader needs to be installed separately for the integration to work.
+          If you don't have reloader installed this annotation will be ignored.
 
-        - BFT sequencer connections are recommended again with this upgrade. To enable them, remove the config flags to disable them from the SV and validator configuration
-          used to :ref:`disable them <helm-sv-bft-sequencer-connections>`.
+   - Scan UI
 
-    - SV and Validator app
+     - The following tabs and features have been removed from Scan UI.
+       Their corresponding API endpoints are still available, yet deprecated, and will be removed soon.
+       Users are strongly advised to migrate to non-deprecated API endpoints as soon as possible.
 
-    - Going forward unusable splice DARs will be automatically unvetted by the super validators.
-      This will be used for DARs that can already not be used,
-      e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
+      - Canton Coin Activity
+         - Recent activity list, and all leaderboards
+         - Total app & validator rewards
+         - The round as-of which the content has been computed (no round-based data is listed any more)
+         - The tab has been renamed "Canton Coin Configuration"
+      - Governance
+         - Completely removed
+      - Validators
+         - Completely removed
 
-      The minimum supported versions are:
-
-         ================== =======
-         name               version
-         ================== =======
-         amulet             0.1.14
-         amuletNameService  0.1.14
-         dsoGovernance      0.1.19
-         validatorLifecycle 0.1.5
-         wallet             0.1.14
-         walletPayments     0.1.14
-         ================== =======
 
     - Scan
 
-       - Added a new ``/v1/domains/{domain_id}/parties/{party_id}/participant-id`` endpoint that returns all participant IDs hosting a given party,
-         supporting parties hosted on multiple participants. The previous ``/v0`` endpoint only supported single-participant hosting.
+        - Scan now ingests and serves app activity records for traffic-based rewards,
+          which delivers Increments 2 and 3 from the
+          `CIP-104 incremental roll-out plan <https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md#incremental-roll-out>`__.
 
-    - SV UI
+          The responses from the ``/v0/events`` and ``/v0/events/{update_id}``
+          `endpoints <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L1579-L1639>`__
+          now include the
+          ``traffic_summary`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4007-L4026>`__) and
+          ``app_activity_records`` (`schema <https://github.com/hyperledger-labs/splice/blob/004f19622e4a145840f18d3fda9d71c9a751a282/apps/scan/src/main/openapi/scan.yaml#L4027-L4063>`__)
+          fields.
 
-       - Fixed the SV UI to correctly handle parties hosted on multiple participants (e.g., the DSO party).
-         The SV app now proxies the party-to-participant mapping through Scan's new v1 endpoint.
+          .. note::
 
-    - LocalNet
+              These new fields enable the Canton Network community to start
+              validating the traffic-based rewards model and to prepare for the full
+              roll-out of CIP-104 in the future.
 
-       - LocalNet now supports running multiple synchronizers side by side for testing multi-synchronizer scenarios. By default, only the ``global``
-         synchronizer is active. To enable the second synchronizer called ``app-synchronizer``, start LocalNet with the ``multi-sync`` Docker
-         Compose profile (``--profile multi-sync``). The ``app-provider`` and ``app-user`` participant nodes are cross-connected to both
-         synchronizers. See :ref:`multi-sync-localnet` for details.
+              **Network explorer operators**: consider ingesting traffic summaries and
+              app activity records in your network explorer apps together with the mediator verdicts
+              and use them to provide both per-transaction and per-round previews of the expected
+              traffic-based app rewards when CIP-104 goes live.
 
-     - Scan
+              **App developers**: review the app activity records for your app to
+              understand the impact of traffic-based app rewards on your app.
+              Keep in mind that the rewards depend on the exact transaction structure of your app,
+              which might change when you stop creating ``FeaturedAppActivityMarker`` contracts in your transactions.
+              Traffic-based app rewards also depend on the featured app status of counter-parties in your transactions.
+              Expected rewards can therefore differ between DevNet, TestNet and MainNet
+              because different apps are featured.
 
-       - **Experimental**: Add an optional ``app_activity_records`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints.
-         When enabled by SV configuration, traffic summaries and app activity records are included alongside verdicts in event history items.
-         This is part of the CIP-104 preview and is subject to change.
-
-         App activity record computation will be enabled step-by-step on Dev/Test/MainNet,
-         once the SVs have successfully concluded their performance testing.
+          The new fields are marked as experimental in the API specification, as the validation might
+          show that changes are required. Most likely that will though not be the case.

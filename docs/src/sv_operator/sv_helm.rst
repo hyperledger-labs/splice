@@ -1101,28 +1101,6 @@ and you should see all peer SVs listed as peers (their human-friendly names will
 
 The SV UI also presents the status of your global synchronizer node. To see it, click on the "Domain Node Status" tab.
 
-.. _helm-scan-web-ui:
-
-Observing the Canton Coin Scan UI
----------------------------------
-
-The Canton Coin Scan app is a public-facing application that provides summary information regarding Canton Coin activity on the network.
-A copy of it is hosted by each Super Validator. Open your browser at https://scan.sv.YOUR_HOSTNAME to see your instance of it.
-
-Note that after spinning up the application, it may take several minutes before data is available (as it waits to see a mining round opening and closing).
-In the top-right corner of the screen, see the message starting with "The content on this page is computed as of round:".
-If you see a round number, then the data in your scan app is up-to-date.
-If, instead, you see "??", that means that the backend is working, but does not yet expose any useful information. It should turn into a round number within a few minutes.
-A "--" as a round number indicates a problem. It may be very temporary while the data is being fetched from the backend, but if it persists for more than that,
-please inspect the browser logs and reach out to Digital Asset support as needed.
-
-Note that as of now, each instance of the Scan app backend aggregates only Canton Coin activity occuring while the app is up and ingesting ledger updates.
-This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
-At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
-This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
-
-.. todo:: update the above paragraph with an explanation of backfilling, and checking when it is complete
-
 Following an Amulet Conversion Rate Feed
 ----------------------------------------
 

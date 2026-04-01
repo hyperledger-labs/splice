@@ -452,6 +452,69 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       }
     }
 
+    "listExpiredAmuletTransferInstructions" should {
+
+      "return expired instructions and respect ignored parties" in {
+        val now = Instant.parse("2025-01-01T12:00:00.000000Z")
+        val past = now.minusSeconds(3600)
+        val future = now.plusSeconds(3600)
+        val amount = new java.math.BigDecimal("10.0").setScale(10)
+
+        val expiredCid = amuletTransferInstruction(
+          sender = userParty(1),
+          receiver = userParty(3),
+          amount = amount,
+          requestedAt = past.minusSeconds(60),
+          expiresAt = past,
+        )
+
+        val activeCid = amuletTransferInstruction(
+          sender = userParty(1),
+          receiver = userParty(2),
+          amount = amount,
+          requestedAt = now,
+          expiresAt = future,
+        )
+
+        val ignoredCid = amuletTransferInstruction(
+          sender = userParty(2),
+          receiver = userParty(1),
+          amount = amount,
+          requestedAt = past.minusSeconds(60),
+          expiresAt = past,
+        )
+
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(Seq(expiredCid, activeCid, ignoredCid))(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+
+          resultAll <- store.listExpiredAmuletTransferInstructions(Set.empty)(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100),
+          )(traceContext)
+
+          resultFiltered <- store.listExpiredAmuletTransferInstructions(Set(userParty(2)))(
+            CantonTimestamp.assertFromInstant(now),
+            PageLimit.tryCreate(100),
+          )(traceContext)
+
+        } yield {
+          val allContracts = resultAll.map(_.contract)
+          allContracts should contain(expiredCid)
+          allContracts should contain(ignoredCid)
+          allContracts should not contain activeCid
+
+          val filteredContracts = resultFiltered.map(_.contract)
+          filteredContracts should contain(expiredCid)
+          filteredContracts should not contain ignoredCid
+          filteredContracts should not contain activeCid
+        }
+      }
+    }
+
     "listConfirmations" should {
 
       "list all confirmations with a matching action" in {
@@ -1036,6 +1099,24 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         } yield {
           result.map(_.value) should contain theSameElementsAs goodClosed.map(
             AssignedContract(_, dummyDomain)
+          )
+        }
+      }
+
+      "return ClosedMiningRounds ordered by ingestion order when limited" in {
+        // Create 5 archivable closed rounds; ingestion order = round 1, 2, 3, 4, 5
+        val allRounds = (1 to 5).map(n => closedMiningRound(dsoParty, n.toLong))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(allRounds)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          // Query with limit=3: should return the 3 oldest by ingestion order (rounds 1, 2, 3)
+          result <- store.listArchivableClosedMiningRounds(limit = PageLimit.tryCreate(3))
+        } yield {
+          result.map(_.value.contract.payload.round.number) should be(
+            Seq(1L, 2L, 3L)
           )
         }
       }
