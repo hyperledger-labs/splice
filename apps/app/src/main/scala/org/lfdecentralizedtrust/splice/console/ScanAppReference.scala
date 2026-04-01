@@ -450,6 +450,31 @@ abstract class ScanAppReference(
       )
     }
 
+  def getAcsSnapshotAtV1(
+      at: CantonTimestamp,
+      migrationId: Long,
+      recordTimeMatch: Option[definitions.AcsRequest.RecordTimeMatch] = Some(
+        definitions.AcsRequest.RecordTimeMatch.Exact
+      ),
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+      partyIds: Option[Vector[PartyId]] = None,
+      templates: Option[Vector[PackageQualifiedName]] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetAcsSnapshotAtV1(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          recordTimeMatch,
+          after,
+          pageSize,
+          partyIds,
+          templates,
+        )
+      )
+    }
+
   def getHoldingsStateAt(
       at: CantonTimestamp,
       migrationId: Long,
