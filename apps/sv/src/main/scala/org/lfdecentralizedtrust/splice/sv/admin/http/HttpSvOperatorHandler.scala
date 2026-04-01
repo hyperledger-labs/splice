@@ -137,8 +137,13 @@ class HttpSvOperatorHandler(
           body.effectiveFrom,
           body.effectiveTo,
           body.limit.intValue,
+          body.pageToken.map(_.intValue),
         )
       } yield {
+        val nextPageToken =
+          if (voteResults.size >= body.limit.intValue)
+            Some(BigInt(body.pageToken.map(_.intValue).getOrElse(0) + voteResults.size))
+          else None
         r0.ListVoteRequestResultsResponse.OK(
           definitions.ListDsoRulesVoteResultsResponse(
             voteResults
@@ -153,7 +158,8 @@ class HttpSvOperatorHandler(
                     ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
                   )
               })
-              .toVector
+              .toVector,
+            nextPageToken,
           )
         )
       }

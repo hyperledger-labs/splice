@@ -3,6 +3,7 @@
 
 import {
   Box,
+  CircularProgress,
   Typography,
   Table,
   TableBody,
@@ -20,6 +21,8 @@ import { CopyableIdentifier, PageSectionHeader, VoteStats } from '../../componen
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
 import dayjs from 'dayjs';
+import { useEffect } from 'react';
+import { useInView } from 'react-intersection-observer';
 
 export type ProposalSortOrder = 'effectiveAtAsc' | 'effectiveAtDesc';
 
@@ -32,6 +35,9 @@ interface ProposalListingSectionProps {
   showVoteStats?: boolean;
   showStatus?: boolean;
   sortOrder?: ProposalSortOrder;
+  fetchNextPage?: () => void;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
 }
 
 const getTotalVotes = (item: ProposalListingData): number =>
@@ -74,55 +80,85 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     showVoteStats,
     showStatus,
     sortOrder,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = props;
+
+  const { ref, inView } = useInView();
+
+  useEffect(() => {
+    if (inView && hasNextPage && !isFetchingNextPage && fetchNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const sortedData = sortProposals(data, sortOrder);
 
   const columnsCount = getColumnsCount(showThresholdDeadline, showStatus, showVoteStats);
   const gridTemplate = getGridTemplate(columnsCount);
 
+  const supportsInfiniteScroll = fetchNextPage !== undefined;
+
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
       <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
-      {sortedData.length === 0 ? (
+      {sortedData.length === 0 && !hasNextPage ? (
         <InfoBox info={noDataMessage} data-testid={`${uniqueId}-section-info`} />
       ) : (
-        <TableContainer data-testid={`${uniqueId}-section-table`}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ display: 'grid', gridTemplateColumns: gridTemplate }}>
-                <TableCell>ACTION</TableCell>
-                <TableCell>VOTE PROPOSAL CONTRACT ID</TableCell>
-                {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
-                <TableCell>EFFECTIVE AT</TableCell>
-                {showStatus && <TableCell>STATUS</TableCell>}
-                {showVoteStats && <TableCell>VOTES</TableCell>}
-                <TableCell>YOUR VOTE</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody sx={{ display: 'contents' }}>
-              {sortedData.map((vote, index) => (
-                <VoteRow
-                  key={index}
-                  actionName={vote.actionName}
-                  description={vote.description}
-                  contractId={vote.contractId}
-                  uniqueId={uniqueId}
-                  votingThresholdDeadline={vote.votingThresholdDeadline}
-                  voteTakesEffect={vote.voteTakesEffect}
-                  yourVote={vote.yourVote}
-                  status={vote.status}
-                  voteStats={vote.voteStats}
-                  gridTemplate={gridTemplate}
-                  showVoteStats={showVoteStats}
-                  showThresholdDeadline={showThresholdDeadline}
-                  showStatus={showStatus}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <>
+          <TableContainer data-testid={`${uniqueId}-section-table`}>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ display: 'grid', gridTemplateColumns: gridTemplate }}>
+                  <TableCell>ACTION</TableCell>
+                  <TableCell>VOTE PROPOSAL CONTRACT ID</TableCell>
+                  {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
+                  <TableCell>EFFECTIVE AT</TableCell>
+                  {showStatus && <TableCell>STATUS</TableCell>}
+                  {showVoteStats && <TableCell>VOTES</TableCell>}
+                  <TableCell>YOUR VOTE</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody sx={{ display: 'contents' }}>
+                {sortedData.map((vote, index) => (
+                  <VoteRow
+                    key={index}
+                    actionName={vote.actionName}
+                    description={vote.description}
+                    contractId={vote.contractId}
+                    uniqueId={uniqueId}
+                    votingThresholdDeadline={vote.votingThresholdDeadline}
+                    voteTakesEffect={vote.voteTakesEffect}
+                    yourVote={vote.yourVote}
+                    status={vote.status}
+                    voteStats={vote.voteStats}
+                    gridTemplate={gridTemplate}
+                    showVoteStats={showVoteStats}
+                    showThresholdDeadline={showThresholdDeadline}
+                    showStatus={showStatus}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {supportsInfiniteScroll && (
+            <Box ref={ref} sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              {isFetchingNextPage ? (
+                <CircularProgress size={24} />
+              ) : hasNextPage ? (
+                <Typography fontSize={14} color="text.secondary">
+                  More results available
+                </Typography>
+              ) : sortedData.length > 0 ? (
+                <Typography fontSize={14} color="text.secondary">
+                  No more results
+                </Typography>
+              ) : null}
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );

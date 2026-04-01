@@ -310,6 +310,7 @@ class CachingScanStore(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Limit,
+      offset: Option[Int] = None,
   )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] =
     getCache(
       "listVoteRequestResults",
@@ -323,6 +324,7 @@ class CachingScanStore(
         effectiveFrom,
         effectiveTo,
         limit,
+        offset,
       )
     )
 
