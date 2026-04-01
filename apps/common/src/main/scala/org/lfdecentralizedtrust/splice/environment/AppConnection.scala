@@ -33,15 +33,10 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import io.circe.Json
 import io.grpc.{CallCredentials, Deadline, Status}
-import org.apache.pekko.http.scaladsl.model.{
-  HttpHeader,
-  HttpResponse,
-  MediaTypes,
-  ResponseEntity,
-  StatusCode,
-  Uri,
-}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, MediaTypes, StatusCode, Uri}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
 
@@ -86,9 +81,29 @@ abstract class BaseAppConnection(
         case Right(response: HttpResponse)
             if response.entity.contentType.mediaType == MediaTypes.`application/json` =>
           EitherT.left(
-            Future.successful(
-              new BaseAppConnection.UnexpectedHttpJsonResponse(response.status, response.entity)
-            )
+            Unmarshal(response.entity)
+              .to[ByteString]
+              .flatMap(s =>
+                io.circe.jawn.parseByteBuffer(s.asByteBuffer) match {
+                  case Right(value) =>
+                    Future.successful(
+                      new BaseAppConnection.UnexpectedHttpJsonResponse(response.status, value)
+                    )
+                  case Left(failure) =>
+                    val truncated =
+                      if (s.length > 100) s.take(97).utf8String + "..." else s.utf8String
+                    logger.warn(
+                      s"Failed to parse the response body as json, even though the content type was application/json. Status code: ${response.status}, body: ${truncated}, parsing failure: $failure"
+                    )(TraceContext.empty)
+                    Future.successful(
+                      new BaseAppConnection.UnexpectedHttpMalformedJsonResponse(
+                        response.status,
+                        truncated,
+                      )
+                    )
+
+                }
+              )
           )
         case Right(response: HttpResponse)
             if response.entity.contentType.mediaType == MediaTypes.`text/plain` || response.entity.contentType.mediaType == MediaTypes.`text/html` =>
@@ -96,10 +111,10 @@ abstract class BaseAppConnection(
             response.entity
               .getDataBytes()
               .runFold(
-                ByteString.empty,
-                { (acc: ByteString, chunk) =>
-                  if (acc.length > 100) { acc }
-                  else { acc ++ chunk }
+                "",
+                { (acc: String, chunk) =>
+                  if (acc.length > 100) { acc + "..." }
+                  else { acc ++ chunk.utf8String }
                 },
                 mat,
               )
@@ -108,7 +123,7 @@ abstract class BaseAppConnection(
               .map { bs =>
                 new BaseAppConnection.UnexpectedHttpTextResponse(
                   response.status,
-                  bs.utf8String,
+                  bs,
                 )
               }
           )
@@ -133,8 +148,17 @@ abstract class BaseAppConnection(
 }
 
 object BaseAppConnection {
-  final class UnexpectedHttpJsonResponse(val statusCode: StatusCode, val entity: ResponseEntity)
-      extends Throwable(s"Unexpected Http Response (status $statusCode): $entity")
+  def truncate(json: Json, maxLength: Int = 100): String = {
+    val jsonString = json.noSpaces
+    if (jsonString.length > maxLength) jsonString.take(maxLength - 3) + "..."
+    else jsonString
+  }
+  final class UnexpectedHttpJsonResponse(val statusCode: StatusCode, val content: Json)
+      extends Throwable(s"Unexpected Http Json Response (status $statusCode): ${truncate(content)}")
+  final class UnexpectedHttpMalformedJsonResponse(val statusCode: StatusCode, val content: String)
+      extends Throwable(
+        s"Unexpected Http response, with json header but a malformed Json content (status $statusCode): $content"
+      )
   final class UnexpectedHttpTextResponse(val statusCode: StatusCode, val content: String)
       extends Throwable(s"Unexpected text or html response (status $statusCode): $content")
   final class UnexpectedHttpNonJsonResponse(val statusCode: StatusCode)

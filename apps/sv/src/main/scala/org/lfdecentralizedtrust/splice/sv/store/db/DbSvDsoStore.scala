@@ -360,6 +360,63 @@ class DbSvDsoStore(
   ): Future[Seq[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]] =
     listRewardCouponsOnDomain(SvRewardCoupon.COMPANION, round, synchronizerId, limit)
 
+  override protected def listClosedMiningRoundsWithoutCouponsOnDomain(
+      domain: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]
+  ] = {
+    val closedRoundPqn =
+      PackageQualifiedName.fromJavaCodegenCompanion(ClosedMiningRound.COMPANION)
+    val couponPqns = Seq(
+      AppRewardCoupon.COMPANION,
+      ValidatorRewardCoupon.COMPANION,
+      SvRewardCoupon.COMPANION,
+      ValidatorLivenessActivityRecord.COMPANION,
+    ).map(PackageQualifiedName.fromJavaCodegenCompanion)
+
+    // I think `reduce` makes this nicer to read but the wartremover doesn't like it...
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    val notExistsClauses = couponPqns
+      .map { pqn =>
+        sql"""and not exists (
+                select 1 from #${DsoTables.acsTableName} rc
+                where rc.store_id = $acsStoreId
+                  and rc.migration_id = $domainMigrationId
+                  and rc.package_name = ${pqn.packageName}
+                  and rc.template_id_qualified_name = ${pqn.qualifiedName}
+                  and rc.reward_round = cr.mining_round
+                  and rc.reward_party is not null
+                  and rc.assigned_domain = $domain
+              )"""
+      }
+      .reduce((a, b) => (a ++ b).toActionBuilder)
+
+    val opName = "listClosedMiningRoundsWithoutCouponsOnDomain"
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .query(
+            (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("cr.")}
+                   from #${DsoTables.acsTableName} cr
+                   where cr.store_id = $acsStoreId
+                     and cr.migration_id = $domainMigrationId
+                     and cr.package_name = ${closedRoundPqn.packageName}
+                     and cr.template_id_qualified_name = ${closedRoundPqn.qualifiedName}
+                     and cr.assigned_domain = $domain
+                """ ++ notExistsClauses ++ sql"""
+                   order by cr.event_number
+                   limit ${sqlLimit(limit)}
+                """).toActionBuilder.as[SelectFromAcsTableResult],
+            opName,
+          )
+        limited = applyLimit(opName, limit, result)
+      } yield limited.map(contractFromRow(ClosedMiningRound.COMPANION)(_))
+    }
+  }
+
   override def countValidatorFaucetCouponsOnDomain(round: Long, synchronizerId: SynchronizerId)(
       implicit tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](

@@ -1103,6 +1103,76 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         }
       }
 
+      "return ClosedMiningRounds ordered by ingestion order when limited" in {
+        // Create 5 archivable closed rounds; ingestion order = round 1, 2, 3, 4, 5
+        val allRounds = (1 to 5).map(n => closedMiningRound(dsoParty, n.toLong))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(allRounds)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          // Query with limit=3: should return the 3 oldest by ingestion order (rounds 1, 2, 3)
+          result <- store.listArchivableClosedMiningRounds(limit = PageLimit.tryCreate(3))
+        } yield {
+          result.map(_.value.contract.payload.round.number) should be(
+            Seq(1L, 2L, 3L)
+          )
+        }
+      }
+
+      "skip past rounds with coupons to find archivable rounds beyond the limit" in {
+        // 4 rounds with coupons (one coupon type each), then 1 clean round
+        val roundsWithCoupons = (1 to 4).map(n => closedMiningRound(dsoParty, n.toLong))
+        val cleanRound = closedMiningRound(dsoParty, round = 5)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(roundsWithCoupons :+ cleanRound)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- dummyDomain.create(appRewardCoupon(round = 1, userParty(1)))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(validatorRewardCoupon(round = 2, userParty(1)))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            svRewardCoupon(round = 3, sv = userParty(1), beneficiary = userParty(2), weight = 1L)
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(validatorLivenessActivityRecord(userParty(1), round = 4))(
+            store.multiDomainAcsStore
+          )
+          // limit=3: naive approach would fetch rounds 1-3 (all have coupons), return empty.
+          result <- store.listArchivableClosedMiningRounds(limit = PageLimit.tryCreate(3))
+        } yield {
+          result.map(_.value.contract.payload.round.number) should be(Seq(5L))
+        }
+      }
+
+      "return empty when all closed rounds have coupons" in {
+        val allRounds = (1 to 3).map(n => closedMiningRound(dsoParty, n.toLong))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(dsoRules())(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(allRounds)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- dummyDomain.create(appRewardCoupon(round = 1, userParty(1)))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(validatorRewardCoupon(round = 2, userParty(1)))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            svRewardCoupon(round = 3, sv = userParty(1), beneficiary = userParty(2), weight = 1L)
+          )(store.multiDomainAcsStore)
+          result <- store.listArchivableClosedMiningRounds()
+        } yield {
+          result shouldBe empty
+        }
+      }
+
     }
 
     "lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset" should {

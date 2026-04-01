@@ -1078,206 +1078,204 @@ class ValidatorApp(
           .withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { implicit traceContext =>
-          requestLogger(traceContext) {
-            HttpErrorHandler(loggerFactory)(traceContext) {
-              concat(
-                (Seq(
-                  ValidatorResource.routes(
-                    handler,
-                    operation =>
-                      metrics.httpServerMetrics.withMetrics("validator")(operation).tflatMap { _ =>
-                        AuthenticationOnlyAuthExtractor(
-                          verifier,
-                          loggerFactory,
-                          OAuthRealms.Validator,
-                        )(
-                          traceContext
-                        )(
-                          operation
-                        )
+          HttpErrorHandler(loggerFactory)(traceContext) {
+            concat(
+              (Seq(
+                ValidatorResource.routes(
+                  handler,
+                  operation =>
+                    metrics.httpServerMetrics.withMetrics("validator")(operation).tflatMap { _ =>
+                      AuthenticationOnlyAuthExtractor(
+                        verifier,
+                        loggerFactory,
+                        OAuthRealms.Validator,
+                      )(
+                        traceContext
+                      )(
+                        operation
+                      )
+                    },
+                ),
+                ScanproxyResource.routes(
+                  scanProxyHandler,
+                  operation =>
+                    metrics.httpServerMetrics.withMetrics("scanProxy")(operation).tflatMap { _ =>
+                      AuthenticationOnlyAuthExtractor(
+                        verifier,
+                        loggerFactory,
+                        OAuthRealms.ScanProxy,
+                      )(
+                        traceContext
+                      )(operation)
+                    },
+                ),
+                pathPrefix("api" / "validator" / "v0" / "scan-proxy") {
+                  concat(
+                    TokenStandardMetadataResource.routes(
+                      tokenStandardScanProxyHandler,
+                      operation => {
+                        metrics.httpServerMetrics
+                          .withMetrics("tokenStandardMetadata")(operation)
+                          .tflatMap { _ =>
+                            AuthenticationOnlyAuthExtractor(
+                              verifier,
+                              loggerFactory,
+                              OAuthRealms.ScanProxy,
+                            )(
+                              traceContext
+                            )(
+                              operation
+                            )
+                          }
                       },
-                  ),
-                  ScanproxyResource.routes(
-                    scanProxyHandler,
-                    operation =>
-                      metrics.httpServerMetrics.withMetrics("scanProxy")(operation).tflatMap { _ =>
-                        AuthenticationOnlyAuthExtractor(
+                    ),
+                    TokenStandardTransferInstructionResource.routes(
+                      tokenStandardScanProxyHandler,
+                      operation =>
+                        metrics.httpServerMetrics
+                          .withMetrics("tokenStandardTransfer")(operation)
+                          .tflatMap { _ =>
+                            AuthenticationOnlyAuthExtractor(
+                              verifier,
+                              loggerFactory,
+                              OAuthRealms.ScanProxy,
+                            )(
+                              traceContext
+                            )(
+                              operation
+                            )
+                          },
+                    ),
+                    TokenStandardAllocationInstructionResource.routes(
+                      tokenStandardScanProxyHandler,
+                      operation =>
+                        metrics.httpServerMetrics
+                          .withMetrics("tokenStandardAllocationInstruction")(operation)
+                          .tflatMap { _ =>
+                            AuthenticationOnlyAuthExtractor(
+                              verifier,
+                              loggerFactory,
+                              OAuthRealms.ScanProxy,
+                            )(
+                              traceContext
+                            )(
+                              operation
+                            )
+                          },
+                    ),
+                    TokenStandardAllocationResource.routes(
+                      tokenStandardScanProxyHandler,
+                      operation =>
+                        metrics.httpServerMetrics
+                          .withMetrics("tokenStandardAllocation")(operation)
+                          .tflatMap { _ =>
+                            AuthenticationOnlyAuthExtractor(
+                              verifier,
+                              loggerFactory,
+                              OAuthRealms.ScanProxy,
+                            )(
+                              traceContext
+                            )(
+                              operation
+                            )
+                          },
+                    ),
+                  )
+                },
+                ValidatorAdminResource.routes(
+                  adminHandler,
+                  operationId =>
+                    metrics.httpServerMetrics
+                      .withMetrics("admin")(operationId)
+                      .tflatMap { _ =>
+                        AdminAuthExtractor(
                           verifier,
+                          validatorParty,
+                          userRightsProvider,
                           loggerFactory,
-                          OAuthRealms.ScanProxy,
+                          OAuthRealms.ValidatorOperator,
+                        )(traceContext)(operationId)
+                      },
+                ),
+                ValidatorPublicResource.routes(
+                  publicHandler,
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("public")(operation)
+                      .tflatMap { _ => provide(()) },
+                ),
+              ) ++ walletInternalHandler.toList.map { case (walletHandler, walletManager) =>
+                InternalWalletResource.routes(
+                  walletHandler,
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("walletInternal")(operation)
+                      .tflatMap { _ =>
+                        UserWalletAuthExtractor(
+                          verifier,
+                          walletManager,
+                          userRightsProvider,
+                          loggerFactory,
+                          OAuthRealms.Wallet,
                         )(
                           traceContext
                         )(operation)
                       },
-                  ),
-                  pathPrefix("api" / "validator" / "v0" / "scan-proxy") {
-                    concat(
-                      TokenStandardMetadataResource.routes(
-                        tokenStandardScanProxyHandler,
-                        operation => {
-                          metrics.httpServerMetrics
-                            .withMetrics("tokenStandardMetadata")(operation)
-                            .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
-                                traceContext
-                              )(
-                                operation
-                              )
-                            }
-                        },
-                      ),
-                      TokenStandardTransferInstructionResource.routes(
-                        tokenStandardScanProxyHandler,
-                        operation =>
-                          metrics.httpServerMetrics
-                            .withMetrics("tokenStandardTransfer")(operation)
-                            .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
-                                traceContext
-                              )(
-                                operation
-                              )
-                            },
-                      ),
-                      TokenStandardAllocationInstructionResource.routes(
-                        tokenStandardScanProxyHandler,
-                        operation =>
-                          metrics.httpServerMetrics
-                            .withMetrics("tokenStandardAllocationInstruction")(operation)
-                            .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
-                                traceContext
-                              )(
-                                operation
-                              )
-                            },
-                      ),
-                      TokenStandardAllocationResource.routes(
-                        tokenStandardScanProxyHandler,
-                        operation =>
-                          metrics.httpServerMetrics
-                            .withMetrics("tokenStandardAllocation")(operation)
-                            .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
-                                traceContext
-                              )(
-                                operation
-                              )
-                            },
-                      ),
-                    )
-                  },
-                  ValidatorAdminResource.routes(
-                    adminHandler,
-                    operationId =>
-                      metrics.httpServerMetrics
-                        .withMetrics("admin")(operationId)
-                        .tflatMap { _ =>
-                          AdminAuthExtractor(
-                            verifier,
-                            validatorParty,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.ValidatorOperator,
-                          )(traceContext)(operationId)
-                        },
-                  ),
-                  ValidatorPublicResource.routes(
-                    publicHandler,
-                    operation =>
-                      metrics.httpServerMetrics
-                        .withMetrics("public")(operation)
-                        .tflatMap { _ => provide(()) },
-                  ),
-                ) ++ walletInternalHandler.toList.map { case (walletHandler, walletManager) =>
-                  InternalWalletResource.routes(
-                    walletHandler,
-                    operation =>
-                      metrics.httpServerMetrics
-                        .withMetrics("walletInternal")(operation)
-                        .tflatMap { _ =>
-                          UserWalletAuthExtractor(
-                            verifier,
-                            walletManager,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.Wallet,
-                          )(
-                            traceContext
-                          )(operation)
-                        },
-                  )
-                } ++ walletExternalHandler.toList.map { case (walletHandler, walletManager) =>
-                  ExternalWalletResource.routes(
-                    walletHandler,
-                    operation =>
-                      metrics.httpServerMetrics
-                        .withMetrics("walletExternal")(operation)
-                        .tflatMap { _ =>
-                          UserWalletAuthExtractor(
-                            verifier,
-                            walletManager,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.Wallet,
-                          )(
-                            traceContext
-                          )(operation)
-                        },
-                  )
-                } ++ walletStatusHandler.toList.map { case (walletHandler, walletManager) =>
-                  StatusWalletResource.routes(
-                    walletHandler,
-                    operation =>
-                      metrics.httpServerMetrics
-                        .withMetrics("walletStatus")(operation)
-                        .tflatMap { _ =>
-                          AuthenticationOnlyAuthExtractor(
-                            verifier,
-                            loggerFactory,
-                            OAuthRealms.Wallet,
-                          )(
-                            traceContext
-                          )(operation)
-                        },
-                  )
-                } ++ ansExternalHandler.toList.map { case (ansHandler, walletManager) =>
-                  AnsResource.routes(
-                    ansHandler,
-                    operation =>
-                      metrics.httpServerMetrics
-                        .withMetrics("ans")(operation)
-                        .tflatMap { _ =>
-                          UserWalletAuthExtractor(
-                            verifier,
-                            walletManager,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.Ans,
-                          )(traceContext)(
-                            operation
-                          )
-                        },
-                  )
-                })*
-              )
-            }
+                )
+              } ++ walletExternalHandler.toList.map { case (walletHandler, walletManager) =>
+                ExternalWalletResource.routes(
+                  walletHandler,
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("walletExternal")(operation)
+                      .tflatMap { _ =>
+                        UserWalletAuthExtractor(
+                          verifier,
+                          walletManager,
+                          userRightsProvider,
+                          loggerFactory,
+                          OAuthRealms.Wallet,
+                        )(
+                          traceContext
+                        )(operation)
+                      },
+                )
+              } ++ walletStatusHandler.toList.map { case (walletHandler, walletManager) =>
+                StatusWalletResource.routes(
+                  walletHandler,
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("walletStatus")(operation)
+                      .tflatMap { _ =>
+                        AuthenticationOnlyAuthExtractor(
+                          verifier,
+                          loggerFactory,
+                          OAuthRealms.Wallet,
+                        )(
+                          traceContext
+                        )(operation)
+                      },
+                )
+              } ++ ansExternalHandler.toList.map { case (ansHandler, walletManager) =>
+                AnsResource.routes(
+                  ansHandler,
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("ans")(operation)
+                      .tflatMap { _ =>
+                        UserWalletAuthExtractor(
+                          verifier,
+                          walletManager,
+                          userRightsProvider,
+                          loggerFactory,
+                          OAuthRealms.Ans,
+                        )(traceContext)(
+                          operation
+                        )
+                      },
+                )
+              })*
+            )
           }
         }
       }

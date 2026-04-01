@@ -4,7 +4,7 @@
   "devDependencies": {
     "@types/node-fetch": "^2.6.12",
     "@types/sinon": "^21.0.0",
-    "sinon": "^21.0.1"
+    "sinon": "^21.0.3"
   },
   "dependencies": {
     "@lfdecentralizedtrust/canton-network-pulumi-deployment": "1.0.0",

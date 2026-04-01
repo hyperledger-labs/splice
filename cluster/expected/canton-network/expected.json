@@ -1352,7 +1352,11 @@
           "type": "unlimited"
         },
         "/api/scan/v0/history/bulk/acs": {
-          "name": "getBulkAcsSnapshot",
+          "name": "listBulkAcsSnapshotObjects",
+          "type": "unlimited"
+        },
+        "/api/scan/v0/history/bulk/updates": {
+          "name": "listBulkUpdateHistoryObjects",
           "type": "unlimited"
         },
         "/api/scan/v0/holdings": {
@@ -1595,7 +1599,11 @@
           "type": "unlimited"
         },
         "/api/scan/v0/history/bulk/acs": {
-          "name": "getBulkAcsSnapshot",
+          "name": "listBulkAcsSnapshotObjects",
+          "type": "unlimited"
+        },
+        "/api/scan/v0/history/bulk/updates": {
+          "name": "listBulkUpdateHistoryObjects",
           "type": "unlimited"
         },
         "/api/scan/v0/holdings": {

@@ -19,6 +19,7 @@ import { ContractId } from '@daml/types';
 
 import * as scanHooks from '../hooks';
 
+// TODO(#4520): Some of the below are no longer used, but were a bit messier to remove, so we left them for now
 export const ScanAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const hooks: VotesHooks = {
     isReadOnly: true,

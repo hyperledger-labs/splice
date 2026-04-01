@@ -15,7 +15,12 @@ import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  UpdateHistoryItem,
+  UpdateHistoryItemV2,
+  UpdateHistoryTransactionV2,
+  ValidatorReceivedFaucets,
+}
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbAppActivityRecordStore.AppActivityRecordT
@@ -31,6 +36,7 @@ import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOff
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
+import scala.collection.immutable.SortedMap
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -252,6 +258,12 @@ sealed trait ScanHttpEncodings {
           EventId.nodeIdFromEventId
         )
     }
+    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
+      http.eventsById.collect { case (eventId, _: httpApi.TreeEvent.members.ExercisedEvent) =>
+        EventId.nodeIdFromEventId(eventId)
+      }.toSeq,
+      nodesWithChildren,
+    )
     TreeUpdateWithMigrationId(
       UpdateHistoryResponse(
         update = ledgerApi.TransactionTreeUpdate(
@@ -263,7 +275,7 @@ sealed trait ScanHttpEncodings {
             http.eventsById
               .map { case (eventId, treeEventHttp) =>
                 Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                  nodesWithChildren,
+                  lastDescendantNodes,
                   treeEventHttp,
                 )
               }
@@ -336,12 +348,12 @@ sealed trait ScanHttpEncodings {
     }
 
   private def httpToJavaEvent(
-      nodesWithChildren: Map[Int, Seq[Int]],
+      lastDescendantNodes: Map[Int, Int],
       http: httpApi.TreeEvent,
   ): javaApi.Event = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
-      httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
+      httpToJavaExercisedEvent(lastDescendantNodes, exercisedHttp)
   }
 
   def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
@@ -367,7 +379,7 @@ sealed trait ScanHttpEncodings {
   }
 
   private def httpToJavaExercisedEvent(
-      nodesWithChildren: Map[Int, Seq[Int]],
+      lastDescendantNodes: Map[Int, Int],
       http: httpApi.ExercisedEvent,
   ): javaApi.ExercisedEvent = {
     val templateId = parseTemplateId(http.templateId)
@@ -385,9 +397,9 @@ sealed trait ScanHttpEncodings {
       decodeChoiceArgument(templateId, interfaceId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
-      EventId.lastDescendedNodeFromChildNodeIds(
+      lastDescendantNodes.getOrElse(
         nodeId,
-        nodesWithChildren,
+        throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
       /*implementedInterfaces = */ java.util.Collections.emptyList(),
@@ -592,6 +604,48 @@ object ScanHttpEncodings {
     )
   }
 
+  def updateV1ToUpdateV2(update: UpdateHistoryItem): UpdateHistoryItemV2 =
+    update match {
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV2(
+          UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
+        )
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV2(
+          UpdateHistoryTransactionV2(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+            externalTransactionHash = t.externalTransactionHash,
+          )
+        )
+    }
+
+  def encodeUpdateV2(
+      update: TreeUpdateWithMigrationId,
+      encoding: definitions.DamlValueEncoding,
+      version: ApiVersion,
+      hashInclusionPolicy: ExternalHashInclusionPolicy = ExternalHashInclusionPolicy.ApplyThreshold,
+      externalTransactionHashThresholdTime: Option[Instant] =
+        ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.UpdateHistoryItemV2 =
+    updateV1ToUpdateV2(
+      encodeUpdate(
+        update,
+        encoding,
+        version,
+        hashInclusionPolicy,
+        externalTransactionHashThresholdTime,
+      )
+    )
+
   /** Returns a copy of the input, modified such that the result is consistent across different SVs:
     * - Offsets are replaced by empty strings
     * - Event ids are replaced by deterministically assigned event ids
@@ -695,7 +749,13 @@ object ScanHttpEncodings {
           .map(_.intValue())
           .map(mapping)
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
-    }
+    }.toMap
+    val lastDescendantNodes = EventId.lastDescendantNodesFromChildNodeIds(
+      tree.getEventsById.asScala.collect { case (_, exercised: javaApi.ExercisedEvent) =>
+        mapping(exercised.getNodeId)
+      }.toSeq,
+      nodesWithChildren,
+    )
     val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
@@ -730,9 +790,9 @@ object ScanHttpEncodings {
           exercised.getChoiceArgument,
           exercised.getActingParties,
           exercised.isConsuming,
-          EventId.lastDescendedNodeFromChildNodeIds(
+          lastDescendantNodes.getOrElse(
             newNodeId,
-            nodesWithChildren.toMap,
+            throw new IllegalStateException(s"Node $nodeId was not in lastDescendantNodes"),
           ),
           exercised.getExerciseResult,
           exercised.getImplementedInterfaces,
