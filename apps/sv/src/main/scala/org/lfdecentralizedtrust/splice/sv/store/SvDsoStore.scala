@@ -355,6 +355,18 @@ trait SvDsoStore
     ]]
   ]
 
+  /** Closed mining rounds that have no reward coupons of any type
+    * (AppRewardCoupon, ValidatorRewardCoupon, SvRewardCoupon, ValidatorLivenessActivityRecord).
+    */
+  protected def listClosedMiningRoundsWithoutCouponsOnDomain(
+      domain: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound]]
+  ]
+
   /** Get the closed round contracts associated with the given round numbers.
     * Contracts that do not exist are filtered out.
     */
@@ -545,56 +557,28 @@ trait SvDsoStore
   ] = {
     for {
       domain <- getDsoRules().map(_.domain)
-      // we limit to the DsoRules domain because this is used by a polling trigger,
+      // We limit to the DsoRules domain because this is used by a polling trigger,
       // which exercises on DsoRules, so all operands must share its domain.
       // There's no harm "missing" closed rounds awaiting reassignment, because
-      // they'll be seen on the next poll
-      closedRounds <- multiDomainAcsStore.listContractsOnDomain(
-        splice.round.ClosedMiningRound.COMPANION,
+      // they'll be seen on the next poll.
+      closedRoundsWithoutCoupons <- listClosedMiningRoundsWithoutCouponsOnDomain(
         domain,
         limit,
       )
-      archivableClosedRounds <- MonadUtil.sequentialTraverse(closedRounds)(round => {
-        for {
-          appRewardCoupons <- listAppRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          validatorRewardCoupons <- listValidatorRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          validatorLivenessActivityRecords <- listValidatorLivenessActivityRecordsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          svRewardCoupons <- listSvRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit.tryCreate(1),
-          )
-          action = new ARC_AmuletRules(
-            new CRARC_MiningRound_Archive(
-              new AmuletRules_MiningRound_Archive(
-                round.contractId
-              )
+      archivableClosedRounds <- MonadUtil.sequentialTraverse(closedRoundsWithoutCoupons)(round => {
+        val action = new ARC_AmuletRules(
+          new CRARC_MiningRound_Archive(
+            new AmuletRules_MiningRound_Archive(
+              round.contractId
             )
           )
+        )
+        for {
           confirmationQueryResult <- lookupConfirmationByActionWithOffset(key.svParty, action)
         } yield {
-          (
-            // archivable if ...
-            if (
-              // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorLivenessActivityRecords.isEmpty && svRewardCoupons.isEmpty &&
-              // ... and a confirmation to archive is not already created by this SV
-              confirmationQueryResult.value.isEmpty
-            ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
-            else None
-          )
+          if (confirmationQueryResult.value.isEmpty)
+            Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
+          else None
         }
       })
     } yield archivableClosedRounds.flatten
