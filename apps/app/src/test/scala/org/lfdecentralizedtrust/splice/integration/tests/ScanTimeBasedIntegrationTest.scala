@@ -672,6 +672,25 @@ class ScanTimeBasedIntegrationTest
         .filter(isInTimeRange)
 
       updatesFromScan should contain theSameElementsAs updatesFromS3
+
+      // Compare acs v0 and v1 endpoints
+      val acsV1AtMidnightFromScan = sv1ScanBackend
+        .getAcsSnapshotAtV1(CantonTimestamp.assertFromInstant(lastMidnight), 0)
+        .value
+        .createdEvents
+
+      acsAtMidnightFromScan.zip(acsV1AtMidnightFromScan).foreach(
+        { case (v0, v1) =>
+          v0.contractId shouldBe v1.contractId
+          v0.templateId shouldBe v1.templateId
+          v0.packageName shouldBe v1.packageName
+          v0.createArguments shouldBe v1.createArguments
+          v0.createdAt shouldBe v1.createdAt
+          v0.signatories should contain theSameElementsInOrderAs v1.signatories
+          v0.observers should contain theSameElementsInOrderAs v1.observers
+        }
+      )
+
     }
   }
 }
