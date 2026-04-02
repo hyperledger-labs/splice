@@ -462,7 +462,7 @@ class ScanTimeBasedIntegrationTest
       .getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshot1.value.toInstant), 0)
       .value shouldBe snapshotAfter.value
 
-    val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
+    val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAtV1(
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
       migrationId,
       templates = Some(
@@ -479,7 +479,7 @@ class ScanTimeBasedIntegrationTest
     val atOrBefore = getLedgerTime
 
     // afOrBefore should return the same ACS snapshot as the exact time given by snapshotAfter
-    val snapshotAtOrBeforeAfterData = sv1ScanBackend.getAcsSnapshotAt(
+    val snapshotAtOrBeforeAfterData = sv1ScanBackend.getAcsSnapshotAtV1(
       CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
       migrationId,
       recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.AtOrBefore),
@@ -495,7 +495,7 @@ class ScanTimeBasedIntegrationTest
     snapshotAfterData shouldBe snapshotAtOrBeforeAfterData
     snapshotAtOrBeforeAfterData.value.recordTime shouldBe snapshotAfter.value
 
-    sv1ScanBackend.getAcsSnapshotAt(
+    sv1ScanBackend.getAcsSnapshotAtV1(
       CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
       migrationId,
       recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.Exact),
@@ -617,6 +617,7 @@ class ScanTimeBasedIntegrationTest
         .filter(_.endsWith(s"Migration-0-$lastMidnight/updates_0.zstd")) should not be empty
 
       // Compare bulk storage data to hot storage data from scan
+      // TODO(#4788): for now, bulk storage still uses v0, so we use that here as well
       val acsAtMidnightFromScan = sv1ScanBackend
         .getAcsSnapshotAt(CantonTimestamp.assertFromInstant(lastMidnight), 0)
         .value
