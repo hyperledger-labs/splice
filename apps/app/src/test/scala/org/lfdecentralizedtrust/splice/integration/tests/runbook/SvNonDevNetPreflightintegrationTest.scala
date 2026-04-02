@@ -90,9 +90,9 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
       go to scanUrl
       import scala.concurrent.duration.*
       eventually(3.minutes) {
-        val asOfRound = find(id("as-of-round")).value.text
-        asOfRound should startWith("The content on this page is computed as of round: ")
-        asOfRound should not be "The content on this page is computed as of round: --"
+        findAll(
+          className("open-mining-round-row")
+        ).length should be >= 2 withClue "open round table rows"
       }
     }
   }

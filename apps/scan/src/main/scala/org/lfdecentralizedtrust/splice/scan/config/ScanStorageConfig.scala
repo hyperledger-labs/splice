@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 }
 import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
-import java.time.{Duration, ZoneOffset}
+import java.time.{Duration, Instant, ZoneOffset}
 import java.time.temporal.{ChronoField, ChronoUnit}
 
 /** Note that these configurations must be kept consistent between SVs,
@@ -119,6 +119,33 @@ case class ScanStorageConfig(
       computeBulkSnapshotTimeAfter(segmentStartTimestamp.timestamp)
     )(_.timestamp)
     s"${segmentStartTimestamp.timestamp}-Migration-${segmentStartTimestamp.migrationId}-${endTimestamp}"
+  }
+
+  def getStartAndEndTimestampsForFolder(
+      folder: String
+  ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
+    val parts = folder.stripSuffix("/").split("-Migration-")
+    if (parts.length != 2) {
+      Left(
+        s"Cannot parse folder name: $folder (wrong number of parts after splitting by '-Migration-': ${parts.length})"
+      )
+    } else {
+      val folderStartStr = parts(0)
+      val parts2 = parts(1).split("-", 2)
+      if (parts2.length != 2) {
+        Left(
+          s"Cannot parse folder name: $folder (wrong number of parts when splitting ${parts(1)}: ${parts2.length})"
+        )
+      } else {
+        val folderEndStr = parts2(1)
+        for {
+          folderStart <- CantonTimestamp.fromInstant(Instant.parse(folderStartStr))
+          folderEnd <- CantonTimestamp.fromInstant(Instant.parse(folderEndStr))
+        } yield {
+          (folderStart, folderEnd)
+        }
+      }
+    }
   }
 
   def findSegmentFolderPrefixByStartTimestamp(

@@ -5,15 +5,17 @@ import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.util.HexString
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
@@ -31,12 +33,9 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.{
-  LogicalSynchronizerUpgradeSequencingTestTrigger,
-  LogicalSynchronizerUpgradeTrigger,
-}
-import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
@@ -110,19 +109,45 @@ class LogicalSynchronizerUpgradeIntegrationTest
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
-        ConfigTransforms
-          .bumpCantonSyncSuccessorPortsBy(22_000)
-          .andThen(
-            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
-              // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
-              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
-            )
-          )(config)
+        ConfigTransforms.bumpCantonSyncSuccessorPortsBy(22_000)(config)
       )
+      // use the standalone participant
+      .addConfigTransforms((_, config) => {
+        val bobValidatorConfig = config
+          .validatorApps(InstanceName.tryCreate("bobValidator"))
+        val updatedConfig = config.copy(
+          validatorApps = config.validatorApps + (
+            InstanceName.tryCreate("bobValidatorLocal") -> {
+              bobValidatorConfig
+            }
+          ),
+          walletAppClients = config.walletAppClients + (
+            InstanceName.tryCreate("bobValidatorWalletLocal") -> {
+              WalletAppClientConfig(
+                adminApi = NetworkAppClientConfig(
+                  s"http://${bobValidatorConfig.adminApi.clientConfig.endpointAsString}"
+                ),
+                ledgerApiUser = bobValidatorConfig.validatorWalletUsers.head,
+              )
+            }
+          ),
+        )
+        ConfigTransforms.bumpSomeValidatorAppCantonPortsBy(21_900, Seq("bobValidatorLocal"))(
+          updatedConfig
+        )
+      })
       .withAmuletPrice(walletAmuletPrice)
+      .withManualStart
 
   override def walletAmuletPrice: java.math.BigDecimal = SpliceUtil.damlDecimal(1.0)
+
+  private def bobValidatorLocal(implicit env: SpliceTestConsoleEnvironment) = {
+    v("bobValidatorLocal")
+  }
+
   "cancel a scheduled logical synchronizer upgrade" in { implicit env =>
+    initDso()
+    startAllSync(aliceValidatorBackend, splitwellValidatorBackend)
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(120)
 
@@ -274,13 +299,26 @@ class LogicalSynchronizerUpgradeIntegrationTest
     val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
       createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
     }
+
+    val bobValidatorWalletLocal = wc(
+      "bobValidatorWalletLocal"
+    )
+    clue("Start bob validator local, onboard and tap before upgrade") {
+      runBobValidatorWithStandaloneParticipant("before-upgrade")(
+        onboardUserAndTapAmulet(
+          bobValidatorLocal,
+          bobValidatorWalletLocal,
+        )
+      )
+    }
+
     val lateJoiningNode = sv4Nodes
     lateJoiningNode.par.foreach(_.stop())
     val topologyFreezeTime = CantonTimestamp.now()
     // We need to give enough time for the new Canton instance to startup
     // and finish sequencer initialization so we can then publish the sequencer announcement before the upgrade time.
-    val upgradeTime = CantonTimestamp.now().plusSeconds(120)
-    clue("Schedule logical synchronizer upgrade") {
+    val upgradeTime = CantonTimestamp.now().plusSeconds(150)
+    clue(s"Schedule logical synchronizer upgrade at $upgradeTime") {
       scheduleLsu(topologyFreezeTime, upgradeTime, newSynchronizerSerial.value.toLong)
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
@@ -359,14 +397,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .size should be >= topologyTransactionsOnTheSync
       }
 
-      clue("Validator connects to the new sequencers and sync topology") {
+      clue("Validator connects to the new sequencers and syncs topology") {
         eventually(60.seconds) {
           val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
           participantIsConnectedToNewSynchronizer(clientWithAdminToken, isSv4Connected = false)
         }
       }
 
-      clue("SVs connect to the new sequencers and sync topology") {
+      clue("SVs connect to the new sequencers and syncs topology") {
         allBackends.par.map { backend =>
           eventually() {
             participantIsConnectedToNewSynchronizer(
@@ -563,14 +601,59 @@ class LogicalSynchronizerUpgradeIntegrationTest
         sv1ScanBackend.startSync()
       }
 
+      clue("bob validator local upgrades after upgrade and can tap") {
+        runBobValidatorWithStandaloneParticipant("after-upgrade") {
+          eventually(60.seconds) {
+            bobValidatorLocal.participantClientWithAdminToken.synchronizers
+              .list_connected()
+              .loneElement
+              .physicalSynchronizerId
+              .serial shouldBe newSynchronizerSerial
+          }
+          bobValidatorWalletLocal.tap(20)
+          checkWallet(
+            bobValidatorLocal.getValidatorPartyId(),
+            bobValidatorWalletLocal,
+            Seq((70, 70)),
+          )
+          // TODO(DACH-NY/canton-network-internal#4426) move check before tap
+          eventually(60.seconds) {
+            participantIsConnectedToNewSynchronizer(
+              bobValidatorLocal.participantClientWithAdminToken,
+              isSv4Connected = true,
+            )
+          }
+        }
+      }
+
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
         // manually stop stuff as we destroy the new synchronizer as it runs in process
-        val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
+        val validators = Seq(aliceValidatorBackend, splitwellValidatorBackend)
         stopAllAsync(validators*).futureValue
         validators.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
         stopAllAsync(allNodes*).futureValue
         allBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
       }
+    }
+  }
+
+  private def runBobValidatorWithStandaloneParticipant(hint: String)(
+      run: => Unit
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    withCanton(
+      Seq(
+        testResourcesPath / "standalone-participant-extra.conf",
+        testResourcesPath / "standalone-participant-extra-no-auth.conf",
+      ),
+      Seq(),
+      s"lsu-bob-validator-$hint",
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> bobValidatorLocal.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_DB" -> s"participant_extra_$dbsSuffix",
+      ProcessTestUtil.javaToolOptionsKey -> "-Xms3g -Xmx3g",
+    ) {
+      bobValidatorLocal.startSync()
+      run
+      bobValidatorLocal.stop()
     }
   }
 

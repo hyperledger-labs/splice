@@ -539,6 +539,9 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationReader
         : ConfigReader[SvOnboardingConfig.DomainMigration] =
       deriveReader[SvOnboardingConfig.DomainMigration]
+    implicit val svOnboardingRollForwardLsuTimestampConfigReader
+        : ConfigReader[SvOnboardingConfig.RollForwardLsuTimestampConfig] =
+      deriveReader[SvOnboardingConfig.RollForwardLsuTimestampConfig]
     implicit val svOnboardingRollForwardLsuReader: ConfigReader[SvOnboardingConfig.RollForwardLsu] =
       deriveReader[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
@@ -988,6 +991,9 @@ object SpliceConfig {
     implicit val svOnboardingDomainMigrationWriter
         : ConfigWriter[SvOnboardingConfig.DomainMigration] =
       deriveWriter[SvOnboardingConfig.DomainMigration]
+    implicit val svOnboardingRollForwardLsuTimestampConfigWriter
+        : ConfigWriter[SvOnboardingConfig.RollForwardLsuTimestampConfig] =
+      deriveWriter[SvOnboardingConfig.RollForwardLsuTimestampConfig]
     implicit val svOnboardingRollForwardLsuWriter: ConfigWriter[SvOnboardingConfig.RollForwardLsu] =
       deriveWriter[SvOnboardingConfig.RollForwardLsu]
     implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =

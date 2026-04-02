@@ -16,6 +16,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
@@ -224,10 +225,17 @@ object SvOnboardingConfig {
     }
   }
 
-  case class RollForwardLsu(
+  final case class RollForwardLsuTimestampConfig(
+      topologyExportTime: CantonTimestamp,
+      trafficExportTime: CantonTimestamp,
+  )
+
+  final case class RollForwardLsu(
       name: String,
       newPhysicalSynchronizerSerial: NonNegativeInt,
-      newPhysicalSynchronizerprotocolVersion: ProtocolVersion,
+      newPhysicalSynchronizerProtocolVersion: ProtocolVersion,
+      // If unset, we assume there is an LsuAnnouncement.
+      exportTimes: Option[RollForwardLsuTimestampConfig],
   ) extends SvOnboardingConfig
 }
 
@@ -356,6 +364,7 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    delegatelessAutomationExpiredAmuletTransferInstructionBatchSize: Int = 100,
     // configuration to periodically take topology snapshots
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,

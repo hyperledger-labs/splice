@@ -173,4 +173,11 @@ Missing successor information for the following sequencers.*sv4
 # We don't use the onboarding flag clearance atm.
 Skipping insertion of pending onboarding flag clearance operation as no party ID was provided
 
+# SV4 migrates late
+SEQ::sv4.*Sequencer can't take requests because it is behind on processing events
+
+# Triggered by roll-forward LSU test
+No sequencer successor was found
+P2P connectivity is not ready
+
 # Make sure to have a trailing newline

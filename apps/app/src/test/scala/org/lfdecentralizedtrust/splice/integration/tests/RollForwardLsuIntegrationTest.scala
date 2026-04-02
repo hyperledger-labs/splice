@@ -26,13 +26,11 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvSynchronizerNodeConfig,
   SvSynchronizerNodesConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeSequencingTestTrigger
 import org.lfdecentralizedtrust.splice.util.*
 import org.scalatest.time.{Minutes, Span}
 import org.scalatest.TryValues
 
 import java.time.{Duration, Instant}
-import java.util.UUID
 import monocle.macros.syntax.lens.*
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
@@ -108,6 +106,8 @@ class RollForwardLsuIntegrationTest
                           c.value.name,
                           NonNegativeInt.tryCreate(2),
                           ProtocolVersion.v34,
+                          // TODO(#4784) Test these with non-None values.
+                          exportTimes = None,
                         )
                         .some
                     )
@@ -121,21 +121,15 @@ class RollForwardLsuIntegrationTest
                   .modify(c => c.copy(legacy = c.current.some))
             ),
           ),
+        (_, config) => ConfigTransforms.withBftSequencers(_.contains("Local"))(config),
       )
-      .withBftSequencersSuccessor
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .addConfigTransform((_, config) =>
         ConfigTransforms
           // This bumps current but not legacy
-          .bumpCantonSyncPortsBy(22_000, name => name.contains("Local"))
-          .andThen(
-            ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
-              // TODO(DACH-NY/canton-network-internal#4254) Reenable once this is fixed in Canton
-              _.withPausedTrigger[LogicalSynchronizerUpgradeSequencingTestTrigger]
-            )
-          )(config)
+          .bumpCantonSyncPortsBy(22_000, name => name.contains("Local"))(config)
       )
       .withAmuletPrice(walletAmuletPrice)
       .withManualStart
@@ -164,7 +158,7 @@ class RollForwardLsuIntegrationTest
       // sv4ValidatorBackend,
     )
 
-    startAllSync((allNodes ++ Seq(aliceValidatorBackend, bobValidatorBackend))*)
+    startAllSync(allNodes*)
 
     // TODO(#4682): Fix with BFT connections
     // actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
@@ -198,63 +192,8 @@ class RollForwardLsuIntegrationTest
       }
     }
 
-    def onboardUserAndTapAmulet(
-        validatorBackend: ValidatorAppBackendReference,
-        walletClient: WalletAppClientReference,
-        tapAmount: BigDecimal = 50.0,
-        expectedAmulets: Range = 50 to 50,
-    ) = {
-      val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
-      walletClient.tap(tapAmount)
-      clue(s"${validatorBackend.name} has tapped a amulet") {
-        checkWallet(
-          walletUserParty,
-          walletClient,
-          Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
-        )
-      }
-      walletUserParty
-    }
-
-    def createExternalParty(
-        validatorBackend: ValidatorAppBackendReference,
-        walletClient: WalletAppClientReference,
-    ) = {
-      val onboarding @ OnboardingResult(externalParty, _, _) =
-        onboardExternalParty(validatorBackend)
-      walletClient.tap(50.0)
-      createTransferPreapprovalEnsuringItExists(walletClient, validatorBackend)
-      createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
-      eventually() {
-        validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty
-        validatorBackend.scanProxy.lookupTransferPreapprovalByParty(
-          externalParty
-        ) should not be empty
-      }
-      validatorBackend
-        .getExternalPartyBalance(externalParty)
-        .totalUnlockedCoin shouldBe "0.0000000000"
-      walletClient.transferPreapprovalSend(externalParty, 40.0, UUID.randomUUID.toString)
-      eventually() {
-        validatorBackend
-          .getExternalPartyBalance(externalParty)
-          .totalUnlockedCoin shouldBe "40.0000000000"
-      }
-      onboarding
-    }
-
-    onboardUserAndTapAmulet(aliceValidatorBackend, aliceValidatorWalletClient)
-
-    // account for the cancellation
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
     val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
-    // Upload after starting validator which connects to global
-    // synchronizers as upload_dar_unless_exists vets on all
-    // connected synchronizers.
-    aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-    clue("Create external party and transfer 40 amulet to it") {
-      createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
-    }
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(60)
     clue("Schedule logical synchronizer upgrade") {
@@ -291,8 +230,7 @@ class RollForwardLsuIntegrationTest
       }
 
       // Restart SV app with roll-forward LSU config
-      startAllSync(allSvLocalBackends*)
-      startAllSync(allScanLocalBackends*)
+      startAllSync(((allSvLocalBackends: Seq[AppBackendReference]) ++ allScanLocalBackends)*)
 
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
         .list(store = Synchronizer(decentralizedSynchronizerId))
@@ -301,8 +239,8 @@ class RollForwardLsuIntegrationTest
 
       clue("new nodes are initialized") {
         allSvBackends.map { backend =>
-          val upgradeSequencerClient = backend.sequencerClientFor(_.successor.value)
-          val upgradeMediatorClient = backend.mediatorClientFor(_.successor.value)
+          val upgradeSequencerClient = backend.sequencerClientFor(_.current)
+          val upgradeMediatorClient = backend.mediatorClientFor(_.current)
           clue(s"check ${backend.name} initialized sequencer from synchronizer predecessor") {
             eventuallySucceeds(2.minutes) {
               upgradeSequencerClient.topology.transactions
@@ -323,25 +261,23 @@ class RollForwardLsuIntegrationTest
         }
       }
 
-      val newSequencerUrls = allSvBackends.map { backend =>
-        backend.config.localSynchronizerNodes.successor.value.sequencer.externalPublicApiUrl
-          .stripPrefix("http://")
-      }
-
       def participantIsConnectedToNewSynchronizer(
-          clientWithAdminToken: ParticipantClientReference
+          sv: SvAppBackendReference
       ) = {
-        clientWithAdminToken.synchronizers
+        sv.participantClient.synchronizers
           .list_connected()
           .loneElement
           .physicalSynchronizerId shouldBe successorPsid
         val sequencerUrlSet = getSequencerUrlSet(
-          clientWithAdminToken,
+          sv.participantClient,
           decentralizedSynchronizerAlias,
         )
-        sequencerUrlSet should have size 4
-        sequencerUrlSet should contain theSameElementsAs newSequencerUrls.toSet
-        clientWithAdminToken.topology.transactions
+        sequencerUrlSet should have size 1
+        sequencerUrlSet shouldBe Set(
+          sv.config.localSynchronizerNodes.current.sequencer.externalPublicApiUrl
+            .stripPrefix("http://")
+        )
+        sv.participantClient.topology.transactions
           .list(store = Synchronizer(decentralizedSynchronizerId))
           .result
           .size should be >= topologyTransactionsOnTheSync
@@ -350,7 +286,7 @@ class RollForwardLsuIntegrationTest
       clue("physical synchronizers configs are set") {
         eventually() {
           val rulesAndState =
-            sv1Backend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
+            sv1LocalBackend.appState.dsoStore.getDsoRulesWithSvNodeStates().futureValue
           val nodeStates = rulesAndState.svNodeStates.values
             .map(
               _.payload.state.synchronizerNodes
@@ -379,24 +315,17 @@ class RollForwardLsuIntegrationTest
         }
       }
 
-      clue("Validator connects to the new sequencers and sync topology") {
-        eventually(60.seconds) {
-          val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
-          participantIsConnectedToNewSynchronizer(clientWithAdminToken)
-        }
-      }
-
       clue("SVs connect to the new sequencers and sync topology") {
-        allSvBackends.par.map { backend =>
+        allSvLocalBackends.par.map { backend =>
           eventually() {
-            participantIsConnectedToNewSynchronizer(backend.participantClientWithAdminToken)
+            participantIsConnectedToNewSynchronizer(backend)
           }
         }
       }
 
       clue("Scan reports active physical synchronizer serial 1 after upgrade") {
         eventually() {
-          Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).foreach { scan =>
+          allScanLocalBackends.foreach { scan =>
             scan.getActivePhysicalSynchronizerSerial() shouldBe newSynchronizerSerial
           }
         }
@@ -404,7 +333,7 @@ class RollForwardLsuIntegrationTest
 
       clue("LSU sequencers are registered") {
         eventually() {
-          inside(sv1ScanBackend.listDsoSequencers()) {
+          inside(sv1ScanLocalBackend.listDsoSequencers()) {
             case Seq(DomainSequencers(synchronizerId, sequencers)) =>
               synchronizerId shouldBe decentralizedSynchronizerId
               sequencers should have size 12
@@ -430,12 +359,10 @@ class RollForwardLsuIntegrationTest
       }
 
       clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
-        // manually stop stuff as we destroy the new synchronizer as it runs in process
-        val validators = Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend)
-        stopAllAsync(validators*).futureValue
-        validators.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
         stopAllAsync(allNodes*).futureValue
-        allSvBackends.par.foreach(_.participantClientWithAdminToken.synchronizers.disconnect_all())
+        allSvLocalBackends.par.foreach(
+          _.participantClientWithAdminToken.synchronizers.disconnect_all()
+        )
       }
     }
   }

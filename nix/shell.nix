@@ -1,4 +1,4 @@
-{ pkgs, x86Pkgs, npmPkgs, variant }:
+{ pkgs, x86Pkgs, variant }:
 let
   use_enterprise = if variant == "enterprise" then true else false;
   inherit (pkgs) stdenv fetchzip;
@@ -43,8 +43,6 @@ let
     lnav
     nix
     nodejs
-    nodePackages.node2nix
-    npmPkgs.syncpack
     openapi-generator-cli
     openjdk21
     pigz
@@ -125,7 +123,6 @@ let
     hub # Github CLI for todo checker
     jq
     nodejs
-    npmPkgs.syncpack
     openapi-generator-cli
     pre-commit
     python3

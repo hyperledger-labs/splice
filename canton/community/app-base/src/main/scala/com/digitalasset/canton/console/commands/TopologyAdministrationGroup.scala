@@ -794,7 +794,7 @@ class TopologyAdministrationGroup(
 
         def call: ConsoleCommandResult[Context.CancellableContext] =
           adminCommand(
-            TopologyAdminCommands.Read.SequencerLsuState(topologyStore, fileStreamObserver)
+            TopologyAdminCommands.Read.SequencerLsuState(topologyStore, None, fileStreamObserver)
           )
 
         processResult(

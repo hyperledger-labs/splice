@@ -1,3 +1,4 @@
+org.lfdecentralizedtrust.splice.admin.api.HttpRequestLoggerTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest

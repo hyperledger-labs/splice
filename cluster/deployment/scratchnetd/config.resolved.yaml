@@ -222,7 +222,10 @@ sv:
           name: 'featured-apps'
           type: 'unlimited'
         /api/scan/v0/history/bulk/acs:
-          name: 'getBulkAcsSnapshot'
+          name: 'listBulkAcsSnapshotObjects'
+          type: 'unlimited'
+        /api/scan/v0/history/bulk/updates:
+          name: 'listBulkUpdateHistoryObjects'
           type: 'unlimited'
         /api/scan/v0/holdings:
           name: 'holdings'
@@ -373,9 +376,6 @@ svs:
           cpu: '1'
           memory: '2Gi'
     svApp:
-      additionalEnvVars:
-        - name: 'ADDITIONAL_CONFIG_PAUSED_LSU_HEALTH_TRIGGER'
-          value: "canton.sv-apps.sv.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeIntegrationTest\"\n"
       resources:
         limits:
           cpu: '3'

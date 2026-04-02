@@ -62,6 +62,9 @@ class DsoDelegateBasedAutomationService(
 
     registerTrigger(new ExpiredAmuletTrigger(config, triggerContext, svTaskContext))
     registerTrigger(new ExpiredLockedAmuletTrigger(config, triggerContext, svTaskContext))
+    registerTrigger(
+      new ExpiredAmuletTransferInstructionTrigger(config, clock, triggerContext, svTaskContext)
+    )
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
@@ -148,6 +151,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[MergeMemberTrafficContractsTrigger],
     aTrigger[ExpiredAmuletTrigger],
     aTrigger[ExpiredLockedAmuletTrigger],
+    aTrigger[ExpiredAmuletTransferInstructionTrigger],
     aTrigger[ExpiredSvOnboardingRequestTrigger],
     aTrigger[CloseVoteRequestTrigger],
     aTrigger[ExpiredSvOnboardingConfirmedTrigger],

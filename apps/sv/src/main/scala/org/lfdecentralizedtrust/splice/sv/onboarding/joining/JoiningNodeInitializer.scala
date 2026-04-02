@@ -624,7 +624,7 @@ class JoiningNodeInitializer(
         if (mediatorTrafficState.extraTrafficLimit != unlimitedTraffic)
           throw Status.FAILED_PRECONDITION
             .withDescription(
-              show"SV mediator $participantId does not have unlimited traffic on synchronizer $synchronizerId"
+              show"SV mediator $mediatorId does not have unlimited traffic on synchronizer $synchronizerId"
             )
             .asRuntimeException()
         ()

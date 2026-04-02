@@ -40,7 +40,7 @@ export function pickTwoRandom(nums: number): [number, number] {
 export function pickTwoRandomUsers(validators: ValidatorConf[]): {
   adminClient: ValidatorClient;
   senderClient: ValidatorClient;
-  receipientClient: ValidatorClient;
+  recipientClient: ValidatorClient;
 } {
   if (validators.length > 1) {
     // Pick two random available validators
@@ -50,17 +50,31 @@ export function pickTwoRandomUsers(validators: ValidatorConf[]): {
     const validator2 = validators[validator2Index];
 
     // Pick two random users from the validators
-    const senderToken = randomItem(validator1.userTokens);
-    const recipientToken = randomItem(validator2.userTokens);
+    const senderIndex = randomIntBetween(0, validator1.userTokens.length - 1);
+    const recipientIndex = randomIntBetween(0, validator2.userTokens.length - 1);
 
-    const adminClient = new ValidatorClient(validator1.walletBaseUrl, validator1.adminToken);
-    const senderClient = new ValidatorClient(validator1.walletBaseUrl, senderToken);
-    const receipientClient = new ValidatorClient(validator2.walletBaseUrl, recipientToken);
+    const senderToken = validator1.userTokens[senderIndex];
+    const recipientToken = validator2.userTokens[recipientIndex];
 
-    return { adminClient, senderClient, receipientClient };
+    const senderFeatured = validator1.userFeatured[senderIndex];
+    const recipientFeatured = validator2.userFeatured[recipientIndex];
+
+    const adminClient = new ValidatorClient(
+      validator1.walletBaseUrl,
+      validator1.adminToken,
+      undefined,
+    );
+    const senderClient = new ValidatorClient(validator1.walletBaseUrl, senderToken, senderFeatured);
+    const recipientClient = new ValidatorClient(
+      validator2.walletBaseUrl,
+      recipientToken,
+      recipientFeatured,
+    );
+
+    return { adminClient, senderClient, recipientClient };
   } else {
     const validatorConf: ValidatorConf = validators[0];
-    const { adminToken, walletBaseUrl, userTokens } = validatorConf;
+    const { adminToken, walletBaseUrl, userTokens, userFeatured } = validatorConf;
 
     // Pick two random users from that validator
     const [senderIndex, recipientIndex] = pickTwoRandom(userTokens.length);
@@ -68,11 +82,14 @@ export function pickTwoRandomUsers(validators: ValidatorConf[]): {
     const senderToken = userTokens[senderIndex];
     const recipientToken = userTokens[recipientIndex];
 
-    const adminClient = new ValidatorClient(walletBaseUrl, adminToken);
-    const senderClient = new ValidatorClient(walletBaseUrl, senderToken);
-    const receipientClient = new ValidatorClient(walletBaseUrl, recipientToken);
+    const senderFeatured = userFeatured[senderIndex];
+    const recipientFeatured = userFeatured[recipientIndex];
 
-    return { adminClient, senderClient, receipientClient };
+    const adminClient = new ValidatorClient(walletBaseUrl, adminToken, undefined);
+    const senderClient = new ValidatorClient(walletBaseUrl, senderToken, senderFeatured);
+    const recipientClient = new ValidatorClient(walletBaseUrl, recipientToken, recipientFeatured);
+
+    return { adminClient, senderClient, recipientClient };
   }
 }
 
