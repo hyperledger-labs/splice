@@ -1352,7 +1352,11 @@
           "type": "unlimited"
         },
         "/api/scan/v0/history/bulk/acs": {
-          "name": "getBulkAcsSnapshot",
+          "name": "listBulkAcsSnapshotObjects",
+          "type": "unlimited"
+        },
+        "/api/scan/v0/history/bulk/updates": {
+          "name": "listBulkUpdateHistoryObjects",
           "type": "unlimited"
         },
         "/api/scan/v0/holdings": {
@@ -1595,7 +1599,11 @@
           "type": "unlimited"
         },
         "/api/scan/v0/history/bulk/acs": {
-          "name": "getBulkAcsSnapshot",
+          "name": "listBulkAcsSnapshotObjects",
+          "type": "unlimited"
+        },
+        "/api/scan/v0/history/bulk/updates": {
+          "name": "listBulkUpdateHistoryObjects",
           "type": "unlimited"
         },
         "/api/scan/v0/holdings": {
@@ -2286,6 +2294,10 @@
           {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
             "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
+            "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -3232,6 +3244,10 @@
           {
             "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
             "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
+            "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",

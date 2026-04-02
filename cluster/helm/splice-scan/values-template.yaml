@@ -74,3 +74,7 @@ logLevel: DEBUG
 #     endpoint:
 #     secretName:
 # publicUrl:
+
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
+enableReloader: true
+

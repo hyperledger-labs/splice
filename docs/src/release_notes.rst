@@ -29,27 +29,34 @@
 
     - SV and Validator app
 
-    - Going forward unusable splice DARs will be automatically unvetted by the super validators.
-      This will be used for DARs that can already not be used,
-      e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
+        - Going forward unusable splice DARs will be automatically unvetted by the super validators.
+          This will be used for DARs that can already not be used,
+          e.g., because a downgrade of AmuletRules to that version is not possible so it does not force more aggressive upgrades for validators or app devs.
 
-      The minimum supported versions are:
+          The minimum supported versions are:
 
-         ================== =======
-         name               version
-         ================== =======
-         amulet             0.1.14
-         amuletNameService  0.1.14
-         dsoGovernance      0.1.19
-         validatorLifecycle 0.1.5
-         wallet             0.1.14
-         walletPayments     0.1.14
-         ================== =======
+             ================== =======
+             name               version
+             ================== =======
+             amulet             0.1.14
+             amuletNameService  0.1.14
+             dsoGovernance      0.1.19
+             validatorLifecycle 0.1.5
+             wallet             0.1.14
+             walletPayments     0.1.14
+             ================== =======
 
     - Scan
 
        - Added a new ``/v1/domains/{domain_id}/parties/{party_id}/participant-id`` endpoint that returns all participant IDs hosting a given party,
          supporting parties hosted on multiple participants. The previous ``/v0`` endpoint only supported single-participant hosting.
+
+       - Added an optional ``external_transaction_hash`` field to the response of ``GET /v1/updates/{update-id}``, ``GET /v2/updates/{update-id}``,  GET ``/v1/updates``, and GET ``/v2/updates`` endpoints. While currently not set, this field will eventually include the transaction hashes signed by external parties.
+
+       - **Experimental**: Added an optional ``app_activity_records`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints. This is currently never set but will eventually include traffic summaries and app activity records are included alongside verdicts in event history items.
+         This is part of the CIP-104 preview and is subject to change.
+         App activity record computation will be enabled step-by-step on Dev/Test/MainNet,
+         once the SVs have successfully concluded their performance testing.
 
     - SV UI
 
@@ -61,14 +68,6 @@
          synchronizer is active. To enable the second synchronizer called ``app-synchronizer``, start LocalNet with the ``multi-sync`` Docker
          Compose profile (``--profile multi-sync``). The ``app-provider`` and ``app-user`` participant nodes are cross-connected to both
          synchronizers. See :ref:`multi-sync-localnet` for details.
-
-     - Scan
-
-       - **Experimental**: Add an optional ``app_activity_records`` field to the response of ``GET /v0/events/{update-id}`` and ``POST /v0/events`` endpoints. This is currently never set but will eventually include traffic summaries and app activity records are included alongside verdicts in event history items.
-         This is part of the CIP-104 preview and is subject to change.
-
-         App activity record computation will be enabled step-by-step on Dev/Test/MainNet,
-         once the SVs have successfully concluded their performance testing.
 
 .. release-notes:: 0.5.16
 
@@ -3887,7 +3886,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   * The Canton Coin Scan app is now being deployed as part of the SV node in our runbook.
     See instructions for deploying the ``cn-scan`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
     and two new required ingress rules in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
-    Section :ref:`Using the Canton Coin Scan UI <helm-scan-web-ui>` explains the UI.
+    Section "Using the Canton Coin Scan UI" explains the UI.
     Note that not all fields in the Scan UI are hooked up to fetch data in the backend yet.
     Ones that should work at this point are the as-of round in the top-right corner, and the Validator and App leaderboards.
 

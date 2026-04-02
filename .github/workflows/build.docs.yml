@@ -25,6 +25,7 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
+          cache_version: 7
           test_name: docs
           save_nix_cache: true
           save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}

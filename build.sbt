@@ -978,6 +978,7 @@ lazy val `apps-common` =
         kubernetes_client,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
+        CantonDependencies.pekko_http_testkit % Test,
         scalapb_runtime_grpc,
         scalapb_runtime,
         scalapb_json4,
@@ -1861,7 +1862,12 @@ runShellcheck := {
 lazy val syncpackCheck = taskKey[Unit]("Check all apps' package.json dependency versions match")
 syncpackCheck := {
   val log = streams.value.log
-  runCommand(Seq("syncpack", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
+  runCommand(
+    Seq("npx", "--yes", "syncpack@10.1.0", "list-mismatches"),
+    log,
+    None,
+    Some(baseDirectory.value / "apps"),
+  )
 }
 
 lazy val illegalDamlReferencesCheck =

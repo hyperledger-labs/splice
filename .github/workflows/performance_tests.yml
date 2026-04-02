@@ -34,6 +34,7 @@ jobs:
         id: setup
         uses: ./splice-shared-gha/.github/actions/tests/common_test_setup
         with:
+          cache_version: 7
           test_name: oss
           target: 'oss'
 
@@ -47,6 +48,9 @@ jobs:
           additional_nix_args: "--keep PERFORMANCE_TESTS_DB_PASSWORD --keep PERFORMANCE_TESTS_DB_HOST --keep PERFORMANCE_TESTS_DB_USER"
           extra_env_vars: 'POSTGRES_HOST="$PERFORMANCE_TESTS_DB_HOST" POSTGRES_USER="$PERFORMANCE_TESTS_DB_USER" POSTGRES_PASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD"'
           pre_sbt_cmd: |
+            echo "Clearing stale metrics files"
+            rm -rf /tmp/store-ingestion-perf-metrics
+
             echo "Clearing database"
             PGPASSWORD="$PERFORMANCE_TESTS_DB_PASSWORD" psql \
               -h"$PERFORMANCE_TESTS_DB_HOST" \
@@ -59,6 +63,11 @@ jobs:
             curl -sSL --fail-with-body "https://storage.googleapis.com/mainnet-history-dumps/mainnetupdates.json" -o /tmp/mainnetupdates.json
             ls -lah /tmp/mainnetupdates.json
           cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t * -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
+
+      - name: Push metrics to Prometheus Pushgateway
+        if: ${{ success() }}
+        run: |
+          python3 scripts/performance/push_store_ingestion_perf_metrics.py
 
       # sanity check
       - name: Check logs for errors
@@ -85,4 +94,3 @@ jobs:
           service_account: "${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}"
           notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
           slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
-

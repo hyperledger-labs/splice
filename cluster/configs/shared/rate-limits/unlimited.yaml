@@ -182,7 +182,11 @@ rateLimits:
     type: unlimited
 
   /api/scan/v0/history/bulk/acs:
-    name: getBulkAcsSnapshot
+    name: listBulkAcsSnapshotObjects
+    type: unlimited
+
+  /api/scan/v0/history/bulk/updates:
+    name: listBulkUpdateHistoryObjects
     type: unlimited
 
   # TODO(#3429): This currently fails with "Orphaned rate limit prefixes not matching any scan.yaml endpoint",

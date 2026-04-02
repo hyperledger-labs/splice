@@ -1,0 +1,70 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: traffic-based-rewards
+    folder: canton-network
+    interval: 5m
+    rules:
+      - uid: afht9v3djz2tcf
+        title: Number of featured app rights
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (namespace)(pg_stat_user_tables_n_live_tup{relname="scan_rewards_reference_store_active"})
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 10000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: "00000039"
+        panelId: 74
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          __dashboardUid__: "00000039"
+          __panelId__: "74"
+          description: |
+            Scan rewards reference store on namespace {{ $labels.namespace }} has too many live rows,
+            which is likely because there are too many featured app right contracts.
+            This may become a problem as the app activity record computation loads
+            all featured app right contracts at round start into memory at once.
+
+            Please investigate the reason for there being that many active featured
+            app right contracts and determine the best course of action.
+            (Note: bumping the alert limit may be OK, if the Scan app has enough memory available.)
+          severity: warning
+          summary: Scan rewards reference store on namespace {{ $labels.namespace }} has too many live rows.
+        labels: {}
+        isPaused: false
