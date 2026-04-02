@@ -3,7 +3,7 @@ groups:
   - orgId: 1
     name: traffic-based-rewards
     folder: canton-network
-    interval: 1m
+    interval: 5m
     rules:
       - uid: afht9v3djz2tcf
         title: Number of featured app rights
@@ -55,7 +55,15 @@ groups:
         annotations:
           __dashboardUid__: "00000039"
           __panelId__: "74"
-          description: Scan rewards reference store on namespace {{ $labels.namespace }} has too many live rows. Check the number of active featured app right contracts.
+          description: |
+            Scan rewards reference store on namespace {{ $labels.namespace }} has too many live rows,
+            which is likely because there are too many featured app right contracts.
+            This may become a problem as the app activity record computation loads
+            all featured app right contracts at round start into memory at once.
+
+            Please investigate the reason for there being that many active featured
+            app right contracts and determine the best course of action.
+            (Note: bumping the alert limit may be OK, if the Scan app has enough memory available.)
           severity: warning
           summary: Scan rewards reference store on namespace {{ $labels.namespace }} has too many live rows.
         labels: {}
