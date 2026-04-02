@@ -24,16 +24,26 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSin
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 
 import io.circe.Json
+import java.lang.management.ManagementFactory
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 final case class StoreIngestionPerfMetrics(
     totalItems: Long,
     totalBatches: Long,
     totalTimeNs: BigDecimal,
+    processCpuTimeNs: BigDecimal,
+    userCpuTimeNs: BigDecimal,
+    kernelCpuTimeNs: BigDecimal,
+    gcTimeMs: BigDecimal,
+    peakHeapBytes: BigDecimal,
 ) {
   def avgItemTimeNs: BigDecimal =
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
+
+  /** Wall-clock time minus CPU time: time spent waiting for I/O (DB writes, network, OS scheduling). */
+  def waitTimeNs: BigDecimal = totalTimeNs - processCpuTimeNs
 }
 
 abstract class StoreIngestionPerformanceTest(
@@ -136,6 +146,12 @@ abstract class StoreIngestionPerformanceTest(
     var totalTimeNs = BigDecimal(0)
     var totalItems = 0L
     var totalBatches = 0L
+    var totalCpuNs = BigDecimal(0)
+    var totalUserCpuNs = BigDecimal(0)
+    var totalKernelCpuNs = BigDecimal(0)
+    var totalGcMs = BigDecimal(0)
+    var maxHeapBytes = BigDecimal(0)
+
     Source
       .fromIterator(() => txs.iterator)
       .batch(ingestionConfig.maxBatchSize.toLong, Vector(_))(_ :+ _)
@@ -149,13 +165,25 @@ abstract class StoreIngestionPerformanceTest(
       .zipWithIndex
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
-        val before = System.nanoTime()
+        val wallBefore = System.nanoTime()
+        val cpuBefore = getProcessCpuTimeNs
+        val (userBefore, kernelBefore) = getUserAndKernelCpuTimeNs
+        val gcBefore = getTotalGcTimeMs
         store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
-            val after = System.nanoTime()
-            val duration = after - before
+            val wallAfter = System.nanoTime()
+            val cpuAfter = getProcessCpuTimeNs
+            val (userAfter, kernelAfter) = getUserAndKernelCpuTimeNs
+            val gcAfter = getTotalGcTimeMs
+            val duration = wallAfter - wallBefore
             totalTimeNs += duration
+            totalCpuNs += (cpuAfter - cpuBefore)
+            totalUserCpuNs += (userAfter - userBefore)
+            totalKernelCpuNs += (kernelAfter - kernelBefore)
+            totalGcMs += (gcAfter - gcBefore)
+            val heapNow = getHeapUsedBytes
+            maxHeapBytes = maxHeapBytes.max(heapNow)
             totalItems += batch.length
             totalBatches += 1
             val avg = totalTimeNs / totalItems
@@ -165,13 +193,72 @@ abstract class StoreIngestionPerformanceTest(
             println(s"${this.getClass.getName}: $msg")
           }
       })
-      .map(_ =>
+      .map { _ =>
+        println(
+          f"Process-level metrics: CPU time=${totalCpuNs / 1e6}%.2f ms (user=${totalUserCpuNs / 1e6}%.2f ms, kernel=${totalKernelCpuNs / 1e6}%.2f ms), GC time=$totalGcMs ms, peak heap=$maxHeapBytes bytes"
+        )
+
         StoreIngestionPerfMetrics(
           totalItems = totalItems,
           totalBatches = totalBatches,
           totalTimeNs = totalTimeNs,
+          processCpuTimeNs = totalCpuNs,
+          userCpuTimeNs = totalUserCpuNs,
+          kernelCpuTimeNs = totalKernelCpuNs,
+          gcTimeMs = totalGcMs,
+          peakHeapBytes = maxHeapBytes,
         )
+      }
+  }
+
+  /** Process-wide CPU time in nanoseconds (all cores combined).
+    * Returns -1 if unavailable.
+    */
+  private def getProcessCpuTimeNs: BigDecimal = {
+    ManagementFactory.getOperatingSystemMXBean match {
+      case sunBean: com.sun.management.OperatingSystemMXBean =>
+        BigDecimal(sunBean.getProcessCpuTime)
+      case _ => BigDecimal(-1)
+    }
+  }
+
+  /** Process-wide user and kernel CPU time in nanoseconds.
+    *
+    * User time: The sum of all live threads' user-mode CPU time (via ThreadMXBean).
+    * Kernel time: Derived as `processCpuTime - userTime`.
+    * Returns (0, 0) if thread CPU time measurement is unsupported.
+    */
+  private def getUserAndKernelCpuTimeNs: (BigDecimal, BigDecimal) = {
+    val threadBean = ManagementFactory.getThreadMXBean
+    if (threadBean.isThreadCpuTimeSupported && threadBean.isThreadCpuTimeEnabled) {
+      val userNs = BigDecimal(
+        threadBean.getAllThreadIds
+          .map(id => threadBean.getThreadUserTime(id))
+          .filter(_ >= 0)
+          .sum
       )
+      val processCpu = getProcessCpuTimeNs
+      val kernelNs =
+        if (processCpu >= 0) (processCpu - userNs).max(BigDecimal(0)) else BigDecimal(0)
+      (userNs, kernelNs)
+    } else {
+      (BigDecimal(0), BigDecimal(0))
+    }
+  }
+
+  /** Total GC collection time across all collectors in milliseconds. */
+  private def getTotalGcTimeMs: BigDecimal = {
+    BigDecimal(
+      ManagementFactory.getGarbageCollectorMXBeans.asScala
+        .map(_.getCollectionTime)
+        .filter(_ >= 0)
+        .sum
+    )
+  }
+
+  /** Process-wide current heap memory usage in bytes (point-in-time snapshot). */
+  private def getHeapUsedBytes: BigDecimal = {
+    BigDecimal(ManagementFactory.getMemoryMXBean.getHeapMemoryUsage.getUsed)
   }
 
   /** A separate Python script pushes the metrics to Prometheus Pushgateway.
@@ -211,6 +298,36 @@ abstract class StoreIngestionPerformanceTest(
             BigDecimal(completionEpochSec),
           ),
           metric("success", "Test run succeeded (1) or failed (0)", BigDecimal(successInt)),
+          metric(
+            "process_cpu_time_ns",
+            "Process-wide CPU time in nanoseconds (all cores combined)",
+            metrics.processCpuTimeNs,
+          ),
+          metric(
+            "user_cpu_time_ns",
+            "User-mode CPU time in nanoseconds (all threads combined)",
+            metrics.userCpuTimeNs,
+          ),
+          metric(
+            "kernel_cpu_time_ns",
+            "Kernel CPU time in nanoseconds (process CPU minus user CPU)",
+            metrics.kernelCpuTimeNs,
+          ),
+          metric(
+            "gc_time_ms",
+            "Total garbage collection time in milliseconds",
+            metrics.gcTimeMs,
+          ),
+          metric(
+            "peak_heap_bytes",
+            "Peak JVM heap memory usage in bytes observed across all ingestion batches",
+            metrics.peakHeapBytes,
+          ),
+          metric(
+            "wait_time_ns",
+            "Time spent waiting for I/O in nanoseconds (wall-clock minus CPU time)",
+            metrics.waitTimeNs,
+          ),
         ),
       )
       .spaces2
