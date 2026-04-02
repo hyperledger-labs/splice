@@ -130,6 +130,7 @@ trait ParticipantAdminDarsConnection {
     }
   }
 
+  // TODO(https://github.com/hyperledger-labs/splice/issues/4803): unvet dependencies
   def unvetDars(
       synchronizerId: SynchronizerId,
       dars: Seq[DarResource],

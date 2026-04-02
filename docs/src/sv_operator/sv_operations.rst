@@ -852,10 +852,15 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
 Unvet unsecure package versions
 -------------------------------
 
-This is mainly used to downgrade to previous versions in case of major issues.
-Do not use it if not advised to do so; unvetting a package changes the vetting state for all SVs.
+This mechanism is primarily used to downgrade to previous versions in the event of major issues.
 
-In order to unvet supported packages, you should set the following:
+To unvet supported packages, all SVs must set the following environment variable in their SV and validator configurations.
+Only supported versions strictly after the minimal initialization version can be unvetted.
+
+Once all SVs apply the identical unvet configuration, the unvetting will take effect within a short period (up to 30 minutes).
+If all SVs remove a supported package from this configuration, the package will be vetted again.
+
+Here an example of how to unvet specific versions of a package:
 
   .. code-block:: yaml
 
@@ -864,3 +869,7 @@ In order to unvet supported packages, you should set the following:
          value: |
            canton.sv-apps.sv.additional-packages-to-unvet.splice-package-1 = ["0.1.16"]
            canton.sv-apps.sv.additional-packages-to-unvet.splice-package-2 = ["0.1.18", "0.1.19"]
+
+.. note::
+
+  Unvetting is only supported for SVs and SV validators and does not unvet dependencies for now.
