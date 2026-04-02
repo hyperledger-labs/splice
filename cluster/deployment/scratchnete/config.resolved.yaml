@@ -335,7 +335,7 @@ svs:
       appsAsync: false
       appsLogLevel: 'DEBUG'
       cantonAsync: false
-      cantonLogLevel: 'DEBUG'
+      cantonLogLevel: 'INFO'
       cometbftLogLevel: 'debug'
     mediator:
       resources:
@@ -428,7 +428,7 @@ synchronizerMigration:
       spliceRoot: 'splice'
     sequencer:
       enableBftSequencer: true
-    version: '0.6.0-snapshot.20260325.2323.0.v75828210'
+    version: '0.6.0-snapshot.20260331.2401.0.va8cdbd51'
   frozenMigrationId: 0
   lsuEnabled: true
 validator1:
