@@ -7,6 +7,7 @@
   jre = super.openjdk21;
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {inherit use_enterprise;};
+  # todo -- add dpm from nix
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
   daml2js = super.callPackage ./daml2js.nix {inherit use_enterprise;};
   python3 = super.python3.override {
