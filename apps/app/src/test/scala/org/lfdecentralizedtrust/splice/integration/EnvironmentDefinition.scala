@@ -327,8 +327,10 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withBftSequencers: EnvironmentDefinition =
-    addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
+  def withBftSequencers(namePredicate: String => Boolean = _ => true): EnvironmentDefinition =
+    addConfigTransformToFront((_, config) =>
+      ConfigTransforms.withBftSequencers(namePredicate)(config)
+    )
 
   def withBftSequencersSuccessor: EnvironmentDefinition =
     addConfigTransform((_, config) => ConfigTransforms.withBftSequencersSuccessor()(config))
