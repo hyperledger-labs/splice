@@ -39,7 +39,7 @@ object DarResourcesUtil extends NamedLogging {
   def lookupAllPackageVersions(name: PackageName): Seq[DarResource] =
     packageResources.view.flatMap(_.all).toSeq.filter(_.metadata.name == name)
 
-  // TODO(hyperledger-labs/splice#4049): remove enableUnsupportedDarsUnvetting once it's on MainNet
+  // TODO(hyperledger-labs/splice#4049): remove `enableUnsupportedDarsUnvetting` once not needed anymore
   def getRequiredPackageVersions(
       name: PackageName,
       upToRequiredVersion: PackageVersion,

@@ -33,6 +33,8 @@ abstract class AdditionalPackagesToUnvetIntegrationTestBase
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .withNoVettedPackages(implicit env => env.validators.local.map(_.participantClient))
+      .withNoVettedPackages(implicit env => env.svs.local.map(_.participantClient))
       .addConfigTransforms((_, config) => {
         config.copy(
           // note that the validators need to reflect the same additionalPackagesToUnvet as the SVs to get to the targeted vetting state

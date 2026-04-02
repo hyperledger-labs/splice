@@ -852,13 +852,16 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
 Unvet unsecure package versions
 -------------------------------
 
-This mechanism is primarily used to downgrade to previous versions in the event of major issues.
+.. warning::
 
-To unvet supported packages, all SVs must set the following environment variable in their SV and validator configurations.
-Only supported versions strictly after the minimal initialization version can be unvetted.
+  Only set these configurations **after agreement with at least 2/3 of the SVs** that this is desired.
 
-Once all SVs apply the identical unvet configuration, the unvetting will take effect within a short period (up to 30 minutes).
-If all SVs remove a supported package from this configuration, the package will be vetted again.
+This mechanism is primarily used to unvet buggy or insecure versions in case of major issues.
+
+To unvet supported packages, SVs (but not regular validators) must set the following environment variable in their SV and validator configurations.
+
+Once at least one SV applies an unvet configuration, the unvetting will take effect within a short period.
+All supported packages not included in this configuration will be vetted.
 
 Here an example of how to unvet specific versions of a package:
 
@@ -867,8 +870,8 @@ Here an example of how to unvet specific versions of a package:
      additionalEnvVars:
        - name: ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET
          value: |
-           canton.sv-apps.sv.additional-packages-to-unvet.splice-package-1 = ["0.1.16"]
-           canton.sv-apps.sv.additional-packages-to-unvet.splice-package-2 = ["0.1.18", "0.1.19"]
+           canton.sv-apps.sv.additional-packages-to-unvet.splice-wallet = ["0.1.16"]
+           canton.sv-apps.sv.additional-packages-to-unvet.splice-amulet = ["0.1.16", "0.1.17"]
 
 .. note::
 
