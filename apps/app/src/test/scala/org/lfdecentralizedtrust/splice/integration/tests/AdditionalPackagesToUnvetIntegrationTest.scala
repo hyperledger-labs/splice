@@ -6,9 +6,11 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{DarResourcesUtil, PackageUnvettingUtil}
 import org.slf4j.event.Level
 
@@ -16,6 +18,8 @@ abstract class AdditionalPackagesToUnvetIntegrationTestBase
     extends IntegrationTest
     with PackageUnvettingUtil {
 
+  protected val initialPackageConfig: InitialPackageConfig =
+    InitialPackageConfig.defaultInitialPackageConfig
   protected val additionalPackagesToUnvetSv1: Seq[DarResource]
   protected val additionalPackagesToUnvetSv1Local: Seq[DarResource] = Seq.empty
 
@@ -66,6 +70,11 @@ abstract class AdditionalPackagesToUnvetIntegrationTestBase
                 ))
         )
       })
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(initialPackageConfig = initialPackageConfig)
+        )(config)
+      )
       .withManualStart
 }
 
@@ -142,15 +151,25 @@ class PackageWithDependencyIntegrationTest extends AdditionalPackagesToUnvetInte
   */
 class DowngradeSvPackagesIntegrationTest extends AdditionalPackagesToUnvetIntegrationTestBase {
 
-  private val darsFromAnUpgrade = Seq(
+  private val darsFromUpgrade_0_5_16 = Seq(
+    DarResources.amulet_0_1_17,
+    DarResources.amuletNameService_0_1_18,
     DarResources.dsoGovernance_0_1_23,
     DarResources.walletPayments_0_1_17,
     DarResources.wallet_0_1_18,
-    DarResources.amuletNameService_0_1_18,
     DarResources.amulet_0_1_17,
   )
 
-  override val additionalPackagesToUnvetSv1: Seq[DarResource] = darsFromAnUpgrade
+  // initialize network with the versions from the upgrade 0.5.16
+  override val initialPackageConfig: InitialPackageConfig = new InitialPackageConfig(
+    DarResources.amulet_0_1_17.metadata.version.toString(),
+    DarResources.amuletNameService_0_1_18.metadata.version.toString(),
+    DarResources.dsoGovernance_0_1_23.metadata.version.toString(),
+    DarResources.validatorLifecycle_0_1_6.metadata.version.toString(),
+    DarResources.wallet_0_1_18.metadata.version.toString(),
+    DarResources.walletPayments_0_1_17.metadata.version.toString(),
+  )
+  override val additionalPackagesToUnvetSv1: Seq[DarResource] = darsFromUpgrade_0_5_16
   override val additionalPackagesToUnvetSv1Local: Seq[DarResource] = Seq(
     DarResources.wallet_0_1_16
   )
@@ -172,7 +191,7 @@ class DowngradeSvPackagesIntegrationTest extends AdditionalPackagesToUnvetIntegr
         getVettedPackageIds(
           sv1Backend.appState.participantAdminConnection,
           synchronizerId,
-        ) should contain noElementsOf darsFromAnUpgrade.map(_.packageId)
+        ) should contain noElementsOf darsFromUpgrade_0_5_16.map(_.packageId)
       }
       stopAllAsync(
         sv1Backend,
@@ -193,7 +212,7 @@ class DowngradeSvPackagesIntegrationTest extends AdditionalPackagesToUnvetIntegr
           sv1LocalBackend.appState.participantAdminConnection,
           synchronizerId,
         )
-        vettedPackageIds should contain allElementsOf darsFromAnUpgrade.map(_.packageId)
+        vettedPackageIds should contain allElementsOf darsFromUpgrade_0_5_16.map(_.packageId)
         vettedPackageIds should not contain DarResources.wallet_0_1_16.packageId
       }
       stopAllAsync(
