@@ -47,9 +47,25 @@ export function valuesForSvApp(
         },
       ]
     : [];
+  const additionalPackagesToUnvetConfig =
+    config.svApp?.additionalPackagesToUnvet &&
+    Object.keys(config.svApp.additionalPackagesToUnvet).length > 0
+      ? [
+          {
+            name: 'ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET',
+            value: Object.entries(config.svApp.additionalPackagesToUnvet)
+              .map(
+                ([pkgName, versions]) =>
+                  `canton.sv-apps.sv.additional-packages-to-unvet.${JSON.stringify(pkgName)} = [${versions.map(v => JSON.stringify(v)).join(', ')}]`
+              )
+              .join('\n'),
+          },
+        ]
+      : [];
   const additionalEnvVars = (config.svApp?.additionalEnvVars || [])
     .concat(bftSequencerConnectionEnvVars)
-    .concat(mediatorPruningConfig);
+    .concat(mediatorPruningConfig)
+    .concat(additionalPackagesToUnvetConfig);
   // if you add a top level field here that is an object make sure to handle merging it in the caller
   return {
     ...(useCantonBft
