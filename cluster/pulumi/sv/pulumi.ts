@@ -29,6 +29,24 @@ export async function stackForSv(
 
 export const svsToDeploy = allSvNamesToDeploy;
 
+export function runSvProjectForSvs<T>(
+  svsToRunFor: string[],
+  operation: string,
+  requiresExistingStack: boolean,
+  runForStack: (stack: automation.Stack, sv: string) => Promise<T>
+) {
+  return svsToRunFor.map(sv => {
+    console.error(`Adding operation for sv ${sv}`);
+    return {
+      name: `${operation}-sv-${sv}`,
+      promise: (async () => {
+        const stack = await stackForSv(sv, requiresExistingStack);
+        return await runForStack(stack, sv);
+      })(),
+    };
+  });
+}
+
 export function runSvProjectForAllSvs<T>(
   operation: string,
   runForStack: (stack: automation.Stack, sv: string) => Promise<T>,
@@ -42,17 +60,9 @@ export function runSvProjectForAllSvs<T>(
     !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
   );
   console.log(`Running for svs ${JSON.stringify(svsToRunFor)}`);
-  return svsToRunFor.map(sv => {
-    console.error(`Adding operation for sv ${sv}`);
-    return {
-      name: `${operation}-sv-${sv}`,
-      promise: (async () => {
-        const stack = await stackForSv(sv, requiresExistingStack);
-        return await runForStack(stack, sv);
-      })(),
-    };
-  });
+  return runSvProjectForSvs(svsToRunFor, operation, requiresExistingStack, runForStack);
 }
+
 export function runSvProjectForAllSvsIfLsu<T>(
   operation: string,
   runForStack: (stack: automation.Stack, sv: string) => Promise<T>,
