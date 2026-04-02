@@ -13,6 +13,7 @@ import com.daml.ledger.javaapi.data.{
   Value,
 }
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -20,13 +21,13 @@ import org.lfdecentralizedtrust.splice.util.{DarUtil, WalletTestUtil}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import java.io.File
-import java.security.MessageDigest
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
-/** Three-way equivalence test: Daml (real participant) == SQL (scan Postgres) == Scala oracle.
+/** Equivalence test: Daml (real participant) == SQL (scan Postgres).
   *
-  * Validates that the plpgsql hash functions (V065) produce identical results
-  * to the Daml CryptoHash module, using a Scala oracle as the common reference.
+  * Validates that the plpgsql hash functions produce identical results
+  * to the Daml CryptoHash module. Daml is the authority.
   *
   * Uses a shared environment so the dar is uploaded and proxy created once,
   * then each hash function gets its own test.
@@ -44,8 +45,9 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       }
       .withManualStart
 
-  "Three-way CryptoHash equivalence (Daml, SQL, Scala)" should {
-    "set up CryptoHashProxy" in { implicit env =>
+  "CryptoHash equivalence (Daml == SQL)" should {
+
+    "set up environment" in { implicit env =>
       startAllSync(
         sv1Backend,
         sv1ScanBackend,
@@ -74,47 +76,58 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       }
     }
 
-    allTestCases.foreach { tc =>
-      tc.description in { implicit env =>
-        val scalaHash = toScalaExpected(tc.op)
-
-        clue(s"Daml vs Scala for ${tc.description}") {
-          val (choiceName, choiceArg) = toDamlChoiceAndArg(tc.op)
-          val cmd =
-            new ExerciseCommand(templateId, proxyContractId, choiceName, choiceArg)
-          val tx = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              actAs = Seq(svParty),
-              commands = Seq(cmd),
-            )
-          val damlHash = tx.getEventsById.values.asScala
-            .collectFirst { case ex: ExercisedEvent =>
-              ex.getExerciseResult match {
-                case t: Text => t.getValue
-                case other =>
-                  fail(s"Expected Text result but got ${other.getClass.getSimpleName}")
-              }
-            }
-            .getOrElse(fail(s"No ExercisedEvent in transaction"))
-
-          damlHash shouldBe scalaHash
-        }
-
-        clue(s"SQL vs Scala for ${tc.description}") {
+    allTestCaseDefs.foreach { tcDef =>
+      tcDef.description in { implicit env =>
+        val damlHash = clue("Daml") { exerciseDaml(tcDef.op) }
+        intermediates(tcDef.description) = damlHash
+        clue("SQL should match Daml") {
           val sqlHash = scanDb
             .query(
-              sql"""select #${toSqlExpr(tc.op)}""".as[String].head,
-              s"test.sqlHash.${tc.description}",
+              sql"""select #${toSqlExpr(tcDef.op, resolveRef)}""".as[String].head,
+              "test.sqlHash",
             )
             .futureValueUS
-
-          sqlHash shouldBe scalaHash
+          sqlHash shouldBe damlHash
         }
       }
     }
   }
 
-  private var svParty: com.digitalasset.canton.topology.PartyId = _
+  /** Exercise a Daml choice and return the Text result. */
+  private def exerciseDaml(op: HashOp)(implicit env: FixtureParam): String = {
+    val (choiceName, choiceArg) = toDamlChoiceAndArg(op, resolveRef)
+    val cmd = new ExerciseCommand(templateId, proxyContractId, choiceName, choiceArg)
+    val tx = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitJava(
+        actAs = Seq(svParty),
+        commands = Seq(cmd),
+      )
+    tx.getEventsById.values.asScala
+      .collectFirst { case ex: ExercisedEvent =>
+        ex.getExerciseResult match {
+          case t: Text => t.getValue
+          case other =>
+            throw new IllegalStateException(
+              s"Expected Text result but got ${other.getClass.getSimpleName}"
+            )
+        }
+      }
+      .getOrElse(throw new IllegalStateException("No ExercisedEvent in transaction"))
+  }
+
+  private def resolveRef(ref: HashRef): String = ref match {
+    case Lit(v) => v
+    case IntermediateRef(name) =>
+      intermediates.getOrElse(
+        name,
+        throw new IllegalStateException(s"Intermediate '$name' not found"),
+      )
+  }
+
+  // Progressive map: each test stores its Daml result for later tests to reference
+  private val intermediates: mutable.Map[String, String] = mutable.Map.empty
+
+  private var svParty: PartyId = _
   private var proxyContractId: String = _
   private var scanDb: DbStorage = _
 }
@@ -137,43 +150,23 @@ object CryptoHashEquivalenceIntegrationTest {
 
   private val templateId = new Identifier(packageId, moduleName, "CryptoHashProxy")
 
-  // -- Scala oracle (mirrors Daml CryptoHash module) --------------------------
+  // -- HashRef: symbolic references to intermediate hash values ---------------
 
-  private def sha256Hex(s: String): String = {
-    val digest = MessageDigest.getInstance("SHA-256")
-    digest.digest(s.getBytes("UTF-8")).map("%02x".format(_)).mkString
-  }
+  sealed trait HashRef
+  case class Lit(value: String) extends HashRef
+  case class IntermediateRef(name: String) extends HashRef
 
-  private def hashText(s: String): String = sha256Hex(s)
-
-  private def hashList(elems: Seq[String]): String = {
-    val parts = elems.size.toString +: elems
-    sha256Hex(parts.mkString("|"))
-  }
-
-  private def hashVariant(tag: String, fieldHashes: Seq[String]): String = {
-    val parts = tag +: fieldHashes.size.toString +: fieldHashes
-    sha256Hex(parts.mkString("|"))
-  }
-
-  private def hashMintingAllowance(provider: String, amount: String): String =
-    hashList(Seq(hashText(provider), hashText(amount)))
-
-  private def hashBatchOfMintingAllowances(allowanceHashes: Seq[String]): String =
-    hashVariant("BatchOfMintingAllowances", Seq(hashList(allowanceHashes)))
-
-  private def hashBatchOfBatches(childHashes: Seq[String]): String =
-    hashVariant("BatchOfBatches", Seq(hashList(childHashes)))
-
-  // -- HashOp: structured description of what to hash -------------------------
+  // -- HashOp: test case operations (may contain HashRef) ---------------------
 
   sealed trait HashOp
   case class HashText(value: String) extends HashOp
-  case class HashList(elems: Seq[String]) extends HashOp
-  case class HashVariant(tag: String, fields: Seq[String]) extends HashOp
+  case class HashList(elems: Seq[HashRef]) extends HashOp
+  case class HashVariant(tag: String, fields: Seq[HashRef]) extends HashOp
   case class HashMintingAllowance(provider: String, amount: String) extends HashOp
-  case class HashBatchOfMintingAllowances(allowanceHashes: Seq[String]) extends HashOp
-  case class HashBatchOfBatches(childHashes: Seq[String]) extends HashOp
+  case class HashBatchOfMintingAllowances(hashes: Seq[HashRef]) extends HashOp
+  case class HashBatchOfBatches(hashes: Seq[HashRef]) extends HashOp
+
+  case class TestCaseDef(description: String, op: HashOp)
 
   // -- Derive Daml choice + arg from HashOp ----------------------------------
 
@@ -183,13 +176,16 @@ object CryptoHashEquivalenceIntegrationTest {
   private def record(fields: (String, Value)*): Value =
     new DamlRecord(fields.map { case (k, v) => new DamlRecord.Field(k, v) }.asJava)
 
-  def toDamlChoiceAndArg(op: HashOp): (String, Value) = op match {
+  def toDamlChoiceAndArg(op: HashOp, r: HashRef => String): (String, Value) = op match {
     case HashText(v) =>
       ("CryptoHashProxy_HashText", record("input" -> text(v)))
     case HashList(elems) =>
-      ("CryptoHashProxy_HashList", record("elems" -> textList(elems)))
+      ("CryptoHashProxy_HashList", record("elems" -> textList(elems.map(r))))
     case HashVariant(tag, fields) =>
-      ("CryptoHashProxy_HashVariant", record("tag" -> text(tag), "fields" -> textList(fields)))
+      (
+        "CryptoHashProxy_HashVariant",
+        record("tag" -> text(tag), "fields" -> textList(fields.map(r))),
+      )
     case HashMintingAllowance(provider, amount) =>
       (
         "CryptoHashProxy_HashMintingAllowance",
@@ -198,10 +194,10 @@ object CryptoHashEquivalenceIntegrationTest {
     case HashBatchOfMintingAllowances(hashes) =>
       (
         "CryptoHashProxy_HashBatchOfMintingAllowances",
-        record("allowanceHashes" -> textList(hashes)),
+        record("allowanceHashes" -> textList(hashes.map(r))),
       )
     case HashBatchOfBatches(hashes) =>
-      ("CryptoHashProxy_HashBatchOfBatches", record("childHashes" -> textList(hashes)))
+      ("CryptoHashProxy_HashBatchOfBatches", record("childHashes" -> textList(hashes.map(r))))
   }
 
   // -- Derive SQL expression from HashOp -------------------------------------
@@ -210,71 +206,75 @@ object CryptoHashEquivalenceIntegrationTest {
   private def sqlArray(elems: Seq[String]): String =
     s"ARRAY[${elems.map(e => s"'$e'").mkString(", ")}]::text[]"
 
-  def toSqlExpr(op: HashOp): String = op match {
+  def toSqlExpr(op: HashOp, r: HashRef => String): String = op match {
     case HashText(v) =>
       s"daml_crypto_hash_text('${escapeSql(v)}')"
     case HashList(elems) =>
-      s"daml_crypto_hash_list(${sqlArray(elems)})"
+      s"daml_crypto_hash_list(${sqlArray(elems.map(r))})"
     case HashVariant(tag, fields) =>
-      s"daml_crypto_hash_variant('${escapeSql(tag)}', ${sqlArray(fields)})"
+      s"daml_crypto_hash_variant('${escapeSql(tag)}', ${sqlArray(fields.map(r))})"
     case HashMintingAllowance(provider, amount) =>
       s"hash_minting_allowance('${escapeSql(provider)}', '${escapeSql(amount)}')"
     case HashBatchOfMintingAllowances(hashes) =>
-      s"hash_batch_of_minting_allowances(${sqlArray(hashes)})"
+      s"hash_batch_of_minting_allowances(${sqlArray(hashes.map(r))})"
     case HashBatchOfBatches(hashes) =>
-      s"hash_batch_of_batches(${sqlArray(hashes)})"
+      s"hash_batch_of_batches(${sqlArray(hashes.map(r))})"
   }
 
-  // -- Derive Scala expected from HashOp -------------------------------------
+  // -- Test case definitions (fully static) -----------------------------------
 
-  def toScalaExpected(op: HashOp): String = op match {
-    case HashText(v) => hashText(v)
-    case HashList(elems) => hashList(elems)
-    case HashVariant(tag, fields) => hashVariant(tag, fields)
-    case HashMintingAllowance(p, a) => hashMintingAllowance(p, a)
-    case HashBatchOfMintingAllowances(h) => hashBatchOfMintingAllowances(h)
-    case HashBatchOfBatches(h) => hashBatchOfBatches(h)
-  }
+  // Test cases are defined statically using HashRef (Lit/IntermediateRef) to
+  // reference intermediate hashes by name. Each test resolves its refs from
+  // a shared map populated progressively as earlier tests run.
+  //
+  // Order matters: intermediates must precede composites that reference them.
+  val allTestCaseDefs: Seq[TestCaseDef] = Seq(
+    // Primitive text hashes — used as intermediates by composite cases
+    TestCaseDef("hAlice", HashText("alice::provider")),
+    TestCaseDef("h10", HashText("10.0")),
+    TestCaseDef("hOnly", HashText("only")),
+    TestCaseDef("h1", HashText("1")),
+    TestCaseDef("hx", HashText("x")),
 
-  // -- Test cases ------------------------------------------------------------
+    // Minting allowance hashes — used as intermediates by batch cases
+    TestCaseDef("maAlice", HashMintingAllowance("alice::provider", "10.0000000000")),
+    TestCaseDef("maBob", HashMintingAllowance("bob::provider", "0")),
+    TestCaseDef("maAlice5", HashMintingAllowance("alice::provider", "5.0")),
+    TestCaseDef("maBob3", HashMintingAllowance("bob::provider", "3.0")),
+    // Batch hashes — used as intermediates by batch-of-batches
+    TestCaseDef("leaf1", HashBatchOfMintingAllowances(Seq(IntermediateRef("maAlice5")))),
+    TestCaseDef("leaf2", HashBatchOfMintingAllowances(Seq(IntermediateRef("maBob3")))),
 
-  case class TestCase(description: String, op: HashOp)
+    // Independent cases (no intermediate references)
+    TestCaseDef("hash of 'hello'", HashText("hello")),
+    TestCaseDef("hash of empty string", HashText("")),
+    TestCaseDef("hashList on empty array", HashList(Seq.empty)),
 
-  private val hAlice = hashText("alice::provider")
-  private val h10 = hashText("10.0")
-  private val hOnly = hashText("only")
-  private val h1 = hashText("1")
-  private val hx = hashText("x")
-
-  val allTestCases: Seq[TestCase] = {
-    val maAlice = hashMintingAllowance("alice::provider", "10.0000000000")
-    val maBob = hashMintingAllowance("bob::provider", "0")
-    val leaf1 = hashBatchOfMintingAllowances(
-      Seq(hashMintingAllowance("alice::provider", "5.0"))
-    )
-    val leaf2 = hashBatchOfMintingAllowances(
-      Seq(hashMintingAllowance("bob::provider", "3.0"))
-    )
-
-    Seq(
-      TestCase("hashText('hello')", HashText("hello")),
-      TestCase("hashText on empty string", HashText("")),
-      TestCase("hashList with two elements", HashList(Seq(hAlice, h10))),
-      TestCase("hashList on empty array", HashList(Seq.empty)),
-      TestCase("hashList on single element", HashList(Seq(hOnly))),
-      TestCase("hashVariant with tag and one field", HashVariant("TestTag", Seq(hAlice))),
-      TestCase(
-        "hash_minting_allowance(alice, 10.0)",
-        HashMintingAllowance("alice::provider", "10.0000000000"),
-      ),
-      TestCase("hash_minting_allowance(bob, 0)", HashMintingAllowance("bob::provider", "0")),
-      TestCase(
-        "hash_batch_of_minting_allowances with two",
-        HashBatchOfMintingAllowances(Seq(maAlice, maBob)),
-      ),
-      TestCase("hash_batch_of_batches with two leaves", HashBatchOfBatches(Seq(leaf1, leaf2))),
-      TestCase("hashRecord [hash 1, hash 'x']", HashList(Seq(h1, hx))),
-      TestCase("hashVariant 'V1' [hash 1, hash 'x']", HashVariant("V1", Seq(h1, hx))),
-    )
-  }
+    // Composite cases using intermediate hashes
+    TestCaseDef(
+      "hashList with two elements",
+      HashList(Seq(IntermediateRef("hAlice"), IntermediateRef("h10"))),
+    ),
+    TestCaseDef("hashList on single element", HashList(Seq(IntermediateRef("hOnly")))),
+    TestCaseDef(
+      "hashVariant with tag and one field",
+      HashVariant("TestTag", Seq(IntermediateRef("hAlice"))),
+    ),
+    TestCaseDef(
+      "hashRecord [hash 1, hash 'x']",
+      HashList(Seq(IntermediateRef("h1"), IntermediateRef("hx"))),
+    ),
+    TestCaseDef(
+      "hashVariant 'V1' [hash 1, hash 'x']",
+      HashVariant("V1", Seq(IntermediateRef("h1"), IntermediateRef("hx"))),
+    ),
+    TestCaseDef(
+      "hash_batch_of_minting_allowances with two",
+      HashBatchOfMintingAllowances(Seq(IntermediateRef("maAlice"), IntermediateRef("maBob"))),
+    ),
+    TestCaseDef(
+      "hash_batch_of_batches with two leaves",
+      HashBatchOfBatches(Seq(IntermediateRef("leaf1"), IntermediateRef("leaf2"))),
+    ),
+  )
 }
