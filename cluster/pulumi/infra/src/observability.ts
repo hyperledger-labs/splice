@@ -930,7 +930,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   subtitle: `Wallet sweep from ${fromParty.hint} to ${toParty.hint}`,
                   ownerPrefixRegex: fromParty.regex,
                   // trigger if it goes above 10% of the defined maxBalance
-                  maxBalanceThreshold: `${config.maxBalance * 1.1}`,
+                  maxBalanceThreshold: `${config.maxBalance * monitoringConfig.alerting.alerts.walletSweep.tolerance}`,
                   uid: `df6rim37tocud${i}`,
                 };
               })
