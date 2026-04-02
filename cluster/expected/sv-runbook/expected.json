@@ -960,6 +960,10 @@
           "name": "domains-v1",
           "type": "unlimited"
         },
+        "/api/scan/v1/state": {
+          "name": "state",
+          "type": "unlimited"
+        },
         "/api/scan/v1/updates": {
           "name": "v1-updates",
           "type": "banned"
