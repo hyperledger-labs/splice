@@ -29,9 +29,7 @@ class SpliceLedgerClient(
     getToken: () => Future[Option[AuthToken]],
     apiLoggingConfig: ApiLoggingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    // Note: traceProvider is not used right now, but we keep it for future use. See the comments on the tracing
-    // client interceptors below
-    val unusedTracerProvider: TracerProvider,
+    tracerProvider: TracerProvider,
     override protected[this] val retryProvider: RetryProvider,
     grpcClientMetrics: GrpcClientMetrics,
 )(implicit
@@ -54,12 +52,7 @@ class SpliceLedgerClient(
       .builderFor(config.address, config.port.unwrap)
       .executor(ec)
       .intercept(
-        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig),
-        // The above interceptor handles both client request logging and trace-id allocation and propagation.
-        // It does though not create proper spans, like they would be required for distributed tracing.
-        // For that we either want to use the standard tracer below (with appropriate adjustments wrt context propagation),
-        // or extend the above interceptor.
-        // GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
+        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig, tracerProvider.tracer),
         new GrpcMetricsClientInterceptor(grpcClientMetrics),
       )
 

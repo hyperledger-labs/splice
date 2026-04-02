@@ -88,6 +88,7 @@ abstract class TopologyAdminConnection(
       apiLoggingConfig,
       loggerFactory,
       grpcClientMetrics,
+      tracer,
     )
     with RetryProvider.Has
     with LsuTopologyAdminConnection
