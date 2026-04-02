@@ -42,7 +42,11 @@ final case class StoreIngestionPerfMetrics(
   def avgItemTimeNs: BigDecimal =
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
 
-  /** Wall-clock time minus CPU time: time spent waiting for I/O (DB writes, network, OS scheduling). */
+  /** Wall-clock time minus process CPU time.
+    * Negative        → CPU-bound: multiple cores burned more CPU than wall-clock elapsed.
+    * Positive < CPU  → mixed: some I/O wait, but CPU work still dominates.
+    * Positive >= CPU → I/O-bound: wait time dominates (DB writes, network, OS scheduling).
+    */
   def waitTimeNs: BigDecimal = totalTimeNs - processCpuTimeNs
 }
 
@@ -336,7 +340,7 @@ abstract class StoreIngestionPerformanceTest(
           ),
           metric(
             "wait_time_ns",
-            "Time spent waiting for I/O in nanoseconds (wall-clock minus CPU time)",
+            "Wall-clock minus CPU time in nanoseconds (negative=CPU-bound, positive<CPU=mixed, positive>=CPU=I/O-bound)",
             metrics.waitTimeNs,
           ),
         ),
