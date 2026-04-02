@@ -489,7 +489,7 @@ class HttpWalletHandler(
                 acceptedPayments.find(_.payload.reference.contractId == contractId) match {
                   case Some(acceptedPayment) =>
                     logger.info(
-                      s"Recovered from timeout: AppPaymentRequest $contractId was already accepted as ${acceptedPayment.contractId}"
+                      s"Recovered from previous timeout: AppPaymentRequest $contractId was already accepted as ${acceptedPayment.contractId}"
                     )
                     r0.AcceptAppPaymentRequestResponse.OK(
                       d0.AcceptAppPaymentRequestResponse(
