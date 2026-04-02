@@ -176,4 +176,7 @@ Skipping insertion of pending onboarding flag clearance operation as no party ID
 # SV4 migrates late
 SEQ::sv4.*Sequencer can't take requests because it is behind on processing events
 
+# Triggered by roll-forward LSU test
+No sequencer successor was found
+
 # Make sure to have a trailing newline
