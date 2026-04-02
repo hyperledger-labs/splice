@@ -74,7 +74,7 @@ db:
 
 resources:
   limits:
-    memory: 6Gi
+    memory: 8Gi
   requests:
     cpu: 2
     memory: 3Gi
