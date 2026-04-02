@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 /* @ts-expect-error typings unavailable */
 import { randomIntBetween, randomItem } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { sleep } from 'k6';
@@ -43,30 +44,50 @@ export function pickTwoRandomUsers(validators: ValidatorConf[]): {
   recipientClient: ValidatorClient;
 } {
   if (validators.length > 1) {
-    // Pick two random available validators
-    const [validator1Index, validator2Index] = pickTwoRandom(validators.length);
+    // Pick two validators independently — they may be the same validator,
+    // giving a natural mix of intra- and cross-validator transfers.
+    const senderValidatorIndex = randomIntBetween(0, validators.length - 1);
+    const recipientValidatorIndex = randomIntBetween(0, validators.length - 1);
+    // Pick the admin validator independently so that admin balance checks
+    // and top-ups are spread across all pods rather than always doubling up
+    // on the sender's or recipient's pod.
+    const adminValidatorIndex = randomIntBetween(0, validators.length - 1);
 
-    const validator1 = validators[validator1Index];
-    const validator2 = validators[validator2Index];
+    const senderValidator = validators[senderValidatorIndex];
+    const recipientValidator = validators[recipientValidatorIndex];
+    const adminValidator = validators[adminValidatorIndex];
 
-    // Pick two random users from the validators
-    const senderIndex = randomIntBetween(0, validator1.userTokens.length - 1);
-    const recipientIndex = randomIntBetween(0, validator2.userTokens.length - 1);
+    // Pick random users within each validator
+    const senderIndex = randomIntBetween(0, senderValidator.userTokens.length - 1);
+    let recipientIndex = randomIntBetween(0, recipientValidator.userTokens.length - 1);
 
-    const senderToken = validator1.userTokens[senderIndex];
-    const recipientToken = validator2.userTokens[recipientIndex];
+    // If both land on the same validator, make sure we pick different users
+    if (senderValidatorIndex === recipientValidatorIndex && senderIndex === recipientIndex) {
+      const others = Array.from(
+        { length: recipientValidator.userTokens.length },
+        (_, n) => n,
+      ).filter(n => n !== senderIndex);
+      recipientIndex = randomItem(others);
+    }
 
-    const senderFeatured = validator1.userFeatured[senderIndex];
-    const recipientFeatured = validator2.userFeatured[recipientIndex];
+    const senderToken = senderValidator.userTokens[senderIndex];
+    const recipientToken = recipientValidator.userTokens[recipientIndex];
+
+    const senderFeatured = senderValidator.userFeatured[senderIndex];
+    const recipientFeatured = recipientValidator.userFeatured[recipientIndex];
 
     const adminClient = new ValidatorClient(
-      validator1.walletBaseUrl,
-      validator1.adminToken,
+      adminValidator.walletBaseUrl,
+      adminValidator.adminToken,
       undefined,
     );
-    const senderClient = new ValidatorClient(validator1.walletBaseUrl, senderToken, senderFeatured);
+    const senderClient = new ValidatorClient(
+      senderValidator.walletBaseUrl,
+      senderToken,
+      senderFeatured,
+    );
     const recipientClient = new ValidatorClient(
-      validator2.walletBaseUrl,
+      recipientValidator.walletBaseUrl,
       recipientToken,
       recipientFeatured,
     );
@@ -97,21 +118,25 @@ export function syncRetryUntil<A>(
   action: () => A | undefined,
   condition: (result: A | undefined) => boolean,
 ): A | undefined {
-  let retries = 200; // The sleep is 200ms, so a larger retry value is fine
-  let final = undefined;
+  const maxTotalSeconds = 60; // cap total polling time at 60s
+  const initialDelaySeconds = 0.2; // start at 200ms
+  const maxDelaySeconds = 5; // cap individual delay at 5s
+  const backoffFactor = 2;
 
-  while (retries >= 0) {
+  let elapsed = 0;
+  let delay = initialDelaySeconds;
+
+  while (elapsed < maxTotalSeconds) {
     const result = action();
     if (condition(result)) {
-      final = result;
-      break;
-    } else {
-      sleep(0.2);
+      return result;
     }
-    retries = retries - 1;
+    sleep(delay);
+    elapsed += delay;
+    delay = Math.min(delay * backoffFactor, maxDelaySeconds);
   }
 
-  return final;
+  return undefined;
 }
 
 export function syncRetryUndefined<A>(action: () => A | undefined): A | undefined {
