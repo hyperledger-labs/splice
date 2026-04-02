@@ -63,6 +63,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import org.slf4j.{Logger, LoggerFactory}
+import pureconfig.configurable.{genericMapReader, genericMapWriter}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.{CannotConvert, FailureReason}
@@ -85,7 +86,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
   SequencerNodeConfig,
 }
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 
 case class SpliceConfig(
@@ -594,6 +595,11 @@ object SpliceConfig {
       ConfigReader.fromString(str =>
         PackageVersion.fromString(str).left.map(err => CannotConvert(str, "PackageVersion", err))
       )
+    implicit val additionalPackagesToUnvetReader
+        : ConfigReader[Map[PackageName, Set[PackageVersion]]] =
+      genericMapReader(str =>
+        PackageName.fromString(str).left.map(err => CannotConvert(str, "PackageName", err))
+      )
     implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
       deriveReader[BeneficiaryConfig]
     implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
@@ -1035,6 +1041,9 @@ object SpliceConfig {
       implicitly[ConfigWriter[String]].contramap(_.toProtoPrimitive)
     implicit val packageVersionConfigWriter: ConfigWriter[PackageVersion] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
+    implicit val additionalPackagesToUnvetWriter
+        : ConfigWriter[Map[PackageName, Set[PackageVersion]]] =
+      genericMapWriter(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]
     implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =

@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.daml.lf.data.Ref.{IdString, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{IdString, PackageName, PackageVersion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -34,6 +34,7 @@ class PackageVetting(
   def vetCurrentPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val currentPackageConfig = schedule.getConfigAsOf(clock.now).packageConfig
@@ -41,7 +42,12 @@ class PackageVetting(
       packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResourcesUtil
-        .getRequiredPackageVersions(pkg.packageName, packageVersion, enableUnsupportedDarsUnvetting)
+        .getRequiredPackageVersions(
+          pkg.packageName,
+          packageVersion,
+          enableUnsupportedDarsUnvetting,
+          additionalPackagesToUnvet = additionalPackagesToUnvet,
+        )
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
     // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
@@ -62,6 +68,7 @@ class PackageVetting(
             pkg.packageName,
             PackageIdResolver.readPackageVersion(currentPackageConfig, pkg),
             enableUnsupportedDarsUnvetting,
+            additionalPackagesToUnvet = additionalPackagesToUnvet,
           )
           .map(versionToVet => pkg -> versionToVet.metadata.version)
       )
@@ -95,6 +102,7 @@ class PackageVetting(
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =
@@ -102,6 +110,7 @@ class PackageVetting(
         amuletRules.createdAt,
         schedule,
         futureAmuletConfigFromVoteRequests,
+        additionalPackagesToUnvet,
       )
     // sort them and vet in the order of earliest first to ensure that dependencies are vetted at the earliest time as well
     // also it doesn't really make sense to run multiple vettings in parallel as they will just race to update the topology state
@@ -223,7 +232,8 @@ class PackageVetting(
       createdAt: Instant,
       amuletConfigSchedule: AmuletConfigSchedule,
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
-  ) = {
+      additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
+  )(implicit tc: TraceContext) = {
     (futureAmuletConfigFromVoteRequests.collect { case (Some(effectiveAt), config) =>
       (effectiveAt, config)
     } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
@@ -236,6 +246,7 @@ class PackageVetting(
                 pkg.packageName,
                 configPackageVersion,
                 enableUnsupportedDarsUnvetting,
+                additionalPackagesToUnvet = additionalPackagesToUnvet,
               )
               .map(_.metadata.version)
           allPackageVersions
