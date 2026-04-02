@@ -86,6 +86,19 @@
              The new fields are marked as experimental in the API specification, as the validation might
              show that changes are required. Most likely that will though not be the case.
 
+    - Canton
+
+        - A cause of frequent ``SEQUENCER_SUBMISSION_REQUEST_REFUSED`` errors when using BFT sequencer connections and request amplification has been addressed.
+          Set ``canton.sequencers.sequencer.sequencer-client.amplify-on-max-sequencing-time-too-far`` to ``false`` to restore previous behavior.
+
+            - The ``SequencerService.sendAsync`` gRPC service will now return ``SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR``
+              instead of ``SEQUENCER_SUBMISSION_REQUEST_REFUSED`` for transactions with a ``maxSequencingTime`` too far in the future
+              from the sequencer view (usually when sequencer is catching up and is behind on processing).
+              This is a breaking API change.
+
+        - The Ledger JSON API ``v2/package-vetting`` endpoint has been deprecated in favor of two new endpoints: ``v2/package-vetting/list`` and ``v2/package-vetting/update``.
+          These new endpoints are equivalent in functionality, but more compliant with HTTP specifications and tools.
+
 .. release-notes:: 0.5.17
 
     - SVs
