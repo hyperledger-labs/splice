@@ -66,12 +66,14 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.topology.{
   Member,
   ParticipantId,
   PartyId,
+  PhysicalSynchronizerId,
   SequencerId,
   SynchronizerId,
 }
@@ -2630,5 +2632,46 @@ object HttpScanAppClient {
         Left("No active synchronizer serial found")
     }
 
+  }
+
+  final case class LookupRollForwardLsu()
+      extends InternalBaseCommand[http.GetRollForwardLsuResponse, Option[RollForwardLsu]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetRollForwardLsuResponse] =
+      client.getRollForwardLsu(
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetRollForwardLsuResponse, Either[
+      String,
+      Option[RollForwardLsu],
+    ]] = { case http.GetRollForwardLsuResponse.OK(response) =>
+      Right(
+        response.rollForwardLsu.map(r =>
+          RollForwardLsu(
+            currentPhysicalSynchronizerId =
+              PhysicalSynchronizerId.tryFromString(r.currentPhysicalSynchronizerId),
+            successorPhysicalSynchronizerId =
+              PhysicalSynchronizerId.tryFromString(r.successorPhysicalSynchronizerId),
+            upgradeTime = CantonTimestamp.assertFromInstant(r.upgradeTime.toInstant),
+          )
+        )
+      )
+    }
+  }
+
+  final case class RollForwardLsu(
+      currentPhysicalSynchronizerId: PhysicalSynchronizerId,
+      successorPhysicalSynchronizerId: PhysicalSynchronizerId,
+      upgradeTime: CantonTimestamp,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] = prettyOfClass(
+      param("currentPhysicalSynchronizerId", _.currentPhysicalSynchronizerId),
+      param("successorPhysicalSynchronizerId", _.successorPhysicalSynchronizerId),
+      param("upgradeTime", _.upgradeTime),
+    )
   }
 }

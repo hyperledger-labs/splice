@@ -157,6 +157,20 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListSvBftSequencersResponse"
 
+  /v0/roll-forward-lsu:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRollForwardLsu"
+      description: |
+        Retrieve information on a roll-forward LSU
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRollForwardLsuResponse"
 
   /v0/active-synchronizer-serial:
     get:
@@ -2098,6 +2112,27 @@ components:
             Any participant should subscribe to this sequencer after this time.
           type: string
           format: date-time
+    GetRollForwardLsuResponse:
+      type: object
+      properties:
+        rollForwardLsu:
+          description: "Info on a roll-forward LSU"
+          "$ref": "#/components/schemas/RollForwardLsu"
+    RollForwardLsu:
+      type: object
+      required:
+        - upgradeTime
+        - currentPhysicalSynchronizerId
+        - successorPhysicalSynchronizerId
+      properties:
+        upgradeTime:
+          description: The time at which to upgrade
+          type: string
+          format: date-time
+        currentPhysicalSynchronizerId:
+          type: string
+        successorPhysicalSynchronizerId:
+          type: string
     GetActivePhysicalSynchronizerSerialResponse:
       type: object
       required: ["serial"]
@@ -4187,4 +4222,3 @@ components:
           description: |
             The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
           type: string
-

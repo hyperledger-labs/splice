@@ -130,6 +130,10 @@ trait ScanConnection
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]]
 
+  def lookupRollForwardLsu()(implicit
+      tc: TraceContext
+  ): Future[Option[HttpScanAppClient.RollForwardLsu]]
+
   def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
