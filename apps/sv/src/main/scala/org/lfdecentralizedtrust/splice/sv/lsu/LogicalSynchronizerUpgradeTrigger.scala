@@ -19,7 +19,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
   TriggerEnabledSynchronization,
 }
-import org.lfdecentralizedtrust.splice.environment.StatusAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  StatusAdminConnection,
+}
 import org.lfdecentralizedtrust.splice.environment.SynchronizerNode.LocalSynchronizerNodes
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.lsu.LogicalSynchronizerUpgradeTrigger.LsuTransferTask
@@ -34,8 +37,10 @@ class LogicalSynchronizerUpgradeTrigger(
     reconciler: SynchronizerNodeReconciler,
     localSynchronizerNodes: LocalSynchronizerNodes[LocalSynchronizerNode],
     successorSynchronizerNode: LocalSynchronizerNode,
+    participantAdminConnection: ParticipantAdminConnection,
     store: SvDsoStore,
     dumpPath: Path,
+    hasBftSequencerConnections: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -79,10 +84,15 @@ class LogicalSynchronizerUpgradeTrigger(
         successorSynchronizerNode.mediatorAdminConnection,
         "mediator",
       )
+      participantNeedsManualLsu <- participantNeedsManualLsu(
+        now,
+        physicalSynchronizerId,
+        announcements.map(_.mapping),
+      )
     } yield {
       announcements
         .filter { _ =>
-          sequencerNotInitialized || mediatorNotInitialized
+          sequencerNotInitialized || mediatorNotInitialized || participantNeedsManualLsu
         }
         .map(result => LsuTransferTask(result.mapping))
     }
@@ -107,7 +117,7 @@ class LogicalSynchronizerUpgradeTrigger(
   protected def completeTask(task: ScheduledTaskTrigger.ReadyTask[LsuTransferTask])(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    (for {
+    for {
       rulesAndState <- store.getDsoRulesWithSvNodeStates()
       owningNodeSvName <- rulesAndState.getSvNameInDso(store.key.svParty)
       _ <- successorSynchronizerNode.cometbftNode.traverse(
@@ -125,11 +135,47 @@ class LogicalSynchronizerUpgradeTrigger(
         task.readyAt,
         Some(task.work.announcement.upgradeTime),
       )
+      currentPsid <- currentSynchronizerNode.sequencerAdminConnection
+        .getPhysicalSynchronizerId()
+      participantPsid <- participantAdminConnection.getPhysicalSynchronizerId(
+        currentPsid.logical
+      )
+      sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
+      hasNoSuccessor <- currentSynchronizerNode.sequencerAdminConnection
+        .lookupSequencerSuccessors(currentPsid.logical, sequencerId)
+        .map(_.isEmpty)
+      _ <-
+        if (
+          task.readyAt.isAfter(
+            task.work.announcement.upgradeTime
+          ) && hasNoSuccessor && !hasBftSequencerConnections && participantPsid != task.work.announcement.successorSynchronizerId
+        ) {
+          logger.info(
+            s"Participant is on physical synchronizer id $participantPsid, past upgrade time with no sequencer successor and BFT disabled, initiating manual LSU"
+          )
+          for {
+            successorSequencerId <-
+              successorSynchronizerNode.sequencerAdminConnection.getSequencerId
+            _ <- participantAdminConnection
+              .performManualLsu(
+                currentPsid,
+                task.work.announcement.successorSynchronizerId,
+                Some(task.work.announcement.upgradeTime),
+                Map(
+                  successorSequencerId -> initializer.successorConnection
+                ),
+              )
+          } yield {
+            logger.info("Manual LSU completed")
+          }
+        } else {
+          Future.unit
+        }
     } yield {
       TaskSuccess(
         show"Initialized new synchronizer with parameters $parameters"
       )
-    })
+    }
   }
 
   protected def isStaleTask(task: ScheduledTaskTrigger.ReadyTask[LsuTransferTask])(implicit
@@ -145,6 +191,27 @@ class LogicalSynchronizerUpgradeTrigger(
         announcement.base.validFrom
           .isBefore(now.toInstant) && announcement.mapping.successorSynchronizerId != synchronizerId
       })
+  }
+
+  private def participantNeedsManualLsu(
+      now: CantonTimestamp,
+      currentPsid: PhysicalSynchronizerId,
+      announcements: Seq[LsuAnnouncement],
+  )(implicit tc: TraceContext): Future[Boolean] = {
+    announcements.find(a => now.isAfter(a.upgradeTime)) match {
+      case Some(announcement) =>
+        for {
+          sequencerId <- currentSynchronizerNode.sequencerAdminConnection.getSequencerId
+          hasNoSuccessor <- currentSynchronizerNode.sequencerAdminConnection
+            .lookupSequencerSuccessors(currentPsid.logical, sequencerId)
+            .map(_.isEmpty)
+          participantPsid <- participantAdminConnection
+            .getPhysicalSynchronizerId(currentPsid.logical)
+        } yield {
+          hasNoSuccessor && !hasBftSequencerConnections && participantPsid != announcement.successorSynchronizerId
+        }
+      case None => Future.successful(false)
+    }
   }
 }
 
