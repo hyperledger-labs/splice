@@ -21,7 +21,7 @@ on:
 
 jobs:
   backport:
-    uses: hyperledger-labs/splice-shared-gha/.github/workflows/backport.yml@mblaze-da/backports/4287
+    uses: hyperledger-labs/splice-shared-gha/.github/workflows/backport.yml@a78684a826be866b199ae7a05471a7fad2c9c76c
     with:
       commit_sha: ${{ inputs.commit_sha }}
       pr_number: ${{ fromJSON(inputs.pr_number) }}
