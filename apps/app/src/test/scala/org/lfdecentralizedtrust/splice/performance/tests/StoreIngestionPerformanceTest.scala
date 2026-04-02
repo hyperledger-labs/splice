@@ -166,21 +166,21 @@ abstract class StoreIngestionPerformanceTest(
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
         val wallBefore = System.nanoTime()
-        val cpuBefore = getProcessCpuTimeNs
         val (userBefore, kernelBefore) = getUserAndKernelCpuTimeNs
         val gcBefore = getTotalGcTimeMs
         store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
             val wallAfter = System.nanoTime()
-            val cpuAfter = getProcessCpuTimeNs
             val (userAfter, kernelAfter) = getUserAndKernelCpuTimeNs
             val gcAfter = getTotalGcTimeMs
             val duration = wallAfter - wallBefore
+            val userDelta = userAfter - userBefore
+            val kernelDelta = kernelAfter - kernelBefore
             totalTimeNs += duration
-            totalCpuNs += (cpuAfter - cpuBefore)
-            totalUserCpuNs += (userAfter - userBefore)
-            totalKernelCpuNs += (kernelAfter - kernelBefore)
+            totalUserCpuNs += userDelta
+            totalKernelCpuNs += kernelDelta
+            totalCpuNs += (userDelta + kernelDelta)
             totalGcMs += (gcAfter - gcBefore)
             val heapNow = getHeapUsedBytes
             maxHeapBytes = maxHeapBytes.max(heapNow)
@@ -211,36 +211,28 @@ abstract class StoreIngestionPerformanceTest(
       }
   }
 
-  /** Process-wide CPU time in nanoseconds (all cores combined).
-    * Returns -1 if unavailable.
-    */
-  private def getProcessCpuTimeNs: BigDecimal = {
-    ManagementFactory.getOperatingSystemMXBean match {
-      case sunBean: com.sun.management.OperatingSystemMXBean =>
-        BigDecimal(sunBean.getProcessCpuTime)
-      case _ => BigDecimal(-1)
-    }
-  }
-
   /** Process-wide user and kernel CPU time in nanoseconds.
     *
-    * User time: The sum of all live threads' user-mode CPU time (via ThreadMXBean).
-    * Kernel time: Derived as `processCpuTime - userTime`.
+    * User time: sum of getThreadUserTime across all live threads.
+    * Kernel time: sum of (getThreadCpuTime - getThreadUserTime) per thread.
+    *
     * Returns (0, 0) if thread CPU time measurement is unsupported.
     */
   private def getUserAndKernelCpuTimeNs: (BigDecimal, BigDecimal) = {
     val threadBean = ManagementFactory.getThreadMXBean
     if (threadBean.isThreadCpuTimeSupported && threadBean.isThreadCpuTimeEnabled) {
-      val userNs = BigDecimal(
-        threadBean.getAllThreadIds
-          .map(id => threadBean.getThreadUserTime(id))
-          .filter(_ >= 0)
-          .sum
-      )
-      val processCpu = getProcessCpuTimeNs
-      val kernelNs =
-        if (processCpu >= 0) (processCpu - userNs).max(BigDecimal(0)) else BigDecimal(0)
-      (userNs, kernelNs)
+      val threadIds = threadBean.getAllThreadIds
+      var userTotalNs = 0L
+      var kernelTotalNs = 0L
+      threadIds.foreach { id =>
+        val cpuNs = threadBean.getThreadCpuTime(id)
+        val userNs = threadBean.getThreadUserTime(id)
+        if (cpuNs >= 0 && userNs >= 0) {
+          userTotalNs += userNs
+          kernelTotalNs += math.max(cpuNs - userNs, 0L)
+        }
+      }
+      (BigDecimal(userTotalNs), BigDecimal(kernelTotalNs))
     } else {
       (BigDecimal(0), BigDecimal(0))
     }
