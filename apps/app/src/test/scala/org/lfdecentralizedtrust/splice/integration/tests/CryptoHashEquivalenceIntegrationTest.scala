@@ -40,21 +40,17 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withAdditionalSetup { implicit env =>
-        sv1Backend.participantClient.upload_dar_unless_exists(darPath)
-      }
       .withManualStart
 
   "CryptoHash equivalence (Daml == SQL)" should {
 
     "set up environment" in { implicit env =>
-      startAllSync(
-        sv1Backend,
-        sv1ScanBackend,
-      )
+      startAllSync(sv1Backend)
       svParty = sv1Backend.getDsoInfo().svParty
+      svDb = sv1Backend.appState.storage
 
-      clue("Create CryptoHashProxy") {
+      clue("Upload dar and create CryptoHashProxy") {
+        sv1Backend.participantClient.upload_dar_unless_exists(darPath)
         val createArgs = new DamlRecord(
           java.util.List.of(
             new DamlRecord.Field("owner", new Party(svParty.toProtoPrimitive))
@@ -70,10 +66,6 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
           .collectFirst { case ce: CreatedEvent => ce.getContractId }
           .getOrElse(fail("No CreatedEvent from CryptoHashProxy create"))
       }
-      scanDb = sv1ScanBackend.appState.storage match {
-        case db: DbStorage => db
-        case s => fail(s"non-DB storage configured: ${s.getClass}")
-      }
     }
 
     allTestCaseDefs.foreach { tcDef =>
@@ -81,7 +73,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
         val damlHash = clue("Daml") { exerciseDaml(tcDef.op) }
         intermediates(tcDef.description) = damlHash
         clue("SQL should match Daml") {
-          val sqlHash = scanDb
+          val sqlHash = svDb
             .query(
               sql"""select #${toSqlExpr(tcDef.op, resolveRef)}""".as[String].head,
               "test.sqlHash",
@@ -129,7 +121,8 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
 
   private var svParty: PartyId = _
   private var proxyContractId: String = _
-  private var scanDb: DbStorage = _
+  private var svDb: DbStorage = _
+
 }
 
 object CryptoHashEquivalenceIntegrationTest {
