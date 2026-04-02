@@ -32,6 +32,21 @@ export function valuesForSvValidatorApp(
         },
       ]
     : [];
+  const additionalPackagesToUnvetConfig =
+    config.validatorApp?.additionalPackagesToUnvet &&
+    Object.keys(config.validatorApp.additionalPackagesToUnvet).length > 0
+      ? [
+          {
+            name: 'ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET',
+            value: Object.entries(config.validatorApp.additionalPackagesToUnvet)
+              .map(
+                ([pkgName, versions]) =>
+                  `canton.validator-apps.validator_backend.additional-packages-to-unvet.${JSON.stringify(pkgName)} = [${versions.map(v => JSON.stringify(v)).join(', ')}]`
+              )
+              .join('\n'),
+          },
+        ]
+      : [];
   // if you add a top level field here that is an object make sure to handle merging it in the caller
   return {
     ...(bftSequencerConnection
@@ -53,6 +68,8 @@ export function valuesForSvValidatorApp(
             },
           ]),
       ...(config.validatorApp?.additionalEnvVars || []),
-    ].concat(participantPruningConfig),
+    ]
+      .concat(participantPruningConfig)
+      .concat(additionalPackagesToUnvetConfig),
   };
 }

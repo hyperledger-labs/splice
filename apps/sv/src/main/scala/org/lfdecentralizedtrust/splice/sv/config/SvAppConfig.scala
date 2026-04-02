@@ -19,7 +19,7 @@ import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -372,6 +372,8 @@ case class SvAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    // Map of package name -> set of versions that should be explicitly unvetted
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
     // If set, automatically copies governance votes (VoteRequests) from the named SV.
     // The value is the SV name as it appears in DsoRules.svs (e.g. "Digital-Asset-2").
