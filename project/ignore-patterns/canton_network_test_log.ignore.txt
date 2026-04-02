@@ -148,4 +148,7 @@ Timeout 10 seconds expired, but readers are still active. Shutting down forcibly
 # SV-4 initialization.
 Not publishing sequencer successor as we are past upgrade time.*LsuNodeInitializer:LogicalSynchronizerUpgradeIntegrationTest.*SV=sv4
 
+# Roll forward tests
+Failed to connect to scan of FAILED Seed URL.*RollForwardLsuIntegrationTest
+
 Ryuk has been disabled
