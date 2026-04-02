@@ -166,17 +166,16 @@ abstract class StoreIngestionPerformanceTest(
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
         val wallBefore = System.nanoTime()
-        val (userBefore, kernelBefore) = getUserAndKernelCpuTimeNs
+        val cpuSnapshotBefore = captureCpuSnapshot()
         val gcBefore = getTotalGcTimeMs
         store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
             val wallAfter = System.nanoTime()
-            val (userAfter, kernelAfter) = getUserAndKernelCpuTimeNs
+            val cpuSnapshotAfter = captureCpuSnapshot()
             val gcAfter = getTotalGcTimeMs
             val duration = wallAfter - wallBefore
-            val userDelta = userAfter - userBefore
-            val kernelDelta = kernelAfter - kernelBefore
+            val (userDelta, kernelDelta) = cpuDelta(cpuSnapshotBefore, cpuSnapshotAfter)
             totalTimeNs += duration
             totalUserCpuNs += userDelta
             totalKernelCpuNs += kernelDelta
@@ -211,31 +210,51 @@ abstract class StoreIngestionPerformanceTest(
       }
   }
 
-  /** Process-wide user and kernel CPU time in nanoseconds.
-    *
-    * User time: sum of getThreadUserTime across all live threads.
-    * Kernel time: sum of (getThreadCpuTime - getThreadUserTime) per thread.
-    *
-    * Returns (0, 0) if thread CPU time measurement is unsupported.
+  /** Per-thread CPU time snapshot: threadId -> (userNs, kernelNs). */
+  private type CpuSnapshot = Map[Long, (Long, Long)]
+
+  /** Capture per-thread user and kernel CPU time for all live threads.
+    * Kernel time per thread = max(cpuTime - userTime, 0).
     */
-  private def getUserAndKernelCpuTimeNs: (BigDecimal, BigDecimal) = {
+  private def captureCpuSnapshot(): CpuSnapshot = {
     val threadBean = ManagementFactory.getThreadMXBean
     if (threadBean.isThreadCpuTimeSupported && threadBean.isThreadCpuTimeEnabled) {
-      val threadIds = threadBean.getAllThreadIds
-      var userTotalNs = 0L
-      var kernelTotalNs = 0L
-      threadIds.foreach { id =>
+      threadBean.getAllThreadIds.flatMap { id =>
         val cpuNs = threadBean.getThreadCpuTime(id)
         val userNs = threadBean.getThreadUserTime(id)
-        if (cpuNs >= 0 && userNs >= 0) {
-          userTotalNs += userNs
-          kernelTotalNs += math.max(cpuNs - userNs, 0L)
-        }
-      }
-      (BigDecimal(userTotalNs), BigDecimal(kernelTotalNs))
+        if (cpuNs >= 0 && userNs >= 0)
+          Some(id -> (userNs, math.max(cpuNs - userNs, 0L)))
+        else
+          None
+      }.toMap
     } else {
-      (BigDecimal(0), BigDecimal(0))
+      Map.empty
     }
+  }
+
+  /** Compute (userDelta, kernelDelta) between two snapshots, considering only threads
+    * present in both.
+    *
+    * Background threads (GC, Pekko dispatchers, timers) can start or stop between
+    * snapshots.
+    * Common thread IDs of two snapshots ensure we ignore dead threads (avoids negative
+    * deltas) and new threads (avoids counting unrelated work).
+    *
+    * The ingestion-runner thread is always present in both snapshots
+    * (cpuSnapshotBefore and cpuSnapshotAfter) because `captureCpuSnapshot()` is called
+    * within the runner thread before and after the ingestion of each batch,
+    * so we are guaranteed to capture its CPU time deltas accurately.
+    */
+  private def cpuDelta(before: CpuSnapshot, after: CpuSnapshot): (BigDecimal, BigDecimal) = {
+    var userDelta = 0L
+    var kernelDelta = 0L
+    after.foreach { case (id, (userAfter, kernelAfter)) =>
+      before.get(id).foreach { case (userBefore, kernelBefore) =>
+        userDelta += math.max(userAfter - userBefore, 0L)
+        kernelDelta += math.max(kernelAfter - kernelBefore, 0L)
+      }
+    }
+    (BigDecimal(userDelta), BigDecimal(kernelDelta))
   }
 
   /** Total GC collection time across all collectors in milliseconds. */
