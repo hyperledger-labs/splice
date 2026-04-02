@@ -190,7 +190,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .item
           .owners
           .map(_.fingerprint)
-          .toIndexedSeq should not contain sv1SequencerId.fingerprint
+          .forgetNE should not contain sv1SequencerId.fingerprint
       }
     }
   }
