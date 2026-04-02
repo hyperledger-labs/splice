@@ -846,3 +846,32 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
       # Example to trigger re-ingestion of the TxLog store for the second time
       persistence:
         txLogStoreDescriptorUserVersion: 2
+
+.. _sv-unvet_unsercure_package_versions:
+
+Unvet unsecure package versions
+-------------------------------
+
+.. warning::
+
+  Only set these configurations **after agreement with at least 2/3 of the SVs** that this is desired.
+  Vetting for the DSO party requires that all SVs have vetted so a single SV unvetting a package will make it unusable and must therefore not be done unless there is an agreement.
+  All supported packages not included in this configuration are vetted.
+
+This mechanism is primarily used to unvet buggy or insecure versions in case of major issues.
+
+To unvet supported packages, SVs (but not regular validators) must set the following environment variable in their SV and validator configurations.
+
+Here an example of how to unvet specific versions of a package:
+
+  .. code-block:: yaml
+
+     additionalEnvVars:
+       - name: ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET
+         value: |
+           canton.sv-apps.sv.additional-packages-to-unvet.splice-wallet = ["0.1.16"]
+           canton.sv-apps.sv.additional-packages-to-unvet.splice-amulet = ["0.1.16", "0.1.17"]
+
+.. note::
+
+  Unvetting is only supported for SVs and SV validators and does not unvet dependencies for now.

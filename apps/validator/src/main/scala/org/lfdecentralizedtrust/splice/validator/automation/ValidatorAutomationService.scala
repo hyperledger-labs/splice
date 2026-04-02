@@ -44,6 +44,7 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 }
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
@@ -80,6 +81,7 @@ class ValidatorAutomationService(
     params: SpliceParametersConfig,
     latestPackagesOnly: Boolean,
     enabledFeatures: EnabledFeaturesConfig,
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -244,6 +246,7 @@ class ValidatorAutomationService(
       latestPackagesOnly,
       svValidator,
       enabledFeatures.enableUnsupportedDarsUnvetting,
+      additionalPackagesToUnvet,
     )
   )
 

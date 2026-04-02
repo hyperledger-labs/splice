@@ -60,9 +60,7 @@ class TrafficBasedRewardsTimeBasedIntegrationTest
           scanConfig.copy(
             mediatorVerdictIngestion = scanConfig.mediatorVerdictIngestion.copy(
               restartDelay = NonNegativeFiniteDuration.ofMillis(500)
-            ),
-            enableAppActivityRecordAndTrafficIngestion = true,
-            serveAppActivityRecordsAndTraffic = true,
+            )
           )
         )(config)
       )

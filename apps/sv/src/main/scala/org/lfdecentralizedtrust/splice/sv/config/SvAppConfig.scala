@@ -21,7 +21,7 @@ import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -384,6 +384,8 @@ case class SvAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    // Map of package name -> set of versions that should be explicitly unvetted
+    additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
     // If true, we check that topology on mediator and sequencer is the same after
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.

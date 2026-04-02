@@ -926,6 +926,7 @@ class JoiningNodeInitializer(
         _ <- vetting.vetCurrentPackages(
           synchronizerId,
           amuletRules.contract,
+          config.additionalPackagesToUnvet,
         )
         _ = logger.info("Packages vetting completed")
       } yield ()

@@ -605,7 +605,9 @@ class SV1Initializer(
     }
   }
 
-  private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
+  private def requiredDars(
+      initialPackageConfig: InitialPackageConfig
+  )(implicit tc: TraceContext): Seq[UploadablePackage] = {
     Seq(
       DarResources.amulet -> initialPackageConfig.amuletVersion,
       DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
@@ -617,6 +619,7 @@ class SV1Initializer(
           PackageVersion.assertFromString(requiredVersion),
           enabledFeatures.enableUnsupportedDarsUnvetting,
           config.latestPackagesOnly,
+          config.additionalPackagesToUnvet,
         )
         .map(UploadablePackage.fromResource)
     }
