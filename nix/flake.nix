@@ -19,7 +19,6 @@
               if system == "aarch64-darwin"
               then import nixpkgs { system = "x86_64-darwin"; overlays = import ./overlays.nix { use_enterprise = false; }; }
               else oss_pkgs;
-            npmPkgs = oss_pkgs.callPackage ./npmpkgs/default.nix { inherit system; };
 
         in
         {
@@ -29,19 +28,16 @@
           };
           # For now, the default is enterprise. Use `nix develop path:nix#oss` to use the OSS version.
           devShells.default = import ./shell.nix {
-            inherit npmPkgs;
             x86Pkgs = enterprise_x86Pkgs;
             pkgs = enterprise_pkgs;
             variant = "enterprise";
           };
           devShells.oss = import ./shell.nix {
-            inherit npmPkgs;
             x86Pkgs = oss_x86Pkgs;
             pkgs = oss_pkgs;
             variant = "oss";
           };
           devShells.static_tests = import ./shell.nix {
-            inherit npmPkgs;
             x86Pkgs = oss_x86Pkgs;
             pkgs = oss_pkgs;
             variant = "static_tests";

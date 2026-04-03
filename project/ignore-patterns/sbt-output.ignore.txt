@@ -129,3 +129,6 @@ Cannot use file /tmp/hsperfdata_ci
 
 # Produced by the console container build
 WARN: InvalidDefaultArgInFrom
+
+# the script does not try to be secure
+.*api_jwt\.py:153: InsecureKeyLengthWarning:.*

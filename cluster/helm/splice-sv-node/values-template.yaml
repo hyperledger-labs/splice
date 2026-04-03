@@ -69,3 +69,7 @@ service:
   ui:
     port: 80
 logLevel: DEBUG
+
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
+enableReloader: true
+

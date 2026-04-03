@@ -109,7 +109,7 @@ class SequencerAdminConnection(
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.chunk)))
   }
 
-  def getLsuState(file: File)(implicit
+  def getLsuState(file: File, ts: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     val responseObserver = new OutputFileStreamObserver[SequencerLsuStateResponse](
@@ -120,6 +120,7 @@ class SequencerAdminConnection(
       TopologyAdminCommands.Read
         .SequencerLsuState(
           store = None,
+          ts = ts,
           observer = responseObserver,
         )
     ).map(_ => ())
@@ -497,10 +498,10 @@ class SequencerAdminConnection(
     SequencerAdminCommands.DisableMember(member)
   )
 
-  def getLsuTrafficControlState()(implicit
+  def getLsuTrafficControlState(ts: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): Future[ByteString] = runCmd(
-    SequencerAdminCommands.GetLsuTrafficControlState
+    SequencerAdminCommands.GetLsuTrafficControlState(ts)
   )
 
   def setLsuTrafficControlState(memberTraffic: ByteString)(implicit

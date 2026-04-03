@@ -160,3 +160,8 @@ To update their versions, edit the respective Dockerfiles with the new version t
 SHA of the multi-arch manifest (docker then resolves that to the correct architecture at build time). A good source of
 official SHAs for images from docker.io is: https://github.com/docker-library/repo-info.
 To inspect a manifest locally, you can run e.g. `docker buildx imagetools inspect nginx:stable`.
+
+## Bumping splice-shared-gha
+
+In order to bump [splice-shared-gha](https://github.com/hyperledger-labs/splice-shared-gha), please run [Bump splice-shared-gha version](https://github.com/hyperledger-labs/splice/actions/workflows/bump_splice_shared_gha.yml) job and merge the PR that will
+be created by the job.

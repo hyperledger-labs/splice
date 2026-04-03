@@ -5,7 +5,7 @@
   "dependencies": {
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0",
-    "@pulumi/pulumi": "^3.225.0"
+    "@pulumi/pulumi": "^3.228.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -21,7 +21,7 @@
     "up": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiUp.ts"
   },
   "devDependencies": {
-    "@types/sinon": "^10.0.15",
-    "sinon": "^15.0.4"
+    "@types/sinon": "^21.0.0",
+    "sinon": "^21.0.3"
   }
 }

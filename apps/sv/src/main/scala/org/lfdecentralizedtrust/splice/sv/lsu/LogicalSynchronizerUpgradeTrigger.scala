@@ -116,7 +116,9 @@ class LogicalSynchronizerUpgradeTrigger(
       _ <- successorSynchronizerNode.cometbftNode.traverse(
         _.reconcileNetworkConfig(owningNodeSvName, rulesAndState)
       )
-      state <- exporter.exportLSUState(task.work.announcement.upgradeTime)
+      state <- exporter.exportLSUState(
+        topologyExportTime = None
+      )
       parameters <- initializer.initializeSynchronizer(
         state,
         task.work.announcement.successorSynchronizerId,

@@ -4,10 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.lsu
 
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.{
@@ -23,6 +24,7 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import SvOnboardingConfig.RollForwardLsuTimestampConfig
 import org.lfdecentralizedtrust.splice.sv.lsu.{LsuNodeInitializer, LsuStateExporter}
 import org.lfdecentralizedtrust.splice.sv.onboarding.{DsoPartyHosting, NodeInitializerUtil}
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
@@ -45,6 +47,7 @@ class RollForwardLsuInitializer(
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     newJoiningNodeInitializer: Option[SvOnboardingConfig.JoinWithKey] => JoiningNodeInitializer,
+    rollForwardConfig: SvOnboardingConfig.RollForwardLsu,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends NodeInitializerUtil {
@@ -110,16 +113,38 @@ class RollForwardLsuInitializer(
         },
         logger,
       )
-      synchronizerId <- legacyNode.sequencerAdminConnection.getPhysicalSynchronizerId()
-      announcements <- legacyNode.sequencerAdminConnection.listLsuAnnouncements(
-        synchronizerId.logical
+      legacyPhysicalSynchronizerId <- legacyNode.sequencerAdminConnection
+        .getPhysicalSynchronizerId()
+      newPhysicalSynchronizerId = PhysicalSynchronizerId(
+        legacyPhysicalSynchronizerId.logical,
+        rollForwardConfig.newPhysicalSynchronizerSerial,
+        rollForwardConfig.newPhysicalSynchronizerProtocolVersion,
       )
-      announcement = announcements match {
-        case Seq(announcement) => announcement
-        case _ =>
-          throw new IllegalStateException(
-            s"Expected exactly one LSU announcement but got: $announcements"
-          )
+      timestamps <- rollForwardConfig.exportTimes match {
+        case Some(config) =>
+          logger.info(s"Using export timestamps from config: $config")
+          Future.successful(config)
+        case None =>
+          for {
+            announcements <- legacyNode.sequencerAdminConnection.listLsuAnnouncements(
+              legacyPhysicalSynchronizerId.logical
+            )
+          } yield {
+            announcements match {
+              case Seq(announcement) =>
+                logger.info(s"Using export timestamps from announcement: $announcement")
+                RollForwardLsuTimestampConfig(
+                  topologyExportTime =
+                    CantonTimestamp.assertFromInstant(announcement.base.validFrom),
+                  trafficExportTime = announcement.mapping.upgradeTime,
+                )
+              case _ =>
+                throw new IllegalStateException(
+                  s"Expected exactly one LSU announcement but got: $announcements"
+                )
+            }
+          }
+
       }
       _ <-
         if (sequencerInitialized && mediatorInitialized) {
@@ -127,23 +152,28 @@ class RollForwardLsuInitializer(
           Future.unit
         } else {
           for {
-            state <- exporter.exportLSUState(announcement.mapping.upgradeTime)
+            state <- exporter.exportLSUState(
+              topologyExportTime = rollForwardConfig.exportTimes.map(_.topologyExportTime)
+            )
             _ <- initializer.initializeSynchronizer(
               state,
-              announcement.mapping.successorSynchronizerId,
+              newPhysicalSynchronizerId,
               now = clock.now,
               // Upgrade time is used to publish the sequencer sucessor which we don't care about for roll-forward LSUs.
               upgradeTime = None,
             )
+            trafficState <- legacyNode.sequencerAdminConnection.getLsuTrafficControlState(ts =
+              rollForwardConfig.exportTimes.map(_.trafficExportTime)
+            )
+            _ <- currentNode.sequencerAdminConnection.setLsuTrafficControlState(trafficState)
           } yield ()
         }
       sequencerId <- currentNode.sequencerAdminConnection.getSequencerId
       participantPhysicalSynchronizerId <- participantAdminConnection.getPhysicalSynchronizerId(
-        synchronizerId.logical
+        legacyPhysicalSynchronizerId.logical
       )
-      // TODO(#4683) Transfer traffic
       _ <-
-        if (participantPhysicalSynchronizerId == announcement.mapping.successorSynchronizerId) {
+        if (participantPhysicalSynchronizerId == newPhysicalSynchronizerId) {
           logger.info("Participant already migrated")
           Future.unit
         } else {
@@ -152,9 +182,9 @@ class RollForwardLsuInitializer(
           )
           participantAdminConnection
             .performManualLsu(
-              synchronizerId,
-              announcement.mapping.successorSynchronizerId,
-              Some(announcement.mapping.upgradeTime),
+              legacyPhysicalSynchronizerId,
+              newPhysicalSynchronizerId,
+              Some(timestamps.trafficExportTime),
               Map(
                 sequencerId -> initializer.successorConnection
               ),

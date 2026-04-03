@@ -111,6 +111,7 @@ abstract class NodeBootstrapBase[
       nodeConfig.nodeTypeName,
       nodeConfig.adminApi,
       parameterConfig,
+      parameterConfig.loggingConfig.api,
       loggerFactory,
       getNode,
     )
