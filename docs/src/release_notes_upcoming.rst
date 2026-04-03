@@ -109,5 +109,3 @@
         These will be automatically archived as soon as traffic-based app rewards are enabled.
         Thus no double-issuance of rewards will occur.
 
-
-    - FIXME: Add Daml versions implementing the CIP-104 change
