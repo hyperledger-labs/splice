@@ -402,6 +402,21 @@ class ScanTimeBasedIntegrationTest
     ansRules.payload.config shouldBe defaultAnsConfig()
   }
 
+  def compareAcsV0V1(
+      v0: Vector[definitions.CreatedEvent],
+      v1: Vector[definitions.ActiveContract],
+  ): Unit = {
+    v0.zip(v1).foreach { case (c0, c1) =>
+      c0.contractId shouldBe c1.contractId
+      c0.templateId shouldBe c1.templateId
+      c0.packageName shouldBe c1.packageName
+      c0.createArguments shouldBe c1.createArguments
+      c0.createdAt shouldBe c1.createdAt
+      c0.signatories should contain theSameElementsInOrderAs c1.signatories
+      c0.observers should contain theSameElementsInOrderAs c1.observers
+    }
+  }
+
   "snapshotting" in { implicit env =>
     val (aliceUserParty, _) = onboardAliceAndBob()
     val migrationId = sv1ScanBackend.config.domainMigrationId
@@ -524,12 +539,18 @@ class ScanTimeBasedIntegrationTest
           .owner should be(aliceUserParty.toProtoPrimitive)
       }
       val snapshotAfterCts = CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant)
-      val holdingsState = sv1ScanBackend.getHoldingsStateAt(
+      val holdingsStateV0 = sv1ScanBackend.getHoldingsStateAt(
         snapshotAfterCts,
         migrationId,
         partyIds = Vector(aliceUserParty),
       )
-      inside(holdingsState) { case Some(holdings) =>
+      val holdingsStateV1 = sv1ScanBackend.getHoldingsStateAtV1(
+        snapshotAfterCts,
+        migrationId,
+        partyIds = Vector(aliceUserParty),
+      )
+      compareAcsV0V1(holdingsStateV0.value.createdEvents, holdingsStateV1.value.createdEvents)
+      inside(holdingsStateV1) { case Some(holdings) =>
         holdings.createdEvents should be(coins)
       }
 
@@ -679,19 +700,7 @@ class ScanTimeBasedIntegrationTest
         .value
         .createdEvents
 
-      acsAtMidnightFromScan
-        .zip(acsV1AtMidnightFromScan)
-        .foreach(
-          { case (v0, v1) =>
-            v0.contractId shouldBe v1.contractId
-            v0.templateId shouldBe v1.templateId
-            v0.packageName shouldBe v1.packageName
-            v0.createArguments shouldBe v1.createArguments
-            v0.createdAt shouldBe v1.createdAt
-            v0.signatories should contain theSameElementsInOrderAs v1.signatories
-            v0.observers should contain theSameElementsInOrderAs v1.observers
-          }
-        )
+      compareAcsV0V1(acsAtMidnightFromScan, acsV1AtMidnightFromScan)
 
     }
   }

@@ -498,6 +498,29 @@ abstract class ScanAppReference(
       )
     }
 
+  def getHoldingsStateAtV1(
+      at: CantonTimestamp,
+      migrationId: Long,
+      partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsStateRequest.RecordTimeMatch.Exact
+      ),
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetHoldingsStateAtV1(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          partyIds,
+          recordTimeMatch,
+          after,
+          pageSize,
+        )
+      )
+    }
+
   def getHoldingsSummaryAt(
       at: CantonTimestamp,
       migrationId: Long,

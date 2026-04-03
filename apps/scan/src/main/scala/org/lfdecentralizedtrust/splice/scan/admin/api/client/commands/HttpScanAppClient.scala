@@ -1192,6 +1192,47 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetHoldingsStateAtV1(
+      at: java.time.OffsetDateTime,
+      migrationId: Long,
+      partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch],
+      after: Option[Long] = None,
+      pageSize: Int = 100,
+  ) extends InternalBaseCommand[
+        http.GetHoldingsStateAtV1Response,
+        Option[definitions.AcsResponseV1],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetHoldingsStateAtV1Response] =
+      client.getHoldingsStateAtV1(
+        definitions.HoldingsStateRequest(
+          migrationId,
+          at,
+          recordTimeMatch,
+          after,
+          pageSize,
+          partyIds.map(_.toProtoPrimitive),
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetHoldingsStateAtV1Response, Either[
+      String,
+      Option[definitions.AcsResponseV1],
+    ]] = {
+      case http.GetHoldingsStateAtV1Response.OK(value) =>
+        Right(Some(value))
+      case http.GetHoldingsStateAtV1Response.NotFound(_) =>
+        Right(None)
+    }
+
+  }
+
   case class GetHoldingsSummaryAt(
       at: java.time.OffsetDateTime,
       migrationId: Long,
