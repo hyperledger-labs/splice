@@ -570,7 +570,7 @@ class ScanTimeBasedIntegrationTest
       advanceTime(java.time.Duration.ofMinutes(10))
       val atOrBefore = getLedgerTime
       val atOrBeforeCts = CantonTimestamp.assertFromInstant(atOrBefore.toInstant)
-      val holdingsStateAtOrBefore = sv1ScanBackend.getHoldingsStateAt(
+      val holdingsStateAtOrBefore = sv1ScanBackend.getHoldingsStateAtV1(
         atOrBeforeCts,
         migrationId,
         partyIds = Vector(aliceUserParty),
@@ -581,7 +581,7 @@ class ScanTimeBasedIntegrationTest
         holdings.recordTime shouldBe snapshotAfter.value
       }
 
-      sv1ScanBackend.getHoldingsStateAt(
+      sv1ScanBackend.getHoldingsStateAtV1(
         atOrBeforeCts,
         migrationId,
         partyIds = Vector(aliceUserParty),
