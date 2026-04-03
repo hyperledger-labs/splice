@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_Add
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.CopyVotesTrigger
 import org.lfdecentralizedtrust.splice.util.SvTestUtil
 
@@ -33,6 +34,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         (_, config) =>
           ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
             _.withPausedTrigger[CopyVotesTrigger]
+              .withPausedTrigger[CloseVoteRequestTrigger]
           )(config),
       )
 
