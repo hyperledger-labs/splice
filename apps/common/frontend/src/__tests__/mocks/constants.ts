@@ -193,6 +193,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                 featuredAppActivityMarkerAmount: null,
                 optDevelopmentFundManager: null,
                 externalPartyConfigStateTickDuration: null,
+                rewardConfig: null,
               },
             },
           },
