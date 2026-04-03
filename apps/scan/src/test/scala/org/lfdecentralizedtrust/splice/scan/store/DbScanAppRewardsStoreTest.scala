@@ -678,6 +678,65 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    // -- computeRewardHashes tests --------------------------------------------
+
+    "computeRewardHashes — leaf batches for 3 parties with batchSize=2" in {
+      for {
+        (store, historyId) <- newStore()
+        // 3 parties: seq_nums 0, 1, 2
+        // With batchSize=2: batch 0 = [0,1], batch 1 = [2]
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(
+            AppActivityPartyTotalT(historyId, roundNumber, 5000000L, 0, "alice::provider", 1L),
+            AppActivityPartyTotalT(historyId, roundNumber, 3000000L, 1, "bob::provider", 1L),
+            AppActivityPartyTotalT(historyId, roundNumber, 1000000L, 2, "charlie::provider", 1L),
+          )
+        )
+        // Insert reward totals for alice and bob (charlie is below threshold)
+        _ <- store.insertAppRewardPartyTotals(
+          Seq(
+            AppRewardPartyTotalT(historyId, roundNumber, 0, BigDecimal("10.0")),
+            AppRewardPartyTotalT(historyId, roundNumber, 1, BigDecimal("6.0")),
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
+        batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+      } yield {
+        // Should have 2 leaf batches at level 0
+        val level0 = batchHashes.filter(_.batchLevel == 0)
+        level0 should have size 2
+
+        // Batch 0: parties [0, 1], Batch 1: party [2]
+        level0(0).partySeqNumBeginIncl shouldBe 0
+        level0(0).partySeqNumEndExcl shouldBe 2
+        level0(1).partySeqNumBeginIncl shouldBe 2
+        level0(1).partySeqNumEndExcl shouldBe 3
+
+        // Hashes should be 32 bytes (SHA-256)
+        all(level0.map(_.batchHash.size)) shouldBe 32
+      }
+    }
+
+    "computeRewardHashes — single party produces single leaf batch" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(AppActivityPartyTotalT(historyId, roundNumber, 5000000L, 0, "alice::provider", 1L))
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          Seq(AppRewardPartyTotalT(historyId, roundNumber, 0, BigDecimal("10.0")))
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
+        batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+      } yield {
+        val level0 = batchHashes.filter(_.batchLevel == 0)
+        level0 should have size 1
+        level0.head.partySeqNumBeginIncl shouldBe 0
+        level0.head.partySeqNumEndExcl shouldBe 1
+        level0.head.batchHash.size shouldBe 32
+      }
+    }
+
   }
 
   private val verdictCounter = new java.util.concurrent.atomic.AtomicLong(1)

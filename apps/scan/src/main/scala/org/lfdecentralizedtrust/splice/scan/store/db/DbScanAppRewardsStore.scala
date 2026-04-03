@@ -507,16 +507,16 @@ class DbScanAppRewardsStore(
 
   /** Runs the full reward computation pipeline for a single round.
     *
-    * TODO(#4384): Will be extended to run CC conversion (stage 2) and
-    * Merkle tree hashing (stage 3) in a single transaction.
-    * TODO(#4382): Update argument list so that it can invoke computeRewardTotals
-    * after aggregateActivityTotals.
+    * TODO(#4382): Update argument list to accept RewardIssuanceParams (for
+    * computeRewardTotals) and batchSize (for computeRewardHashes).
     */
   def computeAndStoreRewards(
       roundNumber: Long
   )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] =
     for {
       _ <- aggregateActivityTotals(roundNumber)
+      // TODO(#4382): call computeRewardTotals(roundNumber, params) here
+      // TODO(#4382): call computeRewardHashes(roundNumber, batchSize) here
       summary <- readComputationSummary(roundNumber)
     } yield summary
 
@@ -680,6 +680,76 @@ class DbScanAppRewardsStore(
     """.as[DbScanAppRewardsStore.RewardComputationSummary].head,
       "appRewards.readComputationSummary",
     )
+
+  // -- Merkle tree hash computation -------------------------------------------
+
+  /** Build Merkle tree of reward hashes for a single round.
+    *
+    * Level 0: hash each batch of MintingAllowances from activity + reward data.
+    * Level 1+: hash batches of batches until a single root remains.
+    * All levels run in a single transaction.
+    */
+  private[store] def computeRewardHashes(
+      roundNumber: Long,
+      batchSize: Int,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import profile.api.jdbcActionExtensionMethods
+
+    val action = for {
+      leafCount <- insertLeafBatches(roundNumber, batchSize)
+      _ = logger.debug(
+        s"Inserted $leafCount leaf batches for round $roundNumber."
+      )
+    } yield ()
+
+    runUpdate(
+      action
+        .map(_ => logger.debug(s"Computed reward hashes for round $roundNumber."))
+        .transactionally,
+      "appRewards.computeRewardHashes",
+    )
+  }
+
+  /** Level 0: group parties into batches, hash each as BatchOfMintingAllowances.
+    *
+    * LEFT JOINs activity totals with reward totals so parties below threshold
+    * appear with amount='0'.
+    *
+    * Uses plpgsql hash functions equivalents to Splice.Amulet.CryptoHash for hashing.
+    *
+    * Returns the number of leaf batches created.
+    */
+  private def insertLeafBatches(
+      roundNumber: Long,
+      batchSize: Int,
+  ) =
+    sql"""insert into #${Tables.appRewardBatchHashes}(
+            history_id, round_number, batch_level,
+            party_seq_num_begin_incl, party_seq_num_end_excl, batch_hash)
+          select
+            $historyId, $roundNumber, 0,
+            min(seq_num), max(seq_num) + 1,
+            decode(hash_batch_of_minting_allowances(
+              array_agg(
+                hash_minting_allowance(party, coalesce(amount, '0'))
+                order by seq_num
+              )
+            ), 'hex')
+          from (
+            select
+              a.app_provider_party_seq_num as seq_num,
+              a.app_provider_party as party,
+              r.total_app_reward_amount::text as amount,
+              (a.app_provider_party_seq_num / $batchSize) as batch_num
+            from #${Tables.appActivityPartyTotals} a
+            left join #${Tables.appRewardPartyTotals} r
+              on a.history_id = r.history_id
+              and a.round_number = r.round_number
+              and a.app_provider_party_seq_num = r.app_provider_party_seq_num
+            where a.history_id = $historyId and a.round_number = $roundNumber
+          ) sub
+          group by batch_num
+    """.asUpdate
 
   // -- Private helpers -------------------------------------------------------
 
