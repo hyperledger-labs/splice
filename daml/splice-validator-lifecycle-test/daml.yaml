@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: splice-validator-lifecycle-test
 source: daml
-version: 0.1.6
+version: 0.1.7
 dependencies:
   - daml-prim
   - daml-stdlib
