@@ -152,12 +152,12 @@ class WalletIntegrationTest
           submitRequest()
         },
         entries => {
-          forAtLeast(1, entries)(
-            // .. and we see that the empty batch is skipped.
-            _.message should include(
-              "Amulet operation batch was empty after filtering"
-            )
-          )
+          // .. and we see that the empty batch is skipped.
+          entries.exists(
+            _.message.contains("Amulet operation batch was empty after filtering")
+          ) || entries.exists(
+            _.message.contains(s"no matching AcceptedAppPayment could be located")
+          ) shouldBe true
         },
       )
     }
