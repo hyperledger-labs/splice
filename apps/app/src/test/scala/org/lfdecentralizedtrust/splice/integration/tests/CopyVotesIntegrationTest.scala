@@ -20,13 +20,27 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
 
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
+  private def addSvAction(index: Int) = new ARC_DsoRules(
+    new SRARC_AddSv(
+      new DsoRules_AddSv(
+        s"copy-vote-host-$index:1234",
+        s"Copy Vote Candidate $index",
+        1000L + index,
+        s"copy-vote-participant-$index",
+        new Round(100L + index),
+      )
+    )
+  )
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
           ConfigTransforms.updateAllSvAppConfigs { (name, svConfig) =>
-            if (name == "sv2")
+            if (name == "sv1")
+              svConfig.copy(copyVotesFrom = Some("Digital-Asset-Eng-2"))
+            else if (name == "sv2")
               svConfig.copy(copyVotesFrom = Some("Digital-Asset-2"))
             else svConfig
           }(config),
@@ -42,15 +56,15 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
     implicit env =>
       val _ = env
 
-      def copyVotesTrigger = sv2Backend.dsoAutomation.trigger[CopyVotesTrigger]
+      def sv2CopyVotesTrigger = sv2Backend.dsoAutomation.trigger[CopyVotesTrigger]
 
-      def resumeTriggerAndCheck(assertion: => org.scalatest.compatible.Assertion) = {
-        copyVotesTrigger.resume()
+      def resumeSv2TriggerAndCheck(assertion: => org.scalatest.compatible.Assertion) = {
+        sv2CopyVotesTrigger.resume()
         try
           eventually() {
             assertion
           }
-        finally copyVotesTrigger.pause().futureValue
+        finally sv2CopyVotesTrigger.pause().futureValue
       }
 
       def voteRequestOnSv2(
@@ -66,18 +80,6 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
           .listVoteRequests()
           .find(_.payload.reason.body == body)
           .value
-
-      def addSvAction(index: Int) = new ARC_DsoRules(
-        new SRARC_AddSv(
-          new DsoRules_AddSv(
-            s"copy-vote-host-$index:1234",
-            s"Copy Vote Candidate $index",
-            1000L + index,
-            s"copy-vote-participant-$index",
-            new Round(100L + index),
-          )
-        )
-      )
 
       val acceptAction = addSvAction(1)
       val rejectAction = addSvAction(2)
@@ -109,7 +111,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )(
         "sv2 copies sv1's accept vote",
         _ =>
-          resumeTriggerAndCheck {
+          resumeSv2TriggerAndCheck {
             val vr = voteRequestOnSv2(acceptTrackingId)
             val votes = vr.payload.votes.asScala
             votes should have size 2
@@ -125,7 +127,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )(
         "sv2 does not create a duplicate vote",
         _ =>
-          resumeTriggerAndCheck {
+          resumeSv2TriggerAndCheck {
             val vr = voteRequestOnSv2(acceptTrackingId)
             vr.payload.votes.asScala should have size 2
           },
@@ -173,7 +175,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )(
         "sv2 copies sv1's reject vote",
         _ =>
-          resumeTriggerAndCheck {
+          resumeSv2TriggerAndCheck {
             val vr = voteRequestOnSv2(rejectTrackingId)
             val votes = vr.payload.votes.asScala
             votes should have size 3
@@ -208,7 +210,7 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )(
         "sv2 updates its copied vote to match sv1",
         _ =>
-          resumeTriggerAndCheck {
+          resumeSv2TriggerAndCheck {
             val vr = voteRequestOnSv2(rejectTrackingId)
             val votes = vr.payload.votes.asScala
             votes should have size 3
@@ -246,11 +248,137 @@ class CopyVotesIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
       )(
         "sv2 does not create a vote for the third request",
         _ =>
-          resumeTriggerAndCheck {
+          resumeSv2TriggerAndCheck {
             val vr = voteRequestOnSv2(noVoteTrackingId)
             vr.payload.votes.asScala should have size 1
             vr.payload.votes.asScala.contains("Digital-Asset-Eng-2") shouldBe false
           },
       )
+  }
+
+  "CopyVotesTrigger does not loop when sv1 and sv2 copy votes from each other" in { implicit env =>
+    val _ = env
+
+    def sv1CopyVotesTrigger = sv1Backend.dsoAutomation.trigger[CopyVotesTrigger]
+    def sv2CopyVotesTrigger = sv2Backend.dsoAutomation.trigger[CopyVotesTrigger]
+
+    def resumeMutualCopyTriggersAndCheck(assertion: => org.scalatest.compatible.Assertion) = {
+      sv1CopyVotesTrigger.resume()
+      sv2CopyVotesTrigger.resume()
+      try
+        eventually() {
+          assertion
+        }
+      finally {
+        sv1CopyVotesTrigger.pause().futureValue
+        sv2CopyVotesTrigger.pause().futureValue
+      }
+    }
+
+    def voteRequestOnSv1(
+        trackingId: org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest.ContractId
+    ) =
+      sv1Backend
+        .listVoteRequests()
+        .find(vr => getTrackingId(vr) == trackingId)
+        .value
+
+    def voteRequestOnSv2(
+        trackingId: org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest.ContractId
+    ) =
+      sv2Backend
+        .listVoteRequests()
+        .find(vr => getTrackingId(vr) == trackingId)
+        .value
+
+    val action = addSvAction(4)
+
+    val (_, voteRequest) = actAndCheck(
+      "sv1 creates a vote request for mutual copying",
+      sv1Backend.createVoteRequest(
+        sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+        action,
+        "url",
+        "copy vote request 4",
+        sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+        None,
+      ),
+    )(
+      "the new vote request is visible to sv2 with only sv1's vote",
+      _ => {
+        val vr = sv2Backend
+          .listVoteRequests()
+          .find(_.payload.reason.body == "copy vote request 4")
+          .value
+        vr.payload.votes.asScala should have size 1
+        vr
+      },
+    )
+    val trackingId = getTrackingId(voteRequest)
+    val initialSourceVoteReason =
+      voteRequest.payload.votes.asScala("Digital-Asset-2").reason.body
+
+    actAndCheck(
+      "resume both copy triggers after sv1 votes",
+      (),
+    )(
+      "sv2 copies sv1's vote without sv1 rewriting itself",
+      _ =>
+        resumeMutualCopyTriggersAndCheck {
+          val sv1Votes = voteRequestOnSv1(trackingId).payload.votes.asScala
+          val sv2Votes = voteRequestOnSv2(trackingId).payload.votes.asScala
+
+          sv1Votes should have size 2
+          sv2Votes should have size 2
+
+          sv1Votes("Digital-Asset-2").accept shouldBe true
+          sv1Votes("Digital-Asset-2").reason.body shouldBe initialSourceVoteReason
+
+          sv1Votes("Digital-Asset-Eng-2").accept shouldBe true
+          sv1Votes("Digital-Asset-Eng-2").reason.body should include(
+            s"Automatically Copied from Digital-Asset-2: $initialSourceVoteReason"
+          )
+        },
+    )
+
+    actAndCheck(
+      "sv2 updates its own vote to reject",
+      sv2Backend.castVote(
+        trackingId,
+        false,
+        "sv2-url",
+        "sv2 changed its mind",
+      ),
+    )(
+      "sv2's manual reject vote is recorded before copying back",
+      _ => {
+        val votes = voteRequestOnSv2(trackingId).payload.votes.asScala
+        votes("Digital-Asset-Eng-2").accept shouldBe false
+        votes("Digital-Asset-Eng-2").reason.body shouldBe "sv2 changed its mind"
+      },
+    )
+
+    actAndCheck(
+      "resume both copy triggers after sv2 changes its vote",
+      (),
+    )(
+      "sv1 copies the new decision without sv2 being overwritten",
+      _ =>
+        resumeMutualCopyTriggersAndCheck {
+          val sv1Votes = voteRequestOnSv1(trackingId).payload.votes.asScala
+          val sv2Votes = voteRequestOnSv2(trackingId).payload.votes.asScala
+
+          sv1Votes should have size 2
+          sv2Votes should have size 2
+
+          sv1Votes("Digital-Asset-2").accept shouldBe false
+          sv1Votes("Digital-Asset-2").reason.body should include(
+            "Automatically Copied from Digital-Asset-Eng-2: sv2 changed its mind"
+          )
+
+          sv2Votes("Digital-Asset-Eng-2").accept shouldBe false
+          sv2Votes("Digital-Asset-Eng-2").reason.body shouldBe "sv2 changed its mind"
+        },
+    )
   }
 }
