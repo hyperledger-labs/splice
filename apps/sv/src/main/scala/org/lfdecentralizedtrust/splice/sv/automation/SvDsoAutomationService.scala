@@ -410,6 +410,17 @@ class SvDsoAutomationService(
         )
       )
     }
+
+    config.copyVotesFrom.foreach { svName =>
+      registerTrigger(
+        new CopyVotesTrigger(
+          triggerContext,
+          dsoStore,
+          connection(SpliceLedgerConnectionPriority.Low),
+          svName,
+        )
+      )
+    }
   }
 
   private val localSequencerClientContext: Option[LocalSequencerClientContext] =
@@ -533,6 +544,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
+      aTrigger[CopyVotesTrigger],
       aTrigger[AmuletPriceMetricsTrigger],
       aTrigger[CreateBootstrapExternalPartyConfigStateInstructionTrigger],
     )

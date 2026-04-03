@@ -8,3 +8,8 @@
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
 .. release-notes:: Upcoming
+
+    - Deployment
+
+        - SV apps now support a ``copyVotesFrom`` setting that automatically mirrors governance votes
+          from another named SV, which can help operators keep votes in sync when they run multiple SV nodes.

@@ -375,6 +375,9 @@ case class SvAppBackendConfig(
     // Map of package name -> set of versions that should be explicitly unvetted
     additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]] = Map.empty,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
+    // If set, automatically copies governance votes (VoteRequests) from the named SV.
+    // The value is the SV name as it appears in DsoRules.svs (e.g. "Digital-Asset-2").
+    copyVotesFrom: Option[String] = None,
     // If true, we check that topology on mediator and sequencer is the same after
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
