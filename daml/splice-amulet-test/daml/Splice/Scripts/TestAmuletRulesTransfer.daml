@@ -47,7 +47,7 @@ testUsageFees = do
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
     checkBalanceChanges defaultAppWithUsers $
-    submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -258,7 +258,7 @@ testSenderChangeAndOutput = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -312,7 +312,7 @@ testSenderSmallChange = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -362,7 +362,7 @@ testSenderSmallChangeNoSenderOutput = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -452,7 +452,7 @@ testAppRewardBeneficiaries = do
 
     transferResult <-
       checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-      submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -479,7 +479,7 @@ testAppRewardBeneficiaries = do
         -- unfeatured with beneficiaries
 
         checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-          submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+          submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs provider1.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
             transfer = Transfer with
               sender = alice.primaryParty
               provider = alice.primaryParty
