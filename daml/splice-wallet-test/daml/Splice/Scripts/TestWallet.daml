@@ -5,6 +5,7 @@ module Splice.Scripts.TestWallet where
 
 import DA.Action
 import DA.Assert
+import DA.Foldable (foldMap)
 import DA.Time
 import Daml.Script
 import DA.List
@@ -83,7 +84,7 @@ collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContext app provider
   -- multi party submit to simplify test
-  _ <- submitMultiMustFail (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  _ <- submitMustFail (foldMap actAs (signatory acceptedPayment) <> readAs app.dso) $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
 
 sendPreapprovedTransfer : AmuletApp -> AmuletUser -> AmuletUser -> AmuletUser -> Decimal -> Script AmuletOperationOutcome

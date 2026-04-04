@@ -200,6 +200,9 @@ getUserReadAs user = do
   rights <- listUserRights user
   pure [p | CanReadAs p <- rights]
 
+getUserReadAs' : UserId -> Script SubmitOptions
+getUserReadAs' user = foldMap readAs <$> getUserReadAs user
+
 
 -- Issuance automation
 ----------------------

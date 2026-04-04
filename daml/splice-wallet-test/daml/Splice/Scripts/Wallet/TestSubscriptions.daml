@@ -5,6 +5,7 @@ module Splice.Scripts.Wallet.TestSubscriptions where
 
 import DA.Action
 import DA.Assert
+import DA.Foldable (foldMap)
 import DA.Time
 import DA.List
 import Daml.Script
@@ -266,10 +267,10 @@ makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state
 failMakeSubscriptionPayment
   : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState -> Script ()
 failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
-  readAs <- getUserReadAs sender.userId
+  readAs <- getUserReadAs' sender.userId
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
-  submitMultiMustFail [sender.primaryParty, walletProvider] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  submitMustFail (foldMap actAs [sender.primaryParty, walletProvider] <> readAs) $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context
     walletProvider
@@ -281,17 +282,17 @@ collectInitialSubscriptionPayment app provider receiver sender payment = do
 
 collectInitialSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Amulet)
 collectInitialSubscriptionPaymentInRound app round provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
-  result <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+  result <- submit (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
   return (result.subscription, result.subscriptionState, result.amulet)
 
 collectInitialSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script ()
 collectInitialSubscriptionPaymentMustFail app provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContext app provider
-  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+  submitMustFail (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
 
 collectSubscriptionPayment : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Amulet)
@@ -301,17 +302,17 @@ collectSubscriptionPayment app provider receiver sender payment = do
 
 collectSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Amulet)
 collectSubscriptionPaymentInRound app round provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
-  result <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+  result <- submit (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionPayment_Collect with
     transferContext
   return (result.subscriptionState, result.amulet)
 
 collectSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script ()
 collectSubscriptionPaymentMustFail app provider receiver sender payment = do
-  readAs <- getUserReadAs receiver.userId
+  readAs <- getUserReadAs' receiver.userId
   transferContext <- getAppTransferContext app provider
-  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+  submitMustFail (foldMap actAs [receiver.primaryParty, provider.primaryParty, sender] <> readAs) $ exerciseCmd payment SubscriptionPayment_Collect with
     transferContext
 
 diffContracts : [(ContractId a, a)] -> [(ContractId a, a)] -> [(ContractId a, a)]

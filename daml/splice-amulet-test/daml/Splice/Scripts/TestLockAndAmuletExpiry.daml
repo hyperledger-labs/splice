@@ -4,6 +4,7 @@
 module Splice.Scripts.TestLockAndAmuletExpiry where
 
 import DA.Assert
+import DA.Foldable (foldMap)
 
 import Daml.Script
 
@@ -184,8 +185,8 @@ testChoice actAs readAs buildCommand = do
   submitMulti actAs readAs buildCommand
 
 testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
-testChoiceFailed actAs readAs buildCommand = do
-  submitMultiMustFail actAs readAs buildCommand
+testChoiceFailed actAsArgs readAsArgs buildCommand = do
+  submitMustFail (foldMap actAs actAsArgs <> foldMap readAs readAsArgs) buildCommand
   pure ()
 
 getLockedAmuletCmd : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
