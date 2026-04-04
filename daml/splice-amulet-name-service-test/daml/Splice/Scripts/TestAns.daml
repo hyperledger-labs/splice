@@ -22,7 +22,7 @@ testWithSubscription = script do
   runNextIssuance app
   runAmuletDepositBots app
 
-  ansRulesCid <- submitMulti [app.dso] [] $ createCmd AnsRules with
+  ansRulesCid <- submit (actAs app.dso) $ createCmd AnsRules with
     dso = app.dso
     config = defaultAnsRulesConfig
 
@@ -169,7 +169,7 @@ terminatedSubscriptionCanBeCleanedUp = script do
   runNextIssuance app
   runAmuletDepositBots app
 
-  ansRulesCid <- submitMulti [app.dso] [] $ createCmd AnsRules with
+  ansRulesCid <- submit (actAs app.dso) $ createCmd AnsRules with
     dso = app.dso
     config = defaultAnsRulesConfig
 

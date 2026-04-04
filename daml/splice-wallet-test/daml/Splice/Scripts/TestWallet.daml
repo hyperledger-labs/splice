@@ -563,7 +563,7 @@ testTransferPreapproval = script do
   [(_, amuletRules)] <- query @AmuletRules app.dso
   let createFee = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).transferConfig.createFee.fee
 
-  install <- submitMulti [aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = aliceValidator.primaryParty
     endUserName = "alice_validator_user"
     dsoParty = app.dso
@@ -667,7 +667,7 @@ testTransferPreapproval = script do
     provider = bobValidator.primaryParty
     expectedDso = Some app.dso
 
-  bobValidatorInstall <- submitMulti [bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  bobValidatorInstall <- submit (actAs bobValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = bobValidator.primaryParty
     endUserName = "bob_validator_user"
     dsoParty = app.dso
