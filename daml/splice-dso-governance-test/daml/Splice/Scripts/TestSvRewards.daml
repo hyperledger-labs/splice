@@ -54,7 +54,7 @@ test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
     let receiveSvRewardCouponFails sv round rulesCid = do
           (weight, rewardStateCid) <- getSvRewardWeightAndState sv
           -- check that collecting the reward coupon fails
-          void $ submitMultiMustFail [sv] [dso] $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
+          void $ submitMustFail (actAs sv <> readAs dso) $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
             openRoundCid = round._1
             rewardStateCid
             beneficiaries = [(sv, weight)]
@@ -199,7 +199,7 @@ test_SvRewards_With_InitialRound_In_SecondIssuanceCurve = do
     let receiveSvRewardCouponFails sv round rulesCid = do
           (weight, rewardStateCid) <- getSvRewardWeightAndState sv
           -- check that collecting the reward coupon fails
-          void $ submitMultiMustFail [sv] [dso] $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
+          void $ submitMustFail (actAs sv <> readAs dso) $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
             openRoundCid = round._1
             rewardStateCid
             beneficiaries = [(sv, weight)]
@@ -323,10 +323,10 @@ test_SvRewardStateMerge = do
   rewardStates <- queryFilter @SvRewardState dso (\state -> state.svName == "sv1")
   length rewardStates === 1
   -- Can't merge a single contract
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3] (Some sv1))
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3] (Some sv1))
   -- Cannot merge contracts for different SV names
   [(sv2RewardStateCid1, _)] <- queryFilter @SvRewardState dso (\state -> state.svName == "sv2")
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3, sv2RewardStateCid1] (Some sv1))
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3, sv2RewardStateCid1] (Some sv1))
   pure ()
 
 test_SvRewardUpdatedWeight : Script ()

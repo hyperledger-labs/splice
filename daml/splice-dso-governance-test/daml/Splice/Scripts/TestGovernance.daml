@@ -59,7 +59,7 @@ testVoteRequestAcceptanceWithoutEffectivity = do
   requestCid <- castVote app sv2 requestCid1 False
 
   -- there are two votes, which is not enough to consider the vote definitive and grant the app right
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
     sv = Some sv1
@@ -73,7 +73,7 @@ testVoteRequestAcceptanceWithoutEffectivity = do
   voteRequest.trackingCid === Some requestCid1
 
   -- there are still only two votes, which is not enough to consider the vote definitive and grant the app right
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
     sv = Some sv1
@@ -133,7 +133,7 @@ testVoteRequestAcceptanceWithEffectivity = do
   requestCid <- castVote app sv2 requestCid1 True
 
   -- there are two votes, which is not enough to consider the vote definitive and grant the app right
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
     sv = Some sv1
@@ -147,7 +147,7 @@ testVoteRequestAcceptanceWithEffectivity = do
 
   -- there are now three votes in favor of the change, but there is an effective date
   -- so it cannot be closed yet
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
     sv = Some sv1
@@ -159,7 +159,7 @@ testVoteRequestAcceptanceWithEffectivity = do
   passTime (days 7)
 
   -- even if everybody voted the request is not definitive yet, as the targetEffectiveAt time has not passed
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
     sv = Some sv1
@@ -299,7 +299,7 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
   [] <- query @FeaturedAppRight provider
 
   -- voteRequests with an effective time set before the expiration date must fail
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
@@ -324,7 +324,7 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
   requestCid <- castVote _app sv4 requestCid True
 
   -- early closing is not possible when an effective time is set
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
     sv = Some sv1
@@ -515,7 +515,7 @@ testRacingSvRemoval = do
 
   -- early closing is not possible, as the outcome of the vote is not determined, and we thus leave
   -- time for some of the SV's to change their vote
-  submitMultiMustFail [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv3 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req4
     amuletRulesCid = None
     sv = Some sv3
@@ -898,7 +898,7 @@ testOffboardSvAndAmuletPriceVotes = do
 
   -- one cannot archive a vote by listing it as a duplicate of its own
   let [(sv3VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv3) amuletPriceVotes
-  submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_GarbageCollectAmuletPriceVotes with
+  submitMustFail (actAs sv2 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_GarbageCollectAmuletPriceVotes with
     nonSvVoteCids = []
     duplicateVoteCids = [[sv3VoteCid, sv3VoteCid]]
     sv = Some sv2
@@ -920,7 +920,7 @@ testVoteRequestExpireWithoutEffectivity = do
     voteRequestTimeout = None
 
   -- attempt to close the vote request before its voting period
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = requestResult.voteRequest
     amuletRulesCid = None
     sv = Some sv1
@@ -962,7 +962,7 @@ testVoteRequestExpireWithEffectivity = do
     voteRequestTimeout = None
 
   -- attempt to close the vote request before its voting period
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = requestResult.voteRequest
     amuletRulesCid = None
     sv = Some sv1
@@ -1019,7 +1019,7 @@ testAmuletPriceVoting = do
   [(voteCid, _)] <- queryFilter @AmuletPriceVote dso (\vote -> vote.sv == sv1)
 
   -- check that price vote updates fail if the coolodwn period is not over
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_UpdateAmuletPriceVote with
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_UpdateAmuletPriceVote with
     sv = sv1
     amuletPrice = 5.0
     voteCid
@@ -1081,7 +1081,7 @@ testVoteCastingCooldown  = do
   let requestCid = result.voteRequest
 
   -- The second vote SV2 fails though
-  _ <- submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+  _ <- submitMustFail (actAs sv2 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
         requestCid
         vote = Vote with
           sv = sv2
@@ -1090,7 +1090,7 @@ testVoteCastingCooldown  = do
           optCastAt = None
 
   -- And that same holds for SV1, as it voted as part of creating the request.
-  _ <- submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+  _ <- submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
         requestCid
         vote = Vote with
           sv = sv1

@@ -31,7 +31,7 @@ testAmuletRulesConfigValidation = do
   amuletRules.configSchedule.initialValue.tickDuration === minutes 20
 
   -- the change of the tick duration fails if the duration is negative
-  submitMultiMustFail [app.dso] [app.dso] $
+  submitMustFail (actAs app.dso <> readAs app.dso) $
     exerciseCmd amuletRulesCid AmuletRules_SetConfig with
       newConfig = makeAmuletConfig (negate (minutes 20)) (RatePerRound 0.000020)
       baseConfig = amuletRules.configSchedule.initialValue

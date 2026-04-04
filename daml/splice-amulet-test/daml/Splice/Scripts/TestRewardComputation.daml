@@ -106,7 +106,7 @@ testRewardComputation = do
 
   -- Provider2 cannot redeem Bob's coupon, even with bob's authorization
   context <- getPaymentTransferContext app provider2
-  submitMultiMustFail [provider1.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  submitMustFail (actAs provider1.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = provider1.primaryParty
       provider = provider1.primaryParty

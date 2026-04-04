@@ -68,7 +68,7 @@ testTransferOffers = script do
   offer <- createOffer 7.0 "To expire" t "to_expire"
   passTime (minutes 6)
   [_] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 7.5)
-  submitMultiMustFail [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
+  submitMustFail (actAs bobValidator.primaryParty <> readAs bob.primaryParty) $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
 
   t <- getTime

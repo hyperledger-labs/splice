@@ -98,7 +98,7 @@ testWithSubscription = script do
 
   -- user can't pay earlier than `renewalDuration` from the next due date
   amulet <- tap app alice 1.5
-  submitMultiMustFail [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  submitMustFail (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso

@@ -141,7 +141,7 @@ testDevelopmentFundCouponExpiry = do
     allocateDevelopmentFundCoupon app fundManager alice.primaryParty amount expiresAt reason [unclaimedDevelopmentFundCouponCid]
 
   -- Unhappy - expiresAt has not been reached
-  submitMultiMustFail [sv1] [app.dso] do
+  submitMustFail (actAs sv1 <> readAs app.dso) do
     exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
       developmentFundCouponCid
       sv = sv1
@@ -195,7 +195,7 @@ testRequiredNumOfConfirmation = do
 
   -- test that expiry is checked
   passTime (minutes 5)
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with
       action
       amuletRulesCid = Some amuletRulesCid
@@ -510,7 +510,7 @@ testTransferPreapprovalExpiry = do
   transferPreapprovalCid <- createTransferPreapproval externalParty validator dso  (now `addRelTime` days 1)
 
   -- Fails before expiry
-  submitMultiMustFail [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
+  submitMustFail (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
     transferPreapprovalCid
     sv = Some sv1
   -- Expire the TransferPreapproval
@@ -620,7 +620,7 @@ testExpireAmuletTransferInstruction = do
                     expireLock = True]
         observers = stakeholders
 
-  submitMultiMustFail [sv1] [app.dso] $ 
+  submitMustFail (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
       amuletRulesCid = amuletRulesCid
       transferInsts = expireBatchChoice 
@@ -710,7 +710,7 @@ testExpireTransferInstructionAlreadyUnlocked = do
                     expireLock = True]
         observers = stakeholders
 
-  submitMultiMustFail [sv1] [app.dso] $ 
+  submitMustFail (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
       amuletRulesCid = amuletRulesCid
       transferInsts = expireBatchChoiceTrue 
@@ -800,7 +800,7 @@ testExpireAmuletAllocation = do
                     expireLock = True]
         observers = stakeholders
 
-  submitMultiMustFail [sv1] [app.dso] $ 
+  submitMustFail (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
       extAmuletRulesCid = extRulesCid
       expireAllocations = expireBatchRequest 
@@ -897,7 +897,7 @@ testExpireAmuletAllocationAlreadyUnlocked = do
                     expireLock = True]
         observers = stakeholders
 
-  submitMultiMustFail [sv1] [app.dso] $ 
+  submitMustFail (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
       extAmuletRulesCid = extRulesCid
       expireAllocations = expireBatchRequestTrue 

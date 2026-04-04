@@ -168,7 +168,7 @@ testExpiringAmuletPaymentRequest = script do
     validatorParty = aliceValidator.primaryParty
 
   -- Try expiring too early
-  submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+  submitMustFail (actAs aliceValidator.primaryParty <> readAs alice.primaryParty) $ exerciseCmd install
         WalletAppInstall_AppPaymentRequest_Expire with
           cid = transferRequest
 

@@ -45,10 +45,10 @@ testLocking = do
 
   [(lockedCid1, _), (lockedCid2, _)] <- query @LockedAmulet alice.primaryParty
 
-  submitMultiMustFail [alice.primaryParty] [app.dso] $
+  submitMustFail (actAs alice.primaryParty <> readAs app.dso) $
     exerciseCmd lockedCid1 LockedAmulet_OwnerExpireLockV2
 
-  submitMultiMustFail [alice.primaryParty] [app.dso] $
+  submitMustFail (actAs alice.primaryParty <> readAs app.dso) $
     exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
   checkTxMetadata' app TxKind_Unlock alice.primaryParty $

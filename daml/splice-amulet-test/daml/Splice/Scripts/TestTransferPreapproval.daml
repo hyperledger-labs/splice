@@ -56,7 +56,7 @@ testTransferPreapprovalSend = script do
   -- Send fails if the pre-approval has expired
   context <- getPaymentTransferContext app bob
   amuletCid <- tap app bob 50.0
-  submitMultiMustFail [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
+  submitMustFail (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
       with
         sender = bob.primaryParty
         context
@@ -78,7 +78,7 @@ testTransferPreapprovalRenewal = script do
 
   -- Renewal fails if provided `newExpiresAt` is earlier than previous `expiresAt`
   providerAmuletCid <- tap app aliceValidator 10.0
-  submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $
+  submitMustFail (actAs aliceValidator.primaryParty <> readAs app.dso) $
     exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid]
@@ -101,7 +101,7 @@ testTransferPreapprovalRenewal = script do
 
   -- Renewal fails if the pre-approval has expired
   providerAmuletCid2 <- tap app aliceValidator 10.0
-  submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $
+  submitMustFail (actAs aliceValidator.primaryParty <> readAs app.dso) $
     exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid2]
@@ -184,7 +184,7 @@ testTransferCommand = script do
   -- Note that the delegate is expected to have access to a node on which `alice` is
   -- hosted at least with observer rights. The readAs right for the DSO party in the submission is just
   -- shortcut to avoid packaging up the DSO party provided contracts (e.g. `AmuletRules`).
-  _ <- submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  _ <- submitMustFail (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context
       inputs = [InputAmulet amulet]
@@ -192,7 +192,7 @@ testTransferCommand = script do
       transferCounterCid
 
   -- receiver is checked
-  _ <- submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  _ <- submitMustFail (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context
       inputs = [InputAmulet amulet]
@@ -233,7 +233,7 @@ testTransferCommand = script do
   passTime (hours 13)
 
   -- Fails if time is after cmd expiry
-  submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  submitMustFail (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = map (InputAmulet . fst) allAmulets
@@ -254,7 +254,7 @@ testTransferCommand = script do
       expectedDso = Some app.dso
 
   -- submission fails if expiresAt is not in the future
-  submitMultiMustFail [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  submitMustFail (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -355,7 +355,7 @@ testTransferCommand = script do
 
   amulet <- tap app alice 50.0
 
-  _ <- submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmdFuture TransferCommand_Send
+  _ <- submitMustFail (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmdFuture TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]

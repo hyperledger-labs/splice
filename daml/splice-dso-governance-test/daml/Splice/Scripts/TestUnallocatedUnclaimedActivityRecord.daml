@@ -227,7 +227,7 @@ test_DsoRules_ExpireUnclaimedActivityRecord = script do
       expiresAt
 
   -- Unhappy path - UnclaimedActivityRecordCid has not expired
-  submitMultiMustFail [sv2] [dso] $
+  submitMustFail (actAs sv2 <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with
       unclaimedActivityRecordCid
       sv = sv2
@@ -261,7 +261,7 @@ allocateMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
   -- Create UnclaimedRewards
   unclaimedRewardsToBurnCids <- forA unclaimedRewardAmounts (mkUnclaimedReward dso)
   -- Allocate the UnallocatedUnclaimedActivityRecord
-  submitMultiMustFail [sv] [dso] $
+  submitMustFail (actAs sv <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_AllocateUnallocatedUnclaimedActivityRecord with
       unallocatedUnclaimedActivityRecordCid
       amuletRulesCid
@@ -290,7 +290,7 @@ allocate unallocatedUnclaimedActivityRecordCid optExpectedLeftover TestContext{.
 
 expireMustFail : ContractId UnallocatedUnclaimedActivityRecord -> TestContext -> Script ()
 expireMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
-  submitMultiMustFail [sv] [dso] $
+  submitMustFail (actAs sv <> readAs dso) $
     exerciseCmd dsoRulesCid DsoRules_ExpireUnallocatedUnclaimedActivityRecord with
       unallocatedUnclaimedActivityRecordCid
       sv

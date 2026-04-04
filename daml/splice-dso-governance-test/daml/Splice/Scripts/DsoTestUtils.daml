@@ -187,7 +187,7 @@ dsoDelegateSubmitsMustFail : AmuletApp -> (ContractId DsoRules -> Commands a) ->
 dsoDelegateSubmitsMustFail app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
   let sv = head (Map.keys dsoRules.svs)
-  submitMultiMustFail [sv] [app.dso] $ mkCommands dsoRulesCid
+  submitMustFail (actAs sv <> readAs app.dso) $ mkCommands dsoRulesCid
 
 svSubmits : AmuletApp -> Party -> (ContractId DsoRules -> Commands a) -> Script a
 svSubmits app sv mkCommands = do

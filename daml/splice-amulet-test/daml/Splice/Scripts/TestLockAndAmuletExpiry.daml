@@ -226,4 +226,4 @@ getLockedAmulet app owner lockHolder amount lockDuration = do
 getLockedAmuletMustFail : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
 getLockedAmuletMustFail app owner lockHolder amount lockDuration =  do
   cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
-  submitMultiMustFail [owner.primaryParty, lockHolder] [app.dso] cmd
+  submitMustFail (actAs owner.primaryParty <> actAs lockHolder <> readAs app.dso) cmd
