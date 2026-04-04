@@ -41,7 +41,7 @@ testTransferExceedsMaxInputs = do
       pure $ InputAmulet amulet
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of inputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
+    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs charlie.primaryParty <> actAs app.dso) $
       createAndExerciseCmd (CheckError app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
@@ -61,7 +61,7 @@ testTransferExceedsMaxOutputs = do
         outputAmulets = map (const outputAmulet) [1..101]
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
+    submit (actAs alice.primaryParty <> actAs bob.primaryParty <> actAs charlie.primaryParty <> actAs app.dso) $
       createAndExerciseCmd (CheckError app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
