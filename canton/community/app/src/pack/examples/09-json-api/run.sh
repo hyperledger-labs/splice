@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Compile the attached model that contains Iou contracts
-daml build --project-root model
+daml build --package-root model
 
 # Start canton console with json enabled and upload daml model
 ../../bin/canton -c json.conf --bootstrap json.canton

@@ -240,7 +240,7 @@ object DamlPlugin extends AutoPlugin {
               command = Seq(
                 damlc.getAbsolutePath,
                 "test",
-                "--project-root",
+                "--package-root",
                 projectDirectory.toString,
               ) ++ Seq("--debug").filter(_ => damlDebug.isDefined),
               cwd = projectDirectory.toFile,
@@ -420,7 +420,7 @@ object DamlPlugin extends AutoPlugin {
       outputDirectory / s"$damlProjectName-$damlProjectVersion.dar"
 
     val damlcCommand = damlc.getAbsolutePath :: "build" ::
-      "--project-root" :: projectDirectory.toString ::
+      "--package-root" :: projectDirectory.toString ::
       "--output" :: versionedDar.getAbsolutePath ::
       "--enable-multi-package=no" :: Nil
     val command =
