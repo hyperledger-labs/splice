@@ -273,7 +273,7 @@ submitExerciseAmuletRulesByKey app actors readers arg = do
   (rules, _) <- fetchAmuletRulesByKey app.dso
   -- TODO(#2957): remove read-as DSO party.
   let adjustedReaders = (app.dso :: readers)
-  submitMulti actors adjustedReaders $ exerciseCmd rules arg
+  submit (foldMap actAs actors <> foldMap readAs adjustedReaders) $ exerciseCmd rules arg
 
 submitExerciseAmuletRulesByKey' : Choice AmuletRules c r => AmuletApp -> AmuletUser -> c -> Script r
 submitExerciseAmuletRulesByKey' app user arg = do

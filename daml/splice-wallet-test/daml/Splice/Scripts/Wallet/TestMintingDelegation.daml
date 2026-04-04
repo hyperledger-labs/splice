@@ -100,7 +100,7 @@ testMintingDelegation = do
         featuredAppRight = None
   (amuletRulesCid, _) <- getAmuletRules app
 
-  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+  submit (actAs delegate <> readAs beneficiary <> readAs app.dso) $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
     inputs = [
         InputValidatorLivenessActivityRecord livenessActivityRecordCid,
         InputAppRewardCoupon appRewardCouponCid,

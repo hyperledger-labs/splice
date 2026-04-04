@@ -199,7 +199,7 @@ testTransferCommand = script do
       transferPreapprovalCidO = Some transferPreapprovalWrongReceiverCid
       transferCounterCid
 
-  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -268,7 +268,7 @@ testTransferCommand = script do
   assert (length allAmulets > 1)
 
   -- fails with out of funds
-  TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso]  $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso)  $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = map (InputAmulet . fst) allAmulets
@@ -333,7 +333,7 @@ testTransferCommand = script do
       description = Some "test-transfer-command"
       expectedDso = Some app.dso
 
-  TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -377,7 +377,7 @@ testTransferCommand = script do
 
   amulet <- tap app alice 50.0
 
-  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -389,7 +389,7 @@ testTransferCommand = script do
   amulet <- tap app alice 50.0
 
   -- transferCmdFuture can now be submitted after the counter advanced
-  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmdFuture TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmdFuture TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -412,7 +412,7 @@ testTransferCommand = script do
       expectedDso = Some app.dso
 
   -- transferCmdFuture can now be submitted after the counter advanced
-  TransferCommand_SendResult (TransferCommandResultFailure msg) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultFailure msg) _ _ <- submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = []
