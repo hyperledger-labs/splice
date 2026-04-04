@@ -4,6 +4,7 @@
 module Splice.Scripts.TestAmuletRulesTransferLimits where
 
 import DA.Action
+import DA.Foldable (foldMap)
 import DA.Text as Text
 import DA.Time
 import DA.Exception
@@ -85,7 +86,7 @@ testTransferExceedsMaxLockHolders = do
     now <- getTime
     let bobParties = map (.primaryParty) bobs
     -- More than the allowed number of lock holders
-    submitMulti ([alice.primaryParty, charlie.primaryParty, app.dso] ++ bobParties) [] $
+    submit (foldMap actAs [alice.primaryParty, charlie.primaryParty, app.dso] <> foldMap actAs bobParties) $
       createAndExerciseCmd (CheckError app.dso ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty

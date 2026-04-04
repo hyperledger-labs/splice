@@ -10,7 +10,7 @@ import Daml.Script
 import DA.Action (void, when, unless)
 import DA.Date
 import DA.Exception
-import DA.Foldable (forA_)
+import DA.Foldable (forA_, foldMap)
 import qualified DA.Map as Map
 import DA.List.Total
 import DA.Optional (fromOptional)
