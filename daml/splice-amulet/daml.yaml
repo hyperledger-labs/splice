@@ -24,7 +24,6 @@ build-options:
   - --ghc-option=-Wunused-matches
   - --target=2.1
   - -Wno-upgrade-exceptions
-  - -Wno-ledger-time-is-alpha
   - -Wno-deprecated-exceptions
 codegen:
   java:
