@@ -174,7 +174,7 @@ testExpiringAmuletPaymentRequest = script do
 
   passTime (minutes 6)
 
-  submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+  submit (actAs aliceValidator.primaryParty <> readAs alice.primaryParty) $ exerciseCmd install
         WalletAppInstall_AppPaymentRequest_Expire with
           cid = transferRequest
 
@@ -395,7 +395,7 @@ testTerminatedPayments = script do
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
   context <- getAppTransferContext app alice
-  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
+  submit (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
   assertTerminatedPayment alice.primaryParty paymentRequest
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
@@ -830,7 +830,7 @@ testBuyMemberTraffic = script do
   _ <- tap app provider2 10.0
 
   let createTrafficRequest amount memberId synchronizerId trackingId expiresAt = do
-      result <- submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
+      result <- submit (actAs provider2Validator.primaryParty <> readAs provider2.primaryParty) $
           exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
             trafficAmount = amount
             memberId = memberId

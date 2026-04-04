@@ -21,7 +21,7 @@ testAmuletRulesConfigValidation = do
 
   -- tick duration can be changed
   [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
-  submitMulti [app.dso] [app.dso] $
+  submit (actAs app.dso <> readAs app.dso) $
     exerciseCmd amuletRulesCid AmuletRules_SetConfig with
       newConfig = makeAmuletConfig (minutes 20) (RatePerRound 0.000020)
       baseConfig = amuletRules.configSchedule.initialValue

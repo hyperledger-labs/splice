@@ -379,7 +379,7 @@ drawOnAllValidatorFaucets app = do
       (\l -> optional True (\state -> state.lastReceivedFor < openRound._2.round) l.faucetState)
     forA_ licenses $ \(lcid, l) ->
       -- submitMulti as the OpenMiningRound would be disclosed using explicit disclosure
-      submitMulti [l.validator] [app.dso] $ exerciseCmd lcid ValidatorLicense_RecordValidatorLivenessActivity with
+      submit (actAs l.validator <> readAs app.dso) $ exerciseCmd lcid ValidatorLicense_RecordValidatorLivenessActivity with
         openRoundCid = openRound._1
 
 -- | Deposit all amulets together with new issuances into a single amulet.

@@ -55,7 +55,7 @@ testSubscription = script do
   (app, Users with .., subscriptionRequestCid) <- testSetup
 
   -- reject...
-  submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
+  submit (actAs alice.primaryParty <> readAs validator) $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
   assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
   -- ...and retry
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"

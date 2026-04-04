@@ -27,7 +27,7 @@ testWithSubscription = script do
     config = defaultAnsRulesConfig
 
   -- user requests entry
-  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  requestSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "ans.darth.vader"
     url = "https://darth-vader-ans.com"
     description = "Darth Vader's ANS Description"
@@ -173,7 +173,7 @@ terminatedSubscriptionCanBeCleanedUp = script do
     dso = app.dso
     config = defaultAnsRulesConfig
 
-  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  requestSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "ans.darth.vader"
     url = "https://darth-vader-ans.com"
     description = "Darth Vader's ANS Description"

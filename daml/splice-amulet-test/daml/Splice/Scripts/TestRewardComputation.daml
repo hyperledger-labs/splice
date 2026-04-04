@@ -120,7 +120,7 @@ testRewardComputation = do
   -- But bob can redeem the coupon himself
   context <- getPaymentTransferContext app provider2
   transferResult <- checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
-    submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bob.primaryParty
         provider = bob.primaryParty

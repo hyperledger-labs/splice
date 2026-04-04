@@ -149,7 +149,7 @@ testDevelopmentFundCouponExpiry = do
   -- Happy
   setTime $ addRelTime expiresAt (minutes 1)
   unclaimedDevelopmentFundCouponCid <- (.unclaimedDevelopmentFundCouponCid) . (.result) <$>
-    submitMulti [sv1] [app.dso] do
+    submit (actAs sv1 <> readAs app.dso) do
       exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
         developmentFundCouponCid
         sv = sv1
@@ -185,7 +185,7 @@ testRequiredNumOfConfirmation = do
           joinedAsOfRound = (Round 3)
 
   confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
-    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = svParty
       action
     return result.confirmation
@@ -204,7 +204,7 @@ testRequiredNumOfConfirmation = do
   passTime (negate (minutes 5))
 
   -- There are 4 SVs in total, which implies f = 1 and thus 3 confirmations are required.
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with
       action
       amuletRulesCid = Some amuletRulesCid
@@ -227,7 +227,7 @@ testConfirmationExpiry = do
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
   -- create a single confirmation which will not suffice to initiate an action
-  confirmationResult <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+  confirmationResult <- submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
     confirmer = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_AddSv $ DsoRules_AddSv with
@@ -263,7 +263,7 @@ testDecentralizedAns = do
   [(dsoRulesCid, _)] <- query @DsoRules dso
   [(ansRulesCid, _)] <- query @AnsRules dso
 
-  ansSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  ansSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "ans.darth.vader"
     url = "https://darth-vader-ans.com"
     description = "Darth Vader's ANS Description"
@@ -288,7 +288,7 @@ testDecentralizedAns = do
           ansRulesCid
 
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
-    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = svParty
       action = collectInitialPaymentAction
     return result.confirmation
@@ -296,7 +296,7 @@ testDecentralizedAns = do
   confirmations <- query @Confirmation dso
   length confirmations === 4
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with
       action = collectInitialPaymentAction
       amuletRulesCid = None
@@ -321,7 +321,7 @@ testDecentralizedAns = do
     walletProvider = app.dso
   let paymentCid = result.subscriptionPayment
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_CollectEntryRenewalPayment with
       ansEntryContextCid = ansSummary.entryCid
       choiceArg = AnsEntryContext_CollectEntryRenewalPayment with
@@ -339,7 +339,7 @@ testDecentralizedAns = do
 
   -- SVs confirm to reject invalid entry payment of ANS request.
 
-  rejectedSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  rejectedSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "reject.darth.vader"
     url = "invalid url which will be rejected by SVs by creating confirmations."
     description = "ANS Description"
@@ -364,7 +364,7 @@ testDecentralizedAns = do
           ansRulesCid
 
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
-    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = svParty
       action = rejectInitialPaymentAction
     return result.confirmation
@@ -372,7 +372,7 @@ testDecentralizedAns = do
   confirmations <- query @Confirmation dso
   length confirmations === 4
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with
       action = rejectInitialPaymentAction
       amuletRulesCid = None
@@ -396,7 +396,7 @@ terminatedSubscriptionCanBeCleanedUp = script do
   [(dsoRulesCid, _)] <- query @DsoRules dso
   [(ansRulesCid, _)] <- query @AnsRules dso
 
-  ansSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+  ansSummary <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "ans.darth.vader"
     url = "https://darth-vader-ans.com"
     description = "Darth Vader's ANS Description"
@@ -404,7 +404,7 @@ terminatedSubscriptionCanBeCleanedUp = script do
 
   result <- submit alice.primaryParty $ exerciseCmd ansSummary.requestCid SubscriptionRequest_Reject
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid result.terminatedSubscription (Some sv1))
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid result.terminatedSubscription (Some sv1))
 
   entryContexts <- query @AnsEntryContext app.dso
   entryContexts === []
@@ -425,12 +425,12 @@ testCreateExternalPartyAmuletRules = script do
         dsoAction = SRARC_CreateExternalPartyAmuletRules DsoRules_CreateExternalPartyAmuletRules
 
   confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
-    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = svParty
       action
     return result.confirmation
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with
       action
       amuletRulesCid = None
@@ -453,7 +453,7 @@ testTransferPreapprovalSend = do
 
   transferPreapprovalCid <- createTransferPreapproval externalParty validator dso  (now `addRelTime` hours 24)
 
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -468,12 +468,12 @@ testTransferPreapprovalSend = do
         dsoAction = SRARC_CreateTransferCommandCounter (DsoRules_CreateTransferCommandCounter alice.primaryParty)
 
   confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
-    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = svParty
       action
     return result.confirmation
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with
       action
       amuletRulesCid = None
@@ -488,7 +488,7 @@ testTransferPreapprovalSend = do
 
   [] <- query @Amulet externalParty
 
-  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submitMulti [validator] [app.dso] $ exerciseCmd transferCmd TransferCommand_Send with
+  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submit (actAs validator <> readAs app.dso) $ exerciseCmd transferCmd TransferCommand_Send with
     context
     transferPreapprovalCidO = Some transferPreapprovalCid
     inputs = [InputAmulet amulet]
@@ -516,7 +516,7 @@ testTransferPreapprovalExpiry = do
   -- Expire the TransferPreapproval
   passTime (days 1)
   -- Succeeds after expiry
-  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
+  submit (actAs sv1 <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
     transferPreapprovalCid
     sv = Some sv1
 
@@ -537,12 +537,12 @@ testBootstrapExternalPartyConfigState = do
   let action = ARC_DsoRules (SRARC_CreateBootstrapExternalPartyConfigStateInstruction DsoRules_CreateBootstrapExternalPartyConfigStateInstruction)
 
   confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
-    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+    result <- submit (actAs svParty <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
       confirmer = svParty
       action
     return result.confirmation
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
     action
     amuletRulesCid = None
     confirmationCids
@@ -550,7 +550,7 @@ testBootstrapExternalPartyConfigState = do
 
   [(instructionCid, _)] <- query @BootstrapExternalPartyConfigStateInstruction dso
   [(round0Cid, _), (round1Cid, _), (round2Cid, _)] <- Registry.getActiveOpenRoundsSorted dso
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_BootstrapExternalPartyConfigState with
+  submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_BootstrapExternalPartyConfigState with
     amuletRulesCid
     instructionCid
     openMiningRoundTriple = OpenMiningRoundTriple with
@@ -628,7 +628,7 @@ testExpireAmuletTransferInstruction = do
 
   passTime (hours 2)
 
-  submitMulti [sv1] [app.dso] $ 
+  submit (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
       amuletRulesCid = amuletRulesCid
       transferInsts = expireBatchChoice 
@@ -723,7 +723,7 @@ testExpireTransferInstructionAlreadyUnlocked = do
                     expireLock = False]
         observers = stakeholders
 
-  submitMulti [sv1] [app.dso] $ 
+  submit (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_Amulet_ExpireTransferInstructions with
       amuletRulesCid = amuletRulesCid
       transferInsts = expireBatchChoiceFalse 
@@ -808,7 +808,7 @@ testExpireAmuletAllocation = do
 
   passTime (hours 2)
 
-  submitMulti [sv1] [app.dso] $ 
+  submit (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
       extAmuletRulesCid = extRulesCid
       expireAllocations = expireBatchRequest 
@@ -910,7 +910,7 @@ testExpireAmuletAllocationAlreadyUnlocked = do
                     expireLock = False]
         observers = stakeholders
 
-  submitMulti [sv1] [app.dso] $ 
+  submit (actAs sv1 <> readAs app.dso) $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireAmuletAllocations with
       extAmuletRulesCid = extRulesCid
       expireAllocations = expireBatchRequestFalse 

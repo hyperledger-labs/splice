@@ -158,7 +158,7 @@ testMintingDelegation_checksExpiry = do
 
   -- Record an activity before expiry to have a valid livenessActivityRecordCid
   (openRoundCid, _) <- getLatestOpenRound app
-  submitMulti [beneficiary] [app.dso] $ exerciseCmd validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
+  submit (actAs beneficiary <> readAs app.dso) $ exerciseCmd validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
 
   [(livenessActivityRecordCid, _)] <- query @ValidatorLivenessActivityRecord beneficiary
 

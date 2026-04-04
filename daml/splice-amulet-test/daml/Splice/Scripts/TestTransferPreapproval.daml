@@ -40,7 +40,7 @@ testTransferPreapprovalSend = script do
   -- Externally signed transaction (or not if bob is not also externally hosted, like for a sweep) to send amulets
   context <- getPaymentTransferContext app bob
   amuletCid <- tap app bob 50.0
-  result <- submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
+  result <- submit (actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
     with
       sender = bob.primaryParty
       context
@@ -86,7 +86,7 @@ testTransferPreapprovalRenewal = script do
 
   -- Provider can renew the pre-approval (before expiry)
   let newExpiresAt = now `addRelTime` (days 2)
-  result <- submitMulti [aliceValidator.primaryParty] [app.dso] $
+  result <- submit (actAs aliceValidator.primaryParty <> readAs app.dso) $
     exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid]
@@ -152,7 +152,7 @@ testTransferCommand = script do
   transferPreapprovalFakeDsoCid <- createTransferPreapproval externalParty aliceValidator.primaryParty fakeDso expiresAt
   transferPreapprovalWrongReceiverCid <- createTransferPreapproval wrongReceiver aliceValidator.primaryParty app.dso expiresAt
 
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -215,7 +215,7 @@ testTransferCommand = script do
   appRewards <- query @AppRewardCoupon aliceValidator.primaryParty
   map snd appRewards === [AppRewardCoupon app.dso aliceValidator.primaryParty True 1.0 (Round 1) (Some aliceValidator.primaryParty)]
 
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -242,7 +242,7 @@ testTransferCommand = script do
 
   now <- getTime
 
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -285,7 +285,7 @@ testTransferCommand = script do
   transferCounter.nextNonce === 2
 
   -- sender can withdraw
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -301,7 +301,7 @@ testTransferCommand = script do
   None <- queryContractId app.dso transferCmd
 
   -- stakeholder can expire
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -322,7 +322,7 @@ testTransferCommand = script do
   None <- queryContractId app.dso transferCmd
 
   -- Old nonces get immediately rejected and archive the transer command
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -342,7 +342,7 @@ testTransferCommand = script do
 
   reason === ITR_Other "Expected nonce 1 is smaller than current counter 2"
 
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmdFuture <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmdFuture <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -364,7 +364,7 @@ testTransferCommand = script do
 
   -- Sequence another transfer with nonce 2
 
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       receiver = externalParty
@@ -400,7 +400,7 @@ testTransferCommand = script do
   transferCounter.nextNonce === 4
 
   receiverNoPreapproval <- allocateParty "receiver-no-preapproval"
-  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submit (actAs alice.primaryParty <> readAs app.dso) $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
       delegate = aliceValidator.primaryParty
