@@ -143,7 +143,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
 
   transferResult <-
     checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+    checkBalanceChanges defaultAppWithUsers $ submit (actAs alice.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $
     exerciseCmd contextWithRound1.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -224,7 +224,7 @@ testAmuletUsedAfterHoldingFeeChanged = do
 submitTransfer: ContractId AmuletRules -> TransferContext -> AmuletApp -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
 submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amount =
   checkTransferMetadata app TxKind_Transfer sender $
-    submitMulti [sender, receiver] [app.dso] $
+    submit (actAs sender <> actAs receiver <> readAs app.dso) $
       exerciseCmd amuletRulesCid AmuletRules_Transfer with
         transfer = Transfer with
           sender = sender

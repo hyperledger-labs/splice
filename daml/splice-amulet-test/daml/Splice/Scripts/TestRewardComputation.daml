@@ -135,7 +135,7 @@ testRewardComputation = do
   -- Alice can redeem her coupons and do so even in a single transfer to bob
   context <- getPaymentTransferContext app aliceValidator
   transferResult <- checkTransferMetadata app TxKind_Transfer aliceValidator.primaryParty $
-    submitMulti [aliceValidator.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs aliceValidator.primaryParty <> actAs bob.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = aliceValidator.primaryParty
         provider = aliceValidator.primaryParty
@@ -190,7 +190,7 @@ testRewardComputation = do
   -- Bob validator can redeem the coupons they are a beneficiary on
   context <- getPaymentTransferContext app bobValidator
   transferResult <- checkTransferMetadata app TxKind_MergeSplit bobValidator.primaryParty $
-    submitMulti [bobValidator.primaryParty, bobValidator.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submit (actAs bobValidator.primaryParty <> actAs bobValidator.primaryParty <> readAs app.dso) $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = bobValidator.primaryParty
         provider = bobValidator.primaryParty

@@ -361,7 +361,7 @@ initiateAndAcceptVote app (initiator::others) action = do
 castVote : AmuletApp -> Party -> ContractId VoteRequest -> Bool -> Script (ContractId VoteRequest)
 castVote app sv requestCid vote = do
     [(dsoRulesCid, _)] <- query @DsoRules app.dso
-    result <- submitMulti [sv, app.dso] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+    result <- submit (actAs sv <> actAs app.dso <> readAs app.dso) $ exerciseCmd dsoRulesCid DsoRules_CastVote with
         requestCid = requestCid
         vote = Vote with
             sv = sv
