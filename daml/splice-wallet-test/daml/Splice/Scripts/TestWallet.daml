@@ -161,7 +161,7 @@ testExpiringAmuletPaymentRequest = script do
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 30.0 AmuletUnit)
 
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "alice"
     dsoParty = app.dso
@@ -423,7 +423,7 @@ testSuccessfulBatchAmuletPaymentRequests = script do
       (alice.primaryParty, PaymentAmount 2.0 AmuletUnit)]
 
   let endUserName = "wallet_service_participant_user"
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = endUserName
     dsoParty = app.dso
@@ -475,7 +475,7 @@ testInsufficientFundsBatchAmuletPaymentRequests = script do
   runAmuletDepositBots app
   amulet <- tap app alice 42.0
 
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     dsoParty = app.dso
@@ -529,7 +529,7 @@ testCO_MergeTransferInputs = script do
   amulet <- tap app alice 42.0
   amulet2 <- tap app alice 43.0
 
-  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     dsoParty = app.dso
@@ -631,7 +631,7 @@ testTransferPreapproval = script do
 
   tap app bob 42.0
 
-  submitMulti [bob.primaryParty, bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  submit (actAs bob.primaryParty <> actAs bobValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = bob.primaryParty
     endUserName = "bob_user"
     dsoParty = app.dso
@@ -822,7 +822,7 @@ testBuyMemberTraffic = script do
   openRound3.round.number === openRound2.round.number + 1
 
   -- create a wallet install contract and tap some amulets for provider2
-  provider2Install <- submitMulti [provider2.primaryParty, provider2Validator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  provider2Install <- submit (actAs provider2.primaryParty <> actAs provider2Validator.primaryParty) $ createCmd $ WalletAppInstall with
       endUserParty = provider2.primaryParty
       endUserName = "provider2_wallet_user"
       dsoParty = app.dso
@@ -903,7 +903,7 @@ testInsufficientFundsBatchSubscriptions = script do
   pizzeria <- setupUser app "pizzeria" validator
   provider <- setupUser app "la_famiglia" validator
 
-  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+  install <- submit (actAs alice.primaryParty <> actAs validator) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     dsoParty = app.dso
@@ -976,13 +976,13 @@ testTokenStandardTransfer = script do
   bobValidator <- allocateParty "bobValidator"
   bob <- allocateParty "bob"
 
-  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice <> actAs aliceValidator) $ createCmd $ WalletAppInstall with
     endUserParty = alice
     endUserName = "alice_user"
     dsoParty = registry.dso
     validatorParty = aliceValidator
 
-  bobInstall <- submitMulti [bob, bobValidator] [] $ createCmd $ WalletAppInstall with
+  bobInstall <- submit (actAs bob <> actAs bobValidator) $ createCmd $ WalletAppInstall with
     endUserParty = bob
     endUserName = "bob_user"
     dsoParty = registry.dso
@@ -1083,7 +1083,7 @@ testTokenStandardAllocate = script do
 
   provider <- allocateParty "provider"
 
-  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice <> actAs aliceValidator) $ createCmd $ WalletAppInstall with
     endUserParty = alice
     endUserName = "alice_user"
     dsoParty = registry.dso

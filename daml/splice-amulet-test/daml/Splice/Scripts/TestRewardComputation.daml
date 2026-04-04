@@ -26,7 +26,7 @@ testRewardComputation = do
       validatorRewardCoupon = 2.3
 
   -- bare-create all five kinds of rewards for Alice
-  appCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon1 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = None
@@ -34,7 +34,7 @@ testRewardComputation = do
     round = Round 0
     featured = True
 
-  appCoupon2 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon2 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = None
@@ -42,7 +42,7 @@ testRewardComputation = do
     round = Round 0
     featured = False
 
-  appCoupon3 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon3 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = Some bobValidator.primaryParty
@@ -50,7 +50,7 @@ testRewardComputation = do
     round = Round 0
     featured = True
 
-  appCoupon4 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon4 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
     beneficiary = Some bobValidator.primaryParty
@@ -59,7 +59,7 @@ testRewardComputation = do
     featured = False
 
 
-  validatorCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+  validatorCoupon1 <- submit (actAs app.dso <> actAs aliceValidator.primaryParty) $ createCmd ValidatorRewardCoupon with
     dso = app.dso
     user = aliceValidator.primaryParty
     amount = validatorRewardCoupon

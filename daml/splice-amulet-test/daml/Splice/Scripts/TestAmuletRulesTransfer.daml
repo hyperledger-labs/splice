@@ -474,7 +474,7 @@ testAppRewardBeneficiaries = do
       then do
         [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
         -- archive to simplify test queries
-        submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd rewardCid
+        submit (actAs alice.primaryParty <> actAs app.dso) $ archiveCmd rewardCid
 
         -- unfeatured with beneficiaries
 
@@ -502,7 +502,7 @@ testAppRewardBeneficiaries = do
         [(rewardCid2, bobAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon bob.primaryParty (\r -> r.beneficiary == Some bob.primaryParty)
 
         -- archive to simplify test queries
-        forA_ [rewardCid1, rewardCid2] $ \cid -> submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd cid
+        forA_ [rewardCid1, rewardCid2] $ \cid -> submit (actAs alice.primaryParty <> actAs app.dso) $ archiveCmd cid
 
 
         forA_ [aliceAppRewardCouponUnfeaturedNoBeneficiary, aliceAppRewardCouponUnfeaturedBeneficiary, bobAppRewardCouponUnfeaturedBeneficiary] $ \reward -> do

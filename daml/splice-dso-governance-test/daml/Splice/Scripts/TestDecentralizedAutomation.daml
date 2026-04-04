@@ -272,7 +272,7 @@ testDecentralizedAns = do
   amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd ansSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd ansSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -315,7 +315,7 @@ testDecentralizedAns = do
   appContext <- getAppTransferContext app app.dsoUser
 
   amulet <- tap app alice 1.5
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
@@ -348,7 +348,7 @@ testDecentralizedAns = do
   amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+  result <- submit (actAs alice.primaryParty <> actAs app.dso) $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso

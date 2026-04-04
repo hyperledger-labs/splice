@@ -113,7 +113,7 @@ setupValidator' app name = do
   validatorParty <- allocatePartyByHint (PartyIdHint name)
   sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
   now <- getTime
-  submitMulti [validatorParty, app.dso] [] $ createCmd ValidatorLicense with
+  submit (actAs validatorParty <> actAs app.dso) $ createCmd ValidatorLicense with
     dso = app.dso
     sponsor = sponsorParty
     validator = validatorParty
@@ -192,7 +192,7 @@ getAllValidatorRights _app = do
 
 recordValidatorOf : AmuletApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
-  submitMulti [u, v] [] $
+  submit (actAs u <> actAs v) $
     void $ createCmd ValidatorRight with dso = app.dso; validator = v; user = u
 
 getUserReadAs : UserId -> Script [Party]

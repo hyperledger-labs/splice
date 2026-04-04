@@ -164,7 +164,7 @@ getSvInfoByParty app sv = do
 
 generateUnclaimedReward : AmuletApp -> AmuletUser -> Script ()
 generateUnclaimedReward app provider1 = do
-  submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+  submit (actAs app.dso <> actAs provider1.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
     beneficiary = None

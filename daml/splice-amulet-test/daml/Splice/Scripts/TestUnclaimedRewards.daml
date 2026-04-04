@@ -37,7 +37,7 @@ testUnclaimedRewards_withCoupons = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- bare-create all three kinds of rewards
-  appCoupon1 <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon1 <- submit (actAs app.dso <> actAs provider1.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
     beneficiary = None
@@ -45,7 +45,7 @@ testUnclaimedRewards_withCoupons = do
     round = Round 0
     featured = True
 
-  appCoupon2 <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+  appCoupon2 <- submit (actAs app.dso <> actAs provider1.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
     beneficiary = None
@@ -53,18 +53,18 @@ testUnclaimedRewards_withCoupons = do
     round = Round 0
     featured = False
 
-  validatorCoupon1 <- submitMulti [app.dso, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+  validatorCoupon1 <- submit (actAs app.dso <> actAs alice.primaryParty) $ createCmd ValidatorRewardCoupon with
     dso = app.dso
     user = alice.primaryParty
     amount = 2.3
     round = Round 0
 
-  validatorFaucet1 <- submitMulti [app.dso, alice.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
+  validatorFaucet1 <- submit (actAs app.dso <> actAs alice.primaryParty) $ createCmd ValidatorFaucetCoupon with
     dso = app.dso
     validator = alice.primaryParty
     round = Round 0
 
-  validatorFaucet2 <- submitMulti [app.dso, provider1Validator.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
+  validatorFaucet2 <- submit (actAs app.dso <> actAs provider1Validator.primaryParty) $ createCmd ValidatorFaucetCoupon with
     dso = app.dso
     validator = provider1Validator.primaryParty
     round = Round 0
@@ -79,7 +79,7 @@ testUnclaimedRewards_withCoupons = do
     validator = provider1Validator.primaryParty
     round = Round 0
 
-  svRewardCoupon1 <- submitMulti [app.dso, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
+  svRewardCoupon1 <- submit (actAs app.dso <> actAs provider2.primaryParty) $ createCmd SvRewardCoupon with
     dso = app.dso
     sv = provider2.primaryParty
     beneficiary = provider2.primaryParty
@@ -136,7 +136,7 @@ testNoUnclaimedRewards = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- bare-create enough rewards that there are no unclaimed rewards
-  _ <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+  _ <- submit (actAs app.dso <> actAs provider1.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
     beneficiary = None
@@ -144,7 +144,7 @@ testNoUnclaimedRewards = do
     round = Round 0
     featured = True
 
-  _ <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+  _ <- submit (actAs app.dso <> actAs provider1.primaryParty) $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
     beneficiary = None
@@ -152,13 +152,13 @@ testNoUnclaimedRewards = do
     round = Round 0
     featured = False
 
-  _ <- submitMulti [app.dso, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+  _ <- submit (actAs app.dso <> actAs alice.primaryParty) $ createCmd ValidatorRewardCoupon with
     dso = app.dso
     user = alice.primaryParty
     amount = 30000000.0
     round = Round 0
 
-  _ <- submitMulti [app.dso, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
+  _ <- submit (actAs app.dso <> actAs provider2.primaryParty) $ createCmd SvRewardCoupon with
     dso = app.dso
     sv = provider2.primaryParty
     beneficiary = provider2.primaryParty

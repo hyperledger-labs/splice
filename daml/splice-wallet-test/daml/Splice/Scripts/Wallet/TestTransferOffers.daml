@@ -23,13 +23,13 @@ testTransferOffers = script do
   tap app alice 15.0
 
   t <- getTime
-  aliceInstall <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submit (actAs alice.primaryParty <> actAs aliceValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "alice"
     dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
-  bobInstall <- submitMulti [bob.primaryParty, bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+  bobInstall <- submit (actAs bob.primaryParty <> actAs bobValidator.primaryParty) $ createCmd $ WalletAppInstall with
     endUserParty = bob.primaryParty
     endUserName = "bob"
     dsoParty = app.dso
