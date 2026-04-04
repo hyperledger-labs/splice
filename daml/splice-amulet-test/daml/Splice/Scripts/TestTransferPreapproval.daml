@@ -21,7 +21,7 @@ import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMa
 createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
 createTransferPreapproval receiver provider dso expiresAt = do
   now <- getTime
-  submitMulti [receiver, provider, dso] [] $ createCmd TransferPreapproval with
+  submit (actAs receiver <> actAs provider <> actAs dso) $ createCmd TransferPreapproval with
       receiver
       provider
       dso

@@ -172,7 +172,7 @@ createLockedAmulet registry user amount lock = do
 createTransferPreapproval : AmuletRegistry -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
 createTransferPreapproval registry receiver provider expiresAt = do
   now <- getTime
-  submitMulti [receiver, provider, registry.dso] [] $ createCmd TransferPreapproval with
+  submit (actAs receiver <> actAs provider <> actAs registry.dso) $ createCmd TransferPreapproval with
       receiver
       provider
       dso = registry.dso

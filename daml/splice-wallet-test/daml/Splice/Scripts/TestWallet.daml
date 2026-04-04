@@ -921,7 +921,7 @@ testInsufficientFundsBatchSubscriptions = script do
         dso = app.dso
         description = "test subscription"
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData payData)
 
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0

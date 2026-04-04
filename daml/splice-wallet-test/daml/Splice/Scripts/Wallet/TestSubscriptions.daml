@@ -41,7 +41,7 @@ testSetup = script do
 
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData testPayData)
   pure (app, Users with .., subscriptionRequestCid)
 
 
@@ -59,7 +59,7 @@ testSubscription = script do
   assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
   -- ...and retry
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData testPayData)
 
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
   None <- queryContractId alice.primaryParty subscriptionRequestCid
@@ -72,7 +72,7 @@ testSubscription = script do
 
   -- ..and retry
   let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData testPayData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
   (subscriptionCid, subscriptionStateCid, amuletCid) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
@@ -159,7 +159,7 @@ testUSDSubscription = script do
         description = "test subscription"
   advanceToIssuanceWithPrice app 2.0
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submit (actAs alice.primaryParty <> actAs pizzeria.primaryParty <> actAs provider.primaryParty) $ createCmd (SubscriptionRequest subscriptionData payData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator (Some featuredValidator) subscriptionRequestCid
 
   (_, round) <- getLatestOpenRound app
