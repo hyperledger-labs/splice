@@ -4,6 +4,9 @@
 module Splice.Scripts.TestLockAndAmuletExpiry where
 
 import DA.Assert
+import DA.Foldable (foldMap, forA_)
+import DA.Time
+
 
 import Daml.Script
 
@@ -19,9 +22,6 @@ import Splice.Types
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 import Splice.Scripts.Util
-
-import DA.Foldable (forA_)
-import DA.Time
 
 scaleAmuletConfig : Decimal -> AmuletConfig Unit.USD -> AmuletConfig Amulet
 scaleAmuletConfig amuletPrice config = AmuletConfig with
@@ -180,12 +180,12 @@ addRelRoundN n t relTime
   | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
 
 testChoice : [Party] -> [Party] -> Commands a -> Script a
-testChoice actAs readAs buildCommand = do
-  submitMulti actAs readAs buildCommand
+testChoice actors readers buildCommand = do
+  submit (foldMap actAs actors <> foldMap readAs readers) buildCommand
 
 testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
-testChoiceFailed actAs readAs buildCommand = do
-  submitMultiMustFail actAs readAs buildCommand
+testChoiceFailed actAsArgs readAsArgs buildCommand = do
+  submitMustFail (foldMap actAs actAsArgs <> foldMap readAs readAsArgs) buildCommand
   pure ()
 
 getLockedAmuletCmd : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
@@ -219,11 +219,11 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
 getLockedAmulet : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedAmulet)
 getLockedAmulet app owner lockHolder amount lockDuration = do
   cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
-  result <- submitMulti [owner.primaryParty, lockHolder] [app.dso] cmd
+  result <- submit (actAs owner.primaryParty <> actAs lockHolder <> readAs app.dso) cmd
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   pure lockedAmulet
 
 getLockedAmuletMustFail : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
 getLockedAmuletMustFail app owner lockHolder amount lockDuration =  do
   cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
-  submitMultiMustFail [owner.primaryParty, lockHolder] [app.dso] cmd
+  submitMustFail (actAs owner.primaryParty <> actAs lockHolder <> readAs app.dso) cmd

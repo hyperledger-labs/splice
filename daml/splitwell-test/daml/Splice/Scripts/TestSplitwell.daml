@@ -7,7 +7,7 @@ import Splice.Splitwell
 import Splice.Scripts.TestWallet
 
 import DA.Action
-import DA.Foldable (forA_)
+import DA.Foldable (forA_, foldMap)
 import DA.List (sort)
 import DA.Map (Map)
 import qualified DA.Map as M
@@ -46,9 +46,9 @@ exerciseSplitwellRules user provider arg = exerciseSplitwellRules' user provider
 
 
 exerciseSplitwellRules' : Choice SplitwellRules c r => AmuletUser -> AmuletUser -> [Party] -> c -> Script r
-exerciseSplitwellRules' user provider readAs arg = do
+exerciseSplitwellRules' user provider readers arg = do
   rule <- getSplitwellRules provider
-  submitMulti [user.primaryParty] (provider.primaryParty :: readAs) $ exerciseCmd rule arg
+  submit (actAs user.primaryParty <> readAs provider.primaryParty <> foldMap readAs readers) $ exerciseCmd rule arg
 
 getGroup : AmuletUser -> GroupKey -> Script (ContractId Group)
 getGroup user k = do
