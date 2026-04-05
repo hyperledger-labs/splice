@@ -908,34 +908,60 @@ class HttpValidatorAdminHandler(
           openRounds <- scanConnection.getOpenAndIssuingMiningRounds().map(_._1)
           contracts <- getExternalPartyAmulets(partyId)
         } yield {
-          val earliestOpenRound = openRounds
-            .minByOption(_.payload.round.number)
-            .fold(
-              throw Status.NOT_FOUND
-                .withDescription("No open mining round found")
-                .asRuntimeException()
-            )(_.payload.round.number)
-          val amuletsSummary = contracts._1.foldLeft(HoldingsSummary.Empty) { case (acc, amulet) =>
-            acc.addAmulet(amulet.payload, earliestOpenRound)
-          }
-          val summary = contracts._2.foldLeft(amuletsSummary) { case (acc, amulet) =>
-            acc.addLockedAmulet(amulet.payload, earliestOpenRound)
-          }
           v0.ValidatorAdminResource.GetExternalPartyBalanceResponse.OK(
-            definitions.ExternalPartyBalanceResponse(
-              partyId = partyIdStr,
-              totalUnlockedCoin = Codec.encode(summary.totalUnlockedCoin),
-              totalLockedCoin = Codec.encode(summary.totalLockedCoin),
-              totalCoinHoldings = Codec.encode(summary.totalCoinHoldings),
-              accumulatedHoldingFeesUnlocked = Codec.encode(summary.accumulatedHoldingFeesUnlocked),
-              accumulatedHoldingFeesLocked = Codec.encode(summary.accumulatedHoldingFeesLocked),
-              accumulatedHoldingFeesTotal = Codec.encode(summary.accumulatedHoldingFeesTotal),
-              totalAvailableCoin = Codec.encode(summary.totalAvailableCoin),
-              computedAsOfRound = earliestOpenRound,
+            HttpValidatorAdminHandler.buildExternalPartyBalanceResponse(
+              partyIdStr,
+              HttpValidatorAdminHandler.latestExternalPartyBalanceRound(
+                clock.now.toInstant,
+                openRounds.map(_.payload),
+              ),
+              contracts._1.map(_.payload),
+              contracts._2.map(_.payload),
             )
           )
         }
       }
     }
+  }
+}
+
+object HttpValidatorAdminHandler {
+
+  private[http] def latestExternalPartyBalanceRound(
+      now: Instant,
+      openRounds: Seq[org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound],
+  ): Long =
+    openRounds.view
+      .filter(round => !round.opensAt.isAfter(now))
+      .maxByOption(_.round.number)
+      .fold(
+        throw Status.NOT_FOUND
+          .withDescription("No open mining round found")
+          .asRuntimeException()
+      )(_.round.number)
+
+  private[http] def buildExternalPartyBalanceResponse(
+      partyIdStr: String,
+      asOfRound: Long,
+      amulets: Seq[Amulet],
+      lockedAmulets: Seq[LockedAmulet],
+  ): definitions.ExternalPartyBalanceResponse = {
+    val amuletsSummary = amulets.foldLeft(HoldingsSummary.Empty) { case (acc, amulet) =>
+      acc.addAmulet(amulet, asOfRound)
+    }
+    val summary = lockedAmulets.foldLeft(amuletsSummary) { case (acc, amulet) =>
+      acc.addLockedAmulet(amulet, asOfRound)
+    }
+    definitions.ExternalPartyBalanceResponse(
+      partyId = partyIdStr,
+      totalUnlockedCoin = Codec.encode(summary.totalUnlockedCoin),
+      totalLockedCoin = Codec.encode(summary.totalLockedCoin),
+      totalCoinHoldings = Codec.encode(summary.totalCoinHoldings),
+      accumulatedHoldingFeesUnlocked = Codec.encode(summary.accumulatedHoldingFeesUnlocked),
+      accumulatedHoldingFeesLocked = Codec.encode(summary.accumulatedHoldingFeesLocked),
+      accumulatedHoldingFeesTotal = Codec.encode(summary.accumulatedHoldingFeesTotal),
+      totalAvailableCoin = Codec.encode(summary.totalAvailableCoin),
+      computedAsOfRound = asOfRound,
+    )
   }
 }
