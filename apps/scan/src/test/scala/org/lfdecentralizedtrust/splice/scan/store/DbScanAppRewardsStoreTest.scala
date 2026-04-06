@@ -934,6 +934,88 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    // -- lookupBatchByHash tests ----------------------------------------------
+
+    "lookupBatchByHash — returns None for non-existent hash" in {
+      for {
+        (store, _) <- newStore()
+        result <- store.lookupBatchByHash(
+          roundNumber,
+          ByteString.copyFrom(Array.fill(32)(0.toByte)),
+        )
+      } yield {
+        result shouldBe None
+      }
+    }
+
+    "lookupBatchByHash — leaf batch returns MintingAllowances" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(
+            AppActivityPartyTotalT(historyId, roundNumber, 5000000L, 0, "alice::provider"),
+            AppActivityPartyTotalT(historyId, roundNumber, 3000000L, 1, "bob::provider"),
+          )
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          Seq(
+            AppRewardPartyTotalT(historyId, roundNumber, 0, BigDecimal("10.0")),
+            AppRewardPartyTotalT(historyId, roundNumber, 1, BigDecimal("6.0")),
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
+        batches <- store.getAppRewardBatchHashesByRound(roundNumber)
+        leafHash = batches.filter(_.batchLevel == 0).head.batchHash
+        result <- store.lookupBatchByHash(roundNumber, leafHash)
+      } yield {
+        result shouldBe defined
+        result.value shouldBe a[DbScanAppRewardsStore.BatchOfMintingAllowances]
+        val allowances =
+          result.value.asInstanceOf[DbScanAppRewardsStore.BatchOfMintingAllowances].allowances
+        allowances should have size 2
+        allowances(0).provider shouldBe "alice::provider"
+        allowances(0).amount shouldBe BigDecimal("10.0")
+        allowances(1).provider shouldBe "bob::provider"
+        allowances(1).amount shouldBe BigDecimal("6.0")
+      }
+    }
+
+    "lookupBatchByHash — internal batch returns BatchOfBatches" in {
+      for {
+        (store, historyId) <- newStore()
+        // 4 parties / batchSize=2 → 2 level-0 batches → 1 level-1 batch
+        _ <- store.insertAppActivityPartyTotals(
+          (0 to 3).map(i =>
+            AppActivityPartyTotalT(
+              historyId,
+              roundNumber,
+              1000000L * (i + 1),
+              i,
+              s"party$i::provider",
+            )
+          )
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          (0 to 3).map(i =>
+            AppRewardPartyTotalT(historyId, roundNumber, i, BigDecimal(s"${i + 1}.0"))
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
+        batches <- store.getAppRewardBatchHashesByRound(roundNumber)
+        level1Hash = batches.filter(_.batchLevel == 1).head.batchHash
+        result <- store.lookupBatchByHash(roundNumber, level1Hash)
+      } yield {
+        result shouldBe defined
+        result.value shouldBe a[DbScanAppRewardsStore.BatchOfBatches]
+        val childHashes =
+          result.value.asInstanceOf[DbScanAppRewardsStore.BatchOfBatches].childHashes
+        childHashes should have size 2
+        // Child hashes should match the level-0 batches
+        val level0Hashes = batches.filter(_.batchLevel == 0).map(_.batchHash)
+        childHashes shouldBe level0Hashes
+      }
+    }
+
   }
 
   private val verdictCounter = new java.util.concurrent.atomic.AtomicLong(1)

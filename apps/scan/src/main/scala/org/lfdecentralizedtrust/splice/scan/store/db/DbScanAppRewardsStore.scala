@@ -87,6 +87,12 @@ object DbScanAppRewardsStore {
       rewardedPartiesCount: Long,
       batchesCreatedCount: Long,
   )
+
+  final case class MintingAllowance(provider: String, amount: BigDecimal)
+
+  sealed trait BatchContents
+  case class BatchOfBatches(childHashes: Seq[ByteString]) extends BatchContents
+  case class BatchOfMintingAllowances(allowances: Seq[MintingAllowance]) extends BatchContents
 }
 
 class DbScanAppRewardsStore(
@@ -494,6 +500,90 @@ class DbScanAppRewardsStore(
       "appRewards.getAppRewardRootHashByRound",
     )
   }
+
+  /** Look up the contents of a batch by its hash.
+    *
+    * Returns BatchOfBatches (child hashes) for internal nodes,
+    * or BatchOfMintingAllowances (party + amount) for leaf nodes.
+    * Returns None if no batch with this hash exists for the round.
+    */
+  def lookupBatchByHash(
+      roundNumber: Long,
+      batchHash: ByteString,
+  )(implicit tc: TraceContext): Future[Option[DbScanAppRewardsStore.BatchContents]] =
+    for {
+      batchO <- findBatchByHash(roundNumber, batchHash)
+      result <- (batchO match {
+        case None =>
+          Future.successful(Option.empty[DbScanAppRewardsStore.BatchContents])
+        case Some((level, beginIncl, endExcl)) if level > 0 =>
+          getChildBatchHashes(roundNumber, level, beginIncl, endExcl)
+            .map(hashes => Some(DbScanAppRewardsStore.BatchOfBatches(hashes)))
+        case Some((_, beginIncl, endExcl)) =>
+          getLeafAllowances(roundNumber, beginIncl, endExcl)
+            .map(allowances => Some(DbScanAppRewardsStore.BatchOfMintingAllowances(allowances)))
+      })
+    } yield result
+
+  private def findBatchByHash(
+      roundNumber: Long,
+      batchHash: ByteString,
+  )(implicit tc: TraceContext): Future[Option[(Int, Int, Int)]] = {
+    import storage.DbStorageConverters.setParameterByteArray
+    runQuerySingle(
+      sql"""select batch_level, party_seq_num_begin_incl, party_seq_num_end_excl
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId
+              and round_number = $roundNumber
+              and batch_hash = ${batchHash.toByteArray}
+            limit 1
+      """.as[(Int, Int, Int)].headOption,
+      "appRewards.lookupBatchByHash.find",
+    )
+  }
+
+  private def getChildBatchHashes(
+      roundNumber: Long,
+      parentLevel: Int,
+      beginIncl: Int,
+      endExcl: Int,
+  )(implicit tc: TraceContext): Future[Seq[ByteString]] =
+    runQuery(
+      sql"""select batch_hash
+            from #${Tables.appRewardBatchHashes}
+            where history_id = $historyId
+              and round_number = $roundNumber
+              and batch_level = ${parentLevel - 1}
+              and party_seq_num_begin_incl >= $beginIncl
+              and party_seq_num_end_excl <= $endExcl
+            order by party_seq_num_begin_incl
+      """.as[Array[Byte]],
+      "appRewards.lookupBatchByHash.children",
+    ).map(_.map(ByteString.copyFrom))
+
+  private def getLeafAllowances(
+      roundNumber: Long,
+      beginIncl: Int,
+      endExcl: Int,
+  )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.MintingAllowance]] =
+    runQuery(
+      sql"""select a.app_provider_party,
+                   coalesce(r.total_app_reward_amount, 0.0000000000)
+            from #${Tables.appActivityPartyTotals} a
+            left join #${Tables.appRewardPartyTotals} r
+              on a.history_id = r.history_id
+              and a.round_number = r.round_number
+              and a.app_provider_party_seq_num = r.app_provider_party_seq_num
+            where a.history_id = $historyId
+              and a.round_number = $roundNumber
+              and a.app_provider_party_seq_num >= $beginIncl
+              and a.app_provider_party_seq_num < $endExcl
+            order by a.app_provider_party_seq_num
+      """.as[(String, BigDecimal)],
+      "appRewards.lookupBatchByHash.allowances",
+    ).map(_.map { case (provider, amount) =>
+      DbScanAppRewardsStore.MintingAllowance(provider, amount)
+    })
 
   // -- Aggregation ------------------------------------------------------------
 
