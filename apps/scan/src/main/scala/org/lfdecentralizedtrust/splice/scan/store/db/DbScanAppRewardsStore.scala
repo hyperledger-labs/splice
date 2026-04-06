@@ -701,6 +701,7 @@ class DbScanAppRewardsStore(
         s"Inserted $leafCount leaf batches for round $roundNumber."
       )
       _ <- aggregateToRoot(roundNumber, batchSize, level = 0, batchCount = leafCount)
+      _ <- insertRootHash(roundNumber)
     } yield ()
 
     runUpdate(
@@ -794,6 +795,22 @@ class DbScanAppRewardsStore(
               and batch_level = $currentLevel
           ) sub
           group by batch_num
+    """.asUpdate
+
+  /** Copy the single remaining batch hash into the root hashes table.
+    * Reads the highest batch_level to find the root.
+    */
+  private def insertRootHash(
+      roundNumber: Long
+  ) =
+    sql"""insert into #${Tables.appRewardRootHashes}(history_id, round_number, root_hash)
+          select history_id, round_number, batch_hash
+          from #${Tables.appRewardBatchHashes}
+          where history_id = $historyId and round_number = $roundNumber
+            and batch_level = (
+              select max(batch_level) from #${Tables.appRewardBatchHashes}
+              where history_id = $historyId and round_number = $roundNumber
+            )
     """.asUpdate
 
   // -- Private helpers -------------------------------------------------------

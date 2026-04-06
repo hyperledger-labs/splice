@@ -841,6 +841,7 @@ class DbScanAppRewardsStoreTest
         )
         _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
         batchHashes <- store.getAppRewardBatchHashesByRound(roundNumber)
+        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
       } yield {
         // Only level 0, no higher levels
         batchHashes should have size 1
@@ -848,6 +849,55 @@ class DbScanAppRewardsStoreTest
         batchHashes.head.partySeqNumBeginIncl shouldBe 0
         batchHashes.head.partySeqNumEndExcl shouldBe 3
         batchHashes.head.batchHash.size shouldBe 32
+
+        // Root hash equals the single leaf batch hash
+        rootHash shouldBe defined
+        rootHash.value.rootHash shouldBe batchHashes.head.batchHash
+      }
+    }
+
+    "computeRewardHashes — root hash exists after multi-level aggregation" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppActivityPartyTotals(
+          (0 to 4).map(i =>
+            AppActivityPartyTotalT(
+              historyId,
+              roundNumber,
+              1000000L * (i + 1),
+              i,
+              s"party$i::provider",
+            )
+          )
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          (0 to 4).map(i =>
+            AppRewardPartyTotalT(historyId, roundNumber, i, BigDecimal(s"${i + 1}.0"))
+          )
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 2)
+        rootHash <- store.getAppRewardRootHashByRound(roundNumber)
+        latestRound <- store.lookupLatestRoundWithRewardComputation()
+      } yield {
+        rootHash shouldBe defined
+        rootHash.value.rootHash.size shouldBe 32
+        latestRound.value shouldBe roundNumber
+      }
+    }
+
+    "computeRewardHashes — re-run for same round raises error" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(AppActivityPartyTotalT(historyId, roundNumber, 1000000L, 0, "alice::provider"))
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          Seq(AppRewardPartyTotalT(historyId, roundNumber, 0, BigDecimal("10.0")))
+        )
+        _ <- store.computeRewardHashes(roundNumber, batchSize = 100)
+        result <- store.computeRewardHashes(roundNumber, batchSize = 100).failed
+      } yield {
+        result shouldBe a[Exception]
       }
     }
 
