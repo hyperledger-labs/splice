@@ -662,6 +662,13 @@ lazy val `splice-api-featured-app-v1-daml` =
       Compile / damlPrebuiltDar := Some(
         (LocalRootProject / baseDirectory).value / "daml" / "dars" / "splice-api-featured-app-v1-1.0.0.dar"
       ),
+      // Exclude header check for FeaturedAppRightV1.daml and its generated docs as it exists on main without a header,
+      // and adding one would change its DAR hash, cascading through all dependent packages.
+      Compile / headerSources ~= {
+        _.filterNot(f =>
+          f.getName == "FeaturedAppRightV1.daml" || f.getName == "Splice-Api-FeaturedAppRightV1.rst"
+        )
+      },
     )
 
 lazy val `splice-api-featured-app-v2-daml` =
