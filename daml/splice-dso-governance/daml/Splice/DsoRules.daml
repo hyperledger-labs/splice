@@ -34,6 +34,7 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DSO.Locking
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
@@ -326,6 +327,24 @@ data DsoRules_CreateBootstrapExternalPartyConfigStateInstructionResult = DsoRule
 data DsoRules_ExpireAmuletAllocationsResult = DsoRules_ExpireAmuletAllocationsResult
   with
     result : ExternalPartyAmuletRules_ExpireAmuletAllocationsResult
+  deriving (Eq, Show)
+
+data DsoRules_DeclareLockingResult = DsoRules_DeclareLockingResult with
+    lockingDeclaration : ContractId LockingDeclaration
+  deriving (Eq, Show)
+
+data DsoRules_AcceptDelegatedLockResult = DsoRules_AcceptDelegatedLockResult with
+    delegatedLockingPosition : ContractId DelegatedLockingPosition
+  deriving (Eq, Show)
+
+data DsoRules_ReleaseDelegatedLockResult = DsoRules_ReleaseDelegatedLockResult
+  deriving (Eq, Show)
+
+data DsoRules_UpdateLockingDeclarationResult = DsoRules_UpdateLockingDeclarationResult with
+    lockingDeclaration : ContractId LockingDeclaration
+  deriving (Eq, Show)
+
+data DsoRules_RevokeLockingDeclarationResult = DsoRules_RevokeLockingDeclarationResult
   deriving (Eq, Show)
 
 
@@ -1660,6 +1679,106 @@ template DsoRules with
           openMiningRoundTriple
           expectedDso = dso
         pure DsoRules_BootstrapExternalPartyConfigStateResult
+
+    -- CIP-0105 Locking (Phase 2)
+    -- Capabilities #1 and #4
+    ------------------------
+
+    -- | Capability #1: SV declares a locked position.
+    -- The SV informs the DSO that they have locked CC in a disclosed wallet.
+    nonconsuming choice DsoRules_DeclareLocking : DsoRules_DeclareLockingResult
+      with
+        sv : Party
+        lockedAmount : Decimal
+        walletPartyId : Text
+        currentRound : Round
+      controller dso
+      do
+        info <- getSvInfo sv this
+        require "Locked amount must be positive" (lockedAmount > 0.0)
+        declarationCid <- create LockingDeclaration with
+          dso
+          info = LockingInfo with
+            svParty = sv
+            svName = info.name
+            lockedAmount
+            walletPartyId
+            declaredRound = currentRound
+        return DsoRules_DeclareLockingResult with
+          lockingDeclaration = declarationCid
+
+    -- | Capability #1: Update an existing locking declaration.
+    nonconsuming choice DsoRules_UpdateLockingDeclaration : DsoRules_UpdateLockingDeclarationResult
+      with
+        sv : Party
+        existingDeclarationCid : ContractId LockingDeclaration
+        newLockedAmount : Decimal
+        currentRound : Round
+      controller dso
+      do
+        info <- getSvInfo sv this
+        existing <- fetch existingDeclarationCid
+        require "Only the declaring SV can update" (existing.info.svParty == sv)
+        require "New locked amount must be positive" (newLockedAmount > 0.0)
+        archive existingDeclarationCid
+        newCid <- create LockingDeclaration with
+          dso
+          info = existing.info with
+            lockedAmount = newLockedAmount
+            declaredRound = currentRound
+        return DsoRules_UpdateLockingDeclarationResult with
+          lockingDeclaration = newCid
+
+    -- | Capability #1: Revoke a locking declaration.
+    nonconsuming choice DsoRules_RevokeLockingDeclaration : DsoRules_RevokeLockingDeclarationResult
+      with
+        sv : Party
+        declarationCid : ContractId LockingDeclaration
+      controller dso
+      do
+        existing <- fetch declarationCid
+        require "Only the declaring SV can revoke" (existing.info.svParty == sv)
+        archive declarationCid
+        return DsoRules_RevokeLockingDeclarationResult
+
+    -- | Capability #4: SV accepts a delegated lock proposal from a non-SV lender.
+    -- Consumes the lender's proposal and creates an active delegated position.
+    nonconsuming choice DsoRules_AcceptDelegatedLock : DsoRules_AcceptDelegatedLockResult
+      with
+        sv : Party
+        proposalCid : ContractId DelegatedLockProposal
+        currentRound : Round
+      controller dso
+      do
+        info <- getSvInfo sv this
+        proposal <- fetch proposalCid
+        require "Proposal must be for this SV" (proposal.svParty == sv)
+        require "Proposal must target this DSO" (proposal.dso == dso)
+        require "Locked amount must be positive" (proposal.lockedAmount > 0.0)
+        exercise proposalCid DelegatedLockProposal_Accept
+        positionCid <- create DelegatedLockingPosition with
+          dso
+          lender = proposal.lender
+          svParty = sv
+          svName = info.name
+          lockedAmount = proposal.lockedAmount
+          walletPartyId = proposal.walletPartyId
+          acceptedRound = currentRound
+        return DsoRules_AcceptDelegatedLockResult with
+          delegatedLockingPosition = positionCid
+
+    -- | Release an active delegated locking position.
+    -- Removes the position from the DSO state.
+    nonconsuming choice DsoRules_ReleaseDelegatedLock : DsoRules_ReleaseDelegatedLockResult
+      with
+        sv : Party
+        positionCid : ContractId DelegatedLockingPosition
+      controller dso
+      do
+        position <- fetch positionCid
+        require "Only the benefiting SV can release" (position.svParty == sv)
+        archive positionCid
+        return DsoRules_ReleaseDelegatedLockResult
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
