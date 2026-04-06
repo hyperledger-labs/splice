@@ -2470,6 +2470,67 @@ class HttpScanHandler(
       }
     }
   }
+
+  def getRewardAccountingBatch(
+      respond: ScanResource.GetRewardAccountingBatchResponse.type
+  )(roundNumber: Long, batchHash: String)(extracted: TraceContext): Future[
+    ScanResource.GetRewardAccountingBatchResponse
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardAccountingBatch") { _ => _ =>
+      appRewardsStoreO match {
+        case None =>
+          Future.successful(
+            ScanResource.GetRewardAccountingBatchResponse.NotFound(
+              ErrorResponse("Reward accounting is not enabled on this node")
+            )
+          )
+        case Some(appRewardsStore) =>
+          val hashBytes =
+            com.google.protobuf.ByteString.copyFrom(
+              batchHash.grouped(2).map(Integer.parseInt(_, 16).toByte).toArray
+            )
+          appRewardsStore.lookupBatchByHash(roundNumber, hashBytes).map {
+            case None =>
+              ScanResource.GetRewardAccountingBatchResponse.NotFound(
+                ErrorResponse(
+                  s"Batch not (yet) found for round $roundNumber with hash $batchHash"
+                )
+              )
+            case Some(batch: DbScanAppRewardsStore.BatchOfBatches) =>
+              ScanResource.GetRewardAccountingBatchResponse.OK(
+                definitions.GetRewardAccountingBatchResponse(
+                  batchType = definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfBatches,
+                  childHashes = Some(
+                    batch.childHashes
+                      .map(_.toByteArray.map("%02x".format(_)).mkString)
+                      .toVector
+                  ),
+                  mintingAllowances = None,
+                )
+              )
+            case Some(batch: DbScanAppRewardsStore.BatchOfMintingAllowances) =>
+              ScanResource.GetRewardAccountingBatchResponse.OK(
+                definitions.GetRewardAccountingBatchResponse(
+                  batchType =
+                    definitions.GetRewardAccountingBatchResponse.BatchType.BatchOfMintingAllowances,
+                  childHashes = None,
+                  mintingAllowances = Some(
+                    batch.allowances
+                      .map(a =>
+                        definitions.RewardAccountingMintingAllowance(
+                          provider = a.provider,
+                          amount = a.amount.toString,
+                        )
+                      )
+                      .toVector
+                  ),
+                )
+              )
+          }
+      }
+    }
+  }
 }
 
 object HttpScanHandler {

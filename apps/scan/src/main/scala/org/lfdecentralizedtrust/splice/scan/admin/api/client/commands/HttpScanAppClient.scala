@@ -2605,4 +2605,26 @@ object HttpScanAppClient {
         Right(None)
     }
   }
+
+  case class GetRewardAccountingBatch(roundNumber: Long, batchHash: String)
+      extends InternalBaseCommand[
+        http.GetRewardAccountingBatchResponse,
+        Option[definitions.GetRewardAccountingBatchResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetRewardAccountingBatchResponse] =
+      client.getRewardAccountingBatch(roundNumber, batchHash, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRewardAccountingBatchResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetRewardAccountingBatchResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
 }

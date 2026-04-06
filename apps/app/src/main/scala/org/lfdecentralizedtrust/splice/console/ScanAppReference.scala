@@ -377,6 +377,15 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetRewardAccountingRootHash(roundNumber))
     }
 
+  @Help.Summary("Get CIP-0104 batch contents by hash for a specific round")
+  def getRewardAccountingBatch(
+      roundNumber: Long,
+      batchHash: String,
+  ): Option[definitions.GetRewardAccountingBatchResponse] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardAccountingBatch(roundNumber, batchHash))
+    }
+
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
 

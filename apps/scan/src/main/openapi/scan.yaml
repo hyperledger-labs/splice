@@ -1690,6 +1690,39 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/reward-accounting-process/rounds/{round_number}/batches/{batch_hash}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getRewardAccountingBatch"
+      description: |
+        SV node internal API (CIP-0104, subject to change).
+        Returns the contents of a reward batch identified by its hash.
+        The response is either a list of child batch hashes (for internal nodes)
+        or a list of minting allowances (for leaf nodes).
+      parameters:
+        - name: "round_number"
+          in: "path"
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: "batch_hash"
+          in: "path"
+          required: true
+          schema:
+            type: string
+            description: Hex-encoded batch hash
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardAccountingBatchResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /v0/history/bulk/acs:
     get:
       tags: [ pre-alpha, scan ]
@@ -4099,3 +4132,33 @@ components:
         root_hash:
           type: string
           description: Hex-encoded root hash
+
+    GetRewardAccountingBatchResponse:
+      type: object
+      required:
+        - batch_type
+      properties:
+        batch_type:
+          type: string
+          enum: [BatchOfBatches, BatchOfMintingAllowances]
+        child_hashes:
+          type: array
+          items:
+            type: string
+          description: Hex-encoded child batch hashes (present for BatchOfBatches)
+        minting_allowances:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RewardAccountingMintingAllowance"
+          description: Party + amount pairs (present for BatchOfMintingAllowances)
+
+    RewardAccountingMintingAllowance:
+      type: object
+      required:
+        - provider
+        - amount
+      properties:
+        provider:
+          type: string
+        amount:
+          type: string
