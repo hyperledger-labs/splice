@@ -759,7 +759,7 @@ class DbScanAppRewardsStore(
             min(seq_num), max(seq_num) + 1,
             decode(hash_batch_of_minting_allowances(
               array_agg(
-                hash_minting_allowance(party, coalesce(amount, '0'))
+                hash_minting_allowance(party, coalesce(amount, '0.0000000000'))
                 order by seq_num
               )
             ), 'hex')

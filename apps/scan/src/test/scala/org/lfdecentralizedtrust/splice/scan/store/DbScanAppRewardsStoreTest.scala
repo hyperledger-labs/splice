@@ -885,6 +885,39 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    "computeRewardHashes — below-threshold party hashes same as explicit zero amount" in {
+      // Party below threshold (absent from reward table) should hash with
+      // amount '0.0000000000' to match Daml's show on Numeric 10.
+      // We verify this by computing hashes two ways and comparing.
+      val round1 = 42L
+      val round2 = 43L
+      for {
+        (store, historyId) <- newStore()
+        // Round 1: alice has activity but is NOT in reward table (below threshold)
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(AppActivityPartyTotalT(historyId, round1, 1000000L, 0, "alice::provider"))
+        )
+        // No reward party total for alice — COALESCE fires
+        _ <- store.computeRewardHashes(round1, batchSize = 100)
+        batchesRound1 <- store.getAppRewardBatchHashesByRound(round1)
+
+        // Round 2: alice has activity AND is in reward table with explicit zero
+        _ <- store.insertAppActivityPartyTotals(
+          Seq(AppActivityPartyTotalT(historyId, round2, 1000000L, 0, "alice::provider"))
+        )
+        _ <- store.insertAppRewardPartyTotals(
+          Seq(AppRewardPartyTotalT(historyId, round2, 0, BigDecimal("0.0000000000")))
+        )
+        _ <- store.computeRewardHashes(round2, batchSize = 100)
+        batchesRound2 <- store.getAppRewardBatchHashesByRound(round2)
+      } yield {
+        // Both should produce exactly one level-0 batch with the same hash
+        batchesRound1 should have size 1
+        batchesRound2 should have size 1
+        batchesRound1.head.batchHash shouldBe batchesRound2.head.batchHash
+      }
+    }
+
     "computeRewardHashes — re-run for same round raises error" in {
       for {
         (store, historyId) <- newStore()
