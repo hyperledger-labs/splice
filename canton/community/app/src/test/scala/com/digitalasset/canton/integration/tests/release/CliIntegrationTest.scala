@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release
@@ -15,13 +15,15 @@ import scala.sys.process.*
   * new process with the to-be-tested CLI options as arguments. Before being able to run these tests
   * locally, you need to execute `sbt bundle` and `sbt package`.
   */
-abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
+class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
   // turn off cache-dir to avoid compilation errors due to concurrent cache access
   protected lazy val cacheTurnOff =
     s"$resourceDir/config-snippets/disable-ammonite-cache.conf"
 
   protected lazy val simpleConf =
     "community/app/src/pack/examples/01-simple-topology/simple-topology.conf"
+  private lazy val unsupportedProtocolVersionConfig =
+    "community/app/src/test/resources/unsupported-minimum-protocol-version.conf"
 
   // Message printed out by the bootstrap script if Canton is started successfully
   protected lazy val successMsg = "The last emperor is always the worst."
@@ -133,53 +135,6 @@ abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
         assert(contents.contains(",\"message\":\"Starting Canton version "))
     }
 
-    "run with log last errors disabled" in { processLogger =>
-      s"$cantonBin --log-last-errors=false --config $simpleConf $cantonShouldStartFlags" ! processLogger
-      checkOutput(
-        processLogger,
-        shouldContain = Seq(successMsg),
-      )
-    }
-
-    "log last errors in separate file" in { processLogger =>
-      s"$cantonBin --config $cacheTurnOff --log-truncate --log-file-appender flat --config $simpleConf --no-tty --bootstrap $resourceDir/scripts/bootstrap-with-error.canton --log-file-name log/canton-without-debug.log" ! processLogger
-
-      // Make sure the main log file does not contain debug-level log entries
-      val logFile = File("log/canton-without-debug.log")
-      val logContents = logFile.contentAsString
-      assert(!logContents.contains("some logging debug event"))
-      assert(logContents.contains("some logging error"))
-
-      val lastErrorsLogFile = File("log/canton_errors.log")
-      lastErrorsLogFile.lineCount shouldEqual 4
-      val errorContents = lastErrorsLogFile.contentAsString
-      // Errors file must include debug output
-      forEvery(List("some logging debug event", "some logging error"))(errorContents.contains)
-    }
-
-    "dynamically set log level with log last errors enabled" in { processLogger =>
-      s"$cantonBin --config $cacheTurnOff --log-truncate --log-file-appender flat --config $simpleConf --no-tty --bootstrap $resourceDir/scripts/bootstrap-with-error-dynamic.canton --log-file-name log/canton-partial-debug.log" ! processLogger
-
-      val logFile = File("log/canton-partial-debug.log")
-      val logContents = logFile.contentAsString
-
-      assert(!logContents.contains("some logging debug event"))
-      assert(logContents.contains("final logging debug event"))
-
-      val lastErrorsLogFile = File("log/canton_errors.log")
-      lastErrorsLogFile.lineCount shouldEqual 6
-      val errorContents = lastErrorsLogFile.contentAsString
-      // Errors file must include debug output
-      forEvery(
-        List(
-          "some logging debug event",
-          "some logging error",
-          "final logging debug event",
-          "final logging error",
-        )
-      )(errorContents.contains)
-    }
-
     "run with log file appender off" in { processLogger =>
       s"$cantonBin --log-file-appender=off --config $simpleConf $cantonShouldStartFlags" ! processLogger
       checkOutput(
@@ -223,6 +178,8 @@ abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
       ).foreach { check =>
         val fl = File(check)
         assert(fl.exists, s"$check is missing")
+        // Delete the generate remote configs after checking their existence
+        fl.delete()
       }
     }
 
@@ -252,7 +209,7 @@ abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
               "--log-file-name",
               "log/" + logFileName,
               "-c",
-              "demo/demo.conf",
+              "examples/01-simple-topology/simple-topology.conf",
             ),
             Some(new java.io.File(cantonDir)),
           ) ! processLogger
@@ -267,7 +224,7 @@ abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
             expectedErrorLines
               .map(expectedErrorLine =>
                 (logEntry: LogEntry) => logEntry.errorMessage should include(expectedErrorLine)
-              )*
+              ) *,
           )
 
           exitCode shouldBe expectedExitCode
@@ -318,7 +275,15 @@ abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
         )()
       }
     }
+
+    "return an appropriate error when an invalid config is used" in { processLogger =>
+      s"$cantonBin --config $simpleConf --config $unsupportedProtocolVersionConfig" ! processLogger
+      checkOutput(
+        processLogger,
+        shouldContain = Seq("unsupported-minimum-protocol-version.conf", "42"),
+        shouldSucceed = false,
+      )
+    }
+
   }
 }
-
-class CommunityCliIntegrationTest extends CliIntegrationTest with CommunityReleaseTest

@@ -17,7 +17,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.HexString
-import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 
 import java.nio.file.Files
@@ -88,6 +87,7 @@ class RecoverExternalPartyIntegrationTest
               ParticipantPermission.Confirmation,
             )
           ),
+          partySigningKeysWithThreshold = None,
         )
         .value
 
@@ -174,7 +174,8 @@ class RecoverExternalPartyIntegrationTest
       }
       val acsSnapshotFile = Files.createTempFile("acs", ".snapshot")
       Files.write(acsSnapshotFile, acsSnapshot.toByteArray())
-      bobValidatorBackend.participantClient.repair.import_acs(acsSnapshotFile.toString)
+      bobValidatorBackend.participantClient.repair
+        .import_acs(synchronizerId, acsSnapshotFile.toString)
       bobValidatorBackend.participantClient.synchronizers.reconnect_all()
     }
 
@@ -264,7 +265,7 @@ class RecoverExternalPartyIntegrationTest
       tx,
       NonEmpty(Seq, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,
-      ProtocolVersion.v34,
+      sv1Backend.config.localSynchronizerNodes.current.protocolVersion,
     )
   }
 }

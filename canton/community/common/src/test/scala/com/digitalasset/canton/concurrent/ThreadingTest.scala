@@ -1,9 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
 
 import cats.syntax.parallel.*
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -17,6 +19,8 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 
 @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
 class ThreadingTest extends AnyWordSpec with BaseTest {
+
+  private val noOpMetrics = new ExecutorServiceMetrics(NoOpMetricsFactory)
 
   private lazy val configuredNumerOfThreads: PositiveInt =
     Threading.detectNumberOfThreads(noTracingLogger)
@@ -239,6 +243,7 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
         Threading.newExecutionContext(
           "threading-test-execution-context",
           noTracingLogger,
+          noOpMetrics,
         )
 
       def rec(n: Int): Future[Int] =
@@ -345,6 +350,7 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
         Threading.newExecutionContext(
           "threading-test-execution-context",
           noTracingLogger,
+          noOpMetrics,
         )
       )(logger, DefaultProcessingTimeouts.testing)
     ) { case ExecutorServiceExtensions(ec) =>

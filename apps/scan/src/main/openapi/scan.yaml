@@ -158,6 +158,25 @@ paths:
                 "$ref": "#/components/schemas/ListSvBftSequencersResponse"
 
 
+  /v0/active-synchronizer-serial:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getActivePhysicalSynchronizerSerial"
+      description: |
+        Get the current physical synchronizer serial as reported by the SV participant.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetActivePhysicalSynchronizerSerialResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
       tags: [external, scan]
@@ -2016,11 +2035,11 @@ components:
             $ref: "#/components/schemas/SynchronizerBftSequencer"
     SynchronizerBftSequencer:
       type: object
-      required: ["migrationId", "id", "p2pUrl"]
+      required: ["serialId", "id", "p2pUrl"]
       properties:
-        migrationId:
+        serialId:
           description: |
-            The synchronizer migration id corresponding to this sequencer.
+            The synchronizer serial corresponding to this sequencer.
           type: integer
           format: int64
         id:
@@ -2056,6 +2075,13 @@ components:
         migrationId:
           description: |
             The synchronizer migration id corresponding to this sequencer.
+            Set to -1 if serial is set.
+          type: integer
+          format: int64
+        synchronizerSerial:
+          description: |
+            The synchronizer serial corresponding to this sequencer.
+            One of migrationId or serialId will be set.
           type: integer
           format: int64
         id:
@@ -2072,6 +2098,15 @@ components:
             Any participant should subscribe to this sequencer after this time.
           type: string
           format: date-time
+    GetActivePhysicalSynchronizerSerialResponse:
+      type: object
+      required: ["serial"]
+      properties:
+        serial:
+          description: |
+            The current physical synchronizer serial as reported by the SV participant.
+          type: integer
+          format: int64
     ListDsoScansResponse:
       type: object
       required: ["scans"]

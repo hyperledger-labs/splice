@@ -1,16 +1,17 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.util.ShowUtil.*
+import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantClientConfig}
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.util.ShowUtil.*
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
@@ -29,18 +30,18 @@ class SequencerPruningIntegrationTest
         (_, config) =>
           ConfigTransforms.updateAllSvAppConfigs { (_, config) =>
             config.copy(
-              localSynchronizerNode = config.localSynchronizerNode.map(synchronizerNode =>
-                synchronizerNode.copy(
-                  sequencer = synchronizerNode.sequencer.copy(
-                    pruning = Some(
+              localSynchronizerNodes = config.localSynchronizerNodes
+                .focus(_.current)
+                .modify(
+                  _.focus(_.sequencer.pruning).replace(
+                    Some(
                       SequencerPruningConfig(
                         pruningInterval = NonNegativeFiniteDuration(2.seconds),
                         retentionPeriod = NonNegativeFiniteDuration(120.seconds),
                       )
                     )
                   )
-                )
-              ),
+                ),
               // The pruning trigger only registers the advancing of time when things happen
               // on the ledger, so let's make sure that things happen frequently.
               onLedgerStatusReportInterval = NonNegativeFiniteDuration(30.seconds),

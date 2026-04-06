@@ -6,7 +6,12 @@ package org.lfdecentralizedtrust.splice.config
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.environment.DarResources
-import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanAppBackendConfig}
+import org.lfdecentralizedtrust.splice.scan.config.{
+  BftSequencerConfig,
+  ScanAppBackendConfig,
+  ScanSynchronizerConfig,
+  ScanSynchronizerNodesConfig,
+}
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
@@ -92,6 +97,7 @@ object ConfigTransforms {
               )
             case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
             case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
+            case Some(rollForwardLsu: SvOnboardingConfig.RollForwardLsu) => Some(rollForwardLsu)
             case None => None
           },
         )
@@ -333,6 +339,7 @@ object ConfigTransforms {
             Some(update(foundDso))
           case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
           case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
+          case Some(rollForwardLsu: SvOnboardingConfig.RollForwardLsu) => Some(rollForwardLsu)
           case None => None
         }
     )
@@ -408,20 +415,67 @@ object ConfigTransforms {
   ): ConfigTransform =
     updateAllRemoteSplitwellAppConfigs((_, config) => update(config))
 
-  def bumpScanCantonDomainPortsBy(bump: Int) = {
-    updateAllScanAppConfigs_(
-      _.focus(_.bftSequencers).modify(
-        _.map(
-          _.focus(_.p2pUrl).modify(
-            bumpUrl(bump, _)
+  def bumpOptionalUrl(o: Option[String], bump: Int): Option[String] = {
+    o.map(bumpUrl(bump, _))
+  }
+
+  def bumpCantonSyncSuccessorPortsBy(bump: Int) = {
+    updateAllSvAppConfigs((_, conf) =>
+      conf
+        .focus(_.localSynchronizerNodes.successor)
+        .some
+        .modify(portTransform(bump, _))
+    ).andThen(
+      updateAllScanAppConfigs((_, conf) =>
+        conf
+          .focus(_.synchronizerNodes.successor)
+          .some
+          .modify(
+            portTransform(bump, _)
+              .focus(_.bftSequencerConfig)
+              .some
+              .modify(_.focus(_.p2pUrl).modify(bumpUrl(bump, _)))
           )
-        )
       )
     )
   }
 
-  def bumpOptionalUrl(o: Option[String], bump: Int): Option[String] = {
-    o.map(bumpUrl(bump, _))
+  def bumpCantonSyncPortsBy(
+      bump: Int,
+      predicate: String => Boolean = _ => true,
+  ): ConfigTransform = {
+    val transforms = Seq(
+      updateAllSvAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.domains.global.url)
+            .modify(_.map(bumpUrl(bump, _)))
+            .focus(_.localSynchronizerNodes.current)
+            .modify(portTransform(bump, _))
+        else conf
+      ),
+      updateAllScanAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.synchronizerNodes)
+            .modify(portTransform(bump, _))
+            .focus(_.synchronizerNodes.current.bftSequencerConfig)
+            .modify(_.map(c => c.copy(p2pUrl = bumpUrl(bump, c.p2pUrl))))
+        else conf
+      ),
+      updateAllValidatorConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.domains.global.url)
+            .modify(bumpOptionalUrl(_, bump))
+            .focus(_.domains.extra)
+            .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
+        else conf
+      ),
+    )
+
+    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
+
   }
 
   def bumpCantonPortsBy(bump: Int, predicate: String => Boolean = _ => true): ConfigTransform = {
@@ -432,10 +486,6 @@ object ConfigTransforms {
           conf
             .focus(_.participantClient)
             .modify(portTransform(bump, _))
-            .focus(_.domains.global.url)
-            .modify(_.map(bumpUrl(bump, _)))
-            .focus(_.localSynchronizerNode)
-            .modify(_.map(portTransform(bump, _)))
         else conf
       ),
       updateAllScanAppConfigs((name, conf) =>
@@ -443,12 +493,6 @@ object ConfigTransforms {
           conf
             .focus(_.participantClient)
             .modify(portTransform(bump, _))
-            .focus(_.sequencerAdminClient)
-            .modify(portTransform(bump, _))
-            .focus(_.mediatorAdminClient)
-            .modify(portTransform(bump, _))
-            .focus(_.bftSequencers)
-            .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
         else conf
       ),
       updateAllValidatorConfigs((name, conf) =>
@@ -456,10 +500,6 @@ object ConfigTransforms {
           conf
             .focus(_.participantClient)
             .modify(portTransform(bump, _))
-            .focus(_.domains.global.url)
-            .modify(bumpOptionalUrl(_, bump))
-            .focus(_.domains.extra)
-            .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
         else conf
       ),
       updateAllSplitwellAppConfigs((name, conf) =>
@@ -474,36 +514,10 @@ object ConfigTransforms {
       ),
     )
 
-    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
+    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) =>
+      f compose tf
+    ) compose bumpCantonSyncPortsBy(bump, predicate)
 
-  }
-
-  def bumpSomeSvAppPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
-    updateAllSvAppConfigs((name, config) => {
-      if (svApps.contains(name)) {
-        config
-          .focus(_.adminApi)
-          .modify(portTransform(bump, _))
-      } else {
-        config
-      }
-    }) compose bumpSomeSvAppCantonPortsBy(bump, svApps)
-  }
-
-  def bumpSomeSvAppCantonPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
-    updateAllSvAppConfigs((name, config) => {
-      if (svApps.contains(name)) {
-        config
-          .focus(_.domains.global.url)
-          .modify(_.map(bumpUrl(bump, _)))
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(portTransform(bump, _)))
-      } else {
-        config
-      }
-    })
   }
 
   def bumpUrl(bump: Int, uri: Uri): Uri = {
@@ -517,6 +531,21 @@ object ConfigTransforms {
   private def setPortPrefix(range: Int): Port => Port = { port =>
     Port.tryCreate((range * 1000) + port.unwrap % 1000)
   }
+
+  private def setPortPrefix(
+      range: Int,
+      c: ScanSynchronizerNodesConfig,
+  ): ScanSynchronizerNodesConfig =
+    c.focus(_.current)
+      .modify(setPortPrefix(range, _))
+      .focus(_.successor)
+      .modify(_.map(setPortPrefix(range, _)))
+
+  private def setPortPrefix(range: Int, c: ScanSynchronizerConfig): ScanSynchronizerConfig =
+    c.focus(_.sequencer.port)
+      .modify(setPortPrefix(range))
+      .focus(_.mediator.port)
+      .modify(setPortPrefix(range))
 
   private def setPortPrefixInUrl(range: Int): String => String = { s =>
     val uri = Uri(s)
@@ -532,8 +561,8 @@ object ConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.participantClient.adminApi.port)
           .modify(setPortPrefix(range))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(c => setSvSynchronizerConfigPortsPrefix(range, c)))
+          .focus(_.localSynchronizerNodes.current)
+          .modify(setSvSynchronizerConfigPortsPrefix(range, _))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
       } else {
@@ -575,9 +604,7 @@ object ConfigTransforms {
         config
           .focus(_.participantClient)
           .modify(portTransform(bump, _))
-          .focus(_.sequencerAdminClient)
-          .modify(portTransform(bump, _))
-          .focus(_.mediatorAdminClient)
+          .focus(_.synchronizerNodes)
           .modify(portTransform(bump, _))
       } else {
         config
@@ -595,12 +622,8 @@ object ConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.adminApi.internalPort)
           .modify(_.map(setPortPrefix(range)))
-          .focus(_.sequencerAdminClient.port)
-          .modify(setPortPrefix(range))
-          .focus(_.mediatorAdminClient.port)
-          .modify(setPortPrefix(range))
-          .focus(_.bftSequencers)
-          .modify(_.map(_.focus(_.sequencerAdminClient.port).modify(setPortPrefix(range))))
+          .focus(_.synchronizerNodes)
+          .modify(setPortPrefix(range, _))
       } else {
         config
       }
@@ -680,40 +703,66 @@ object ConfigTransforms {
     )
   }
 
+  private def enableBftOnSvNode(node: SvSynchronizerNodeConfig): SvSynchronizerNodeConfig =
+    node.focus(_.sequencer).modify(_.copy(isBftSequencer = true))
+
   def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
-    config
-      .focus(_.localSynchronizerNode)
-      .modify(
-        _.map(
-          _.focus(_.sequencer).modify(
-            _.copy(
-              isBftSequencer = true
-            )
-          )
-        )
+    config.focus(_.localSynchronizerNodes.current).modify(enableBftOnSvNode)
+
+  def withBftSequencerSuccessor(config: SvAppBackendConfig): SvAppBackendConfig =
+    config.focus(_.localSynchronizerNodes.successor).modify(_.map(enableBftOnSvNode))
+
+  private def bftScanConfig(name: String, basePort: Int): Option[BftSequencerConfig] =
+    Some(
+      BftSequencerConfig(
+        s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}"
       )
+    )
 
   def withBftSequencer(
       name: String,
       config: ScanAppBackendConfig,
-      migrationId: Long = 0,
       basePort: Int = 5010,
   ): ScanAppBackendConfig =
-    config.copy(
-      bftSequencers = Seq(
-        BftSequencerConfig(
-          migrationId,
-          config.sequencerAdminClient,
-          s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}",
-        )
-      )
-    )
+    config
+      .focus(_.synchronizerNodes.current.bftSequencerConfig)
+      .replace(bftScanConfig(name, basePort))
 
-  def withBftSequencers(): ConfigTransform = {
-    updateAllSvAppConfigs_(withBftSequencer(_)) compose {
-      updateAllScanAppConfigs((scan, config) => withBftSequencer(scan, config))
+  def withBftSequencerSuccessor(
+      name: String,
+      config: ScanAppBackendConfig,
+      basePort: Int = 5010,
+  ): ScanAppBackendConfig =
+    config
+      .focus(_.synchronizerNodes.successor)
+      .modify(_.map(_.focus(_.bftSequencerConfig).replace(bftScanConfig(name, basePort))))
+
+  private def withBftSequencersFor(
+      svTransform: SvAppBackendConfig => SvAppBackendConfig,
+      scanTransform: (String, ScanAppBackendConfig) => ScanAppBackendConfig,
+      namePredicate: String => Boolean,
+  ): ConfigTransform =
+    updateAllSvAppConfigs { case (name, c) =>
+      if (namePredicate(name)) {
+        svTransform(c)
+      } else {
+        c
+      }
+    } compose {
+      updateAllScanAppConfigs { case (name, c) =>
+        if (namePredicate(name)) {
+          scanTransform(name, c)
+        } else {
+          c
+        }
+      }
     }
-  }
+
+  def withBftSequencers(namePredicate: String => Boolean = _ => true): ConfigTransform =
+    withBftSequencersFor(withBftSequencer, withBftSequencer(_, _), namePredicate)
+
+  def withBftSequencersSuccessor(namePredicate: String => Boolean = _ => true): ConfigTransform =
+    withBftSequencersFor(withBftSequencerSuccessor, withBftSequencerSuccessor(_, _), namePredicate)
 
   def withNoVoteCooldown: ConfigTransform = {
     updateAllSvAppFoundDsoConfigs_ { c =>
@@ -741,6 +790,21 @@ object ConfigTransforms {
 
   private def portTransform(bump: Int, c: FullClientConfig): FullClientConfig =
     c.copy(port = c.port + bump)
+
+  private def portTransform(
+      bump: Int,
+      c: ScanSynchronizerNodesConfig,
+  ): ScanSynchronizerNodesConfig =
+    c.copy(
+      current = portTransform(bump, c.current),
+      successor = c.successor.map(portTransform(bump, _)),
+    )
+
+  def portTransform(bump: Int, c: ScanSynchronizerConfig): ScanSynchronizerConfig =
+    c.copy(
+      sequencer = portTransform(bump, c.sequencer),
+      mediator = portTransform(bump, c.mediator),
+    )
 
   private def portTransform(bump: Int, c: LedgerApiClientConfig): LedgerApiClientConfig =
     c.focus(_.clientConfig).modify(portTransform(bump, _))

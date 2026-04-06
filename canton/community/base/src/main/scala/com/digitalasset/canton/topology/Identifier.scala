@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -14,6 +14,8 @@ import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError, checked}
 import slick.jdbc.{GetResult, SetParameter}
+
+import scala.math.Ordering
 
 object Namespace {
   implicit val setParameterNamespace: SetParameter[Namespace] = (v, pp) =>
@@ -97,6 +99,13 @@ object UniqueIdentifier {
 
   private def validIdentifier(id: String): Either[String, String185] =
     verifyValidString(id).flatMap(String185.create(_))
+
+  val orderingIdentifierThenNamespace: Ordering[UniqueIdentifier] =
+    Ordering
+      .by[UniqueIdentifier, String](_.identifier.toProtoPrimitive)
+      .orElse(
+        Ordering.by[UniqueIdentifier, String](_.namespace.toProtoPrimitive)
+      )
 
   def create(id: String, namespace: Namespace): Either[String, UniqueIdentifier] =
     for {

@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   DomainMigration,
   FoundDso,
   JoinWithKey,
+  RollForwardLsu,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
@@ -58,7 +59,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected val domainTimeSync: DomainTimeSynchronization
   protected val domainUnpausedSync: DomainUnpausedSynchronization
   protected val participantAdminConnection: ParticipantAdminConnection
-  protected val cometBftNode: Option[CometBftNode]
   protected val ledgerClient: SpliceLedgerClient
   protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig
 
@@ -88,7 +88,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       dsoStore: SvDsoStore,
       ledgerClient: SpliceLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
+      synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -106,7 +106,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       storage,
       ledgerClient,
       participantAdminConnection,
-      localSynchronizerNode,
+      synchronizerNodeService,
       retryProvider,
       config.topologySnapshotConfig,
       loggerFactory,
@@ -138,11 +138,12 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def newSvDsoAutomationService(
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
+      synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
       synchronizerId: SynchronizerId,
       enabledFeatures: EnabledFeaturesConfig,
+      synchronizerNodeReconciler: SynchronizerNodeReconciler,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -160,14 +161,14 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ledgerClient,
       participantAdminConnection,
       retryProvider,
-      cometBftNode,
-      localSynchronizerNode,
+      synchronizerNodeService,
       upgradesConfig,
       spliceInstanceNamesConfig,
       loggerFactory,
       packageVersionSupport,
       synchronizerId,
       enabledFeatures,
+      synchronizerNodeReconciler,
     )
 
   protected def newDsoPartyHosting(
@@ -178,16 +179,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     retryProvider,
     loggerFactory,
   )
-
-  protected def rotateGenesisGovernanceKeyForSV1(
-      cometBftNode: Option[CometBftNode],
-      name: String,
-  )(implicit tc: TraceContext): Future[Unit] =
-    cometBftNode match {
-      case Some(cometBftNode) =>
-        cometBftNode.rotateGenesisGovernanceKeyForSV1(name)
-      case _ => Future.unit
-    }
 
   protected def ensureCometBftGovernanceKeysAreSet(
       cometBftNode: Option[CometBftNode],
@@ -329,6 +320,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                         rnd
                     }
                     setInitialRound(connection, initialRound.toLong)
+                  case _: RollForwardLsu =>
+                    sys.error("Initial round should already be set when doing an LSU")
                 }
               case None =>
                 logger.debug(

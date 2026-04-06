@@ -189,4 +189,69 @@ class ApiClientRequestLogger(
       delegate.request(numMessages)
     }
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product"))
+  private def cutMessage(message: Any): String =
+    if (config.messagePayloads) {
+      config.printer.printAdHoc(message)
+    } else ""
+
+  protected def logThrowable(
+      within: => Unit
+  )(createLogMessage: String => String, traceContext: TraceContext): Unit = {
+    try {
+      within
+    } catch {
+      // If the server implementation fails, the server method must return a failed future or call StreamObserver.onError.
+      // This handler is invoked, when an internal GRPC error occurs or the server implementation throws.
+      case t: Throwable =>
+        logger.error(createLogMessage("failed with an unexpected throwable"), t)(traceContext)
+        t match {
+          case _: RuntimeException =>
+            throw t
+          case _: Exception =>
+            // Convert to a RuntimeException, because GRPC is unable to handle undeclared checked exceptions.
+            throw new RuntimeException(t)
+          case _: Throwable =>
+            throw t
+        }
+    }
+  }
+
+  protected def logStatusOnClose(
+      status: Status,
+      trailers: Metadata,
+      createLogMessage: String => String,
+  )(implicit requestTraceContext: TraceContext): Status = {
+    val enhancedStatus = enhance(status)
+
+    val statusString = Option(enhancedStatus.getDescription).filterNot(_.isEmpty) match {
+      case Some(d) => s"${enhancedStatus.getCode}/$d"
+      case None => enhancedStatus.getCode.toString
+    }
+
+    val trailersString = stringOfTrailers(trailers)
+
+    if (enhancedStatus.getCode == Status.OK.getCode) {
+      logger.debug(
+        createLogMessage(s"succeeded($statusString)$trailersString"),
+        enhancedStatus.getCause,
+      )
+    } else {
+      val message = createLogMessage(s"failed with $statusString$trailersString")
+      if (
+        enhancedStatus.getCode == Status.Code.UNKNOWN || enhancedStatus.getCode == Status.Code.DATA_LOSS
+      ) {
+        logger.error(message, enhancedStatus.getCause)
+      } else if (enhancedStatus.getCode == Status.Code.INTERNAL) {
+        logger.error(message, enhancedStatus.getCause)
+      } else if (enhancedStatus.getCode == Status.Code.UNAUTHENTICATED) {
+        logger.debug(message, enhancedStatus.getCause)
+      } else {
+        logger.info(message, enhancedStatus.getCause)
+      }
+    }
+
+    enhancedStatus
+  }
 }

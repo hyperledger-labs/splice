@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -11,6 +11,8 @@ import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
 import com.digitalasset.canton.ledger.client.services.version.VersionClient
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.audit.ApiRequestLogger
+import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
 import sttp.tapir.AnyEndpoint
 import sttp.tapir.generic.auto.*
@@ -18,7 +20,12 @@ import sttp.tapir.json.circe.jsonBody
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class JsVersionService(versionClient: VersionClient, val loggerFactory: NamedLoggerFactory)(implicit
+@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
+class JsVersionService(
+    versionClient: VersionClient,
+    override protected val requestLogger: ApiRequestLogger,
+    val loggerFactory: NamedLoggerFactory,
+)(implicit
     val executionContext: ExecutionContext,
     val authInterceptor: AuthInterceptor,
 ) extends Endpoints {
@@ -29,16 +36,20 @@ class JsVersionService(versionClient: VersionClient, val loggerFactory: NamedLog
       getVersion,
     )
   )
+
   private def getVersion(
       caller: CallerContext
   ): TracedInput[Unit] => Future[
     Either[JsCantonError, version_service.GetLedgerApiVersionResponse]
-  ] =
-    tracedInput =>
+  ] = {
+    implicit val tc: TraceContext = caller.traceContext()
+
+    _ =>
       versionClient
-        .serviceStub(caller.token())(tracedInput.traceContext)
+        .serviceStub(caller.token())
         .getLedgerApiVersion(version_service.GetLedgerApiVersionRequest())
         .resultToRight
+  }
 }
 
 object JsVersionService extends DocumentationEndpoints {
@@ -49,7 +60,7 @@ object JsVersionService extends DocumentationEndpoints {
 
   val versionEndpoint = version.get
     .out(jsonBody[version_service.GetLedgerApiVersionResponse])
-    .description("Get the version details of the participant node")
+    .protoRef(version_service.VersionServiceGrpc.METHOD_GET_LEDGER_API_VERSION)
 
   override def documentation: Seq[AnyEndpoint] = Seq(versionEndpoint)
 }

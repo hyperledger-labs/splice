@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -13,6 +13,9 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.annotation.nowarn
+
+@nowarn("cat=deprecation")
 class SortedReconciliationIntervalsProviderTest
     extends AnyWordSpec
     with BaseTest
@@ -21,13 +24,11 @@ class SortedReconciliationIntervalsProviderTest
 
   "SortedReconciliationIntervalsProvider" must {
     "allow to query reconciliation intervals" in {
-      val protocolVersion = testedProtocolVersion
-
       val clock = new SimClock(fromEpoch(0), loggerFactory)
 
       val synchronizerParameters = Vector(
-        mkDynamicSynchronizerParameters(0, 10, 1, protocolVersion),
-        mkDynamicSynchronizerParameters(10, 2, protocolVersion),
+        mkDynamicSynchronizerParameters(0, 10, 1),
+        mkDynamicSynchronizerParameters(10, 2),
       )
 
       val reconciliationIntervals = synchronizerParameters.map(_.map(_.reconciliationInterval))
@@ -110,8 +111,9 @@ class SortedReconciliationIntervalsProviderTest
       val clock = new SimClock(fromEpoch(0), loggerFactory)
 
       val synchronizerParameters = Vector(
-        mkDynamicSynchronizerParameters(0, 13, 2, testedProtocolVersion),
-        mkDynamicSynchronizerParameters(13, 9, testedProtocolVersion),
+        mkDynamicSynchronizerParameters(0, 13, 2),
+        mkDynamicSynchronizerParameters(13, 9, 17),
+        mkDynamicSynchronizerParameters(17, 20),
       )
 
       val topologySnapshot = mock[TopologySnapshot]
@@ -133,17 +135,17 @@ class SortedReconciliationIntervalsProviderTest
         loggerFactory = loggerFactory,
       )
 
-      clock.advanceTo(fromEpoch(18))
+      clock.advanceTo(fromEpoch(40))
 
-      for {
-        x <- provider.computeReconciliationIntervalsCovering(fromEpoch(10), fromEpoch(18))
-      } yield {
-        x shouldBe
-          List(
-            CommitmentPeriod.create(fromEpochSecond(10), fromEpochSecond(12)),
-            CommitmentPeriod.create(fromEpochSecond(12), fromEpochSecond(18)),
-          )
-      }
+      val periods =
+        provider.computeReconciliationIntervalsCovering(fromEpoch(8), fromEpoch(40)).futureValueUS
+      periods.toSeq shouldBe
+        Seq(
+          CommitmentPeriod.create(fromEpochSecond(20), fromEpochSecond(40)),
+          CommitmentPeriod.create(fromEpochSecond(12), fromEpochSecond(20)),
+          CommitmentPeriod.create(fromEpochSecond(10), fromEpochSecond(12)),
+          CommitmentPeriod.create(fromEpochSecond(8), fromEpochSecond(10)),
+        ).map(_.value)
     }
 
   }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.ProtoDeserializationError.TimestampConversionError
 import com.digitalasset.canton.data.CantonTimestamp.TimeGranularity
+import com.digitalasset.canton.resource.ToDbPrimitive
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.time.RefinedDuration
@@ -67,7 +68,7 @@ final case class CantonTimestamp(underlying: LfTimestamp)
   def max(that: CantonTimestamp): CantonTimestamp = if (compare(that) > 0) this else that
 
   def -(other: CantonTimestamp): Duration =
-    Duration.ofNanos(1000L * (this.underlying.micros - other.underlying.micros))
+    Duration.between(other.underlying.toInstant, this.underlying.toInstant)
 
   def +(duration: RefinedDuration): CantonTimestamp = plus(duration.unwrap)
   def -(duration: RefinedDuration): CantonTimestamp = minus(duration.unwrap)
@@ -158,8 +159,9 @@ object CantonTimestamp {
   // Timestamps are stored as microseconds relative to EPOCH in a `bigint` rather than a SQL `timestamp`.
   // This avoids all the time zone conversions introduced by various layers that are hard to make consistent
   // across databases.
-  implicit val setParameterTimestamp: SetParameter[CantonTimestamp] = (v, pp) =>
-    pp.setLong(v.toMicros)
+  implicit val cantonTimestampToDbPrimitive: ToDbPrimitive[CantonTimestamp, Long] = ToDbPrimitive(
+    _.toMicros
+  )
   implicit val setParameterOptionTimestamp: SetParameter[Option[CantonTimestamp]] = (v, pp) =>
     pp.setLongOption(v.map(_.toMicros))
   implicit val getResultTimestamp: GetResult[CantonTimestamp] =
@@ -169,14 +171,18 @@ object CantonTimestamp {
 
   private val isoFormat = DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of("Z"))
 
+  def fromString(str: String): Either[String, CantonTimestamp] = Either
+    .catchOnly[DateTimeParseException](isoFormat.parse(str, Instant.from(_)))
+    .leftMap(_.getMessage)
+    .flatMap(CantonTimestamp.fromInstant)
+    .leftMap(err => s"Unable to parse $str as CantonTimestamp: $err")
+
+  def assertFromString(str: String): CantonTimestamp =
+    fromString(str).valueOr(err => throw new IllegalArgumentException(err))
+
   implicit val cantonTimestampReader: ConfigReader[CantonTimestamp] =
     ConfigReader.fromNonEmptyString { str =>
-      Either
-        .catchOnly[DateTimeParseException](
-          isoFormat.parse(str, Instant.from(_))
-        )
-        .leftMap(_.getMessage)
-        .flatMap(CantonTimestamp.fromInstant)
+      fromString(str)
         .leftMap[FailureReason](error =>
           CannotConvert(str, classOf[CantonTimestamp].getName, error)
         )

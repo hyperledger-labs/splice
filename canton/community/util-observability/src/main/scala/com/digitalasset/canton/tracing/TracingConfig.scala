@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -54,7 +54,7 @@ object TracingConfig {
     final case class Zipkin(address: String = "localhost", port: Int = 9411) extends Exporter
     final case class Otlp(
         address: String = "localhost",
-        port: Int = 4318,
+        port: Int = 4317,
         trustCollectionPath: Option[String] = None,
         additionalHeaders: Map[String, String] = Map.empty,
         timeout: Option[FiniteDuration] = None,

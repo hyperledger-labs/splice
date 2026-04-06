@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -219,7 +219,7 @@ object ConsoleScriptRunner extends NoTracing {
     val normalized = script.replaceAll("\\r\\n|\\r|\\n", "\n")
     Hash
       .build(HashPurpose.CantonScript, HashAlgorithm.Sha256)
-      .add(normalized)
+      .addString(normalized)
       .finish()
   }
 }

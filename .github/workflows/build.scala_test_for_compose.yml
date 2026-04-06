@@ -100,7 +100,7 @@ jobs:
       - name: Run Tests
         uses: ./splice-shared-gha/.github/actions/tests/scala_test
         with:
-          cache_version: 7
+          cache_version: 8
           start_canton_options: ${{ inputs.start_canton_options }}
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}

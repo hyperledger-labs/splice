@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.config
 
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.config.{
@@ -24,6 +25,7 @@ trait BaseScanAppConfig {}
 final case class ScanSynchronizerConfig(
     sequencer: FullClientConfig,
     mediator: FullClientConfig,
+    bftSequencerConfig: Option[BftSequencerConfig],
 )
 
 final case class MediatorVerdictIngestionConfig(
@@ -53,8 +55,7 @@ case class ScanAppBackendConfig(
     override val storage: DbConfig,
     svUser: String,
     override val participantClient: ParticipantClientConfig,
-    sequencerAdminClient: FullClientConfig,
-    mediatorAdminClient: FullClientConfig,
+    synchronizerNodes: ScanSynchronizerNodesConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     enableAppActivityRecordAndTrafficIngestion: Boolean = true,
@@ -72,7 +73,6 @@ case class ScanAppBackendConfig(
     updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
-    bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
     acsStoreDescriptorUserVersion: Option[Long] = None,
     txLogStoreDescriptorUserVersion: Option[Long] = None,
@@ -82,6 +82,7 @@ case class ScanAppBackendConfig(
     // TODO(#4249): use on-ledger synchronization for switching record times
     externalTransactionHashThresholdTime: Option[Instant] =
       ScanAppBackendConfig.DefaultExternalTransactionHashThresholdTime,
+    globalSynchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("global"),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
@@ -94,6 +95,12 @@ object ScanAppBackendConfig {
   val DefaultExternalTransactionHashThresholdTime: Option[Instant] =
     Some(java.time.Instant.parse("2030-01-01T00:00:00Z"))
 }
+
+final case class ScanSynchronizerNodesConfig(
+    current: ScanSynchronizerConfig,
+    successor: Option[ScanSynchronizerConfig],
+    legacy: Option[ScanSynchronizerConfig],
+)
 
 final case class ScanCacheConfig(
     svNodeState: CacheConfig = CacheConfig(

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.db
@@ -45,8 +45,8 @@ class DbRequestJournalStore(
     extends RequestJournalStore
     with DbStore { self =>
 
-  import DbStorage.Implicits.*
   import storage.api.*
+  import storage.converters.*
 
   implicit val getResultRequestState: GetResult[RequestState] = GetResult { r =>
     val index = r.nextInt()
@@ -80,7 +80,7 @@ class DbRequestJournalStore(
       override def executeBatch(items: NonEmpty[Seq[Traced[RequestData]]])(implicit
           traceContext: TraceContext,
           callerCloseContext: CloseContext,
-      ): FutureUnlessShutdown[Iterable[Try[Unit]]] =
+      ): FutureUnlessShutdown[immutable.Iterable[Try[Unit]]] =
         bulkUpdateWithCheck(items, "DbRequestJournalStore.insert")(traceContext, self.closeContext)
 
       override protected def bulkUpdateAction(items: NonEmpty[Seq[Traced[RequestData]]])(implicit
@@ -243,7 +243,7 @@ class DbRequestJournalStore(
           implicit
           traceContext: TraceContext,
           callerCloseContext: CloseContext,
-      ): FutureUnlessShutdown[Iterable[Try[Result]]] =
+      ): FutureUnlessShutdown[immutable.Iterable[Try[Result]]] =
         bulkUpdateWithCheck(items, "DbRequestJournalStore.replace")(traceContext, self.closeContext)
 
       override protected def bulkUpdateAction(items: NonEmpty[Seq[Traced[ReplaceRequest]]])(implicit
@@ -392,7 +392,7 @@ class DbRequestJournalStore(
         select max(request_timestamp)
         from par_journal_requests
         where physical_synchronizer_idx = $physicalSynchronizerIdx and request_timestamp <= $requestTimestamp
-        """.as[CantonTimestamp].headOption,
+        """.as[Option[CantonTimestamp]].headOption.map(_.flatten),
       functionFullName,
     )
 }

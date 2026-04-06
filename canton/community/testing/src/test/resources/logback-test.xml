@@ -34,7 +34,7 @@
   <include resource="rewrite-appender.xml"/>
 
   <root level="INFO">
-    <appender-ref ref="REWRITE_LOG_LEVEL_SYNC" />
+    <appender-ref ref="REWRITE_LOG_LEVEL_SYNC"/>
   </root>
 
   <!-- Ensure everything is logged before the JVM exits -->

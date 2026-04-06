@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -16,7 +16,7 @@ import com.digitalasset.canton.util.{ErrorUtil, ResourceUtil}
 import com.digitalasset.canton.{
   BaseTest,
   HasExecutionContext,
-  ProtocolVersionChecksFixtureAnyWordSpec,
+  TestPredicateFiltersFixtureAnyWordSpec,
 }
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.scalatest.Outcome
@@ -24,11 +24,11 @@ import org.scalatest.wordspec.FixtureAnyWordSpec
 
 import java.util.concurrent.atomic.AtomicReference
 
-class SequencedEventMonotonicityCheckerTest
+final class SequencedEventMonotonicityCheckerTest
     extends FixtureAnyWordSpec
     with BaseTest
     with HasExecutionContext
-    with ProtocolVersionChecksFixtureAnyWordSpec {
+    with TestPredicateFiltersFixtureAnyWordSpec {
   import SequencedEventMonotonicityCheckerTest.*
 
   override protected type FixtureParam = SequencedEventTestFixture

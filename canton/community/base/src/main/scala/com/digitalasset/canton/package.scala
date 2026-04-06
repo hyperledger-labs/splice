@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset
@@ -7,7 +7,7 @@ import com.digitalasset.canton.data.{Counter, CounterCompanion}
 import com.digitalasset.canton.serialization.DeterministicEncoding.encodeLong
 import com.digitalasset.daml.lf.command.ReplayCommand
 import com.digitalasset.daml.lf.data.{IdString, Ref, Time}
-import com.digitalasset.daml.lf.transaction.{ContractStateMachine, Versioned}
+import com.digitalasset.daml.lf.transaction.{GlobalKey, Versioned}
 import com.digitalasset.daml.lf.value.Value
 import com.google.protobuf.ByteString
 import scalapb.GeneratedMessage
@@ -24,6 +24,8 @@ package object canton {
   // in Canton.
   type LfPartyId = Ref.Party
   val LfPartyId: Ref.Party.type = Ref.Party
+
+  type InternedPartyId = Int
 
   // Ledger participant id
   type LedgerParticipantId = Ref.ParticipantId
@@ -107,7 +109,7 @@ package object canton {
   type LfWorkflowId = Ref.WorkflowId
   val LfWorkflowId: Ref.WorkflowId.type = Ref.WorkflowId
 
-  type LfKeyResolver = ContractStateMachine.KeyResolver
+  type LfKeyResolver = Map[GlobalKey, Vector[LfValue.ContractId]]
 
   /** The counter assigned by the sequencer to messages sent to the participant. The counter is
     * specific to every participant.

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.repair
@@ -7,6 +7,11 @@ import com.daml.test.evidence.scalatest.OperabilityTestHelpers
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Inspection.{
   SynchronizerTimeRange,
   TimeRange,
+}
+import com.digitalasset.canton.admin.api.client.data.{
+  GrpcSequencerConnection,
+  SequencerConnections,
+  SynchronizerConnectionConfig,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -40,12 +45,8 @@ import com.digitalasset.canton.participant.admin.grpc.PruningServiceError.Unsafe
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.ReceivedCmtState.Match
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.sync.{SyncServiceError, SynchronizerMigrationError}
-import com.digitalasset.canton.participant.synchronizer.{
-  SynchronizerConnectionConfig,
-  SynchronizerRegistryError,
-}
+import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{KnownPhysicalSynchronizerId, PartyId}
@@ -684,18 +685,19 @@ final class ParticipantMigrateSynchronizerCrashRecoveryIntegrationTest
       synchronizerId = daId,
       beginOffsetExclusive = ledgerEnd,
       completeAfter = PositiveInt.one,
+      onboarding = false,
     )
 
     val source =
       participant1.underlying.value.sync.internalIndexService.value.activeContracts(
         Set(alice.toLf),
-        Offset.fromLong(aliceAddedOnP3Offset.unwrap).toOption,
+        Offset.fromLong(aliceAddedOnP3Offset).toOption,
       )
     val aliceACS =
       source
         .runWith(Sink.seq)
         .futureValue
-        .map(resp => RepairContract.toRepairContract(resp.getActiveContract).value)
+        .map(resp => RepairContract.fromLapiActiveContract(resp.getActiveContract).value)
         .toList
 
     participant3.synchronizers.disconnect_all()

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -9,7 +9,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors.SubmissionRequestRefused
 import com.digitalasset.canton.sequencing.protocol.{
   Batch,
-  ClosedEnvelope,
+  ClosedUncompressedEnvelope,
   Deliver,
   DeliverError,
   MessageId,
@@ -40,10 +40,10 @@ object SequencerTestUtils extends BaseTest {
       messageId: Option[MessageId] = Some(MessageId.tryCreate("mock-deliver")),
       topologyTimestampO: Option[CantonTimestamp] = None,
       previousTimestamp: Option[CantonTimestamp] = None,
-  ): Deliver[ClosedEnvelope] = {
+  ): Deliver[ClosedUncompressedEnvelope] = {
     val batch = Batch.empty(testedProtocolVersion)
 
-    val deliver = Deliver.create[ClosedEnvelope](
+    val deliver = Deliver.create[ClosedUncompressedEnvelope](
       previousTimestamp,
       timestamp,
       synchronizerId,
@@ -57,9 +57,9 @@ object SequencerTestUtils extends BaseTest {
       case Some(bytes) =>
         // Somehow ugly way to tweak the `deserializedFrom` attribute of Deliver
         SequencedEvent
-          .fromProtoV30(deliver.toProtoV30)(bytes)
+          .fromProtoV30(defaultMaxBytesToDecompress, deliver.toProtoV30)(bytes)
           .value
-          .asInstanceOf[Deliver[ClosedEnvelope]]
+          .asInstanceOf[Deliver[ClosedUncompressedEnvelope]]
 
       case None => deliver
     }

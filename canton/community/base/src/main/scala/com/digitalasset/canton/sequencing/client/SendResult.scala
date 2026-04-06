@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -67,7 +67,7 @@ object SendResult {
   )(result: SendResult): FutureUnlessShutdown[Unit] =
     result match {
       case SendResult.Success(_) =>
-        FutureUnlessShutdown.pure(())
+        FutureUnlessShutdown.unit
       case SendResult.Error(
             DeliverError(_, _, _, _, SequencerErrors.AggregateSubmissionAlreadySent(_), _)
           ) =>
