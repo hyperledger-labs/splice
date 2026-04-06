@@ -329,6 +329,11 @@ export function installGcpQuotaAlerts(
   new gcp.monitoring.AlertPolicy('quotaExceededAlert', {
     ...baseArgs,
     displayName: `Quota Exceeded in ${CLUSTER_BASENAME}`,
+    documentation: {
+      subject: `Quota \${metric.label.quota_metric} exceeded in ${CLUSTER_BASENAME}`,
+      content: `The quota "\${metric.display_name}" (**\${metric.label.quota_metric}**) has been exceeded in cluster **${CLUSTER_BASENAME}**.`,
+      mimeType: 'text/markdown',
+    },
     conditions: [
       {
         // "Quota Full" (Exceeded right now)
