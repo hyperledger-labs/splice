@@ -95,6 +95,9 @@ def move_upcoming_notes():
     upcoming_header = lines_upcoming[:split_index_upcoming]
     upcoming_content = lines_upcoming[split_index_upcoming:]
 
+    # comment out Upcoming section
+    upcoming_header[-1] = '.. ' + upcoming_header[-1]
+
     with open(release_notes_filename, 'r') as f:
         lines_release_notes = f.readlines()
 
