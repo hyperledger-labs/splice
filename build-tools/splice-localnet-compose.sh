@@ -29,8 +29,17 @@ ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
 
+function usage() {
+    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-P <protocol_version>]"
+    echo ""
+    echo "Options:"
+    echo "  -D                        Completely tear down the localnet (using 'docker compose down') instead of just stopping the containers (using 'docker compose stop')"
+    echo "  -M                        Start the localnet with the 'multi-sync' profile enabled"
+    echo "  -P <protocol_version>     Set the PROTOCOL_VERSION environment variable to the specified value (e.g. 35)"
+}
+
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M]"
+    usage
     exit 1
 fi
 
@@ -53,6 +62,16 @@ while [[ $# -gt 0 ]]; do
             ;;
         -M)
             MULTI_SYNC_PROFILE=( --profile multi-sync )
+            ;;
+        -P)
+            shift
+            if [[ -z "$1" ]]; then
+                echo "Error: -P requires a protocol version argument."
+                usage
+                exit 1
+            fi
+            PROTOCOL_VERSION=$1
+            export PROTOCOL_VERSION
             ;;
         *)
             echo "Unknown option: $1"

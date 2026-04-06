@@ -3,16 +3,17 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import io.circe.parser.decode
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.client.RequestBuilding.Get
-import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
-
 import com.digitalasset.canton.http.json.v2.JsStateServiceCodecs.*
 import com.daml.ledger.api.v2.state_service.GetConnectedSynchronizersResponse
+import org.apache.pekko.stream.scaladsl.FileIO
 
+import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.sys.process.*
 
@@ -177,6 +178,31 @@ class LocalNetFrontendIntegrationTest
   "docker-compose based localnet works for multiple synchronizers" in { implicit env =>
     withLocalNet(Seq("-M")) { implicit env =>
       testMultiSynchronizerSupport(isMultiSync = true)
+    }
+  }
+
+  "localnet supports configurable protocol versions" in { implicit env =>
+    withLocalNet(Seq("-P", "35")) { implicit env =>
+      implicit val actorSystem: ActorSystem = env.actorSystem
+      registerHttpConnectionPoolsCleanup(env)
+      val host = "json-ledger-api.localhost"
+      val port = 3975 // JSON API of app provider
+      val url = s"http://$host:$port"
+      val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
+      val filePath = Paths.get("apps/app/src/test/resources/nuck-example-main-0.0.1.dar")
+      val entity = HttpEntity(
+        ContentTypes.`application/octet-stream`,
+        FileIO.fromPath(filePath)
+      )
+      val response =
+        Http()
+          .singleRequest(
+            Post(s"$url/v2/packages")
+              .withHeaders(Seq(Authorization(OAuth2BearerToken(token))))
+              .withEntity(entity)
+          )
+          .futureValue
+      response.status should be(StatusCodes.OK)
     }
   }
 }
