@@ -135,6 +135,11 @@ monitoring:
         # Multiplier applied to a wallet sweep's configured maxBalance to set the alert threshold.
         # 1.5 means the alert fires if the balance is 50% higher than expected.
         tolerance: 1.5
+      gcpQuotas:
+        # Quota metric names to exclude from GCP quota alerts.
+        # Each entry is matched as a regex alternative against the quota_metric label.
+        # Example: "hsm_asymmetric_usage" excludes HSM asymmetric signing quotas.
+        excludedMetrics: []
     # Alert on secrets appearing in logs (JWTs, Bearer tokens, passwords, etc.)
     # Key=value secrets (excluding masked values)
     # JWTs identified by base64 header prefix "eyJhbGc" (decodes to '{"alg')

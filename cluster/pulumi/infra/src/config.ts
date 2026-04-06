@@ -18,6 +18,14 @@ export const clusterBaseDomain = clusterHostname.split('.')[0];
 
 export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');
 
+const GcpQuotasConfigSchema = z.object({
+  // so existing overrides don't break
+  enabled: z.literal(true).optional(),
+  excludedMetrics: z
+    .array(z.string().regex(/^[a-zA-Z0-9_./-]+$/, 'valid GCP quota metric name characters'))
+    .default([]),
+});
+
 const MonitoringConfigSchema = z
   .object({
     alerting: z.object({
@@ -79,8 +87,7 @@ const MonitoringConfigSchema = z
         walletSweep: z.object({
           tolerance: z.number(),
         }),
-        // so existing overrides don't break
-        gcpQuotas: z.object({ enabled: z.literal(true) }).optional(),
+        gcpQuotas: GcpQuotasConfigSchema.default({ excludedMetrics: [] }),
       }),
       logAlerts: z.object({}).catchall(z.string()).default({}),
       loggedSecretsFilter: z.string().optional(),
@@ -138,6 +145,8 @@ export const InfraConfigSchema = z.object({
 });
 
 export type CloudArmorConfig = z.infer<typeof CloudArmorConfigSchema>;
+
+export type GcpQuotaAlertsConfig = z.infer<typeof GcpQuotasConfigSchema>;
 
 export type Config = z.infer<typeof InfraConfigSchema>;
 

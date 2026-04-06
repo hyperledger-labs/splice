@@ -10,12 +10,22 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { slackAlertNotificationChannel, slackToken } from './alertings';
-import { monitoringConfig } from './config';
+import { type GcpQuotaAlertsConfig, monitoringConfig } from './config';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
 function ensureTrailingNewline(s: string): string {
   return s.endsWith('\n') ? s : `${s}\n`;
+}
+
+// Monitoring filter limited to 2048 chars: https://cloud.google.com/monitoring/api/v3/filters
+function assertFilterLength(filter: string): string {
+  if (filter.length > 2048) {
+    throw new Error(
+      `${CLUSTER_BASENAME} monitoring filter is ${filter.length} chars; >2048 char limit`
+    );
+  }
+  return filter;
 }
 
 export function getNotificationChannel(
@@ -291,10 +301,20 @@ resource.type="cloudsql_database"
 }
 
 export function installGcpQuotaAlerts(
-  notificationChannel: gcp.monitoring.NotificationChannel
+  notificationChannel: gcp.monitoring.NotificationChannel,
+  gcpQuotasConfig: GcpQuotaAlertsConfig
 ): void {
   const quotaUsageThreshold = 0.9;
   const quotaUsageThresholdPercent = quotaUsageThreshold * 100;
+  const excludedMetrics = gcpQuotasConfig.excludedMetrics;
+
+  // Build exclusion fragments for threshold filters and PromQL queries
+  const thresholdExclusion =
+    excludedMetrics.length > 0
+      ? excludedMetrics.map(m => ` AND metric.label.quota_metric != "${m}"`).join('')
+      : '';
+  const promqlExclusion =
+    excludedMetrics.length > 0 ? `, quota_metric!~"${excludedMetrics.join('|')}"` : '';
 
   const baseArgs: Pick<
     gcp.monitoring.AlertPolicyArgs,
@@ -324,8 +344,9 @@ export function installGcpQuotaAlerts(
           ],
           comparison: 'COMPARISON_GT',
           duration: '60s',
-          filter:
-            'resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"',
+          filter: assertFilterLength(
+            `resource.type="consumer_quota" AND metric.type="serviceruntime.googleapis.com/quota/exceeded"${thresholdExclusion}`
+          ),
           trigger: {
             count: 1,
           },
@@ -348,9 +369,9 @@ export function installGcpQuotaAlerts(
         displayName: `Allocation Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
-            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"}
+            serviceruntime_googleapis_com:quota_allocation_usage{monitored_resource="consumer_quota"${promqlExclusion}}
             / ignoring(limit_name) group_right()
-            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
@@ -368,9 +389,9 @@ export function installGcpQuotaAlerts(
         displayName: `Rate Quota approaching limit (>${quotaUsageThresholdPercent}%) in ${CLUSTER_BASENAME}`,
         conditionPrometheusQueryLanguage: {
           query: `
-            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"}
+            serviceruntime_googleapis_com:quota_rate_net_usage{monitored_resource="consumer_quota"${promqlExclusion}}
             / ignoring(limit_name) group_right()
-            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"} > 0)
+            (serviceruntime_googleapis_com:quota_limit{monitored_resource="consumer_quota"${promqlExclusion}} > 0)
             > ${quotaUsageThreshold}
           `,
           duration: '300s',
