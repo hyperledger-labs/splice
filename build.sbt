@@ -653,7 +653,10 @@ lazy val `splice-api-featured-app-v1-daml` =
     .in(file("daml/splice-api-featured-app-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      // Exclude header check for FeaturedAppRightV1.daml as it exists on main without a header,
+      // and adding one would change its DAR hash, cascading through all dependent packages.
+      Compile / headerSources ~= { _.filterNot(_.getName == "FeaturedAppRightV1.daml") },
     )
 
 lazy val `splice-api-featured-app-v2-daml` =
