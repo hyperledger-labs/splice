@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.pruning
@@ -332,11 +332,13 @@ trait SequencerPruningIntegrationTest extends CommunityIntegrationTest with Shar
 trait SequencerNodePruningIntegrationTest extends SequencerPruningIntegrationTest {
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
-      .addConfigTransform(reduceSequencerClientAcknowledgementInterval)
-      .addConfigTransform(reduceSequencerAcknowledgementConflateWindow)
-      .addConfigTransform(increaseParticipant3AcknowledgementInterval)
-      .addConfigTransform(ConfigTransforms.useStaticTime)
-      .addConfigTransform(setupSequencerConfig)
+      .addConfigTransforms(
+        reduceSequencerClientAcknowledgementInterval,
+        reduceSequencerAcknowledgementConflateWindow,
+        increaseParticipant3AcknowledgementInterval,
+        ConfigTransforms.useStaticTime,
+        setupSequencerConfig,
+      )
       .withSetup { implicit env =>
         import env.*
 

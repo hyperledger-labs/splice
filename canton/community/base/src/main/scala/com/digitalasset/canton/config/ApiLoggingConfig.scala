@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 
 /** Control logging of the ApiRequestLogger
@@ -27,6 +26,11 @@ import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
   * @param warnBeyondLoad
   *   If API logging is turned on, emit a warning on each request if the load exceeds this
   *   threshold.
+  * @param debugInProcessRequests
+  *   grpc in-process communication is logged with DEBUG level otherwise only in TRACE
+  * @param prefixGrpcAddresses
+  *   Prefix connecting gRPC client addresses with "grpc:" (default: true, false for full backwards
+  *   compatibility). http is always prefixed with "http:"
   */
 final case class ApiLoggingConfig(
     messagePayloads: Boolean = false,
@@ -35,16 +39,15 @@ final case class ApiLoggingConfig(
     maxStringLength: Int = ApiLoggingConfig.defaultMaxStringLength,
     maxMetadataSize: Int = ApiLoggingConfig.defaultMaxMetadataSize,
     warnBeyondLoad: Option[Int] = ApiLoggingConfig.defaultWarnBeyondLoad,
-) extends UniformCantonConfigValidation {
+    debugInProcessRequests: Boolean = false,
+    prefixGrpcAddresses: Boolean = true,
+) {
 
   /** Pretty printer for logging event details */
   lazy val printer = new CantonPrettyPrinter(maxStringLength, maxMessageLines)
 }
 
 object ApiLoggingConfig {
-  implicit val apiLoggingConfigCantonConfigValidator: CantonConfigValidator[ApiLoggingConfig] =
-    CantonConfigValidatorDerivation[ApiLoggingConfig]
-
   val defaultMaxMethodLength: Int = 30
   val defaultMaxMessageLines: Int = 20
   val defaultMaxStringLength: Int = 250

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -36,14 +36,14 @@ object BatchN {
   /** Causes BatchN to favor a higher number of small batches when catching up after backpressure */
   case object MaximizeConcurrency extends CatchUpMode
 
-  def apply[IN](
+  def apply[In](
       maxBatchSize: Int,
       maxBatchCount: Int,
       catchUpMode: CatchUpMode = MaximizeConcurrency,
-  ): Flow[IN, Iterable[IN], NotUsed] = {
+  ): Flow[In, Iterable[In], NotUsed] = {
     val totalBatchSize = maxBatchSize * maxBatchCount
-    Flow[IN]
-      .batch[ArrayBuffer[IN]](
+    Flow[In]
+      .batch[ArrayBuffer[In]](
         totalBatchSize.toLong,
         newBatch(totalBatchSize, _),
       )(_ addOne _)
@@ -60,26 +60,119 @@ object BatchN {
         } else {
           totalBatch
             .grouped(batchSize)
-            .map(new IterableToIterable(_))
             .toVector
         }
       }
   }
 
-  private def newBatch[IN](maxBatchSize: Int, newElement: IN) = {
-    val newBatch = ArrayBuffer.empty[IN]
+  private final case class WeightedElem[T](elem: T, weight: Long)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private final class BatchBuilder[T] {
+    private var elems: ArrayBuffer[T] = new ArrayBuffer[T]()
+    private var _weight: Long = 0
+
+    def weight: Long = _weight
+
+    def isEmpty: Boolean = elems.isEmpty
+
+    def add(weightedElem: WeightedElem[T]): Unit = {
+      elems.addOne(weightedElem.elem)
+      _weight = _weight + weightedElem.weight
+    }
+
+    def buildAndReset: Iterable[T] = {
+      val result = elems
+      elems = new ArrayBuffer[T]()
+      _weight = 0
+      result
+    }
+  }
+
+  /** The weighted version of `apply`. In case of `MaximizeConcurrency` it attempts to create
+    * equally weighed batches.
+    *   - If an item is too heavy to fit in a batch (over maxBatchWeight) it is rather added to the
+    *     next batch
+    *     - Unless this is the single item in this batch
+    *   - The `weightFn` is evaluated once and memoized in `WeightedElem`s
+    *   - After processing all the items in the next buffer the prepared batch can be
+    *     - at batch cap => it is emitted as a last batch
+    *     - less than batch cap => save these items for the next iteration of `statefulMap`
+    *
+    * @param weightFn
+    *   the function to calculate the weight of each incoming item
+    * @param weightReporter
+    *   provides a way to observe the actual weights of each batch. Used for metric reporting
+    */
+  def weighted[In](
+      maxBatchWeight: Long,
+      downstreamParallelism: Int,
+      catchUpMode: CatchUpMode = MaximizeConcurrency,
+  )(
+      weightFn: In => Long,
+      weightReporter: Long => Unit = _ => (),
+  ): Flow[In, Iterable[In], NotUsed] = {
+    // setting maxBatchCount a bit more than the downstream parallelism to ensure the parallel processing capacity is well utilised
+    val maxBatchCount = downstreamParallelism + 1
+
+    def calculateBatches(
+        builder: BatchBuilder[In],
+        nextBuffer: ArrayBuffer[WeightedElem[In]],
+    ): (BatchBuilder[In], Iterable[Iterable[In]]) = {
+      val batchWeightCap =
+        catchUpMode match {
+          case MaximizeBatchSize => maxBatchWeight
+          case MaximizeConcurrency =>
+            (builder.weight + nextBuffer.view.map(_.weight).sum) / maxBatchCount
+        }
+      if (batchWeightCap == 0) {
+        (
+          builder,
+          (builder.buildAndReset ++ nextBuffer.map(_.elem)).view
+            .map(Seq(_))
+            .toVector,
+        )
+      } else {
+        val acc: ArrayBuffer[Iterable[In]] = new ArrayBuffer(initialSize = maxBatchCount)
+        nextBuffer.foreach { item =>
+          if (builder.weight > 0 && builder.weight + item.weight > batchWeightCap) {
+            weightReporter(builder.weight)
+            acc.addOne(builder.buildAndReset)
+          }
+          builder.add(item)
+        }
+        if (builder.weight < batchWeightCap)
+          (builder, acc)
+        else {
+          weightReporter(builder.weight)
+          (builder, acc.addOne(builder.buildAndReset))
+        }
+      }
+    }
+
+    def finish(builder: BatchBuilder[In]) =
+      if (builder.isEmpty) None
+      else Some(ArrayBuffer(builder.buildAndReset))
+
+    Flow[In]
+      .map(e => WeightedElem(e, weightFn(e)))
+      .batchWeighted[ArrayBuffer[WeightedElem[In]]](
+        maxBatchWeight * maxBatchCount,
+        _.weight,
+        ArrayBuffer(_),
+      )(_ addOne _)
+      .statefulMap(() => new BatchBuilder[In]())(
+        calculateBatches,
+        finish,
+      )
+      .mapConcat(identity)
+  }
+
+  private def newBatch[In](maxBatchSize: Int, newElement: In) = {
+    val newBatch = ArrayBuffer.empty[In]
     newBatch.sizeHint(maxBatchSize)
     newBatch.addOne(newElement)
     newBatch
   }
 
-  // WARNING! DO NOT USE THIS WRAPPER OUTSIDE OF THIS CONTEXT!
-  // this wrapping is only safe because it is used in this context where it is an invariant of the algorithm
-  // that the ArrayBuffer is not changing after the result left the BatchN stage.
-  // Please note as soon as this immutable.Iterable is used in any further collection processing, where new result
-  // collection needs to be built, this will fall back to IterableFactory.Delegate[Iterable](List).
-  // Please note this cannot be a value class, since some ancestors of immutable.Iterable is Any.
-  private class IterableToIterable[X](val iterable: Iterable[X]) extends Iterable[X] {
-    override def iterator: Iterator[X] = iterable.iterator
-  }
 }

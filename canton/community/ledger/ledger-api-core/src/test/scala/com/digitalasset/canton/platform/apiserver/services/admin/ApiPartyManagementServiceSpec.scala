@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
 import cats.syntax.traverse.*
-import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.admin.party_management_service.AllocateExternalPartyRequest.SignedTransaction
 import com.daml.ledger.api.v2.admin.party_management_service.{
   AllocateExternalPartyRequest,
@@ -16,6 +15,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
 import com.daml.ledger.api.v2.crypto.SignatureFormat.SIGNATURE_FORMAT_RAW
 import com.daml.ledger.api.v2.{crypto, crypto as lapicrypto}
 import com.daml.nonempty.NonEmpty
+import com.daml.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.tracing.TelemetrySpecBase.*
 import com.daml.tracing.{DefaultOpenTelemetry, NoOpTelemetry}
 import com.digitalasset.base.error.ErrorsAssertions
@@ -29,6 +29,7 @@ import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SigningPublicKey,
   TestHash,
+  v30,
 }
 import com.digitalasset.canton.ledger.api.{IdentityProviderId, ObjectMeta}
 import com.digitalasset.canton.ledger.localstore.api.{
@@ -68,6 +69,7 @@ import com.digitalasset.canton.topology.transaction.{
   PartyToKeyMapping,
   PartyToParticipant,
   TopologyChangeOp,
+  TopologyMapping,
   TopologyTransaction,
 }
 import com.digitalasset.canton.topology.{
@@ -76,12 +78,12 @@ import com.digitalasset.canton.topology.{
   Namespace,
   ParticipantId,
   PartyId,
+  PhysicalSynchronizerId,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{BaseTest, HasExecutorService}
+import com.digitalasset.canton.{BaseTest, HasExecutorService, LfPartyId}
 import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.ByteString
 import io.grpc.Status.Code
@@ -118,29 +120,33 @@ class ApiPartyManagementServiceSpec
   val partiesPageSize = PositiveInt.tryCreate(100)
 
   val aPartyAllocationTracker =
-    PartyAllocation.TrackerKey("aParty", DefaultTestIdentities.participant1.toLf, Added(Submission))
+    PartyAllocation.TrackerKey(
+      DefaultTestIdentities.party1.toLf,
+      DefaultTestIdentities.participant1.toLf,
+      Added(Submission),
+    )
   val createSubmissionId = new CreateSubmissionId {
     override def apply(
-        partyIdHint: String,
+        partyIdHint: LfPartyId,
         authorizationLevel: TopologyTransactionEffective.AuthorizationLevel,
     ): PartyAllocation.TrackerKey = aPartyAllocationTracker
   }
 
   lazy val (
-    _mockIndexTransactionsService,
     mockIdentityProviderExists,
     mockIndexPartyManagementService,
+    mockUserManagementStore,
     mockPartyRecordStore,
   ) = mockedServices()
   val partyAllocationTracker = makePartyAllocationTracker(loggerFactory)
 
   lazy val apiService = ApiPartyManagementService.createApiService(
-    mock[IndexPartyManagementService],
-    mock[UserManagementStore],
-    mock[IdentityProviderExists],
+    mockIndexPartyManagementService,
+    mockUserManagementStore,
+    mockIdentityProviderExists,
     partiesPageSize,
     NonNegativeInt.tryCreate(0),
-    mock[PartyRecordStore],
+    mockPartyRecordStore,
     TestPartySyncService(testTelemetrySetup.tracer),
     oneHour,
     createSubmissionId,
@@ -243,59 +249,58 @@ class ApiPartyManagementServiceSpec
             AllocateExternalPartyRequest,
           ] => Mutation[AllocateExternalPartyRequest],
           expectedFailure: PartyId => Option[String],
-      ) = {
-        val (publicKey, keyPair) = createSigningKey
-        val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
-        val partyId = PartyId.tryCreate("alice", cantonPublicKey.fingerprint)
-        for {
-          generatedTransactions <- apiService.generateExternalPartyTopology(
-            GenerateExternalPartyTopologyRequest(
-              synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
-              partyHint = "alice",
-              publicKey = publicKey,
-              localParticipantObservationOnly = false,
-              otherConfirmingParticipantUids =
-                Seq(DefaultTestIdentities.participant2.uid.toProtoPrimitive),
-              confirmationThreshold = 1,
-              observingParticipantUids =
-                Seq(DefaultTestIdentities.participant3.uid.toProtoPrimitive),
+      ) =
+        loggerFactory.suppress(
+          ApiPartyManagementServiceSuppressionRule
+        ) {
+          val (publicKey, keyPair) = createSigningKey
+          val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
+          val partyId = PartyId.tryCreate("alice", cantonPublicKey.fingerprint)
+          for {
+            generatedTransactions <- apiService.generateExternalPartyTopology(
+              GenerateExternalPartyTopologyRequest(
+                synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
+                partyHint = "alice",
+                publicKey = publicKey,
+                localParticipantObservationOnly = false,
+                otherConfirmingParticipantUids =
+                  Seq(DefaultTestIdentities.participant2.uid.toProtoPrimitive),
+                confirmationThreshold = 1,
+                observingParticipantUids =
+                  Seq(DefaultTestIdentities.participant3.uid.toProtoPrimitive),
+              )
             )
-          )
-          signature = sign(keyPair, generatedTransactions.multiHash, partyId.fingerprint)
-          request = AllocateExternalPartyRequest(
-            synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
-            onboardingTransactions = generatedTransactions.topologyTransactions.map(tx =>
-              AllocateExternalPartyRequest.SignedTransaction(tx, Seq.empty)
-            ),
-            multiHashSignatures = Seq(signature),
-            identityProviderId = "",
-          ).update(requestTransform)
-          result <- apiService
-            .allocateExternalParty(request)
-            .transform {
-              case Failure(e: io.grpc.StatusRuntimeException) =>
-                expectedFailure(partyId) match {
-                  case Some(value) =>
-                    e.getStatus.getCode.value() shouldBe io.grpc.Status.INVALID_ARGUMENT.getCode
-                      .value()
-                    e.getStatus.getDescription should include(value)
-                    Success(succeed)
-                  case None =>
-                    fail(s"Expected success but allocation failed with $e")
-                }
-              case Failure(other) => fail(s"expected a gRPC exception but got $other")
-              case Success(_) if expectedFailure(partyId).isDefined =>
-                fail("Expected a failure but got a success")
-              case Success(_) => Success(succeed)
-            }
-        } yield result
-      }
-
-      val (bobKey, bobKeyPair) = {
-        val (publicKey, keyPair) = createSigningKey
-        (cantonSigningPublicKey(publicKey.value), keyPair)
-      }
-      val bobParty = PartyId.tryCreate("bob", bobKey.fingerprint)
+            signature = sign(keyPair, generatedTransactions.multiHash, partyId.fingerprint)
+            request = AllocateExternalPartyRequest(
+              synchronizer = DefaultTestIdentities.synchronizerId.toProtoPrimitive,
+              onboardingTransactions = generatedTransactions.topologyTransactions.map(tx =>
+                AllocateExternalPartyRequest.SignedTransaction(tx, Seq.empty)
+              ),
+              multiHashSignatures = Seq(signature),
+              identityProviderId = "",
+              waitForAllocation = Some(true),
+              userId = "",
+            ).update(requestTransform)
+            result <- apiService
+              .allocateExternalParty(request)
+              .transform {
+                case Failure(e: io.grpc.StatusRuntimeException) =>
+                  expectedFailure(partyId) match {
+                    case Some(value) =>
+                      e.getStatus.getCode.value() shouldBe io.grpc.Status.INVALID_ARGUMENT.getCode
+                        .value()
+                      e.getStatus.getDescription should include(value)
+                      Success(succeed)
+                    case None =>
+                      fail(s"Expected success but allocation failed with $e")
+                  }
+                case Failure(other) => fail(s"expected a gRPC exception but got $other")
+                case Success(_) if expectedFailure(partyId).isDefined =>
+                  fail("Expected a failure but got a success")
+                case Success(_) => Success(succeed)
+              }
+          } yield result
+        }
 
       def mkDecentralizedTx(ownerSize: Int): (SignedTransaction, Namespace) = {
         val ownersKeys = Seq.fill(ownerSize)(createSigningKey).map { case (publicKey, keyPair) =>
@@ -334,6 +339,8 @@ class ApiPartyManagementServiceSpec
       }
 
       "fail if missing a party to participant" in {
+        val (decentralizedNamespaceTx, _) = mkDecentralizedTx(1)
+
         testAllocateExternalPartyValidation(
           _.onboardingTransactions.modify(
             _.filterNot(tx =>
@@ -342,9 +349,161 @@ class ApiPartyManagementServiceSpec
                 .value
                 .selectMapping[PartyToParticipant]
                 .nonEmpty
-            )
+            ) // Add another type of tx, otherwise it fails with "empty transaction field"
+              .appended(decentralizedNamespaceTx)
           ),
           _ => Some("One transaction of type PartyToParticipant must be provided, got 0"),
+        )
+      }
+
+      "fail on invalid key usages for party namespace key" in {
+        testAllocateExternalPartyValidation(
+          _.onboardingTransactions.modify(
+            _.map(tx =>
+              TopologyTransaction
+                .fromByteString(testedProtocolVersion, tx.transaction)
+                .value
+                .selectMapping[PartyToParticipant]
+                .map(
+                  _.toProtoV30.mapping.value.update(
+                    _.partyToParticipant.partySigningKeys.keys.modify(
+                      _.map(_.copy(usage = Seq(v30.SigningKeyUsage.SIGNING_KEY_USAGE_PROTOCOL)))
+                    )
+                  )
+                )
+                .map(TopologyMapping.fromProtoV30(_).value)
+                .map(
+                  TopologyTransaction(
+                    TopologyChangeOp.Replace,
+                    PositiveInt.one,
+                    _,
+                    testedProtocolVersion,
+                  )
+                )
+                .map { updatedTx =>
+                  SignedTransaction(updatedTx.toByteString, tx.signatures)
+                }
+                .getOrElse(tx)
+            )
+          ),
+          _ => Some("Missing Namespace and Protocol usage on the party namespace key"),
+        )
+      }
+
+      "fail on invalid key usages for protocol keys" in {
+        testAllocateExternalPartyValidation(
+          _.onboardingTransactions.modify(
+            _.map(tx =>
+              TopologyTransaction
+                .fromByteString(testedProtocolVersion, tx.transaction)
+                .value
+                .selectMapping[PartyToParticipant]
+                .map(
+                  _.toProtoV30.mapping.value.update(
+                    _.partyToParticipant.partySigningKeys.keys.modify(
+                      _.map(_.copy(usage = Seq(v30.SigningKeyUsage.SIGNING_KEY_USAGE_NAMESPACE)))
+                    )
+                  )
+                )
+                .map(TopologyMapping.fromProtoV30(_).value)
+                .map(
+                  TopologyTransaction(
+                    TopologyChangeOp.Replace,
+                    PositiveInt.one,
+                    _,
+                    testedProtocolVersion,
+                  )
+                )
+                .map { updatedTx =>
+                  SignedTransaction(updatedTx.toByteString, tx.signatures)
+                }
+                .getOrElse(tx)
+            )
+          ),
+          _ => Some("Missing Protocol usage on signing keys"),
+        )
+      }
+
+      "fail on empty protocol keys" in {
+        testAllocateExternalPartyValidation(
+          _.onboardingTransactions.modify(
+            _.map(tx =>
+              TopologyTransaction
+                .fromByteString(testedProtocolVersion, tx.transaction)
+                .value
+                .selectMapping[PartyToParticipant]
+                .map(
+                  _.toProtoV30.mapping.value.update(
+                    _.partyToParticipant.optionalPartySigningKeys.set(None)
+                  )
+                )
+                .map(TopologyMapping.fromProtoV30(_).value)
+                .map(
+                  TopologyTransaction(
+                    TopologyChangeOp.Replace,
+                    PositiveInt.one,
+                    _,
+                    testedProtocolVersion,
+                  )
+                )
+                .map { updatedTx =>
+                  SignedTransaction(updatedTx.toByteString, tx.signatures)
+                }
+                .getOrElse(tx)
+            )
+          ),
+          _ =>
+            Some(
+              "Party signing keys must be supplied either in the PartyToParticipant or in a PartyToKeyMapping transaction. Not in both."
+            ),
+        )
+      }
+
+      "fail on protocol keys in both PTK and PTP" in {
+        val (publicKey, keyPair) = createSigningKey
+        val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
+
+        def mkPtkTransaction(partyId: PartyId) = TopologyTransaction(
+          Replace,
+          PositiveInt.one,
+          PartyToKeyMapping.tryCreate(
+            partyId = partyId,
+            threshold = PositiveInt.one,
+            signingKeys = NonEmpty.mk(Seq, cantonPublicKey),
+          ),
+          testedProtocolVersion,
+        )
+        def mkSignature(
+            ptkTransaction: TopologyTransaction[TopologyChangeOp.Replace, PartyToKeyMapping],
+            partyId: PartyId,
+        ) = sign(
+          keyPair,
+          ptkTransaction.hash.hash.getCryptographicEvidence,
+          partyId.fingerprint,
+        )
+
+        testAllocateExternalPartyValidation(
+          _.onboardingTransactions.modify { transactions =>
+            val partyId = transactions
+              .flatMap(tx =>
+                TopologyTransaction
+                  .fromByteString(testedProtocolVersion, tx.transaction)
+                  .value
+                  .selectMapping[PartyToParticipant]
+              )
+              .loneElement
+              .mapping
+              .partyId
+
+            val ptk = mkPtkTransaction(partyId)
+            val signature = mkSignature(ptk, partyId)
+
+            transactions :+ SignedTransaction(ptk.toByteString, Seq(signature))
+          },
+          _ =>
+            Some(
+              "Party signing keys must be supplied either in the PartyToParticipant or in a PartyToKeyMapping transaction. Not in both."
+            ),
         )
       }
 
@@ -476,74 +635,70 @@ class ApiPartyManagementServiceSpec
         )
       }
 
+      "refuse mismatching ptk namespace and ptp namespace" in {
+        val (publicKey, keyPair) = createSigningKey
+        val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
+        val ptkPartyId = PartyId.tryCreate("alice", cantonPublicKey.fingerprint)
+
+        val ptkTransaction = TopologyTransaction(
+          Replace,
+          PositiveInt.one,
+          PartyToKeyMapping.tryCreate(
+            partyId = ptkPartyId,
+            threshold = PositiveInt.one,
+            signingKeys = NonEmpty.mk(Seq, cantonPublicKey),
+          ),
+          testedProtocolVersion,
+        )
+        val signature = sign(
+          keyPair,
+          ptkTransaction.hash.hash.getCryptographicEvidence,
+          ptkPartyId.fingerprint,
+        )
+        testAllocateExternalPartyValidation(
+          _.onboardingTransactions.modify(transactions =>
+            transactions :+ SignedTransaction(
+              ptkTransaction.toByteString,
+              Seq(signature),
+            )
+          ),
+          partyId =>
+            Some(
+              s"The PartyToKeyMapping namespace (${ptkPartyId.namespace}) does not match the PartyToParticipant namespace (${partyId.namespace})"
+            ),
+        )
+      }
+
       "refuse mismatching party namespace and p2p namespace" in {
-        val updatedTransaction = TopologyTransaction(
+        val (publicKey, keyPair) = createSigningKey
+        val cantonPublicKey = cantonSigningPublicKey(publicKey.value)
+        val nsdPartyId = PartyId.tryCreate("alice", cantonPublicKey.fingerprint)
+
+        val nsdTransaction = TopologyTransaction(
           Replace,
           PositiveInt.one,
           NamespaceDelegation.tryCreate(
-            namespace = bobParty.namespace,
-            target = bobKey,
+            namespace = nsdPartyId.namespace,
+            target = cantonPublicKey,
             restriction = DelegationRestriction.CanSignAllMappings,
           ),
           testedProtocolVersion,
         )
         val signature = sign(
-          bobKeyPair,
-          updatedTransaction.hash.hash.getCryptographicEvidence,
-          bobParty.fingerprint,
+          keyPair,
+          nsdTransaction.hash.hash.getCryptographicEvidence,
+          nsdPartyId.fingerprint,
         )
         testAllocateExternalPartyValidation(
-          _.onboardingTransactions.modify(
-            _.map(tx =>
-              TopologyTransaction
-                .fromByteString(testedProtocolVersion, tx.transaction)
-                .value
-                .selectMapping[NamespaceDelegation]
-                .map(_ => updatedTransaction)
-                .map { updatedTx =>
-                  SignedTransaction(
-                    updatedTx.toByteString,
-                    Seq(signature),
-                  )
-                }
-                .getOrElse(tx)
+          _.onboardingTransactions.modify(transactions =>
+            transactions :+ SignedTransaction(
+              nsdTransaction.toByteString,
+              Seq(signature),
             )
           ),
           partyId =>
             Some(
-              s"The Party namespace (${bobParty.namespace}) does not match the PartyToParticipant namespace (${partyId.namespace})"
-            ),
-        )
-      }
-
-      "refuse mismatching p2k namespace and p2p namespace" in {
-        def updatedTransaction(signingKeys: NonEmpty[Seq[SigningPublicKey]]) = TopologyTransaction(
-          Replace,
-          PositiveInt.one,
-          PartyToKeyMapping.tryCreate(
-            partyId = bobParty,
-            threshold = PositiveInt.one,
-            signingKeys = signingKeys,
-          ),
-          testedProtocolVersion,
-        )
-        testAllocateExternalPartyValidation(
-          _.onboardingTransactions.modify(
-            _.map(tx =>
-              TopologyTransaction
-                .fromByteString(testedProtocolVersion, tx.transaction)
-                .value
-                .selectMapping[PartyToKeyMapping]
-                .map(p2k => updatedTransaction(p2k.mapping.signingKeys.toSeq))
-                .map { updatedTx =>
-                  SignedTransaction(updatedTx.toByteString, tx.signatures)
-                }
-                .getOrElse(tx)
-            )
-          ),
-          partyId =>
-            Some(
-              s"The PartyToKeyMapping namespace (${bobParty.namespace}) does not match the PartyToParticipant namespace (${partyId.namespace})"
+              s"The Party namespace (${nsdPartyId.namespace}) does not match the PartyToParticipant namespace (${partyId.namespace})"
             ),
         )
       }
@@ -736,18 +891,17 @@ class ApiPartyManagementServiceSpec
     }
 
     "generate-external-topology" when {
-      def getMappingsFromResponse(response: GenerateExternalPartyTopologyResponse) = {
-        response.topologyTransactions should have length (3)
+      def getMappingFromResponse(response: GenerateExternalPartyTopologyResponse) = {
+        response.topologyTransactions should have length 1
         val txs = response.topologyTransactions.toList
           .traverse(tx =>
             TopologyTransaction
-              .fromByteString(ProtocolVersion.latest, tx)
+              .fromByteString(testedProtocolVersion, tx)
           )
           .valueOrFail("unable to parse topology txs")
           .map(_.mapping)
         txs match {
-          case (nd: NamespaceDelegation) :: (pk: PartyToKeyMapping) :: (pp: PartyToParticipant) :: Nil =>
-            (nd, pk, pp)
+          case (pp: PartyToParticipant) :: Nil => pp
           case other => fail("unexpected mappings: " + other)
         }
       }
@@ -770,11 +924,7 @@ class ApiPartyManagementServiceSpec
             )
           )
         } yield {
-          val (nd, pk, pp) = getMappingsFromResponse(response)
-          pk.party shouldBe pp.partyId
-          pk.party.namespace shouldBe nd.namespace
-          nd.namespace.fingerprint shouldBe nd.target.fingerprint
-          pk.threshold.value shouldBe 1
+          val pp = getMappingFromResponse(response)
           pp.participants.toSet shouldBe Set(
             HostingParticipant(
               DefaultTestIdentities.participant1,
@@ -811,7 +961,7 @@ class ApiPartyManagementServiceSpec
             )
           )
         } yield {
-          val (_, _, pp) = getMappingsFromResponse(response)
+          val pp = getMappingFromResponse(response)
           pp.participants.toSet shouldBe Set(
             HostingParticipant(
               DefaultTestIdentities.participant1,
@@ -1086,7 +1236,7 @@ object ApiPartyManagementServiceSpec {
 
   private final case class TestPartySyncService(tracer: Tracer) extends state.PartySyncService {
     override def allocateParty(
-        hint: Ref.Party,
+        partyId: PartyId,
         submissionId: Ref.SubmissionId,
         synchronizerIdO: Option[SynchronizerId],
         externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
@@ -1101,10 +1251,12 @@ object ApiPartyManagementServiceSpec {
       FutureUnlessShutdown.pure(state.SubmissionResult.Acknowledged)
     }
 
-    override def protocolVersionForSynchronizerId(
+    override def physicalSynchronizerIdForSynchronizerId(
         synchronizerId: SynchronizerId
-    ): Option[ProtocolVersion] =
-      Option.when(synchronizerId == DefaultTestIdentities.synchronizerId)(ProtocolVersion.latest)
+    ): Option[PhysicalSynchronizerId] =
+      Option.when(synchronizerId == DefaultTestIdentities.synchronizerId)(
+        DefaultTestIdentities.physicalSynchronizerId
+      )
 
     override def participantId: ParticipantId = DefaultTestIdentities.participant1
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -111,8 +111,6 @@ object ParticipantNodePersistentState extends HasLoggerName {
         loggerFactory = loggerFactory,
       )
 
-    val pruningStore = ParticipantPruningStore(storage, timeouts, loggerFactory)
-
     implicit val loggingContext: NamedLoggingContext =
       NamedLoggingContext(loggerFactory, traceContext)
     val logger = loggingContext.tracedLogger
@@ -174,11 +172,13 @@ object ParticipantNodePersistentState extends HasLoggerName {
     for {
       _ <- settingsStore.refreshCache()
       _ <- maxDeduplicationDurationO.traverse_(checkOrSetMaxDedupDuration)
+      pruningStore <- ParticipantPruningStore(storage, timeouts, loggerFactory)
       ledgerApiStore <-
         LedgerApiStore.initialize(
           storageConfig = storageConfig,
+          storage = Some(storage),
           ledgerParticipantId = ledgerParticipantId,
-          legderApiDatabaseConnectionTimeout = ledgerApiServerConfig.databaseConnectionTimeout,
+          ledgerApiDatabaseConnectionTimeout = ledgerApiServerConfig.databaseConnectionTimeout,
           ledgerApiPostgresDataSourceConfig = ledgerApiServerConfig.postgresDataSource,
           timeouts = timeouts,
           loggerFactory = loggerFactory,

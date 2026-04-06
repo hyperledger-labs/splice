@@ -22,8 +22,8 @@ tests:
         amuletNameAcronym: MCK
         nameServiceName: Mock Name Service
         nameServiceNameAcronym: MNS
-      sequencerAddress: "sequencer-address"
-      mediatorAddress: "mediator-address"
+      sequencerAddress: "current-sequencer-address"
+      mediatorAddress: "current-mediator-address"
       participantAddress: "mock-address"
       persistence:
         host: mock-pg-host
@@ -47,3 +47,203 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_TX_LOG_STORE_DESCRIPTOR_USER_VERSION')].value
           pattern: 'canton\.scan-apps\.scan-app\.tx-log-store-descriptor-user-version = 3'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='SPLICE_APP_SCAN_SEQUENCER_ADDRESS')].value
+          pattern: 'current-sequencer-address'
+  - it: "sets successor synchronizer"
+    set:
+      # Things we need just to pass the schema
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+        successor:
+          sequencer: "successor-sequencer-address"
+          mediator: "successor-mediator-address"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+        # set for this test
+        acsStoreDescriptorUserVersion: 2
+        txLogStoreDescriptorUserVersion: 3
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        targetAudience: "mock_audience"
+      maxDarVersion: 1.0.0
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: scan-app
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='SPLICE_APP_SCAN_SEQUENCER_ADDRESS')].value
+          pattern: 'current-sequencer-address'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='SPLICE_APP_SCAN_MEDIATOR_ADDRESS')].value
+          pattern: 'current-mediator-address'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_SUCCESSOR')].value
+          pattern: |
+            canton.scan-apps.scan-app.synchronizer-nodes.successor {
+              sequencer {
+                address = "successor-sequencer-address"
+                port = 5009
+              }
+              mediator {
+                address = "successor-mediator-address"
+                port = 5007
+              }
+            }
+  - it: "sets legacy synchronizer"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+        legacy:
+          sequencer: "legacy-sequencer-address"
+          mediator: "legacy-mediator-address"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: scan-app
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='SPLICE_APP_SCAN_SEQUENCER_ADDRESS')].value
+          pattern: 'current-sequencer-address'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='SPLICE_APP_SCAN_MEDIATOR_ADDRESS')].value
+          pattern: 'current-mediator-address'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_LEGACY')].value
+          pattern: |
+            canton.scan-apps.scan-app.synchronizer-nodes.legacy {
+              sequencer {
+                address = "legacy-sequencer-address"
+                port = 5009
+              }
+              mediator {
+                address = "legacy-mediator-address"
+                port = 5007
+              }
+            }
+  - it: "sets bft sequencer config on current synchronizer"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+          bftSequencerConfig:
+            p2pUrl: "http://bft-p2p-current:1234"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: scan-app
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SEQUENCER_CURRENT')].value
+          pattern: 'p2p-url = "http://bft-p2p-current:1234"'
+  - it: "sets bft sequencer config on successor synchronizer"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+          bftSequencerConfig:
+            p2pUrl: "http://bft-p2p-current:1234"
+        successor:
+          sequencer: "successor-sequencer-address"
+          mediator: "successor-mediator-address"
+          bftSequencerConfig:
+            p2pUrl: "http://bft-p2p-successor:5678"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: scan-app
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SEQUENCER_CURRENT')].value
+          pattern: 'p2p-url = "http://bft-p2p-current:1234"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SEQUENCER_SUCCESSOR')].value
+          pattern: 'p2p-url = "http://bft-p2p-successor:5678"'
+  - it: "sets bft sequencer config on legacy synchronizer"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+          bftSequencerConfig:
+            p2pUrl: "http://bft-p2p-current:1234"
+        legacy:
+          sequencer: "legacy-sequencer-address"
+          mediator: "legacy-mediator-address"
+          bftSequencerConfig:
+            p2pUrl: "http://bft-p2p-legacy:9012"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: scan-app
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SEQUENCER_CURRENT')].value
+          pattern: 'p2p-url = "http://bft-p2p-current:1234"'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SEQUENCER_LEGACY')].value
+          pattern: 'p2p-url = "http://bft-p2p-legacy:9012"'

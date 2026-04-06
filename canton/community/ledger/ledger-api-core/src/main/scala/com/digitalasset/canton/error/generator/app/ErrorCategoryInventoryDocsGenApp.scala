@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error.generator.app
@@ -12,6 +12,9 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
   */
 object ErrorCategoryInventoryDocsGenApp {
 
+  /** to run, in sbt call: ledger-api-core/runMain
+    * com.digitalasset.canton.error.generator.app.ErrorCategoryInventoryDocsGenApp
+    */
   def main(args: Array[String]): Unit = {
     val outputText = ErrorCategoryInventoryDocsGenerator.genText()
     if (args.length >= 1) {

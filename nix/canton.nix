@@ -1,15 +1,10 @@
-{ stdenv, use_enterprise }:
+{ stdenv }:
 let sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
 in
 stdenv.mkDerivation rec {
   name = "canton";
   version = sources.version;
-  src = if use_enterprise then
-    builtins.fetchurl {
-         url = "https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-${sources.version}.tar.gz";
-         sha256 = sources.enterprise_sha256;
-    }
-  else
+  src =
     builtins.fetchurl {
         url = "https://www.canton.io/releases/canton-open-source-${sources.version}.tar.gz";
         sha256 = sources.oss_sha256;

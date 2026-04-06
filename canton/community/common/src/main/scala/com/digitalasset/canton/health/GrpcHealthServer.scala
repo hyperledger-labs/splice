@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.health
 
-import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.lifecycle.LifeCycle.toCloseableServer
@@ -28,14 +27,12 @@ class GrpcHealthServer(
     with FlagCloseable {
   private val server = CantonServerBuilder
     .forConfig(
-      config,
-      None,
-      executor,
-      loggerFactory,
-      apiConfig,
-      tracingConfig,
-      grpcMetrics,
-      NoOpTelemetry,
+      config = config,
+      executor = executor,
+      loggerFactory = loggerFactory,
+      apiLoggingConfig = apiConfig,
+      tracing = tracingConfig,
+      grpcMetrics = grpcMetrics,
     )
     .addService(ProtoReflectionServiceV1.newInstance(), withLogging = false)
     .addService(healthManager.getHealthService.bindService())

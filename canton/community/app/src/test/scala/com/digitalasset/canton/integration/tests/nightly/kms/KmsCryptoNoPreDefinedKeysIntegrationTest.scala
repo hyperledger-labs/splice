@@ -1,16 +1,18 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.nightly.kms
 
 import cats.data.EitherT
 import cats.syntax.parallel.*
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.{ExecutionContextIdlenessExecutorService, Threading}
 import com.digitalasset.canton.config.DefaultProcessingTimeouts.shutdownProcessing
-import com.digitalasset.canton.config.{DbConfig, KmsConfig}
+import com.digitalasset.canton.config.KmsConfig
 import com.digitalasset.canton.crypto.kms.{Kms, KmsError}
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStore, KmsCryptoPrivateStore}
-import com.digitalasset.canton.integration.plugins.{UseKms, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseKms}
 import com.digitalasset.canton.integration.tests.security.kms.KmsCryptoIntegrationTestBase
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -35,6 +37,7 @@ trait KmsCryptoNoPreDefinedKeysIntegrationTest extends KmsCryptoIntegrationTestB
     Threading.newExecutionContext(
       loggerFactory.threadName + "-kms-init-keys-deletion-execution-context",
       noTracingLogger,
+      new ExecutorServiceMetrics(NoOpMetricsFactory),
     )
 
   private def deleteKeys(
@@ -67,6 +70,6 @@ trait KmsCryptoNoPreDefinedKeysIntegrationTest extends KmsCryptoIntegrationTestB
   setupPlugins(
     withAutoInit = true,
     storagePlugin = Option.empty[EnvironmentSetupPlugin],
-    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
+    sequencerPlugin = new UseBftSequencer(loggerFactory),
   )
 }

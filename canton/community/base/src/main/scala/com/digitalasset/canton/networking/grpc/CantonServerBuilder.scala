@@ -1,13 +1,12 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.networking.grpc
 
-import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.CantonAdminTokenDispenser
+import com.daml.tls.TlsServerConfig.logTlsProtocolsAndCipherSuites
+import com.daml.tls.{BaseServerTlsConfig, TlsConfig, TlsServerConfig}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.TlsServerConfig.logTlsProtocolsAndCipherSuites
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
@@ -153,13 +152,11 @@ object CantonServerBuilder {
     */
   def forConfig(
       config: ServerConfig,
-      adminTokenDispenser: Option[CantonAdminTokenDispenser],
       executor: Executor,
       loggerFactory: NamedLoggerFactory,
       apiLoggingConfig: ApiLoggingConfig,
       tracing: TracingConfig,
       grpcMetrics: GrpcServerMetricsX,
-      telemetry: Telemetry,
       additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
   ): CantonServerBuilder = {
     val builder =
@@ -177,25 +174,19 @@ object CantonServerBuilder {
 
     new BaseBuilder(
       reifyBuilder(configureKeepAlive(config.keepAliveServer, builderWithSsl)),
-      config.instantiateServerInterceptors(
+      new CantonCommunityServerInterceptors(
         config.name,
         tracing,
         apiLoggingConfig,
         loggerFactory,
         grpcMetrics,
-        config.authServices,
-        adminTokenDispenser,
-        config.jwtTimestampLeeway,
-        config.adminTokenConfig,
-        config.jwksCacheConfig,
-        telemetry,
         additionalInterceptors,
         config.limits,
       ),
     )
   }
 
-  private def baseSslBuilder(config: BaseTlsArguments): SslContextBuilder = {
+  private def baseSslBuilder(config: TlsConfig): SslContextBuilder = {
     import scala.jdk.CollectionConverters.*
     val s1 =
       GrpcSslContexts.forServer(config.certChainFile.pemStream, config.privateKeyFile.pemStream)
@@ -203,7 +194,7 @@ object CantonServerBuilder {
     config.ciphers.fold(s2)(ciphers => s2.ciphers(ciphers.asJava))
   }
 
-  def baseSslContext(config: TlsBaseServerConfig): SslContext = baseSslBuilder(config).build()
+  def baseSslContext(config: BaseServerTlsConfig): SslContext = baseSslBuilder(config).build()
 
   def sslContext(
       config: TlsServerConfig,

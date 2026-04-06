@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -156,6 +156,7 @@ import com.daml.ledger.api.v2.update_service.{
 }
 import com.digitalasset.canton.admin.api.client
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
+  CustomClientTimeout,
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
   TimeoutType,
@@ -170,6 +171,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   TemplateId,
   UserRights,
 }
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
@@ -297,6 +299,9 @@ object LedgerApiCommands {
         synchronizerId: SynchronizerId,
         transactions: Seq[(GenericTopologyTransaction, Seq[Signature])],
         multiHashSignatures: Seq[Signature],
+        synchronize: Boolean,
+        identityProviderId: String,
+        userId: String,
     ) extends BaseCommand[
           AllocateExternalPartyRequest,
           AllocateExternalPartyResponse,
@@ -314,7 +319,9 @@ object LedgerApiCommands {
             },
             multiHashSignatures =
               multiHashSignatures.map(_.toProtoV30.transformInto[lapicrypto.Signature]),
-            identityProviderId = "",
+            waitForAllocation = Some(synchronize),
+            identityProviderId = identityProviderId,
+            userId = userId,
           )
         )
       override protected def submitRequest(
@@ -369,7 +376,7 @@ object LedgerApiCommands {
 
     }
 
-    final case class ListKnownParties(identityProviderId: String)
+    final case class ListKnownParties(identityProviderId: String, filterParty: String)
         extends BaseCommand[ListKnownPartiesRequest, ListKnownPartiesResponse, Seq[
           PartyDetails
         ]] {
@@ -379,6 +386,7 @@ object LedgerApiCommands {
             pageToken = "",
             pageSize = 0,
             identityProviderId = identityProviderId,
+            filterParty = filterParty,
           )
         )
       override protected def submitRequest(
@@ -1399,6 +1407,7 @@ object LedgerApiCommands {
     def synchronizerId: Option[SynchronizerId]
     def userId: String
     def packageIdSelectionPreference: Seq[LfPackageId]
+    def tapsMaxPasses: Option[Int]
 
     protected def mkCommand: Commands = Commands(
       workflowId = workflowId,
@@ -1426,6 +1435,7 @@ object LedgerApiCommands {
       synchronizerId = synchronizerId.map(_.toProtoPrimitive).getOrElse(""),
       packageIdSelectionPreference = packageIdSelectionPreference.map(_.toString),
       prefetchContractKeys = Nil,
+      tapsMaxPasses = tapsMaxPasses,
     )
 
     override protected def pretty: Pretty[this.type] =
@@ -1461,6 +1471,7 @@ object LedgerApiCommands {
         override val synchronizerId: Option[SynchronizerId],
         override val userId: String,
         override val packageIdSelectionPreference: Seq[LfPackageId],
+        override val tapsMaxPasses: Option[Int],
     ) extends SubmitCommand
         with BaseCommand[SubmitRequest, SubmitResponse, Unit] {
       override protected def createRequest(): Either[String, SubmitRequest] =
@@ -1597,6 +1608,8 @@ object LedgerApiCommands {
         prefetchContractKeys: Seq[PrefetchContractKey],
         maxRecordTime: Option[CantonTimestamp],
         costEstimationHints: Option[CostEstimationHints],
+        tapsMaxPasses: Option[Int],
+        hashingSchemeVersion: HashingSchemeVersion,
     ) extends BaseCommand[
           PrepareSubmissionRequest,
           PrepareSubmissionResponse,
@@ -1622,6 +1635,8 @@ object LedgerApiCommands {
             prefetchContractKeys = prefetchContractKeys,
             maxRecordTime = maxRecordTime.map(_.toProtoTimestamp),
             estimateTrafficCost = costEstimationHints,
+            tapsMaxPasses = tapsMaxPasses,
+            hashingSchemeVersion = Some(hashingSchemeVersion),
           )
         )
 
@@ -1908,6 +1923,8 @@ object LedgerApiCommands {
         override val packageIdSelectionPreference: Seq[LfPackageId],
         transactionShape: TransactionShape,
         includeCreatedEventBlob: Boolean,
+        override val tapsMaxPasses: Option[Int],
+        optTimeout: Option[NonNegativeDuration],
     ) extends SubmitCommand
         with BaseCommand[
           SubmitAndWaitForTransactionRequest,
@@ -1962,7 +1979,8 @@ object LedgerApiCommands {
       ): Either[String, Transaction] =
         response.transaction.toRight("Received response without any transaction")
 
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+      override def timeoutType: TimeoutType =
+        optTimeout.map(CustomClientTimeout(_)).getOrElse(DefaultUnboundedTimeout)
 
     }
 
@@ -2179,6 +2197,7 @@ object LedgerApiCommands {
           GetActiveContractsRequest(
             activeAtOffset = activeAtOffset,
             eventFormat = Some(EventFormat(parties.map((_, filter)).toMap, None, verbose)),
+            streamContinuationToken = None,
           )
         )
       }
@@ -2373,23 +2392,32 @@ object LedgerApiCommands {
     final case class GetEventsByContractId(
         contractId: String,
         requestingParties: Seq[String],
+        includeCreatedEventBlob: Boolean,
     ) extends BaseCommand[
           GetEventsByContractIdRequest,
           GetEventsByContractIdResponse,
         ] {
 
-      override protected def createRequest(): Either[String, GetEventsByContractIdRequest] = Right(
-        GetEventsByContractIdRequest(
-          contractId = contractId,
-          eventFormat = Some(
-            EventFormat(
-              filtersByParty = requestingParties.map(_ -> Filters(Nil)).toMap,
-              filtersForAnyParty = None,
-              verbose = true,
+      override protected def createRequest(): Either[String, GetEventsByContractIdRequest] = {
+        val filters = Filters(
+          Seq(
+            CumulativeFilter(
+              IdentifierFilter.WildcardFilter(WildcardFilter(includeCreatedEventBlob))
             )
-          ),
+          )
         )
-      )
+        val eventFormat = EventFormat(
+          filtersForAnyParty = Option.when(requestingParties.isEmpty)(filters),
+          filtersByParty = requestingParties.map(_ -> filters).toMap,
+          verbose = true,
+        )
+        Right(
+          GetEventsByContractIdRequest(
+            contractId = contractId,
+            eventFormat = Some(eventFormat),
+          )
+        )
+      }
 
       override protected def submitRequest(
           service: EventQueryServiceStub,

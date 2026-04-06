@@ -26,10 +26,14 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
   const { configChange, effectiveDate, pendingFieldInfo } = props;
   const field = useFieldContext<ConfigFieldState>();
 
-  const isSynchronizerUpgradeTime =
-    field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeTime';
-  const isSynchronizerUpgradeMigrationId =
-    field.state.value?.fieldName === 'nextScheduledSynchronizerUpgradeMigrationId';
+  const isSynchronizerUpgradeTime = [
+    'nextScheduledSynchronizerUpgradeTime',
+    'nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime',
+    'nextScheduledLogicalSynchronizerUpgradeUpgradeTime',
+  ].includes(field.state.value?.fieldName);
+  const isSynchronizerUpgradeField =
+    field.state.value?.fieldName.startsWith('nextScheduledSynchronizerUpgrade') ||
+    field.state.value?.fieldName.startsWith('nextScheduledLogicalSynchronizerUpgrade');
 
   // We disable the field if it is pending and the value is the default value.
   // The default value check is to handle the case where the user made a change
@@ -42,7 +46,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
 
   // When effective at Threshold, we disable the upgrade time and migrationId config fields
   const isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId =
-    isEffectiveAtThreshold && (isSynchronizerUpgradeTime || isSynchronizerUpgradeMigrationId);
+    isEffectiveAtThreshold && (isSynchronizerUpgradeTime || isSynchronizerUpgradeField);
 
   const isDisabled =
     isPendingAndDefaultValue ||
@@ -102,6 +106,7 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
 
           {isSynchronizerUpgradeTime && (
             <SynchronizerUpgradeTimeDisplay
+              fieldName={field.state.value?.fieldName || ''}
               effectiveDate={effectiveDate}
               configChange={configChange}
             />
@@ -148,24 +153,34 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
 
 interface SynchronizerUpgradeTimeDisplayProps {
   effectiveDate: string | undefined;
+  fieldName: string;
   configChange: ConfigChange;
 }
+
+export const synchronizerUpgradeTimeDefault = (
+  fieldName: string,
+  effectiveDate: string | undefined
+): dayjs.Dayjs => {
+  const defaultTime = dayjs(effectiveDate).utc().add(1, 'hour');
+  return fieldName == 'nextScheduledLogicalSynchronizerUpgradeUpgradeTime'
+    ? defaultTime.add(1, 'day')
+    : defaultTime;
+};
 
 export const SynchronizerUpgradeTimeDisplay: React.FC<
   SynchronizerUpgradeTimeDisplayProps
 > = props => {
-  const { effectiveDate } = props;
-  const defaultMigrationTime = dayjs(effectiveDate)
-    .utc()
-    .add(1, 'hour')
-    .format(nextScheduledSynchronizerUpgradeFormat);
+  const { effectiveDate, fieldName } = props;
+  const defaultMigrationTime = synchronizerUpgradeTimeDefault(fieldName, effectiveDate).format(
+    nextScheduledSynchronizerUpgradeFormat
+  );
 
   return (
     <Typography
       variant="caption"
       color="text.secondary"
       sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}
-      data-testid={`next-scheduled-upgrade-time-default`}
+      data-testid={`${fieldName}-default`}
     >
       {`Default: ${defaultMigrationTime}`}
     </Typography>

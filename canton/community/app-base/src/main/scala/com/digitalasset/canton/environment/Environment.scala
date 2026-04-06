@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -7,8 +7,8 @@ import better.files.File
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
 import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
 import com.digitalasset.canton.concurrent.*
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.{
@@ -45,7 +45,7 @@ import com.digitalasset.canton.time.*
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import com.digitalasset.canton.util.{MonadUtil, PekkoUtil, SingleUseCell}
+import com.digitalasset.canton.util.{MonadUtil, Mutex, PekkoUtil, SingleUseCell}
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
@@ -55,15 +55,14 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Future, blocking}
 import scala.util.control.NonFatal
 
 /** Holds all significant resources held by this process.
   */
 abstract class Environment[Config <: SharedCantonConfig[Config]](
     initialConfig: Config,
-    edition: CantonEdition,
     val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
@@ -136,7 +135,10 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     loggerFactory,
   )
 
-  def isEnterprise: Boolean = edition == EnterpriseCantonEdition
+  lazy val executorServiceMetrics: ExecutorServiceMetrics =
+    new ExecutorServiceMetrics(
+      metricsRegistry.generateMetricsFactory(MetricsContext.Empty)
+    )
 
   @VisibleForTesting
   protected def createHealthDumpGenerator(
@@ -180,28 +182,35 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   installJavaUtilLoggingBridge()
   logger.debug(config.portDescription)
 
-  private val numThreads = Threading.detectNumberOfThreads(noTracingLogger)
-  implicit val executionContext: ExecutionContextIdlenessExecutorService =
+  private val numThreads = config.parameters.threading.parallelism
+    .getOrElse(Threading.detectNumberOfThreads(noTracingLogger))
+  implicit lazy val executionContext: ExecutionContextIdlenessExecutorService =
     Threading.newExecutionContext(
       loggerFactory.threadName + "-env-ec",
       noTracingLogger,
-      Some(
-        new ExecutorServiceMetrics(
-          metricsRegistry.generateMetricsFactory(MetricsContext.Empty)
-        )
-      ),
-      numThreads,
+      parallelism = numThreads,
+      executorServiceMetrics = executorServiceMetrics,
+      maxExtraThreads = config.parameters.threading.maxExtraThreads,
+      keepAliveMillis = config.parameters.threading.keepAliveMillis,
+      corePoolSize = config.parameters.threading.corePoolSize,
+      maxPoolSize = config.parameters.threading.maxPoolSize,
+      minRunnable = config.parameters.threading.minRunnable,
     )
+  config.parameters.threading.mutexMaxSpins.foreach { maxSpins =>
+    Mutex.MaxSpins.set(maxSpins.value)
+  }
 
   private val deadlockConfig = config.monitoring.deadlockDetection
   protected def timeouts: ProcessingTimeout = config.parameters.timeouts.processing
 
-  protected val futureSupervisor =
+  private val lock = new Mutex()
+
+  protected[canton] val futureSupervisor =
     if (config.monitoring.logging.logSlowFutures)
       new FutureSupervisor.Impl(timeouts.slowFutureWarn, loggerFactory)
     else FutureSupervisor.Noop
 
-  private val monitorO = if (deadlockConfig.enabled) {
+  private lazy val monitorO = if (deadlockConfig.enabled) {
     val mon = new ExecutionContextMonitor(
       loggerFactory,
       deadlockConfig.interval.toInternal,
@@ -298,6 +307,8 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     timeouts,
     config.sequencersByString,
     config.sequencerNodeParametersByString,
+    apiName => GrpcAdminCommandRunner(this, apiName),
+    config.parameters.enableAlphaStateViaConfig,
     loggerFactory,
   )
 
@@ -483,6 +494,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
           config.sequencerNodeParametersByString(name),
           createClock(Some(SequencerNodeBootstrap.LoggerFactoryKeyName -> name)),
           metricsRegistry.forSequencer(name),
+          executorServiceMetrics,
           testingConfig,
           futureSupervisor,
           loggerFactory.append(SequencerNodeBootstrap.LoggerFactoryKeyName, name),
@@ -506,6 +518,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
         config.mediatorNodeParametersByString(name),
         createClock(Some(MediatorNodeBootstrap.LoggerFactoryKeyName -> name)),
         metricsRegistry.forMediator(name),
+        executorServiceMetrics,
         testingConfig,
         futureSupervisor,
         loggerFactory.append(MediatorNodeBootstrap.LoggerFactoryKeyName, name),
@@ -531,6 +544,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
           config.participantNodeParametersByString(name),
           createClock(Some(ParticipantNodeBootstrap.LoggerFactoryKeyName -> name)),
           metricsRegistry.forParticipant(name),
+          executorServiceMetrics,
           testingConfig,
           futureSupervisor,
           loggerFactory.append(ParticipantNodeBootstrap.LoggerFactoryKeyName, name),
@@ -554,7 +568,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   def addUserCloseable(closeable: AutoCloseable): Unit = userCloseables.append(closeable)
 
-  override def close(): Unit = blocking(this.synchronized {
+  override def close(): Unit = (lock.exclusive {
     val closeActorSystem: AutoCloseable =
       LifeCycle.toCloseableActorSystem(actorSystem, logger, timeouts)
 
@@ -602,7 +616,6 @@ trait EnvironmentFactory[C <: SharedCantonConfig[C], E <: Environment[C]] {
 
 final class CantonEnvironment(
     override val config: CantonConfig,
-    edition: CantonEdition,
     override val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
@@ -610,7 +623,6 @@ final class CantonEnvironment(
     override val loggerFactory: NamedLoggerFactory,
 ) extends Environment[CantonConfig](
       config,
-      edition,
       testingConfig,
       participantNodeFactory,
       sequencerNodeFactory,

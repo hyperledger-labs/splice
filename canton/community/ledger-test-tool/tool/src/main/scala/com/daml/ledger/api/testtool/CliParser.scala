@@ -1,21 +1,22 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.api.testtool
 
 import com.daml.ledger.api.testtool.infrastructure.PartyAllocationConfiguration
 import com.daml.ledger.api.testtool.runner.Config
+import com.daml.tls.TlsClientCertificate
 import com.digitalasset.canton.buildinfo.BuildInfo
+import com.digitalasset.canton.config.PemFile
 import com.digitalasset.canton.config.RequireTypes.ExistingFile
-import com.digitalasset.canton.config.{PemFile, TlsClientCertificate}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import scopt.{OptionParser, Read}
 
 import java.io.File
 import java.nio.file.Paths
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.util.Try
 import scala.util.matching.Regex
+import scala.util.{Success, Try}
 
 object CliParser {
   private val Name = "ledger-api-test-tool"
@@ -284,13 +285,16 @@ object CliParser {
     help("help").text("Prints this usage text").discard
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TryPartial", "org.wartremover.warts.IterableOps"))
   private def oneOfRead[T](readersHead: Read[T], readersTail: Read[T]*): Read[T] = Read.reads {
     str =>
       val results =
         (readersHead #:: LazyList(readersTail*)).map(reader => Try(reader.reads(str)))
-      results.find(_.isSuccess) match {
-        case Some(value) => value.get
-        case None => results.head.get // throw the first failure
-      }
+
+      results
+        .collectFirst { case Success(value) => value }
+        .getOrElse {
+          results.head.get // throw the first failure
+        }
   }
 }

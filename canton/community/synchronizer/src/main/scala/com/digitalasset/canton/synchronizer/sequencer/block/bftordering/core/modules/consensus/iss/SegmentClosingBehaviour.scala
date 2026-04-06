@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -30,6 +30,7 @@ final class SegmentClosingBehaviour[E <: Env[E]](
     private val waitingForFutureIds: mutable.Set[FutureId],
     actionName: String,
     parent: ModuleRef[Consensus.Message[E]],
+    traceContextOfParent: TraceContext,
     firstBlockNumber: BlockNumber,
     epochNumber: EpochNumber,
     messageToSendParent: Consensus.Message[E],
@@ -57,25 +58,41 @@ final class SegmentClosingBehaviour[E <: Env[E]](
         haveReceivedStartModuleClosingBehaviourMessage = true
         stopIfWeShould()
 
+      case _: ConsensusSegment.ConsensusMessage.PbftTimeout =>
+        ignoreMessage(message)
+      case ConsensusSegment.Internal.BlockInactivityTimeout =>
+        ignoreMessage(message)
+
+      case _: ConsensusSegment.ConsensusMessage.CancelEpoch =>
+        // This can still be received while already closing due `PreIssConsensusModule` processing postponed messages
+        //  that trigger the catch-up detector
+        ignoreMessage(message)
+
       case _ =>
         logger.error(
           s"Segment module $firstBlockNumber $actionName epoch $epochNumber but got unexpected message: $message"
         )
     }
 
+  private def ignoreMessage(
+      message: ConsensusSegment.Message
+  )(implicit traceContext: TraceContext): Unit =
+    logger.debug(
+      s"Segment module $firstBlockNumber $actionName epoch $epochNumber is closing, received $message (ignore)"
+    )
+
   private def stopIfWeShould()(implicit
-      context: E#ActorContextT[ConsensusSegment.Message],
-      traceContext: TraceContext,
+      context: E#ActorContextT[ConsensusSegment.Message]
   ): Unit =
     if (waitingForFutureIds.isEmpty && haveReceivedStartModuleClosingBehaviourMessage) {
       stop()
     }
 
   private def stop()(implicit
-      context: E#ActorContextT[ConsensusSegment.Message],
-      traceContext: TraceContext,
+      context: E#ActorContextT[ConsensusSegment.Message]
   ): Unit =
     context.stop { () =>
+      implicit val traceContext: TraceContext = traceContextOfParent
       logger.info(
         s"Segment module $firstBlockNumber $actionName epoch $epochNumber"
       )

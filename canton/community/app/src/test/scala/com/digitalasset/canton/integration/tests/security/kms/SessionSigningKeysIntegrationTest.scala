@@ -1,15 +1,17 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.security.kms
 
-import com.digitalasset.canton.config.{DbConfig, SessionSigningKeysConfig}
-import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UseReferenceBlockSequencer}
+import com.digitalasset.canton.config.SessionSigningKeysConfig
+import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres}
 import com.digitalasset.canton.integration.tests.security.kms.aws.AwsKmsCryptoIntegrationTestBase
 import com.digitalasset.canton.integration.tests.security.kms.gcp.GcpKmsCryptoIntegrationTestBase
 import com.digitalasset.canton.integration.tests.security.kms.mock.MockKmsDriverCryptoIntegrationTestBase
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransform,
+  ConfigTransforms,
   EnvironmentSetupPlugin,
   SharedEnvironment,
 }
@@ -22,17 +24,24 @@ trait SessionSigningKeysIntegrationTest
     with SharedEnvironment
     with KmsCryptoIntegrationTestBase {
 
+  protected lazy val nodesWithSessionSigningKeysDisabled: Set[String] = Set.empty
+
+  override protected def otherConfigTransforms: Seq[ConfigTransform] = Seq(
+    // By default session signing keys are enabled for all integration tests
+    ConfigTransforms.setSessionSigningKeys(
+      SessionSigningKeysConfig.disabled,
+      nodeFilter = name => nodesWithSessionSigningKeysDisabled.contains(name),
+    )
+  )
+
   s"ping succeeds with nodes $protectedNodes using session signing keys" in { implicit env =>
     import env.*
 
     env.nodes.local.foreach { node =>
-      if (protectedNodes.contains(node.name)) {
-        val sessionSigningKeysConfig =
-          node.config.crypto.kms.valueOrFail("no kms config").sessionSigningKeys
-        if (nodesWithSessionSigningKeysDisabled.contains(node.name))
-          sessionSigningKeysConfig shouldBe SessionSigningKeysConfig.disabled
-        else sessionSigningKeysConfig shouldBe SessionSigningKeysConfig.default
-      } else node.config.crypto.kms shouldBe empty
+      if (nodesWithSessionSigningKeysDisabled.contains(node.name))
+        node.config.crypto.sessionSigningKeys shouldBe SessionSigningKeysConfig.disabled
+      else
+        node.config.crypto.sessionSigningKeys shouldBe SessionSigningKeysConfig.default
     }
 
     assertPingSucceeds(participant1, participant2)
@@ -50,8 +59,8 @@ class AwsKmsSessionSigningKeysIntegrationTestPostgres
 
   setupPlugins(
     withAutoInit = false,
-    storagePlugin = Option.empty[EnvironmentSetupPlugin],
-    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
+    storagePlugin = Some(new UsePostgres(loggerFactory)),
+    sequencerPlugin = new UseBftSequencer(loggerFactory),
   )
 }
 
@@ -66,8 +75,8 @@ class GcpKmsSessionSigningKeysIntegrationTestPostgres
 
   setupPlugins(
     withAutoInit = false,
-    storagePlugin = Option.empty[EnvironmentSetupPlugin],
-    sequencerPlugin = new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory),
+    storagePlugin = Some(new UsePostgres(loggerFactory)),
+    sequencerPlugin = new UseBftSequencer(loggerFactory),
   )
 }
 
@@ -78,7 +87,7 @@ class MockKmsDriverSessionSigningKeysIntegrationTestPostgres
     Set.empty
 
   override protected lazy val protectedNodes: Set[String] =
-    Set("sequencer1")
+    Set("participant1", "participant2", "mediator1", "sequencer1")
 
   setupPlugins(
     // TODO(#25069): Add persistence to mock KMS driver to support auto-init = false

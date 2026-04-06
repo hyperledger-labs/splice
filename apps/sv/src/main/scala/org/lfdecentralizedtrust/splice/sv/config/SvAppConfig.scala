@@ -4,21 +4,23 @@
 package org.lfdecentralizedtrust.splice.sv.config
 
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionPoolDelays,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
   NonNegativeLong,
   NonNegativeNumeric,
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.sequencing.{
-  SequencerConnectionPoolDelays,
-  SubmissionRequestAmplification,
-}
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
@@ -222,6 +224,19 @@ object SvOnboardingConfig {
       case other => other
     }
   }
+
+  final case class RollForwardLsuTimestampConfig(
+      topologyExportTime: CantonTimestamp,
+      trafficExportTime: CantonTimestamp,
+  )
+
+  final case class RollForwardLsu(
+      name: String,
+      newPhysicalSynchronizerSerial: NonNegativeInt,
+      newPhysicalSynchronizerProtocolVersion: ProtocolVersion,
+      // If unset, we assume there is an LsuAnnouncement.
+      exportTimes: Option[RollForwardLsuTimestampConfig],
+  ) extends SvOnboardingConfig
 }
 
 final case class InitialAnsConfig(
@@ -300,8 +315,7 @@ case class SvAppBackendConfig(
     svPartyHint: Option[String] = None,
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
-    cometBftConfig: Option[SvCometBftConfig] = None,
-    localSynchronizerNode: Option[SvSynchronizerNodeConfig],
+    localSynchronizerNodes: SvSynchronizerNodesConfig,
     scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -310,6 +324,7 @@ case class SvAppBackendConfig(
     domainMigrationId: Long = 0L,
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(2),
+    lsuSequencingTestInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     extraBeneficiaries: Seq[BeneficiaryConfig] = Seq.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
@@ -337,9 +352,6 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
-    // We want to be able to override this for simtime tests
-    topologyChangeDelayDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
     delegatelessAutomationExpiredRewardCouponNumBatches: Int = 20,
@@ -394,12 +406,13 @@ case class SvAppBackendConfig(
       PackageVettingLookupService.CacheConfig(),
 ) extends SpliceBackendConfig {
 
-  def shouldSkipSynchronizerInitialization =
+  def shouldSkipSynchronizerInitialization: Boolean =
     skipSynchronizerInitialization &&
       onboarding.fold(true) {
         case _: SvOnboardingConfig.FoundDso => true
         case _: SvOnboardingConfig.JoinWithKey => true
         case _: SvOnboardingConfig.DomainMigration => false
+        case _: SvOnboardingConfig.RollForwardLsu => false
       }
   override val nodeTypeName: String = "SV"
 
@@ -428,6 +441,7 @@ object SvAppBackendConfig {
     PositiveInt.tryCreate(5),
     NonNegativeFiniteDuration.ofSeconds(10),
   )
+
 }
 
 case class SvCometBftConfig(
@@ -508,9 +522,18 @@ final case class SvScanConfig(
 final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
-) {
-  val parameters: SynchronizerParametersConfig = SynchronizerParametersConfig()
-}
+    cometBftConfig: Option[SvCometBftConfig] = None,
+    protocolVersion: ProtocolVersion = ProtocolVersion.v34,
+    serial: Option[NonNegativeInt],
+    // We want to be able to override this for simtime tests
+    topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(250),
+)
+
+final case class SvSynchronizerNodesConfig(
+    current: SvSynchronizerNodeConfig,
+    successor: Option[SvSynchronizerNodeConfig],
+    legacy: Option[SvSynchronizerNodeConfig] = None,
+)
 
 final case class SvCantonIdentifierConfig(
     participant: String,

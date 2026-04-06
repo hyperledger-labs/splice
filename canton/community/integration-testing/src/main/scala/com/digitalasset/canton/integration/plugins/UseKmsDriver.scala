@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -30,7 +30,6 @@ import scala.jdk.CollectionConverters.*
 class UseKmsDriver(
     protected val keyId: Option[KmsKeyId] = None,
     protected val nodes: Set[String],
-    protected val nodesWithSessionSigningKeysDisabled: Set[String] = Set.empty,
     protected val enableEncryptedPrivateStore: EncryptedPrivateStoreStatus =
       EncryptedPrivateStoreStatus.Enable,
     val driverName: String,

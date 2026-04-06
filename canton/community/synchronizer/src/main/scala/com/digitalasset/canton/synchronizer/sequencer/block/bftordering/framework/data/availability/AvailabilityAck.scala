@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability
 
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose, Signature, v30}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
@@ -16,18 +17,18 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.AvailabilityAck as ProtoAvailabilityAck
 
-final case class AvailabilityAck(from: BftNodeId, signature: Signature) {
+final case class AvailabilityAck(from: BftNodeId, signature: Signature) extends PrettyPrinting {
 
-  def validateIn(currentOrderingTopology: OrderingTopology): Either[ValidationError, Unit] =
+  def validateIn(orderingTopology: OrderingTopology): Either[ValidationError, Unit] =
     for {
       _ <- Either.cond(
-        currentOrderingTopology.contains(from),
+        orderingTopology.contains(from),
         (),
         ValidationError.NodeNotInTopology,
       )
       keyId = FingerprintKeyId.toBftKeyId(signature.authorizingLongTermKey)
       _ <- Either.cond(
-        currentOrderingTopology.nodesTopologyInfo
+        orderingTopology.nodesTopologyInfo
           .get(from)
           .map(_.keyIds)
           .getOrElse(Set.empty)
@@ -36,6 +37,12 @@ final case class AvailabilityAck(from: BftNodeId, signature: Signature) {
         ValidationError.KeyNotInTopology,
       )
     } yield ()
+
+  override protected def pretty: Pretty[AvailabilityAck.this.type] =
+    prettyOfClass(
+      param("from", _.from.doubleQuoted),
+      param("signature", _.signature),
+    )
 }
 
 object AvailabilityAck {
@@ -67,9 +74,9 @@ object AvailabilityAck {
           HashPurpose.BftAvailabilityAck,
           HashAlgorithm.Sha256,
         )
-        .add(batchId.getCryptographicEvidence)
-        .add(epoch)
-        .add(from)
+        .addByteString(batchId.getCryptographicEvidence)
+        .addLong(epoch)
+        .addString(from)
         .finish()
     )(
       metricsContext.withExtraLabels(

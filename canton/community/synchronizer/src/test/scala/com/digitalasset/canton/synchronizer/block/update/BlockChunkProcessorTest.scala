@@ -1,16 +1,18 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.update
 
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
-import com.digitalasset.canton.sequencing.protocol.{MessageId, SubmissionRequest}
-import com.digitalasset.canton.synchronizer.block.update.{
-  BlockChunkProcessor,
-  BlockUpdateGeneratorImpl,
+import com.digitalasset.canton.sequencing.protocol.{
+  AllMembersOfSynchronizer,
+  MemberRecipient,
+  MessageId,
+  SequencersOfSynchronizer,
+  SubmissionRequest,
 }
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.SubmissionOutcome
@@ -50,28 +52,47 @@ class BlockChunkProcessorTest extends AsyncWordSpec with BaseTest {
 
         val blockChunkProcessor =
           new BlockChunkProcessor(
-            testedProtocolVersion,
             syncCryptoApiFake,
             sequencerId,
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
+            None,
+            BatchingConfig(),
             loggerFactory,
             SequencerTestMetrics,
             memberValidatorMock,
           )
 
-        blockChunkProcessor
-          .emitTick(
-            state = BlockUpdateGeneratorImpl.State(
-              lastBlockTs = aTimestamp,
-              lastChunkTs = aTimestamp,
-              latestSequencerEventTimestamp = None,
-              inFlightAggregations = Map.empty,
+        def emitTick(
+            recipient: Either[AllMembersOfSynchronizer.type, SequencersOfSynchronizer.type]
+        ) =
+          blockChunkProcessor
+            .emitTick(
+              state = BlockUpdateGeneratorImpl.State(
+                lastBlockTs = aTimestamp,
+                lastChunkTs = aTimestamp,
+                latestSequencerEventTimestamp = None,
+                inFlightAggregations = Map.empty,
+                latestPendingTopologyTransactionTimestamp = None,
+              ),
+              height = aHeight,
+              tickAtLeastAt = tickSequencingTimestamp,
+              groupRecipient = recipient,
+            )
+
+        for {
+          (state1, update1) <- emitTick(Right(SequencersOfSynchronizer))
+          (state2, update2) <- emitTick(Left(AllMembersOfSynchronizer))
+        } yield {
+          Table(
+            ("state", "update", "expected tick recipients"),
+            (state1, update1, Set(MemberRecipient(sequencerId))),
+            (
+              state2,
+              update2,
+              Set(AllMembersOfSynchronizer),
             ),
-            height = aHeight,
-            tickAtLeastAt = tickSequencingTimestamp,
-          )
-          .map { case (state, update) =>
+          ).forEvery { case (state, update, expectedTickRecipients) =>
             state.lastChunkTs shouldBe tickSequencingTimestamp
             state.latestSequencerEventTimestamp shouldBe Some(tickSequencingTimestamp)
             update.submissionsOutcomes should matchPattern {
@@ -87,19 +108,19 @@ class BlockChunkProcessorTest extends AsyncWordSpec with BaseTest {
                         None,
                       ),
                       `tickSequencingTimestamp`,
-                      deliverToMembers,
+                      recipients,
                       batch,
                       _,
                       _,
                       None,
                     )
                   )
-                  if deliverToMembers == Set(sequencerId) &&
+                  if recipients == expectedTickRecipients &&
                     batch.envelopes.isEmpty =>
             }
           }
-          .failOnShutdown
-      }
+        }
+      }.failOnShutdown
     }
   }
 }

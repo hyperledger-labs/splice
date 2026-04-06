@@ -1,12 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
 
 import com.daml.ledger.api.v2.update_service.GetUpdateResponse
-import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
-import com.digitalasset.canton.crypto.{Hash, HashPurpose}
-import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.{
   CumulativeFilter,
@@ -20,27 +18,16 @@ import com.digitalasset.canton.ledger.participant.state.{
   Reassignment,
   ReassignmentInfo,
   TestAcsChangeFactory,
-  TransactionMeta,
   Update,
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.canton.platform
 import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
-import com.digitalasset.canton.protocol.{
-  ContractInstance,
-  ExampleContractFactory,
-  ReassignmentId,
-  TestUpdateId,
-  UpdateId,
-}
+import com.digitalasset.canton.protocol.{ContractInstance, ReassignmentId}
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag
-import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.transaction.{CommittedTransaction, Node}
-import com.digitalasset.daml.lf.value.Value
-import com.google.protobuf.ByteString
+import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.flatspec.AnyFlatSpec
@@ -69,14 +56,6 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
       connectionPoolEnabled = true,
     ).toPostgresDbConfig
 
-  private val synchronizer1 = SynchronizerId.tryFromString("x::synchronizer1")
-  private val synchronizer2 = SynchronizerId.tryFromString("x::synchronizer2")
-  private val packageName: Ref.PackageName = Ref.PackageName.assertFromString("-package-name-")
-  private val dsoParty = Ref.Party.assertFromString("dsoParty") // sees all
-  private lazy val parties =
-    (1 to 10000).view.map(index => Ref.Party.assertFromString(s"party$index")).toVector
-  private lazy val templates =
-    (1 to 300).view.map(index => Ref.Identifier.assertFromString(s"P:M:T$index")).toVector
   private val wildcardTemplates = CumulativeFilter(
     templateFilters = Set.empty,
     interfaceFilters = Set.empty,
@@ -94,11 +73,8 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
     filtersForAnyParty = Some(wildcardTemplates),
     verbose = false,
   )
-  private val someLFHash = com.digitalasset.daml.lf.crypto.Hash
-    .assertFromString("01cf85cfeb36d628ca2e6f583fa2331be029b6b28e877e1008fb3f862306c086")
   override implicit val traceContext: TraceContext = TraceContext.createNew("load-test")
 
-  private val builder = TxBuilder()
   private val testAcsChangeFactory = TestAcsChangeFactory()
 
   it should "Index assign/unassign updates" ignore {
@@ -123,48 +99,16 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
     indexUpdates(allUpdates)
   }
 
-  it should "Index CN ACS Export NFR fixture updates" ignore {
-    val nextRecordTime: () => CantonTimestamp = nextRecordTimeFactory()
-    def ingestionIteration(): Unit = {
-      logger.warn(s"start preparing updates...")
-      if (1 == "1".toInt)
-        fail(
-          "WARNING! Please check if you really want to do this! The following parameters result in a fixture probably not fitting in the memory. Please verify parameters. Bigger workloads are possible with doing multiple iterations."
-        )
-      val passes = 4320
-      val txSize = 5
-      // 2000*5 = 10'000 contracts created then archived in a pass,
-      // 10'000*4320 = 43'200'000 contracts created and archived at the end
-      val txsCreatedAndArchivedPerPass = 2000
-      // 23*5 = 115 contracts staying active per pass,
-      // 115*4320 = 496'800 contracts staying alive at the end
-      val txsStayingActivePerPass = 23
-      val createPayloadLength = 300
-      val archiveArgumentPayloadLengthFromTo = (13, 38)
-      val archiveResultPayloadLengthFromTo = (13, 58)
-      val allUpdates = (1 to passes).toVector
-        .flatMap(_ =>
-          createsAndArchives(
-            nextRecordTime = nextRecordTime,
-            txSize = txSize,
-            txsCreatedThenArchived = txsCreatedAndArchivedPerPass,
-            txsCreatedNotArchived = txsStayingActivePerPass,
-            createPayloadLength = createPayloadLength,
-            archiveArgumentPayloadLengthFromTo = archiveArgumentPayloadLengthFromTo,
-            archiveResultPayloadLengthFromTo = archiveResultPayloadLengthFromTo,
-          )
-        )
-      val allUpdateSize = allUpdates.size
-      logger.warn(s"prepared $allUpdateSize updates")
-      indexUpdates(allUpdates)
-    }
+  // will fail without an explicit flag
+  it should "Index CN ACS Export NFR fixture updates" ignore cnNFRIngestionFixture()
 
-    (1 to 1).foreach { i =>
-      logger.warn(s"ingestion iteration: $i started")
-      ingestionIteration()
-      logger.warn(s"ingestion iteration: $i finished")
-    }
-  }
+  it should "10% CN NFR" ignore cnNFRIngestionFixture(passes = 432)
+
+  it should "Cycle Contract Case" ignore cnNFRIngestionFixture(
+    passes = 43,
+    txsPerPass = 10000,
+    activeTxsPerPass = 2,
+  )
 
   it should "Fetch ACS" ignore TraceContext.withNewTraceContext("ACS fetch") {
     implicit traceContext =>
@@ -177,19 +121,28 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
         .getActiveContracts(
           eventFormat = eventFormat(dsoParty),
           activeAt = ledgerEndOffset,
+          continuationToken = None,
         )
+        .map(_.withEmptyChecksum)
         .zipWithIndex
         .runWith(Sink.last)
         .map { case (last, lastIndex) =>
           val totalMillis = System.currentTimeMillis() - startTime
           logger.warn(
-            s"finished fetching acs in $totalMillis ms, ${lastIndex + 1} active contracts returned."
+            s"finished fetching acs in ${seconds(totalMillis)} s, ${lastIndex + 1} active contracts returned."
           )
           logger.warn(s"last active contract acs: $last")
         }
         .futureValue(
           PatienceConfiguration.Timeout(Span.convertDurationToSpan(Duration(2000, "seconds")))
         )
+  }
+
+  private def seconds(milliseconds: Long): String = {
+    val secs = milliseconds / 1000
+    val millis = milliseconds.abs - secs.abs * 1000
+    val milliString = (1000 + millis).toString.substring(1)
+    secs.toString + '.' + milliString
   }
 
   private def nextRecordTimeFactory(): () => CantonTimestamp = {
@@ -230,6 +183,51 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
     () => recordTime.updateAndGet(_.immediateSuccessor)
   }
 
+  /** Creates and ingests passes * txsPerPass transactions, each with 5 contracts. After each pass,
+    * all but activeTxsPerPass of the txsPerPass transactions are archived.
+    */
+  private def cnNFRIngestionFixture(
+      passes: Int = 4320,
+      txsPerPass: Int = 2023,
+      activeTxsPerPass: Int = 23,
+      yesIReallyWantToRunIt: Boolean = false,
+  ): Unit = {
+    val nextRecordTime: () => CantonTimestamp = nextRecordTimeFactory()
+    def ingestionIteration(): Unit = {
+      logger.warn(s"start preparing updates...")
+      if (!yesIReallyWantToRunIt)
+        fail(
+          "WARNING! Please check if you really want to do this! The following parameters result in a fixture probably not fitting in the memory. Please verify parameters. Bigger workloads are possible with doing multiple iterations."
+        )
+      val txSize = 5
+      val txsCreatedAndArchivedPerPass = txsPerPass - activeTxsPerPass
+      val createPayloadLength = 300
+      val archiveArgumentPayloadLengthFromTo = (13, 38)
+      val archiveResultPayloadLengthFromTo = (13, 58)
+      val allUpdates = (1 to passes).toVector
+        .flatMap(_ =>
+          createsAndArchives(
+            nextRecordTime = nextRecordTime,
+            txSize = txSize,
+            txsCreatedThenArchived = txsCreatedAndArchivedPerPass,
+            txsCreatedNotArchived = activeTxsPerPass,
+            createPayloadLength = createPayloadLength,
+            archiveArgumentPayloadLengthFromTo = archiveArgumentPayloadLengthFromTo,
+            archiveResultPayloadLengthFromTo = archiveResultPayloadLengthFromTo,
+          )
+        )
+      val allUpdateSize = allUpdates.size
+      logger.warn(s"prepared $allUpdateSize updates")
+      indexUpdates(allUpdates)
+    }
+
+    (1 to 1).foreach { i =>
+      logger.warn(s"ingestion iteration: $i started")
+      ingestionIteration()
+      logger.warn(s"ingestion iteration: $i finished")
+    }
+  }
+
   private def withReporter[UpdateT, ResultT, Out](
       updates: Vector[UpdateT],
       parallelism: Int,
@@ -251,8 +249,7 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
       val lastState = new AtomicLong(0L)
       override def run(): Unit = {
         val current = state.get()
-        val last = lastState.get()
-        lastState.set(current)
+        val last = lastState.getAndSet(current)
         val reportRate = (current - last) / reportingSeconds
         val avgRate = current * 1000 / (System.currentTimeMillis() - startTime)
         val minutesLeft = (numOfUpdates - current) / avgRate / 60
@@ -292,6 +289,7 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
   }
 
   private def indexUpdates(updates: Vector[(Update, Vector[ContractInstance])]): Unit = {
+    val startTime = System.currentTimeMillis
     val updatesWithIds = fillUpdatesWithInternalContractIds(updates)
     val ledgerEndLongBefore = index.currentLedgerEnd().futureValue.map(_.positive).getOrElse(0L)
     withReporter(
@@ -308,6 +306,8 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
           .map(_.positive)
           .getOrElse(0L) - ledgerEndLongBefore) shouldBe updates.size,
     ).discard
+    val timeSpan = seconds(System.currentTimeMillis - startTime)
+    logger.warn(s"Ingestion cycle completed in $timeSpan seconds")
   }
 
   private def fillUpdatesWithInternalContractIds(
@@ -330,21 +330,6 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
     sb.toString
   }
 
-  private def randomTemplate = templates(random.nextInt(templates.size))
-  private def randomParty = parties(random.nextInt(parties.size))
-  private def randomHash: Hash = Hash.digest(
-    HashPurpose.PreparedSubmission,
-    ByteString.copyFromUtf8(s"${random.nextLong()}"),
-    Sha256,
-  )
-  private def randomUpdateId: UpdateId = TestUpdateId(randomHash.toHexString)
-  private def randomLength(lengthFromToInclusive: (Int, Int)) = {
-    val (from, to) = lengthFromToInclusive
-    val randomDistance = to - from + 1
-    assert(randomDistance > 1)
-    from + random.nextInt(randomDistance)
-  }
-
   private def allAssignsThenAllUnassigns(
       nextRecordTime: () => CantonTimestamp,
       assignPayloadLength: Int,
@@ -363,39 +348,6 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
     assigned ++ cidBatches.map(cids =>
       unassigns(nextRecordTime(), unassignPayloadLength)(cids) -> Vector.empty
     )
-  }
-
-  private def createsAndArchives(
-      nextRecordTime: () => CantonTimestamp,
-      txSize: Int,
-      txsCreatedThenArchived: Int,
-      txsCreatedNotArchived: Int,
-      createPayloadLength: Int,
-      archiveArgumentPayloadLengthFromTo: (Int, Int),
-      archiveResultPayloadLengthFromTo: (Int, Int),
-  ): Vector[(Update.SequencedTransactionAccepted, Vector[ContractInstance])] = {
-    val (createTxs, contracts) =
-      (1 to txsCreatedThenArchived + txsCreatedNotArchived).iterator
-        .map(_ =>
-          creates(
-            recordTime = nextRecordTime,
-            payloadLength = createPayloadLength,
-          )(txSize)
-        )
-        .toVector
-        .unzip
-    val archivingTxs = contracts.iterator
-      .take(txsCreatedThenArchived)
-      .map(_.map(_.inst.toCreateNode))
-      .map(
-        archives(
-          recordTime = nextRecordTime,
-          argumentLength = randomLength(archiveArgumentPayloadLengthFromTo),
-          resultLength = randomLength(archiveResultPayloadLengthFromTo),
-        )
-      )
-      .toVector
-    createTxs.zip(contracts) ++ archivingTxs.map(_ -> Vector.empty)
   }
 
   private def assigns(recordTime: CantonTimestamp, payloadLength: Int)(
@@ -439,109 +391,6 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
       )
     })
 
-  private def creates(recordTime: () => CantonTimestamp, payloadLength: Int)(
-      size: Int
-  ): (Update.SequencedTransactionAccepted, Vector[ContractInstance]) = {
-    val txBuilder = TxBuilder()
-    val contracts = (1 to size)
-      .map(_ =>
-        genContract(
-          argumentPayload = randomString(payloadLength),
-          template = randomTemplate,
-          signatories = Set(
-            dsoParty,
-            randomParty,
-            randomParty,
-            randomParty,
-          ),
-        )
-      )
-      .toVector
-    contracts.map(_.inst.toCreateNode).foreach(txBuilder.add)
-    val tx = txBuilder.buildCommitted()
-    val contractAuthenticationData = contracts
-      .map(
-        _.contractId -> Bytes.fromByteString(ByteString.copyFromUtf8(randomString(42)))
-      )
-      .toMap
-    transaction(
-      synchronizerId = synchronizer1,
-      recordTime = recordTime(),
-    )(tx, contractAuthenticationData) -> contracts
-  }
-
-  private def archives(
-      recordTime: () => CantonTimestamp,
-      argumentLength: Int,
-      resultLength: Int,
-  )(
-      creates: Seq[Node.Create]
-  ): Update.SequencedTransactionAccepted = {
-    val txBuilder = TxBuilder()
-    val archives = creates.iterator
-      .map(create =>
-        archive(
-          create = create,
-          actingParties = Set(
-            randomParty,
-            randomParty,
-            randomParty,
-          ),
-          argumentPayload = randomString(argumentLength),
-          resultPayload = randomString(resultLength),
-        )
-      )
-      .toVector
-    archives.foreach(txBuilder.add)
-    val tx = txBuilder.buildCommitted()
-    transaction(
-      synchronizerId = synchronizer1,
-      recordTime = recordTime(),
-    )(tx)
-  }
-
-  private def genContract(
-      argumentPayload: String,
-      template: Ref.Identifier,
-      signatories: Set[Party],
-  ): ContractInstance =
-    ExampleContractFactory
-      .build(
-        templateId = template,
-        argument = Value.ValueRecord(
-          tycon = None,
-          fields = ImmArray(None -> Value.ValueText(argumentPayload)),
-        ),
-        signatories = signatories,
-        stakeholders = signatories,
-        packageName = packageName,
-      )
-
-  private def archive(
-      create: Node.Create,
-      actingParties: Set[Ref.Party],
-      argumentPayload: String,
-      resultPayload: String,
-  ): platform.Exercise =
-    builder.exercise(
-      contract = create,
-      choice = Ref.Name.assertFromString("archivingarchivingarchivingarchivingarchivingarchiving"),
-      consuming = true,
-      actingParties = actingParties,
-      argument = Value.ValueRecord(
-        tycon = None,
-        fields = ImmArray(None -> Value.ValueText(argumentPayload)),
-      ),
-      byKey = false,
-      interfaceId = None,
-      result = Some(
-        Value.ValueRecord(
-          tycon = None,
-          fields = ImmArray(None -> Value.ValueText(resultPayload)),
-        )
-      ),
-    )
-
   private def assign(
       nodeId: Int,
       ledgerEffectiveTime: Time.Timestamp,
@@ -558,6 +407,7 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
       contractAuthenticationData = Bytes.Empty,
       reassignmentCounter = 10L,
       nodeId = nodeId,
+      internalContractId = -1, // will be filled later
     ) -> contract
   }
 
@@ -597,35 +447,5 @@ class IndexComponentLoadTest extends AnyFlatSpec with IndexComponentTest {
       recordTime = recordTime,
       synchronizerId = synchronizerId,
       acsChangeFactory = testAcsChangeFactory,
-      internalContractIds = Map.empty,
-    )
-
-  private def transaction(
-      synchronizerId: SynchronizerId,
-      recordTime: CantonTimestamp,
-  )(
-      transaction: CommittedTransaction,
-      contractAuthenticationData: Map[ContractId, Bytes] = Map.empty,
-  ): Update.SequencedTransactionAccepted =
-    Update.SequencedTransactionAccepted(
-      completionInfoO = None,
-      transactionMeta = TransactionMeta(
-        ledgerEffectiveTime = recordTime.underlying,
-        workflowId = None,
-        preparationTime = recordTime.underlying,
-        submissionSeed = someLFHash,
-        timeBoundaries = LedgerTimeBoundaries.unconstrained,
-        optUsedPackages = None,
-        optNodeSeeds = None,
-        optByKeyNodes = None,
-      ),
-      transaction = transaction,
-      updateId = randomUpdateId,
-      contractAuthenticationData = contractAuthenticationData,
-      synchronizerId = synchronizerId,
-      recordTime = recordTime,
-      acsChangeFactory = testAcsChangeFactory,
-      externalTransactionHash = None,
-      internalContractIds = Map.empty,
     )
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util.retry
@@ -216,6 +216,9 @@ abstract class RetryWithDelay(
               val errorKind = retryable.logAndDetermineErrorKind(outcome, logger, lastErrorKind)
               val retriesOfErrorKind =
                 if (lastErrorKind.contains(errorKind)) retriesOfLastErrorKind else 0
+              logger.trace(
+                s"Determined kind $errorKind with $retriesOfErrorKind retries (max ${errorKind.maxRetries}) for outcome $outcome of '$operationName'; "
+              )
               if (
                 errorKind.maxRetries == Int.MaxValue || retriesOfErrorKind < errorKind.maxRetries
               ) {

@@ -1,11 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
+import better.files.File
 import better.files.File.*
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.console.CommandFailure
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.{
+  directoryForDump,
+  migrationDumpPathForSv,
+}
+import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.migrationTestDumpDir
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -33,10 +38,7 @@ class SvMigrationApiIntegrationTest extends SvIntegrationTestBase {
       )
     }
     val dumpTimestamp = Instant.now().minus(1, ChronoUnit.MINUTES)
-    val expectedDirectory = migrationDumpPathForSv(
-      sv1Backend.name
-    ).parent / s"export_at_${dumpTimestamp.toEpochMilli}"
-
+    val expectedDirectory = directoryForDump(sv1Backend.name, dumpTimestamp)
     clue(s"export is written at ${expectedDirectory.toString()}") {
       sv1Backend.triggerDecentralizedSynchronizerMigrationDump(
         0,
@@ -49,8 +51,18 @@ class SvMigrationApiIntegrationTest extends SvIntegrationTestBase {
     }
   }
 
-  private def migrationDumpPathForSv(name: String) = {
-    migrationDumpDir(name) / "domain_migration_dump.json"
+}
+
+object SvMigrationApiIntegrationTest {
+
+  def directoryForDump(name: String, timestamp: Instant): File = {
+    migrationDumpPathForSv(
+      name
+    ).parent / s"export_at_${timestamp.toEpochMilli}"
+  }
+
+  def migrationDumpPathForSv(name: String): File = {
+    migrationTestDumpDir(name) / "domain_migration_dump.json"
   }
 
 }

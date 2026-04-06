@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release
@@ -12,39 +12,8 @@ import scala.sys.process.Process
 /** Test _some_ exemples from the release artifact. In particular the ones requiring external
   * scripts to be run on the participant.
   */
-abstract class ReleaseExamplesIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
+class ReleaseExamplesIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
   "The release examples" should {
-
-    "successfully run the debug encryption script" in { processLogger =>
-      val debugExampleDir = File(s"$cantonDir/examples/99-debug-encryption")
-      val cantonBinRel = debugExampleDir.relativize(File(cantonBin))
-      Process(
-        s"$cantonBinRel run -v --config simple-topology.conf bootstrap.sc",
-        cwd = debugExampleDir.toJava,
-      ).!(processLogger) shouldBe 0
-      checkOutput(
-        processLogger,
-        shouldContain = Seq(
-          "Encryption test completed"
-        ),
-      )
-    }
-
-    "successfully initialize participant with offline root namespace key" in { processLogger =>
-      val offlineExampleDir = File(s"$cantonDir/examples/10-offline-root-namespace-init")
-      val cantonBinRel = offlineExampleDir.relativize(File(cantonBin))
-      Process(
-        s"$cantonBinRel run --config manual-init-example.conf bootstrap.canton",
-        cwd = offlineExampleDir.toJava,
-      ).!(processLogger) shouldBe 0
-      checkOutput(
-        processLogger,
-        shouldContain = Seq(
-          "participant initialization completed successfully"
-        ),
-      )
-    }
-
     "successfully run the interactive topology example" in { processLogger =>
       val interactiveTopologyDir = File(s"$cantonDir/examples/08-interactive-submission")
       val cantonBinRel = interactiveTopologyDir.relativize(File(cantonBin))
@@ -72,7 +41,3 @@ abstract class ReleaseExamplesIntegrationTest extends ReleaseArtifactIntegration
     }
   }
 }
-
-class CommunityReleaseExamplesIntegrationTest
-    extends ReleaseExamplesIntegrationTest
-    with CommunityReleaseTest

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests
@@ -13,11 +13,8 @@ import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedIncompleteUnassigned
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{
-  DbConfig,
-  NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
-}
 import com.digitalasset.canton.console.{
   CommandFailure,
   LocalParticipantReference,
@@ -28,9 +25,9 @@ import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
+  UseBftSequencer,
   UsePostgres,
   UseProgrammableSequencer,
-  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.util.TestUtils.hasPersistence
 import com.digitalasset.canton.integration.util.{AcsInspection, EntitySyntax, PartiesAllocator}
@@ -51,7 +48,6 @@ import monocle.macros.syntax.lens.*
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Tag}
 
-import java.time.Duration as JDuration
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -584,8 +580,6 @@ abstract class SynchronizerChangeSimClockIntegrationTest
           val participants = Seq(P4, P5)
 
           val clock = env.environment.simClock.value
-          clock.advance(NonNegativeFiniteDuration.tryOfSeconds(1).unwrap)
-          participants.foreach(_.testing.fetch_synchronizer_times())
 
           val paintOfferId = createPaintOffer(alice, bank, painter, P5, participants)
 
@@ -614,11 +608,10 @@ abstract class SynchronizerChangeSimClockIntegrationTest
           // paintOffer is assigned to IouSynchronizer (assignment has completed)
           assertInAcsSync(Seq(P4, P5), iouSynchronizerAlias, paintOfferId)
 
-          // Trigger the automatic assignment after a assignment has already been completed
+          // Trigger the automatic assignment after an assignment has already been completed
           val automaticAssignmentTime = exclusivityTimeout.unwrap
           val baseTime = clock.now
           clock.advance(automaticAssignmentTime)
-          participants.foreach(_.testing.fetch_synchronizer_times())
 
           // paintOffer is still in the IouSynchronizer
           assertInAcsSync(Seq(P4, P5), iouSynchronizerAlias, paintOfferId)
@@ -630,8 +623,8 @@ abstract class SynchronizerChangeSimClockIntegrationTest
             5.seconds,
           )
 
-          // TODO(i9502): Work out why this workaround is required, and remove it if possible
-          clock.advance(JDuration.ofSeconds(1))
+          // Fetch synchronizer times for all participants, because reassignments do not work, if
+          // the target topology is outdated.
           participants.foreach(_.testing.fetch_synchronizer_times())
 
           // Check that reassignments can still be completed
@@ -656,7 +649,7 @@ class SynchronizerChangeSimClockIntegrationTestPostgres
     extends SynchronizerChangeSimClockIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(
@@ -678,7 +671,7 @@ trait SynchronizerChangeRealClockIntegrationTest
           val iou = createIou(alice, bank, painter)
           val iouId = iou.id.toLf
 
-          // paintOfferId <- submit alice do
+          // paintOfferId <- submit alice dos
           //   create $ OfferToPaintHouseByOwner with painter = painter; houseOwner = alice; bank = bank; iouId = iouId
           val cmd = createPaintOfferCmd(alice, bank, painter, iouId)
           clue("creating paint offer") {
@@ -982,8 +975,9 @@ trait SynchronizerChangeRealClockIntegrationTest
 }
 
 //class SynchronizerChangeRealClockIntegrationTestDefault extends SynchronizerChangeRealClockIntegrationTest {
+// 	registerPlugin(new UseH2(loggerFactory))
 //  registerPlugin(
-//    new UseReferenceBlockSequencer[DbConfig.H2](
+//    new UseBftSequencer(
 //      loggerFactory,
 //      sequencerGroups = MultiSynchronizer(
 //        Seq(
@@ -1000,7 +994,7 @@ class SynchronizerChangeRealClockIntegrationTestPostgres
     extends SynchronizerChangeRealClockIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseReferenceBlockSequencer[DbConfig.Postgres](
+    new UseBftSequencer(
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(

@@ -1,19 +1,17 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
+import cats.Eval
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.mediator.v30.MediatorStatusServiceGrpc.MediatorStatusService
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
-import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{
@@ -65,17 +63,17 @@ import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
 import com.digitalasset.canton.synchronizer.service.GrpcSequencerConnectionService
 import com.digitalasset.canton.time.{Clock, HasUptime, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
+import com.digitalasset.canton.topology.admin.grpc.PsidLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{
   InitialTopologySnapshotValidator,
   TopologyTransactionProcessor,
 }
+import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{MonadUtil, SingleUseCell}
+import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.{
   ProtocolVersion,
   ProtocolVersionCompatibility,
@@ -107,13 +105,6 @@ final case class MediatorNodeParameterConfig(
     override val watchdog: Option[WatchdogConfig] = None,
 ) extends ProtocolConfig
     with LocalNodeParametersConfig
-    with UniformCantonConfigValidation
-
-object MediatorNodeParameterConfig {
-  implicit val mediatorNodeParameterConfigCantonConfigValidator
-      : CantonConfigValidator[MediatorNodeParameterConfig] =
-    CantonConfigValidatorDerivation[MediatorNodeParameterConfig]
-}
 
 final case class MediatorNodeParameters(
     general: CantonNodeParameters.General,
@@ -125,14 +116,8 @@ final case class MediatorNodeParameters(
 final case class RemoteMediatorConfig(
     adminApi: FullClientConfig,
     token: Option[String] = None,
-) extends NodeConfig
-    with UniformCantonConfigValidation {
+) extends NodeConfig {
   override def clientAdminApi: ClientConfig = adminApi
-}
-object RemoteMediatorConfig {
-  implicit val remoteMediatorConfigCantonConfigValidator
-      : CantonConfigValidator[RemoteMediatorConfig] =
-    CantonConfigValidatorDerivation[RemoteMediatorConfig]
 }
 
 /** Mediator Node configuration that defaults to auto-init
@@ -151,8 +136,7 @@ final case class MediatorNodeConfig(
     override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig(),
     override val topology: TopologyConfig = TopologyConfig(),
 ) extends LocalNodeConfig
-    with ConfigDefaults[Option[DefaultPorts], MediatorNodeConfig]
-    with UniformCantonConfigValidation {
+    with ConfigDefaults[Option[DefaultPorts], MediatorNodeConfig] {
 
   override def nodeTypeName: String = "mediator"
 
@@ -163,20 +147,16 @@ final case class MediatorNodeConfig(
   def replicationEnabled: Boolean = replication.exists(_.isEnabled)
 
   override def withDefaults(
-      ports: Option[DefaultPorts],
-      edition: CantonEdition,
-  ): MediatorNodeConfig = ports.fold(this)(ports =>
-    this
-      .focus(_.adminApi.internalPort)
-      .modify(ports.mediatorAdminApiPort.setDefaultPort)
+      ports: Option[DefaultPorts]
+  ): MediatorNodeConfig =
+    ports
+      .fold(this)(ports =>
+        this
+          .focus(_.adminApi.internalPort)
+          .modify(ports.mediatorAdminApiPort.setDefaultPort)
+      )
       .focus(_.replication)
-      .modify(ReplicationConfig.withDefaultO(storage, _, edition))
-  )
-}
-
-object MediatorNodeConfig {
-  implicit val mediatorNodeConfigCantonConfigValidator: CantonConfigValidator[MediatorNodeConfig] =
-    CantonConfigValidatorDerivation[MediatorNodeConfig]
+      .modify(ReplicationConfig.withDefaultO(storage, _))
 }
 
 class MediatorNodeBootstrap(
@@ -203,33 +183,39 @@ class MediatorNodeBootstrap(
 
   override protected def adminTokenConfig: AdminTokenConfig = config.adminApi.adminTokenConfig
 
-  private val synchronizerTopologyManager = new SingleUseCell[SynchronizerTopologyManager]()
+  private def synchronizerTopologyManager: Option[SynchronizerTopologyManager] =
+    getNode.flatMap(_.replicaManager.mediatorRuntime).map(_.mediator.topologyManager)
 
   override protected def sequencedTopologyStores: Seq[TopologyStore[SynchronizerStore]] =
-    synchronizerTopologyManager.get.map(_.store).toList
+    synchronizerTopologyManager.map(_.store).toList
 
   override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] =
-    synchronizerTopologyManager.get.toList
+    synchronizerTopologyManager.toList
 
   override protected def lookupTopologyClient(
-      storeId: TopologyStoreId
+      psid: PhysicalSynchronizerId
   ): Option[SynchronizerTopologyClient] =
-    storeId match {
-      case SynchronizerStore(synchronizerId) =>
-        replicaManager.mediatorRuntime
-          .map(_.mediator.topologyClient)
-          .filter(_.psid == synchronizerId)
-      case _ => None
-    }
+    replicaManager.mediatorRuntime
+      .map(_.mediator.topologyClient)
+      .filter(_.psid == psid)
 
-  override protected lazy val lookupActivePSId: PSIdLookup =
+  override protected def lookupSynchronizerTimeTracker(
+      psid: PhysicalSynchronizerId
+  ): Option[SynchronizerTimeTracker] =
+    replicaManager.mediatorRuntime
+      .flatMap(rt => Option.when(rt.mediator.topologyClient.psid == psid)(rt.mediator.timeTracker))
+
+  override protected lazy val lookupActivePsid: PsidLookup =
     synchronizerId =>
-      synchronizerTopologyManager.get
+      synchronizerTopologyManager
         .map(_.psid)
         .filter(_.logical == synchronizerId)
 
   private lazy val deferredSequencerClientHealth =
     MutableHealthComponent(loggerFactory, SequencerClient.healthName, timeouts)
+
+  private val deferredSequencerConnectionPoolHealthRef =
+    new AtomicReference[() => Seq[HealthQuasiComponent]](() => Seq.empty)
 
   override protected def mkNodeHealthService(
       storage: Storage
@@ -239,8 +225,11 @@ class MediatorNodeBootstrap(
         "mediator",
         logger,
         timeouts,
-        Seq(storage),
-        softDependencies = Seq(deferredSequencerClientHealth),
+        criticalDependencies = Seq(storage),
+        softDependencies = Eval.always(
+          deferredSequencerClientHealth +:
+            deferredSequencerConnectionPoolHealthRef.get.apply()
+        ),
       )
 
     val liveness = LivenessHealthService(
@@ -277,6 +266,22 @@ class MediatorNodeBootstrap(
         false, // this stage does not have auto-init
       )
       with GrpcMediatorInitializationService.Callback {
+
+    private val connectionPoolFactory = new GrpcSequencerConnectionXPoolFactory(
+      clientProtocolVersions = ProtocolVersionCompatibility.supportedProtocols(parameters),
+      minimumProtocolVersion = Some(ProtocolVersion.minimum),
+      authConfig = parameters.sequencerClient.authToken,
+      keepAliveClientConfigO = parameters.sequencerClient.keepAliveClient,
+      member = mediatorId,
+      clock = clock,
+      crypto = crypto,
+      seedForRandomnessO = arguments.testingConfig.sequencerTransportSeed,
+      metrics = arguments.metrics.sequencerClient.connectionPool,
+      metricsContext = MetricsContext.Empty,
+      futureSupervisor = futureSupervisor,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory,
+    )
 
     override def getAdminToken: Option[String] = Some(adminTokenDispenser.getCurrentToken.secret)
 
@@ -372,34 +377,40 @@ class MediatorNodeBootstrap(
         )
         EitherT.pure(InitializeMediatorResponse())
       } else {
-        val synchronizerAlias = SynchronizerAlias.tryCreate("synchronizer")
-        val sequencerInfoLoader = createSequencerInfoLoader()
         completeWithExternalUS {
           logger.info(
             s"Assigning mediator to ${request.synchronizerId} via sequencers ${request.sequencerConnections}"
           )
           for {
-            sequencerAggregatedInfo <- sequencerInfoLoader
-              .loadAndAggregateSequencerEndpoints(
-                synchronizerAlias,
-                Some(request.synchronizerId),
-                request.sequencerConnections,
-                request.sequencerConnectionValidation,
+            connectionPool <- EitherT.fromEither[FutureUnlessShutdown](
+              connectionPoolFactory
+                .createFromOldConfig(
+                  request.sequencerConnections,
+                  expectedPsidO = None,
+                  tracingConfig = parameters.tracing,
+                  name = "temp",
+                )
+                .leftMap(_.toString)
+            )
+            _ <- connectionPool.start().leftMap(_.toString)
+            staticParameters = connectionPool.staticSynchronizerParametersO.getOrElse(
+              ErrorUtil.invalidState(
+                "a successfully started connection pool must have the static parameters defined"
               )
-              .leftMap(error => s"Error loading sequencer endpoint information: $error")
-
+            )
+            _ = connectionPool.close()
             _ <- CryptoHandshakeValidator
-              .validate(sequencerAggregatedInfo.staticSynchronizerParameters, cryptoConfig)
+              .validate(staticParameters, cryptoConfig)
               .toEitherT[FutureUnlessShutdown]
 
             configToStore = MediatorSynchronizerConfiguration(
               request.synchronizerId,
-              sequencerAggregatedInfo.staticSynchronizerParameters,
+              staticParameters,
               request.sequencerConnections,
             )
             _ <- EitherT.right(synchronizerConfigurationStore.saveConfiguration(configToStore))
           } yield (
-            sequencerAggregatedInfo.staticSynchronizerParameters,
+            staticParameters,
             request.synchronizerId,
           )
         }.map(_ => InitializeMediatorResponse())
@@ -430,57 +441,22 @@ class MediatorNodeBootstrap(
 
     override protected def attempt()(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, String, Option[RunningNode[MediatorNode]]] = {
-
-      def createSynchronizerOutboxFactory(
-          synchronizerTopologyManager: SynchronizerTopologyManager
-      ) =
-        new SynchronizerOutboxFactory(
-          memberId = mediatorId,
-          authorizedTopologyManager = authorizedTopologyManager,
-          synchronizerTopologyManager = synchronizerTopologyManager,
-          crypto = crypto,
-          topologyConfig = config.topology,
-          timeouts = timeouts,
-          loggerFactory = synchronizerLoggerFactory,
-          futureSupervisor = arguments.futureSupervisor,
-        )
-
-      def createSynchronizerTopologyManager(): Either[String, SynchronizerTopologyManager] = {
-        val outboxQueue = new SynchronizerOutboxQueue(loggerFactory)
-
-        val topologyManager = new SynchronizerTopologyManager(
-          nodeId = mediatorId.uid,
-          clock = clock,
-          crypto = crypto,
-          staticSynchronizerParameters = staticSynchronizerParameters,
-          store = synchronizerTopologyStore,
-          outboxQueue = outboxQueue,
-          disableOptionalTopologyChecks = config.topology.disableOptionalTopologyChecks,
-          dispatchQueueBackpressureLimit = parameters.general.dispatchQueueBackpressureLimit,
-          exitOnFatalFailures = parameters.exitOnFatalFailures,
-          timeouts = timeouts,
-          futureSupervisor = futureSupervisor,
-          loggerFactory = loggerFactory,
-        )
-
-        if (synchronizerTopologyManager.putIfAbsent(topologyManager).nonEmpty)
-          Left("synchronizerTopologyManager shouldn't have been set before")
-        else
-          topologyManager.asRight
-
-      }
-
+    ): EitherT[FutureUnlessShutdown, String, Option[RunningNode[MediatorNode]]] =
       synchronizeWithClosing("starting up mediator node") {
         for {
           // safety check. normally we shouldn't even be able to get to this point without a configuration,
           // because the previous bootstrap stage only completes if it finds a configuration.
           _ <- fetchSynchronizerConfigOrFail(synchronizerConfigurationStore)
 
-          synchronizerTopologyManager <- EitherT.fromEither[FutureUnlessShutdown](
-            createSynchronizerTopologyManager()
+          synchronizerOutboxFactory = new SynchronizerOutboxFactory(
+            memberId = mediatorId,
+            authorizedTopologyManager = authorizedTopologyManager,
+            crypto = crypto,
+            topologyConfig = config.topology,
+            timeouts = timeouts,
+            loggerFactory = synchronizerLoggerFactory,
+            futureSupervisor = arguments.futureSupervisor,
           )
-          synchronizerOutboxFactory = createSynchronizerOutboxFactory(synchronizerTopologyManager)
 
           _ <- EitherT.right[String](
             replicaManager.setup(
@@ -496,8 +472,7 @@ class MediatorNodeBootstrap(
                   adminServerRegistry,
                   staticSynchronizerParameters,
                   synchronizerTopologyStore,
-                  topologyManagerStatus = TopologyManagerStatus
-                    .combined(authorizedTopologyManager, synchronizerTopologyManager),
+                  authorizedTopologyManagerStatus = authorizedTopologyManager,
                   config.topology,
                   synchronizerOutboxFactory,
                 ),
@@ -520,20 +495,7 @@ class MediatorNodeBootstrap(
           Some(new RunningNode(bootstrapStageCallback, node))
         }
       }
-    }
   }
-
-  private def createSequencerInfoLoader() =
-    new SequencerInfoLoader(
-      timeouts = timeouts,
-      traceContextPropagation = parameters.tracing.propagation,
-      clientProtocolVersions =
-        if (parameters.alphaVersionSupport) ProtocolVersion.supported
-        else ProtocolVersion.stable,
-      minimumProtocolVersion = Some(ProtocolVersion.minimum),
-      dontWarnOnDeprecatedPV = parameters.dontWarnOnDeprecatedPV,
-      loggerFactory = loggerFactory,
-    )
 
   private def fetchSynchronizerConfigOrFail(
       configStore: MediatorSynchronizerConfigurationStore
@@ -554,13 +516,11 @@ class MediatorNodeBootstrap(
       adminServerRegistry: CantonMutableHandlerRegistry,
       staticSynchronizerParameters: StaticSynchronizerParameters,
       synchronizerTopologyStore: TopologyStore[SynchronizerStore],
-      topologyManagerStatus: TopologyManagerStatus,
+      authorizedTopologyManagerStatus: TopologyManagerStatus,
       topologyConfig: TopologyConfig,
       synchronizerOutboxFactory: SynchronizerOutboxFactory,
   ): EitherT[FutureUnlessShutdown, String, MediatorRuntime] = {
     val synchronizerLoggerFactory = loggerFactory.append("psid", psid.toString)
-    val synchronizerAlias = SynchronizerAlias(psid.uid.toLengthLimitedString)
-    val sequencerInfoLoader = createSequencerInfoLoader()
     def getSequencerConnectionFromStore: FutureUnlessShutdown[Option[SequencerConnections]] =
       synchronizerConfigurationStore.fetchConfiguration().map(_.map(_.sequencerConnections))
 
@@ -568,6 +528,7 @@ class MediatorNodeBootstrap(
       clientProtocolVersions = ProtocolVersionCompatibility.supportedProtocols(parameters),
       minimumProtocolVersion = Some(ProtocolVersion.minimum),
       authConfig = parameters.sequencerClient.authToken,
+      keepAliveClientConfigO = parameters.sequencerClient.keepAliveClient,
       member = mediatorId,
       clock = clock,
       crypto = crypto.crypto,
@@ -578,8 +539,6 @@ class MediatorNodeBootstrap(
       timeouts = timeouts,
       loggerFactory = synchronizerLoggerFactory,
     )
-
-    val useNewConnectionPool = parameters.sequencerClient.useNewConnectionPool
 
     val connectionPoolRef = new AtomicReference[Option[SequencerConnectionXPool]](None)
 
@@ -603,17 +562,19 @@ class MediatorNodeBootstrap(
       topologyProcessorAndClient <-
         EitherT
           .right(
-            TopologyTransactionProcessor.createProcessorAndClientForSynchronizer(
-              synchronizerTopologyStore,
-              synchronizerPredecessor = None,
-              crypto.pureCrypto,
-              arguments.parameterConfig,
-              arguments.config.topology,
-              arguments.clock,
-              staticSynchronizerParameters,
-              arguments.futureSupervisor,
-              synchronizerLoggerFactory,
-            )()
+            TopologyTransactionProcessor
+              .createProcessorAndClientForSynchronizer(
+                synchronizerTopologyStore,
+                upgradeTimeFromPredecessor = None,
+                crypto.pureCrypto,
+                arguments.parameterConfig,
+                arguments.config.topology,
+                arguments.clock,
+                staticSynchronizerParameters,
+                arguments.metrics.topologyCache,
+                arguments.futureSupervisor,
+                synchronizerLoggerFactory,
+              )()
           )
       (topologyProcessor, topologyClient) = topologyProcessorAndClient
       _ = ips.add(topologyClient)
@@ -635,9 +596,7 @@ class MediatorNodeBootstrap(
       sequencerClientFactory = SequencerClientFactory(
         psid,
         syncCryptoWithOptionalSessionKeys,
-        crypto,
         parameters.sequencerClient,
-        parameters.tracing.propagation,
         arguments.testingConfig,
         staticSynchronizerParameters,
         timeouts,
@@ -658,38 +617,18 @@ class MediatorNodeBootstrap(
         parameters.loggingConfig,
         parameters.exitOnFatalFailures,
         synchronizerLoggerFactory,
-        ProtocolVersionCompatibility.supportedProtocols(parameters),
       )
 
       // we wait here until the sequencer becomes active. this allows to reconfigure the
       // sequencer client address
-      connectionPoolAndInfo <-
-        if (useNewConnectionPool)
-          GrpcSequencerConnectionService.waitUntilSequencerConnectionIsValidWithPool(
-            connectionPoolFactory = connectionPoolFactory,
-            tracingConfig = parameters.tracing,
-            flagCloseable = this,
-            loadConfig = getSequencerConnectionFromStore,
-          )
-        else
-          for {
-            info <- GrpcSequencerConnectionService.waitUntilSequencerConnectionIsValid(
-              sequencerInfoLoader,
-              this,
-              getSequencerConnectionFromStore,
-            )
-            dummyPool <- EitherT.fromEither[FutureUnlessShutdown](
-              connectionPoolFactory
-                .createFromOldConfig(
-                  sequencerConnections = info.sequencerConnections,
-                  expectedPSIdO = None,
-                  tracingConfig = parameters.tracing,
-                  name = "dummy",
-                )
-                .leftMap(error => error.toString)
-            )
-          } yield (dummyPool, info)
-      (connectionPool, info) = connectionPoolAndInfo
+      connectionPoolAndSequencerConnections <-
+        GrpcSequencerConnectionService.waitUntilSequencerConnectionIsValidWithPool(
+          connectionPoolFactory = connectionPoolFactory,
+          tracingConfig = parameters.tracing,
+          flagCloseable = this,
+          loadConfig = getSequencerConnectionFromStore,
+        )
+      (connectionPool, sequencerConnections) = connectionPoolAndSequencerConnections
       _ = connectionPoolRef.set(Some(connectionPool))
 
       sequencerClient <- sequencerClientFactory
@@ -699,34 +638,24 @@ class MediatorNodeBootstrap(
           sendTrackerStore,
           RequestSigner(
             syncCryptoWithOptionalSessionKeys,
-            staticSynchronizerParameters.protocolVersion,
             loggerFactory,
           ),
-          info.sequencerConnections,
+          sequencerConnections,
           synchronizerPredecessor = None,
-          info.expectedSequencersO,
           connectionPool,
         )
+        .leftMap(error => s"Failed to create sequencer client: $error")
 
       sequencerClientRef =
         GrpcSequencerConnectionService
-          .setup[MediatorSynchronizerConfiguration](mediatorId, useNewConnectionPool)(
+          .setup[MediatorSynchronizerConfiguration](
             adminServerRegistry,
             () => synchronizerConfigurationStore.fetchConfiguration(),
             config => synchronizerConfigurationStore.saveConfiguration(config),
             Lens[MediatorSynchronizerConfiguration, SequencerConnections](_.sequencerConnections)(
               connection => conf => conf.copy(sequencerConnections = connection)
             ),
-            RequestSigner(
-              syncCryptoWithOptionalSessionKeys,
-              staticSynchronizerParameters.protocolVersion,
-              loggerFactory,
-            ),
-            sequencerClientFactory,
-            sequencerInfoLoader,
             connectionPoolFactory,
-            synchronizerAlias,
-            psid,
             sequencerClient,
             parameters.tracing,
             loggerFactory,
@@ -734,6 +663,9 @@ class MediatorNodeBootstrap(
 
       _ = sequencerClientRef.set(sequencerClient)
       _ = deferredSequencerClientHealth.set(sequencerClient.healthComponent)
+      _ = deferredSequencerConnectionPoolHealthRef.set(() =>
+        sequencerClient.getConnectionPoolHealthStatus
+      )
 
       timeTracker = SynchronizerTimeTracker(
         config.timeTracker,
@@ -744,24 +676,45 @@ class MediatorNodeBootstrap(
       )
       _ = topologyClient.setSynchronizerTimeTracker(timeTracker)
 
+      outboxQueue = new SynchronizerOutboxQueue(timeouts, loggerFactory)
+
+      topologyManager = new SynchronizerTopologyManager(
+        nodeId = mediatorId.uid,
+        clock = clock,
+        crypto = crypto,
+        staticSynchronizerParameters = staticSynchronizerParameters,
+        topologyCacheAggregatorConfig = parameters.batchingConfig.topologyCacheAggregator,
+        topologyConfig = config.topology,
+        store = synchronizerTopologyStore,
+        outboxQueue = outboxQueue,
+        disableOptionalTopologyChecks = config.topology.disableOptionalTopologyChecks,
+        dispatchQueueBackpressureLimit = parameters.general.dispatchQueueBackpressureLimit,
+        exitOnFatalFailures = parameters.exitOnFatalFailures,
+        timeouts = timeouts,
+        futureSupervisor = futureSupervisor,
+        loggerFactory = loggerFactory,
+      )
+
       // TODO(i12076): Request topology information from all sequencers and reconcile
       _ <- MonadUtil.unlessM(
         EitherT.right[String](synchronizerConfigurationStore.isTopologyInitialized())
       )(
-        new StoreBasedSynchronizerTopologyInitializationCallback(
-          mediatorId
-        ).callback(
-          new InitialTopologySnapshotValidator(
-            new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
-            synchronizerTopologyStore,
-            Some(staticSynchronizerParameters),
-            validateInitialSnapshot = topologyConfig.validateInitialTopologySnapshot,
-            synchronizerLoggerFactory,
-          ),
-          topologyClient,
-          sequencerClient,
-          staticSynchronizerParameters.protocolVersion,
-        ).semiflatMap(_ => synchronizerConfigurationStore.setTopologyInitialized())
+        (new StoreBasedSynchronizerTopologyInitializationCallback)
+          .callback(
+            new InitialTopologySnapshotValidator(
+              new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
+              synchronizerTopologyStore,
+              parameters.batchingConfig.topologyCacheAggregator,
+              topologyConfig,
+              Some(staticSynchronizerParameters),
+              timeouts,
+              synchronizerLoggerFactory,
+            ),
+            topologyClient,
+            sequencerClient,
+            staticSynchronizerParameters.protocolVersion,
+          )
+          .semiflatMap(_ => synchronizerConfigurationStore.setTopologyInitialized())
       )
 
       mediatorRuntime <- MediatorRuntimeFactory.create(
@@ -773,7 +726,8 @@ class MediatorNodeBootstrap(
         syncCryptoWithOptionalSessionKeys,
         topologyClient,
         topologyProcessor,
-        topologyManagerStatus,
+        topologyManager,
+        TopologyManagerStatus.combined(authorizedTopologyManagerStatus, topologyManager),
         synchronizerOutboxFactory,
         timeTracker,
         parameters,
@@ -826,8 +780,8 @@ object MediatorNodeBootstrap {
     * all sends requested and events received to the directory specified by the recording config. A
     * new recording starts whenever the synchronizer is restarted.
     */
-  @VisibleForTesting
-  val recordSequencerInteractions: AtomicReference[PartialFunction[Member, RecordingConfig]] =
+  private[canton] val recordSequencerInteractions
+      : AtomicReference[PartialFunction[Member, RecordingConfig]] =
     new AtomicReference(PartialFunction.empty)
 
   /** If the function maps `member` to `path`, the sequencer client for `member` will replay events
@@ -872,9 +826,5 @@ class MediatorNode(
     )
   }
 
-  override def close(): Unit =
-    LifeCycle.close(
-      replicaManager,
-      storage,
-    )(logger)
+  override def close(): Unit = LifeCycle.close(replicaManager, storage)(logger)
 }
